@@ -3,6 +3,9 @@ MultipleReplicaScanSeqs
 * Modified check for DESeq error message when dispersion fit fails.  New DESeq is using a different error message!  
 FilterPointData
 * Added another check to limit filtering for regions that go beyond the end of a chromosome
+All apps
+* Reorganized the USeq code base and MakeUSeq app to support an Eclipse centric SNV.
+* Wrote up instructions on how build an Eclipse USeq project linked to the Sourceforge SVN and deploy modified USeq packages. See Documentation/buildingUSeqFromEclipseSVN.txt
 
 ----USeq_8.4.3----
 SamParser
