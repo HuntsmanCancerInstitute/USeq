@@ -25,5 +25,7 @@ Type 'java edu/utah/seq/misc/MakeUSeq TestRelease1.0'
 
 ## Customize the Source/edu/utah/seq/misc/MakeUSeq.java file to create soft links and an appropriate rsync call specific for your configuration.
 
+## Are you seeing a big list of xxx.jar files in the navigation tree?  Switch to Package Explorer, not Project Explorer: Window-> Show View-> Package Explorer
+
 ## Developers, please do not check in any xxx.class files or folders from the Classes directory to the Sourceforge SVN
 
