@@ -1,6 +1,6 @@
 # 26 Oct 2012: David.Nix@hci.utah.edu
 
-# This document describes how to create an Eclipse project synched to the USeq svn on SourceForge.  This can be done anonoumously with read only access. If you would like to be considered for write permission developer access to the USeq svn, create an account on sourceforge and send your username to david.nix@hci.utah.edu . 
+# This document describes how to create an Eclipse project synched to the USeq svn on SourceForge.  This can be done anonymously with read only access. If you would like to be considered for write permission developer access to the USeq svn, create an account on sourceforge and send your username to david.nix@hci.utah.edu . 
 
 # Install the SVN plugin Subversive from http://www.eclipse.org/subversive/downloads.php
 
@@ -15,11 +15,15 @@ Hit Finish button
 Check Out As -> Check out as a project with the name specified: -> USeq
 Hit Finish button
 
-# The project should be ready to go. Test the appropriate library references by opening the Source folder in Eclipse and naviate to a xxx.java file and type something to break the code.  It should turn red with error indicators.  If not you may need to reset the Build Path in the project Preferences.
+# The project should be ready to go but, to be sure:
 
-# Build a 'USeq_TestRelease1.0':
+## Test the appropriate library references by opening the Source folder in Eclipse and naviate to a xxx.java file and type something to break the code.  It should turn red with error indicators.  If not you may need to reset the Build Path in the project Preferences.
+
+## Build a 'USeq_TestRelease1.0':
 Open a terminal and navigate into the USeq/Classes directory
 Type 'java edu/utah/seq/misc/MakeUSeq TestRelease1.0'
 
 ## Customize the Source/edu/utah/seq/misc/MakeUSeq.java file to create soft links and an appropriate rsync call specific for your configuration.
+
+## Developers, please do not check in any xxx.class files or folders from the Classes directory to the Sourceforge SVN
 
