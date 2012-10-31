@@ -1,0 +1,1730 @@
+<html><head><title>TiMAT2 Command Line Menus</title><style type="text/css">#rt{text-align:right; color: #000000; font-weight: bold}#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633; font:arial; font-size:12;}BODY {color:black; background-color:white; font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}A:link    {text-decoration: none; color: #000000; font-weight: bold}  A:visited {text-decoration: none; color: #000000; font-weight: bold}   A:hover   {text-decoration: none; color: #FFCC66; font-weight: bold} A:active  {text-decoration: none; color: #000000; font-weight: bold}   </style></head><body><H1>Command Line Menus</H1> <p><a href="#AggregatePlotter">AggregatePlotter</a><br>
+<a href="#AnnotateRegions">AnnotateRegions</a><br>
+<a href="#Bar2Gr">Bar2Gr</a><br>
+<a href="#CelFileConverter">CelFileConverter</a><br>
+<a href="#CelFileQualityControl">CelFileQualityControl</a><br>
+<a href="#CelMasker">CelMasker</a><br>
+<a href="#CelProcessor">CelProcessor</a><br>
+<a href="#CoordinateExtractor1lq">CoordinateExtractor1lq</a><br>
+<a href="#ConvertAgilentData">ConvertAgilentData</a><br>
+<a href="#ConvertGeoData">ConvertGeoData</a><br>
+<a href="#ConvertNimblegenNDF2TPMap">ConvertNimblegenNDF2TPMap</a><br>
+<a href="#ConvertNimblegenPAIR2Cela">ConvertNimblegenPAIR2Cela</a><br>
+<a href="#CorrelationMaps">CorrelationMaps</a><br>
+<a href="#Correlate">Correlate</a><br>
+<a href="#BestWindowScoreExtractor">BestWindowScoreExtractor</a><br>
+<a href="#ExportIntergenicRegions">ExportIntergenicRegions</a><br>
+<a href="#ExportIntronicRegions">ExportIntronicRegions</a><br>
+<a href="#FDRWindowConverter">FDRWindowConverter</a><br>
+<a href="#FetchGenomicSequences">FetchGenomicSequences</a><br>
+<a href="#FindNeighboringGenes">FindNeighboringGenes</a><br>
+<a href="#FileCrossFilter">FileCrossFilter</a><br>
+<a href="#FileJoiner">FileJoiner</a><br>
+<a href="#FileSplitter">FileSplitter</a><br>
+<a href="#FilterTPMapByRegions">FilterTPMapByRegions</a><br>
+<a href="#FindSubBindingRegions">FindSubBindingRegions</a><br>
+<a href="#Gr2Bar">Gr2Bar</a><br>
+<a href="#HierarchicalClustering">HierarchicalClustering</a><br>
+<a href="#IndexFastas">IndexFastas</a><br>
+<a href="#IntensityPrinter">IntensityPrinter</a><br>
+<a href="#IntersectLists">IntersectLists</a><br>
+<a href="#IntersectRegions">IntersectRegions</a><br>
+<a href="#IntervalFilter">IntervalFilter</a><br>
+<a href="#IntervalGFFPrinter">IntervalGFFPrinter</a><br>
+<a href="#IntervalGraphPrinter">IntervalGraphPrinter</a><br>
+<a href="#IntervalMaker">IntervalMaker</a><br>
+<a href="#IntervalPlotter">IntervalPlotter</a><br>
+<a href="#IntervalReportPrinter">IntervalReportPrinter</a><br>
+<a href="#JQSub">JQSub</a><br>
+<a href="#LoadChipSetIntervalOligoInfo">LoadChipSetIntervalOligoInfo</a><br>
+<a href="#LoadIntervalOligoInfo">LoadIntervalOligoInfo</a><br>
+<a href="#MakeChromosomeSets">MakeChromosomeSets</a><br>
+<a href="#MergeWindowArrays">MergeWindowArrays</a><br>
+<a href="#MultiWindowIntervalMaker">MultiWindowIntervalMaker</a><br>
+<a href="#MummerMapper">MummerMapper</a><br>
+<a href="#OligoIntensityPrinter">OligoIntensityPrinter</a><br>
+<a href="#OligoTiler">OligoTiler</a><br>
+<a href="#OverlapCounter">OverlapCounter</a><br>
+<a href="#ScoreParsedBars">ScoreParsedBars</a><br>
+<a href="#Primer3Wrapper">Primer3Wrapper</a><br>
+<a href="#PrintSelectColumns">PrintSelectColumns</a><br>
+<a href="#RankedSetAnalysis">RankedSetAnalysis</a><br>
+<a href="#ScanChip">ScanChip</a><br>
+<a href="#ScanChromosomes">ScanChromosomes</a><br>
+<a href="#ScanGenes">ScanGenes</a><br>
+<a href="#ScatterPlot">ScatterPlot</a><br>
+<a href="#ScoreChromosomes">ScoreChromosomes</a><br>
+<a href="#ScoreIntervals">ScoreIntervals</a><br>
+<a href="#ScoreSequences">ScoreSequences</a><br>
+<a href="#SetNumberIntervalMaker">SetNumberIntervalMaker</a><br>
+<a href="#Sgr2Bar">Sgr2Bar</a><br>
+<a href="#SynonymMatching">SynonymMatching</a><br>
+<a href="#T2">T2</a><br>
+<a href="#TPMapOligoBlastFilter">TPMapOligoBlastFilter</a><br>
+<a href="#TPMapProcessor">TPMapProcessor</a><br>
+<a href="#TPMapSort">TPMapSort</a><br>
+<a href="#VirtualCel">VirtualCel</a><br>
+<a href="#Windows2HeatMapSgr">Windows2HeatMapSgr</a><br>
+<p><a name="AggregatePlotter"><pre>
+
+**************************************************************************************
+**                            Aggregate Plotter:  Feb 2009                          **
+**************************************************************************************
+Fetches point data contained within each region, inverts - stranded annotation, zeros
+the coordinates, scales, sums, and window averages the values.  Usefull for generating
+class averages from a list of annotated regions. Use a spreadsheet app to graph the
+results.
+
+Options:
+-t PointData directories, full path, comma delimited. These should contain chromosome
+       specific xxx.bar.zip files.
+-b Bed file (chr, start, stop, name, score, strand(+/-/.), full path, containing
+       regions to stack.
+-p Peak shift, average distance between + and - strand peaks. Will be used to shift
+       the PointData by 1/2 the peak shift, defaults to 0. 
+-u Strand usage, defaults to 0 (combine), 1 (use only same strand), 2 (opposite
+       strand), or 3 (ignore).
+       this option to select particular stranded data to aggregate.
+-r Replace scores with 1. Useful for raw PointData bar files.
+-d Delog2 scores. Do it if your data is in log2 space.
+-v Convert each region scores to % of region total.
+-s Scale all regions to a particular size. Defaults to max region size.
+
+Example: java -Xmx1500M -jar pathTo/USeq/Apps/AgregatePlotter -t
+      /Data/PolIIRep1/,/Data/PolIIRep2/ -b /Anno/tssSites.bed -p 73 -u 1
+
+**************************************************************************************
+
+</pre><p>
+<a name="AnnotateRegions"><pre>
+
+**************************************************************************************
+**                          Annotate Regions:     Jan 2005                          **
+**************************************************************************************
+Annotates a picks file finding surrounding protein coding genes.
+
+-g Full path file name for the DmelRel4.0 GFF3 file.
+-p Full path file name for the binding region picks or Interval file.
+-c Full path file name for the Filtered CG names file (optional)
+-b Size of neighborhood in bp, default is 10000 (optional)
+-r Number of random trials (optional)
+-n Just print number of neighbors for random trials (optional)
+-s Skip filtering GFF file
+
+Example: java -jar pathTo/T2/Apps/AnnotateRegions -g /dmel/dmel_RELEASE4.0.gff3 -p
+      /affy/zeste/finalPicks.txt -c /dmel/CGs.txt
+
+**************************************************************************************
+
+</pre><p>
+<a name="Bar2Gr"><pre>
+
+**************************************************************************************
+**                                 Bar2Gr: Nov 2006                                 **
+**************************************************************************************
+Converts xxx.bar to text xxx.gr files.
+
+-f The full path directory/file name for your xxx.bar file(s).
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/Bar2Gr -f /affy/BarFiles/ 
+
+**************************************************************************************
+
+</pre><p>
+<a name="CelFileConverter"><pre>
+
+**************************************************************************************
+**                           Cel File Converter: Feb  2008                          **
+**************************************************************************************
+Converts text version cel files into serialized java float[][]s for use by TiMAT2
+applications.
+
+Parameters:
+-f Full path to a text version 'xxx.cel' file or directory containing the same.
+-b Optional, full path to bunzip2. Convert compressed cel files 'xxx.cel.bz2'
+-s Full path to alternative save directory, defaults to cel file parent directory.
+-c Save a float[] by concatinating the lines of the float[][]
+-r Rotate cel file 90 degrees clockwise.
+
+Example: java -Xmx512M -jar pathTo/T2/Apps/CelFileConverter -f /data/cels/ 
+
+**************************************************************************************
+
+</pre><p>
+<a name="CelFileQualityControl"><pre>
+
+**************************************************************************************
+**                     Cel File Quality Control: May  2006                          **
+**************************************************************************************
+Calculates a variety of qc statistics on serialized float[][] version cel files.
+Uses hierarchical clustering of Pearson correlation coefficients based on cel files'
+PM intensities to group like cel files and flag outliers.
+
+Required Parameters:
+
+-f Cel files (serialized float[][], 'xxx.cela', output from the CelFileConverter app)
+     to process, no spaces. Use key=value grouping to associate
+     files for comparison (e.g. grp1=/data/file1.cela,grp1=/data/file2.cela,
+     grp2=/data/file3.cela,grp2=/data/file4.cela,/data/file5.cela). Grouped/ ungrouped
+     mixing permitted. Directories can also be specified instead of individual files,
+     be sure each file you want examined ends in 'cela' (ie grp5=/data/treatDir/)
+-x Full path to the serialized 1lq control coordinate file ('xxx.1lq.SerCont')
+     generated by the trans/qc/CoordinateExtractor1lq app.
+-r Full path directory name where results should be saved.
+
+Optional Parameters:
+
+-l Load parameters file, full path file name, see -e option.
+-s Switch Dim and Bright coordinates.
+-e Print example parameters file with current defaults.
+-c Minimum acceptable within group correlation coefficient (R) (defaults to 0.75).
+-p Write outlier image PNG files to disk, defaults to false.
+-a Write image PNG files for all files, defaults to no.
+-d Display charts, default to no.
+
+Example: java -Xmx512M -jar pathTo/T2/Apps/CelFileQualityControl -f tr=/data/file1.cel,
+     tr=/data/file2.cel,cont=/data/file3.cel,cont=/data/file4.cel,/data/file5.cel
+     -s -c 0.9 -p -d -x /maps/dmel.1lq.SerCont -r /data/QCDmelRNAResults/
+
+**************************************************************************************
+
+</pre><p>
+<a name="CelMasker"><pre>
+
+**************************************************************************************
+**                            Cel Masker: Feb 2006                                  **
+**************************************************************************************
+CM builds and displays a virtual chip from a text version cel file.  Problem areas on
+the chip can be circled and assigned a different intensity. Use the median chip value
+to neutrally mask the area.
+-c Full path file name for a text version cel file or converted xxx.cela file
+-r The number of rows on the chip, defaults to 2560, only needed for text cel files.
+-m Maximum intensity value to color scale, defaults to 20000.
+-v Value to assign to the masked region. Defaults to the median chip intensity.
+
+   Mouse click once and drag to create a selection ellipse.
+   Use the arrow keys for fine adjustment.
+   Use shift+ arrow keys to modify the ellipse.
+   Double click the mouse to set the ellipse and create another.
+   Use the i or o keys to zoom in and out.
+   Press the m key to apply the masks and  redraw the image.
+   Press the q key to apply the masks and write the modified cel file to disk.
+
+Example: java -Xmx256M -jar pathTo/T2/Apps/CelMasker -c /affy/badChip.cel -r 1280
+      -m 250
+
+**************************************************************************************
+
+</pre><p>
+<a name="CelProcessor"><pre>
+
+**************************************************************************************
+**                            Cel Processor: Sept 2008                              **
+**************************************************************************************
+CP tpmaps, quantile normalizes, and median scales raw intensity values from float[][]
+'xxx.cela' files.  Group files using different directories.
+
+Use the following options when running CP:
+
+-t Full path directory name for the 'TPMapFiles' directory generated by the
+      TPMapProcessor.
+-d A directory containing xxx.cela files for normalization or a comma delimited list.
+-u Use MisMatch data, perform max((PM-MM),1) transformation, default is no.
+-q Skip quantile normalization, default is to perform QN.
+-c Median scale using control sequences instead of all the mapped intensities.
+-p Scale using control genes and cubic splines (chip set dependent).
+-m The target median value for scaling, defaults to 100. 
+-r Break and save each normalized cel file as chromosome specific IntensityFeature[]s
+      for downstream multi-chip merging.
+-s Calculate and print statistics on each .cel file, default is no.
+-i Correlate and hierarchical cluster raw cel file PM intensities. Provide a full path
+      name to save the chart.
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/CelProcessor -t /affy/TPMapFiles/ -d
+      /affy/tCels/,/affy/cCels/ -u -s -m 50 -i /affy/QC/hcPlot.png
+
+**************************************************************************************
+
+</pre><p>
+<a name="CoordinateExtractor1lq"><pre>
+
+**************************************************************************************
+**                      Coordinate Extractor 1lq: Sept  2007                        **
+**************************************************************************************
+Extracts control and pm coordinates from an unrotated text 1lq file.  An int[][][]
+is saved to disk for each 1lq file. Also creates virtual cel files for each class for
+visualization using the VirtualCel app.
+
+-f Full path to a 'xxx.1lq' file or directory containing such for extraction.
+-r Alternative results directory, defaults to the xxx.1lq parent directory.
+-s Save virtual 'xxx.cela' files for each set of coordinates, each is assigned an
+      intensity of 100, default is no.
+-p Extract coordinates for pre 7G, unrotated, cel files, default is to rotate 1lq.
+
+Example: java -Xmx512M -jar pathTo/T2/Apps/CoordinateExtractor1lq -f
+      /data/hmn1lqFiles/ 
+
+**************************************************************************************
+
+</pre><p>
+<a name="ConvertAgilentData"><pre>
+
+**************************************************************************************
+**                          Convert Agilent Data: Nov 2007                          **
+**************************************************************************************
+Parses Agilent two color data files to map and cela files for use in TiMAT2.
+Assumes each oligo is a 60mer. Also creates log2(Green/Red) sgr files for IGB.
+WARNING, Agilent file formats are so relaxed as to make this parser near useless.
+Each raw txt data file must be tested extensively! 
+
+-f Full path file name or directory containing text Agilent two color tiling data.
+-e Exclude any 'ControlType' data lines that are not equal to zero.
+-d To filter data lines based on their 'SystematicName,' provide a Java RE that will
+      match. Non matches will be dropped. For example, '.*Spombe.+' .
+-c To generate a tpmap and sgr files, provide a Java RE to extract the chromosome #
+      and the oligo start and stop positions, ie for 'Spombe|complement_chr2:10-70' one would
+      provide '.+chr(.+):(\d+)-(\d+)' from the 'SystematicName' column.
+-n Number to subtract from oligo start position, defaults to zero.  Use to change
+      coordinates to interbase/ zero based if needed.
+-s Switch ratio to Red(cy5)/Green(cy3) for making sgr files.
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/ConvertAgilentData -f /badData/ -c
+      '.+chr(.+):(\d+)-(\d+)' -s -d '.*Spombe.+' -e
+
+**************************************************************************************
+
+</pre><p>
+<a name="ConvertGeoData"><pre>
+
+**************************************************************************************
+**                           Convert Geo Data: April 2007                           **
+**************************************************************************************
+Parses a Gene Expression Omnibus individual data file for a particular sample, not a
+Download family file.  The SOFT, MINiMl and TXT formats are useless since they don't
+give access to the raw data only the processed ratios. This is very free form. Check
+your results carefully! Assumes two color data files, makes a tpmap and cela files
+for use in TiMAT2. Also creates log2(Green/Red) sgr files for IGB. Column indexes
+start with zero! Your GEO data file should look something like the following:
+
+   #ID_REF = 
+   #Rval = Cy5 (red) signal, Input total DNA from WI38 cells
+   #Gval = Cy3 (green) signal, MeDIP DNA from WI38 cells
+   #VALUE = log2(Gval/Rval)
+              ID_REF                 Rval    Gval     VALUE
+   CHR1P000009757_HSAP0406S00000003 2934.45 6303.33   1.1030
+   CHR1P000009637_HSAP0406S00000003 4742.78 13346.00  1.4926
+   CHR1P000009627_HSAP0406S00000003 3311.56 8825.89   1.4142
+   ...
+
+Options:
+-f Full path file name or directory containing text files.
+-o Length of oligo.
+-c Column index of chromosome position.
+-r Column index of green intensity values.
+-g Column index of red intensity values.
+-s Switch ratio to Red/Green for making sgr files.
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/ConvertGeoData -f /data/ -c 0 -r 2 -g 1
+
+**************************************************************************************
+
+</pre><p>
+<a name="ConvertNimblegenNDF2TPMap"><pre>
+
+**************************************************************************************
+**                         Convert Nimblegen NDF 2 TPMap: June 2008                 **
+**************************************************************************************
+Converts a Nimblegen NDF text file to a tpmap.
+
+-f Full path file name or directory containing text xxx.ndf file(s).
+-a Parse all lines, default is to look for linese beginning with 'chr' or 'CHR'
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/ConvertNimblegenNDF2TPMap -f /badData/
+
+**************************************************************************************
+
+</pre><p>
+<a name="ConvertNimblegenPAIR2Cela"><pre>
+
+**************************************************************************************
+**                      Convert Nimblegen PAIR 2 Cela: Jan 2007                     **
+**************************************************************************************
+Converts Nimblegen PAIR text data file(s) to cela.
+
+-f Full path file name or directory containing text xxx.pair file(s).
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/ConvertNimblegenPAIR2Cela -f /badData/
+
+**************************************************************************************
+
+</pre><p>
+<a name="CorrelationMaps"><pre>
+
+**************************************************************************************
+**                           Correlation Maps:    Nov 2007                         **
+**************************************************************************************
+CM calculates a correlation score for each window of genes and using permutation, an
+empirical p-value.  The correlation score is the mean of all pair Spearman ranks for
+the gene expression profiles in each window. If a single value is given (unlogged!) for
+each gene, a mean of the scores within each window is calculated.
+
+To calculate p-values, X randomized datasets are created by shuffling the expression
+profiles between genes, windows are scored and pooled.  P-values for each real
+score are calculated based on the area under the right side of the randomized score
+distribution. In addition to a spread sheet report summary, heat map xxx.bar files
+for the p-values and mean correlation are created for visualization in IGB.
+Note, this analysis is not stranded.  If so desired parse lists appropriately.
+
+Parameters:
+-f The full path file name for a tab delimited gene file (name,chr,start,stop,scores)
+-o Region filter file, full path file name for a tab delimited region file to use in
+      removing genes from correlation analysis. (chrom, start, stop).
+-g Genome version for IGB visualizations (e.g. C_elegans_May_2007).
+-w Window size, default is 50000bp. Setting this too small may exclude some regions.
+-n Minimum number of genes required in each window, defaults to 3. Setting this too
+       high will exclude some regions.
+-r Number random trials, defaults to 100
+
+Example: java -Xmx256M -jar pathTo/T2/Apps/CorrelationMaps -f /Mango/geneFile.txt
+       -w 30000 -n 2 -o /Mango/operons.txt
+
+**************************************************************************************
+
+</pre><p>
+<a name="Correlate"><pre>
+
+**************************************************************************************
+**                                Correlate:    Nov 2008                            **
+**************************************************************************************
+Calculates all pair-wise Pearson correlation coefficients (r) and if indicated will
+perform a hierarchical clustering on the files.
+
+Parameters:
+-d The full path directory name containing serialized java float[] files (xxx.celp
+      see CelProcessor app).
+-a Files provided are float[][] files (xxx.cela) and need to be collapsed to float[]
+-c Cluster files.
+
+Example: java -Xmx256M -jar pathTo/T2/Apps/Correlate -f /Mango/PCels/ -c
+
+**************************************************************************************
+
+</pre><p>
+<a name="BestWindowScoreExtractor"><pre>
+
+**************************************************************************************
+**                     Best Window Score Extractor: September  2008                 **
+**************************************************************************************
+BWSE prints the best window score for every region. Preference is given to
+the best centered and closest to the size to the region. Use the -s flag to bind the
+best positive scoring window.
+
+Parameters:
+-w Full path file name for the serialized Window[] generated by ScanChip or
+      ScanChromosome.
+-r Full path file name for the tab delimited text regions file (chrom, start, stop, 
+      ... etc.
+-z Size of oligo, defaults to 25.
+-i Score index to use in extracting Window scores see ScanChip, defaults to 1.
+-s Find best scoring window within each region, defaults to best centered, similar size.
+-m Multiply scores by -1
+
+Example: java -Xmx1500M -jar pathTo/Apps/BestWindowScoreExtractor -w
+      /affy/wins -r /affy/qPCRRes.txt -i 0 -s
+
+**************************************************************************************
+
+</pre><p>
+<a name="ExportIntergenicRegions"><pre>
+
+**************************************************************************************
+**                        Export Intergenic Regions    May 2007                     **
+**************************************************************************************
+EIR takes a gff file and uses it to mask a boolean array.  Parts of the boolean array
+that are not masked are returned and represent integenic sequences. Be sure to put in
+a gff line at the end of each chromosome noting the last base so you caputure the last
+intergenic region. (eg chr1 GeneDB lastBase 3600000 3600001 . + . lastBase). Base
+coordinates are assumed to be end inclusive, not interbase.
+
+Parameters:
+-g Full path file name for a gff file or directory containing such.
+-t Base pairs to trim from the ends of each intergenic region, defaults to 0.
+-m Minimum acceptable intergenic size, those smaller will be tossed, defaults to 60bp
+-s Subtract one from the start and stop coordinates of your gff file.
+
+Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportIntergenicRegions -s -m 100 -g
+                 /user/Jib/GffFiles/Pombe/sanger.gff
+
+**************************************************************************************
+
+</pre><p>
+<a name="ExportIntronicRegions"><pre>
+
+**************************************************************************************
+**                         Export Intronic Regions    June 2007                     **
+**************************************************************************************
+EIR takes a UCSC Gene table and fetches the most conservative/ smallest intronic
+regions. Base coordinates are assumed to be end inclusive, not interbase.
+
+Parameters:
+-g Full path file name for the UCSC Gene table.
+-m Minimum acceptable intron size, those smaller will be tossed, defaults to 60bp
+-s Subtract one from the stop coordinates of your UCSC table to convert from interbase.
+
+Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportIntronicRegions -s -m 100 -g
+                 /user/Jib/ucscPombe.txt
+
+**************************************************************************************
+
+</pre><p>
+<a name="FDRWindowConverter"><pre>
+
+**************************************************************************************
+**                        FDR Window Converter: May 2006                            **
+**************************************************************************************
+Given a Window[] from a mock IP analysis (ie IgG) and Window[]s from real IPs, FDRWC
+will associate an empirical FDR (# mock/ # real windows at each threshold) for each
+real IP Window. The FDR will be appended on to each Window's score array as a
+-10Log10(fdr) transformed value. 
+
+-m Full path file name for the mock IP serialized Window[] array.
+-r Full path file name for a directory or file containing real IP serialized Window[]s.
+-s Score index to use converting to FDRs, see ScanChip or ScanChromosome.
+-z Size of oligo, defaults to 25.
+-p Print sgr files for the empirical FDR scores.
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/FDRWindowConverter -m /affy/mockWins -r 
+      /affy/realIPs/ -s 1
+
+**************************************************************************************
+
+</pre><p>
+<a name="FetchGenomicSequences"><pre>
+
+**************************************************************************************
+**                          FetchGenomicSequences: May 2008                         **
+**************************************************************************************
+Given a file containing genomic coordinates, fetches and saves the sequence (column
+output: chrom origStart origStop fetchedStart fetchedStop completeFetch seq).
+
+-f Full path file name to the file or directory containing tab delimited chrom, start,
+        stop files.  Interbabase coordinates (zero based, end excluded).
+-s Full path directory name containing containing genomic fasta files. The fasta
+        defines the name of the sequence, not the file name. 
+-b Fetch flanking bases, defaults to 0. Will set start to zero or end to last base if
+        boundaries are exceeded.
+
+Example: java -Xmx1000M -jar pathTo/T2/Apps/FetchGenomicSequences -f /data/miRNAs.txt
+      -c /genomes/human/v35.1/ -b 5000. 
+
+
+**************************************************************************************
+
+</pre><p>
+<a name="FindNeighboringGenes"><pre>
+
+**************************************************************************************
+**                          Find Neighboring Genes:   Nov 2008                      **
+**************************************************************************************
+FNG takes a list of genes in UCSC Gene Table format and intersects them with a list of
+regions finding the closest gene to each region as well as all of the genes that fall
+within a given neighborhood. Distance is measured from the center of the region to the
+transcription start site/ 1st base position in 1st exon. See Tables link under
+http://genome.ucsc.edu/ . Note, output coordinates are zero based, end inclusive.
+
+-g Full path file name for a tab delimited UCSC Gene Table (name chrom strand txStart
+      txEnd cdsStart cdsEnd exonCount exonStarts exonEnds etc...) .
+-p Full path file/directory name for tab delimited region list(s) (chr, start, stop) .
+-b Size of neighborhood in bp, default is 10000 
+-f Find genes that overlap neighborhood irregardles of distance to TSS.
+-c Only print closest genes.
+-o Print neighbors on one line.
+
+Example: java -jar pathTo/T2/Apps/FindNeighboringGenes -g /anno/hg17Ensembl.txt -p
+      /affy/p53/finalPicks.txt -b 5000 -c
+
+**************************************************************************************
+
+</pre><p>
+<a name="FileCrossFilter"><pre>
+
+**************************************************************************************
+**                            File Cross Filter: March 2008                         **
+**************************************************************************************
+FCF take a column in the matcher file and uses it to parse the rows from other files.
+Useful for pulling out and printing in order the rows that match the first file.
+
+-m Full path file name for a tab delimited txt file to use in matching.
+-f Ditto but for the file to parse, can specify a directory too.
+-i Ignore duplicate keys.
+-a Column index containing the unique matcher IDs, defaults to 0.
+-b Ditto but for the files to parse.
+
+Example: java -jar pathTo/T2/Apps/FileCrossFilter -f /extendedArrayData/ -m /old/
+     originalArray.txt -a 2 -b 2
+
+**************************************************************************************
+
+</pre><p>
+<a name="FileJoiner"><pre>
+
+**************************************************************************************
+**                             File Joiner: Feb 2005                                **
+**************************************************************************************
+Joins text files into a single file, avoiding line concatenations. This is a problem
+with using 'cat * >> combine.txt'.  Removes empty lines.
+
+Required Parameters:
+-f Full path name for the directory containing the text files.
+
+Example: java -jar pathTo/T2/Apps/FileJoiner -f /affy/SplitFiles/
+
+**************************************************************************************
+
+</pre><p>
+<a name="FileSplitter"><pre>
+
+**************************************************************************************
+**                          File Splitter: May 2009                                 **
+**************************************************************************************
+Splits a big text file into smaller files given a maximum number of lines.
+
+Required Parameters:
+-f Full path file name or directory for the text file(s) (.zip/.gz OK).
+-n Maximum number of lines to place in each split file.
+
+Example: java -Xmx256M -jar pathTo/T2/FileSplitter -f /affy/bpmap.txt -n 50000
+
+**************************************************************************************
+
+</pre><p>
+<a name="FilterTPMapByRegions"><pre>
+
+**************************************************************************************
+**                        Filter TPMap By Regions: Jan 2006                         **
+**************************************************************************************
+FTBR strips any oligos not contained within one or more of the user defined regions.
+
+    -t Full path file name for the tpmap file.
+    -r Full path file name for the tab delimited regions file (chr start stop 
+           (inclusive, zero based)).
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/FilterTPMapByRegions -t /affy/enc.tpmap
+           -r /affy/encRgns.txt
+
+**************************************************************************************
+
+</pre><p>
+<a name="FindSubBindingRegions"><pre>
+
+**************************************************************************************
+**                       Find Sub Binding Regions:    Oct 2006                      **
+**************************************************************************************
+FSBR takes Interval[] that have been loaded with oligo information and scans each for
+the highest median ratio scoring sub window. FSBR also picks binding peaks using
+smoothed intensity values (trimmed mean ratio sliding window) .
+
+Parameters:
+-i The full path file name for a serialize Interval[] file, alternatively, give a
+       directory, and all the Interval files within will be processed.
+-w Sub Window size, default is 350bp.
+-n Minimum number of oligos required in sub window, defaults to 4.
+-s Peak Picker smoothing window size, default is 230bp.
+-m Max number of peaks to find, defaults to 4.
+-c Minimum binding peak ratio score, defaults to 1.3, set internally for flattops.
+-f Pick flattop peaks, defaults to sloped peaks.
+-g Max bp gap for expansion of flattop peaks, defaults to 75bp.
+-d Maximum fraction score drop for expanding flattop peaks, defaults to 0.8.
+
+Example: java -Xmx256M -jar pathTo/T2/Apps/FindSubBindingRegions -i /affy/Ints/ -w
+       300 -n 4
+
+**************************************************************************************
+
+</pre><p>
+<a name="Gr2Bar"><pre>
+
+**************************************************************************************
+**                                 Gr2Bar: Nov 2006                                 **
+**************************************************************************************
+Converts xxx.gr.zip files to chromosome specific bar files.
+
+-f The full path directory/file name for your xxx.gr.zip file(s).
+-v Genome version (ie hg18, dm2, ce2, mm8), get from UCSC Browser,
+      http://genome.ucsc.edu/FAQ/FAQreleases
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/Gr2Bar -f /affy/GrFiles/ -v hg17 
+
+**************************************************************************************
+
+</pre><p>
+<a name="HierarchicalClustering"><pre>
+
+**************************************************************************************
+**                        Hierarchical Clustering: July 2007                        **
+**************************************************************************************
+HC hierarchically clusters serialized float[] arrays using a Pearson correlation
+coefficient (r) as a metric.  For each round, all pairwise r values between the arrays
+are calculated, the pair of arrays with the highest r value is removed from the pool,
+their intensities are averaged, and the averaged array is added back to the pool.
+Rounds of clustering continue until only one cluster remains. R values are typically
+squared and multiplied by 100 to give a similarity percentage. For ChIP chip
+experiments, clusters with an r < 0.75 (50% similar) are processed separately.
+
+-d Full path directory name containing serialized float[] arrays, 'xxx.celp' files.
+-c These are text files containing one column of floats, convert to 'xxx.celp'
+-a AntiLog base 2 the values.
+
+Example: java -Xmx1500M -jar pathTo/T2/HierarchicalClustering -d /affy/CelpFiles
+
+**************************************************************************************
+
+</pre><p>
+<a name="IndexFastas"><pre>
+
+**************************************************************************************
+**                            Index Fastas: April 2007                              **
+**************************************************************************************
+IF is used to break apart long sequences into small binary files for rapid access.
+
+-f Full path file name to a xxx.fasta sequence or directory containing such.
+-n Number of bases permitted in each indexed file, defaults to 1,000,000.
+-i Alternative save directory, defaults to fasta directory.
+
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/IndexFastas -f /genomes/hg17/
+
+**************************************************************************************
+
+</pre><p>
+<a name="IntensityPrinter"><pre>
+
+**************************************************************************************
+**                        Intensity Printer: April 2007                             **
+**************************************************************************************
+IP prints to file  intensity scores in a .sgr text format for direct import into
+Affy's IGB.
+
+Use the following options when running IP:
+
+-b Full path directory name for the 'xxxTPMapFiles' generated by the TPMapProcessor
+-i The full path director or file name for the xxx.celp intensity files.
+
+Example: java -Xmx256M -jar pathTo/T2/Apps/IntensityPrinter -b /affy/TPMapFiles/ -i 
+      /affy/t.celp 
+
+**************************************************************************************
+
+</pre><p>
+<a name="IntersectLists"><pre>
+
+**************************************************************************************
+**                            Intersect Lists: Dec 2008                             **
+**************************************************************************************
+IL intersects two lists (of genes) and using randomization, calculates the
+significance of the intersection and the fold enrichment over random. Note, duplicate
+items are filtered from each list prior to analysis.
+
+-a Full path file name for list A (or directory containing), one item per line.
+-b Full path file name for list B (or directory containing), one item per line.
+-t The total number of unique items from which A and B were drawn.
+-n Number of permutations, defaults to 1000.
+-p Print the intersection sets (common, unique to A, unique to B) to screen.
+
+Example: java -Xmx1500M -jar pathTo/Apps/IntersectLists -a /Data/geneListA.txt -b 
+     /Data/geneListB.txt -t 28356 -n 10000
+
+**************************************************************************************
+
+</pre><p>
+<a name="IntersectRegions"><pre>
+
+**************************************************************************************
+**                         Intersect Regions: August 2008                           **
+**************************************************************************************
+IR intersects lists of regions (tab delimited: chrom start stop(inclusive)). Random
+regions can also be used to calculate a p-value and fold enrichment.
+
+-f First regions files, a single file, or a directory of files.
+-s Second regions files, a single file, or a directory of files.
+-g Max gap, defaults to 0. A max gap of 0 = regions must abut, negative values force
+      overlap (ie -1= 1bp overlap, be careful not to exceed the length of the smaller
+      region), positive values enable gaps (ie 1=1bp gap).
+-e Score intersections where second regions are entirely contained by first regions.
+-r Make random regions matched to the second regions file(s) and intersect with the
+      first.  Enter the full path directory name containing chromosome specific
+      interrogated regions files (ie named: chr1, chr2 ...: chrom start stop(inclusive)).
+-c Match GC content of second regions file(s) when selecting random regions, rather
+      slow. Provide a full path directory name containing chromosome specific genomic
+      sequences.  To speed the matching place the fraction GC in the last column of
+      your region file(s).
+-n Number of random region trials, defaults to 1000.
+-w Write intersection and difference files for the first and second region files.
+-x Write paired intersections to file.
+-p Print length distribution histogram for gaps between first and closest second.
+-q Parameters for histogram, comma delimited list, no spaces:
+       minimum length, maximum length, number of bins.  Defaults to -100, 2400, 100.
+-i Serialized interval files are provided, not text region files.
+
+
+Example: java -Xmx1500M -jar pathTo/Apps/IntersectRegions -f /data/miRNAs.txt
+      -s /data/DroshaLists/ -g 500 -n 1000 -r /data/InterrogatedRegions/
+
+
+**************************************************************************************
+
+</pre><p>
+<a name="IntervalFilter"><pre>
+
+**************************************************************************************
+**                            Interval Filter: April 2007                           **
+**************************************************************************************
+IF filters Interval[] arrays dividing and saving Intervals that pass and fail.
+The reported number of cut intervals is sequential and may not reflect the total
+number that would fail each particular test when using a single filter.
+
+-i Score index to use in window filtering, see ScanChromosome or ScanChipNoPerm
+-a Filter by the best window score based on the score index (minimum).
+-b Filter by the best median ratio sub window (minimum).
+-f Filter by the coefficient of the variation (stnd dev window oligos/ mean) for
+      the intensities, either treatment or control (singleton,
+      one chip driver) (maximum)
+-e Flag intervals that intersect particular regions, enter full path names, comma
+      delimited, containing tab delimited: chrom start stop.
+-m Minimal fraction of intersection with particular regions for removal, defaults to
+      0.25.  Measured as cumulative bases covered, relative to the interval.
+-g Remove particular intervals, enter a full path name for a tab delimited text
+      file containing rows with chromosome start stop.
+-k Full path file name for the Interval[], if a directory is specified, all files
+      within will be processed. (Required)
+
+Example: java -Xmx256M -jar pathTo/T2/Apps/IntervalFilter -k /affy/res/ -a 1.5 -i 1
+      -e /repeats/hg17_simpleSegDupRepMask.txt -m 0.5
+
+**************************************************************************************
+
+</pre><p>
+<a name="IntervalGFFPrinter"><pre>
+
+**************************************************************************************
+**                        Interval GFF Printer: Feb 2007                            **
+**************************************************************************************
+IGP prints a GFF3 txt file given a serialized Interval file, sorts by the median ratio
+of the best sub window. Use the following options:
+
+-f Full path file name for the Interval[], if a directory is specified, all files
+      within will be processed and saved to the same GFF3 file.
+-d Don't print non interval lines (ie window, oligo).
+-s Print simple GFF not GFF3.
+-i Score index to use in assigning the best window summary score. See ScanChip.
+
+Example: java -jar pathTo/T2/Apps/IntervalGFFPrinter -f /my/affy/res/ -i 2
+
+**************************************************************************************
+
+</pre><p>
+<a name="IntervalGraphPrinter"><pre>
+
+**************************************************************************************
+**                        Interval Graph Printer: Jun 2006                          **
+**************************************************************************************
+IGP converts serialized Interval[] arrays to graph files (.sgr & .bed) for import into
+Affymetrix' IGB. Files will be written to the data directory. Intervals are sorted by
+the median ratio of the best sub window, if present, or the best window. 
+
+Use the following options when running IGP:
+
+-f Full path file name for the Interval[], if a directory is specified, all files
+      within will be processed. (Required)
+-s Score cut off, print everything above this score, defaults to all.
+-r Rank cut off, prints everything above this rank, ie the top 200, defaults to all.
+-g Print goal post Interval representations using the sub window score, if present, or
+      the best window score, default is to print individual oligo log2(aveT/aveC)
+      scores.
+-c Chromosome prefix to prepend onto each .sgr line. (This is sometimes needed to match
+      IGB's quickload seqIDs.)
+
+Example: java -jar pathTo/T2/Apps/IntervalGraphPrinter -f /my/affy/res/ -s 50 -r 200 
+
+**************************************************************************************
+
+</pre><p>
+<a name="IntervalMaker"><pre>
+
+**************************************************************************************
+**                           Interval Maker: June 2007                              **
+**************************************************************************************
+IM combines Windows into larger Intervals given a minimal score, minimum number of
+oligos, and a maximum gap.
+
+Options:
+
+-s Minimal score, defaults to 0. Can also provide a comma delimited list, no spaces,
+     to use in generating multiple Interval arrays.
+-i Score index, the score you wish to use in merging, see ScanChip or ScanChromosome.
+-m Multiply window scores by -1. Useful for looking for reduced regions.
+-o Minimum number of oligo positions in each window, defaults to 10.
+-g Maximum allowable bp gap between starts of oligos, defaults to 24.
+-z Size of oligo, defaults to 25.
+-r Enter a full path tab delimited regions file name (chr start stop) to use in
+      removing intersecting windows. Coordinates are assumed to be zero based and end
+      inclusive.
+-f Full path file name for the Window[] array, if a directory is specified,
+      all files will be processed.
+
+Example: java -Xmx500M -jar pathTo/T2/Apps/IntervalMaker -f /affy/res/zeste.res -s 50
+      -i 0 -g -200 -o 5
+
+**************************************************************************************
+
+</pre><p>
+<a name="IntervalPlotter"><pre>
+
+**************************************************************************************
+**                          Interval Plotter:     Nov 2005                          **
+**************************************************************************************
+IP plots and saves graphs for serialized Interval[] arrays.  Load the Intervals with
+data from the FindSubBindingRegion, LoadIntervalOligoInformation, and optionally
+ScoreIntervals programs prior to running the IntervalPlotter. Plotted are graphs for
+averaged treatment intensity, the averaged control intensity, the average difference,
+the average fold difference, a smoothed trimmed mean ratio, peak picks, the best
+window, the best sub window, centered PSPM hit scores, the number of 1bp mis/matches
+for each oligo in the genome, and the treatment and control intensities for each
+individual processed cel file. Click and or drag to fetch the coordinates and sequence
+for a selected region. Columns in console: interval rank, median ratio best sub window,
+trimmed mean score for the closest oligo if just one click or the max trimmed mean
+score within the dragged box, chromosome, start, stop, and sequence. Intervals are
+sorted by the best median ratio sub window.
+
+-f Full path file or directory name for the data loaded Interval[](s).
+-s Score cut off, plot everything above this score, defaults to all.
+-r Rank cut off, plot everything above this rank, ie the top 200, defaults to all.
+-q Rank cut off, plot everything below this rank, defaults to all.
+-p Save plots to disk, default is no.
+-m Magnify saved plots (2 twice as big, 3 three times as big...), default is none.
+-a Anti alias saved plots, good for printed figures, bad for computer display,
+      default is no.
+-b Hide the PSPM graphs.
+
+Example: java -jar pathTo/T2/Apps/IntervalPlotter -f /affy/res/Z.resAll -t -s 1.5 -r
+      200 -p -m 1.5 -a
+
+Questions? Contact David_Nix@Affymetrix.com or SuperFly@lbl.gov
+**************************************************************************************
+
+</pre><p>
+<a name="IntervalReportPrinter"><pre>
+
+**************************************************************************************
+**                        Interval Report Printer: April 2007                       **
+**************************************************************************************
+IRP prints reports in spread sheet format or as detailed pages for Interval[] arrays.
+Intervals are sorted by the median ratio of the best sub window.
+Use the following options:
+
+-f Full path file name for the Interval[], if a directory is specified, all files
+      within will be processed. (Required)
+-s Score cut off, print everything above this score, defaults to all
+-r Rank cut off, prints everything above this rank, ie the top 200, defaults to all
+-i Score index to use in sorting when there is no sub window, defaults to 1.
+-p Print sequences, default is no
+-a Print best window sequence in summary line instead of interval sequence.
+-b Print tab delimited summary line, default is to print a detailed report.
+-c Print coordinates (chrom, start, stop).
+
+Example: java -jar pathTo/T2/Apps/IntervalReportPrinter -f /my/affy/res/ -s 1.5
+      -r 200 -p -b
+
+**************************************************************************************
+
+</pre><p>
+<a name="JQSub"><pre>
+
+**************************************************************************************
+**                                 JQSub: April 2007                                **
+**************************************************************************************
+JQSub executes a given command line on the cluster logging your submission and results
+in a temp directory designated by the ~/.paramFileJQSub.txt in your home directory.
+Use the word 'return' to separate multiple shell commands. JQSub is java friendly and
+will direct your job to the appropriate cluster depending on your -Xmx parameter.
+
+Options:
+-w Wall time in hours, defaults to 72.  Set to 10-15% longer than expected runtime
+     for your application.  Otherwise it gets the chop.
+
+Example: java util/apps/JQSub -w 1.75 java -Xmx4000M trans/main/ScanChip
+
+**************************************************************************************
+
+</pre><p>
+<a name="LoadChipSetIntervalOligoInfo"><pre>
+
+**************************************************************************************
+**                 Load Chip Set Interval Oligo Info : April 2007                    **
+**************************************************************************************
+LCSIOI fetches oligo intensities, start positions, and their sequence for a given
+array of intervals using the following parameters:
+
+-o The 'OligoPositions' directory, full path, generated by ChipSetCelProcessor.
+-s Load sequence information, provide the full path directory name containing indexed
+       genomic fasta sequences. Run the IndexFastas app on your chromosome split seqs.
+-t Treatment chip set directories, full path, comma delimited, no spaces.
+-c Control chip set directories, full path, comma delimited, no spaces.
+-i The full path Interval[] file name or directory containing Interval[] files.
+
+Example: java -Xmx256M -jar pathTo/T2/Apps/LoadChipSetIntervalOligoInfo -b
+      /affy/675bpTPMapFiles -s /seq/dmel/ -t /affy/tCels -c /affy/cCels 
+
+**************************************************************************************
+
+</pre><p>
+<a name="LoadIntervalOligoInfo"><pre>
+
+**************************************************************************************
+**                      Load Interval Oligo Info: Dec 2005                          **
+**************************************************************************************
+LIOI fetches oligo intensities, start positions, and their sequence for a given
+array of intervals using the following parameters:
+
+-b The full path 'xxxTPMapFiles' directory name generated by the TPMapProcessor
+-s The full path directory name containing the split genomic fasta files.
+-t The full path directory name containing the serialized float[] treatment file(s)
+-c The full path directory name containing the serialized float[] control file(s)
+-i The full path Interval[] file name or directory containing Interval[] files.
+
+Example: java -Xmx256M -jar pathTo/T2/Apps/LoadIntervalOligoInfo -b
+      /affy/675bpTPMapFiles -s /seq/dmel/ -t /affy/tCels -c /affy/cCels 
+
+**************************************************************************************
+
+</pre><p>
+<a name="MakeChromosomeSets"><pre>
+
+**************************************************************************************
+**                          Make Chromosome Sets: Feb  2007                         **
+**************************************************************************************
+MCS takes directories containing split chromosome intensity files from the
+CelProcessor app and combines them into a master set of chromosome split intensity
+files for use by ScanChromosomesCNV.
+
+Use the following options when running CP:
+
+-d Comma delimited list of directories containing split chromosome files from
+      CelProcessor, no spaces. These should represent one complete replica.
+-n Full path directory name to save the combine chomosomes.
+-s Skip making chromosome oligo positions (you already have them for this chip set).
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/MakeChromosomeSets -d
+     /ProcCelFiles/Chip1RepA,/ProcCelFiles/Chip2RepA,/ProcCelFiles/Chip3RepA -n
+     /ProcCelFiles/RepA
+
+**************************************************************************************
+
+</pre><p>
+<a name="MergeWindowArrays"><pre>
+
+**************************************************************************************
+**                         Merge Window Arrays: March 2007                          **
+**************************************************************************************
+Concatinates serialized Window[]s into one.
+-f Full path directory name for the folder containing eserialized Window[]s
+      from the ScanChromosomesCNV or ScanChip app.
+-r Restrict files for merging to those ending in '_Win', defaults to all.
+-n (Optional) Full path file name to use in saving the merged windows array.
+-m Multiply window scores by -1. Useful for looking for reduced regions.
+-t Score threshold, tosses any windows with a score < threshold, defaults to 0.2
+-i Score index, defaults to 1.  See ScanChromosome for index descriptions.
+
+Example: java -Xmx5000M -jar /YourPathTo/T2/Apps/MergeWindowArrays -f /affy/win/ 
+**************************************************************************************
+
+</pre><p>
+<a name="MultiWindowIntervalMaker"><pre>
+
+**************************************************************************************
+**                       Multi Window Interval Maker: July 2006                     **
+**************************************************************************************
+MWIM combines Windows into larger Intervals given minimal score(s), a maximum gap, a
+minimum number of windows per index that must pass, and a minimum number of oligos in
+each window.  For each index, the best window is used to represent the Interval. Must
+have all the windows from ScanChip or ScanChromosome, no pruning.
+
+Options:
+
+-i Score index, the score you wish to use in merging, see ScanChipNoPerm or 
+      ScanChromosome.
+-o Minimum number of oligo positions in each window, defaults to 10.
+-g Maximum allowable bp gap between starts of oligos, defaults to 24.
+-z Size of oligo, defaults to 25.
+-s Minimal score(s), comma delimited, no spaces, one for each Window[] file.
+-f Full path file names for the Window[]s, comma delimited, no spaces.
+-n Composite name to use as a base in saving.
+-m For a given window index, minimum number of windows from the different arrays that
+      must pass to be included in building an interval. Defaults to all.
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/MultiWindowIntervalMaker -f 
+      /affy/win1,/affy/win2,/affy/win3 -i 1 -g -100 -s 0.5,0.5,0.3 -m 2
+
+**************************************************************************************
+
+</pre><p>
+<a name="MummerMapper"><pre>
+
+**************************************************************************************
+**                             Mummer Mapper: April 2007                            **
+**************************************************************************************
+MM uses MUMMER to generate a 7G or pre 7G tpmap from a standard, unrotated, 1lq file
+using genomic fasta file(s). Note, DO NOT use a rotated 7G specific 1lq file! Oligos
+in the 1lq file are reversed prior to mapping. MUMMER matches are case-insensitive but,
+restricted to GATC, thus use Ns or Xs to mask your genomic fasta files. For large
+fasta's compile and run MUMMER on a 64 bit machine. Coordinate are zero based and
+relative to the forward (+) strand. In addition to the genomic fasta files, it may be
+usefull to include one named chrCtrls and populated with control sequences
+found on the array (e.g. bacterial, Arabidopsis, known regions that don't change).
+These can be used by the TiMAT2 CelProcessor app for defined region median scaling.
+See MUMMER from http://sourceforge.net/projects/mummer .
+
+Parameters:
+    -p Full path file name for the 1lq file.
+    -r Full path directory file name to save the results.
+    -g Full path file or directory name containing genomic (multi) fasta file(s).
+    -m Full path file name for the mummer application. Defaults to
+          /nfs/transcriptome/software/noarch/T2/64Bit_MUMmer3.18/mummer
+    -x Maximum number of exact matches allowed per oligo, defaults to 100, set to 1
+         for unique oligos.
+    -y Minimum size of oligos to map, others will be excluded. Defaults to 25.
+    -a Match forward complement, defaults to both.
+    -b Match reverse complement, defaults to both.
+    -c Reverse complement the 1lq oligo sequences. This switches the orientation of
+         the 1lq file S <-> AS. (Use of -b -c is the same as -a.)
+    -i Don't reverse the oligo sequence, by default oligo sequences are reversed
+         since seqs in 1lq format are listed 3' to 5'.
+    -o Replace the orientation column with the number of exact matches for a
+         particular oligo in the genome. Doing so enables graphing of matches when
+         generating interval plots in TiMAT2 (recommended).
+    -s Save temp files to '/scratch/'.
+    -e Remove control probes that also match non-control fasta sequences.
+    -f Enter a comma delimited list, no spaces, of particular DESTYPES to map, others
+         will be skipped. Using '-111,111' is recommended! (PM= -111,111; MM= -113,113;
+         'manufacture/ gridding controls= 0,1,-1,-3,3,-4,4,-6,6').
+    -d Don't print mismatch coordinates (ie they don't exist).
+    -n Make a new 7G scanner tpmap, enter the number of rows/ columns in a cel file,
+         default is to make an old pre-7G tpmap.
+
+MM probes are assumed to be directly below their PM counter-part on the array. If
+    mapping MM oligos (not recommended) their 'MM but really PM' counter-part is
+    assumed to be directly above.
+To make an antisense stranded tpmap from an antisense 1lq file use option -b. To
+    make a sense stranded tpmap from an antisense 1lq file use options -c -a.
+To make a mock 1lq file, create a tab delimited text file with the following:
+    X  Y  Seq  Destype  ... Be sure to have this header immediately preceed your map
+    data.  The Destype column is optional but can be used to filter your mock 1lq
+    for particular lines.  If needed, use the -i flag to prevent reversing of your
+    sequences. Rember that X and Y are zero based. The PrintSelectColumns app can be
+    used to manipulate your map file to make a mock 1lq.
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/MummerMapper -p /affy/human.1lq -f
+    -111,111 -g /affy/human/NCBIv34/ -m
+    /nfs/transcriptome/software/noarch/T2/64Bit_MUMmer3.18/mummer -r /affy/results/
+    -s -x 10 -n 2560 -y 22
+
+**************************************************************************************
+
+</pre><p>
+<a name="OligoIntensityPrinter"><pre>
+
+**************************************************************************************
+**                        Oligo Intensity Printer: Dec 2005                         **
+**************************************************************************************
+OIP prints to file the average treatment, control, and ratio oligo intensity scores
+      (no windowing) in a .sgr text format for direct import into Affy's IGB.
+
+Use the following options when running OIP:
+
+-b Full path directory name for the 'xxxTpmapFiles' generated by the TPMapProcessor
+-t The full path file name for a directory or file containing serialized float[] 
+      'xxx.celp' treatment file(s).
+-c The full path file name for a directory or file containing serialized float[]
+      'xxx.celp' control file(s).
+
+Example: java -Xmx256M -jar pathTo/T2/Apps/OligoIntensityPrinter -b
+      /affy/675bp3MinFsTPMapFiles/ -t /affy/t.celp -c /affy/c.celp 
+
+**************************************************************************************
+
+</pre><p>
+<a name="OligoTiler"><pre>
+
+**************************************************************************************
+**                              Oligo Tiler: May 2009                               **
+**************************************************************************************
+OT tiles oligos across genomic regions returning their forward and reverse sequences.
+Won't tile oligos with non GATC characters, case insensitive. Replaces non GATC chars
+in offset regions with 'a'.
+
+Options:
+-f Fasta file directory, should contain chromosome specific xxx.fasta files.
+-r Regions file to tile (tab delimited: chr start stop ...) interbase coordinates.
+-o Effective oligo size, defaults to 40.
+-s Spacing to place oligos, defaults to 50.
+-t Three prime offset, defaults to 20.
+-m Minimum size of region to tile, defaults to 20.
+-p Print reverse strand oligos.
+-c Tile CpG (spacing not used, see max gap option).
+-g Max gap between adjacent CpGs to include in same oligo, defaults to 8.
+
+Example: java -Xmx4000M -jar pathTo/Apps/OligoTiler -s 40  -f /Genomes/Hg18/Fastas/ 
+     -r /Designs/cancerArray.bed -p
+
+************************************************************************************
+
+</pre><p>
+<a name="OverlapCounter"><pre>
+
+**************************************************************************************
+**                         Overlap Counter: March 2005                              **
+**************************************************************************************
+
+OC performs a pairwise intersection analysis between each Interval[]  file within a
+directory.  Sets of overlapping and non-overlapping Intervals, for each file, can be
+written to disk. 
+
+Parameters:
+-f Full path file name for a directory containing Interval files, required.
+-n The number of Intervals to compare. Enter say 200 to compare the top 200 after
+       sorting. If they don't exist, all will be used.  Default is all.
+-m Max gap between boarders, default is 0bp. Negative values force an overlap.
+-p Print distance to closest interval peak.
+-w Write the overlapping and non-overlapping Interval files to disk, the default is no.
+
+Example: java -Xmx128M -jar pathTo/T2/Apps/OverlapCounter -f /affy/res/Intervals/
+      -n 250 -p -w -m -100
+
+**************************************************************************************
+
+</pre><p>
+<a name="ScoreParsedBars"><pre>
+
+**************************************************************************************
+**                           ScoreParsedBars: Sept 2008                             **
+**************************************************************************************
+For each region finds the underlying scores from the chromosome specific bar files.
+Prints the scores as well as their mean . A p-value for each region's score can be
+calculated using chromosome, interrogated region, length, # scores, and gc matched
+random regions. Be sure to set the -u flag if your scores are log2 values.
+
+-r Full path file name for your region file (tab delimited: chr start stop(inclusive)).
+-b Full path directory name for the chromosome specific data xxx.bar files.
+-o Bp offset to add to the position bar file coordinates, defaults to 0.
+-s Bp offset to add to the end of each region, defaults to 0.
+-u Unlog the bar file values, set this flag if your scores are log2 transformed.
+-g Estimate a p-value for the score associated with each region. Provide a full path
+         directory name for chromosome specific gc content boolean arrays. See
+         ConvertFasta2GCBoolean app. Complete option -i
+-i If estimating p-values, provide a full path file name containing the interrogated
+         regions (tab delimited: chr start stop ...) to use in drawing random regions.
+-n Number of random region sets, defaults to 1000.
+-d Don't print individual scores to screen.
+
+Example: java -jar pathTo/Apps/ScoreParsedBars -b /BarFiles/Oligos/
+       -r /Res/miRNARegions.bed -o -30 -s -60 -i /Res/interrRegions.bed
+       -g /Genomes/Hg18/GCBooleans/
+
+**************************************************************************************
+
+</pre><p>
+<a name="Primer3Wrapper"><pre>
+
+**************************************************************************************
+**                            Primer3 Wrapper: Dec  2006                            **
+**************************************************************************************
+Wrapper for the primer3 application. Extracts sequence, formats for primer3, executes
+and parses the output to a spreadsheet. See http://frodo.wi.mit.edu/primer3/
+
+-f Full path file name for your sequence file, tab delimited, sequence in 1st column.
+-s Pick small product sizes (45-80bp), defaults to standard (80-150bp)
+-p Full path name for the primer3_core application. Defaults to
+     /nfs/transcriptome/software/noarch/T2/64Bit_Primer3_1.0.0/src/primer3_core
+-m Full path file name for the mispriming library. Defaults to
+     /nfs/transcriptome/software/noarch/T2/64Bit_Primer3_1.0.0/
+     cat_humrep_and_simple.cgi.txt
+
+Example: java -jar pathTo/T2/Apps/Primer3Wrapper -f /home/dnix/seqForQPCR.txt -p
+    /nfs/transcriptome/software/noarch/T2/64Bit_Primer3_1.0.0/src/primer3_core
+    -m /nfs/transcriptome/software/noarch/T2/64Bit_Primer3_1.0.0/
+    cat_humrep_and_simple.cgi.txt -s 
+**************************************************************************************
+
+</pre><p>
+<a name="PrintSelectColumns"><pre>
+
+**************************************************************************************
+**                           Print Select Columns: July 2006                        **
+**************************************************************************************
+Spread sheet manipulation.
+
+Required Parameters:
+-f Full path file or directory name for tab delimited text file(s)
+-i Column indexs to print, comma delimited, no spaces
+-n Number of initial lines to skip
+-l Print only this last number of lines
+-c Column word to append onto the start of each line
+-r Append a row number column as the first column in the output file
+-d Append file name onto the start of each line
+-s Skip blank lines and those with less than the indicated number of columns.
+
+Example: java -jar pathTo/T2/PrintSelectColumns -f /TabFiles/ -i 0,3,9 -n 1 -c chr
+
+**************************************************************************************
+
+</pre><p>
+<a name="RankedSetAnalysis"><pre>
+
+**************************************************************************************
+**                          Ranked Set Analysis: Jan 2006                           **
+**************************************************************************************
+RSA performs set analysis (intersection, union, difference) on lists of
+genomic regions (tab delimited: chrom, start, stop, score, (optional notes)).
+
+-a Full path file name for the first list of genomic regions.
+-b Full path file name for the second list of genomic regions.
+-d (Optional) Full path directory containing region files for all pair analysis.
+-m Max gap, bps, set negative to force an overlap, defaults to -100
+-s Save comparison as a PNG, default is no.
+
+Example: java -jar pathTo/T2/Apps/RankedSetAnalysis -a /affy/nonAmpA.txt -b
+      /affy/nonAmpB.txt -s
+
+**************************************************************************************
+
+</pre><p>
+<a name="ScanChip"><pre>
+
+**************************************************************************************
+**                               Scan Chip: March 2007                              **
+**************************************************************************************
+SC uses a sliding window to calculate window level statistics on processed cel
+files (xxx.celp) using a Wilcoxon Rank Sum test and either a trimmed mean (10%) or
+pseudo median on the windowed relative differences. To estimate confidence, SC wraps
+Bourgon's Symmetric Null P-value estimator and John Storey's QValue R package. SC can
+also use random label permutation to estimate a p-value and FDR. A variety of sgr
+files can be saved for direct viewing in Affymetrix' IGB. xxxHM.sgr should be viewed
+as heat maps or stair-step graphs. Negative scores/ p-values/ FDRs indicate reduction,
+positive accumulation.
+
+Note, the order of scores associated with each window are:
+      [0]= Wilcoxon Rank Sum, -10Log10(p-val)
+      [1]= Trimmed Mean or Layered Pseudo Median Relative Difference
+      [2]= -10Log10(uncorrected p-value) based on rnd perm of cel file labels (if set)
+      [3]= -10Log10(FDR) based on rnd perm of cel file labels (if set)
+      [4]= -10Log10(q-valFDR) based on symmetric null distribution, (if set)
+
+-b The full path 'TPMapFiles' directory name generated by the TPMapProcessor program
+-r The full path file name to use in saving the results
+-t The full path directory name containing the serialized float[] treatment file(s)
+-c The full path directory name containing the serialized flaot[] control file(s)
+-m Minimal number of oligo positions required in each window. Defaults to 10. 
+-z Size of oligo, defaults to 25.
+-a Use a pseudo median of all pair relative differences instead of a trimmed mean.
+       This is very slow but much more robust.
+-x Maximum number of window scores before random sampling for pseudo median
+       calculation, defaults to 1000. (#T x #C x #oligos in window).
+-y Use average treatment/ average control relative differences instead of all layer in
+       pseudo median calculation.
+-p Convert window scores to q-value FDRs, -10log10(multiple test corr pval).
+       Requires config R, and possibly compiling the SymPTest.
+-s The full path to the symmetric_p_test, defaults to
+      '/home/BioApps/T2/OthersCode/RBSymPTest/symmetric_p_test'
+-q The full path to qvalue loaded R, defaults to
+      '/usr/local/R/bin/R'
+-l Use random permutation of the chip labels to estimate a p-value and FDR for the
+       window scores.
+-n Number of random permutations, defaults to 10.
+-i Print an individual oligo log2 ratio (aveT/aveC) sgr file.
+-d Print heat map window summary sgr files.
+-e Print point window summary sgr files.
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/ScanChip -b /affy/TPMapFiles -r
+      /affy/res/zeste.res -t /affy/tCels -c /affy/cCels -m 5 -i -e
+
+**************************************************************************************
+
+</pre><p>
+<a name="ScanChromosomes"><pre>
+
+**************************************************************************************
+**                            Scan Chromosmes: Dec 2007                             **
+**************************************************************************************
+SC uses a sliding window to calculate to window level statistics on processed cel
+file directories (see CelProcessor -r and MakeChromosomeSets) using a Wilcoxon Rank
+Sum test and one of the following statistics: a trimmed mean (10%) or pseudo median
+on the average replica relative differences or a pseudo median on the all pair
+relative differences within each window. To estimate confidence SC wraps Bourgon's
+Symmetric Null P-value estimator and John Storey's QValue R package. SC can also use
+random label permutation to estimate a p-value and FDR. A variety of bar files can be
+saved for direct viewing in Affymetrix' IGB. xxxHM.bar should be viewed as heat maps.
+Negative scores/ p-values/ FDRs indicate reduction, positive accumulation.
+
+Note, the order of scores associated with each window are:
+      [0]= Wilcoxon Rank Sum, -10Log10(p-val)
+      [1]= Trimmed Mean or Layered Pseudo Median Relative Difference
+      [2]= -10Log10(uncorrected p-value) based on rnd perm of cel file labels (if set)
+      [3]= -10Log10(FDR) based on random permutation  (if set)
+      [4]= -10Log10(q-val FDR) based on symmetric null distribution, (if set)
+
+Required:
+-o The 'OligoPositions' directory, full path, generated by MakeChromosomeSets.
+-r The full path directory name to use in saving the results.
+-t Treatment chip set directories, full path, comma delimited, no spaces.
+-c Control chip set directories, full path, comma delimited, no spaces.
+-v Genome version (ie hg17, dm2, ce2, mm8), get from UCSC Browser,
+      http://genome.ucsc.edu/FAQ/FAQreleases, for bar files.
+
+Optional:
+-w Window size, defaults to 675bp.
+-m Minimal number of unique oligo positions required in each window. Defaults to
+       10. Set to 1 to save all windows.
+-z Size of oligo, defaults to 25.
+-f Name(s) of chromosomes, comma delimited (e.g. chr21,chr22), to process, others
+       will be skipped, defaults to all.
+-b Break and process part of each chromosome(s), (e.g. 2-1 to split in 1/2 and
+       and process the first half, 3-2 split in thirds, process the 2nd 3rd).
+-a Use a layered pseudo median instead of a trimmed mean relative difference.
+       This is very slow but much more robust. (For every oligo, all rel diffs are
+       calculated between its treatment and control intensities.  These are pooled
+       and a median is then calculated on all pairwise means.)
+-y Use an average of the treatment and control replicas as input for the relative
+       difference instead of making all pairwise relative differences in the
+       pseudo median calculation.
+-l Use random permutation of the chip labels to estimate a p-value and FDR for the
+       window score.
+-u Use random permutation of the intensity positions to estimate a p-value and FDR
+       for the window score.
+-n Number of random permutations, defaults to 10.
+-x Randomize within replica intensities.
+-p Convert window ratio scores to q-value FDRs, -10log10(multiple test corr pval).
+      Requires installing Storey's R Q-Value Pkg and possibly compiling the SymPTest.
+-s The full path to the symmetric_p_test, defaults to
+      '/home/BioApps/T2/OthersCode/RBSymPTest/symmetric_p_test'
+-q The full path to qvalue loaded R, defaults to
+      '/usr/local/R/bin/R'
+-i Print an individual oligo log2 ratio (aveT/aveC) bar files.
+-e Print point window summary bar files.
+-d Print heat map window summary bar files.
+-k Strand (either '+' or '-') for stranded data, used when writing bar files.
+-j Convert relative difference scores to log2.
+-g Exclude windows falling within this range (ie -0.2,0.2) when making heat maps.
+
+Example: java -Xmx8000M -jar pathTo/T2/Apps/ScanChromosomesCNV -o /affy/OliPosHWG14 -r
+      /affy/res/p53/ -t /Cels/T/B10_ChrNorm,/Cels/T/B11_ChrNorm -c /Cels/C/B10_ChrNorm,
+      /Cels/C/B11_ChrNorm,/Cels/C/B12_ChrNorm -m 5 -i -e -l -n 3 -v hg17 
+
+
+**************************************************************************************
+
+</pre><p>
+<a name="ScanGenes"><pre>
+
+**************************************************************************************
+**                              Scan Genes: Sept 2007                               **
+**************************************************************************************
+SG parses a UCSC table format gene file, see http://genome.ucsc.edu/cgi-bin/hgTables
+(tab delimited: #name chrom strand txStart txEnd cdsStart cdsEnd exonCount exonStarts
+exonEnds) to identify the exons associated with each gene.  These are then used to
+fetch the underlying intensity values. A median is then taken of the aveT/aveC ratio
+scores for each gene.
+
+-o The 'OligoPositions' directory, full path, generated by CelProcessor.
+-r The full path file name to use in saving the results.
+-t Treatment chip set directories, full path, comma delimited, no spaces.
+-c Control chip set directories, full path, comma delimited, no spaces.
+-g The full path file name for the UCSC table format gene file.
+-s Number to subtract from ends, defaults to 1.  Used to convert UCSC interbase
+       numbering to end inclusive numbering. Set to 0 if already end inclusive.
+-z Size of oligo.  Defaults to 25.
+-p Print associated treatment and control intensities.
+
+Example: java -Xmx1500M -jar pathTo/T2/Apps/ScanGenes -o /affy/OligoPositionsHWG14 -r
+      /genes.xls -t /Cels/T/B10_ChrNorm,/Cels/T/B11_ChrNorm -c /Cels/C/B10_ChrNorm,
+      /Cels/C/B11_ChrNorm,/Cels/C/B12_ChrNorm -g /ucscHg17RefSeq.txt -p
+
+**************************************************************************************
+
+</pre><p>
+<a name="ScatterPlot"><pre>
+
+**************************************************************************************
+**                            Scatter Plot: Aug 2005                                **
+**************************************************************************************
+To draw a simple scatter plot and calculates a Pearson correlation coefficient for two
+serialized int[] or float[] arrays, enter full path names on the command line. If you
+wish to skip zero values in the analysis, type 'skip' after the second file name.
+
+Example: java -Xmx750M -jar pathTo/T2/Apps/ScatterPlot /my/int/array1 /my/int/array2 
+
+**************************************************************************************
+
+</pre><p>
+<a name="ScoreChromosomes"><pre>
+
+**************************************************************************************
+**                           Score Chromosomes: Sept 2008                           **
+**************************************************************************************
+SC scores chromosomes for the presence of transcription factor binding sites. Use the
+following options:
+
+-g The full path directory name to the split genomic sequences (i.e. chr2L.fasta, 
+      chr3R.fasta...), FASTA format.
+-t Full path file name for the FASTA file containing aligned trimmed examples of
+      transcription factor binding sites.  A log likelihood position specific
+      probability matrix will be generated from these sequences and used to scan the
+      chromosomes for hits to the matrix.
+-s Score cut off for the matrix. Defaults to the score of the lowest scoring sequence
+      used in making the LLPSPM.
+-p Print hits to screen, default is no.
+-v Provide a versioned genome (ie hg18, dm2, ce2, mm8), see UCSC Browser,
+      http://genome.ucsc.edu/FAQ/FAQreleases, if you would like to write graph LLPSPM
+      scores to bar files for direct viewing in IGB.
+
+Example: java -Xmx4000M -jar pathTo/T2/Apps/ScoreChromosomes -g /my/affy/Hg18Seqs/ -t 
+      /my/affy/fgf8.fasta -s 4.9 -v H_sapiens_Mar_2006
+
+**************************************************************************************
+
+</pre><p>
+<a name="ScoreIntervals"><pre>
+
+**************************************************************************************
+**                          Score Intervals: Jan 2005                               **
+**************************************************************************************
+SI scores serialized Interval[] arrays for the presence of transcription factor
+binding sites. Use the following options:
+
+-f Full path file name for the Interval[], if a directory is specified, all files
+      within will be processed. (Required)
+-g The full path directory name to the split genomic sequences (i.e. chr2L.fasta, 
+      chr3R.fasta...).  The file prefix names should match the chromosome names in the
+      Intervals (ie chr2L, chr3R...). (Required)
+-t Full path file name for the fasta file containing aligned trimmed examples of
+      transcription factor binding sites.  A log likelihood position specific
+      probability matrix will be generated from these sequences and used to scan all
+      the Intervals for hits to the matrix.
+-s Score cut off for the matrix. Defaults to the score of the lowest scoring sequence
+      used in making the LLPSPM.
+-w A window size in bp for calculating the maximum binding cluster, defaults to 350bp
+-i Score the best average intensity window instead of the full interval.
+-a Just print average hits per kb for best windows in interval array.
+
+Example: java -jar pathTo/T2/Apps/ScoreIntervals -f /my/affy/intervals/ -g
+      /my/affy/DmelSeqs/ -t /my/affy/zeste.fasta -s 4.9 -w 375 -i
+
+**************************************************************************************
+
+</pre><p>
+<a name="ScoreSequences"><pre>
+
+**************************************************************************************
+**                           Score Sequences: July 2007                             **
+**************************************************************************************
+SS scores sequences for the presence of transcription factor binding sites. Use the
+following options:
+
+-g The full path FASTA formatted file name for the sequence(s) to scan.
+-t Full path file name for the FASTA file containing aligned trimmed examples of
+      transcription factor binding sites.  A log likelihood position specific
+      probability matrix will be generated from these sequences and used to scan the
+      sequences for hits to the matrix.
+-s Score cut off for the matrix. Defaults to zero.
+
+Example: java -Xmx500M -jar pathTo/T2/Apps/ScoreSequences -g /my/affy/DmelSeqs.fasta
+      -t /my/affy/zeste.fasta
+
+**************************************************************************************
+
+</pre><p>
+<a name="SetNumberIntervalMaker"><pre>
+
+**************************************************************************************
+**                       Set Number Interval Maker: Feb 2007                        **
+**************************************************************************************
+SNIM determines the threshold needed to create a set number of intervals for each score
+index.
+
+-n Number of intervals, single value or comma delimited list.
+-s Particular score index to use, default is to scan all.
+-i Multiply indexed window scores by -1. Useful for looking for reduced regions.
+-o Minimum number of oligos in each window, defaults to 10.
+-z Size of oligo, defaults to 25.
+-m Max gap between starts of oligos for collapsing windows when scanning intervals,
+      defaults to 24.
+-a Make intervals using found thresholds.
+-f Full path file name for the Window[] array, if a directory is specified,
+      all files will be processed.
+
+Example: java -Xmx500M -jar pathTo/T2/Apps/SetNumberIntervalMaker -f
+                 /affy/res/zeste.res -n 600,1200,24000 -a
+
+**************************************************************************************
+
+</pre><p>
+<a name="Sgr2Bar"><pre>
+
+**************************************************************************************
+**                               Sgr2Bar: July 2008                                 **
+**************************************************************************************
+Converts xxx.sgr(.zip) files to chromosome specific bar files.
+
+-f The full path directory/file name for your xxx.sgr(.zip) file(s).
+-v Genome version (ie H_sapiens_Mar_2006, M_musculus_Jul_2007), get from UCSC Browser.
+-s Strand, defaults to '.', use '+', or '-'
+-t Graph file should be viewed as a stair step, defaults to bar
+
+Example: java -Xmx1500M -jar pathTo/Apps/Sgr2Bar -f /affy/sgrFiles/ -s + -t
+      -v D_rerio_Jul_2006
+
+**************************************************************************************
+
+</pre><p>
+<a name="SynonymMatching"><pre>
+
+**************************************************************************************
+**                             Synonym Matching: Jan 2008                           **
+**************************************************************************************
+SM attempts to assign a standard name to each pick using synonym tables. For each name
+in the picks file, it is used to fetch the associated synonyms and then SM attempts to
+match it to a standard name or the alternative name.  If a match is found, the original
+pick and it's associated standard name are printed to screen.
+
+-s The full path file name for a two column tab delimited text file containing the
+      standard name and an alternative name.
+-a The full path file name for a multi column tab delimited text file containing
+      synonyms. All names on a line are considered synonyms.
+-p The full path file name for a one column tab delimited text file containing select
+      names from the synonyms file.
+
+Example: java -Xmx500M -jar pathTo/T2/Apps/SynonymMatching -s /Anno/zv7Stnd_GbNames.txt
+      -a /Anno/zv7AgilentSynonyms.txt -p /Data/upRegPicksAgilent.txt
+
+**************************************************************************************
+
+</pre><p>
+<a name="T2"><pre>
+
+**************************************************************************************
+**                                T2: April 2007                                    **
+**************************************************************************************
+T2 launches many of the TiMAT2 applications based on a tab delimited parameter file
+(see T2_xxx/Documentation/t2ParamFileTemplate.xls). It converts, normalizes, splits,
+and merges txt cel files and then launches ScanChromosomes.  If you wish to make use
+of a cluster for parallel processing, configure and test the JQSub TiMAT2 app.
+
+-p Full path file name for the tab delimited parameter file.
+-c Use the cluster(s) specified by JQSub.
+
+Example: java pathTo/T2/Apps/T2 -c -p /my/t2ParamFile.txt
+
+**************************************************************************************
+
+</pre><p>
+<a name="TPMapOligoBlastFilter"><pre>
+
+**************************************************************************************
+**                         TPMapOligoBlastFilter: Feb 2005                          **
+**************************************************************************************
+TOBF takes an Affymetrix text bpmap file and BLASTs each oligo against a BLAST
+database.  Use formatdb on a complete genome.fasta file to create the database.
+BOBF writes three files, one that assigns new coordinates to the oligo and replaces the
+ori column with the number of 1bp mismatches and exact matches.  A second file is
+written containing oligos with only one exact match in the genome, the ori column is
+replaced with the number of 1bp mismatches.  The third contains oligos with no exact
+match to the genome.  The number of 1bp mismatches is assigned to the ori column.
+This combo program is quite slow, 0.45sec
+per oligo, so break up your tpmap file into separate files using the FileSplitter
+program and farm the jobs out to a cluster. After processing, combine the files using
+FileJoiner and sort using the TPMapSort program. If you don't care about 1bp mismatches
+use MUMMERMapper, it should take about an hour. 
+
+Required Parameters:
+-b Full path file name for text bpmap file.
+-d Full path file name for BLAST database.
+-s Full path file name for the blastall program.
+
+Example: java -Xmx256M -jar pathTo/T2/Apps/TPMapOligoBlastFilter -b /affy/tpmap1 -s
+      /ncbi/bin/blastall -d /seq/dmel/whole_genome.fasta
+
+**************************************************************************************
+
+</pre><p>
+<a name="TPMapProcessor"><pre>
+
+**************************************************************************************
+**                            TPMap Processor: Aug 2006                             **
+**************************************************************************************
+
+The TPMapProcessor takes a tpmap file, creates sets of oligos (Windows) to be used
+in statistical analysis, and splits the tpmap file into separate chromosomes. The
+entire output folder is needed by several other TiMAT2 applications. Save it!
+
+Parameters:
+-w The maximum length for a Window in bp, default 675.
+-f Full path file name for the text tpmap file.
+-n Minimum number of oligos, defaults to 1.  Don't change if using the q-value
+      estimation in ScanChip! Minimal oligo requirements can be set later.
+
+Example: java -Xmx1000M -jar pathTo/T2/Apps/TPMapProcessor -f /affy/tpmap.txt -w 500 
+
+**************************************************************************************
+
+</pre><p>
+<a name="TPMapSort"><pre>
+
+**************************************************************************************
+**                            TPMap Sort: Jan 2005                                  **
+**************************************************************************************
+Sorts a text bpmap file based on chromosome and oligo start positions.
+
+Required Parameters:
+-f Full path file name for the text tpmap file.
+
+Example: java -Xmx500M -jar pathTo/T2/Apps/TPMapSort -f /affy/tpmap.txt
+
+**************************************************************************************
+
+</pre><p>
+<a name="VirtualCel"><pre>
+
+**************************************************************************************
+**                           Virtual Cel: August 2005                               **
+**************************************************************************************
+VC builds virtual chips from converted cel files (see CovertCelFiles.java) and saves
+each as a PNG image file. Examine these images for inconsistencies that need to be
+masked using the Cel Masker application. Use the following options when running VC:
+
+-c Full path file name for the directory containing converted 'xxx.cela' float[][] cel
+     files.
+-m Maximum intensity value to color scale, defaults to 20000.
+
+Example: java -Xmx256M -jar pathTo/T2/Apps//VirtualCel -c /affy/chips/
+
+**************************************************************************************
+
+</pre><p>
+<a name="Windows2HeatMapSgr"><pre>
+
+**************************************************************************************
+**                          Windows 2 Heat Map: Jan  2006                           **
+**************************************************************************************
+W2HM converts a list of potentially overlapping windows into an sgr file for
+visualization in IGB.
+
+-f Full path to tab delimited text file or directory containing windows
+      (chrom start stop score).
+-s Score to assign to all windows, default is to use the given score.
+
+Example: java -Xmx512M -jar pathTo/T2/Apps/Windows2HeatMap -f /data/winFiles/ -s 100
+
+Questions, comments, suggestions? Contact Gingeras Group or David_Nix@Affymetrix.com
+**************************************************************************************
+
+</pre><p>
+</body></html>

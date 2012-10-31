@@ -1,0 +1,129 @@
+###Parameter file for TiMAT2's T2 Wrapper Application###
+
+
+############################################ General ###########################################
+#Full path to the java app
+java				/usr/bin/java
+
+#Full path to the TiMAT2 Application directory
+appsDirectory		/home/BioApps/T2/Apps/
+
+#Maximum RAM memory allowed for T2 use
+maxMemory			4000
+
+#Full path to where you want to save the results
+resultsDirectory	/home/dnix/Tmp/T2Test/
+
+#Base name for the results
+resultsName			Oct4
+
+#Average size of the tiled oligos
+sizeOfOligo			25
+
+#Strand specific analysis? '+' = forward, '-' = reverse, '.' = not stranded
+strand	.
+
+
+########################################## TPMap Files #########################################
+# TPMap file directory
+mapDirectory	/home/dnix/Tmp/Mouse/Maps/TPMapFiles/
+
+# For each chip in the chip set (there could be just one) list the names of the processed tpmaps (run TPMapProcessor on each tpmap)
+m1	Mm35b_M_01_header_1oligos_500bp_TPMapFiles
+m2	Mm35b_M_02_header_1oligos_500bp_TPMapFiles
+m3	Mm35b_M_03_header_1oligos_500bp_TPMapFiles
+
+
+
+########################################## Cel Files ##########################################
+# Text Cel file or binary xxx.cela file directory 
+celDirectory	/home/dnix/Tmp/T2Test/CelFiles/
+
+
+# For each chip in the chip set list the treatment replica file names, comma delimited, no spaces
+
+t1	MM14_AS_iRASmES_TetP-hRAS_Oct4_00hr_C01_B1_T1.cel,MM14_AS_iRASmES_TetP-hRAS_Oct4_00hr_C01_B2_T1.cel,MM14_AS_iRASmES_TetP-hRAS_Oct4_00hr_C01_B3_T1.cel
+t2	MM14_AS_iRASmES_TetP-hRAS_Oct4_00hr_C02_B1_T1.cel,MM14_AS_iRASmES_TetP-hRAS_Oct4_00hr_C02_B2_T1.cel,MM14_AS_iRASmES_TetP-hRAS_Oct4_00hr_C02_B3_T1.cel
+t3	MM14_AS_iRASmES_TetP-hRAS_Oct4_00hr_C03_B1_T1.cel,MM14_AS_iRASmES_TetP-hRAS_Oct4_00hr_C03_B2_T1.cel,MM14_AS_iRASmES_TetP-hRAS_Oct4_00hr_C03_B3_T1.cel
+
+# For each chip in the chip set list the control replica file names
+
+c1	MM14_AS_iRASmES_TetP-hRAS_InputOct4_00hr_C01_B1_T1.cel
+c2	MM14_AS_iRASmES_TetP-hRAS_InputOct4_00hr_C02_B1_T1.cel
+c3	MM14_AS_iRASmES_TetP-hRAS_InputOct4_00hr_C03_B1_T1.cel
+
+
+########################################## Options ##########################################
+
+#### CelProcessor Options ####
+# What median value do you wish to scale your data?
+targetMedian				100
+
+# If you have a chrCtrls chromosome, do you want to use these values to median scale the entire chip?
+medianScaleUsingControlSeqs	false
+
+# Should quantile normalization be applied across the treatment and control chips?  If false, QN is applied seperately on the treatment chips and control chips.
+quantileNormalizeAll		true
+
+
+#### ScanChromosomes ####
+# What window size do want to use in smoothing the mapped intensity data?  The largest window is actually the window size + the size of the oligo -1.
+windowSize					500
+
+# What is the minimum number of oligo positions that must be contained within a window for it to be scored?
+minimumNumberOfOligos		7
+
+# What is the UCSC genome version? See http://genome.ucsc.edu/FAQ/FAQreleases.  This is used by IGB to load the appropriate annotation when visualizing xxx.bar file results.
+genomeVersion				mm8
+
+# Should the pseudo median be used in place of a trimmed mean when generating window summary scores?  It is a more robust estimater but much slower.
+usePseudoMedian				true
+
+# Should random permutation be used to estimate a window level confidence (FDR and PValue)?  How many permutations?  Enter 'position' or 'label'.  Label permutation is only meaningfull when you have the same number of treatment and control replicas and 3 or more of each.
+useRandomPermutation		true
+permutationType				label
+numberOfRandomPermutations	10
+
+# Reality check, randomize the data prior to running the ScanChromosomes application.  Randomizes within replica intensity positions. Everything 'significant' is now a false positive.
+randomizeData				false
+
+# Should a snmmetric null test be applied to estimate a window level confidence (pValue -> multiple test corrected q-value FDRs)? Full path to the applications. R must be loaded with the QValue package.  This is only meaningfull when the left handed side of the t/c ratio histogram approximates a null distribution (e.g. chIP-chip data, not transcriptome data).
+useSymmetricNull			true
+symmetricNullApp			/nfs/transcriptome/software/noarch/T2/OthersCode/RBSymPTest/symmetric_p_test
+rApp						/nfs/linux/pkg/stats/R/2.1.1/i386-intel-linux/bin/R
+
+
+#### MergeWindowArrays ####
+# Do you want to look at regions where the control intensities are greater than the treatment intensities?  (e.g. transcriptomics, not chIP-chip)
+makeReducedWindows			true
+
+
+
+#### OPTIONAL APPS BELOW ####
+
+#### SetNumberIntervalMaker ####
+# Comment out numberOfIntervals to skip all of the following
+
+# Provide a list of set number of intervals to make.  For each #, bootstrapping is used to find a threshold that creates that approximate number of intervals.  Use this to create the top 100 intervals, top 200, top 400, etc.
+numberOfIntervals			100,200,400,800,1600
+
+# What is the maximum bp gap allowed between windows for them to be joined into the same interval.
+maxGap						24
+
+
+#### LoadChipSetIntervalOligoInfo ####
+# Do you want to load sequence data into the intervals? This can be quite time consuming. If so provide a full path directory name containing xxx.fasta sequences. Comment out genomicFastaSeqDirectory to skip
+genomicFastaSeqDirectory	/Users/dnix/HCI/Genomes/Human/Hg17/
+
+
+#### FindSubBindingRegions ####
+# Do you want to attempt to identify multiple peaks of binding within the intervals (recommended for chIP-chip data). Comment out subWindowSize to skip.
+subWindowSize				350
+minNumberOligosInSubWin		2
+peakPickerWindowSize		230
+maxNumberPeaks				4
+
+
+#### IntervalFilter ####
+# Would you like to flag repeat and low complexity intervals?  Provide full path file names for txt files containing chr, start, stop. Comment out repeatRegionFiles to skip
+repeatRegionFiles			/home/dnix/RepetativeRegions/humanNCBI35.1Regions.txt,/home/dnix/RepetativeRegions/humanNCBI35.1LowComplexity.txt
