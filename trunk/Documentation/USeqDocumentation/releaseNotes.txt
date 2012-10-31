@@ -1,0 +1,63 @@
+----USeq_8.4.4----
+MultipleReplicaScanSeqs
+* Modified check for DESeq error message when dispersion fit fails.  New DESeq is using a different error message!  
+FilterPointData
+* Added another check to limit filtering for regions that go beyond the end of a chromosome
+
+----USeq_8.4.3----
+SamParser
+* Added fix for parser to skip xxx.bai indexes when parsing bam files
+Many apps
+* Upgraded from org.apache.commons.math... to math3 for all chiSquare tests
+USeq2Text and USeq2UCSCBig
+* Added check for rare cases when the first two useq regions overlap.  The UCSC converters were throwing errors when encountering these during the USeq-> bw conversion.
+ScoreChromosomes
+* Added ability to work with gzip compressed fasta files.
+* Fixed bug causing MultipleFastaParser to mis read gzipped files.
+
+----USeq_8.4.2----
+SamAlignmentExtractor
+* Added an application to extract SAM/BAM alignments that overlap regions in a bed file.
+
+----USeq_8.4.1----
+FetchGenomicSequence
+* Added option to export fasta format
+* Fixed multiple file select when providing a directory
+
+----USeq_8.4.0----
+DefinedRegionDifferentialSeq
+* Added gzipper to geneStats.xls output
+* Added bed file output for each condition comparison
+* Added an option to exclude alignments that align to more than one location.  This uses the IH flag set by running the SamTranscriptomeParser on your raw alignments.
+* Added a description of the columns to the usageRNASeq.html and outputFileTypeDescriptions.html documents 
+* Added a read depth maximum, defaulting to 20K.  Genes/ regions containing one or more bases with with more than 20K overlapping alignments are excluded from the analyis.  This was needed to prevent rRNA contaminated libraries from spiking the application's memory.  It is also proving useful for excluding a few genes from driving DESeq's library abundance estimation with extreem read counts.
+
+NovoalignBisulfiteParser
+* Modified base level score checking to ignore reads with INDELs.  This was causing a mis reference to an incorrect score for the indel and potentially excluding it from the analysis. In some cases this also fixed a mis base score reference to non indel reads.
+
+
+----USeq_8.3.9----
+BisStat
+* Added a catch to skip base context scanning when no data was found for a particular chromosome.
+
+AggregatePlotter
+* Added an option to average scores between shared bases across collapsed regions instead of summing.  This is useful for methylation analysis with the BisStat BaseFraction methylation data.
+
+DefinedRegionDifferentialSeq
+* Eliminated empty space columns from spread sheet output.  This feature was causing problems in Excel when selecting data for sorting.
+
+AllelicMethylationDetector
+* Added option to scan and score a user defined set of regions for allelic methylation
+* Added a final sum total graph for all regions that passed thresholds
+
+All Apps
+* Added a call to all Apps to print the USeq_xxx version in the Arguments prior to running
+
+
+----USeq_8.3.8----
+Sam2USeq
+* Fixed a bug that might effect some relative read coverage graphs when trying to convert the xxx.useq results files to xxx.bw for visualization in IGV and the UCSC Browser.  A rounding error after scaling was causing some data to look the same when infact it wasn't causing multiple stair step regions to be generated with the same position and score values.  
+
+BisSeqAggregatePlotter
+* Fixed a bug that was causing app to not merge data across chromosomes, thus old analysis only generated aggregates from the last chromosome of data.
+

@@ -1,0 +1,58 @@
+<html>
+<head>
+	<title>Bis-Seq Analysis with USeq</title>
+<style type="text/css">
+	#rt{text-align:right; color: #000000; font-weight: bold}
+	#grBk {background-color: #CC9966;}
+	TD {font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}
+	H1 {color: #996633; font:arial; font-size:14;}
+	H2 {color: #996633; font:arial; font-size:12;}
+	BODY {color:black; background-color:white; font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}
+	LI {margin-top:6px;}
+	A:link    {text-decoration: none; color: #000000; font-weight: bold}  
+	A:visited {text-decoration: none; color: #000000; font-weight: bold}   
+	A:hover   {text-decoration: none; color: #FFCC66; font-weight: bold} 
+	A:active  {text-decoration: none; color: #000000; font-weight: bold}   
+</style>
+</head>
+<H1>Bisulfite Sequencing Analysis with USeq:</H1>
+<br>
+<body>
+
+<h2>Alignments and PointData Parsing:</h2>
+
+<ol>
+	<li> Find a big Linux or Mac OS server with > 24GB RAM (ideally 64GB) and > 500GB of fast disk.  These applications are memory intensive.  <a href="http://aws.amazon.com/ec2/">Amazon EC2</a> rents such computers for < $2.25/ hr.
+	<li> Align your bisulfite sequence fastq data using <a href="http://www.novocraft.com">Novocrafts</a> novoalign in bisulfite mode.  For Illumina libraries use the '-b 2' option. The following novoalign parameters are a good starting point for 101bp paired end reads are ' -oSAM -rRandom -t240 -h120 -b2 '. The novoindex should contain a chromosome called chrLambda that contains the demethylated lambda sequence that was spiked into your genomic DNA prior to conversion.  This is a critical control for measuring the combine conversion and sequencing error rate.
+	<li> Run the USeq <a href="cmdLnMenus.html#NovoalignBisulfiteParser">NovoalignBisulfiteParser</a> on the sam or native format alignments to parse the text based alignments into four binary PointData sets containing the number of observed converted Cs (Ts - non methylCs) and non-converted Cs (methylCs) at each reference C sequenced in the genome for both the plus and minus strands. Note, the xxx.bar file output can be visualized directly in the <a href="http://bioserver.hci.utah.edu/IGB/igb_2G.jnlp">Integrated Genome Browser (IGB)</a>.  Better yet, convert your xxx.bar files to xxx.useq using the <a href="cmdLnMenus.html#Bar2USeq">Bar2USeq</a> application. 
+</ol>
+
+<h2>Single Methylome Analysis:</h2>
+
+<ol>
+	<li> Run the <a href="cmdLnMenus.html#BisStat">BisStat</a> application on the parsed PointData from <a href="cmdLnMenus.html#NovoalignBisulfiteParser">NovoalignBisulfiteParser</a> to generate aggregate methylation statistics and fraction methylation tracks. <a href="cmdLnMenus.html#BisStat">BisStat</a> scores all xxCxx contexts for methylation using two methods.  The first is simply a tabulation of the number of converted Cs and non-convertedCs found in a given context in each alignment.  No thresholds are set except those used when parsing the text novoalignments.  The second method looks at each reference C in a particular context and uses a binomial p-value to test whether that C is methylated.  The expect is set to the observed non-converted C rate from the fully un methylated lambda sequence alignments.  This expect represents a combination of the fraction of non conversion and sequencing error.  P-values were converted to FDRs using the Benjamini & Hochberg  (REF) method to control for multiple testing.  Each reference C displaying an FDR of 0.01 or less is considered methylated.  This latter method is sensitive to the read depth in a given dataset and can only be used when comparing genomes sequenced to a similar depth.  The tabulation method is rather insensitive to read depth but assumes a consistent sampling of all xxCxx contexts across the genome between different methylomes.
+	<li> <a href="cmdLnMenus.html#BisStat">BisStat</a> generates several summary graph files in bar format for visualizing the per base fraction methylation and associated FDR for Cs that meet a minimum read coverage, defaults to 8.  It also calculates a smoothed window fraction methylation by taking the median of the per base fraction methylation scores.  
+	<li> To identify regions with a particular fraction methylation, use the <a href="cmdLnMenus.html#BisStatRegionMaker">BisStatRegionMaker</a>. To examine particular methylation contexts (e.g. mCG, mCHG, mCHH), first parse the methylome PointData with the <a href="cmdLnMenus.html#ParsePointDataContexts">ParsePointDataContexts</a> application. 
+	<li> To examine particular regions for their methylation state use the <a href="cmdLnMenus.html#ScoreMethylatedRegions"> ScoreMethylatedRegions </a>application.  It can use randomly selected regions matched for chromosome, region length, number of observations, and GC content to calculate a p-value for differential methylation and fold enrichment over background.    Alternatively, one can filter the methylome PointData for particular regions with the <a href="cmdLnMenus.html#FilterPointData">FilterPointData</a> application and then pass this filtered data to <a href="cmdLnMenus.html#BisStat">BisStat</a> to generate the context summary statistics.  
+	<li> Class average plots of methylation over particular genomic annotations can be generated using the <a href="cmdLnMenus.html#BisSeqAggregatePlotter">BisSeqAggregatePlotter</a>. This application takes a list of regions (e.g. transcription start sites +/- 5kb) and collects, inverts negative strand region data, scales, and sums the methylome data into a single aggregate region.  A per base fraction methylation is calculated for bases with eight or more observations in the aggregate.  Lastly, several median smoothed fraction methylation scores are calculated using sliding windows of 5, 10, and 25% max region size.  These can then be plotted using Excel or R.
+</ol>
+
+<h2>Comparative Methylome Analysis:</h2>
+
+<ol>
+	<li> Two applications have been developed to identify regions of differential methylation between methylomes.  The first, <a href="cmdLnMenus.html#BisSeq">BisSeq</a>, takes parsed methylome PointData from two experiments and uses a sliding window to score each window for differential methylation using a fisher exact or chi-square test.  The p-values are controlled for multiple testing by converting to FDRs using the Benjamini and Hochberg (REF) method. A good start is to take overlapping 1.5kb windows that meet or exceeded an FDR of 30 (0.001) and also show a log2Ratio of  2 (4x fold difference).  A spread sheet output of differentially methylated regions is generated as well as the window level FDR and log2 ratio (fraction methylation treatment/ fraction methylation control) data as bar file graphs for visualization in IGB.
+	<li> The second application, <a href="cmdLnMenus.html#DefinedRegionBisSeq">DefinedRegionBisSeq</a>, functions analogously to BisSeq but scores user defined regions (e.g. gene promoters, CpG islands) for differential methylation.
+</ol>
+<br>
+<h2>Publically Available Methylome Datasets:</h2>
+
+All of the data referenced in our Sperm Methylome Paper (REF) may be manually downloaded from the <a href="https://bioserver.hci.utah.edu/gnomex/gnomex.html">HCIs GNomEx</a> instance. See Experiments 7795R and Analysis A119, A191, A201, A203, A207, A212, A226, A235, A271, and A281 .  This includes the raw fastq sequence, novoalignments, and processed analysis for sperm as well as ES cell and fibroblast reprocessed data from Lister et. al. and Laurent et. al. datasets.   
+<p>
+Analysis data tracks may be programmatically accessed through the <a href="http://bioserver.hci.utah.edu:8080/DAS2DB/genopub">HCIs GenoPub DAS/2 Server</a> instance.  See H_sapiens_Mar_2006 -> Cairns Lab -> Methylome Project.  These data tracks may be directly visualized using <a href="http://bioserver.hci.utah.edu/IGB/igb_2G.jnlp">IGB</a>. See Data Access tab -> H_sapiens_2006 -> Uof UBioinfoCore -> Cairns Lab -> Methylome Project .
+<p>
+<a href="http://useq.sourceforge.net">USeq</a>, <a href="http://sourceforge.net/projects/gnomex/">GNomEx</a>, <a href="http://sourceforge.net/projects/genoviz/">IGB and GenoPub</a> are open source projects.
+
+</body>
+</html>
+
+

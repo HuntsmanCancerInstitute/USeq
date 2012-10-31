@@ -1,0 +1,107 @@
+<html>
+<head>
+	<title>Extended Splice Junction RNA-Seq Analysis with USeq</title>
+<style type="text/css">
+	#rt{text-align:right; color: #000000; font-weight: bold}
+	#grBk {background-color: #CC9966;}
+	TD {font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}
+	H1 {color: #996633; font:arial; font-size:14;}
+	H2 {color: #996633; font:arial; font-size:12;}
+	BODY {color:black; background-color:white; font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}
+	LI {margin-top:6px;}
+	A:link    {text-decoration: none; color: #000000; font-weight: bold}  
+	A:visited {text-decoration: none; color: #000000; font-weight: bold}   
+	A:hover   {text-decoration: none; color: #FFCC66; font-weight: bold} 
+	A:active  {text-decoration: none; color: #000000; font-weight: bold}   
+</style>
+</head>
+<H1>Extended Splice Junction RNA-Seq Analysis with USeq</H1>
+<br>
+<body>
+
+
+<h2>To create a novoindex with extended splice junctions:</h2>
+<ol>
+<li> Create a multi-fasta file containing extended splice junctions matched to your target read length minus 4bp using the USeq MakeTranscriptome app.
+	<ol>
+		<li> Download from UCSC an Ensembl transcript table, use the "output file: selected fields from primary and related tables" to 
+	   		select: name chrom strand txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds name2.
+	   	<li> Optional but recommended, toss annotations to non standard chromosomes (e.g. chrUn_XXX, chrXX_ctg5_XXX, chrXX_g100XXX).  These contain unassembled and different variations of the reference chromosomes.  They add duplicate identical sequence too so that reads will sometimes match to both the variant and the reference and are scored as non unique hits.
+		<li> Use the USeq <a href="cmdLnMenus.html#PrintSelectColumns">PrintSelectColumns</a> app to move the name2 column before name.  This places the ensembl gene name first and the transcript name second. 
+	  		 Note, Excel won't work here. (e.g. java -jar -Xmx2G ~/AppsUSeq/PrintSelectColumns -i 10,0,1,2,3,4,5,6,7,8,9 -f mm9EnsTrans.ucsc) . Either remove the header line or place a # at it's start.
+		<li> Run the USeq <a href="cmdLnMenus.html#MakeTranscriptome">MakeTranscriptome</a> app to generate extended splice junctions. The splice junction radius should be set to your read length minus 4. 
+	   		This is a time and memory intensive.  If needed, split by chromosome and run on a cluster.  
+	   		(e.g. java -jar -Xmx22G ~/USeqApps/MakeTranscriptome -f /Genomes/Mm9/Fastas -u mm9EnsTrans_Corr.ucsc -r 46)
+	</ol>
+<li> Place the splice junction fasta file in the fasta genome directory and run novoindex.  It is a good idea to include a chromosome with adapter 
+       sequence combinations as well as a chromosome with phiX sequence. It is also recommended to exclude non standard chromosomes that could potentially provided duplicate identical sequence causing unique matches to look non unique.
+       (e.g. ~/BioApps/novocraft/novoindex mm9EnsTransRad46Num100kMin10SplicesChrPhiXAdaptr.novoindex Fastas/* )	  
+       
+<li> Share your novoindex and splice junction files by uploading your data into an Analysis Report in GNomEx! Novoindexes, gene, and transcript files are available for many species and genome builds, 
+see <a href="https://bioserver.hci.utah.edu:443/gnomex/gnomexGuestFlex.jsp?topicNumber=4"> UBioCore Transcriptomes</a>.
+</ol>
+<p>
+<br>
+
+<h2>To align and process your Illumina fastq RNA-Seq data:</h2>
+<ol>
+<li> Align your fastq data using novoalign and the read length matched extended splice junction novoindex.  Output the reads in SAM format and allow for 50 
+       repeat matches for each read. Use grep to toss @SQ lines and those reads that don't align.
+       (e.g.  ~/novocraft/novoalign -o SAM -r All 50  
+       -d /scratch/local/mm9EnsTransRad46Num100kMin10SplicesChrPhiXAdaptr.novoindex -f /scratch/local/7410X6_s_5_1_sequence.txt.gz 
+       /scratch/local/7410X6_s_5_2_sequence.txt.gz | grep -v ^@SQ  | grep chr | gzip > 7410X6_s_5_raw.sam.gz )
+
+</ol>
+Note, these alignments are not ready for use.  The splice-junction coordinates need to be converted to genomic coordinates by running the 
+<a href="cmdLnMenus.html#SamTranscriptomeParser">SamTranscriptomeParser</a> or the <a href="cmdLnMenus.html#RNASeq">RNASeq</a> app. (e.g. java -jar -Xmx4G ~/AppsUSeq/SamTranscriptomeParser -a 90 -f 7410X6_s_5_raw.sam.gz Sam headers are created automatically.)
+<p>
+<br>
+       
+<h2>To analyze your processed RNA-Seq data:</h2>
+The easiest option is to run the <a href="cmdLnMenus.html#RNASeq">RNASeq</a> application on your raw sam alignment files.  This executes many USeq applications and is a good starting point.<br>
+<br>
+Custom Analysis:
+<ol>
+<li> Convert splice-junction coordinates to genomic coordinates by running the <a href="cmdLnMenus.html#SamTranscriptomeParser">SamTranscriptomeParser</a>  (e.g. java -jar -Xmx4G ~/AppsUSeq/SamTranscriptomeParser -a 90 -f 7410X6_s_5_raw.sam.gz Sam headers are created automatically.)
+<li> Generate relative read/ depth coverage graphs using the USeq <a href="cmdLnMenus.html#Sam2USeq">Sam2USeq</a> apps. These can be visualized in IGB (and UCSC Genome Browser if you upload your data to GenoPub) to show the sequence depth over every base.  
+<li> Run the <a href="cmdLnMenus.html#DefinedRegionDifferentialSeq">DefinedRegionDifferentialSeq</a> to score known annotation for differential expression using Anders' DESeq package and your processed BAM files.
+    <ol>
+    <li> First create a gene table containing collapsed transcripts using the modified transcript table downloaded from UCSC, see above. This should contain 
+       the following columns: geneName transcriptName chrom strand txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds.  Use the USeq 
+       <a href="cmdLnMenus.html#MergeUCSCGeneTable">MergeUCSCGeneTable</a> app to merge any transcripts that share the same geneName.  Exons are maximized, introns minimized.
+       (e.g. java -jar -Xmx4G ~/AppsUSeq/MergeUCSCGeneTable -u mm9EnsTrans_Corr.ucsc )
+    <li> Install R and the DESeq package, see http://www-huber.embl.de/users/anders/DESeq/
+    <li> Run the <a href="cmdLnMenus.html#DefinedRegionDifferentialSeq">DefinedRegionDifferentialSeq</a> app to score genes (or other defined regions) for differential expression and alternative splicing 
+       (e.g. java -Xmx4G -jar ~/AppsUSeq/DefinedRegionDifferentialSeq -c /Data/PolIIConditions -s PolIIResults/ -u /Anno/mm9EnsGenes.ucsc.gz -g H_sapiens_Feb_2009)
+    </ol>  
+<li> Upload your analysis into an Analysis Report in GNomEx and post your data tracks!
+</ol>
+<p>
+<br>
+
+<h2><a href="cmdLnMenus.html#DefinedRegionDifferentialSeq">DefinedRegionDifferentialSeq</a> spreadsheet column descriptions:</h2>
+	<ol>
+		<li> #DisplayName - if the Integrated Genome Browser is open, clicking these hyper links will take you to that defined region/ gene in the genome browser.
+		<li> Name - present if found in the gene table.
+		<li> Chr  - chromosome 
+		<li> Strand - strand of the defined region
+		<li> Start  - start bp coordinate (0 based) for the defined region
+		<li> Stop - stop bp coordinate (end excluded) for the defined region
+		<li> TotalBPs - total base pairs of the defined region/ gene's exons. 
+		<li> PVal_ConditionA_ConditionB - uncorrected negative binomial -10*log10(pval) from DESeq for the paired ConditionA vs ConditionB comparison
+		<li> FDR_ConditionA_ConditionB - Benjamini-Hochberg -10*log10(FDR) estimation derived from the DESeq p-values
+		<li> VarCorLg2Rto_ConditionA_ConditionB - Log2 ratio estimation (pseudo median of ConditionA varCors - pseudo median of ConditionB varCors) for the degree of differential expression based on DESeq's variance corrected counts for each sample. 
+		<li> SpliceChiPVal_ConditionA_ConditionB - Bonferroni corrected chi-square test of independence -10*log10(pval) looking for differences in the distribution of reads between the exons for a particular gene.  Replica counts are merged for this analysis.
+		<li> SpliceMaxLg2Rto_ConditionA_ConditionB - The maximum observed log2Ratio for differential exonic splicing normalized for total gene counts.
+		<li> SpliceMaxExon_Treatment_Control - The zero based index for which exon displayed the maximum log2Ratio splicing difference.
+		<li> Counts_ConditionReplica - number of fragments from each replica that aligned to the defined region or gene exons.
+		<li> VarCorCounts_ConditionReplica   - DESeq's variance corrected fragment counts for each replica that aligned to the defined region or gene exons.
+		<li> FPKM_ConditionReplica - FPKM corrected fragment counts for each replica that aligned to the defined region or gene exons. FPKM = #fragments/TotalBPs/1000/#fragmentsInDataSet/1M
+	</ol>
+
+
+
+</body>
+</html>
+
+

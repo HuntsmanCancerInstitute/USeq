@@ -1,0 +1,141 @@
+<html>
+<head>
+	<title>USeq Compressed Binary Data Format 1.0</title>
+
+<style type="text/css">
+	#cr{text-align:center; color: #000000; font-weight: bold}
+	#rt{text-align:right; color: #000000; font-weight: bold}
+	#grBk {background-color: #CC9966;}
+	TD {font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}
+	H1 {color: #996633; font:arial; font-size:16;}
+	H2 {color: #996633; font:arial; font-size:12; text-align:left;}
+	BODY {color:black; background-color:white; font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}
+	
+	A:link    {text-decoration: none; color: #000000; font-weight: bold}  
+	A:visited {text-decoration: none; color: #000000; font-weight: bold}   
+	A:hover   {text-decoration: none; color: #FFCC66; font-weight: bold} 
+	A:active  {text-decoration: none; color: #000000; font-weight: bold}   
+</style>
+</head>
+
+<body>
+
+<H1>USeq Compressed Binary Data Format 1.0</H1>
+
+
+
+<H2>General Description:</H2>
+
+A useq archive is a zip compressed "directory" containing genomic data split by chromosome, strand, and slices of observations. 
+Its purpose is to provide a means to store and distribute massive genomic datasets using compressed preindexed minimal binary data formats.
+The Java code for reading and writing useq data is distributed through the <a href="http://genoviz.sourceforge.net">GenoViz</a> and 
+<a href="http://useq.sourceforge.net">USeq</a> sourceforge projects.  
+The <a href="http://igb.bioviz.org">Integrated Genome Browser</a> and <a href="http://bioserver.hci.utah.edu/BioInfo/index.php/Software:DAS2">GenoPub</a> 
+(a DAS/2 data distribution web app) support useq archives.<p>
+
+<i>The data types currently supported within an archive are:</i>
+ <ul>
+	<li>Position
+	<li>Position, score
+	<li>Position, text
+	<li>Position, score, text
+	<li>Start, stop
+	<li>Start, stop, score
+	<li>Start, stop, text
+	<li>Start, stop, score, text
+</ul>
+
+These cover most of the commonly used genomic data file types (e.g. xxx.bed, xxx.gff, xxx.sgr, xxx.gr, xxx.wig).
+Use the <a href="http://useq.sourceforge.net/cmdLnMenus.html#Text2USeq">Text2USeq</a> or <a href="http://useq.sourceforge.net/cmdLnMenus.html#Wig2USeq">Wig2USeq</a>
+ applications to convert text genomic data formats into USeq archives.
+Likewise, use the <a href="http://useq.sourceforge.net/cmdLnMenus.html#USeq2Text">USeq2Text</a> application to covert USeq archives into 6 
+column text bed files (chrom start stop text score strand).
+
+
+
+<p>
+<H2>General Guidelines:</H2>
+<ul>
+     <li>USeq archives are designated by the xxx.useq extension
+     <li>Interbase coordinates (first base is zero, last base in a range (start stop) is excluded, length = start - stop)
+     <li>Coordinates are relative to the sense + genomic strand
+     <li>Start <= stop (orientation is designated by the strand)
+     <li>Strand is either +, -, or .
+     <li>Each data slice within an archive contains the same data type
+     <li>The data within a slice is sorted first by start position and when appropriate, by length, shortest to longest
+     <li>Each data slice follows a particular naming convention (e.g. chrX+43455645-43456645-1000.isft, chrY_random.22345-23678-100.i), no spaces:
+		<ul>
+			<li>chromosome (e.g. chr5, chrX_random,  chr4_ctg9_hap1)
+			<li>strand (+, -, or .)
+			<li>first start bp position
+			<li>last start bp position + 1 (the +1 is used to follow the interbase range coordinates specification, starts are included, stops excluded)
+			<li>number of observations
+			<li>data type (a combination of the following single letters)
+				<ul>
+					<li>signed 16-bit short = s 
+					<li>signed 32-bit integer = i
+					<li>signed single-precision 32-bit IEEE 754 float = f
+					<li>UTF-8 text = t
+				</ul>
+		</ul>
+     <li>Data slices within an archive are in no particular order
+     <li>The first "file" within a useq archive is always a text 'archiveReadMe.xxx'.  
+</ul>
+<p>   
+<H2>Format archiveReadMe.xxx</H2> 
+	The archiveReadMe.xxx contains three required key=values as well as additional information related to the entire dataset.  
+    The format of the archiveReadMe.txt version is simply comment lines beginning with '#' that are not parsed and key=values delimited by a return, thus one per line.
+ 	The first '=' sign in each key = value is used to split the tokens. Keys must not contain '=' signs or white space. White space before and after the '=' is permitted.
+ 	When possible, use the reserve key names in the ArchiveInfo.java file and add new ones as needed. At some point an archiveReadMe.xml version with a DTD should be created, volunteers?<p>
+ 	
+ 	<i>There currently are three <b>required</b> reserved keys:</i>
+ 	<ul>
+		<li>useqArchiveVersion = 1.0 (only 1.0 at present)
+		<li>versionedGenome = H_sapiens_Mar_2006 (the Affymetrix form (species, three letter build month, and year) is prefered for reference genomes)
+		<li>dataType = graph, region, sequence, or other (a hint in how to render the data)
+ 	</ul>
+ 	
+ 	<i>Optional reserved keys:</i>
+ 	<ul>
+		<li>description = 
+		<li>originatingDataSource = 
+		<li>archiveCreationDate = 
+		<li>units = of the score value 
+ 	
+		<li>initialGraphStyle = Bar, Dot, Line, Min_Max_Ave, Stairstep, or HeatMap
+		<li>initialColor = hex color value (e.g. #B2B300) for observations
+		<li>initialBackground = hex color value for track background
+		<li>initialMinY = float for setting the minimum score value
+		<li>initialMaxY = float for setting the maximum score value
+ 	</ul>
+<p>
+<H2>Inner workings of a data slice serialization</H2>
+
+	See one of the USeqData files (e.g. RegionScoreTextData.java) for a code example illustrating the folowing. 
+	USeq archives make use start position offsets and region lengths in combination with zip compression to significantly reduces the size of the data.
+	The advanteges of using a zip archive are numerous and include data compression, random file access to each data slice, an extractible text readme file, 
+	cross platform (Windows, Mac, Linux...) / language support (Java, C++, Python, Perl), and maual manipulation of the archive after creation.<p>
+	
+	<i>For each data slice:</i>
+ 	<ul>
+		<li>The data slice is first scanned to see if shorts can be used for the start position offsets. If the gap between all subsequent start positions is less than 65536, shorts are used. Since Java has only signed types, the range of every short is extended by subtracting 32768.  
+		<li>Likewise, for start stop data, the lengths are scanned to see if shorts can be used in place of ints for the data slice.
+		<li>After writing the archiveReadMe.xxx to a zip stream, the data slices are written using this form:
+		<li>A zip entry is begun using the chrX+43455645-43456645-1000.isft naming convention
+		<li>A text/string UTF-8 value is written. Currently this is not used and defaults to "".
+		<li>The first observation is written.  This includes:
+		<ul>
+			<li>an int representing the real genomic bp position/ start
+			<li>if start stop data, the length of the region (stop-start) is written as either an int or a short
+			<li>lastly, any other data such as score and text are written for the first observation
+		</ul>
+		<li>The subsequent observations are written.
+		<ul>
+			<li>an int or short representing the offset from the prior observation (remember the data are sorted by start position)
+			<li>if start stop data, the length of the region (stop-start) is written as either an int or a short 
+			<li>lastly, any other data such as score and text
+		</ul>
+		<li>The zip entry is closed.
+	</ul>
+</body>
+</html>

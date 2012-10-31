@@ -1,0 +1,81 @@
+<html>
+<head>
+	<title>TiMAT2 (T2) Output File Type Descriptions</title>
+
+<style type="text/css">
+	#rt{text-align:right; color: #000000; font-weight: bold}
+	#grBk {background-color: #CC9966;}
+	TD {font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}
+	H1 {color: #996633; font:arial; font-size:16;}
+	H2 {color: #996633; font:arial; font-size:12;}
+	BODY {color:black; background-color:white; font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}
+	
+	A:link    {text-decoration: none; color: #000000; font-weight: bold}  
+	A:visited {text-decoration: none; color: #000000; font-weight: bold}   
+	A:hover   {text-decoration: none; color: #FFCC66; font-weight: bold} 
+	A:active  {text-decoration: none; color: #000000; font-weight: bold}   
+</style>
+</head>
+
+<body>
+<H1>TiMAT2 results typically include:</H1>
+<ul>
+	<li> If the <a href="cmdLnMenus.html#T2">T2</a> app was used to run the analysis in batch, a xxxt2ParameterFile.txt file used to launch the <a href="cmdLnMenus.html#T2">T2</a> application. This contains all of the application parameters used in processing the data.
+	<li> A QC folder containing hierarchical clustering of the raw mapped intensities. This isn't very useful for single replica experiments. The numbers are 100xR^2 Pearson correlation value and should be above 50.
+	<li> Three data folders containing information relevant to <b>Oligos</b>, <b>Windows</b>, and <b>Intervals</b>:
+		<ul>
+		<li><b>Oligos:</b> a simple log2(mean T/ mean C) ratio for each oligo in the dataset, the value is assigned to the center of the oligo.  Oligo data is typically broken down by chromosome and stored as binary xxx.bar files for viewing in IGB.
+		<li><b>Windows:</b> several different measurements related to the overlapping window scanning summary statistics. These are best used for visualization in a browser. For each summary score, two types of window representations are given. xxxHM is a window representation best viewed in IGB as a stair step or black and white heatmap. The xxx folder are point window summaries where the window score is assigned to the center position in the window.
+			<ul>
+			<li> Sum: Wilcoxon Rank Sum test, values are a -1*log10(p-value), this is one of the better pvalue tests but still yields all kinds of false positives
+			<li> Pse: all layer pseudomedian relative difference, this is a robust signal estimation and is recommended for ranking and viewing your results. A relative difference is ratio between the difference in intensities and the average intensity (t-c) / ((t+c)/2). Relative differences have proven to be a better transformation than log2.
+			<li> RndPVal: random label permutation based uncorrected p-value using either the trm or pse window scores, -10Log10(p-value) transformed			
+			<li> RndFDR: random label permutation based FDR using either the trm or pse window scores, -10Log10(FDR) transformed
+			<li> QVal: a multiple test corrected p-value estimation based on Richard Bourgon's symetric null test and the pseudomedian relative difference scores. Values are a -1*log10(q-value) transformation. Of all the confidence estimators, this has proven to be the best. Although, it varies up to 4x between experiments. 
+			</ul>
+		<li><b>Intervals:</b> Intervals are collapsed overlapping windows and best used for downstream analysis. Several different sets of intervals are created by lowering the pse score threshold to produce the top 100, 200, 400 ... intervals. For each interval set, the following are generated.
+			<ul>
+			<li> SpreadSheetReports: spreadsheet report for the interval set, lots of info, these are ordered by the median ratio of the best subwindow, most significant on top.
+			<li> Sgr: a text file representing each interval in the xxx.sgr format for viewing in IGB. The values are a slice of the Oligo graph.
+			<li> Bed: a text file representing each interval in the xxx.bed format. Simple start stop. Ranked most significant to least. 
+			<li>Interval plots containing individual oligo graphs as png images. Graph order: </li>
+				<ol>
+				<li>Mean oligo treatment, red</li>
+				<li>Mean oligo control, green</li>
+				<li>Difference, yellow</li>
+				<li>Log2 ratio, blue</li>
+				<li>Smoothed ratio, white</li>
+				<li>Three bars representing the peak picker results (grey/red), the best window (yellow), the best sub window (pink)</li>
+				<li>The number of exact matches of a particular oligo to the genome, white</li>
+				<li>Individual cel file treatment intensities, red</li>
+				<li>Individual cel file control intensities, green</li>
+				</ol>
+			</ul>
+		</ul>
+</ul>
+
+
+<br>
+
+<h1>File/ Directory Index:</h1>
+<center>
+<table ID='grBk' width="750" cellspacing="5" cellpadding="2" >
+<tr><td ID='rt'>Trm <td> Trimmed mean relative difference window score</tr>
+<tr><td ID='rt'>Pse <td> Pseudo median relative difference window score</tr>
+<tr><td ID='rt'>Sum <td> Wilcoxon rank sum window score, -10Log10(p-value) transformed</tr>
+<tr><td ID='rt'>QVal <td> Multiple test corrected symmetric p-value estimation of trm or pse window scores, -10Log10(q-value) transformed</tr>
+<tr><td ID='rt'>RndPVal <td> Random label permutation based uncorrected p-value using either the trm or pse window scores, -10Log10(p-value) transformed</tr>
+<tr><td ID='rt'>RndFDR <td> Random label permutation based FDR using either the trm or pse window scores, -10Log10(FDR) transformed</tr>
+<tr><td ID='rt'>Win <td> Directory containing serialized Window[]s for downstream TiMAT2 application use.</tr>
+<tr><td ID='rt'>Oligo <td> Individual aveT/ aveC oligo ratios, log2 transformed, score assigned to the center position of the oligo.</tr>
+<tr><td ID='rt'>HM <td> Heat map or stair step</tr>
+<tr><td ID='rt'>sgr.zip <td> SGR file format for direct viewing in IGB, text, tab delimited, chromosome position score.</tr>
+<tr><td ID='rt'>gr.zip <td> GR file format for viewing in IGB, be sure to select the appropriate chromosome in IGB prior to loading a gr file. Tab delimited, position score.</tr>
+<tr><td ID='rt'>bar <td> binary file format for viewing in IGB. See the <a href="cmdLnMenus.html#Bar2Gr">Bar2Gr</a> to convert to txt.</tr>
+<tr><td ID='rt'>bed <td> Tab delimited chrom, start, stop coordinates for the intervals</tr>
+<tr><td ID='rt'>xls <td> Excel spreadsheet containing a variety of statistics for each interval, tab delimited text.</tr>
+</table>
+</center>
+</body>
+
+</html>
