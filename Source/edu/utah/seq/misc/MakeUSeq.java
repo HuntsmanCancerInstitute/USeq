@@ -132,6 +132,7 @@ public class MakeUSeq {
 			"util/apps/ScoreSequences",
 			"trans/misc/Sgr2Bar",
 			"edu/utah/seq/data/Simulator",
+			"edu/utah/seq/base/SNPComparator",
 			"edu/utah/seq/analysis/StrandedBisSeq",
 			"util/bio/parsers/SRAProcessor",
 			"edu/utah/seq/data/SubSamplePointData",
