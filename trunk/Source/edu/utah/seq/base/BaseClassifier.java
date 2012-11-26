@@ -4,7 +4,9 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
+import org.apache.commons.math3.distribution.BinomialDistribution;
 import org.apache.commons.math3.distribution.NormalDistribution;
+import org.apache.commons.math3.stat.inference.ChiSquareTest;
 import org.apache.commons.math3.util.FastMath;
 
 import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
@@ -33,6 +35,7 @@ public class BaseClassifier {
 	private float minimumCorrelationDifference = 0.01f;
 	private double minimumLikelihood= 2;
 	private double minimumLikelihoodDifference = 0.1;
+	private int maxAdjacentDistance = 3;
 	private boolean printOnlyChanged = false;
 	private boolean useLikelihood = true;
 
@@ -41,8 +44,6 @@ public class BaseClassifier {
 	private int nMerAdder;
 	private HashMap<String, HashMap<String, NMer>> firstReadMatrixLookup = new HashMap<String, HashMap<String, NMer>>(1000000);
 	private HashMap<String, HashMap<String, NMer>> secondReadMatrixLookup = new HashMap<String, HashMap<String, NMer>>(1000000);
-	private HashMap<String, HashMap<String, Classifier>> firstReadClassifiers; 
-	private HashMap<String, HashMap<String, Classifier>> secondReadClassifiers; 
 	private HashMap<String, SAMRecord> changedAlignments = new HashMap<String, SAMRecord>();
 
 	private Bed[] variants;
@@ -78,6 +79,7 @@ public class BaseClassifier {
 		//load variants
 		System.out.println("Fetching variant associated alignments...");
 		variants = Bed.parseFile(bedFile, 0, 0);
+		Arrays.sort(variants);
 		variantAlignments = new VariantAlignment[variants.length][];
 
 		//make alignment readers
@@ -104,7 +106,6 @@ public class BaseClassifier {
 		//printModels();
 		
 		System.out.println("Calling variant alignments with models...");
-
 		scoreVariants();
 
 
@@ -115,7 +116,7 @@ public class BaseClassifier {
 		printBaseClassifierStats();
 		
 		//write out new bam file?
-		//writeBAM();
+		writeBAM();
 
 		//close alignment readers
 		for (int i=0; i< bamReaders.length; i++) bamReaders[i].close();
@@ -129,7 +130,10 @@ public class BaseClassifier {
 	//methods
 	
 	public void writeBAM(){
-		if (numVarAlignChanged2N ==0 && this.numVarAlignChanged2Novel == 0) return;
+		if (numVarAlignChanged2N ==0 && numVarAlignChanged2Novel == 0) {
+			System.out.println("\nNo changes made to bam files so not writing out new file.\n");
+			return;
+		}
 		
 		System.out.print("\nWriting modified BAM file(s)");
 		int counter = 0;
@@ -618,6 +622,76 @@ public class BaseClassifier {
 				}
 			}
 		}
+	}
+	
+	/*
+	public void scoreForStrandBias(){
+		System.out.println("Scoring variants for strand and position bias...");
+		double numVars = variants.length;
+		
+		//for each variant
+		for (int i=0; i< variants.length; i++){
+			Bed variant = variants[i];			
+			VariantAlignment[] vas = variantAlignments[i];
+			
+			//strand bias?
+			int numPlusStrand = 0;
+			int numMinusStrand = 0;
+			int maxReadLengthInt = 0;
+			for (VariantAlignment va : vas){
+				SAMRecord sam = va.getAlignment();
+				if (sam.getReadNegativeStrandFlag()) numMinusStrand++;
+				else numPlusStrand++;
+				if (maxReadLengthInt < sam.getReadLength()) maxReadLengthInt = sam.getReadLength();
+			}
+			double maxReadLength = maxReadLengthInt;
+			BinomialDistribution bd = new BinomialDistribution(numPlusStrand+numMinusStrand, 0.5);
+			double pvalStrand = bd.getProbabilityOfSuccess() * numVars;
+			
+			//position bias? 
+			int numBasesPerBlock = maxReadLength/5.0;
+			double expect = ((double)(numPlusStrand+numMinusStrand)) / 5 ;
+			long[] hits = new long[5];
+			double[] expects = new double[5];
+			Arrays.fill(expects, expect);
+			for (VariantAlignment va : vas){
+				int centerIndex = va.getCenterIndex();
+				//scale it?
+				int readLength = va.getAlignment().getReadLength();
+				if (readLength != maxReadLength) {
+					float scalar = (float)maxReadLength/ (float)readLength;
+					centerIndex = Math.round(scalar * (float)centerIndex);
+				}
+				hits[centerIndex]++;
+			}
+			//probably not a good test since there are alot of cells with zero, better to bin by quartile and score
+			ChiSquareTest chi = new ChiSquareTest();
+			double pvalPosition = chi.chiSquareTest(expects, hits) * numVars;
+			
+			//adjacent variants?
+			boolean adjacentFound = false;
+			//look left
+			if (i!=0){
+				Bed pre = variants[i-1];
+				adjacentFound = checkForAdjacentVariant(pre, variant);
+			}
+			//look right
+			if (adjacentFound == false){
+				int index = i+1;
+				if (index != variants.length) {
+					Bed post = variants[index];
+					adjacentFound = checkForAdjacentVariant(variant, post);
+				}
+			}
+			
+		}
+	}*/
+	
+	public boolean checkForAdjacentVariant(Bed left, Bed right){
+		if (left.getChromosome().equals(right.getChromosome())){
+			if (left.intersects(right.getStart()- maxAdjacentDistance, right.getStop()+ maxAdjacentDistance)) return true;
+		}
+		return false;
 	}
 
 	public void loadVariantAlignments(){
