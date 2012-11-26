@@ -54,9 +54,12 @@ public class VCFParser {
 				fields = TAB.split(line);
 				if (fields.length != VCFRecord.numberColumnsInVCFRecord){
 					System.err.println("Malformed VCF Record skipping -> "+line);
-					if (badCounter++ > 100) throw new Exception("Too many malformed VCF Records.");
+					if (badCounter++ > 100) throw new Exception("\nToo many malformed VCF Records.\n");
 					continue;
 				}
+				//no info? skip it
+				if (fields[VCFRecord.sampleIndex].startsWith("./.:.:")) continue;
+				
 				//get chromosome and position
 				String chr = fields[VCFRecord.chromosomeIndex];
 				VCFRecord vcf = new VCFRecord(fields);
@@ -67,15 +70,17 @@ public class VCFParser {
 				}
 				int position = vcf.getPosition();
 				//initialize 
-				if (oldChrom == null) oldChrom = chr;
+				if (oldChrom == null) {
+					oldChrom = chr;					
+				}
 				else if (chr.equals(oldChrom) == false){
 					//new chrom so close old
 					setChromData(oldChrom, records, positions);
-					oldPosition = position;
-					oldChrom = chr;
+					oldPosition = -1;
+					oldChrom = chr;					
 				}
 				//check position 
-				if (oldPosition >= position) throw new Exception ("New position "+position+" is < or = prior position "+oldPosition);
+				if (oldPosition >= position) throw new Exception ("\nNew position "+position+" is < or = prior position "+oldPosition+".  Is your vcf file sorted?\n");
 				//save
 				positions.add(position);
 				records.add(vcf);
@@ -87,6 +92,7 @@ public class VCFParser {
 		}catch (Exception e) {
 			System.err.println("\nAborting, problem parsing vcf record -> "+line);
 			e.printStackTrace();
+			System.exit(1);
 		} finally{
 			try {
 				in.close();
