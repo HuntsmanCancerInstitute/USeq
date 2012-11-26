@@ -28,8 +28,8 @@ public class Classifier {
 			for (int j=0; j< obsInts.length; j++){
 				double d = density(obsInts[j], meansACGT[i][j], stdsACGT[i][j]);
 //System.out.println("\t"+d+" "+Math.log(d));
-				if (d <=0) Misc.printErrAndExit("Zero density? ");
-				acgtSums[i] += Math.log(d);
+				if (d <=0) System.err.println("Negative/ zero density observed, skipping "+obsInts[j]+" "+meansACGT[i][j]+" "+stdsACGT[i][j]);
+				else acgtSums[i] += Math.log(d);
 			}
 			//delog it
 			acgtSums[i] = Num.antiLog(acgtSums[i], Math.E);

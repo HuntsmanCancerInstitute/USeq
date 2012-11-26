@@ -30,8 +30,8 @@ public class VariantAlignment{
 		centerIndex = findReadIndex(centerReferenceBasePosition,alignment);
 
 		if (centerIndex == -1) {
-			System.err.println("\nCenterBase is not in this alignment? Deletion? Skipping\n"+alignment.getSAMString()+centerReferenceBasePosition);
-			findReadIndexDebug(centerReferenceBasePosition, alignment);
+			//System.err.println("\nCenterBase is not in this alignment? Deletion? Skipping\n"+alignment.getSAMString()+centerReferenceBasePosition);
+			//findReadIndexDebug(centerReferenceBasePosition, alignment);
 		}
 		else {
 			//define start stop
@@ -225,7 +225,7 @@ public class VariantAlignment{
 		System.arraycopy(likelihoodACGTRatios, 0, sorted, 0, sorted.length);
 		Arrays.sort(sorted);
 
-		//does it pass minimum correlation
+		//does it pass minimum likelihood?
 		if (sorted[3] < baseClassifier.getMinimumLikelihood()) {
 			baseClassifier.incrementNumVarAlignFailingMinCor();
 			baseClassifier.incrementNumVarAlignChanged2N();
