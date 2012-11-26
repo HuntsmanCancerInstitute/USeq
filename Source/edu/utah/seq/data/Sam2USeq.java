@@ -449,17 +449,34 @@ public class Sam2USeq {
 
 
 			}
-		} catch (EOFException eof){		
-			
-			//make PositionScore[]
-			PositionScore[] positions = makeStairStepGraph(firstBase, baseCounts);
+		} catch (EOFException eof){	
+			PositionScore[] positions = null;
 
-			//write data to disk
-			SliceInfo sliceInfo = new SliceInfo(chromData.chromosome, chromData.strand,0,0,0,null);
-			PositionScoreData psd = new PositionScoreData (positions, sliceInfo);
-			psd.sliceWritePositionScoreData(rowChunkSize, tempDirectory, files2Zip);
+			//do they want relative read coverage graphs and good block counts?
+			if (makeRelativeTracks && minimumCounts !=0){
+				//first make positions without scaling
+				positions = makeStairStepGraph(firstBase, baseCounts, false);
+				//make blocks 
+				makeGoodBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
+				//now make positions with scaling, this will alter the baseCounts
+				positions = makeStairStepGraph(firstBase, baseCounts, true);
+				//write data to disk
+				SliceInfo sliceInfo = new SliceInfo(chromData.chromosome, chromData.strand,0,0,0,null);
+				PositionScoreData psd = new PositionScoreData (positions, sliceInfo);
+				psd.sliceWritePositionScoreData(rowChunkSize, tempDirectory, files2Zip);
+			}
 
-			if (minimumCounts !=0) makeGoodBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
+			else {
+				//make PositionScore[]
+				positions = makeStairStepGraph(firstBase, baseCounts, makeRelativeTracks);
+
+				//write data to disk
+				SliceInfo sliceInfo = new SliceInfo(chromData.chromosome, chromData.strand,0,0,0,null);
+				PositionScoreData psd = new PositionScoreData (positions, sliceInfo);
+				psd.sliceWritePositionScoreData(rowChunkSize, tempDirectory, files2Zip);
+
+				if (minimumCounts !=0) makeGoodBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
+			}
 
 			//delete file
 			chromData.binaryFile.delete();
@@ -490,10 +507,10 @@ public class Sam2USeq {
 		}
 	}
 
-	/**Makes a stairstep graph from base count data.  The firstBase is added to the index to create a bp position*/
-	public PositionScore[] makeStairStepGraph(int firstBase, float[] baseCount){
+	/**Makes a stairstep graph from base count data.  The firstBase is added to the index to create a bp position.  Note if you scaleCounts then the original float[] is modified!*/
+	public PositionScore[] makeStairStepGraph(int firstBase, float[] baseCount, boolean scaleCounts){
 		//scale it?
-		if (makeRelativeTracks){
+		if (scaleCounts){
 			for (int i=0; i< baseCount.length; i++){
 				if (baseCount[i] !=0) baseCount[i] = baseCount[i]/scalar;
 			}
@@ -687,7 +704,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam 2 USeq : Aug 2012                             **\n" +
+				"**                                Sam 2 USeq : Nov 2012                             **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
