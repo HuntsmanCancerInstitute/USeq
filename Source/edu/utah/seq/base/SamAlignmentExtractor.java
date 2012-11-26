@@ -67,6 +67,12 @@ public class SamAlignmentExtractor {
 			//make output writer
 			File intSam = new File (bedFile.getParentFile(), Misc.removeExtension(bedFile.getName())+".sam.gz");
 			samOut = new Gzipper(intSam);
+			
+			//add header from first reader
+			String header = samReaders[0].getFileHeader().getTextHeader();
+			if (header != null){
+				samOut.println(header.trim());
+			}
 
 			//for each chromosome of gene models
 			System.out.println("\nScanning regions by chromosome... ");
@@ -218,7 +224,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Sam Alignment Extractor: Aug 2012                     **\n" +
+				"**                            Sam Alignment Extractor: Nov 2012                     **\n" +
 				"**************************************************************************************\n" +
 
 				"Given a bed file containing regions of interest, parses all of the intersecting sam\n" +
