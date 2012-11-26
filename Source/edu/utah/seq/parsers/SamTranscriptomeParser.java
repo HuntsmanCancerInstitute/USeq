@@ -249,7 +249,11 @@ public class SamTranscriptomeParser{
 				}
 
 				//convert possible splice junctions to genomic coordinates, toss MD and RG tags
-				if (sa.convertTranscriptomeAlignment(true) == false) Misc.printErrAndExit("Failed to convert\n"+sa);
+				if (sa.convertTranscriptomeAlignment(true) == false) {
+					System.err.println("Failed to convert, skippping ->\n"+sa);
+					numberPassingAlignments--;
+					continue;
+				}
 
 				String readName = sa.getName();
 
@@ -325,6 +329,23 @@ public class SamTranscriptomeParser{
 
 			int numberFirstPair = firstPair.size();
 			int numberSecondPair = secondPair.size();
+
+			//fix mate info in pairs? Can only do this if one first and one second.  Don't know how to join up repeat matches?
+			if (secondPairPresent && numberFirstPair == 1 && numberSecondPair == 1){
+				SamAlignment first = firstPair.get(0);
+				SamAlignment second = secondPair.get(0);
+
+				//any junctions?
+				if (first.isConvertedJunctionCoordinates()){
+					second.setMateReferenceSequence(first.getReferenceSequence());
+					second.setMatePosition(first.getPosition());
+				}
+				if (second.isConvertedJunctionCoordinates()){
+					first.setMateReferenceSequence(second.getReferenceSequence());
+					first.setMatePosition(second.getPosition());
+				}
+
+			}
 
 			//print em?
 			if (numberFirstPair <= maxMatches && numberSecondPair <=maxMatches){
@@ -601,7 +622,7 @@ public class SamTranscriptomeParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Sam Transcriptome Parser: July 2012                     **\n" +
+				"**                          Sam Transcriptome Parser: Nov 2012                      **\n" +
 				"**************************************************************************************\n" +
 				"STP takes SAM alignment files that were aligned against chromosomes and extended\n" +
 				"splice junctions (see MakeTranscriptome app), converts the coordinates to genomic\n" +
@@ -612,7 +633,7 @@ public class SamTranscriptomeParser{
 				"\nOptions:\n"+
 				"-f The full path file or directory containing raw xxx.sam(.gz/.zip OK) file(s).\n" +
 				"      Multiple files will be merged.\n" +
-				
+
 				"\nDefault Options:\n"+
 				"-s Save file, defaults to that inferred by -f. If an xxx.sam extension is provided,\n" +
 				"      the alignments won't be sorted by coordinate or saved as a bam file.\n"+
@@ -632,7 +653,7 @@ public class SamTranscriptomeParser{
 				"      header from the read data.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/SamTranscriptomeParser -f /Novo/Run7/\n" +
-				"     -m 20 /Novo/STPParsedBamFiles/run7.bam -u \n\n" +
+				"     -m 20 /Novo/STPParsedBams/run7.bam -u \n\n" +
 
 		"**************************************************************************************\n");
 
