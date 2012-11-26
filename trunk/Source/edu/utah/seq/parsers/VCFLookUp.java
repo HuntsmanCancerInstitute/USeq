@@ -30,13 +30,29 @@ public class VCFLookUp {
 		}
 		return vals ;
 	}
+	
+	/**Returns an array of VCFRecord containing the slice defined by the start and stop(excluded). Returns null if none found.*/
+	public VCFRecord[] fetchVCFRecordsDebug (int startBp, int stopBp){
+		System.out.println("Looking for "+startBp+" "+stopBp);
+		int[] indexes = findIndexes (startBp, stopBp);	
+		if (indexes == null || indexes[0] == indexes[1]) return null;
+		int num = indexes[1] - indexes[0];
+		if (num ==0) return null;
+		VCFRecord[] vals = new VCFRecord[num];
+		int counter = 0;
+		for (int i=indexes[0]; i< indexes[1]; i++){
+			vals[counter++] = vcfRecord[i];
+			System.out.println("\tFound vcf "+vcfRecord[i].toStringSimple());
+		}
+		return vals ;
+	}
 
 	/**Given a start bp (included) and stop bp (not included), returns start (included) and stop (not included) indexes.
 	 * May return startIndex = endIndex, therefore nothing found.*/
 	public int[] findIndexes(int startBp, int stopBp){
 		//find start index, included
 		int startIndex = Arrays.binarySearch(basePosition, startBp);
-//todo Why not this? Arrays.binary(arg0, arg1)
+
 		if (startIndex < 0) {
 			startIndex = (startIndex*-1) -1;
 		}

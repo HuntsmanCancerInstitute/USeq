@@ -44,8 +44,8 @@ public class VCFRecord {
 	
 	//fields
 	private int position;
-	private char reference;
-	private char alternate;
+	private String reference;
+	private String alternate;
 	private String filter;
 	private String info;
 	private String[] sample;
@@ -57,19 +57,59 @@ public class VCFRecord {
 	public static final int filterIndex = 6;
 	public static final int infoIndex = 7;
 	public static final int sampleIndex = 9;
+	public static final int sampleGenotypeIndex =0;
+	public static final int sampleScoreIndex =7;
 	public static final int numberColumnsInVCFRecord = 10;
 	public static final Pattern colon = Pattern.compile(":");
 	
 	/**Only extracts some of the fields from a record*/
 	public VCFRecord(String[] fields) throws Exception{
-		position = Integer.parseInt(fields[positionIndex]);
-		reference = fields[referenceIndex].charAt(0);
-		alternate = fields[alternateIndex].charAt(0);
+		//must subtract 1 from position to put it into interbase coordinates
+		position = Integer.parseInt(fields[positionIndex]) - 1;
+		reference = fields[referenceIndex];
+		alternate = fields[alternateIndex];
 		filter = fields[filterIndex];
 		info = fields[infoIndex];
 		sample = colon.split(fields[sampleIndex]);
 	}
 	
+	public String toStringSimple(){
+		StringBuilder sb = new StringBuilder();
+		sb.append(position);
+		sb.append("\t");
+		sb.append(reference);
+		sb.append("\t");
+		sb.append(alternate);
+		sb.append("\t'");
+		sb.append(getSampleGenotype());
+		sb.append("'\t");
+		sb.append(getSampleScore());
+		return sb.toString();
+	}
+	
+	public String getSampleGenotype(){
+		return sample[sampleGenotypeIndex];
+	}
+	
+	public boolean isGenotypeHomozygous(){
+		if (sample[sampleGenotypeIndex].equals("1/1") || sample[sampleGenotypeIndex].equals("0/0")) return true;
+		return false;
+	}
+	
+	/**Returns either the alternate+alternate, reference+alternate, alternate+reference, reference+reference based on the genotype 1/1, 0/1, 1/0, 0/0; or null if none found.*/
+	public String getCalledBases(){
+		if (sample[sampleGenotypeIndex].equals("1/1")) return alternate+alternate;
+		if (sample[sampleGenotypeIndex].equals("0/1")) return reference+alternate;
+		//these should probably never be called
+		if (sample[sampleGenotypeIndex].equals("0/0")) return reference+reference;
+		if (sample[sampleGenotypeIndex].equals("1/0")) return alternate+reference;
+		return null;
+	}
+	
+	public String getSampleScore(){
+		return sample[sampleScoreIndex];
+		              
+	}
 	public String getSampleField(int index){
 		return sample[index];
 	}
@@ -82,19 +122,19 @@ public class VCFRecord {
 		this.position = position;
 	}
 
-	public char getReference() {
+	public String getReference() {
 		return reference;
 	}
 
-	public void setReference(char reference) {
+	public void setReference(String reference) {
 		this.reference = reference;
 	}
 
-	public char getAlternate() {
+	public String getAlternate() {
 		return alternate;
 	}
 
-	public void setAlternate(char alternate) {
+	public void setAlternate(String alternate) {
 		this.alternate = alternate;
 	}
 
