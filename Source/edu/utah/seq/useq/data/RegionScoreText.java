@@ -57,6 +57,9 @@ public class RegionScoreText extends RegionScore{
 			}
 		}
 	}
+	public String toStringUnderscore(){
+		return start+"_"+stop+"_"+score+"_"+text;
+	}
 	public String getBedLine (String chromosome){
 		return chromosome+"\t"+start+"\t"+stop+"\t"+text+"\t"+score+"\t.";
 	}
