@@ -10,8 +10,12 @@ import edu.utah.seq.useq.SliceInfo;
 import edu.utah.seq.useq.USeqUtilities;
 import edu.utah.seq.useq.data.PositionScore;
 import edu.utah.seq.useq.data.PositionScoreData;
+import edu.utah.seq.useq.data.Region;
+import edu.utah.seq.useq.data.RegionScoreText;
 import net.sf.samtools.*;
 import net.sf.samtools.SAMRecord.SAMTagAndValue;
+import util.bio.annotation.Bed;
+import util.bio.annotation.Coordinate;
 import util.bio.annotation.ExportIntergenicRegions;
 import util.gen.*;
 
@@ -38,6 +42,9 @@ public class Sam2USeq {
 	private String adapter = "chrAdapt";
 	private String phiX = "chrPhiX";
 	private HashMap <String, ChromData> chromDataHash = new HashMap <String, ChromData>();
+	private HashMap<String,Region[]> regions = null;
+	private ArrayList<String> countedChromosomes = new ArrayList<String>();
+	private Histogram histogram;
 	private ArrayList<File> files2Zip = new ArrayList<File>();
 	private float scalar = 0;
 	private Pattern cigarSub = Pattern.compile("(\\d+)([MSDHN])");
@@ -101,6 +108,27 @@ public class Sam2USeq {
 		makeCoverageTracks();
 
 		if (minimumCounts !=0) bedOut.close();
+		
+		
+		//finish read depth coverage stats
+		finishReadDepthStats();
+	}
+	
+	public void finishReadDepthStats(){
+		if (regions != null){
+			
+			//increment regions not scanned
+			for (String chromStrand: countedChromosomes) regions.remove(chromStrand);
+			for (Region[] chromRegions: regions.values()){
+				for (Region r: chromRegions){
+					int length = r.getLength();					
+					for (int i=0; i < length; i++) histogram.count(0);
+				}
+			}
+			
+			//print histogram
+			printHistogramStats();
+		}
 	}
 
 	public void splitSamBamFiles(){
@@ -159,12 +187,13 @@ public class Sam2USeq {
 
 					//make chromosome strand
 					String chromosome = sam.getReferenceName();
-					String strand;
+					String strand = null;
 					if (stranded){
 						if (sam.getReadNegativeStrandFlag()) strand = "-";
 						else strand = "+";
 					}
 					else strand = ".";
+					
 					String chromosomeStrand = chromosome+strand;
 
 					//check cigar
@@ -227,117 +256,6 @@ public class Sam2USeq {
 		//set scalar
 		scalar = (float)(numberPassingAlignmentsForScaling/ 1000000.0);
 	}
-
-	/*
-	public void splitSamFiles(){
-		for (File samFile: samFiles){
-			if (verbose) System.out.print("\t"+samFile.getName());
-			try{
-				//get reader
-				BufferedReader in = IO.fetchBufferedReader(samFile);
-				String line;
-				int counter =0;
-				String currentChromStrand = "";
-				ChromData data = null;
-				int numBadLines = 0;
-				while ((line = in.readLine()) !=null){
-					//print status blip
-					if (++counter == 200000){
-						if (verbose) System.out.print(".");
-						counter = 0;
-					}
-					line = line.trim();
-					//skip header and blank lines
-					if (line.length() == 0 || line.startsWith("@")) continue;
-
-					SamAlignment sa;
-					try {
-						sa = new SamAlignment(line, false);
-					} catch (MalformedSamAlignmentException e) {
-						if (verbose) System.out.println("\nSkipping malformed sam alignment -> "+e.getMessage());
-						if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
-						continue;
-					}
-
-					//is it aligned?
-					if (sa.isUnmapped()) continue;
-
-					numberAlignments++;
-
-					//does it pass the vendor qc?
-					if (sa.failedQC()) continue;
-
-					//skip phiX and adapter
-					if (sa.getReferenceSequence().startsWith(phiX) || sa.getReferenceSequence().startsWith(adapter)) continue;
-
-					//does it pass the scores threshold?
-					if (sa.getAlignmentScore() > maximumAlignmentScore) continue;
-					if (sa.getMappingQuality() < minimumMappingQuality) continue;
-
-					//check for unique alignments? Not sure this works unless dups have been marked
-					if (uniquesOnly && sa.isADuplicate()) continue;
-
-					//increment counter
-					numberPassingAlignments++;
-
-					//make chromosome strand
-					String chromosome = sa.getReferenceSequence();
-					String strand;
-					if (stranded){
-						if (sa.isReverseStrand()) strand = "-";
-						else strand = "+";
-					}
-					else strand = ".";
-					String chromosomeStrand = chromosome+strand;
-
-					//check cigar
-					String cigar = sa.getCigar();
-					checkCigar(cigar, sa);
-
-					//get start 
-					int start = sa.getUnclippedStart();
-					int end = sa.getPosition() + sa.countLengthOfAlignment();
-
-					//get ChromData
-					if (currentChromStrand.equals(chromosomeStrand) == false){
-						currentChromStrand = chromosomeStrand;
-						//already present?
-						if (chromDataHash.containsKey(currentChromStrand)) {
-							//yes so fetch
-							data = chromDataHash.get(currentChromStrand);
-						}
-						else {
-							//no thus make new and set
-							File f = new File(tempDirectory, currentChromStrand);
-							DataOutputStream dos = new DataOutputStream(new BufferedOutputStream (new FileOutputStream(f)));
-							data = new ChromData (start, end, chromosome, strand, f, dos);
-							chromDataHash.put(currentChromStrand, data);
-						}
-					}
-
-					//set first and last?
-					if (start < data.firstBase) data.firstBase = start;
-					if (end > data.lastBase) data.lastBase = end;
-
-					//save data start and cigar
-					data.out.writeInt(start);
-					data.out.writeUTF(cigar);
-				}
-				if (verbose) System.out.println();
-			} catch (Exception e){
-				System.err.println("\nError parsing sam file or writing split binary chromosome files.\nToo many open files? Too many chromosomes? " +
-				"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
-				e.printStackTrace();
-				System.exit(1);
-			}
-			if (verbose) System.out.println();
-		}
-
-		closeWriters();
-
-		//set scalar
-		scalar = (float)(numberPassingAlignments/ 1000000.0);
-	}*/
 
 	private class ChromData{
 		//fields
@@ -410,7 +328,7 @@ public class Sam2USeq {
 		//make array to hold counts
 		int firstBase = chromData.firstBase;
 		int lastBase = chromData.lastBase;
-		float[] baseCounts = new float[1000 + lastBase - firstBase];
+		float[] baseCounts = new float[lastBase - firstBase];
 
 		//fetch dis
 		DataInputStream dis = null;
@@ -451,6 +369,28 @@ public class Sam2USeq {
 			}
 		} catch (EOFException eof){	
 			PositionScore[] positions = null;
+			
+			//calculate read coverage over interrogated regions
+			if (regions != null){
+				String chromStrand = chromData.chromosome+chromData.strand;
+				countedChromosomes.add(chromStrand);
+				//get regions
+				Region[] chrRegions = regions.get(chromStrand);
+				if (chrRegions != null) {
+					//for each region
+					for (Region r: chrRegions){
+						int start = r.getStart() - firstBase;
+						int stop = r.getStop() - firstBase;
+						//before counted bases? past end? Add zeros to all bases
+						for (int i=start; i< stop; i++){
+							//before or after scored bases
+							if (i < 0 || i >= baseCounts.length) histogram.count(0);
+							//nope inside
+							else histogram.count(baseCounts[i]);
+						}
+					}
+				}
+			}
 
 			//do they want relative read coverage graphs and good block counts?
 			if (makeRelativeTracks && minimumCounts !=0){
@@ -630,6 +570,7 @@ public class Sam2USeq {
 		Pattern pat = Pattern.compile("-[a-z]");
 		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		File forExtraction = null;
+		File regionFile = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -646,6 +587,7 @@ public class Sam2USeq {
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'c': minimumCounts  = Float.parseFloat(args[++i]); break;
 					case 'l': minimumLength  = Integer.parseInt(args[++i]); break;
+					case 'b': regionFile = new File(args[i+1]); i++; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -664,6 +606,18 @@ public class Sam2USeq {
 		samFiles = IO.collapseFileArray(tot);
 		if (samFiles == null || samFiles.length ==0 || samFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.sam(.zip/.gz) file(s)!\n");
 
+		//stranded and regionFile?
+		if (regionFile !=null){
+			regions = Bed.parseRegions(regionFile, stranded == false);
+			histogram = new Histogram(0, 101, 101);
+			//watch out for stranded analysis
+			if (stranded) {
+				for (String s : regions.keySet()){ 
+					if (s.endsWith(".")) Misc.printErrAndExit("\nError: cannot perform a stranded analysis with non stranded interrogated regions.  Aborting.\n");
+				}
+			}
+		}
+		
 		//genome version?
 		if (versionedGenome == null) Misc.printErrAndExit("\nPlease provide a versioned genome (e.g. H_sapiens_Mar_2006).\n");
 
@@ -694,17 +648,36 @@ public class Sam2USeq {
 			System.out.println(maximumAlignmentScore+"\tMaximum alignment score.");
 			if (minimumCounts !=0){
 				System.out.println(minimumCounts+"\tMinimum counts.");
-				System.out.println(minimumLength+"\tMinimum length.\n");
+				System.out.println(minimumLength+"\tMinimum length.");
 			}
+			if (regionFile!= null) System.out.println(regionFile.getName()+"\tInterrogated region file.");
 		}
 
 
 	}	
+	
+	public void printHistogramStats(){
+			System.out.println("\nInterrogated region read depth coverage statistics");
+			int[] counts = histogram.getBinCounts();
+			double total = histogram.getTotalBinCounts();
+
+			System.out.println("BaseCoverage\tObservedBasesWithGivenCoverage\tFractionObserved\tFractionObservedWithGivenOrMoreCoverage");
+			double numCounts = 0;
+			for (int i=0; i< counts.length; i++){
+				double fract = (double)counts[i] / total;
+				double cumFrac = (total-numCounts)/ total;
+				System.out.println(i+"\t"+counts[i]+"\t"+ Num.formatNumber(fract, 3) +"\t"+Num.formatNumber(cumFrac, 3));
+				numCounts += counts[i];
+				if (numCounts == total) break;
+			}
+			System.out.println("Total interrogated bases "+(int)total);
+
+	}
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam 2 USeq : Nov 2012                             **\n" +
+				"**                                Sam 2 USeq : Dec 2012                             **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
@@ -727,13 +700,16 @@ public class Sam2USeq {
 				"      total number of genome wide alignments for that read.  Repeat alignments are\n" +
 				"      thus given fractional count values at a given location. Requires that the IH\n" +
 				"      tag was set.\n"+
+				"-b Path to a region bed file (tab delim: chr start stop ...) to use in calculating\n" +
+				"      read coverage statistics.  Be sure these do not overlap! Run the MergeRegions app\n" +
+				"      if in doubt.\n"+ 
 				"-c Print regions that meet a minimum # counts, defaults to 0, don't print.\n"+
 				"-l Print regions that also meet a minimum length, defaults to 0.\n"+
 
 				"\n"+
 
 				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r\n"+
-				"     -v H_sapiens_Feb_2009 -s\n\n"+
+				"     -v H_sapiens_Feb_2009 -b ccdsExons.bed.gz \n\n"+
 
 		"**************************************************************************************\n");
 
