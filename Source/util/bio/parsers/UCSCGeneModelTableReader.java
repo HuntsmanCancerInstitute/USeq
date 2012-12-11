@@ -18,8 +18,8 @@ public class UCSCGeneModelTableReader {
 	public static void main(String[] args){
 		//(new UCSCGeneModelTableReader (new File (args[0]), 1)).readOutHash();
 		UCSCGeneModelTableReader reader = new UCSCGeneModelTableReader (new File (args[0]), 0);
-		
-		reader.removeOverlappingExons();
+		System.out.println("Num lines "+reader.getGeneLines().length);
+		//reader.removeOverlappingExons();
 		/*
 		UCSCGeneLine[] genes = reader.getGeneLines();
 		//print introns
