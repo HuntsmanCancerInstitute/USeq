@@ -1,3 +1,27 @@
+----USeq_8.4.6----
+CompareIntersectingRegions 
+* New app for comparing hits to a master list of regions given one or more test region files.  Good for ranking master regions by number of hits from other lists.
+SamAlignmentExtractor
+* Added feature to put header from first bam file onto output gzipped sam file.
+RNAEditingPileUpParser
+* Added a check for base fraction editing that is > 1 due to weirdness with mpileup output.
+* Added feature to output PointData for Edited and Reference A positions for use with downstream methylome analysis apps.
+* Fixed a bug that was counting mpileup INDEL bases as edited bases.
+Sam2USeq
+* Added feature to take a file of regions and calculate base coverage statistics.  
+SamTranscriptomeParser
+* Added feature to output read depth stats for a given list of interrogated bases.
+
+
+----USeq_8.4.5----
+Sam2USeq
+* Fixed a bug with generating regions passing a defined read coverage.  If relative graphs were being generated then the app was thresholding for high coverage regions using the relative score instead of the read count.
+SamTranscriptomeParser
+* Added a checker for broken zero exon length splice junctions in alignments.  A warning is now thrown and these are skipped.
+* For unique paired alignments, fixed the mate referenced and mate position for those hitting splice or transcript junctions.  These were still pointing to their non genomic coordinates.
+UCSCGeneModelTableReader
+* Added checker for zero length exons.  This will effect every USeq app that loads a UCSC gene table. It aborts if found.
+
 ----USeq_8.4.4----
 MultipleReplicaScanSeqs
 * Modified check for DESeq error message when dispersion fit fails.  New DESeq is using a different error message!  
