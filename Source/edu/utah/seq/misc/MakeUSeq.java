@@ -46,6 +46,7 @@ public class MakeUSeq {
 			"edu/utah/seq/analysis/BisStatRegionMaker",
 			"edu/utah/seq/analysis/ChIPSeq",
 			"util/bio/wrappers/CHPCAligner",
+			"util/apps/CompareIntersectingRegions",
 			"edu/utah/seq/parsers/CompareParsedAlignments",
 			"util/bio/seq/ConcatinateFastas",
 			"edu/utah/seq/data/CorrelatePointData",
