@@ -241,8 +241,10 @@ System.out.println("\trc "+basesRev);
 					switch (test){
 					case 'v': sequencingVCFFile = new File(args[++i]); break;
 					case 'b': arraySnpBedFile = new File(args[++i]); break;
-					case 's': minimumArrayScore = Float.parseFloat(args[++i]); break;
+					case 'a': minimumArrayScore = Float.parseFloat(args[++i]); break;
+					case 's': minimumVCFScore = Double.parseDouble(args[++i]); break;
 					case 'g': genomeVersion = args[++i];
+					
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -271,6 +273,8 @@ System.out.println("\trc "+basesRev);
 				"Options:\n"+
 				"-v VCF file (xxx.vcf(.gz/.zip OK).\n"+
 				"-b Bed file containing array snp calls.\n"+
+				"-a Minimum array SNP score, defaults to 0.9 .\n"+
+				"-s Minimum vcf variant score, defaults to 0.01 .\n"+
 				"-g Genome version, defaults to hg19.\n"+
 
 				"\n"+
