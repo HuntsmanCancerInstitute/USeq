@@ -92,6 +92,8 @@ public class UCSCGeneLine {
 					Misc.printExit("\nError: problem parsing exons from "+Misc.stringArrayToString(tokens, "\t"));
 				}
 				for (int j=0; j< exonCount; j++){
+					int stop = stops[j]-numToSubtractFromEnd;
+					if (stop <= starts[j] ) Misc.printExit("\nError: One of your exon stops is <= its start! Correct and restart.  See ->\n"+Misc.stringArrayToString(tokens, "\t"));
 					exons[j] = new ExonIntron(starts[j], stops[j]-numToSubtractFromEnd);
 				}
 				if (exonCount > 1) Arrays.sort(exons);
