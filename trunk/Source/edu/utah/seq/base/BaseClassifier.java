@@ -33,11 +33,13 @@ public class BaseClassifier {
 	private String cigar = "101M";
 	private float minimumCorrelation= 0.85f;
 	private float minimumCorrelationDifference = 0.01f;
-	private double minimumLikelihood= 2;
-	private double minimumLikelihoodDifference = 0.1;
+	private double minimumLikelihood= 0.95;
+	private double minimumLikelihoodDifference = 0.5;
 	private int maxAdjacentDistance = 3;
-	private boolean printOnlyChanged = false;
+	private boolean printOnlyChanged = true;
 	private boolean useLikelihood = true;
+	private boolean printLikelihoods = false;
+	private boolean setRecalledBasesToN = true;
 
 	//internal
 
@@ -109,7 +111,7 @@ public class BaseClassifier {
 		scoreVariants();
 
 
-		System.out.println("\nWriting variants to file...");
+		System.out.println("\nPrinting variants with alignments...");
 		printVariants();
 
 		//print stats
@@ -141,14 +143,12 @@ public class BaseClassifier {
 		//for each bam reader
 		for (int i=0; i< bamFiles.length; i++){
 			//make writer
-			String name = Misc.removeExtension(bamFiles[i].getName());
-			File bam = new File(bamFiles[i].getParentFile(), name +"_BC.bam");
-			SAMFileWriter out = new SAMFileWriterFactory().makeBAMWriter(bamReaders[i].getFileHeader(), true, bam);
-			
-			//make indexer
-			//File bai = new File(bamFiles[i].getParentFile(), name +"_BC.bai");
-			//BAMIndexer indexOut = new BAMIndexer(bai, bamReaders[i].getFileHeader());
-			
+			String name = Misc.removeExtension(bamFiles[i].getName()) +"_Ml"+Num.formatNumber(minimumLikelihood, 1)+"Mld"+Num.formatNumber(minimumLikelihoodDifference, 1);
+			 
+			File bam = new File(bamFiles[i].getParentFile(), name +".bam");
+			SAMFileWriterFactory f = new SAMFileWriterFactory();
+			f.setCreateIndex(true);
+			SAMFileWriter out = f.makeBAMWriter(bamReaders[i].getFileHeader(), true, bam);
 			
 			//for each sam record
 			SAMRecordIterator it = bamReaders[i].iterator();
@@ -176,23 +176,14 @@ public class BaseClassifier {
 				sam.setAttribute("IT", null);
 
 				out.addAlignment(sam);
-				//indexOut.processAlignment(sam);
+				
 
 			}
 			it.close();
 			out.close();
-			//indexOut.finish();
 		}
 		System.out.println();
 		
-	}
-	
-	public void makeBamIndex (File bam){
-		//make reader
-		SAMFileReader in = new SAMFileReader(bam);
-		//make file out
-		File bai = new File (Misc.removeExtension(".bam") +".bai");
-		BAMIndexer.createAndWriteIndex(bam, bai, false);
 	}
 
 	public void printAlignmentStats(){
@@ -255,11 +246,7 @@ public class BaseClassifier {
 			
 			//any alignments?
 			VariantAlignment[] alignments = variantAlignments[i];
-			if (alignments == null){
-				if (printOnlyChanged == false) System.out.println(variant+"\tNo overlapping alignments ");
-			}
-			
-			else { 
+			if (alignments != null){
 				int[] countsACGTN = new int[5];
 				int[] cCountsACGTN = new int[5];
 				//for each VariantAlignment
@@ -290,6 +277,26 @@ public class BaseClassifier {
 					//any changes
 					sb.append("\t");
 					sb.append(changedVariant);
+					sb.append("\n");
+					
+					//print individual calls?
+					if (changedVariant == true && printLikelihoods == true){
+						
+						for (VariantAlignment va: alignments) {
+							sb.append("\t"+va.getIndexStrand()+"\t"+va.getVariantSeq()+"\t"+va.isChangedToN()+"\t"+va.isChangedToDiff()+"\t"+va.getAlignment().getReadName());
+							sb.append("\n\t");
+							for (String s: va.getVariantSeqs()) {
+								sb.append(s);
+								sb.append("\t");
+							}
+							sb.append("\n\t");
+							for (double s: va.getLikelihoodACGTRatios()) {
+								sb.append(s);
+								sb.append("\t");
+							}
+							sb.append("\n");
+						}
+					}
 					System.out.println(sb.toString());
 					
 				}
@@ -358,19 +365,6 @@ public class BaseClassifier {
 		
 		va.setLikelihoodACGTRatios(l);
 		va.callCenterBaseWithLikelihood();
-		
-		System.out.println("\n"+va.getIndexStrand()+" "+va.getVariantSeq());
-		for (String s: varSeqs) {
-			System.out.print(s);
-			System.out.print("\t");
-		}
-		System.out.println();
-		for (double s: l) {
-			System.out.print(s);
-			System.out.print("\t");
-		}
-		System.out.println();
-
 
 	}
 	
@@ -716,12 +710,14 @@ public class BaseClassifier {
 				for (int x=0; x< num; x++){
 					SAMRecord sam = al.get(x);
 					VariantAlignment va = new VariantAlignment(this, sam, centerBasePosition, nMerAdder);
-					//watch out for deletion alignments
-					if (va.getCenterIndex() != -1) alVA.add(va);
+					//watch out for deletion and N alignments
+					if (va.getIndexStrand() != null) alVA.add(va);
 				}
-				variantAlignments[i] = new VariantAlignment[alVA.size()];
-				alVA.toArray(variantAlignments[i]);
-				numVarAlign += variantAlignments[i].length;
+				if (alVA.size() !=0){
+					variantAlignments[i] = new VariantAlignment[alVA.size()];
+					alVA.toArray(variantAlignments[i]);
+					numVarAlign += variantAlignments[i].length;
+				}
 			}
 		}
 	}
@@ -782,7 +778,6 @@ public class BaseClassifier {
 		new BaseClassifier(args);
 	}		
 
-
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
@@ -796,6 +791,8 @@ public class BaseClassifier {
 					switch (test){
 					case 'a': bamFiles = IO.extractFiles(new File(args[++i]), ".bam"); break;
 					case 'v': bedFile = new File(args[++i]); break;
+					case 'l': minimumLikelihood = Double.parseDouble(args[++i]); break;
+					case 'd': minimumLikelihoodDifference = Double.parseDouble(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -851,6 +848,10 @@ public class BaseClassifier {
 
 	public double getMinimumLikelihoodDifference() {
 		return minimumLikelihoodDifference;
+	}
+
+	public boolean isSetRecalledBasesToN() {
+		return setRecalledBasesToN;
 	}
 
 
