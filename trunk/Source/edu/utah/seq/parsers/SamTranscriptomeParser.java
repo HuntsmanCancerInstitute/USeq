@@ -292,7 +292,7 @@ public class SamTranscriptomeParser{
 		return true;
 	}
 
-	/**Takes a block of alignments all originating from the same read.  Collapses those with the same coordinates and CIGAR.
+	/**Takes a block of alignments all originating from the same fragment.  Collapses those with the same coordinates and CIGAR.
 	 * Saves them if they pass a whole set of filters.*/
 	public void filterPrintAlignments(ArrayList<SamAlignment> al){
 		try {
@@ -344,6 +344,9 @@ public class SamTranscriptomeParser{
 					first.setMateReferenceSequence(second.getReferenceSequence());
 					first.setMatePosition(second.getPosition());
 				}
+				
+				//merge pairs?
+				//trimPairedAlignments (first, second);
 
 			}
 
@@ -401,6 +404,30 @@ public class SamTranscriptomeParser{
 
 		}
 	}
+	/**Eliminates overlap between paired reads
+	private void trimPairedAlignments(SamAlignment first, SamAlignment second) {
+		//trim them of soft clipped info
+		first.trimMaskingOfReadToFitAlignment();
+		second.trimMaskingOfReadToFitAlignment();
+		
+		//do they overlap?
+		int startBaseFirst = first.getPosition();
+		int stopBaseFirst = startBaseFirst + first.countLengthOfAlignment();
+		int startBaseSecond = second.getPosition();
+		int stopBaseSecond = startBaseSecond + second.countLengthOfAlignment();
+		if (stopBaseFirst <= startBaseSecond || startBaseFirst >= stopBaseSecond) return;
+		
+		//make arrays to hold sequence and qualites
+		int start = startBaseFirst;
+		if (startBaseSecond < start) start = startBaseSecond;
+		int stop = stopBaseFirst;
+		if (stopBaseSecond > stop) stop = stopBaseSecond;
+		int size = stop-start;
+		String[] firstSeq = new String[size];
+		
+		//what about insertions! how are you going to represent these
+		
+	}*/
 
 	public void printSam(SamAlignment sam, int numberRepeats){
 		//add/ replace IH tag for number of "Number of stored alignments in SAM that contains the query in the current record"
