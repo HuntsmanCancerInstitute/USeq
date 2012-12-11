@@ -17,186 +17,222 @@ import util.gen.*;
 public class RNAEditingPileUpParser {
 
 	//user defined fields
-	private File[] pileupFiles;
+	private File pileupFile;
 	private float minimumReadCoverage = 5.0f;
 	private float minimumFractionEditedBase = 0.01f;
 	private String versionedGenome;
+	private File saveDirectory;
+	private File nonConvertedPointDataDirectory;
+	private File convertedPointDataDirectory;
 	
 	//internal fields
 	private Pattern space = Pattern.compile("\\t");
 	private Pattern GBase = Pattern.compile("G");
 	private Pattern cBase = Pattern.compile("c");
+	private Pattern rBase = Pattern.compile("[\\.,]");
 	private int chromIndex = 0;
 	private int positionIndex = 1;
 	private int refseqIndex = 2;
-	private int readDepthIndex = 3;
+	//private int readDepthIndex = 3;
 	private int baseCallIndex = 4;
 	//private int baseScoreIndex = 5;
-	private File dataDirectory;
-	private ArrayList<File> dataFiles;
+	private File baseFractionEdited;
+	private ArrayList<Integer> positionsPlus = new ArrayList<Integer>();
+	private ArrayList<Float> conversionsPlus = new ArrayList<Float>();
+	private ArrayList<Float> nonConversionsPlus = new ArrayList<Float>();
+	private ArrayList<Integer> positionsMinus = new ArrayList<Integer>();
+	private ArrayList<Float> conversionsMinus = new ArrayList<Float>();
+	private ArrayList<Float> nonConversionsMinus = new ArrayList<Float>();
+	public static Pattern INDEL = Pattern.compile("[-+](\\d+)");
 
 	public RNAEditingPileUpParser(String[] args){
 		long startTime = System.currentTimeMillis();
 		processArgs(args);
 		
-		System.out.println("Processing pileup files:");
-		
-		for (File pf : pileupFiles){
-			System.out.println("\t" + pf.getName());
-			
-			parseFile(pf);
-			
-			convertToPointData();
-		}
+		System.out.println("Processing pileup file");
+		parseFile(pileupFile);
 		
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" min\n");
 	}
 	
-	public void convertToPointData(){
-		// for each data file
-		for (File dataFile: dataFiles){
-			String fileName = dataFile.getName();
-			int fileLength = fileName.length();
-			
-			String strand = fileName.substring(fileLength-1);
-			String chromosome = fileName.substring(0, fileLength-1);
-			
-			//parse binary data: position fraction
-			DataInputStream dis = null;
-			ArrayList<Point> ptAL = new ArrayList<Point>();
-			
-			try {
-				dis = new DataInputStream(new BufferedInputStream(new FileInputStream(dataFile)));
-				
-				while (true){
-					int position = dis.readInt();
-					float fraction = dis.readFloat();
-					ptAL.add(new Point (position, fraction));
-				}
-			} catch (EOFException eof){	
-				if (ptAL.size() != 0){
-					PointData pd = Point.extractPositionScores(ptAL);
-					Info info = new Info("ParsedPileUp", versionedGenome, chromosome, strand, 1, null);
-					pd.setInfo(info);
-					//save
-					pd.writePointData(dataDirectory);
-				}
-			}
-			catch (Exception e){
-				e.printStackTrace();
-				Misc.printErrAndExit("\nError encountered in parsing this binary file? "+dataFile);
-			} finally {
-				if (dis != null) {
-					try {
-						dis.close();
-					} catch (IOException ignored) {}
-				}
-			}
-		}
+	
+	public void clearArrayLists(){
+		positionsPlus.clear();
+		conversionsPlus.clear();
+		nonConversionsPlus.clear(); 
+		positionsMinus.clear();
+		conversionsMinus.clear();
+		nonConversionsMinus.clear();
 	}
 	
 	public void parseFile(File pileupFile){
 		try {
 			//input streams
 			BufferedReader in = IO.fetchBufferedReader(pileupFile);
-			String baseName = Misc.removeExtension(pileupFile.getCanonicalPath());
-			dataDirectory = new File (baseName+ "_" +(int)minimumReadCoverage +"RC"+minimumFractionEditedBase+"FE");
-			dataDirectory.mkdir();
-			dataFiles = new ArrayList<File>();
+			
+			//where to save base fraction edited
+			baseFractionEdited = new File (saveDirectory, "BaseFractionEdited_" +(int)minimumReadCoverage +"RC"+minimumFractionEditedBase+"FE");
+			baseFractionEdited.mkdir();
 			
 			//data output streams
-			String chromosome = "";
-			DataOutputStream dosPlus = null;
-			DataOutputStream dosMinus = null;
+			String chromosome = null;
+
 			
 			//for each line in the file
 			String line;
-			System.out.print("\t\t");
 			while ((line = in.readLine()) != null){
+				if (line.length() == 0 || line.startsWith("#")) continue;
 				String[] tokens = space.split(line);
 				if (tokens.length < 5){
 					System.err.println("\nMalformed pileup line, skipping -> "+line+"\n\t"+tokens.length+" Tokens");
 					continue;
 				}
-				//refseq base an A?
-				String refSeqBase = tokens[refseqIndex].toUpperCase();
-				
-				//minimum coverage
-				float coverage = Float.parseFloat(tokens[readDepthIndex]);
-				if (coverage < minimumReadCoverage) continue;
+				//set first chrom?
+				if (chromosome == null) chromosome = tokens[chromIndex];
 				
 				//new chromosome?
-				if (tokens[chromIndex].equals(chromosome) == false){
+				else if (tokens[chromIndex].equals(chromosome) == false){
+					System.out.print(" "+chromosome);
+					//process old
+					processParsedData(positionsPlus, conversionsPlus, nonConversionsPlus, chromosome, "+");
+					processParsedData(positionsMinus, conversionsMinus, nonConversionsMinus, chromosome, "-");
+					//clear old
+					clearArrayLists();
 					chromosome = tokens[chromIndex];
-					System.out.print(chromosome+" ");
-					//close old streams
-					if (dosPlus != null) {
-						dosPlus.close();
-						dosMinus.close();
-					}
-					//make new ones
-					File f = new File (dataDirectory, chromosome+"+");
-					dosPlus = new DataOutputStream(new BufferedOutputStream (new FileOutputStream(f)));
-					dataFiles.add(f);
-					f.deleteOnExit();
-					f = new File (dataDirectory, chromosome+"-");
-					dosMinus = new DataOutputStream(new BufferedOutputStream (new FileOutputStream(f)));
-					dataFiles.add(f);
-					f.deleteOnExit();
 				}
+				
+				//refseq base 
+				String refSeqBase = tokens[refseqIndex].toUpperCase();
 				
 				//plus strand
 				if (refSeqBase.equals("A")){
-					//look for upper case G's
-					int numGs = countGs(tokens[baseCallIndex]);
-					if (numGs !=0){
-						float fraction = ((float)numGs) / coverage;
-						if (fraction < minimumFractionEditedBase) continue;
-						int position = Integer.parseInt(tokens[positionIndex]) -1;
-						dosPlus.writeInt(position);
-						dosPlus.writeFloat(fraction);
-					}
+					Integer position = Integer.parseInt(tokens[positionIndex]) -1;
+					//remove INDELS
+					tokens[baseCallIndex] = removeINDELS(tokens[baseCallIndex]);
+					//look for upper case G's, (conversion of A to G on plus strand)
+					float numGs = countGs(tokens[baseCallIndex]);
+					float numNonGs = countRefs(tokens[baseCallIndex]);
+					//save em
+					positionsPlus.add(position);
+					conversionsPlus.add(numGs);
+					nonConversionsPlus.add(numNonGs); 
+					/*if (position == 295083){
+						System.out.println("295083!!!!!");
+						System.out.println("Converted "+numGs);
+						System.out.println("Noncon    "+numNonGs);
+						System.out.println("Bases "+tokens[baseCallIndex]);
+					}*/
 				}
+				
 				//minus strand
 				else if (refSeqBase.equals("T")){
-					//look for lower case c's
-					int numCs = countCs(tokens[baseCallIndex]);
-					if (numCs !=0){
-						float fraction = ((float)numCs) / Float.parseFloat(tokens[readDepthIndex]);
-						if (fraction < minimumFractionEditedBase) continue;
-						int position = Integer.parseInt(tokens[positionIndex]) -1;
-						dosMinus.writeInt(position);
-						dosMinus.writeFloat(fraction);
-					}
+					Integer position = Integer.parseInt(tokens[positionIndex]) -1;
+					//remove INDELS
+					tokens[baseCallIndex] = removeINDELS(tokens[baseCallIndex]);
+					//look for lower case c's, (conversion of A to G on minus strand)
+					float numCs = countCs(tokens[baseCallIndex]);
+					float numNonCs = countRefs(tokens[baseCallIndex]);
+					//save em
+					positionsMinus.add(position);
+					conversionsMinus.add(numCs);
+					nonConversionsMinus.add(numNonCs); 
 				}
 				
 			}
-			System.out.println();
-			
-			//close streams
-			if (dosPlus != null) {
-				dosPlus.close();
-				dosMinus.close();
-			}
+			//process final
+			System.out.print(" "+chromosome);
+			processParsedData(positionsPlus, conversionsPlus, nonConversionsPlus, chromosome, "+");
+			processParsedData(positionsMinus, conversionsMinus, nonConversionsMinus, chromosome, "-");
+			clearArrayLists();
 			in.close();
+			System.out.println();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
 	
-	public int countGs(String baseCalls){
+	public static String removeINDELS(String bases){
+		Matcher mat = INDEL.matcher(bases);
+		int numDeleted = 0;
+		while (mat.find()){
+			//System.out.println("\nPre\t"+bases);
+			int firstMatch = mat.start() - numDeleted;
+			int lastMatch = mat.end() - numDeleted;
+			int numToDelete = Integer.parseInt(mat.group(1));
+			//System.out.println("\t"+numDeleted+"\t"+firstMatch+"\t"+lastMatch);
+			bases = bases.substring(0, firstMatch) + bases.substring(lastMatch+numToDelete);
+			//System.out.println("Post\t"+bases);
+			numDeleted += numToDelete;
+			numDeleted += (lastMatch-firstMatch);
+		}
+		return bases;
+	}
+	
+	private void processParsedData(ArrayList<Integer> positions, ArrayList<Float> conversions, ArrayList<Float> nonConversions, String chromosome, String strand) {
+		int[] pos = Num.arrayListOfIntegerToInts(positions);
+		if (pos.length == 0) return;
+		float[] con = Num.arrayListOfFloatToArray(conversions);
+		float[] nonCon = Num.arrayListOfFloatToArray(nonConversions);
+		
+		//make non edited bases
+		PointData pd = new PointData();
+		Info info = new Info("NonEditedBases", versionedGenome, chromosome, strand, 1, null);
+		pd.setInfo(info);
+		pd.setPositions(pos);
+		pd.setScores(nonCon);
+		pd.writePointData(nonConvertedPointDataDirectory);
+		
+		//make edited bases
+		pd = new PointData();
+		info = new Info("EditedBases", versionedGenome, chromosome, strand, 1, null);
+		pd.setInfo(info);
+		pd.setPositions(pos);
+		pd.setScores(con);
+		pd.writePointData(convertedPointDataDirectory);
+		
+		//make base fraction bases
+		ArrayList<Point> pts = new ArrayList<Point>();
+		for (int i=0; i< pos.length; i++){
+			float total = con[i]+ nonCon[i];
+			if (total < minimumReadCoverage) continue;
+			float fraction = con[i]/ total;
+			if (fraction < minimumFractionEditedBase) continue;
+			pts.add(new Point(pos[i], fraction));
+		}
+		
+		if (pts.size() != 0){
+			pd = Point.extractPositionScores(pts);
+			info = new Info("BaseFractionEdited", versionedGenome, chromosome, strand, 1, null);
+			pd.setInfo(info);
+			pd.writePointData(baseFractionEdited);
+		}
+		
+		
+		pd.setInfo(info);
+		//save
+		pd.writePointData(baseFractionEdited);
+		
+	}
+
+	public float countGs(String baseCalls){
 		Matcher mat = GBase.matcher(baseCalls);
-		int num = 0;
+		float num = 0;
 		while (mat.find()) num++;
 		return num;
 	}
 	
-	public int countCs(String baseCalls){
+	public float countCs(String baseCalls){
 		Matcher mat = cBase.matcher(baseCalls);
-		int num = 0;
+		float num = 0;
+		while (mat.find()) num++;
+		return num;
+	}
+	
+	public float countRefs(String baseCalls){
+		Matcher mat = rBase.matcher(baseCalls);
+		float num = 0;
 		while (mat.find()) num++;
 		return num;
 	}
@@ -220,9 +256,10 @@ public class RNAEditingPileUpParser {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'p': pileupFiles = IO.extractFiles( new File(args[++i])); break;
+					case 'p': pileupFile = new File(args[++i]); break;
 					case 'r': minimumReadCoverage = Float.parseFloat(args[++i]); break;
 					case 'f': minimumFractionEditedBase = Float.parseFloat(args[++i]); break;
+					case 's': saveDirectory = new File(args[++i]); saveDirectory.mkdir(); break;
 					case 'v': versionedGenome = args[i+1]; i++; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
@@ -235,8 +272,22 @@ public class RNAEditingPileUpParser {
 		}
 
 		//look for bam files
-		if (pileupFiles == null || pileupFiles.length == 0 || pileupFiles[0].canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your pileup file(s)?\n");
+		if (pileupFile == null || pileupFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your pileup file?\n");
 		if (versionedGenome == null) Misc.printExit("\nPlease enter a genome version recognized by UCSC, see http://genome.ucsc.edu/FAQ/FAQreleases.\n");
+		
+		if (saveDirectory == null ) {
+			String baseName = Misc.capitalizeFirstLetter(Misc.removeExtension(pileupFile.getName()));
+			saveDirectory = new File (pileupFile.getParentFile(), baseName);
+		}
+		
+		File pointDataDirectory = new File (saveDirectory, "PointData");
+		pointDataDirectory.mkdirs();
+		nonConvertedPointDataDirectory = new File (pointDataDirectory, "Reference");
+		nonConvertedPointDataDirectory.mkdir();
+		convertedPointDataDirectory = new File (pointDataDirectory, "Edited");
+		convertedPointDataDirectory.mkdir();
+		
+		
 		
 		System.out.println(minimumReadCoverage+"\tMinimum Read Coverage");
 		System.out.println(minimumFractionEditedBase+"\tMinimum Fraction Edited Bases\n");
@@ -249,23 +300,24 @@ public class RNAEditingPileUpParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            RNA Editing PileUp Parser: Jan 2012                       **\n" +
+				"**                          RNA Editing PileUp Parser: Dec 2012                     **\n" +
 				"**************************************************************************************\n" +
 				"Parses a SAMTools mpileup output file for refseq A bases that show evidence of\n" +
-				"RNA editing via conversion to Gs, stranded. Bases passing the thresholds are\n" +
-				"written to file in bar format for viewing in IGB and subsequent clustering with\n" +
-				"the RNAEditingScanSeqs app.\n\n"+
+				"RNA editing via conversion to Gs, stranded. Base fraction editing is calculated for\n" +
+				"bases passing the thresholds for viewing in IGB and subsequent clustering with\n" +
+				"the RNAEditingScanSeqs app. The parsed PointData can be further processed using the\n" +
+				"methylome analysis applications.\n\n"+
 
 				"Options:\n"+
-				"-p Path to pileup file (.gz or.zip OK) or directory containing such. Multiple files\n" +
-				"      are processed independently.\n"+
+				"-p Path to a mpileup file (.gz or.zip OK, use 'samtools mpileup -Q 13 -A -B' params).\n"+
 				"-v Versioned Genome (ie H_sapiens_Mar_2006), see UCSC Browser,\n"+
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
+				"-s Save directory, full path, defaults to pileup file directory.\n"+
 				"-r Minimum read coverage, defaults to 5.\n"+
 				"-f Minimum fraction edited base, defaults to 0.01\n"+
 
-				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/RNAEditingPileUpParser -p /Pileups/\n" +
-				"      -v C_elegans_May_2008\n\n" +
+				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/RNAEditingPileUpParser -p \n" +
+				"      /Pileups/N2.mpileup.gz -v C_elegans_Oct_2010\n\n" +
 
 		"**************************************************************************************\n");
 
