@@ -14,12 +14,13 @@ public class VariantAlignment{
 	private String leftSeq;
 	private String centerSeq;
 	private String rightSeq;
-	private String indexStrand;
+	private String indexStrand = null;
 	private float[] weightedCorrelationsACGT;
 	private double[] likelihoodACGTRatios;
 	private String classifiedCenterSeq = null;
 	private BaseClassifier baseClassifier;
-	private boolean changed = false;
+	private boolean changedToN = false;
+	private boolean changedToDiff = false;
 
 	//constructor
 	public VariantAlignment(BaseClassifier baseClassifier, SAMRecord alignment, int centerReferenceBasePosition, int nMerAdder){
@@ -43,6 +44,8 @@ public class VariantAlignment{
 			String seq = alignment.getReadString();
 			//get real read sequence at center, must make this a new string since the seq can be changed
 			centerSeq = new String(seq.substring(centerIndex, centerIndex+1));
+			//watch out for N's
+			if (centerSeq.equals("N")) return;
 			leftSeq = alignment.getReadString().substring(startIndex, centerIndex);
 			rightSeq = alignment.getReadString().substring(centerIndex+1, endIndex); 
 
@@ -176,7 +179,7 @@ public class VariantAlignment{
 		if (sortedCorr[3] < baseClassifier.getMinimumCorrelation()) {
 			baseClassifier.incrementNumVarAlignFailingMinCor();
 			baseClassifier.incrementNumVarAlignChanged2N();
-			changed = true;
+			changedToN = true;
 			classifiedCenterSeq = "N";
 		}
 
@@ -184,7 +187,7 @@ public class VariantAlignment{
 		else if ( (sortedCorr[3] - sortedCorr[2]) < baseClassifier.getMinimumCorrelationDifference()) {
 			baseClassifier.incrementNumVarAlignFailingMinCorDiff();
 			baseClassifier.incrementNumVarAlignChanged2N();
-			changed = true;
+			changedToN = true;
 			classifiedCenterSeq = "N";
 		}
 
@@ -206,12 +209,11 @@ public class VariantAlignment{
 			//did it change?
 			if (classifiedCenterSeq.equals(centerSeq) == false) {
 				baseClassifier.incrementNumVarAlignChanged2Novel();
-				changed = true;
+				changedToDiff = true;
 			}
-			else changed = false;
 		}
 		//add reference
-		if (changed) {
+		if (changedToN || changedToDiff) {
 			String seqOrder = "1";
 			if (alignment.getSecondOfPairFlag()) seqOrder = "2";
 			baseClassifier.getChangedAlignments().put(alignment.getReadName()+seqOrder, alignment);
@@ -229,7 +231,7 @@ public class VariantAlignment{
 		if (sorted[3] < baseClassifier.getMinimumLikelihood()) {
 			baseClassifier.incrementNumVarAlignFailingMinCor();
 			baseClassifier.incrementNumVarAlignChanged2N();
-			changed = true;
+			changedToN = true;
 			classifiedCenterSeq = "N";
 		}
 
@@ -237,7 +239,7 @@ public class VariantAlignment{
 		else if ( (sorted[3] - sorted[2]) < baseClassifier.getMinimumCorrelationDifference()) {
 			baseClassifier.incrementNumVarAlignFailingMinCorDiff();
 			baseClassifier.incrementNumVarAlignChanged2N();
-			changed = true;
+			changedToN = true;
 			classifiedCenterSeq = "N";
 		}
 
@@ -259,12 +261,11 @@ public class VariantAlignment{
 			//did it change?
 			if (classifiedCenterSeq.equals(this.centerSeq) == false) {
 				baseClassifier.incrementNumVarAlignChanged2Novel();
-				changed = true;
+				changedToDiff = true;
 			}
-			else changed = false;
 		}
 		//add reference
-		if (changed) {
+		if (changedToN || changedToDiff) {
 			String seqOrder = "1";
 			if (alignment.getSecondOfPairFlag()) seqOrder = "2";
 			baseClassifier.getChangedAlignments().put(alignment.getReadName()+seqOrder, alignment);
@@ -273,9 +274,13 @@ public class VariantAlignment{
 	}
 	
 	public void changeSAMRecord(){
+		//add new base or just N?
+		String toChange2 = "N";
+		if (baseClassifier.isSetRecalledBasesToN() == false) toChange2 = classifiedCenterSeq;
+		
 		//modify sequence 
 		String seq = alignment.getReadString();
-		seq = seq.substring(0, centerIndex) + classifiedCenterSeq + seq.substring(centerIndex+1, seq.length());
+		seq = seq.substring(0, centerIndex) + toChange2 + seq.substring(centerIndex+1, seq.length());
 		alignment.setReadString(seq);
 	}
 	
@@ -283,13 +288,23 @@ public class VariantAlignment{
 		return classifiedCenterSeq;
 	}
 	public boolean isChanged() {
-		return changed;
+		if (changedToN || changedToDiff) return true;
+		return false;
 	}
 	public String getCenterSeq() {
 		return centerSeq;
 	}
 	public void setLikelihoodACGTRatios(double[] likelihoodACGTRatios) {
 		this.likelihoodACGTRatios = likelihoodACGTRatios;
+	}
+	public double[] getLikelihoodACGTRatios() {
+		return likelihoodACGTRatios;
+	}
+	public boolean isChangedToN() {
+		return changedToN;
+	}
+	public boolean isChangedToDiff() {
+		return changedToDiff;
 	}
 
 

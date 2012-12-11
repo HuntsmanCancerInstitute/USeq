@@ -3,14 +3,9 @@ package edu.utah.seq.base;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
-
 import net.sf.samtools.*;
 import util.bio.annotation.Bed;
-import util.bio.annotation.ExonIntron;
-import util.bio.parsers.*;
 import util.gen.*;
-import edu.utah.seq.analysis.multi.MultipleConditionRNASeq;
-import edu.utah.seq.useq.apps.Text2USeq;
 import edu.utah.seq.useq.data.RegionScoreText;
 
 
@@ -22,6 +17,8 @@ public class SamAlignmentExtractor {
 	//user defined fields
 	private File[] bamFiles;
 	private File bedFile;
+	private int minimumReadDepth = 1;
+	private int maximumReadDepth = -1;
 
 	//internal fields
 	private SAMFileReader[] samReaders;
@@ -154,9 +151,18 @@ public class SamAlignmentExtractor {
 			//fetch the overlapping alignments
 			ArrayList<String> alignments = fetchOverlappingAlignments (regions[i]);
 			
-			//print em
-			if (alignments.size() !=0) System.out.println("\t"+alignments.size()+"\t"+regions[i].toString());
-			samOut.println(alignments);
+			//pass min and max?
+			int numAlignments = alignments.size();
+			if (numAlignments >= minimumReadDepth){
+				//check max?
+				if (maximumReadDepth != -1){
+					if (numAlignments > maximumReadDepth) continue;
+				}
+				//print em
+				if (alignments.size() !=0) System.out.println("\t"+alignments.size()+"\t"+regions[i].toString());
+				samOut.println(alignments);
+			}
+			
 		}
 	}
 
@@ -185,6 +191,8 @@ public class SamAlignmentExtractor {
 					switch (test){
 					case 'a': bamFiles = IO.extractFiles(args[++i], ".bam"); break;
 					case 'b': bedFile = new File(args[++i]); break;
+					case 'i': minimumReadDepth = Integer.parseInt(args[++i]); break;
+					case 'x': maximumReadDepth = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -224,7 +232,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Sam Alignment Extractor: Nov 2012                     **\n" +
+				"**                            Sam Alignment Extractor: Dec 2012                     **\n" +
 				"**************************************************************************************\n" +
 
 				"Given a bed file containing regions of interest, parses all of the intersecting sam\n" +
@@ -236,6 +244,8 @@ public class SamAlignmentExtractor {
 				"       xxx.bai indexs sorted by coordinate.\n" +
 				"-b A bed file (chr, start, stop,...), full path, see,\n" +
 				"       http://genome.ucsc.edu/FAQ/FAQformat#format1\n"+
+				"-i Minimum read depth, defaults to 1\n"+
+				"-x Maximum read depth, defaults to unlimited\n"+
 
 				"\n"+
 

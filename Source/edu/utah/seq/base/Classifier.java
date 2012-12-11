@@ -1,7 +1,6 @@
 package edu.utah.seq.base;
 
 import org.apache.commons.math3.util.FastMath;
-import util.gen.Misc;
 import util.gen.Num;
 
 public class Classifier {
@@ -22,28 +21,56 @@ public class Classifier {
 		
 		//calculate summed log densities for each case
 		double[] acgtSums = new double[meansACGT.length];
+		double totalSums = 0;
 		for (int i=0; i< meansACGT.length; i++){
-//System.out.println("\n"+i);
 			//for each of the nmer bases
 			for (int j=0; j< obsInts.length; j++){
 				double d = density(obsInts[j], meansACGT[i][j], stdsACGT[i][j]);
-//System.out.println("\t"+d+" "+Math.log(d));
+				//if (d <=0) System.err.println("Negative/ zero density observed, skipping "+d+" "+obsInts[j]+" "+meansACGT[i][j]+" "+stdsACGT[i][j]);
+				if (d>0) acgtSums[i] += Math.log(d);
+			}
+			//delog it
+			acgtSums[i] = Num.antiLog(acgtSums[i], Math.E);
+			totalSums+= acgtSums[i];
+		}
+
+		//calculate likelihoods
+		double[] actgLikelihoods = new double[meansACGT.length];
+		for (int i=0; i< meansACGT.length; i++){
+			actgLikelihoods[i] = acgtSums[i] / totalSums;
+		}
+
+		return actgLikelihoods;
+	}
+	
+	public double[] calculateLikelihoodsTest(double[] obsInts){
+		
+		//calculate summed log densities for each case
+		double[] acgtSums = new double[meansACGT.length];
+		double totalSums = 0;
+		for (int i=0; i< meansACGT.length; i++){
+			System.out.println("\nTest case "+i);
+			//for each of the nmer bases
+			for (int j=0; j< obsInts.length; j++){
+				double d = density(obsInts[j], meansACGT[i][j], stdsACGT[i][j]);
+				System.out.println("\tDensity for "+j+"\t"+d+"  Logged density "+Math.log(d));
 				if (d <=0) System.err.println("Negative/ zero density observed, skipping "+obsInts[j]+" "+meansACGT[i][j]+" "+stdsACGT[i][j]);
 				else acgtSums[i] += Math.log(d);
 			}
 			//delog it
 			acgtSums[i] = Num.antiLog(acgtSums[i], Math.E);
-//System.out.println(i+"\t"+acgtSums[i]);
+			System.out.println("Final delogged sum for "+i+"\t"+acgtSums[i]);
+			totalSums+= acgtSums[i];
 		}
 		
 		//calculate average of sums
-		double meanSum = Num.mean(acgtSums);
-//System.out.println("Mean "+meanSum);
 
 		//calculate likelihoods
+		System.out.println("Likelihoods for each test case");
 		double[] actgLikelihoods = new double[meansACGT.length];
 		for (int i=0; i< meansACGT.length; i++){
-			actgLikelihoods[i] = acgtSums[i] / meanSum;
+			actgLikelihoods[i] = acgtSums[i] / totalSums;
+			System.out.println(i+" case  "+actgLikelihoods[i] +" = "+acgtSums[i]+" / "+totalSums);
 		}
 
 		return actgLikelihoods;
@@ -58,7 +85,7 @@ public class Classifier {
     
     /*For testing.*/
     public static void main (String[] args){
-    	//all are ACGT
+    	//all are ACGT vs xxNxx
     	float[][] means =
     	{
     	{127.2825203f, 843.7784553f, 2514.060976f, 2335.296748f, 238.1382114f, 330.5914634f, 3052.806911f, 3224.786585f, 2994.587398f, 386.9207317f, 191.0792683f, 62.24390244f, 53.05894309f, 199.5447154f, 2728.028455f, 5157.414634f, 396.2276423f, 85.93699187f, 121.6707317f, 1600.107724f },
@@ -79,7 +106,7 @@ public class Classifier {
     	
     	double[] obsInts = {57, 544, 859, 2344, 130, 97, 2808, 2995, 2662, 248, -160, -21, -436, 199, 2552, 4016, -97, -45, -117, 807};
      	
-    	Misc.printArray(c.calculateLikelihoods(obsInts));
+    	c.calculateLikelihoodsTest(obsInts);
     	
     }
 }
