@@ -68,7 +68,7 @@ public class ScoreMethylatedRegions {
 		System.out.println(fractionGCTolerance+"\tFraction GC Tolerance");
 		System.out.println(fractionObsTolerance+"\tFraction Obs Tolerance");
 	}
-
+	
 	public ScoreMethylatedRegions(String[] args){
 
 		processArgs(args);
@@ -86,12 +86,16 @@ public class ScoreMethylatedRegions {
 
 		//for each region
 		regionResults = new RegionResult[regions.length];
+		
+		ArrayList<ArrayList<Float>> randomResultsAgg = new ArrayList<ArrayList<Float>>();
+		ArrayList<Float> regionResultsAgg = new ArrayList<Float>();
+		
 		for (int x=0; x< regions.length; x++){
 			
 			//new chromosome? load data!
 			if (regions[x].getChromosome().equals(currentChrom) == false) {
 				currentChrom = regions[x].getChromosome();
-				System.out.print(currentChrom+" ");
+				System.out.print("\n"+currentChrom+" ");
 
 				//load PointData
 				fetchDataAndRemove();
@@ -129,18 +133,27 @@ public class ScoreMethylatedRegions {
 				regionResults[x].results = regions[x].toStringSimpleFloat()+"\tToo few observations";
 				continue;
 			}
+			
 
 			//make random matched regions?
 			if (makeRandom) {
-				regionResults[x] = makeRandom(regions[x], numberObservations);
+				ArrayList<Float> f = makeRandom(regions[x],numberObservations);
+				regionResults[x] = makeRandomInd(regions[x],numberObservations,f);
+				
+				if (f.size() == numberRandom) {
+					randomResultsAgg.add(f);
+					regionResultsAgg.add(scores[3]);
+				}
+			} else {
+				regionResults[x].results = regions[x].toStringSimpleFloat();
+				regionResultsAgg.add(scores[3]);
 			}
-
-			//nope just print the scores
-			else regionResults[x].results = regions[x].toStringSimpleFloat();
 
 		}
 		
 		System.out.println();
+		
+		
 		
 		//sort and print results
 		Arrays.sort(regionResults);
@@ -148,9 +161,12 @@ public class ScoreMethylatedRegions {
 			if (printAll || rr.results.contains("Too few") == false) out.println(rr.results);
 		}
 		out.close();
+		
+		this.printAggregateData(randomResultsAgg, regionResultsAgg, regions.length);
 
 		System.out.println("\nDone!\n");
 	}
+
 	
 	private class RegionResult implements Comparable<RegionResult>{
 		int index;
@@ -178,10 +194,135 @@ public class ScoreMethylatedRegions {
 		totalBPInterrogatedRegions = Region.totalBP(currentInterrogatedRegions);
 		startsBPInterrogatedRegions = Region.startsInBases(currentInterrogatedRegions);
 	}
+	
+	public double getMedian(ArrayList<Float> values) {
+		ArrayList<Float> tempVals = (ArrayList<Float>)values.clone();
+		Collections.sort(tempVals);
+		
+		int half = tempVals.size() / 2;
+		
+		if ((tempVals.size() % 2) == 1) {
+			return tempVals.get(half);
+		} else {
+			return (tempVals.get(half) + tempVals.get(half + 1)) / 2.0;
+		}
+	}
+	
+	private void printAggregateData(ArrayList<ArrayList<Float>> randomData, ArrayList<Float> regionData,int length) {
+		System.out.println(String.format("Aggregating data for %d of %d regions\n",regionData.size(),length));
+		
+		double realMed = getMedian(regionData);
+		ArrayList<ArrayList<Float>> realData = new ArrayList<ArrayList<Float>>();
+		int maxSize = Integer.MIN_VALUE;
+		
+		
+		
+		if (randomData != null) {
+			int numGreaterThan = 0;
+			int numLessThan = 0;
+			double average = 0;
+			double med;
+			
+			//Find the largest row in the data
+			for (ArrayList<Float> row: randomData) {
+				if (row.size() > maxSize) {
+					maxSize = row.size();
+				}
+			}
+			
+			//Transpose random data
+			for (int i=0; i<maxSize;i++) {
+				ArrayList<Float> col = new ArrayList<Float>();
+				for (ArrayList<Float> rowdata: randomData) {
+					try {
+						col.add(rowdata.get(i));
+					} catch (IndexOutOfBoundsException iobex) {
+						//ArrayLists might not all have the same size, so this is here to make sure
+						//errors aren't thrown.
+					}
+				}
+				realData.add(col);
+			}
+			
+			for (ArrayList<Float> rd: realData) {
+				med = getMedian(rd);
+				average += med;
+				
+				if (med > realMed) {
+					numGreaterThan += 1;
+				} else if (med < realMed) {
+					numLessThan += 1;
+				} else {
+					numGreaterThan += 1;
+					numLessThan += 1;
+				}
+			}
+			
 
-	/**Takes a Positive and finds 1000 chrom, length, gc, and number scores matched random regions.*/
-	public RegionResult makeRandom(Positive region, double numberObservations){
+			average = average / ((double)realData.size());
+			double numGreaterThanP = numGreaterThan/ ((double)realData.size());
+			if (numGreaterThanP > 1) numGreaterThanP = 1;
+			double numLessThanP = numLessThan/ ((double)realData.size());
+			if (numLessThanP > 1) numLessThanP = 1;
+			double foldEnrich = Math.log(realMed/average)/Math.log(2);
+			System.out.println(String.format("Median methylation in the targed regions is: %.3f",realMed));
+			System.out.println(String.format("Median methylation in randomly generated regions: %.3f.\n" +
+											 "P-value: Targeted region more enriched than random regions: %.3f (%d/%d).\n" + 
+											 "P-value: Targeted region less enriched than random regions: %.3f (%d/%d).\n" +
+											 "Fold-Enrichment target regions / random regions: %.3f.",
+					average,numGreaterThanP,numGreaterThan,realData.size(),numLessThanP,numLessThan,realData.size(),foldEnrich));
+		}
+		
+	}
+	
+	private RegionResult makeRandomInd(Positive region, double numberObservations, ArrayList<Float> fractionsNonConverted) {
+		//ArrayList<Float> fractionsNonConverted = makeRandom(region,numberObservations);
+		
 		RegionResult rr = new RegionResult(region.getIndex());
+		
+		if (fractionsNonConverted.size() != numberRandom) {
+			rr.results = region.toStringSimpleFloat()+"\tSkipping, too few random regions found";
+		}
+		else {
+			ArrayList regionScoresAL = region.getScores();
+			float[] regionScores = (float[])regionScoresAL.get(0);
+			double real = regionScores[3];
+
+			//calculate p-value up and down. 
+			//count number > and <
+			double numGreaterThan = 0;
+			double numLessThan = 0;
+			double average =0;
+			for (int i=0; i<fractionsNonConverted.size(); i++){
+				average += fractionsNonConverted.get(i);
+				if (fractionsNonConverted.get(i) > real) numGreaterThan++;
+				else if (fractionsNonConverted.get(i) < real ) numLessThan++;
+				//same score
+				else{
+					numGreaterThan++;
+					numLessThan++;
+				}
+			}
+
+			//calc ave, and pvalues, bonferroni corrected
+			average = average/ ((double)numberRandom);
+			numGreaterThan =  numGreaterThan/ ((double)numberRandom);
+			if (numGreaterThan > 1) numGreaterThan = 1;
+			numLessThan = numLessThan/ ((double)numberRandom);
+			if (numLessThan > 1) numLessThan = 1;
+			double foldEnrich = Math.log(real/average)/Math.log(2);
+			//save results 
+			//coord, ave score, fold enrich, pvalUp, pvalDown
+			rr.results = region.toStringSimpleFloat()+"\t"+average+"\t"+foldEnrich+"\t"+numGreaterThan+"\t"+numLessThan;
+		}
+		
+		return rr;
+		
+	}
+	
+	
+	/**Takes a Positive and finds 1000 chrom, length, gc, and number scores matched random regions.*/
+	private ArrayList<Float> makeRandom(Positive region, double numberObservations){
 		//calculate gc content of real region and set min max
 		double realGC = calculateFractionGCContent(region.getStart(), region.getStop());		
 		int sizeRealRegionMinOne = region.getStop() - region.getStart();
@@ -192,13 +333,13 @@ public class ScoreMethylatedRegions {
 		double diff = numberObservations * fractionObsTolerance;
 		int minObs = (int)Math.round(numberObservations - diff);
 		if (minObs < minimumNumberObservations) minObs = minimumNumberObservations; 
-
+		
 		//try 100,000 times to find a gc and min num matched random region
 		Random randomGenerator = new Random();
-		int numberRandomFound = 0;
-		float[] fractionsNonConverted = new float[numberRandom];	
+		ArrayList<Float> fractionsNonConverted = new ArrayList<Float>();
+		
 		for (int x=0; x<numberRandom; x++){
-			for (int y=0; y< 100000; y++){
+			for (int y=0; y< 10000; y++){
 				//randomly pick an interrogatedRegion unbiased by size
 				//pick a base from total
 				int randomBase = randomGenerator.nextInt(totalBPInterrogatedRegions);
@@ -223,58 +364,24 @@ public class ScoreMethylatedRegions {
 				//check gc
 				double testGC = calculateFractionGCContent(start, stop);
 				if (testGC < minGC || testGC > maxGC) continue;
-				//check num scores			
+				//check num scores
 				Positive testRegion = new Positive(currentChrom, start, stop);
 				//load region with scores
 				loadRegion(testRegion);
 				//correct number?
 				ArrayList testAL = testRegion.getScores();
 				float[] scores = (float[])testAL.get(0);
-				int numTestScores = (int)scores[2];				
+				int numTestScores = (int)scores[5];
 				if (numTestScores < minObs ) continue;
 				//otherwise add fractionNonConverted
-				numberRandomFound++;
-				fractionsNonConverted[x] = scores[0];
+
+				fractionsNonConverted.add(scores[3]);
 				break;
 			}
 		}
-		if (numberRandomFound != numberRandom) {
-			rr.results = region.toStringSimpleFloat()+"\tSkipping, too few random regions found";
-		}
-		else {
-			ArrayList regionScoresAL = region.getScores();
-			float[] regionScores = (float[])regionScoresAL.get(0);
-			double real = regionScores[0];
-
-			//calculate p-value up and down. 
-			//count number > and <
-			double numGreaterThan = 0;
-			double numLessThan = 0;
-			double average =0;
-			for (int i=0; i<fractionsNonConverted.length; i++){
-				average += fractionsNonConverted[i];
-				if (fractionsNonConverted[i] > real) numGreaterThan++;
-				else if (fractionsNonConverted[i] < real ) numLessThan++;
-				//same score
-				else{
-					numGreaterThan++;
-					numLessThan++;
-				}
-			}
-
-			//calc ave, and pvalues, bonferroni corrected
-			average = average/ ((double)numberRandom);
-			numGreaterThan = totalNumberRegions * numGreaterThan/ ((double)numberRandom);
-			if (numGreaterThan > 1) numGreaterThan = 1;
-			numLessThan = totalNumberRegions * numLessThan/ ((double)numberRandom);
-			if (numLessThan > 1) numLessThan = 1;
-			double foldEnrich = real/average;
-			//save results 
-			//coord, ave score, fold enrich, pvalUp, pvalDown
-			rr.results = region.toStringSimpleFloat()+"\t"+average+"\t"+foldEnrich+"\t"+numGreaterThan+"\t"+numLessThan;
-		}
+		//System.out.print(".");
+		return fractionsNonConverted;
 		
-		return rr;
 	}
 
 
@@ -361,7 +468,6 @@ public class ScoreMethylatedRegions {
 		int f = 0;
 		for (int x=indexes[0]; x< indexes[1]; x++) {
 			fractions[f++] = methylatedBases[x].getFractionMethylation();
-			//System.out.println("\t"+methylatedBases[x]);
 		}
 		float median = -1;
 		float mean = -1;
@@ -399,7 +505,7 @@ public class ScoreMethylatedRegions {
 		new ScoreMethylatedRegions(args);
 	}		
 
-	/**This method will process each argument and assign new varibles*/
+	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		File interrogatedRegionsFile = null;
