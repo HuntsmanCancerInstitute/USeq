@@ -337,8 +337,8 @@ public class ScoreEnrichedRegions {
 		if (numLessThanP > 1) numLessThanP = 1;
 		System.out.println(String.format("\nMedian Enrichment Targeted Regions: %f\n" +
 										 "Median Enrichment Random Regions: %f (%f/%d).\n" +
-										 "P-value random more enriched than targeted regions: %f (%d/%d).\n" + 
-										 "P-value random less enriched than targeted regions: %f (%d/%d).\n",
+										 "P-value targeted more enriched than random regions: %f (%d/%d).\n" + 
+										 "P-value targeted more enriched than random regions: %f (%d/%d).\n",
 				(double)realMed,(double)med,(double)average,numberRandom,(double)numGreaterThanP,
 				(int)numGreaterThan,numberRandom,(double)numLessThanP,(int)numLessThan,numberRandom));
 
