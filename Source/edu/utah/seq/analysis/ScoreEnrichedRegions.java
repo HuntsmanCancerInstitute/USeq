@@ -157,9 +157,9 @@ public class ScoreEnrichedRegions {
 		//Grab gene counts from data
 		System.out.println("Load Conditions");
 		for (int i=0; i< conditions.length; i++) {
-			System.out.println("Condition " + i);
+			System.out.println("\nCondition " + (i+1));
 			for (Replica r: conditions[i].getReplicas()){
-				System.out.println("Replica " + i);
+				System.out.println("Replica " + (i+1));
 				loadReplica(r,i);
 			}
 		}
@@ -191,7 +191,7 @@ public class ScoreEnrichedRegions {
 		
 		try {
 			BufferedWriter br = new BufferedWriter(new FileWriter(outputFile));
-			br.write("#Index\tChrom\tStart\tStop\tLength\tControl\tRegion_Log2Ratio\tAverage_Random_Log2Ratio\tPvalue_Greater\tPvalue_Less\n");
+			br.write("#Index\tChrom\tStart\tStop\tLength\tCondition1\tCondition2\tRegion_Log2Ratio\tAverage_Random_Log2Ratio\tPvalue_Greater\tPvalue_Less\n");
 			
 			//calculate globals
 			double scalarCT = readCounts[1] / (double)readCounts[0];
@@ -330,16 +330,24 @@ public class ScoreEnrichedRegions {
 			}
 		}
 		
+		double scalarCT = readCounts[1] / (double)readCounts[0];
+		double scalarTC = readCounts[0] / (double)readCounts[1];
+		System.out.println(String.format("\nScaling factor Condition1: %.3f\nScaling factor Condition2: %.3f\n",scalarCT,scalarTC));
+		
+		
+		Arrays.sort(fakeMed);
+		double test = Num.median(fakeMed);
 		double med = average / ((double)numberRandom);
 		double numGreaterThanP = numGreaterThan/ ((double)numberRandom);
 		if (numGreaterThanP > 1) numGreaterThanP = 1;
 		double numLessThanP = numLessThan/ ((double)numberRandom);
 		if (numLessThanP > 1) numLessThanP = 1;
-		System.out.println(String.format("\nMedian Enrichment Targeted Regions: %f\n" +
-										 "Median Enrichment Random Regions: %f (%f/%d).\n" +
-										 "P-value targeted more enriched than random regions: %f (%d/%d).\n" + 
-										 "P-value targeted more enriched than random regions: %f (%d/%d).\n",
-				(double)realMed,(double)med,(double)average,numberRandom,(double)numGreaterThanP,
+		System.out.println(String.format("\nMedian Enrichment Targeted Regions: %.3f\n" +
+										 "Median Median Enrichment Random Regions %.3f\n" +
+										 "Mean Median Enrichment Random Regions: %.3f.\n" +
+										 "P-value targeted more enriched than random regions: %.3f (%d/%d).\n" + 
+										 "P-value targeted more enriched than random regions: %.3f (%d/%d).\n",
+				(double)realMed,(double)test,(double)med,(double)numGreaterThanP,
 				(int)numGreaterThan,numberRandom,(double)numLessThanP,(int)numLessThan,numberRandom));
 
 	}
@@ -509,6 +517,7 @@ public class ScoreEnrichedRegions {
 			}
 			randomRegions.clear();
 			
+			System.out.println("Loading gene counts into random regions");
 			//Load counts into random regions
 			for (int i=0;i<numberRandom;i++) {
 				loadGeneCounts(randomGCLA.get(i),realRandomRegions.get(i),bpNames,badBases,chrom);
@@ -714,6 +723,9 @@ public class ScoreEnrichedRegions {
 		
 		//Calculate median ratio
 		double median = -1;
+		
+		//Sort array
+		Arrays.sort(log2Ratio);
 
 		if (log2Ratio.length == 1) {
 			median = log2Ratio[0];

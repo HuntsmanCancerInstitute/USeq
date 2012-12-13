@@ -1,0 +1,233 @@
+<project name="USeq" basedir="." default="main">
+    <taskdef resource="net/sf/antcontrib/antcontrib.properties"/>  
+	
+	<property file="build.properties"/>
+	<property environment="env"/>
+	
+	<target name="clean">
+		<delete dir="${release.base.dir}"/>
+	</target>
+	
+	<target name="master-jar" description="creates the master jar file with all code" depends="clean">
+		
+		<!-- Copy base class files to the build directory -->
+		<echo>Unpacking base classes</echo>
+		<copy file="Misc/JavaxComOrgInfoNetClasses.zip" todir="${release.build.dir}"/>
+		<unzip src="${release.build.dir}/JavaxComOrgInfoNetClasses.zip" dest="${release.build.dir}"/>
+		<move todir="${release.build.dir}">
+			<fileset dir="${release.build.dir}/JavaxComOrgInfoNetClasses"/>
+		</move>
+		
+		<delete dir="${release.build.dir}/JavaxComOrgInfoNetClasses"/>
+		<delete dir="${release.build.dir}/__MACOSX"/>
+		<delete file="${release.build.dir}/JavaxComOrgInfoNetClasses.zip"/>
+		
+		<!-- Copy Driver -->
+		<macrodef name="copy-class">
+			<attribute name="jarpath"/>
+			<sequential>
+				<!-- <mkdir dir="${release.build.dir}/@{jarpath}"/> -->
+				<copy todir="${release.build.dir}/@{jarpath}">
+					<fileset dir="${classes.dir}/@{jarpath}">
+						<include name="**/*class"/>
+						<include name="**/*properties"/>
+					</fileset>
+				</copy>
+			
+			</sequential>
+		</macrodef>
+		
+		<!-- Load in jar names and copy them to the build directory -->
+		<echo>Copying class files</echo>
+				
+		<for list="${class.select}" param="jar.location">
+			<sequential>
+				<copy-class jarpath="@{jar.location}"/>
+			</sequential>
+		</for>
+		
+		<!-- Build the jar -->
+		<jar destfile="${release.master.jar.dir}/bioToolsCodeLibrary.jar" basedir="${release.build.dir}" compress="false">
+			<manifest>
+				<attribute name="Manifest-Version" value="1.0"/>
+				<attribute name="Implementation-Vendor" value="Implementation-Vendor: University of Utah Bioinformatics Shared Resource (http://bioserver.hci.utah.edu)"/>
+				<attribute name="Implementation-Version" value="USeq_${version}"/>
+			</manifest>
+		</jar>
+		
+		<!-- Clean up build directory -->
+		<delete dir="${release.build.dir}"/>
+				
+	</target>
+	
+	<target name="create-docs" description="Creates helpfiles for each jar" depends="clean">
+		
+
+		<!-- Help Driver -->
+		<macrodef name="help-class">
+			<attribute name="jarname"/>
+			<attribute name="jarpath"/>
+			<sequential>
+				<local name="helpoutput"/>
+				<exec dir="${classes.dir}" executable="java" failonerror="true" outputproperty="helpoutput" logError="true">
+					<arg value="@{jarpath}/@{jarname}"/>
+				</exec>
+				
+				<!-- Write menus to files -->
+				<concat destfile="${orig.doc.dir}/cmdLnMenus.html" append="true">
+					<![CDATA[<a href="#]]>@{jarname}<![CDATA[">]]>@{jarname}<![CDATA[</a><br>]]>
+				</concat>
+				<concat destfile="${orig.doc.dir}/temp.html" append="true">
+					<![CDATA[<a name="]]>@{jarname}<![CDATA["><pre>]]>${helpoutput}<![CDATA[</pre><br><p>]]>
+				</concat>
+					
+			</sequential>
+		</macrodef>
+		
+		<!-- Write header to the html document -->
+		<concat destfile="${orig.doc.dir}/cmdLnMenus.html">
+			<![CDATA[<html><head><title>USeq Command Line Menus ]]>${version}<![CDATA[
+			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
+			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
+			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
+			font:arial; font-size:12;}BODY {color:black; background-color:white; font-family:
+			Verdana, Arial, Helvetica, sans-serif; font-size:12;}A:link    {text-decoration: none;
+			color: #000000; font-weight: bold}  A:visited {text-decoration: none; color: #000000;
+			font-weight: bold}   A:hover   {text-decoration: none; color: #FFCC66; font-weight: bold}
+			A:active  {text-decoration: none; color: #000000; font-weight: bold}   </style></head><body>
+			<H1>Command Line Menus</H1> <p>
+			]]>
+		</concat>
+		
+		<concat destfile="${orig.doc.dir}/temp.html">
+			<![CDATA[<br><p>]]>
+		</concat>
+		
+		
+		<!-- Load in jar names and create menu -->
+		<echo>Creating menus</echo>
+		
+		<for list="${jar.select}" param="jar.location">
+			<sequential>
+				<propertyregex property="jar.path" input="@{jar.location}" regexp="^(.+)/(.+)$" select="\1" override="true"/>
+				<propertyregex property="jar.name" input="@{jar.location}" regexp="^(.+)/(.+)$" select="\2" override="true"/>
+				<if>
+					<equals arg1="${jar.name}" arg2="GWrap_GUI_ClickMe"/>
+					<then>
+					</then>
+					<else>
+						<help-class jarpath="${jar.path}" jarname="${jar.name}"/>
+					</else>
+				</if>
+			</sequential>
+		</for>
+		
+		<!-- Add footer to second html file -->
+		<concat destfile="${orig.doc.dir}/temp.html" append="true">
+			<![CDATA[</body></html>]]>
+		</concat>
+		
+		<!-- Combine two html files -->
+		<concat destfile="${orig.doc.dir}/cmdLnMenus.html" append="true">
+			<filelist dir="${orig.doc.dir}" files="temp.html"/>
+		</concat>
+		
+		<!-- Copy existing documentation to Doc directory -->
+		<copy todir="${release.doc.dir}" >
+			<fileset dir="${orig.doc.dir}"/>
+		</copy>
+		
+		<!-- Clean up mess -->
+		<delete file="${orig.doc.dir}/temp.html"/>
+		
+	</target>
+					
+	
+	<target name="worker-jars" description="Creates individual jar files" depends="clean,master-jar">
+		<!-- Worker Jar Driver -->
+		<macrodef name="packaging">
+			<attribute name="jarname"/>
+			<attribute name="jarpath"/>
+			<sequential>
+				<jar destfile="${release.worker.jar.dir}/@{jarname}" compress="false">
+					<manifest> 
+						<attribute name="Main-Class" value="@{jarpath}/@{jarname}"/>
+						<attribute name="Class-Path" value="../LibraryJars/bioToolsCodeLibrary.jar"/>
+						<attribute name="Manifest-Version" value="1.0"/>
+						<attribute name="Implementation-Version" value="USeq_${version}"/>
+					</manifest>
+				</jar>
+			</sequential>
+		</macrodef>
+		
+		<!-- Gui Jar Driver -->
+		<macrodef name="gui-packaging">
+			<attribute name="jarname"/>
+			<attribute name="jarpath"/>
+			<sequential>
+				<jar destfile="${release.base.dir}/@{jarname}.jar" compress="false">
+					<manifest>
+						<attribute name="Main-Class" value="@{jarpath}/@{jarname}"/>
+						<attribute name="Class-Path" value="LibraryJars/bioToolsCodeLibrary.jar"/>
+						<attribute name="Manifest-Version" value="1.0"/>
+						<attribute name="Implementation-Version" value="USeq_${version}"/>
+					</manifest>
+				</jar>
+			</sequential>
+		</macrodef>
+		
+		<!-- Load in jar names and call Jar Driver -->						
+		<for list="${jar.select}" param="jar.location">
+			<sequential>
+				<propertyregex property="jar.path" input="@{jar.location}" regexp="^(.+)/(.+)$" select="\1" override="true"/>
+				<propertyregex property="jar.name" input="@{jar.location}" regexp="^(.+)/(.+)$" select="\2" override="true"/>
+				<if>
+					<equals arg1="${jar.name}" arg2="GWrap_GUI_ClickMe"/>
+					<then>
+						<gui-packaging jarpath="${jar.path}" jarname="${jar.name}"/>
+					</then>
+					<else>
+						<packaging jarpath="${jar.path}" jarname="${jar.name}"/>
+					</else>
+				</if>
+			</sequential>
+		</for>
+	</target>
+					
+	<target name="build-release" depends="clean,master-jar,worker-jars,create-docs">
+		<zip destfile="${release.base.dir}/SourceCode.zip" basedir="${src.dir}"/>
+		<zip destfile="${base.dir}/USeq_${version}.zip" basedir="${release.base.dir}"/>
+	</target>
+	
+	<target name="mosbruger-release" depends="worker-jars">
+		<!-- Mosbruger Specific configurations -->
+		<symlink action="delete" link="/Users/timmosbruger/AppsUSeq"/>
+		<echo>Creating Symlink to the applications in home</echo>
+		<symlink link="/Users/timmosbruger/AppsUSeq" resource="/Users/timmosbruger/Documents/eclipse4.3/USeq/Releases/${release.name}/Apps/"/>
+		<echo>Copying applications to server</echo>
+		<exec executable="rsync" dir="/Users/timmosbruger/Documents/eclipse4.3/USeq/Releases/">
+			<arg value="-r"/>
+			<arg value="${release.name}"/>
+			<arg value="${env.moab}:/home/u0855942/tim_scripts/"/>
+		</exec>
+	</target>
+	
+	<target name="nix-release" depends="build-release">
+		<!-- Nix Specific configurations -->
+		<symlink action="delete" link="/Users/davidnix/AppsUSeq"/>
+		<echo>Creating Symlink to the applications in home</echo>
+		<symlink link="/Users/davixnix/AppsUSeq" resource="/Users/davidnix/Code/USeq/Releases/${release.name}/Apps/"/>
+		<echo>Copying applications to server</echo>
+		<exec executable="rsync" dir="/Users/davidnix/Code/USeq/Releases/${release.name}/">
+			<arg value="-r"/>
+			<arg value="."/>
+			<arg value="${env.moab}:/home/BioApps/USeq/"/>
+		</exec>
+	</target>
+	
+	
+	<target name="main" depends="build-release"/>
+	
+				
+	
+</project>

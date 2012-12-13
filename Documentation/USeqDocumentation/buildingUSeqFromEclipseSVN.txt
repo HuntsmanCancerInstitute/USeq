@@ -19,9 +19,40 @@ Hit Finish button
 
 ## Test the appropriate library references by opening the Source folder in Eclipse and naviate to a xxx.java file and type something to break the code.  It should turn red with error indicators.  If not you may need to reset the Build Path in the project Preferences.
 
+## Build a 'USeq_TestRelease1.0:
+
+1)	Download ANT binaries: http://ant.apache.org/bindownload.cgi and copy the downloaded, unzipped directory to a safe location.
+2)  Create ANT_HOME environmental variable:  (In ~/.bashrc: export ANT_HOME=/path/to/ant/install/directory/apache-ant-1.8.4/)
+3) 	Download ant-contrib-0.6 : http://sourceforge.net/projects/ant-contrib/files/ant-contrib/.  Move the ant-contrib-0.6.jar file into the ant lib directory
+
+Build From Eclipse
+
+4) Point eclipse to your ant installation (one time only).  Select from menu: 'Eclipse->Preferences->Ant->Runtime'. Click on the 'Ant Home' button and select the Ant installation directory (see step 1)
+5) Navigate to build.properties and change version to 'TestRelease1.0'
+6) Navigate to build.xml, right click on 'build-release' under the Outline View Tab and select 'Run As->Ant Build'
+7) Enjoy the magic.
+
+Build from command line
+
+4) Navigate to USeq directory.
+5) open build.properties and change version to 'TestRelease1.0'
+6) type 'ant' on the command line
+7) Embrace the magic.
+
+*Users can setup custom build tasks to make deployment to a server easier (See mosbruger-release).  Custom tasks can be executed with in Eclipse or run on the command line by typing: 'ant mosbruger-release'.
+
+*If you are using a mac and want to use a an custom environmental variable in your ant build script, you need to add the following lines to your ~/.bashrc and restart eclipse:
+export VARNAME=variable_information
+launchctl setenv VARNAME $VARNAME 
+
+
+**************************** DEPRICATED *************************************
+
 ## Build a 'USeq_TestRelease1.0':
 Open a terminal and navigate into the USeq/Classes directory
 Type 'java edu/utah/seq/misc/MakeUSeq TestRelease1.0'
+
+*****************************************************************************
 
 ## Customize the Source/edu/utah/seq/misc/MakeUSeq.java file to create soft links and an appropriate rsync call specific for your configuration.
 
