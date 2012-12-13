@@ -1,119 +1,249 @@
-<html><head><title>USeq Command Line Menus null</title><style type="text/css">#rt{text-align:right; color: #000000; font-weight: bold}#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633; font:arial; font-size:12;}BODY {color:black; background-color:white; font-family: Verdana, Arial, Helvetica, sans-serif; font-size:12;}A:link    {text-decoration: none; color: #000000; font-weight: bold}  A:visited {text-decoration: none; color: #000000; font-weight: bold}   A:hover   {text-decoration: none; color: #FFCC66; font-weight: bold} A:active  {text-decoration: none; color: #000000; font-weight: bold}   </style></head><body><H1>Command Line Menus</H1> <p><a href="#ABITraceTCPeakCalculator">ABITraceTCPeakCalculator</a><br>
-<a href="#AggregatePlotter">AggregatePlotter</a><br>
-<a href="#Alleler">Alleler</a><br>
-<a href="#AllelicMethylationDetector">AllelicMethylationDetector</a><br>
-<a href="#BamIntensityJoiner">BamIntensityJoiner</a><br>
-<a href="#BamNMerIntensityParser">BamNMerIntensityParser</a><br>
-<a href="#Bar2Gr">Bar2Gr</a><br>
-<a href="#Bar2USeq">Bar2USeq</a><br>
-<a href="#BaseClassifier">BaseClassifier</a><br>
-<a href="#Bed2Bar">Bed2Bar</a><br>
-<a href="#BedStats">BedStats</a><br>
-<a href="#BisSeq">BisSeq</a><br>
-<a href="#BisSeqAggregatePlotter">BisSeqAggregatePlotter</a><br>
-<a href="#BisSeqErrorAdder">BisSeqErrorAdder</a><br>
-<a href="#BisStat">BisStat</a><br>
-<a href="#BisStatRegionMaker">BisStatRegionMaker</a><br>
-<a href="#ChIPSeq">ChIPSeq</a><br>
-<a href="#CHPCAligner">CHPCAligner</a><br>
-<a href="#CompareParsedAlignments">CompareParsedAlignments</a><br>
-<a href="#ConcatinateFastas">ConcatinateFastas</a><br>
-<a href="#CorrelatePointData">CorrelatePointData</a><br>
-<a href="#BisulfiteConvertFastas">BisulfiteConvertFastas</a><br>
-<a href="#CorrelationMaps">CorrelationMaps</a><br>
-<a href="#ConvertFastaA2G">ConvertFastaA2G</a><br>
-<a href="#ConvertFastqA2G">ConvertFastqA2G</a><br>
-<a href="#ConvertFasta2GCBoolean">ConvertFasta2GCBoolean</a><br>
-<a href="#ConvertFasta2GCBarGraph">ConvertFasta2GCBarGraph</a><br>
-<a href="#DefinedRegionBisSeq">DefinedRegionBisSeq</a><br>
-<a href="#DefinedRegionDifferentialSeq">DefinedRegionDifferentialSeq</a><br>
-<a href="#DefinedRegionScanSeqs">DefinedRegionScanSeqs</a><br>
-<a href="#EnrichedRegionMaker">EnrichedRegionMaker</a><br>
-<a href="#ElandMultiParser">ElandMultiParser</a><br>
-<a href="#ElandParser">ElandParser</a><br>
-<a href="#ElandSequenceParser">ElandSequenceParser</a><br>
-<a href="#ExportExons">ExportExons</a><br>
-<a href="#ExportIntergenicRegions">ExportIntergenicRegions</a><br>
-<a href="#ExportIntronicRegions">ExportIntronicRegions</a><br>
-<a href="#ExportTrimmedGenes">ExportTrimmedGenes</a><br>
-<a href="#FetchGenomicSequences">FetchGenomicSequences</a><br>
-<a href="#FindNeighboringGenes">FindNeighboringGenes</a><br>
-<a href="#FindOverlappingGenes">FindOverlappingGenes</a><br>
-<a href="#FindSharedRegions">FindSharedRegions</a><br>
-<a href="#FileCrossFilter">FileCrossFilter</a><br>
-<a href="#FileMatchJoiner">FileMatchJoiner</a><br>
-<a href="#FileJoiner">FileJoiner</a><br>
-<a href="#FileSplitter">FileSplitter</a><br>
-<a href="#FilterDuplicateAlignments">FilterDuplicateAlignments</a><br>
-<a href="#Graph2Bed">Graph2Bed</a><br>
-<a href="#FilterIntersectingRegions">FilterIntersectingRegions</a><br>
-<a href="#FilterPointData">FilterPointData</a><br>
-<a href="#Gr2Bar">Gr2Bar</a><br>
-<a href="#IntersectLists">IntersectLists</a><br>
-<a href="#IntersectKeyWithRegions">IntersectKeyWithRegions</a><br>
-<a href="#IntersectRegions">IntersectRegions</a><br>
-<a href="#KeggPathwayEnrichment">KeggPathwayEnrichment</a><br>
-<a href="#MaqSnps2Bed">MaqSnps2Bed</a><br>
-<a href="#MakeSpliceJunctionFasta">MakeSpliceJunctionFasta</a><br>
-<a href="#MakeTranscriptome">MakeTranscriptome</a><br>
-<a href="#MaskExonsInFastaFiles">MaskExonsInFastaFiles</a><br>
-<a href="#MaskRegionsInFastaFiles">MaskRegionsInFastaFiles</a><br>
-<a href="#MergePointData">MergePointData</a><br>
-<a href="#MergeRegions">MergeRegions</a><br>
-<a href="#MergeUCSCGeneTable">MergeUCSCGeneTable</a><br>
-<a href="#MultipleConditionRNASeq">MultipleConditionRNASeq</a><br>
-<a href="#MultipleReplicaDefinedRegionScanSeqs">MultipleReplicaDefinedRegionScanSeqs</a><br>
-<a href="#MultipleReplicaScanSeqs">MultipleReplicaScanSeqs</a><br>
-<a href="#NovoalignBisulfiteParser">NovoalignBisulfiteParser</a><br>
-<a href="#NovoalignIndelParser">NovoalignIndelParser</a><br>
-<a href="#NovoalignParser">NovoalignParser</a><br>
-<a href="#NovoalignPairedParser">NovoalignPairedParser</a><br>
-<a href="#OligoTiler">OligoTiler</a><br>
-<a href="#OverdispersedRegionScanSeqs">OverdispersedRegionScanSeqs</a><br>
-<a href="#ParseIntersectingAlignments">ParseIntersectingAlignments</a><br>
-<a href="#ParsePointDataContexts">ParsePointDataContexts</a><br>
-<a href="#PeakShiftFinder">PeakShiftFinder</a><br>
-<a href="#PointDataManipulator">PointDataManipulator</a><br>
-<a href="#Primer3Wrapper">Primer3Wrapper</a><br>
-<a href="#PrintSelectColumns">PrintSelectColumns</a><br>
-<a href="#QCSeqs">QCSeqs</a><br>
-<a href="#Qseq2Fastq">Qseq2Fastq</a><br>
-<a href="#RandomizeTextFile">RandomizeTextFile</a><br>
-<a href="#RankedSetAnalysis">RankedSetAnalysis</a><br>
-<a href="#ReadCoverage">ReadCoverage</a><br>
-<a href="#RNAEditingPileUpParser">RNAEditingPileUpParser</a><br>
-<a href="#RNAEditingScanSeqs">RNAEditingScanSeqs</a><br>
-<a href="#RNASeq">RNASeq</a><br>
-<a href="#RNASeqSimulator">RNASeqSimulator</a><br>
-<a href="#Sam2Fastq">Sam2Fastq</a><br>
-<a href="#Sam2USeq">Sam2USeq</a><br>
-<a href="#SamAlignmentExtractor">SamAlignmentExtractor</a><br>
-<a href="#SamParser">SamParser</a><br>
-<a href="#SamTranscriptomeParser">SamTranscriptomeParser</a><br>
-<a href="#SamFixer">SamFixer</a><br>
-<a href="#ScanSeqs">ScanSeqs</a><br>
-<a href="#ScoreMethylatedRegions">ScoreMethylatedRegions</a><br>
-<a href="#ShiftAnnotationPositions">ShiftAnnotationPositions</a><br>
-<a href="#SoapV1Parser">SoapV1Parser</a><br>
-<a href="#SubtractRegions">SubtractRegions</a><br>
-<a href="#ScoreChromosomes">ScoreChromosomes</a><br>
-<a href="#ScoreParsedBars">ScoreParsedBars</a><br>
-<a href="#ScoreSequences">ScoreSequences</a><br>
-<a href="#Sgr2Bar">Sgr2Bar</a><br>
-<a href="#Simulator">Simulator</a><br>
-<a href="#StrandedBisSeq">StrandedBisSeq</a><br>
-<a href="#SRAProcessor">SRAProcessor</a><br>
-<a href="#SubSamplePointData">SubSamplePointData</a><br>
-<a href="#Tag2Point">Tag2Point</a><br>
-<a href="#Text2USeq">Text2USeq</a><br>
-<a href="#UCSCBig2USeq">UCSCBig2USeq</a><br>
-<a href="#USeq2UCSCBig">USeq2UCSCBig</a><br>
-<a href="#USeq2Text">USeq2Text</a><br>
-<a href="#Wig2Bar">Wig2Bar</a><br>
-<a href="#Wig2USeq">Wig2USeq</a><br>
-<p><a name="ABITraceTCPeakCalculator"><pre>
 
-**************************************************************************************
+			<html><head><title>USeq Command Line Menus tim_ep
+			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
+			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
+			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
+			font:arial; font-size:12;}BODY {color:black; background-color:white; font-family:
+			Verdana, Arial, Helvetica, sans-serif; font-size:12;}A:link    {text-decoration: none;
+			color: #000000; font-weight: bold}  A:visited {text-decoration: none; color: #000000;
+			font-weight: bold}   A:hover   {text-decoration: none; color: #FFCC66; font-weight: bold}
+			A:active  {text-decoration: none; color: #000000; font-weight: bold}   </style></head><body>
+			<H1>Command Line Menus</H1> <p>
+			
+		
+					<a href="#ABITraceTCPeakCalculator">ABITraceTCPeakCalculator</a><br>
+				
+					<a href="#AggregatePlotter">AggregatePlotter</a><br>
+				
+					<a href="#Alleler">Alleler</a><br>
+				
+					<a href="#AllelicMethylationDetector">AllelicMethylationDetector</a><br>
+				
+					<a href="#BamIntensityJoiner">BamIntensityJoiner</a><br>
+				
+					<a href="#BamNMerIntensityParser">BamNMerIntensityParser</a><br>
+				
+					<a href="#Bar2Gr">Bar2Gr</a><br>
+				
+					<a href="#Bar2USeq">Bar2USeq</a><br>
+				
+					<a href="#BaseClassifier">BaseClassifier</a><br>
+				
+					<a href="#Bed2Bar">Bed2Bar</a><br>
+				
+					<a href="#BedStats">BedStats</a><br>
+				
+					<a href="#BisSeq">BisSeq</a><br>
+				
+					<a href="#BisSeqAggregatePlotter">BisSeqAggregatePlotter</a><br>
+				
+					<a href="#BisSeqErrorAdder">BisSeqErrorAdder</a><br>
+				
+					<a href="#BisStat">BisStat</a><br>
+				
+					<a href="#BisStatRegionMaker">BisStatRegionMaker</a><br>
+				
+					<a href="#ChIPSeq">ChIPSeq</a><br>
+				
+					<a href="#CHPCAligner">CHPCAligner</a><br>
+				
+					<a href="#CompareParsedAlignments">CompareParsedAlignments</a><br>
+				
+					<a href="#ConcatinateFastas">ConcatinateFastas</a><br>
+				
+					<a href="#CorrelatePointData">CorrelatePointData</a><br>
+				
+					<a href="#BisulfiteConvertFastas">BisulfiteConvertFastas</a><br>
+				
+					<a href="#CorrelationMaps">CorrelationMaps</a><br>
+				
+					<a href="#ConvertFastaA2G">ConvertFastaA2G</a><br>
+				
+					<a href="#ConvertFastqA2G">ConvertFastqA2G</a><br>
+				
+					<a href="#ConvertFasta2GCBoolean">ConvertFasta2GCBoolean</a><br>
+				
+					<a href="#ConvertFasta2GCBarGraph">ConvertFasta2GCBarGraph</a><br>
+				
+					<a href="#DefinedRegionBisSeq">DefinedRegionBisSeq</a><br>
+				
+					<a href="#DefinedRegionDifferentialSeq">DefinedRegionDifferentialSeq</a><br>
+				
+					<a href="#DefinedRegionScanSeqs">DefinedRegionScanSeqs</a><br>
+				
+					<a href="#EnrichedRegionMaker">EnrichedRegionMaker</a><br>
+				
+					<a href="#ElandMultiParser">ElandMultiParser</a><br>
+				
+					<a href="#ElandParser">ElandParser</a><br>
+				
+					<a href="#ElandSequenceParser">ElandSequenceParser</a><br>
+				
+					<a href="#ExportExons">ExportExons</a><br>
+				
+					<a href="#ExportIntergenicRegions">ExportIntergenicRegions</a><br>
+				
+					<a href="#ExportIntronicRegions">ExportIntronicRegions</a><br>
+				
+					<a href="#ExportTrimmedGenes">ExportTrimmedGenes</a><br>
+				
+					<a href="#FetchGenomicSequences">FetchGenomicSequences</a><br>
+				
+					<a href="#FindNeighboringGenes">FindNeighboringGenes</a><br>
+				
+					<a href="#FindOverlappingGenes">FindOverlappingGenes</a><br>
+				
+					<a href="#FindSharedRegions">FindSharedRegions</a><br>
+				
+					<a href="#FileCrossFilter">FileCrossFilter</a><br>
+				
+					<a href="#FileMatchJoiner">FileMatchJoiner</a><br>
+				
+					<a href="#FileJoiner">FileJoiner</a><br>
+				
+					<a href="#FileSplitter">FileSplitter</a><br>
+				
+					<a href="#FilterDuplicateAlignments">FilterDuplicateAlignments</a><br>
+				
+					<a href="#Graph2Bed">Graph2Bed</a><br>
+				
+					<a href="#FilterIntersectingRegions">FilterIntersectingRegions</a><br>
+				
+					<a href="#FilterPointData">FilterPointData</a><br>
+				
+					<a href="#Gr2Bar">Gr2Bar</a><br>
+				
+					<a href="#IntersectLists">IntersectLists</a><br>
+				
+					<a href="#IntersectKeyWithRegions">IntersectKeyWithRegions</a><br>
+				
+					<a href="#IntersectRegions">IntersectRegions</a><br>
+				
+					<a href="#KeggPathwayEnrichment">KeggPathwayEnrichment</a><br>
+				
+					<a href="#MaqSnps2Bed">MaqSnps2Bed</a><br>
+				
+					<a href="#MakeSpliceJunctionFasta">MakeSpliceJunctionFasta</a><br>
+				
+					<a href="#MakeTranscriptome">MakeTranscriptome</a><br>
+				
+					<a href="#MaskExonsInFastaFiles">MaskExonsInFastaFiles</a><br>
+				
+					<a href="#MaskRegionsInFastaFiles">MaskRegionsInFastaFiles</a><br>
+				
+					<a href="#MergePointData">MergePointData</a><br>
+				
+					<a href="#MergeRegions">MergeRegions</a><br>
+				
+					<a href="#MergeUCSCGeneTable">MergeUCSCGeneTable</a><br>
+				
+					<a href="#MultipleConditionRNASeq">MultipleConditionRNASeq</a><br>
+				
+					<a href="#MultipleReplicaDefinedRegionScanSeqs">MultipleReplicaDefinedRegionScanSeqs</a><br>
+				
+					<a href="#MultipleReplicaScanSeqs">MultipleReplicaScanSeqs</a><br>
+				
+					<a href="#NovoalignBisulfiteParser">NovoalignBisulfiteParser</a><br>
+				
+					<a href="#NovoalignIndelParser">NovoalignIndelParser</a><br>
+				
+					<a href="#NovoalignParser">NovoalignParser</a><br>
+				
+					<a href="#NovoalignPairedParser">NovoalignPairedParser</a><br>
+				
+					<a href="#OligoTiler">OligoTiler</a><br>
+				
+					<a href="#OverdispersedRegionScanSeqs">OverdispersedRegionScanSeqs</a><br>
+				
+					<a href="#ParseIntersectingAlignments">ParseIntersectingAlignments</a><br>
+				
+					<a href="#ParsePointDataContexts">ParsePointDataContexts</a><br>
+				
+					<a href="#PeakShiftFinder">PeakShiftFinder</a><br>
+				
+					<a href="#PointDataManipulator">PointDataManipulator</a><br>
+				
+					<a href="#Primer3Wrapper">Primer3Wrapper</a><br>
+				
+					<a href="#PrintSelectColumns">PrintSelectColumns</a><br>
+				
+					<a href="#QCSeqs">QCSeqs</a><br>
+				
+					<a href="#Qseq2Fastq">Qseq2Fastq</a><br>
+				
+					<a href="#RandomizeTextFile">RandomizeTextFile</a><br>
+				
+					<a href="#RankedSetAnalysis">RankedSetAnalysis</a><br>
+				
+					<a href="#ReadCoverage">ReadCoverage</a><br>
+				
+					<a href="#RNAEditingPileUpParser">RNAEditingPileUpParser</a><br>
+				
+					<a href="#RNAEditingScanSeqs">RNAEditingScanSeqs</a><br>
+				
+					<a href="#RNASeq">RNASeq</a><br>
+				
+					<a href="#RNASeqSimulator">RNASeqSimulator</a><br>
+				
+					<a href="#Sam2Fastq">Sam2Fastq</a><br>
+				
+					<a href="#Sam2USeq">Sam2USeq</a><br>
+				
+					<a href="#SamAlignmentExtractor">SamAlignmentExtractor</a><br>
+				
+					<a href="#SamParser">SamParser</a><br>
+				
+					<a href="#SamTranscriptomeParser">SamTranscriptomeParser</a><br>
+				
+					<a href="#SamFixer">SamFixer</a><br>
+				
+					<a href="#ScanSeqs">ScanSeqs</a><br>
+				
+					<a href="#ShiftAnnotationPositions">ShiftAnnotationPositions</a><br>
+				
+					<a href="#SoapV1Parser">SoapV1Parser</a><br>
+				
+					<a href="#SubtractRegions">SubtractRegions</a><br>
+				
+					<a href="#ScoreChromosomes">ScoreChromosomes</a><br>
+				
+					<a href="#ScoreParsedBars">ScoreParsedBars</a><br>
+				
+					<a href="#ScoreSequences">ScoreSequences</a><br>
+				
+					<a href="#Sgr2Bar">Sgr2Bar</a><br>
+				
+					<a href="#Simulator">Simulator</a><br>
+				
+					<a href="#StrandedBisSeq">StrandedBisSeq</a><br>
+				
+					<a href="#SRAProcessor">SRAProcessor</a><br>
+				
+					<a href="#SubSamplePointData">SubSamplePointData</a><br>
+				
+					<a href="#Tag2Point">Tag2Point</a><br>
+				
+					<a href="#Text2USeq">Text2USeq</a><br>
+				
+					<a href="#UCSCBig2USeq">UCSCBig2USeq</a><br>
+				
+					<a href="#USeq2UCSCBig">USeq2UCSCBig</a><br>
+				
+					<a href="#USeq2Text">USeq2Text</a><br>
+				
+					<a href="#Wig2Bar">Wig2Bar</a><br>
+				
+					<a href="#Wig2USeq">Wig2USeq</a><br>
+				
+					<a href="#TcrDriver">TcrDriver</a><br>
+				
+					<a href="#ScoreMethylatedRegions">ScoreMethylatedRegions</a><br>
+				
+					<a href="#ScoreEnrichedRegions">ScoreEnrichedRegions</a><br>
+				
+			<br><p>
+		
+					<a name="ABITraceTCPeakCalculator"><pre>**************************************************************************************
 **                        ABI Trace TC Peak Calculator: July 2009                   **
 **************************************************************************************
 Uses a sliding window to estimate the mean T peak area, compares it to the observed
@@ -128,11 +258,9 @@ Required Parameters:
 Example: java -jar pathTo/Apps/ABITraceTCPeakCalculator -f /MyBisSeqData/exp1.txt -c
 
 **************************************************************************************
-
-</pre><p>
-<a name="AggregatePlotter"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="AggregatePlotter"><pre>**************************************************************************************
 **                            Aggregate Plotter:  August 2012                       **
 **************************************************************************************
 Fetches point data contained within each region, inverts - stranded annotation, zeros
@@ -161,11 +289,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/AgregatePlotter -t
       /Data/PolIIRep1/,/Data/PolIIRep2/ -b /Anno/tssSites.bed -p 73 -u 1
 
 **************************************************************************************
-
-</pre><p>
-<a name="Alleler"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Alleler"><pre>**************************************************************************************
 **                                Alleler:  Sept 2010                               **
 **************************************************************************************
 Intersects a list of alleles (SNPs and INDELs) with gene models and returns their
@@ -188,11 +314,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/Alleler -a /APCSeq/apcFam7Alleles.
       -u /Anno/ucscKnownGenes.txt -g /Anno/Hg18Fastas/ -n 5000 -d -b
 
 **************************************************************************************
-
-</pre><p>
-<a name="AllelicMethylationDetector"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="AllelicMethylationDetector"><pre>**************************************************************************************
 **                     Allelic Methylation Detector:  September 2012                **
 **************************************************************************************
 AMD identifies regions displaying allelic methylation, e.g. ~50% average mCG
@@ -222,11 +346,9 @@ Options:
 Example: java -Xmx4G -jar pathTo/USeq/Apps/ beta! 
 
 **************************************************************************************
-
-</pre><p>
-<a name="BamIntensityJoiner"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="BamIntensityJoiner"><pre>**************************************************************************************
 **                          Bam Intensity Joiner : August 2012                      **
 **************************************************************************************
 Extracts base level intensity information from the output of modified Picard
@@ -249,11 +371,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/BamIntensityJoiner -u 10000 -m 101
       /Alignments/8341X.sam.gz -i /Ints/8341X.bam -r /Merged/8341.bam
 
 **************************************************************************************
-
-</pre><p>
-<a name="BamNMerIntensityParser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="BamNMerIntensityParser"><pre>**************************************************************************************
 **                           Bam NMer Intensity Parser : April 2012                 **
 **************************************************************************************
 Parses a BAM file from a modified Picard IlluminaBaseCallsToSam run on raw Illumina
@@ -270,11 +390,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/BamIntensityParser -f /Data/BamFil
        -n 7 -q 30
 
 **************************************************************************************
-
-</pre><p>
-<a name="Bar2Gr"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Bar2Gr"><pre>**************************************************************************************
 **                                 Bar2Gr: Nov 2006                                 **
 **************************************************************************************
 Converts xxx.bar to text xxx.gr files.
@@ -284,11 +402,9 @@ Converts xxx.bar to text xxx.gr files.
 Example: java -Xmx1500M -jar pathTo/T2/Apps/Bar2Gr -f /affy/BarFiles/ 
 
 **************************************************************************************
-
-</pre><p>
-<a name="Bar2USeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Bar2USeq"><pre>**************************************************************************************
 **                                 Bar 2 USeq: Mar 2011                             **
 **************************************************************************************
 Recurses through directories and sub directories of xxx.bar(.zip/.gz OK) files
@@ -316,11 +432,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Bar2USeq -f
       -d 'Final processed chIP-Seq results for Bcd and Hunchback, 30M reads' 
 
 **************************************************************************************
-
-</pre><p>
-<a name="BaseClassifier"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="BaseClassifier"><pre>**************************************************************************************
 **                             Base Classifier : Oct 2012                            **
 **************************************************************************************
 Beta.
@@ -331,11 +445,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/BamIntensityParser -f /Data/BamFil
        -n 7 -q 30
 
 **************************************************************************************
-
-</pre><p>
-<a name="Bed2Bar"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Bed2Bar"><pre>**************************************************************************************
 **                                  Bed2Bar: June 2010                              **
 **************************************************************************************
 Bed2Bar builds stair step graphs from bed files for display in IGB. Strands are merged
@@ -353,11 +465,9 @@ Example: java -Xmx4G pathTo/Apps/Bed2Bar -f /affy/res/zeste.bed.gz -v
       M_musculus_Jul_2007 -g 1000 -s -t 100 
 
 **************************************************************************************
-
-</pre><p>
-<a name="BedStats"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="BedStats"><pre>**************************************************************************************
 **                                BedStats: June 2010                               **
 **************************************************************************************
 Calculates several statistics on bed files where the name column contains a short read
@@ -374,11 +484,9 @@ Options:
 Example: java -Xmx1500M -jar pathToUSeq/Apps/BedStats -b /Res/ex1.bed.gz -s 9 -t 10
 
 **************************************************************************************
-
-</pre><p>
-<a name="BisSeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="BisSeq"><pre>**************************************************************************************
 **                                  BisSeq: May 2012                                **
 **************************************************************************************
 Takes two condition (treatment and control) PointData from converted and non-converted
@@ -417,11 +525,9 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/BisStat -c /Sperm/Converted -n
       -w 500 -m 10 -l 2 -f 50 
 
 **************************************************************************************
-
-</pre><p>
-<a name="BisSeqAggregatePlotter"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="BisSeqAggregatePlotter"><pre>**************************************************************************************
 **                       Bis Seq Aggregate Plotter: October 2012                    **
 **************************************************************************************
 BSAP merges bisulfite data over equally sized regions to generate data for class
@@ -446,11 +552,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/BisSeqAgregatePlotter -c
       /NBP/Con -n /NBP/NonCon -b /Anno/tssSites.bed -m
 
 **************************************************************************************
-
-</pre><p>
-<a name="BisSeqErrorAdder"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="BisSeqErrorAdder"><pre>**************************************************************************************
 **                                BisSeqErrorAdder: June 2012                       **
 **************************************************************************************
 Takes PointData from converted and non-converted C bisulfite sequencing data parsed
@@ -476,11 +580,9 @@ Example: java -Xmx12G -jar pathTo/USeq/Apps/BisSeqErrorAdder -c /Data/Sperm/Conv
       -n /Data/Sperm/NonConverted -f 0.02 
 
 **************************************************************************************
-
-</pre><p>
-<a name="BisStat"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="BisStat"><pre>**************************************************************************************
 **                                  BisStat: August 2012                            **
 **************************************************************************************
 Takes PointData from converted and non-converted C bisulfite sequencing data parsed
@@ -521,11 +623,9 @@ Example: java -Xmx12G -jar pathTo/USeq/Apps/BisStat -c /Data/Sperm/Converted -n
       /Genomes/Hg18/Fastas -o 10 
 
 **************************************************************************************
-
-</pre><p>
-<a name="BisStatRegionMaker"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="BisStatRegionMaker"><pre>**************************************************************************************
 **                           BisStat Region Maker: March 2012                       **
 **************************************************************************************
 Takes serialized window objects from BisStat, thresholds based on the min and max
@@ -548,11 +648,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/BisStatRegionMaker -m 0.8 -x 1.0 -g 1
       -s /Data/BisStat/SerializedWindowObjects  
 
 **************************************************************************************
-
-</pre><p>
-<a name="ChIPSeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ChIPSeq"><pre>**************************************************************************************
 **                                  ChIPSeq: April 2012                             **
 **************************************************************************************
 The ChIPSeq application is a wrapper for processing ChIP-Seq data through a variety of
@@ -604,11 +702,9 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/ChIPSeq -y eland -v D_rerio_Dec_2008 
       /Data/Results/WtVsNull -f /Anno/satelliteRepeats.bed
 
 **************************************************************************************
-
-</pre><p>
-<a name="CHPCAligner"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="CHPCAligner"><pre>**************************************************************************************
 **                                CHPC Aligner: Sept 2011                           **
 **************************************************************************************
 Wrapper for running novoalign on the CHPC clusters. You will need to configure ssh
@@ -650,11 +746,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/CHPCAlign  -p '-F ILMFQ -t60 -rRandom
     -a /mnt/hci-ma/AnalysisData/2010/A115  -w 6 -e nix@gmail.com -t -b 
 
 **************************************************************************************
-
-</pre><p>
-<a name="CompareParsedAlignments"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="CompareParsedAlignments"><pre>**************************************************************************************
 **                         Compare Parsed Alignments: Nov 2009                      **
 **************************************************************************************
 Compares two parsed alignments for a common distribution of snps using R's Fisher's
@@ -670,11 +764,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/CompareParsedAlignments.
      -a /SeqData/lymphSNPs.alleles -b /SeqData/normalSNPs.alleles -b /temp/
 
 **************************************************************************************
-
-</pre><p>
-<a name="ConcatinateFastas"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ConcatinateFastas"><pre>**************************************************************************************
 **                              Concatinate Fastas: Oct 2010                        **
 **************************************************************************************
 Concatinates a directory of fasta files into a single sequence seperated by a defined
@@ -692,11 +784,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/ConcatinateFastas -n 2000 -d
     /zv8/MergedNA_Scaffolds -f /zv8/BadFastas/ -c chrNA_Scaffold 
 
 **************************************************************************************
-
-</pre><p>
-<a name="CorrelatePointData"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="CorrelatePointData"><pre>**************************************************************************************
 **                                CorrelatePointData: Aug 2011                      **
 **************************************************************************************
 Calculates a Pearson Correlation Coefficient on the values of PointData found with the
@@ -713,11 +803,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/CorrelatePointData -f /BaseFracMethyl
       -s /BaseFracMethyl/X2 
 
 **************************************************************************************
-
-</pre><p>
-<a name="BisulfiteConvertFastas"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="BisulfiteConvertFastas"><pre>**************************************************************************************
 **                        Bisulfite Convert Fastas: Dec 2008                        **
 **************************************************************************************
 Converts all the c/C's to t/T's in fasta file(s) maintaining case.
@@ -728,11 +816,9 @@ Required Parameters:
 Example: java -Xmx2000M -jar pathTo/Apps/BisulfiteConvertFastas -f /affy/Fastas/
 
 **************************************************************************************
-
-</pre><p>
-<a name="CorrelationMaps"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="CorrelationMaps"><pre>**************************************************************************************
 **                           Correlation Maps:    Nov 2007                         **
 **************************************************************************************
 CM calculates a correlation score for each window of genes and using permutation, an
@@ -761,11 +847,9 @@ Example: java -Xmx256M -jar pathTo/T2/Apps/CorrelationMaps -f /Mango/geneFile.tx
        -w 30000 -n 2 -o /Mango/operons.txt
 
 **************************************************************************************
-
-</pre><p>
-<a name="ConvertFastaA2G"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ConvertFastaA2G"><pre>**************************************************************************************
 **                        Convert Fasta A 2 G: Mar 2012                             **
 **************************************************************************************
 Converts all the a/A's to g/G's in fasta file(s) maintaining case.
@@ -778,11 +862,9 @@ Example: java -Xmx2G -jar pathTo/Apps/ConvertFastaA2G -f /mm9/Fastas/ -s
       /mm9/AGConvertedFastas/
 
 **************************************************************************************
-
-</pre><p>
-<a name="ConvertFastqA2G"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ConvertFastqA2G"><pre>**************************************************************************************
 **                        Convert Fastq A 2 G: Mar 2012                             **
 **************************************************************************************
 Converts all the sequence A's to G's, case insensitive.
@@ -794,11 +876,9 @@ Required Parameters:
 Example: java -Xmx2G -jar pathTo/Apps/ConvertFastqA2G -f /IllData/Fastq/ 
 
 **************************************************************************************
-
-</pre><p>
-<a name="ConvertFasta2GCBoolean"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ConvertFasta2GCBoolean"><pre>**************************************************************************************
 **                       Convert Fasta 2 GC Boolean: Aug 2008                       **
 **************************************************************************************
 Converts fasta file(s) into serialized boolean[]s where every base g or c is true all
@@ -810,11 +890,9 @@ Required Parameters:
 Example: java -Xmx2000M -jar pathTo/Apps/ConvertFasta2GCBoolean -f /affy/Fastas/
 
 **************************************************************************************
-
-</pre><p>
-<a name="ConvertFasta2GCBarGraph"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ConvertFasta2GCBarGraph"><pre>**************************************************************************************
 **                     Convert Fasta 2 GC Bar Graphs: April 2011                    **
 **************************************************************************************
 Converts fasta files into graph files containing a 1 over each C in a CpG context.
@@ -828,11 +906,9 @@ Example: java -Xmx4G -jar pathTo/Apps/ConvertFasta2GCBarGraph -f /affy/Fastas/
       -v H_sapiens_Feb_2009
 
 **************************************************************************************
-
-</pre><p>
-<a name="DefinedRegionBisSeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="DefinedRegionBisSeq"><pre>**************************************************************************************
 **                                DefinedRegionBisSeq: May 2012                     **
 **************************************************************************************
 Takes two condition (treatment and control) PointData from converted and non-converted
@@ -865,11 +941,9 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/DefinedRegionBisStat -c /Sperm/Conve
       -b /Res/CpGIslands.bed 
 
 **************************************************************************************
-
-</pre><p>
-<a name="DefinedRegionDifferentialSeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="DefinedRegionDifferentialSeq"><pre>**************************************************************************************
 **                        Defined Region Differential Seq: Sept 2012                **
 **************************************************************************************
 DRDS takes bam files, one per replica, minimum one per condition, minimum two
@@ -929,11 +1003,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/DefinedRegionDifferentialSeq -c
      -u /Anno/mergedHg19EnsemblGenes.ucsc.gz
 
 **************************************************************************************
-
-</pre><p>
-<a name="DefinedRegionScanSeqs"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="DefinedRegionScanSeqs"><pre>**************************************************************************************
 **                           Defined Region Scan Seqs: March 2011                   **
 **************************************************************************************
 DRSS takes chromosome specific PointData xxx.bar.zip files and extracts scores under
@@ -988,11 +1060,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/DefinedRegionScanSeqs -t
       /Data/PolIIResults -p 100 -b /Data/selectRegions.bed -f 
 
 **************************************************************************************
-
-</pre><p>
-<a name="EnrichedRegionMaker"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="EnrichedRegionMaker"><pre>**************************************************************************************
 **                           Enriched Region Maker: Jan 2010                        **
 **************************************************************************************
 ERM combines windows from ScanSeqs xxx.swi files into larger enriched or reduced
@@ -1040,11 +1110,9 @@ Example: java -Xmx500M -jar pathTo/USeq/Apps/EnrichedRegionMaker -f /solexa/zest
       -i 1,2,4 -s 20,20,1 -w 50
 
 **************************************************************************************
-
-</pre><p>
-<a name="ElandMultiParser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ElandMultiParser"><pre>**************************************************************************************
 **                          Eland Multi Parser: October 2008                        **
 **************************************************************************************
 Parses an Eland xxx.eland_multi.txt alignment file tabulating hits to each fasta entry.
@@ -1060,11 +1128,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/ElandMultipParser -f
       /data/MultiFiles/ -r /data/transcriptomeResults.xls 
 
 **************************************************************************************
-
-</pre><p>
-<a name="ElandParser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ElandParser"><pre>**************************************************************************************
 **                               ElandParser: May 2008                              **
 **************************************************************************************
 Splits and converts Eland Extended xxx_export.txt or xxx_sorted.txt files
@@ -1087,11 +1153,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/ElandParser -f /Solexa/Run7/
      -v H_sapiens_Mar_2006 -s 38 -r /Solexa/ParsedData/PolIII/
 
 **************************************************************************************
-
-</pre><p>
-<a name="ElandSequenceParser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ElandSequenceParser"><pre>**************************************************************************************
 **                         Eland Sequence Parser: March 2009                        **
 **************************************************************************************
 Parses sequence information from Eland Extended alignment summary files. For every
@@ -1114,11 +1178,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/ElandSequenceParser -v hg18 -c 90
       -f /data/ExportFiles/ -r /data/Results -g /genomes/Hg18Fastas 
 
 **************************************************************************************
-
-</pre><p>
-<a name="ExportExons"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ExportExons"><pre>**************************************************************************************
 **                              Export Exons    June 2009                          **
 **************************************************************************************
 EE takes a UCSC Gene table and prints the exons to a bed file.
@@ -1130,11 +1192,9 @@ Parameters:
 Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportExons -g /user/Jib/ucscPombe.txt
       -a 50
 **************************************************************************************
-
-</pre><p>
-<a name="ExportIntergenicRegions"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ExportIntergenicRegions"><pre>**************************************************************************************
 **                        Export Intergenic Regions    May 2007                     **
 **************************************************************************************
 EIR takes a gff file and uses it to mask a boolean array.  Parts of the boolean array
@@ -1153,11 +1213,9 @@ Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportIntergenicRegions -s -m 100 -g
                  /user/Jib/GffFiles/Pombe/sanger.gff
 
 **************************************************************************************
-
-</pre><p>
-<a name="ExportIntronicRegions"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ExportIntronicRegions"><pre>**************************************************************************************
 **                         Export Intronic Regions    June 2007                     **
 **************************************************************************************
 EIR takes a UCSC Gene table and fetches the most conservative/ smallest intronic
@@ -1172,11 +1230,9 @@ Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportIntronicRegions -s -m 100 -g
                  /user/Jib/ucscPombe.txt
 
 **************************************************************************************
-
-</pre><p>
-<a name="ExportTrimmedGenes"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ExportTrimmedGenes"><pre>**************************************************************************************
 **                              Export Trimmed Genes    May 2012                    **
 **************************************************************************************
 EE takes a UCSC Gene table and clips each gene back to the first intron closed by a
@@ -1191,11 +1247,9 @@ Parameters:
 Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportTrimmedGenes -u -g 
       /user/Jib/ucscPombe.txt
 **************************************************************************************
-
-</pre><p>
-<a name="FetchGenomicSequences"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="FetchGenomicSequences"><pre>**************************************************************************************
 **                          FetchGenomicSequences: Sept 2012                        **
 **************************************************************************************
 Given a file containing genomic coordinates, fetches and saves the sequence (column
@@ -1215,11 +1269,9 @@ Example: java -Xmx1000M -jar pathTo/T2/Apps/FetchGenomicSequences -f /data/miRNA
 
 
 **************************************************************************************
-
-</pre><p>
-<a name="FindNeighboringGenes"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="FindNeighboringGenes"><pre>**************************************************************************************
 **                          Find Neighboring Genes:   Nov 2008                      **
 **************************************************************************************
 FNG takes a list of genes in UCSC Gene Table format and intersects them with a list of
@@ -1240,11 +1292,9 @@ Example: java -jar pathTo/T2/Apps/FindNeighboringGenes -g /anno/hg17Ensembl.txt 
       /affy/p53/finalPicks.txt -b 5000 -c
 
 **************************************************************************************
-
-</pre><p>
-<a name="FindOverlappingGenes"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="FindOverlappingGenes"><pre>**************************************************************************************
 **                           Find Overlapping Genes: Oct 2010                       **
 **************************************************************************************
 Finds overlapping genes that converge, diverge, or contain one another given a UCSC
@@ -1261,11 +1311,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/FindOverlappingGenes -u
       /data/zv8EnsemblGenes.ucsc.gz
 
 **************************************************************************************
-
-</pre><p>
-<a name="FindSharedRegions"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="FindSharedRegions"><pre>**************************************************************************************
 **                            Find Shared Regions: Dec 2011                         **
 **************************************************************************************
 Writes out a bed file of shared regions. Interbase coordinates.
@@ -1280,11 +1328,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/FindSharedRegions -f
       /Res/firstBedFile.bed -s /Res/secondBedFile.bed -r /Res/common.bed -m 100
 
 ************************************************************************************
-
-</pre><p>
-<a name="FileCrossFilter"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="FileCrossFilter"><pre>**************************************************************************************
 **                            File Cross Filter: March 2008                         **
 **************************************************************************************
 FCF take a column in the matcher file and uses it to parse the rows from other files.
@@ -1299,11 +1345,9 @@ Example: java -jar pathTo/T2/Apps/FileCrossFilter -f /extendedArrayData/ -m /old
      originalArray.txt -a 2 -b 2
 
 **************************************************************************************
-
-</pre><p>
-<a name="FileMatchJoiner"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="FileMatchJoiner"><pre>**************************************************************************************
 **                            File Match Joiner:  July 2008                         **
 **************************************************************************************
 FMJ loads a file and a particular column containing unique entries, a key, and then
@@ -1322,11 +1366,9 @@ Example: java -jar pathTo/Apps/FileMatchJoiner -k /snpChromMap.txt -m /SNPData/
      --b 2 -p
 
 **************************************************************************************
-
-</pre><p>
-<a name="FileJoiner"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="FileJoiner"><pre>**************************************************************************************
 **                             File Joiner: Feb 2005                                **
 **************************************************************************************
 Joins text files into a single file, avoiding line concatenations. This is a problem
@@ -1338,11 +1380,9 @@ Required Parameters:
 Example: java -jar pathTo/T2/Apps/FileJoiner -f /affy/SplitFiles/
 
 **************************************************************************************
-
-</pre><p>
-<a name="FileSplitter"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="FileSplitter"><pre>**************************************************************************************
 **                          File Splitter: July 2010                                **
 **************************************************************************************
 Splits a big text file into smaller files given a maximum number of lines.
@@ -1355,11 +1395,9 @@ Required Parameters:
 Example: java -Xmx256M -jar pathTo/T2/FileSplitter -f /affy/bpmap.txt -n 50000
 
 **************************************************************************************
-
-</pre><p>
-<a name="FilterDuplicateAlignments"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="FilterDuplicateAlignments"><pre>**************************************************************************************
 **                          FilterDuplicateAlignments: Mar 2010                     **
 **************************************************************************************
 Filters alignments for potential amplification bias by randomly selecting X alignments
@@ -1386,11 +1424,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/FilterDuplicateAlignments -f
 	  Use -c 10 -p 12 -s 8 -t 13 -b 9  for ELAND sorted or export alignments.
 
 **************************************************************************************
-
-</pre><p>
-<a name="Graph2Bed"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Graph2Bed"><pre>**************************************************************************************
 **                                 Graph 2 Bed: Feb 2011                            **
 **************************************************************************************
 Converts USeq stair step and heat map graphs into region bed files using a threshold.
@@ -1405,11 +1441,9 @@ Options:
 Example: java -Xmx1500M -jar pathTo/USeq/Apps/Graph2Bed -t 9 -p /data/ReadCoverage
 
 **************************************************************************************
-
-</pre><p>
-<a name="FilterIntersectingRegions"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="FilterIntersectingRegions"><pre>**************************************************************************************
 **                        Filter Intersecting Regions: Feb 2011                     **
 **************************************************************************************
 Flattens the mask regions file and uses it to split the split file into intersecting
@@ -1427,11 +1461,9 @@ Example: java -Xmx4000M -jar pathTo/Apps/FilterIntersectingRegions -i 0.5
         -m /ArrayDesigns/repMskedDesign.bed -s /ArrayDesigns/novoMskedDesign.bed
 
 ************************************************************************************
-
-</pre><p>
-<a name="FilterPointData"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="FilterPointData"><pre>**************************************************************************************
 **                          Filter Point Data: Oct 2012                             **
 **************************************************************************************
 FPD drops or saves observations from PointData that intersect a list of regions
@@ -1451,11 +1483,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/FilterPointData -p /data/PointData
       -r /repeats/hg18RepeatMasker.bed -a 0.75
 
 **************************************************************************************
-
-</pre><p>
-<a name="Gr2Bar"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Gr2Bar"><pre>**************************************************************************************
 **                                 Gr2Bar: Nov 2006                                 **
 **************************************************************************************
 Converts xxx.gr.zip files to chromosome specific bar files.
@@ -1467,11 +1497,9 @@ Converts xxx.gr.zip files to chromosome specific bar files.
 Example: java -Xmx1500M -jar pathTo/T2/Apps/Gr2Bar -f /affy/GrFiles/ -v hg17 
 
 **************************************************************************************
-
-</pre><p>
-<a name="IntersectLists"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="IntersectLists"><pre>**************************************************************************************
 **                            Intersect Lists: Dec 2008                             **
 **************************************************************************************
 IL intersects two lists (of genes) and using randomization, calculates the
@@ -1488,11 +1516,9 @@ Example: java -Xmx1500M -jar pathTo/Apps/IntersectLists -a /Data/geneListA.txt -
      /Data/geneListB.txt -t 28356 -n 10000
 
 **************************************************************************************
-
-</pre><p>
-<a name="IntersectKeyWithRegions"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="IntersectKeyWithRegions"><pre>**************************************************************************************
 **                       Intersect Key With Regions: July 2012                      **
 **************************************************************************************
 IR intersects lists of genomicRegions (chrom start stop(inclusive)) with a key, assumes the
@@ -1511,11 +1537,9 @@ Example: java -Xmx1500M -jar pathTo/Apps/IntersectKeyWithRegions -k /data/key.tx
       -r /data/HitLists/ 
 
 **************************************************************************************
-
-</pre><p>
-<a name="IntersectRegions"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="IntersectRegions"><pre>**************************************************************************************
 **                            Intersect Regions: May 2012                           **
 **************************************************************************************
 IR intersects lists of regions (tab delimited: chrom start stop(inclusive)). Random
@@ -1545,11 +1569,9 @@ Example: java -Xmx1500M -jar pathTo/Apps/IntersectRegions -f /data/miRNAs.txt
 
 
 **************************************************************************************
-
-</pre><p>
-<a name="KeggPathwayEnrichment"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="KeggPathwayEnrichment"><pre>**************************************************************************************
 **                           Kegg Pathway Enrichment:  Aug 2009                     **
 **************************************************************************************
 KPE looks for overrepresentation of genes from a user's list in Kegg pathways using a
@@ -1573,11 +1595,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/KeggPathwayEnrichment -e
       -a /HCV/ensemblGenesWith20OrMoreReads.txt -s /HCV/upRegInHCV_Norm.txt
 
 **************************************************************************************
-
-</pre><p>
-<a name="MaqSnps2Bed"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="MaqSnps2Bed"><pre>**************************************************************************************
 **                              MaqSnps2Bed: June 2009                              **
 **************************************************************************************
 Converts a Maq snp text file (1 based coordinates) into a bed file (interbase 
@@ -1589,11 +1609,9 @@ Example: java -Xmx1000M -jar path2/USeq/Apps/MaqSnps2Bed -f /data/maqSnpFile.txt
 
 
 **************************************************************************************
-
-</pre><p>
-<a name="MakeSpliceJunctionFasta"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="MakeSpliceJunctionFasta"><pre>**************************************************************************************
 **                        Make Splice Junction Fasta: Nov 2010                     **
 **************************************************************************************
 
@@ -1618,11 +1636,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/MakeSpliceJunctionFasta -s 32
       /Genomes/Hg18/Fastas/hg18_32_splices.fasta 
 
 ************************************************************************************
-
-</pre><p>
-<a name="MakeTranscriptome"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="MakeTranscriptome"><pre>**************************************************************************************
 **                           Make Transcriptome:  June 2012                         **
 **************************************************************************************
 Takes a UCSC ref flat table of transcripts and generates two multi fasta files of
@@ -1655,11 +1671,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MakeTranscriptome -f /Genomes/Hg18/Fa
       -u /Anno/Hg18/ensemblGenes.txt.ucsc -r 46 -s 
 
 ************************************************************************************
-
-</pre><p>
-<a name="MaskExonsInFastaFiles"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="MaskExonsInFastaFiles"><pre>**************************************************************************************
 **                        Mask Exons In Fasta Files: June 2011                      **
 **************************************************************************************
 Replaces the exonic sequence with Ns.
@@ -1678,11 +1692,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MaskExonsInFastaFiles -f
       /Genomes/Hg18/MaskedFastas/
 
 ************************************************************************************
-
-</pre><p>
-<a name="MaskRegionsInFastaFiles"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="MaskRegionsInFastaFiles"><pre>**************************************************************************************
 **                       Mask Regions In Fasta Files: Dec 2011                      **
 **************************************************************************************
 Replaces the region (or non region) sequence with Ns. Interbase coordinates.
@@ -1698,11 +1710,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MaskRegionsInFastaFiles -f
       /Genomes/Hg18/MaskedFastas/
 
 ************************************************************************************
-
-</pre><p>
-<a name="MergePointData"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="MergePointData"><pre>**************************************************************************************
 **                             Merge Point Data: Jan 2011                           **
 **************************************************************************************
 Efficiently merges PointData, collapsing by position and possibly strand. Identical
@@ -1722,11 +1732,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/MergePointData -p
       /Data/Ets1Rep1/,/Data/Ets1Rep2/ -s /Data/MergedEts1 -m 
 
 **************************************************************************************
-
-</pre><p>
-<a name="MergeRegions"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="MergeRegions"><pre>**************************************************************************************
 **                             Merge Regions: May 2009                              **
 **************************************************************************************
 Flattens tab delimited bed files (chr start stop ...). Assumes interbase coordinates.
@@ -1737,11 +1745,9 @@ Options:
 Example: java -Xmx4000M -jar pathTo/Apps/MergeRegions -d /Anno/TilingDesign/
 
 ************************************************************************************
-
-</pre><p>
-<a name="MergeUCSCGeneTable"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="MergeUCSCGeneTable"><pre>**************************************************************************************
 **                           Merge UCSC Gene Table: Oct 2010                       **
 **************************************************************************************
 Merges transcript models that share the same gene name (in column 0). Maximizes exons,
@@ -1756,11 +1762,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MergeUCSCGeneTable -u
       /data/zv8EnsemblGenes.ucsc.gz
 
 **************************************************************************************
-
-</pre><p>
-<a name="MultipleConditionRNASeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="MultipleConditionRNASeq"><pre>**************************************************************************************
 **                         Multiple Condition RNASeq: Mar 2012                      **
 **************************************************************************************
 
@@ -1811,11 +1815,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MultipleConditionRNASeq -c
      -u /Anno/mergedHg19EnsemblGenes.ucsc.gz
 
 **************************************************************************************
-
-</pre><p>
-<a name="MultipleReplicaDefinedRegionScanSeqs"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="MultipleReplicaDefinedRegionScanSeqs"><pre>**************************************************************************************
 **                   Multiple Replica Defined Region Scan Seqs: April 2010          **
 **************************************************************************************
 
@@ -1868,11 +1870,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MultipleReplicaDefinedRegionScanSeqs 
       /Data/PolIIResults/ -f 5 -l 0.322 
 
 **************************************************************************************
-
-</pre><p>
-<a name="MultipleReplicaScanSeqs"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="MultipleReplicaScanSeqs"><pre>**************************************************************************************
 **                        Multiple Replica Scan Seqs: May 2012                      **
 **************************************************************************************
 MRSS uses a sliding window and Ander's DESeq negative binomial pvalue -> Benjamini & 
@@ -1915,11 +1915,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MultipleReplicaScanSeqs -t
       /Data/PolIIResults/ -p 150 -w 250 -b 
 
 **************************************************************************************
-
-</pre><p>
-<a name="NovoalignBisulfiteParser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="NovoalignBisulfiteParser"><pre>**************************************************************************************
 **                        Novoalign Bisulfite Parser: Sept 2012                     **
 **************************************************************************************
 Parses Novoalign single and paired bisulfite sequence alignment files into xxx.bed
@@ -1952,11 +1950,9 @@ Example: java -Xmx25G -jar pathToUSeq/Apps/NovoalignBisulfiteParser -u -a
       /Novo/Run7/ -f /Genomes/Hg19/Fastas/ -v H_sapiens_Feb_2009 -s /Novo/Run7/NBP 
 
 **************************************************************************************
-
-</pre><p>
-<a name="NovoalignIndelParser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="NovoalignIndelParser"><pre>**************************************************************************************
 **                         Novoalign Indel Parser: June 2010                        **
 **************************************************************************************
 Parses Novoalign alignment xxx.txt(.zip/.gz) files for consensus indels, something
@@ -1975,11 +1971,9 @@ Options:
 Example: java -Xmx1500M -jar pathToUSeq/Apps/NovoalignIndelParser -f /Novo/Run7/
      -r /Novo/Run7/indelAlleleTable.txt -p 20 -b 20 -u 3 
 **************************************************************************************
-
-</pre><p>
-<a name="NovoalignParser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="NovoalignParser"><pre>**************************************************************************************
 **                            Novoalign Parser: Jan 2011                            **
 **************************************************************************************
 Parses Novoalign xxx.txt(.zip/.gz) files into center position binary PointData xxx.bar
@@ -2009,11 +2003,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/NovoalignParser -f /Novo/Run7/
      /Anno/Hg18/mergedUCSCKnownGenes.bed 
 
 **************************************************************************************
-
-</pre><p>
-<a name="NovoalignPairedParser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="NovoalignPairedParser"><pre>**************************************************************************************
 **                        Novoalign Paired Parser: January 2009                     **
 **************************************************************************************
 Parses Novoalign paired alignment files xxx.txt(.zip/.gz) into xxx.bed format.
@@ -2028,11 +2020,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/NovoalignPairedParser -f /Novo/Run7
  
 
 **************************************************************************************
-
-</pre><p>
-<a name="OligoTiler"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="OligoTiler"><pre>**************************************************************************************
 **                              Oligo Tiler: Oct 2009                               **
 **************************************************************************************
 OT tiles oligos across genomic regions returning their forward and reverse sequences.
@@ -2059,11 +2049,9 @@ Example: java -Xmx4000M -jar pathTo/Apps/OligoTiler -s 40 -f /Genomes/Hg18/Fasta
      -r /Designs/cancerArray.bed -p -a 
 
 ************************************************************************************
-
-</pre><p>
-<a name="OverdispersedRegionScanSeqs"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="OverdispersedRegionScanSeqs"><pre>**************************************************************************************
 **                        Overdispersed Region Scan Seqs: May 2012                  **
 **************************************************************************************
 
@@ -2122,11 +2110,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/OverdispersedRegionScanSeqs -t
       /Data/PolIIResults/ -f 30 -e 30 -u /Anno/mergedZv9EnsemblGenes.ucsc.gz
 
 **************************************************************************************
-
-</pre><p>
-<a name="ParseIntersectingAlignments"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ParseIntersectingAlignments"><pre>**************************************************************************************
 **                        ParseIntersectingAlignments: June 2010                    **
 **************************************************************************************
 Parses bed alignment files for intersecting reads provided another bed file of alleles.
@@ -2141,11 +2127,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/ParseIntersectingAlignments
      -s /LympAlleles/ex1.bed -a /SeqData/lymphAlignments.bed -m 13
 
 **************************************************************************************
-
-</pre><p>
-<a name="ParsePointDataContexts"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ParsePointDataContexts"><pre>**************************************************************************************
 **                           ParsePointDataContexts: Feb 2011                       **
 **************************************************************************************
 Parses PointData for particular 5bp genomic sequence contexts.
@@ -2170,11 +2154,9 @@ Example: java -Xmx12G -jar pathTo/USeq/Apps/ParsePointDataContexts -c '..CG.' -s
       /Data/PointData/CG -f /Genomes/Hg18/Fastas -p /Data/PointData/All/  
 
 **************************************************************************************
-
-</pre><p>
-<a name="PeakShiftFinder"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="PeakShiftFinder"><pre>**************************************************************************************
 **                               PeakShiftFinder: May 2010                          **
 **************************************************************************************
 PeakShiftFinder estimates the bp difference between sense and antisense proximal chIP-
@@ -2206,11 +2188,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/PeakShiftFinder -t
       /Results/Ets1PeakShiftResults -w 25 -d 5
 
 **************************************************************************************
-
-</pre><p>
-<a name="PointDataManipulator"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="PointDataManipulator"><pre>**************************************************************************************
 **                            Point Data Manipulator: Oct 2010                      **
 **************************************************************************************
 Manipulates PointData to merge strands, shift base positions, replace scores with 1
@@ -2231,11 +2211,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/PointDataManipulator -p
       /Data/Ets1Rep1/,/Data/Ets1Rep2/ -s /Data/MergedEts1 -o -i -m 
 
 **************************************************************************************
-
-</pre><p>
-<a name="Primer3Wrapper"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Primer3Wrapper"><pre>**************************************************************************************
 **                            Primer3 Wrapper: Dec  2006                            **
 **************************************************************************************
 Wrapper for the primer3 application. Extracts sequence, formats for primer3, executes
@@ -2254,11 +2232,9 @@ Example: java -jar pathTo/T2/Apps/Primer3Wrapper -f /home/dnix/seqForQPCR.txt -p
     -m /nfs/transcriptome/software/noarch/T2/64Bit_Primer3_1.0.0/
     cat_humrep_and_simple.cgi.txt -s 
 **************************************************************************************
-
-</pre><p>
-<a name="PrintSelectColumns"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="PrintSelectColumns"><pre>**************************************************************************************
 **                           Print Select Columns: Sept 2010                        **
 **************************************************************************************
 Spread sheet manipulation.
@@ -2277,11 +2253,9 @@ Required Parameters:
 Example: java -jar pathTo/T2/PrintSelectColumns -f /TabFiles/ -i 0,3,9 -n 1 -c chr
 
 **************************************************************************************
-
-</pre><p>
-<a name="QCSeqs"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="QCSeqs"><pre>**************************************************************************************
 **                                 QCSeqs: Nov 2009                                 **
 **************************************************************************************
 QCSeqs takes directories of chromosome specific PointData xxx.bar.zip files that 
@@ -2302,11 +2276,9 @@ Example: java -Xmx1500M -jar pathTo/USeqs/Apps/QCSeqs -d /Solexa/PolII/Rep1PntDa
       /Solexa/PolII/Rep2PntData/ -t /Solexa/PolII/TempDelMe -w 1000 -s 250 
 
 **************************************************************************************
-
-</pre><p>
-<a name="Qseq2Fastq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Qseq2Fastq"><pre>**************************************************************************************
 **                                  Qseq2Fastq: Aug 2010                            **
 **************************************************************************************
 Parses, filters out reads failing QC, compresses and converts single and paired read
@@ -2328,11 +2300,9 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/Qseq2Fastq -f /Runs/7/Fastq -q
       /Runs/100726_SN141_0265_A207D4ABXX/Data/Intensities/BaseCalls 
 
 **************************************************************************************
-
-</pre><p>
-<a name="RandomizeTextFile"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="RandomizeTextFile"><pre>**************************************************************************************
 **                            Randomize Text File: May 2009                         **
 **************************************************************************************
 Randomizes the lines of a text file.
@@ -2345,11 +2315,9 @@ Example: java -Xmx4000M -jar pathTo/Apps/RandomizeTextFile -n 24560 -t
        /TilingDesign/oligos.txt
 
 ************************************************************************************
-
-</pre><p>
-<a name="RankedSetAnalysis"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="RankedSetAnalysis"><pre>**************************************************************************************
 **                          Ranked Set Analysis: Jan 2006                           **
 **************************************************************************************
 RSA performs set analysis (intersection, union, difference) on lists of
@@ -2365,11 +2333,9 @@ Example: java -jar pathTo/T2/Apps/RankedSetAnalysis -a /affy/nonAmpA.txt -b
       /affy/nonAmpB.txt -s
 
 **************************************************************************************
-
-</pre><p>
-<a name="ReadCoverage"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ReadCoverage"><pre>**************************************************************************************
 **                               Read Coverage: Feb 2012                            **
 **************************************************************************************
 Generates read coverage stair-step xxx.bar graph files for visualization in IGB. Will
@@ -2400,11 +2366,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/ReadCoverage -p
       /CapSeqDesign/interrogatedExonsChrX.bed
 
 **************************************************************************************
-
-</pre><p>
-<a name="RNAEditingPileUpParser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="RNAEditingPileUpParser"><pre>**************************************************************************************
 **                            RNA Editing PileUp Parser: Jan 2012                       **
 **************************************************************************************
 Parses a SAMTools mpileup output file for refseq A bases that show evidence of
@@ -2424,11 +2388,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/RNAEditingPileUpParser -p /Pileups/
       -v C_elegans_May_2008
 
 **************************************************************************************
-
-</pre><p>
-<a name="RNAEditingScanSeqs"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="RNAEditingScanSeqs"><pre>**************************************************************************************
 **                            RNA Editing Scan Seqs: Jan 2012                       **
 **************************************************************************************
 Beta.
@@ -2446,11 +2408,9 @@ Options:
 Example: java -Xmx4G -jar pathTo/USeq/Apps/ 
 
 **************************************************************************************
-
-</pre><p>
-<a name="RNASeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="RNASeq"><pre>**************************************************************************************
 **                                   RNASeq: July 2012                              **
 **************************************************************************************
 The RNASeq application is a wrapper for processing RNA-Seq data through a variety of
@@ -2503,11 +2463,9 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/RNASeq -v D_rerio_Dec_2008 -t
       /Data/Results/MutVsWT -g /Anno/zv8Genes.ucsc 
 
 **************************************************************************************
-
-</pre><p>
-<a name="RNASeqSimulator"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="RNASeqSimulator"><pre>**************************************************************************************
 **                            RNA Seq Simulator: Aug 2011                           **
 **************************************************************************************
 RSS takes SAM alignment files from RNA-Seq data and simulates over dispersed, multiple
@@ -2542,11 +2500,9 @@ Example: java -Xmx12G -jar pathTo/USeq/Apps/RNASeqSimulator -u
        /Data/Heart/SplitSAM/ -s 46 -r 15 -g 1000 
 
 **************************************************************************************
-
-</pre><p>
-<a name="Sam2Fastq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Sam2Fastq"><pre>**************************************************************************************
 **                               Sam 2 Fastq: March 2012                            **
 **************************************************************************************
 Extracts the original Illumina fastq data from single or paired end sam alignments.
@@ -2562,11 +2518,9 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/Sam2Fastq -a /SAM/unaligned.sam.gz -f
      /Fastq/X1_110825_SN141_0377_AD06YNACXX_1_2.txt.gz
 
 **************************************************************************************
-
-</pre><p>
-<a name="Sam2USeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Sam2USeq"><pre>**************************************************************************************
 **                                Sam 2 USeq : Aug 2012                             **
 **************************************************************************************
 Generates per base read depth stair-step graph files for genome browser visualization.
@@ -2597,11 +2551,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r
      -v H_sapiens_Feb_2009 -s
 
 **************************************************************************************
-
-</pre><p>
-<a name="SamAlignmentExtractor"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="SamAlignmentExtractor"><pre>**************************************************************************************
 **                            Sam Alignment Extractor: Aug 2012                     **
 **************************************************************************************
 Given a bed file containing regions of interest, parses all of the intersecting sam
@@ -2617,11 +2569,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/SamAlignmentExtractor -a
       /Data/ExonCaptureAlignmentsX1/ -b /Data/SNPCalls/9484X1Calls.bed.gz 
 
 **************************************************************************************
-
-</pre><p>
-<a name="SamParser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="SamParser"><pre>**************************************************************************************
 **                                Sam Parser: Oct 2012                              **
 **************************************************************************************
 Parses SAM and BAM files into alignment center position PointData xxx.bar files.
@@ -2643,11 +2593,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/SamParser -f /Novo/Run7/
      -v C_elegans_May_2008 -m 0 -a 120  
 
 **************************************************************************************
-
-</pre><p>
-<a name="SamTranscriptomeParser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="SamTranscriptomeParser"><pre>**************************************************************************************
 **                          Sam Transcriptome Parser: July 2012                     **
 **************************************************************************************
 STP takes SAM alignment files that were aligned against chromosomes and extended
@@ -2682,11 +2630,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/SamTranscriptomeParser -f /Novo/Run
      -m 20 /Novo/STPParsedBamFiles/run7.bam -u 
 
 **************************************************************************************
-
-</pre><p>
-<a name="SamFixer"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="SamFixer"><pre>**************************************************************************************
 **                                 Sam Fixer: August 2011                           **
 **************************************************************************************
 Parses, filters, merges, and fixes xxx.sam files.
@@ -2713,11 +2659,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/SamParser -f /Novo/Run7/
      -m 20 -a 120 -s /Novo/Run7/mergedFixed.sam  -c 46 -u
 
 **************************************************************************************
-
-</pre><p>
-<a name="ScanSeqs"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ScanSeqs"><pre>**************************************************************************************
 **                                  Scan Seqs: Feb 2012                             **
 **************************************************************************************
 Takes unshifted stranded chromosome specific PointData and uses a sliding window to
@@ -2765,47 +2709,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/ScanSeqs -t
       /Data/PolIIResults -w 200 -p 100 -f -g 5 
 
 **************************************************************************************
-
-</pre><p>
-<a name="ScoreMethylatedRegions"><pre>
-
-**************************************************************************************
-**                        Score Methylated Regions: March 2012                      **
-**************************************************************************************
-For each region finds the underlying methylation data. A p-value (Bon Corr) for each
-region's fraction methylated (# nonConObs/ # totalObs) as well as a fold enrichment
-can be calculated using regions randomly drawn matched by chromosome, region length,
-# obs, and GC content.
-
-Options:
--c Converted PointData directories, full path, comma delimited. These should
-       contain stranded chromosome specific xxx_-/+_.bar.zip files. One
-       can also provide a single directory that contains multiple PointData
-       directories. See the NovoalignBisulfiteParser app.
--n Non-converted PointData directories, ditto. 
--r Full path file text for your region of interest file (tab delim: chr start stop).
--g To calculate p-values for methylation enrichment/ reduction,  provide a full path
-         directory containing for chromosome specific gc content boolean arrays. See
-         the ConvertFasta2GCBoolean app. Complete option -i
--i Likewise, to calculate p-values, also provide a full path file text containing the
-         interrogated regions (tab delim: chr start stop ...) to use in drawing
-         random regions.
--u Number of random region sets, defaults to 1000.
--m Minimum number of observations in a region to score, defaults to 10.
--o Minimum read coverage to count mC fraction, defaults to 8
--b Minimum number of Cs passing read coverage in region to score, defaults to 1
--p Print only regions that pass thresholds, defaults to all
-
-Example: java -jar pathTo/Apps/ScoreMethylatedRegions -c /Data/Sperm/Converted -n 
-      /Data/Sperm/NonConverted -r /Res/miRNARegions.bed -i /Res/interrRegions.bed
-       -g /Genomes/Hg18/GCBooleanArrays/
-
-**************************************************************************************
-
-</pre><p>
-<a name="ShiftAnnotationPositions"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ShiftAnnotationPositions"><pre>**************************************************************************************
 **                         Shift Annotation Positions: Oct 2010                     **
 **************************************************************************************
 Uses the information in an xxx.shifter.txt file from the ConcatinateFastas app to
@@ -2822,11 +2728,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/ShiftAnnotationPositions
     -u /zv8/ucscRefSeq.txt -f /zv8/BadFastas/chrScaffold.shifter.txt
 
 **************************************************************************************
-
-</pre><p>
-<a name="SoapV1Parser"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="SoapV1Parser"><pre>**************************************************************************************
 **                                SoapV1Parser: Feb 2009                            **
 **************************************************************************************
 Splits and converts Soap version 1 alignment xxx.txt files into center position binary
@@ -2847,11 +2751,9 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/SoapV1Parser -f /Soap/Run7/
      -v H_sapiens_Mar_2006 -x 5 -m 20
 
 **************************************************************************************
-
-</pre><p>
-<a name="SubtractRegions"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="SubtractRegions"><pre>**************************************************************************************
 **                             Subtract Regions: May 2009                           **
 **************************************************************************************
 Removes regions and parts there of that intersect the masking region file.  Provide
@@ -2865,11 +2767,9 @@ Example: java -Xmx4000M -jar pathTo/Apps/SubtractRegions -d /Anno/TilingDesign/
        -m /Anno/repeatMaskerHg18.bed
 
 ************************************************************************************
-
-</pre><p>
-<a name="ScoreChromosomes"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ScoreChromosomes"><pre>**************************************************************************************
 **                           Score Chromosomes: Oct  2012                           **
 **************************************************************************************
 SC scores chromosomes for the presence of transcription factor binding sites. Use the
@@ -2892,11 +2792,9 @@ Example: java -Xmx4000M -jar pathTo/T2/Apps/ScoreChromosomes -g /my/affy/Hg18Seq
       /my/affy/fgf8.fasta -s 4.9 -v H_sapiens_Mar_2006
 
 **************************************************************************************
-
-</pre><p>
-<a name="ScoreParsedBars"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ScoreParsedBars"><pre>**************************************************************************************
 **                           ScoreParsedBars: Sept 2008                             **
 **************************************************************************************
 For each region finds the underlying scores from the chromosome specific bar files.
@@ -2922,11 +2820,9 @@ Example: java -jar pathTo/Apps/ScoreParsedBars -b /BarFiles/Oligos/
        -g /Genomes/Hg18/GCBooleans/
 
 **************************************************************************************
-
-</pre><p>
-<a name="ScoreSequences"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="ScoreSequences"><pre>**************************************************************************************
 **                           Score Sequences: July 2007                             **
 **************************************************************************************
 SS scores sequences for the presence of transcription factor binding sites. Use the
@@ -2943,11 +2839,9 @@ Example: java -Xmx500M -jar pathTo/T2/Apps/ScoreSequences -g /my/affy/DmelSeqs.f
       -t /my/affy/zeste.fasta
 
 **************************************************************************************
-
-</pre><p>
-<a name="Sgr2Bar"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Sgr2Bar"><pre>**************************************************************************************
 **                               Sgr2Bar: Jan 2012                                  **
 **************************************************************************************
 Converts xxx.sgr(.zip) files to chromosome specific bar files.
@@ -2961,11 +2855,9 @@ Example: java -Xmx1500M -jar pathTo/Apps/Sgr2Bar -f /affy/sgrFiles/ -s + -t
       -v D_rerio_Jul_2006
 
 **************************************************************************************
-
-</pre><p>
-<a name="Simulator"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Simulator"><pre>**************************************************************************************
 **                               Simulator: Nov 2008                                **
 **************************************************************************************
 Generates chIP-seq simulated sequences for aligning to a reference genome.
@@ -2985,11 +2877,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/Simulator -f /Hg18/Fastas -r /Spik
     -b /Hg18/Repeats/repMsker.bed -l 36
 
 **************************************************************************************
-
-</pre><p>
-<a name="StrandedBisSeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="StrandedBisSeq"><pre>**************************************************************************************
 **                                 StandedBisSeq: Feb 2011                          **
 **************************************************************************************
 Looks for strand bias in CG methylation from one dataset using fischer or chi-square
@@ -3023,11 +2913,9 @@ Example: java -Xmx12G -jar pathTo/USeq/Apps/StandedBisSeq -c /Data/Sperm/Convert
       /Genomes/Hg18/Fastas/ 
 
 **************************************************************************************
-
-</pre><p>
-<a name="SRAProcessor"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="SRAProcessor"><pre>**************************************************************************************
 **                               SRA Processor: August 2012                         **
 **************************************************************************************
 Fetchs SRA files from the Sequence Read Archive and converts them to gzipped fastq.
@@ -3051,11 +2939,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/SRAProcessor -n SRP000401 /
       -c /tomato/job/Nix/SRP000401/cmd.txt 
 
 **************************************************************************************
-
-</pre><p>
-<a name="SubSamplePointData"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="SubSamplePointData"><pre>**************************************************************************************
 **                             SubSamplePointData:  Dec 2008                        **
 **************************************************************************************
 SSPD takes PointData directories and randomly selects points from each directory and
@@ -3070,11 +2956,9 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/SubSamplePointData -n 10000000 -f
     /Data/WCE1_Point,/Data/WCE2_Point,/Data/WCE3_Point -s /Data/Sub/ 
 
 **************************************************************************************
-
-</pre><p>
-<a name="Tag2Point"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Tag2Point"><pre>**************************************************************************************
 **                                Tag2Point: May 2010                               **
 **************************************************************************************
 Splits and converts tab delimited text (chr start stop ... strand (+ or -)) text
@@ -3094,11 +2978,9 @@ Example: java -Xmx1500M -jar pathTo/T2/Apps/Tag2Point -f /Solexa/BedFiles/
      -v H_sapiens_Mar_2006 -b 
 
 **************************************************************************************
-
-</pre><p>
-<a name="Text2USeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Text2USeq"><pre>**************************************************************************************
 **                                Text 2 USeq: June 2012                            **
 **************************************************************************************
 Converts text genomic data files (e.g. xxx.bed, xxx.gff, xxx.sgr, etc.) to
@@ -3147,11 +3029,9 @@ Indexes for common formats:
        gff w/scr,stnd,name -c 0 -b 3 -e 4 -v 5 -s 6 -t 8
 
 **************************************************************************************
-
-</pre><p>
-<a name="UCSCBig2USeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="UCSCBig2USeq"><pre>**************************************************************************************
 **                              UCSC Big 2 USeq: May 2012                           **
 **************************************************************************************
 Converts UCSC bigWig (xxx.bw) or bigBed (xxx.bb) archives to xxx.useq archives.
@@ -3170,11 +3050,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/USeq2UCSCBig -v M_musculus_Jul_2007 -
       /AnalysisResults/USeqDataArchives/ -d /MyApps/UCSC/
 
 **************************************************************************************
-
-</pre><p>
-<a name="USeq2UCSCBig"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="USeq2UCSCBig"><pre>**************************************************************************************
 **                              USeq 2 UCSC Big: Oct 2012                           **
 **************************************************************************************
 Converts USeq archives to UCSC bigWig (xxx.bw) or bigBed (xxx.bb) archives based on
@@ -3191,11 +3069,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/USeq2UCSCBig -u
       /AnalysisResults/USeqDataArchives/ -d /Apps/UCSC/
 
 **************************************************************************************
-
-</pre><p>
-<a name="USeq2Text"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="USeq2Text"><pre>**************************************************************************************
 **                                USeq 2 Text: Oct 2012                             **
 **************************************************************************************
 Converts USeq archives to text either as minimal native, bed, or wig graph format. 
@@ -3212,11 +3088,9 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/USeq2Text -f
       /AnalysisResults/USeqDataArchives/ 
 
 **************************************************************************************
-
-</pre><p>
-<a name="Wig2Bar"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Wig2Bar"><pre>**************************************************************************************
 **                                Wig2Bar: Oct 2009                                 **
 **************************************************************************************
 Converts variable step and fixed step xxx.wig(.zip/.gz OK) files to chrom specific
@@ -3230,11 +3104,9 @@ bar files.
 Example: java -Xmx1500M -jar pathTo/Apps/Wig2Bar -f /WigFiles/ -v hg18 -s 0.0 
 
 **************************************************************************************
-
-</pre><p>
-<a name="Wig2USeq"><pre>
-
-**************************************************************************************
+</pre><br><p>
+				
+					<a name="Wig2USeq"><pre>**************************************************************************************
 **                                Wig 2 USeq: May 2012                              **
 **************************************************************************************
 Converts variable step, fixed step, and bedGraph xxx.wig/bedGraph4(.zip/.gz OK) files
@@ -3258,6 +3130,91 @@ into stair step/ heat map useq archives. Span parameters are not supported.
 Example: java -Xmx1G -jar path2/Apps/Wig2USeq -f /WigFiles/ -v H_sapiens_Feb_2009
 
 **************************************************************************************
+</pre><br><p>
+				
+					<a name="TcrDriver"><pre>************************************************************************************************
 
-</pre><p>
-</body></html>
+
+TcrDriver:  This software merges TCRs into groups.  The software first identifies the V and J regions.  The software then attempts to identify the conserved Cys in the V region and Phe in the J region. If found, the software merges TCRs that are similar between the Cys and Phe bases.  If not found, the software merges TCRs from the start to the end of the sequence.  Aside from TCR classifion, the software generates plots that show TCR length distribution
+
+
+Arguments:
+
+1) V region sequence file:  The sequences should start at the same location as the primer sequences
+2) J region sequence file:  The sequences should start at the same locaiton as the primer seqeunces
+3) TCR sequences file: Sequences should be in fastq format.
+4) Output Prefix.  Prefix of the the output files.
+5) Alignment Score. Identity scores at which TCRs are merged.
+************************************************************************************************</pre><br><p>
+				
+					<a name="ScoreMethylatedRegions"><pre>**************************************************************************************
+**                        Score Methylated Regions: March 2012                      **
+**************************************************************************************
+For each region finds the underlying methylation data. A p-value (Bon Corr) for each
+region's fraction methylated (# nonConObs/ # totalObs) as well as a fold enrichment
+can be calculated using regions randomly drawn matched by chromosome, region length,
+# obs, and GC content.
+
+Options:
+-c Converted PointData directories, full path, comma delimited. These should
+       contain stranded chromosome specific xxx_-/+_.bar.zip files. One
+       can also provide a single directory that contains multiple PointData
+       directories. See the NovoalignBisulfiteParser app.
+-n Non-converted PointData directories, ditto. 
+-r Full path file text for your region of interest file (tab delim: chr start stop).
+-g To calculate p-values for methylation enrichment/ reduction,  provide a full path
+         directory containing for chromosome specific gc content boolean arrays. See
+         the ConvertFasta2GCBoolean app. Complete option -i
+-i Likewise, to calculate p-values, also provide a full path file text containing the
+         interrogated regions (tab delim: chr start stop ...) to use in drawing
+         random regions.
+-u Number of random region sets, defaults to 1000.
+-m Minimum number of observations in a region to score, defaults to 10.
+-o Minimum read coverage to count mC fraction, defaults to 8
+-b Minimum number of Cs passing read coverage in region to score, defaults to 1
+-p Print only regions that pass thresholds, defaults to all
+
+Example: java -jar pathTo/Apps/ScoreMethylatedRegions -c /Data/Sperm/Converted -n 
+      /Data/Sperm/NonConverted -r /Res/miRNARegions.bed -i /Res/interrRegions.bed
+       -g /Genomes/Hg18/GCBooleanArrays/
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="ScoreEnrichedRegions"><pre>**************************************************************************************
+**                        Score Enriched Regions: December 2012                     **
+**************************************************************************************
+ScoreEnrichedRegions determines if the set of regions specified by the user is more or less
+enriched than a randomly generated set of regions matched on chromosome, region
+length and GC content.  The software determines if each individual region is more/less enriched
+as well as the dataset as a whole.  Individual region p-values are caluculated by comparing
+the region fold-enrichment to the fold-enrichment of each randomly generated region.  Aggregate
+p-values are calculated by comparing the median fold-enrichment of the user-specified dataset
+ to median fold-enrichment each randomly generated datset. The software uses 1000 
+randomly generated regions by default. Pseudocounts are added to moderate fold-change values
+Options:
+-c Conditions directory containing one directory for each condition with one xxx.bam
+       file per biological replica and their xxx.bai indexes. The BAM files should be 
+       sorted by coordinate using Picard's SortSam.
+-r Regions of interest in Bed format (chr, start, stop,...), full path, See,
+       http://genome.ucsc.edu/FAQ/FAQformat#format1
+-i Interrogated regions in Bed format (chr, start, stop, ...), full path to use in drawing
+       random regions.
+-g A full path directory containing for chromosome specific gc content boolean arrays. See
+       the ConvertFasta2GCBoolean app
+-o Full path to the output file
+
+Advanced Options:
+-x Max per base alignment depth, defaults to 50000. Genes containing such high
+       density coverage are ignored. Warnings are thrown.
+-f Psuedocounts to each region.  Defaults to 10
+
+Example: java -Xmx10G -jar pathTo/USeq/Apps/ScoreEnrichedRegions -c
+      /Data/TimeCourse/ESCells/ -r regionOfInterest.bed -i sequencedRegions.bed -g gcContent/ 
+     -o resultsGoHere.txt 
+
+**************************************************************************************
+</pre><br><p>
+				
+			</body></html>
+		
