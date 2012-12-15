@@ -98,7 +98,7 @@ public class SNPComparator {
 	
 	private void saveHits(){
 		String name = Misc.removeExtension (sequencingVCFFile.getName()) +"_Int_"+ Misc.removeExtension(arraySnpBedFile.getName());
-		final String header = "IGBLink\tchr\tpos\tref\tvcfAlt\tvcfGeno\tvcfScore\taSNPCall\taSNPScore";
+		final String header = "IGBLink\tchr\tpos\tref\tvcfAlt\tvcfGeno\tvcfScore\tvcfCoverage\taSNPCall\taSNPScore";
 			
 		if (matches.size()!=0){
 			File mFile = new File(sequencingVCFFile.getParentFile(), name+"_Matches.xls");

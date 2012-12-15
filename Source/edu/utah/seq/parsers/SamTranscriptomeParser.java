@@ -3,9 +3,12 @@ package edu.utah.seq.parsers;
 
 import java.io.*;
 import java.util.regex.*;
+
+import util.bio.seq.Seq;
 import util.gen.*;
 
 import java.util.*;
+
 import edu.utah.seq.data.sam.*;
 
 /**
@@ -17,7 +20,7 @@ public class SamTranscriptomeParser{
 	private File saveFile;
 	private File outputFile;
 	private File replacementHeader;
-	private float maximumAlignmentScore = 60;
+	private float maximumAlignmentScore = 90;
 	private float minimumMappingQualityScore = 0;
 	private int numberAlignments = 0;
 	private int numberUnmapped = 0;
@@ -27,10 +30,9 @@ public class SamTranscriptomeParser{
 	private int numberFailingMappingQualityScore = 0;
 	private int numberAdapter = 0;
 	private int numberPhiX = 0;
-	private int numberSpliceJunctionReadsPassingFilters = 0;
-	private int numberGenomicReadsPassingFilters = 0;
-	private double failMaxMatches = 0;
-	private double passMaxMatches = 0;
+	private int numberPrintedAlignments = 0;
+	private double numberOverlappingBases = 0;
+	private double numberNonOverlappingBases = 0;
 	private int maxMatches = 1;
 	private PrintWriter samOut;
 	private Gzipper failedSamOut = null;
@@ -39,7 +41,9 @@ public class SamTranscriptomeParser{
 	private String programArguments;
 	private String genomeVersion = null;
 	private static final Pattern TAB = Pattern.compile("\\t");
-	private boolean reverseStrand = true;
+	private Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MDIN])");
+	private Pattern CIGAR_BAD = Pattern.compile(".*[^\\dMDIN].*");
+	private boolean reverseStrand = false;
 	private boolean removeControlAlignments = true;
 	private boolean randomPickAlignment = false;
 	private HashSet<SamAlignment> uniques = new HashSet<SamAlignment>();
@@ -47,8 +51,11 @@ public class SamTranscriptomeParser{
 	private ArrayList<SamAlignment> secondPair = new ArrayList<SamAlignment>();
 	private Random random = new Random();
 	private boolean verbose = true;
-	//another hack for CJ and Evan
-	private boolean replaceQualitiesWithI = false;
+	//for trimming/ merging paired data
+	private boolean mergePairedAlignments = false;
+	private int minimumDiffQualScore = 3;
+	private double minimumFractionInFrameMismatch = 0.01;
+	private int maximumProperPairDistanceForMerging = 300000;
 
 	//constructors
 	public SamTranscriptomeParser(String[] args){
@@ -115,7 +122,7 @@ public class SamTranscriptomeParser{
 		//stats
 		double fractionPassing = ((double)numberPassingAlignments)/((double)numberAlignments);
 		if (verbose) System.out.println("\nStats (some flags aren't set so be suspicious of zero read catagories):\n");
-		System.out.println("\t"+numberAlignments+"\tTotal # Alignments");
+		System.out.println("\t"+numberAlignments+"\tTotal # Alignments from raw sam file");
 		System.out.println("\t"+numberPassingAlignments+"\tAlignments passing filters ("+Num.formatPercentOneFraction(fractionPassing)+")");
 		System.out.println("\t\t"+numberUnmapped+"\t# Unmapped Reads");
 		System.out.println("\t\t"+numberFailingVendorQC+"\t# Alignments failing vendor/ platform QC");
@@ -124,13 +131,14 @@ public class SamTranscriptomeParser{
 		System.out.println("\t\t"+numberAdapter+"\t# Adapter alignments");
 		System.out.println("\t\t"+numberPhiX+"\t# PhiX alignments");
 		System.out.println();
-		System.out.println("\t"+(int)(failMaxMatches+passMaxMatches)+"\tReads aligning to one or more locations");
-		double fractionPass = passMaxMatches/(failMaxMatches+passMaxMatches);
-		System.out.println("\t"+(int)passMaxMatches+"\tReads aligning <= "+maxMatches+" locations ("+Num.formatPercentOneFraction(fractionPass)+")");
-		double fractionSpliceJunction = ((double)numberSpliceJunctionReadsPassingFilters)/((double)(numberSpliceJunctionReadsPassingFilters+numberGenomicReadsPassingFilters));
-		System.out.println("\t"+numberGenomicReadsPassingFilters+"\tGenomic reads");
-		System.out.println("\t"+numberSpliceJunctionReadsPassingFilters+"\tSplice-junction reads ("+Num.formatPercentOneFraction(fractionSpliceJunction)+")");
-
+		System.out.println("\t"+numberPrintedAlignments+"\t# Alignments written to SAM/BAM file. These passed the maxMatch, collapsed coordinate, and possibly merge pairs filters.");
+		//pair overlap stats?
+		double totalBases = numberNonOverlappingBases + numberOverlappingBases;
+		if (totalBases !=0) {
+			double fractionOverlap = numberOverlappingBases/totalBases;
+			String fractionString = Num.formatNumber(fractionOverlap, 4);
+			System.out.println("\t"+fractionString+"\tFraction overlapping bases in proper paired alignments.");
+		}
 	}
 
 	public boolean parseFile(File samFile){
@@ -170,7 +178,7 @@ public class SamTranscriptomeParser{
 
 				SamAlignment sa;
 				try {
-					sa = new SamAlignment(line, false, replaceQualitiesWithI);
+					sa = new SamAlignment(line, false);
 				} catch (MalformedSamAlignmentException e) {
 					if (verbose) System.out.println("\nSkipping malformed sam alignment -> "+e.getMessage());
 					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
@@ -296,7 +304,7 @@ public class SamTranscriptomeParser{
 	 * Saves them if they pass a whole set of filters.*/
 	public void filterPrintAlignments(ArrayList<SamAlignment> al){
 		try {
-			//collapse alignments with same coordinates and CIGAR 
+			//collapse alignments with same coordinates, CIGAR, and from same read pair 
 			uniques.clear();
 			for (SamAlignment sam : al) uniques.add(sam); 
 
@@ -331,6 +339,7 @@ public class SamTranscriptomeParser{
 			int numberSecondPair = secondPair.size();
 
 			//fix mate info in pairs? Can only do this if one first and one second.  Don't know how to join up repeat matches?
+			//merge ?
 			if (secondPairPresent && numberFirstPair == 1 && numberSecondPair == 1){
 				SamAlignment first = firstPair.get(0);
 				SamAlignment second = secondPair.get(0);
@@ -346,7 +355,30 @@ public class SamTranscriptomeParser{
 				}
 				
 				//merge pairs?
-				//trimPairedAlignments (first, second);
+				if (mergePairedAlignments) {
+					//same chromosome?
+					if (first.getReferenceSequence().equals(second.getReferenceSequence())) {
+						//within acceptable distance
+						int diff = Math.abs(first.getPosition()- second.getPosition());
+						if (diff < maximumProperPairDistanceForMerging){
+							//correct strand?
+							boolean merge = false;
+							if (reverseStrand){
+								if (first.isReverseStrand() == second.isReverseStrand()) merge = true;
+							}
+							else if (first.isReverseStrand() != second.isReverseStrand()) merge = true;
+							//attempt a merge?
+							if (merge){
+								SamAlignment mergedSam = mergePairedAlignments (first, second);
+								//success?
+								if (mergedSam != null) {
+									printSam(mergedSam,1);
+									return;
+								}
+							}
+						}
+					}
+				}
 
 			}
 
@@ -355,35 +387,9 @@ public class SamTranscriptomeParser{
 				//print reads
 				for (SamAlignment sam : firstPair) printSam(sam, numberFirstPair);
 				if (numberSecondPair!=0) for (SamAlignment sam : secondPair) printSam(sam, numberSecondPair);
-
-				//increment counters
-				//non pair
-				if (nonPairedPresent){
-					passMaxMatches += 1;
-					if (nonPairedSpliceJunction) numberSpliceJunctionReadsPassingFilters++;
-					else numberGenomicReadsPassingFilters++;
-				}
-				else {
-					//first pair
-					if (firstPairPresent){
-						passMaxMatches += 1;
-						if (firstPairSpliceJunction) numberSpliceJunctionReadsPassingFilters++;
-						else numberGenomicReadsPassingFilters++;
-					}
-					//second pair?
-					if (secondPairPresent){
-						passMaxMatches += 1;
-						if (secondPairSpliceJunction) numberSpliceJunctionReadsPassingFilters++;
-						else numberGenomicReadsPassingFilters++;
-					}
-				}
-
 			}
 			//don't print all, maybe just random pick?
 			else {
-				if (nonPairedPresent) failMaxMatches++;
-				else failMaxMatches+=2;
-
 				//pick and print random alignments?
 				if (randomPickAlignment){
 					//first pair or non paired
@@ -401,35 +407,143 @@ public class SamTranscriptomeParser{
 		} catch (Exception e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nProblem printing alignment block!?\n");
-
 		}
 	}
-	/**Eliminates overlap between paired reads
-	private void trimPairedAlignments(SamAlignment first, SamAlignment second) {
+	/**Attempts to merge alignments. Doesn't check if proper pairs!  Returns null if it cannot. This modifies the input SamAlignments so print first before calling*/
+	private SamAlignment mergePairedAlignments(SamAlignment first, SamAlignment second) {
 		//trim them of soft clipped info
 		first.trimMaskingOfReadToFitAlignment();
 		second.trimMaskingOfReadToFitAlignment();
 		
-		//do they overlap?
+		//look for bad CIGARs
+		if (CIGAR_BAD.matcher(first.getCigar()).matches()) Misc.printErrAndExit("\nError: unsupported cigar string! See -> "+first.toString()+"\n");
+		if (CIGAR_BAD.matcher(second.getCigar()).matches()) Misc.printErrAndExit("\nError: unsupported cigar string! See -> "+second.toString()+"\n");
+
+		//fetch coordinates
 		int startBaseFirst = first.getPosition();
-		int stopBaseFirst = startBaseFirst + first.countLengthOfAlignment();
+		int stopBaseFirst = startBaseFirst + countLengthOfCigar(first.getCigar());
 		int startBaseSecond = second.getPosition();
-		int stopBaseSecond = startBaseSecond + second.countLengthOfAlignment();
-		if (stopBaseFirst <= startBaseSecond || startBaseFirst >= stopBaseSecond) return;
+		int stopBaseSecond = startBaseSecond + countLengthOfCigar(second.getCigar());
 		
-		//make arrays to hold sequence and qualites
+		//make arrays to hold sequence and qualities
 		int start = startBaseFirst;
 		if (startBaseSecond < start) start = startBaseSecond;
 		int stop = stopBaseFirst;
 		if (stopBaseSecond > stop) stop = stopBaseSecond;
 		int size = stop-start;
-		String[] firstSeq = new String[size];
+	
+		SamLayout firstLayout = new SamLayout(size);
+		SamLayout secondLayout = new SamLayout(size);
 		
-		//what about insertions! how are you going to represent these
+		//layout data
+		firstLayout.layoutCigar(start, first);
+		secondLayout.layoutCigar(start, second);
 		
-	}*/
+		/*if (first.getName().equals("DQNZZQ1:505:D101DACXX:6:1208:13804:3296") ){
+			System.out.println("PreFirstLayout");
+			firstLayout.print();
+			System.out.println("PreSecondLayout");
+			secondLayout.print();
+		}*/
+		
+		//merge layouts, modifies original layouts so print first if you want to see em before mods.
+		SamLayout mergedSamLayout = SamLayout.mergeLayouts(firstLayout, secondLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);
+
+		if (mergedSamLayout == null) {
+			//if (true){
+				/*System.out.println("Failed to merge! ");
+				System.out.println("\nFirst "+first);
+				System.out.println("Second "+second);
+				System.out.println("\tFirst "+startBaseFirst+" "+stopBaseFirst);
+				System.out.println("\tSecond "+startBaseSecond+" "+stopBaseSecond);	
+				//remake em since they might have been modified.
+				firstLayout = new SamLayout(size);
+				secondLayout = new SamLayout(size);
+				firstLayout.layoutCigar(start, first);
+				secondLayout.layoutCigar(start, second);
+				System.out.println("FirstLayout");
+				firstLayout.print();
+				System.out.println("SecondLayout");
+				secondLayout.print();
+				if (mergedSamLayout != null) {
+					System.out.println("MergedLayout");
+					mergedSamLayout.print();
+				}*/
+				
+				//add failed merge tag
+				first.addMergeTag(false);
+				second.addMergeTag(false);
+				
+			return null;
+		}
+		
+		else {
+			//calculate overlap
+			int[] overNonOver = SamLayout.countOverlappingBases(firstLayout, secondLayout);
+			numberOverlappingBases+= overNonOver[0];
+			numberNonOverlappingBases+= overNonOver[1];
+			
+			//make merged
+			SamAlignment mergedSam = makeSamAlignment(first, second, mergedSamLayout, start);
+			return mergedSam;
+		}
+		
+	}
+	
+	public SamAlignment makeSamAlignment(SamAlignment first, SamAlignment second, SamLayout merged, int position){
+		SamAlignment mergedSam = new SamAlignment();
+		//<QNAME>
+		mergedSam.setName(first.getName());
+		//<FLAG>
+		SamAlignmentFlags saf = new SamAlignmentFlags();
+		saf.setReverseStrand(first.isReverseStrand());
+		mergedSam.setFlags(saf.getFlags());
+		//<RNAME>
+		mergedSam.setReferenceSequence(first.getReferenceSequence());
+		//<POS>
+		mergedSam.setPosition(position);
+		//<MAPQ>, bigger better
+		int mqF = first.getMappingQuality();
+		int mqS = second.getMappingQuality();
+		if (mqF > mqS) mergedSam.setMappingQuality(mqF);
+		else mergedSam.setMappingQuality(mqS);
+		//<CIGAR>
+		mergedSam.setCigar(merged.fetchCigar());
+		//<MRNM> <MPOS> <ISIZE>
+		mergedSam.setUnMappedMate();
+		//<SEQ> <QUAL>
+		merged.setSequenceAndQualities(mergedSam);
+		/////tags, setting to read with better as score.
+		//alternative score, smaller better
+		int asF = first.getAlignmentScore();
+		int asS = second.getAlignmentScore();
+		if (asF != Integer.MIN_VALUE && asS != Integer.MIN_VALUE){
+			if (asF < asS) mergedSam.setTags(first.getTags());
+			else mergedSam.setTags(second.getTags());
+		}
+		else mergedSam.setTags(first.getTags());
+		//add merged tag
+		mergedSam.addMergeTag(true);
+		return mergedSam;
+	}
+
+
+
+
+	
+	/**Counts the number bases in the cigar string. Only counts M D I and N.*/
+	public int countLengthOfCigar (String cigar){
+		int length = 0;
+		//for each M D I or N block
+		Matcher mat = CIGAR_SUB.matcher(cigar);
+		while (mat.find()){
+			length += Integer.parseInt(mat.group(1));
+		}
+		return length;
+	}
 
 	public void printSam(SamAlignment sam, int numberRepeats){
+		numberPrintedAlignments++;
 		//add/ replace IH tag for number of "Number of stored alignments in SAM that contains the query in the current record"
 		sam.addRepeatTag(numberRepeats);
 		samOut.println(sam);
@@ -575,16 +689,16 @@ public class SamTranscriptomeParser{
 					switch (test){
 					case 'f': forExtraction = new File(args[++i]); break;
 					case 'n': maxMatches = Integer.parseInt(args[++i]); break;
-					case 'o': reverseStrand = false; break;
+					case 'r': reverseStrand = true; break;
 					case 'u': saveUnmappedAndFailedScore = true; break;
 					case 's': saveFile = new File(args[++i]); break;
-					case 'r': replacementHeader = new File(args[++i]); break;
+					case 'h': replacementHeader = new File(args[++i]); break;
 					case 'c': removeControlAlignments = false; break;
 					case 'd': randomPickAlignment = true; break;
+					case 'p': mergePairedAlignments = true; break;
+					case 'q': maximumProperPairDistanceForMerging = Integer.parseInt(args[++i]); mergePairedAlignments = true; break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'm': minimumMappingQualityScore = Float.parseFloat(args[++i]); break;
-					//hidden options
-					case 'i': replaceQualitiesWithI = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -633,14 +747,15 @@ public class SamTranscriptomeParser{
 
 		//print info
 		if (verbose) {
-			if (replaceQualitiesWithI) System.out.println("Replacing qualities with iiiiiii...");
-			System.out.println(maximumAlignmentScore+ "\tMaximum alignment score");
-			System.out.println(minimumMappingQualityScore+ "\tMinimum mapping quality score");
-			System.out.println(maxMatches+"\tMaximum locations each read may align");
-			System.out.println(reverseStrand +"\tReverse the strand of the second paired alignemnt");
-			System.out.println(saveUnmappedAndFailedScore +"\tSave unmapped and low score reads");
-			System.out.println(removeControlAlignments +"\tRemove control chrPhiX and chrAdapter alignments");
-			System.out.println(randomPickAlignment +"\tRandomly choose an alignment from read blocks that fail the max locations threshold\n");
+			System.out.println(maximumAlignmentScore+ "\tMaximum alignment score.");
+			System.out.println(minimumMappingQualityScore+ "\tMinimum mapping quality score.");
+			System.out.println(maxMatches+"\tMaximum locations each read may align.");
+			System.out.println(reverseStrand +"\tReverse the strand of the second paired alignemnt.");
+			System.out.println(saveUnmappedAndFailedScore +"\tSave unmapped and low score reads.");
+			System.out.println(removeControlAlignments +"\tRemove control chrPhiX and chrAdapter alignments.");
+			System.out.println(randomPickAlignment +"\tRandomly choose an alignment from read blocks that fail the max locations threshold.");
+			System.out.println(mergePairedAlignments +"\tMerge proper paired alignments.");
+			if (mergePairedAlignments) System.out.println(maximumProperPairDistanceForMerging +"\tMaximum bp distance for merging paired alignments.\n");
 
 		}
 
@@ -649,7 +764,7 @@ public class SamTranscriptomeParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Sam Transcriptome Parser: Nov 2012                      **\n" +
+				"**                          Sam Transcriptome Parser: Dec 2012                      **\n" +
 				"**************************************************************************************\n" +
 				"STP takes SAM alignment files that were aligned against chromosomes and extended\n" +
 				"splice junctions (see MakeTranscriptome app), converts the coordinates to genomic\n" +
@@ -664,7 +779,7 @@ public class SamTranscriptomeParser{
 				"\nDefault Options:\n"+
 				"-s Save file, defaults to that inferred by -f. If an xxx.sam extension is provided,\n" +
 				"      the alignments won't be sorted by coordinate or saved as a bam file.\n"+
-				"-a Maximum alignment score. Defaults to 60, smaller numbers are more stringent.\n" +
+				"-a Maximum alignment score. Defaults to 90, smaller numbers are more stringent.\n" +
 				"      Approx 30pts per mismatch.\n"+
 				"-m Minimum mapping quality score, defaults to 0 (no filtering), larger numbers are\n" +
 				"      more stringent. Only applys to genomic matches, not splice junctions. Set to 13\n" +
@@ -672,11 +787,14 @@ public class SamTranscriptomeParser{
 				"-n Maximum number of locations each read may align, defaults to 1 (unique matches).\n"+
 				"-d If the maximum number of locations threshold fails, save one randomly picked repeat\n" +
 				"      alignment per read.\n"+
-				"-o Don't reverse the strand of the second paired alignment. Reversing the strand is\n" +
+				"-r Reverse the strand of the second paired alignment. Reversing the strand is\n" +
 				"      needed for proper same strand visualization of paired stranded Illumina data.\n"+
 				"-u Save unmapped reads and those that fail the alignment score.\n"+
 				"-c Don't remove chrAdapt and chrPhiX alignments.\n"+
-				"-r Full path to a txt file containing a sam header, defaults to autogenerating the\n"+
+				"-p Merge proper paired alignments. Those that cannot be unambiguously merged are left\n" +
+				"      as pairs. Recommended to avoid double counting and accurrate read coverage.\n"+
+				"-q Maximum acceptible base pair distance for merging, defaults to 300000.\n"+
+				"-h Full path to a txt file containing a sam header, defaults to autogenerating the\n"+
 				"      header from the read data.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/SamTranscriptomeParser -f /Novo/Run7/\n" +
@@ -688,6 +806,14 @@ public class SamTranscriptomeParser{
 
 	public int getNumberPassingAlignments() {
 		return numberPassingAlignments;
+	}
+
+	public int getMinimumDiffQualScore() {
+		return minimumDiffQualScore;
+	}
+
+	public double getMinimumFractionInFrameMismatch() {
+		return minimumFractionInFrameMismatch;
 	}	
 
 }

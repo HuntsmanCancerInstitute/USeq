@@ -59,6 +59,7 @@ public class VCFRecord {
 	public static final int sampleIndex = 9;
 	public static final int sampleGenotypeIndex =0;
 	public static final int sampleScoreIndex =7;
+	public static final int sampleRawReadDepthIndex=2;
 	public static final int numberColumnsInVCFRecord = 10;
 	public static final Pattern colon = Pattern.compile(":");
 	
@@ -84,9 +85,14 @@ public class VCFRecord {
 		sb.append(getSampleGenotype());
 		sb.append("'\t");
 		sb.append(getSampleScore());
+		sb.append("\t");
+		sb.append(getSampleRawReadDepth());
 		return sb.toString();
 	}
 	
+	public String getSampleRawReadDepth(){
+		return sample[sampleRawReadDepthIndex];
+	}
 	public String getSampleGenotype(){
 		return sample[sampleGenotypeIndex];
 	}

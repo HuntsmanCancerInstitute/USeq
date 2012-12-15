@@ -377,7 +377,7 @@ public class SamParser{
 				numberAlignments++;
 				SamAlignment sa;
 				try {
-					sa = new SamAlignment(line, true, false);
+					sa = new SamAlignment(line, true);
 				} catch (MalformedSamAlignmentException e) {
 					System.err.println("Skipping malformed sam alignment -> "+e.getMessage());
 					if (numBadLines++ > 1000) Misc.printErrAndExit("Aboring: too many malformed SAM alignments");

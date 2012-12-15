@@ -18,6 +18,10 @@ public class Seq {
 	public static final Pattern chrNumber = Pattern.compile("chr[123456789][1234567890]?");
 	public static final Pattern chrLetter = Pattern.compile("chr[XYM]T?");
 	public static final HashMap<String,Integer> asci2FastQScore = asci2FastQScore();
+	public static final String[] ORDERED_ASCII = new String[]{"!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", "0", "1", "2", "3", "4", "5", 
+		"6", "7", "8", "9", ":", ";", "<", "=", ">", "?", "@", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", 
+		"O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "[", "\\", "]", "^", "_", "`", "a", "b", "c", "d", "e", "f", "g", 
+		"h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "{", "|", "}", "~"};	
 	
 	/**Returns a vertebrate codon:aa HashMap, all capitals, single letter aa's.*/
 	public static HashMap<String,String> fetchCodonAAHashMap(){
@@ -87,13 +91,13 @@ public class Seq {
 	
 	/**Returns a map of asci text character to it's associated Sanger fastq base quality score.
 	 * ! = 0*/
-	public static HashMap<String,Integer> asci2FastQScore(){
-		String[] asci = new String[]{"!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", "0", "1", "2", "3", "4", "5", 
-				"6", "7", "8", "9", ":", ";", "<", "=", ">", "?", "@", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", 
-				"O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "[", "\\", "]", "^", "_", "`", "a", "b", "c", "d", "e", "f", "g", 
-				"h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "{", "|", "}", "~"};		
+	public static HashMap<String,Integer> asci2FastQScore(){	
+		String[] acii = new String[]{"!", "\"", "#", "$", "%", "&", "'", "(", ")", "*", "+", ",", "-", ".", "/", "0", "1", "2", "3", "4", "5", 
+			"6", "7", "8", "9", ":", ";", "<", "=", ">", "?", "@", "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", 
+			"O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "[", "\\", "]", "^", "_", "`", "a", "b", "c", "d", "e", "f", "g", 
+			"h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "{", "|", "}", "~"};	
 		HashMap<String,Integer> map = new HashMap<String,Integer>();
-		for (int i=0; i< asci.length; i++) map.put(asci[i], new Integer(i));
+		for (int i=0; i< acii.length; i++) map.put(acii[i], new Integer(i));
 		return map;
 	}
 	
@@ -104,7 +108,7 @@ public class Seq {
 			String sub = seqQual.substring(i, i+1);
 			Integer val = asci2FastQScore.get(sub);
 			if (val != null) scores[i] = val.intValue();
-			//else System.out.println("\tError converting seq quality character -> "+sub+" from "+seqQual);
+			else System.err.println("\nError converting seq quality character -> "+sub+" from "+seqQual);
 		}
 		return scores;
 	}
