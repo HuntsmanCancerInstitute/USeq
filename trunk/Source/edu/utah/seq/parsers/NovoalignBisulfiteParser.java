@@ -562,7 +562,7 @@ public class NovoalignBisulfiteParser{
 
 				SamAlignment sa;
 				try {
-					sa = new SamAlignment(line, false, false);
+					sa = new SamAlignment(line, false);
 				} catch (Exception e) {
 					System.out.println("\nSkipping malformed sam alignment ->\n"+line+"\n"+e.getMessage());
 					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");

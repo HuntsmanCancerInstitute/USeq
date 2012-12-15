@@ -182,7 +182,7 @@ public class SamFixer{
 				numberAlignments++;
 				SamAlignment sa;
 				try {
-					sa = new SamAlignment(line, false, false);
+					sa = new SamAlignment(line, false);
 				} catch (MalformedSamAlignmentException e) {
 					System.err.println("Skipping, malformed-> "+line);
 					continue;

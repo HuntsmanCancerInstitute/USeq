@@ -4,17 +4,17 @@ package edu.utah.seq.data.sam;
  * @author davidnix*/
 public class SamAlignmentFlags {
 
-	private boolean partOfAPairedAlignment;
-	private boolean aProperPairedAlignment;
-	private boolean unmapped;
-	private boolean mateUnMapped;
-	private boolean reverseStrand;
-	private boolean mateReverseStrand;
-	private boolean firstPair;
-	private boolean secondPair;
-	private boolean notAPrimaryAlignment;
-	private boolean failedQC;
-	private boolean aDuplicate;
+	private boolean partOfAPairedAlignment = false;
+	private boolean aProperPairedAlignment = false;
+	private boolean unmapped = false;
+	private boolean mateUnMapped = false;
+	private boolean reverseStrand = false;
+	private boolean mateReverseStrand = false;
+	private boolean firstPair = false;
+	private boolean secondPair = false;
+	private boolean notAPrimaryAlignment = false;
+	private boolean failedQC = false;
+	private boolean aDuplicate = false;
 	
 	private short flags;
 	private boolean flagResetNeeded;
@@ -23,9 +23,11 @@ public class SamAlignmentFlags {
 	public SamAlignmentFlags(short flags){
 		setBooleanFlags(flags);
 	}
+	public SamAlignmentFlags() {
+	}
 	
 	//methods
-	
+
 	/*Called to set all booleans upon construction*/
 	private void setBooleanFlags (short flags){
 		this.flags = flags;

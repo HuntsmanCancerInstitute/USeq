@@ -562,6 +562,17 @@ public class Misc {
 		for (int i=0; i<len; i++) System.out.print(array[i]+" ");
 		System.out.println();
 	}
+	/**Prints a char[] to System.out*/
+	public static void printArrayWithTabs(char[] array){
+		if (array==null){
+			System.out.println("null");
+			return;
+		}
+		int len = array.length;
+		for (int i=0; i<len; i++) System.out.print(array[i]+"\t");
+		System.out.println();
+	}
+
 	/**Prints a int[] to System.out*/
 	public static void printArray(float[] array){
 		if (array==null){

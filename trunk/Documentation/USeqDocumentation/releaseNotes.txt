@@ -1,3 +1,11 @@
+----USeq_8.4.7----
+SamTranscriptomeParser
+* Fixed bug that was throwing out the 2nd pair in a paired alignment when it was identical to the first.
+* Added an option to merge proper paired alignments. Lots of heavy lifting here.
+* Deleted all of the confusing post processing statistics
+* Made not reversing the strand of the second pair the default
+* Changed the default maximum alignment score to 90 instead of 60
+
 ----USeq_8.4.6----
 CompareIntersectingRegions 
 * New app for comparing hits to a master list of regions given one or more test region files.  Good for ranking master regions by number of hits from other lists.
@@ -9,9 +17,6 @@ RNAEditingPileUpParser
 * Fixed a bug that was counting mpileup INDEL bases as edited bases.
 Sam2USeq
 * Added feature to take a file of regions and calculate base coverage statistics.  
-SamTranscriptomeParser
-* Added feature to output read depth stats for a given list of interrogated bases.
-
 
 ----USeq_8.4.5----
 Sam2USeq

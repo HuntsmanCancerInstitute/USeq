@@ -42,14 +42,14 @@ public class SamAlignment {
 	private static final Pattern MINUS = Pattern.compile("-");
 	private static final Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSNIDH])");
 	private static final Pattern CIGAR_COUNTS = Pattern.compile("(\\d+)[MDN]");
+	private static final Pattern CIGAR_COUNTS_MIN = Pattern.compile("(\\d+)[MIN]");
 	private static final Pattern CIGAR_BAD_CHARACTERS = Pattern.compile(".*[^\\dMNIDSH].*");
 	public static final Pattern CIGAR_STARTING_MASK = Pattern.compile("^(\\d+)[SH].+");
 	public static final Pattern CIGAR_STOP_MASKED= Pattern.compile(".+\\D(\\d+)[SH]$");
 	public static final Pattern CIGAR_STARTING_HARD_MASK = Pattern.compile("^(\\d+)[H].+");
 	public static final Pattern CIGAR_STOP_HARD_MASK= Pattern.compile(".+\\D(\\d+)[H]$");
 	public static final Pattern BAD_NAME = Pattern.compile("(.+)/([12])$");
-	private static final String dummyQualities = "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii";
-
+	
 	//private boolean debug = true;
 
 
@@ -57,7 +57,7 @@ public class SamAlignment {
 	//constructors
 	public SamAlignment(){}
 
-	public SamAlignment (String line, boolean fixNonChrChroms, boolean replaceQualitiesWithI) throws MalformedSamAlignmentException, NumberFormatException{
+	public SamAlignment (String line, boolean fixNonChrChroms) throws MalformedSamAlignmentException, NumberFormatException{
 		String[] tokens = TAB.split(line);
 		//check length
 		if (tokens.length < 11 ) throw new MalformedSamAlignmentException("Cannot parse SamAlignment, too few columns, requires a minimum of 11 -> <QNAME> <FLAG> <RNAME> <POS> <MAPQ> <CIGAR> <MRNM> <MPOS> <ISIZE> <SEQ> <QUAL>  [<TAG>:<VTYPE>:<VALUE> [...]]");
@@ -83,8 +83,7 @@ public class SamAlignment {
 		sequence = tokens[9];
 		qualities = tokens[10];
 		//check lengths
-		if (replaceQualitiesWithI) qualities = dummyQualities.substring(0, sequence.length());
-		else if (sequence.length() != qualities.length()) throw new MalformedSamAlignmentException("Cannot parse SamAlignment, sequence length does not match quality string length see -> "+line);
+		if (sequence.length() != qualities.length()) throw new MalformedSamAlignmentException("Cannot parse SamAlignment, sequence length does not match quality string length see -> "+line);
 		//tags
 		if (tokens.length > 11){
 			int numberTags = tokens.length - 11;
@@ -365,6 +364,21 @@ System.out.println(fixedSeq+"\tFixed");
 		tags = new String[tagsAL.size()];
 		tagsAL.toArray(tags);
 	}
+	
+	/**Replaces or adds a MP:A: tag denoting whether it was merged T or failed merging F.*/
+	public void addMergeTag (boolean successfullyMerged){
+		ArrayList<String> tagsAL = new ArrayList<String>();
+		//remove existing
+		for (String tag : tags){
+			if (tag.startsWith("MP:A:") == false) tagsAL.add(tag);
+		}
+		//add new
+		if (successfullyMerged) tagsAL.add("MP:A:T");
+		else tagsAL.add("MP:A:F");
+		tags = new String[tagsAL.size()];
+		tagsAL.toArray(tags);
+	}
+
 
 	private boolean convertTranscriptomePosition(String coordinatesString, boolean convertMatePosition){
 		//split coordinates on underscore to get chunks
@@ -636,15 +650,16 @@ System.out.println("Start position "+startPosition);*/
 		return Integer.MIN_VALUE;
 	}
 
+	/**For sorting.*/
 	public boolean equals(Object o){
 		SamAlignment sam = (SamAlignment) o;
-		String thisX = referenceSequence+ position+ cigar;
-		String otherX = sam.referenceSequence + sam.position + sam.cigar;
+		String thisX = referenceSequence+ position+ cigar+ isFirstPair();
+		String otherX = sam.referenceSequence + sam.position + sam.cigar+ sam.isFirstPair();
 		return thisX.equals(otherX);
 	}
-
+	/**For sorting.*/
 	public int hashCode(){
-		String thisX = referenceSequence+ position+ cigar;
+		String thisX = referenceSequence+ position+ cigar+ isFirstPair();
 		return thisX.hashCode();
 	}
 
@@ -659,6 +674,17 @@ System.out.println("Start position "+startPosition);*/
 		int length = 0;
 		//for each M D or N block
 		Matcher mat = CIGAR_COUNTS.matcher(cigar);
+		while (mat.find()){
+			length += Integer.parseInt(mat.group(1));
+		}
+		return length;
+	}
+	
+	/**Counts the number of MIN bases in the cigar string. This is the length of the insert for merged pairs.*/
+	public static int countLengthOfCigarMIN (String cigar){
+		int length = 0;
+		//for each M I or N block
+		Matcher mat = CIGAR_COUNTS_MIN.matcher(cigar);
 		while (mat.find()){
 			length += Integer.parseInt(mat.group(1));
 		}

@@ -96,7 +96,7 @@ public class Sam2Fastq{
 			
 			SamAlignment sa;
 			try {
-				sa = new SamAlignment(line, false, false);
+				sa = new SamAlignment(line, false);
 			} catch (MalformedSamAlignmentException e) {
 				System.out.println("\nSkipping malformed sam alignment -> "+e.getMessage());
 				if (numBadLines++ > 100) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");

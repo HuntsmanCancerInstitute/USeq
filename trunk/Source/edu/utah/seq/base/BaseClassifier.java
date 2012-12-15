@@ -39,7 +39,7 @@ public class BaseClassifier {
 	private boolean printOnlyChanged = true;
 	private boolean useLikelihood = true;
 	private boolean printLikelihoods = false;
-	private boolean setRecalledBasesToN = true;
+	private boolean setRecalledBasesToN = false;
 
 	//internal
 
@@ -791,6 +791,7 @@ public class BaseClassifier {
 					switch (test){
 					case 'a': bamFiles = IO.extractFiles(new File(args[++i]), ".bam"); break;
 					case 'v': bedFile = new File(args[++i]); break;
+					case 'n': setRecalledBasesToN = true; break;
 					case 'l': minimumLikelihood = Double.parseDouble(args[++i]); break;
 					case 'd': minimumLikelihoodDifference = Double.parseDouble(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
