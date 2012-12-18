@@ -56,6 +56,8 @@ public class SamTranscriptomeParser{
 	private int minimumDiffQualScore = 3;
 	private double minimumFractionInFrameMismatch = 0.01;
 	private int maximumProperPairDistanceForMerging = 300000;
+	private double numberMergedPairs = 0;
+	private double numberFailedMergedPairs = 0;
 
 	//constructors
 	public SamTranscriptomeParser(String[] args){
@@ -133,8 +135,10 @@ public class SamTranscriptomeParser{
 		System.out.println();
 		System.out.println("\t"+numberPrintedAlignments+"\t# Alignments written to SAM/BAM file. These passed the maxMatch, collapsed coordinate, and possibly merge pairs filters.");
 		//pair overlap stats?
-		double totalBases = numberNonOverlappingBases + numberOverlappingBases;
-		if (totalBases !=0) {
+		if (mergePairedAlignments) {
+			double fractionFailed = numberFailedMergedPairs/ (numberFailedMergedPairs+ numberMergedPairs);
+			System.out.println("\t"+Num.formatNumber(fractionFailed, 4)+"\tFraction proper paired alignments that could not be merged.");
+			double totalBases = numberNonOverlappingBases + numberOverlappingBases;
 			double fractionOverlap = numberOverlappingBases/totalBases;
 			String fractionString = Num.formatNumber(fractionOverlap, 4);
 			System.out.println("\t"+fractionString+"\tFraction overlapping bases in proper paired alignments.");
@@ -313,24 +317,18 @@ public class SamTranscriptomeParser{
 			secondPair.clear();
 			boolean firstPairPresent = false;
 			boolean secondPairPresent = false;
-			boolean firstPairSpliceJunction = false;
-			boolean secondPairSpliceJunction = false;
 			boolean nonPairedPresent = false;
-			boolean nonPairedSpliceJunction = false;
 			for (SamAlignment sam : uniques) {
 				if (sam.isFirstPair()) {
 					firstPairPresent = true;
-					if (sam.isSpliceJunction()) firstPairSpliceJunction =true;
 					firstPair.add(sam);
 				}
 				else if (sam.isSecondPair()) {
 					secondPairPresent = true;
-					if (sam.isSpliceJunction()) secondPairSpliceJunction=true;
 					secondPair.add(sam);
 				}
 				else {
 					nonPairedPresent = true;
-					if (sam.isSpliceJunction()) nonPairedSpliceJunction=true;
 					firstPair.add(sam);
 				}
 			}
@@ -373,8 +371,10 @@ public class SamTranscriptomeParser{
 								//success?
 								if (mergedSam != null) {
 									printSam(mergedSam,1);
+									numberMergedPairs++;
 									return;
 								}
+								else numberFailedMergedPairs++;
 							}
 						}
 					}
@@ -674,12 +674,13 @@ public class SamTranscriptomeParser{
 	}		
 
 
-	/**This method will process each argument and assign new varibles*/
+	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		File forExtraction = null;
-		programArguments = Misc.stringArrayToString(args, " ");
-		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+ programArguments +"\n");
+		String useqVersion = IO.fetchUSeqVersion();
+		programArguments = useqVersion+" "+Misc.stringArrayToString(args, " ");
+		if (verbose) System.out.println("\n"+useqVersion+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -798,7 +799,7 @@ public class SamTranscriptomeParser{
 				"      header from the read data.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/SamTranscriptomeParser -f /Novo/Run7/\n" +
-				"     -m 20 /Novo/STPParsedBams/run7.bam -u \n\n" +
+				"     -m 20 -s /Novo/STPParsedBams/run7.bam -p -r \n\n" +
 
 		"**************************************************************************************\n");
 

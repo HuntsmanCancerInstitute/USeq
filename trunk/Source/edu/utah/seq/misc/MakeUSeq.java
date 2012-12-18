@@ -90,6 +90,7 @@ public class MakeUSeq {
 			"util/bio/seq/MakeTranscriptome",
 			"util/bio/seq/MaskExonsInFastaFiles",
 			"util/bio/seq/MaskRegionsInFastaFiles",
+			"edu/utah/seq/parsers/MergePairedSamAlignments",
 			"edu/utah/seq/data/MergePointData",
 			"util/apps/MergeRegions",
 			"util/bio/parsers/MergeUCSCGeneTable",

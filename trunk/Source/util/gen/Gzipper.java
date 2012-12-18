@@ -27,6 +27,12 @@ public class Gzipper {
 		out.write(rtn);
 	}
 	
+	/**Adds a return onto the line*/
+	public void println(Object line) throws IOException{
+		out.write(line.toString().getBytes());
+		out.write(rtn);
+	}
+	
 	public void print(String line) throws IOException{
 		out.write(line.getBytes());
 	}
