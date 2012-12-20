@@ -33,9 +33,7 @@ public class SamLayout{
 	public void layoutCigar(int start, SamAlignment sam){
 		//for each cigar block in first, looking for MDIN s
 		Matcher mat = CIGAR_SUB.matcher(sam.getCigar());
-		//System.out.println("\tCIGAR "+sam.getCigar());
 		int position = sam.getPosition() - start;
-		//System.out.println("\tPos/layoutIndex "+position);
 		int index = 0;
 		int layoutIndex = position;
 		char[] samSeq = sam.getSequence().toCharArray();
@@ -113,7 +111,7 @@ public class SamLayout{
 			if (f.call[i] != s.call[i] && f.call[i] != '\u0000' && s.call[i] != '\u0000'){
 
 				//are one of the calls an I and the other M
-				if ((f.call[i]=='M' && s.call[i]=='I') || (f.call[i]=='I' && s.call[i]=='M')){//System.out.println("IM mis call found "+i);
+				if ((f.call[i]=='M' && s.call[i]=='I') || (f.call[i]=='I' && s.call[i]=='M')){
 					//are downstream bases in frame?
 					if (inframeDownstreamSeqI(f,s,i,minimumInFrameMismatch)){
 						call[i] = 'I';
