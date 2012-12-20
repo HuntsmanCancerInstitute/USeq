@@ -47,14 +47,17 @@ launchctl setenv VARNAME $VARNAME
 
 
 **************************** DEPRICATED *************************************
+This is no longer updated and may miss new applications.
 
 ## Build a 'USeq_TestRelease1.0':
 Open a terminal and navigate into the USeq/Classes directory
 Type 'java edu/utah/seq/misc/MakeUSeq TestRelease1.0'
 
+## Customize the Source/edu/utah/seq/misc/MakeUSeq.java file to create soft links and an appropriate rsync call specific for your configuration.
+
 *****************************************************************************
 
-## Customize the Source/edu/utah/seq/misc/MakeUSeq.java file to create soft links and an appropriate rsync call specific for your configuration.
+
 
 ## Are you seeing a big list of xxx.jar files in the navigation tree?  Switch to Package Explorer, not Project Explorer: Window-> Show View-> Package Explorer
 
