@@ -1,3 +1,9 @@
+----USeq_8.4.8----
+MergePairedSamAlignments
+* New app for merging paired sam alignments.  Geared for processing exome and whole genome data.  Lots of paired stats. Will merge repeat matches.
+SamTranscriptomeParser
+* Various fixes for issues with merging paired reads with insertions and deletions that preceed the start of the second downstream read.
+
 ----USeq_8.4.7----
 SamTranscriptomeParser
 * Fixed bug that was throwing out the 2nd pair in a paired alignment when it was identical to the first.

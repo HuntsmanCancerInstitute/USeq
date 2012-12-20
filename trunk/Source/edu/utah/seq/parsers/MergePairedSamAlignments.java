@@ -3,6 +3,7 @@ package edu.utah.seq.parsers;
 
 import java.io.*;
 import java.util.regex.*;
+
 import util.gen.*;
 import java.util.*;
 import net.sf.samtools.SAMFileReader;
@@ -25,7 +26,7 @@ public class MergePairedSamAlignments{
 	private boolean secondPairReverseStrand = false;
 	private boolean removeControlAlignments = false;
 	private int minimumDiffQualScore = 3;
-	private double minimumFractionInFrameMismatch = 0.01;
+	private double minimumFractionInFrameMismatch = 0.05;
 	private int maximumProperPairDistanceForMerging = 5000;
 
 	//counters for initial filtering
@@ -52,7 +53,7 @@ public class MergePairedSamAlignments{
 	private int numberUnmappedMatePairedAlignments = 0;
 	private int numberAlignmentsMissingPair;
 	private int numberPairsFailingChrDistStrand;
-	private boolean crossCheckMateCoordinates = false;
+	private boolean crossCheckMateCoordinates = true;
 	private int numberPairsFailingMateCrossCoordinateCheck;
 	private int numberRepeatAlignmentsLackingMate;
 
@@ -62,9 +63,9 @@ public class MergePairedSamAlignments{
 	private Gzipper failedSamOut = null;
 	private Gzipper failedMatePairOut = null;
 	private LinkedHashSet<String> samHeader = new LinkedHashSet<String>();
-	private Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MDIN])");
-	private Pattern CIGAR_BAD = Pattern.compile(".*[^\\dMDIN].*");
-	private Histogram insertSize = new Histogram(0,2001,2001);
+	public static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MDIN])");
+	public static Pattern CIGAR_BAD = Pattern.compile(".*[^\\dMDIN].*");
+	private Histogram insertSize = new Histogram(0,2001,400);
 	private String programArguments;
 
 	//constructors
@@ -135,7 +136,7 @@ public class MergePairedSamAlignments{
 		System.out.println("\t\t"+numberAdapter+"\t# Adapter alignments");
 		System.out.println("\t\t"+numberPhiX+"\t# PhiX alignments");
 		System.out.println();
-		System.out.println("\nPaired alignment stats:\n");
+		System.out.println("Paired alignment stats:\n");
 		System.out.println("\t\t"+numberNonPairedAlignments+"\t# Non paired alignments");
 		System.out.println("\t\t"+numberNonProperPairedAlignments+"\t# Non proper paired alignments");
 		System.out.println("\t\t"+numberUnmappedMatePairedAlignments+"\t# Non mapped mate paired alignments");
@@ -145,7 +146,7 @@ public class MergePairedSamAlignments{
 		System.out.println("\t\t"+numberRepeatAlignmentsLackingMate+"\t# Repeat alignments lacking a mate");
 		System.out.println("\t\t"+(int)numberFailedMergedPairs+"\t# Proper paired alignments that could not be unambiguously merged");
 		System.out.println("\t\t"+(int)numberMergedPairs+"\t# Proper paired alignments that were merged");
-	
+
 		double fractionFailed = numberFailedMergedPairs/ (numberFailedMergedPairs+ numberMergedPairs);
 		System.out.println("\t\t\t"+Num.formatNumber(fractionFailed, 4)+"\tFraction proper paired alignments that could not be merged");
 		double totalBases = numberNonOverlappingBases + numberOverlappingBases;
@@ -153,11 +154,13 @@ public class MergePairedSamAlignments{
 		String fractionString = Num.formatNumber(fractionOverlap, 4);
 		System.out.println("\t\t\t"+fractionString+"\tFraction overlapping bases in proper paired alignments");		
 		//histogram
-		System.out.println("\nMapped genomic insert length distribution for merged paired alignments:");
-		insertSize.setSkipZeroBins(true);
-		insertSize.setTrimLabelsToSingleInteger(true);
-		insertSize.printScaledHistogram();
-		
+		if (insertSize.getTotalBinCounts() !=0){
+			System.out.println("\nMapped genomic insert length distribution for merged paired alignments:\n");
+			insertSize.setSkipZeroBins(true);
+			insertSize.setTrimLabelsToSingleInteger(true);
+			insertSize.printScaledHistogram();
+		}
+
 		System.out.println("\n\t"+numberPrintedAlignments+"\t# Alignments written to SAM/BAM file.");
 
 
@@ -249,7 +252,7 @@ public class MergePairedSamAlignments{
 			int dotCounter = 0;
 
 			samReader = new SAMFileReader(bamFile);
-			
+
 			//check sort order
 			if (samReader.getFileHeader().getSortOrder().compareTo(SortOrder.coordinate) == 0){
 				Misc.printErrAndExit("\nError, your bam file appears sorted by coordinate. Sort by query name and restart.\n");
@@ -258,8 +261,8 @@ public class MergePairedSamAlignments{
 			//load header 
 			String[] header = samReader.getFileHeader().getTextHeader().split("\\n");
 			for (String h: header) samHeader.add(h);
-			
-			
+
+
 			SAMRecordIterator it = samReader.iterator();
 
 			while (it.hasNext()) {
@@ -567,6 +570,9 @@ public class MergePairedSamAlignments{
 			numberMergedPairs++;
 			samOut.println(mergedSam);
 			numberPrintedAlignments++;
+			//if (first.getCigar().contains("D") || second.getCigar().contains("D") || first.getCigar().contains("I") || second.getCigar().contains("I")){
+			//System.out.println(first.getName()+"\t"+first.getReferenceSequence()+"\t"+first.getPosition()+"\t"+first.getCigar()+"\t"+second.getCigar());
+			//}
 		}
 		else {
 			samOut.println(firstSamString);
@@ -587,10 +593,10 @@ public class MergePairedSamAlignments{
 		//check mate position
 		if (first.getMatePosition() != second.getPosition()) return false;
 		if (second.getMatePosition() != first.getPosition()) return false;
-		
+
 		//check chromosome
 		String mateChrom = first.getMateReferenceSequence();
-		
+
 		if (mateChrom.equals("=") == false && mateChrom.equals(first.getReferenceSequence()) == false) return false;
 		mateChrom = second.getMateReferenceSequence();
 		if (mateChrom.equals("=") == false && mateChrom.equals(second.getReferenceSequence()) == false) return false;
@@ -627,72 +633,65 @@ public class MergePairedSamAlignments{
 		if (CIGAR_BAD.matcher(first.getCigar()).matches()) Misc.printErrAndExit("\nError: unsupported cigar string! See -> "+first.toString()+"\n");
 		if (CIGAR_BAD.matcher(second.getCigar()).matches()) Misc.printErrAndExit("\nError: unsupported cigar string! See -> "+second.toString()+"\n");
 
-		//fetch coordinates
-		int startBaseFirst = first.getPosition();
-		int stopBaseFirst = startBaseFirst + countLengthOfCigar(first.getCigar());
-		int startBaseSecond = second.getPosition();
-		int stopBaseSecond = startBaseSecond + countLengthOfCigar(second.getCigar());
+		//order left and right
+		SamAlignment left = first;
+		SamAlignment right = second;
+		if (first.getPosition() > second.getPosition()) {
+			right = first;
+			left = second;
+		}
 
-		//make arrays to hold sequence and qualities
-		int start = startBaseFirst;
-		if (startBaseSecond < start) start = startBaseSecond;
-		int stop = stopBaseFirst;
-		if (stopBaseSecond > stop) stop = stopBaseSecond;
-		int size = stop-start;
+		//System.out.println("Name "+left.getName());
 
-		SamLayout firstLayout = new SamLayout(size);
-		SamLayout secondLayout = new SamLayout(size);
+		//fetch genomic space coordinates
+		int startLeft = left.getPosition();
+		int stopLeft = startLeft + countLengthOfCigar(left.getCigar());
+		int startRight = right.getPosition();
+		int stopRight = startRight + countLengthOfCigar(right.getCigar());
+		int stop = stopRight;
+		if (stopLeft > stop) stop = stopLeft;
+
+		//any Is in left that preceed the start of right?
+		int numAdders = countIs(left.getCigar(), startRight-startLeft);
+
+		//make arrays to hold sequence and qualities in cigar space
+		int size = numAdders + stop-startLeft;
+
+		SamLayout leftLayout = new SamLayout(size);
+		SamLayout rightLayout = new SamLayout(size);
 
 		//layout data
-		firstLayout.layoutCigar(start, first);
-		secondLayout.layoutCigar(start, second);
+		leftLayout.layoutCigar(startLeft, left);
+		rightLayout.layoutCigar(startLeft-numAdders, right);
 
-		/*if (first.getName().equals("DQNZZQ1:505:D101DACXX:6:1208:13804:3296") ){
-			System.out.println("PreFirstLayout");
-			firstLayout.print();
-			System.out.println("PreSecondLayout");
-			secondLayout.print();
-		}*/
+		//System.out.println("\nNumAdders "+numAdders);
+		//System.out.println("PreFirstLayout");
+		//leftLayout.print();
+		//System.out.println("PreSecondLayout");
+		//rightLayout.print();
+
 
 		//merge layouts, modifies original layouts so print first if you want to see em before mods.
-		SamLayout mergedSamLayout = SamLayout.mergeLayouts(firstLayout, secondLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);
+		SamLayout mergedSamLayout = SamLayout.mergeLayouts(leftLayout, rightLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);
+
+		//System.out.println("MergedLayout");
+		//mergedSamLayout.print();
 
 		if (mergedSamLayout == null) {
-			//if (true){
-			/*System.out.println("Failed to merge! ");
-				System.out.println("\nFirst "+first);
-				System.out.println("Second "+second);
-				System.out.println("\tFirst "+startBaseFirst+" "+stopBaseFirst);
-				System.out.println("\tSecond "+startBaseSecond+" "+stopBaseSecond);	
-				//remake em since they might have been modified.
-				firstLayout = new SamLayout(size);
-				secondLayout = new SamLayout(size);
-				firstLayout.layoutCigar(start, first);
-				secondLayout.layoutCigar(start, second);
-				System.out.println("FirstLayout");
-				firstLayout.print();
-				System.out.println("SecondLayout");
-				secondLayout.print();
-				if (mergedSamLayout != null) {
-					System.out.println("MergedLayout");
-					mergedSamLayout.print();
-				}*/
-
 			//add failed merge tag
-			first.addMergeTag(false);
-			second.addMergeTag(false);
-
+			left.addMergeTag(false);
+			right.addMergeTag(false);
 			return null;
 		}
 
 		else {
 			//calculate overlap
-			int[] overNonOver = SamLayout.countOverlappingBases(firstLayout, secondLayout);
+			int[] overNonOver = SamLayout.countOverlappingBases(leftLayout, rightLayout);
 			numberOverlappingBases+= overNonOver[0];
 			numberNonOverlappingBases+= overNonOver[1];
 
 			//make merged
-			SamAlignment mergedSam = makeSamAlignment(first, second, mergedSamLayout, start);
+			SamAlignment mergedSam = makeSamAlignment(left, right, mergedSamLayout, startLeft);
 
 			//set insert length
 			insertSize.count(mergedSam.countLengthOfAlignment());
@@ -702,7 +701,7 @@ public class MergePairedSamAlignments{
 
 	}
 
-	public SamAlignment makeSamAlignment(SamAlignment first, SamAlignment second, SamLayout merged, int position){
+	public static SamAlignment makeSamAlignment(SamAlignment first, SamAlignment second, SamLayout merged, int position){
 		SamAlignment mergedSam = new SamAlignment();
 		//<QNAME>
 		mergedSam.setName(first.getName());
@@ -739,11 +738,38 @@ public class MergePairedSamAlignments{
 		return mergedSam;
 	}
 
+	/**Counts the number Is relative to the stop.*/
+	public static int countIs (String cigar, int stop){
+		if (stop == 0) return 0;
+		int length = 0;
+		int numIs = 0;
+		//for each M D I or N block  MDIN
+		Matcher mat = CIGAR_SUB.matcher(cigar);
+		while (mat.find()){
+			//pass
+			int num = Integer.parseInt(mat.group(1));
+			//is call I 
+			if (mat.group(2).equals("I")){
+				for (int i=0; i< num; i++){
+					length++;
+					if (length >= stop) break;
+					numIs++;
+				}
+			}
+			//nope just addit
+			else {
+				length += num;
+				if (length >= stop) break;
+			}
+
+		}	
+		return numIs;
+	}
 
 	/**Counts the number bases in the cigar string. Only counts M D I and N.*/
-	public int countLengthOfCigar (String cigar){
+	public static int countLengthOfCigar (String cigar){
 		int length = 0;
-		//for each M D I or N block
+		//for each M D I or N block  MDIN
 		Matcher mat = CIGAR_SUB.matcher(cigar);
 		while (mat.find()){
 			length += Integer.parseInt(mat.group(1));
@@ -783,7 +809,7 @@ public class MergePairedSamAlignments{
 			addHeaderAndCompress();
 			return;
 		}
-		
+
 		File headerFile = new File (saveFile+"_temp.sam");
 		PrintWriter out = new PrintWriter(new FileWriter(headerFile));
 
@@ -791,7 +817,6 @@ public class MergePairedSamAlignments{
 		samHeader.add("@PG\tID:MergePairedSamAlignments\tCL: "+programArguments);
 		Iterator<String> it = samHeader.iterator();
 		while (it.hasNext()) out.println(it.next());
-		System.out.println("\nSamHeader: "+samHeader);
 
 		//add file contents
 		BufferedReader in = new BufferedReader (new FileReader(outputFile));
@@ -837,7 +862,8 @@ public class MergePairedSamAlignments{
 					case 'f': forExtraction = new File(args[++i]); break;
 					case 's': saveFile = new File(args[++i]); break;
 					case 'c': removeControlAlignments = true; break;
-					case 'm': crossCheckMateCoordinates = true; break;
+					case 'm': crossCheckMateCoordinates = false; break;
+					case 'r': secondPairReverseStrand = true; break;
 					case 'd': maximumProperPairDistanceForMerging = Integer.parseInt(args[++i]); break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'q': minimumMappingQualityScore = Float.parseFloat(args[++i]); break;
@@ -851,6 +877,7 @@ public class MergePairedSamAlignments{
 		}
 
 		//pull files
+		if (forExtraction == null) Misc.printExit("\nError: please indicate which xxx.sam/bam(.zip/.gz) file(s) to process.\n");
 		File[][] tot = new File[4][];
 		tot[0] = IO.extractFiles(forExtraction,".sam");
 		tot[1] = IO.extractFiles(forExtraction,".sam.gz");
@@ -881,13 +908,14 @@ public class MergePairedSamAlignments{
 		}
 
 		//print info
-		{
-			System.out.println(maximumAlignmentScore+ "\tMaximum alignment score.");
-			System.out.println(minimumMappingQualityScore+ "\tMinimum mapping quality score.");
-			System.out.println(removeControlAlignments +"\tRemove control chrPhiX and chrAdapter alignments.");
-			System.out.println(maximumProperPairDistanceForMerging +"\tMaximum bp distance for merging paired alignments.\n");
+		System.out.println(maximumAlignmentScore+ "\tMaximum alignment score.");
+		System.out.println(minimumMappingQualityScore+ "\tMinimum mapping quality score.");
+		System.out.println(removeControlAlignments +"\tRemove control chrPhiX and chrAdapter alignments.");
+		System.out.println(secondPairReverseStrand +"\tSecond read pair's strand has been reversed.");
+		System.out.println(crossCheckMateCoordinates +"\tCross check read mate coordinates.");
+		System.out.println(maximumProperPairDistanceForMerging +"\tMaximum bp distance for merging paired alignments.\n");
 
-		}
+
 
 	}	
 
@@ -896,10 +924,13 @@ public class MergePairedSamAlignments{
 				"**************************************************************************************\n" +
 				"**                          MergePairedSamAlignments: Dec 2012                      **\n" +
 				"**************************************************************************************\n" +
-				"Merges proper paired alignments that pass a variety of checks and\thresholds. Only\n" +
-				"unambiguous pairs will be merged. Usefull for avoiding non-independent variant\n" +
-				"observations and other double counting issues when reads overlap. Be certain your\n" +
-				"input bam/sam file(s) are sorted by query name, NOT coordinate. \n" +
+				"Merges proper paired alignments that pass a variety of checks and thresholds. Only\n" +
+				"unambiguous pairs will be merged. Useful increasing base calling accuracy and for\n" +
+				"avoiding non-independent variant observations and other double counting issues when\n" +
+				"reads overlap. Identical overlapping bases are assigned the higher quality scores.\n" +
+				"Disagreements are resolved toward the higher quality base. If too close in quality the\n" +
+				"base quality is assigned to zero. Be certain your input bam/sam file(s) are sorted by\n" +
+				"query name, NOT coordinate. \n" +
 
 				"\nOptions:\n"+
 				"-f The full path file or directory containing raw xxx.sam(.gz/.zip OK)/.bam file(s)\n" +
@@ -908,19 +939,19 @@ public class MergePairedSamAlignments{
 
 				"\nDefault Options:\n"+
 				"-s Save file, defaults to that inferred by -f. If an xxx.sam extension is provided,\n" +
-				"      the alignments won't be sorted by coordinate or saved as a bam file.\n"+
+				"      the alignments won't be sorted by coordinate and saved as a bam file.\n"+
 				"-a Maximum alignment score. Defaults to 120, smaller numbers are more stringent.\n" +
 				"      Approx 30pts per mismatch for novoalignments.\n"+
 				"-q Minimum mapping quality score, defaults to 13, larger numbers are more stringent.\n" +
 				"      Set to 0 if processing splice junction indexed RNASeq data.\n"+
 				"-r The second paired alignment's strand is reversed. Defaults to not reversed.\n" +
-				"-c Don't remove chrAdapt and chrPhiX alignments.\n"+
+				"-c Remove chrAdapt and chrPhiX alignments, defaults to not removing.\n"+
 				"-d Maximum acceptible base pair distance for merging, defaults to 5000.\n"+
-				"-m Cross check read mate coordinates, needed for merging repeat matches. Often these\n"+
-				"      are incorrect.  Defaults to not checking.\n"+
+				"-m Don't cross check read mate coordinates, needed for merging repeat matches. Defaults\n" +
+				"      to checking.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/MergePairedSamAlignments -f /Novo/Run7/\n" +
-				"     -m -s /Novo/STPParsedBams/run7.bam -d 10000 \n\n" +
+				"     -c -s /Novo/STPParsedBams/run7.bam -d 10000 \n\n" +
 
 		"**************************************************************************************\n");
 

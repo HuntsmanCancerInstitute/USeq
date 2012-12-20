@@ -41,7 +41,6 @@ public class SamTranscriptomeParser{
 	private String programArguments;
 	private String genomeVersion = null;
 	private static final Pattern TAB = Pattern.compile("\\t");
-	private Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MDIN])");
 	private Pattern CIGAR_BAD = Pattern.compile(".*[^\\dMDIN].*");
 	private boolean reverseStrand = false;
 	private boolean removeControlAlignments = true;
@@ -409,7 +408,7 @@ public class SamTranscriptomeParser{
 			Misc.printErrAndExit("\nProblem printing alignment block!?\n");
 		}
 	}
-	/**Attempts to merge alignments. Doesn't check if proper pairs!  Returns null if it cannot. This modifies the input SamAlignments so print first before calling*/
+	/*Attempts to merge alignments. Doesn't check if proper pairs!  Returns null if it cannot. This modifies the input SamAlignments so print first before calling
 	private SamAlignment mergePairedAlignments(SamAlignment first, SamAlignment second) {
 		//trim them of soft clipped info
 		first.trimMaskingOfReadToFitAlignment();
@@ -439,36 +438,14 @@ public class SamTranscriptomeParser{
 		firstLayout.layoutCigar(start, first);
 		secondLayout.layoutCigar(start, second);
 		
-		/*if (first.getName().equals("DQNZZQ1:505:D101DACXX:6:1208:13804:3296") ){
-			System.out.println("PreFirstLayout");
-			firstLayout.print();
-			System.out.println("PreSecondLayout");
-			secondLayout.print();
-		}*/
+
 		
 		//merge layouts, modifies original layouts so print first if you want to see em before mods.
 		SamLayout mergedSamLayout = SamLayout.mergeLayouts(firstLayout, secondLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);
 
 		if (mergedSamLayout == null) {
 			//if (true){
-				/*System.out.println("Failed to merge! ");
-				System.out.println("\nFirst "+first);
-				System.out.println("Second "+second);
-				System.out.println("\tFirst "+startBaseFirst+" "+stopBaseFirst);
-				System.out.println("\tSecond "+startBaseSecond+" "+stopBaseSecond);	
-				//remake em since they might have been modified.
-				firstLayout = new SamLayout(size);
-				secondLayout = new SamLayout(size);
-				firstLayout.layoutCigar(start, first);
-				secondLayout.layoutCigar(start, second);
-				System.out.println("FirstLayout");
-				firstLayout.print();
-				System.out.println("SecondLayout");
-				secondLayout.print();
-				if (mergedSamLayout != null) {
-					System.out.println("MergedLayout");
-					mergedSamLayout.print();
-				}*/
+
 				
 				//add failed merge tag
 				first.addMergeTag(false);
@@ -488,58 +465,81 @@ public class SamTranscriptomeParser{
 			return mergedSam;
 		}
 		
-	}
+	}*/
 	
-	public SamAlignment makeSamAlignment(SamAlignment first, SamAlignment second, SamLayout merged, int position){
-		SamAlignment mergedSam = new SamAlignment();
-		//<QNAME>
-		mergedSam.setName(first.getName());
-		//<FLAG>
-		SamAlignmentFlags saf = new SamAlignmentFlags();
-		saf.setReverseStrand(first.isReverseStrand());
-		mergedSam.setFlags(saf.getFlags());
-		//<RNAME>
-		mergedSam.setReferenceSequence(first.getReferenceSequence());
-		//<POS>
-		mergedSam.setPosition(position);
-		//<MAPQ>, bigger better
-		int mqF = first.getMappingQuality();
-		int mqS = second.getMappingQuality();
-		if (mqF > mqS) mergedSam.setMappingQuality(mqF);
-		else mergedSam.setMappingQuality(mqS);
-		//<CIGAR>
-		mergedSam.setCigar(merged.fetchCigar());
-		//<MRNM> <MPOS> <ISIZE>
-		mergedSam.setUnMappedMate();
-		//<SEQ> <QUAL>
-		merged.setSequenceAndQualities(mergedSam);
-		/////tags, setting to read with better as score.
-		//alternative score, smaller better
-		int asF = first.getAlignmentScore();
-		int asS = second.getAlignmentScore();
-		if (asF != Integer.MIN_VALUE && asS != Integer.MIN_VALUE){
-			if (asF < asS) mergedSam.setTags(first.getTags());
-			else mergedSam.setTags(second.getTags());
+	/**Attempts to merge alignments. Doesn't check if proper pairs!  Returns null if it cannot. This modifies the input SamAlignments so print first before calling*/
+	private SamAlignment mergePairedAlignments(SamAlignment first, SamAlignment second) {
+		//trim them of soft clipped info
+		first.trimMaskingOfReadToFitAlignment();
+		second.trimMaskingOfReadToFitAlignment();
+
+		//look for bad CIGARs
+		if (CIGAR_BAD.matcher(first.getCigar()).matches()) Misc.printErrAndExit("\nError: unsupported cigar string! See -> "+first.toString()+"\n");
+		if (CIGAR_BAD.matcher(second.getCigar()).matches()) Misc.printErrAndExit("\nError: unsupported cigar string! See -> "+second.toString()+"\n");
+
+		//order left and right
+		SamAlignment left = first;
+		SamAlignment right = second;
+		if (first.getPosition() > second.getPosition()) {
+			right = first;
+			left = second;
 		}
-		else mergedSam.setTags(first.getTags());
-		//add merged tag
-		mergedSam.addMergeTag(true);
-		return mergedSam;
-	}
+
+		//System.out.println("Name "+left.getName());
+
+		//fetch genomic space coordinates
+		int startLeft = left.getPosition();
+		int stopLeft = startLeft + MergePairedSamAlignments.countLengthOfCigar(left.getCigar());
+		int startRight = right.getPosition();
+		int stopRight = startRight + MergePairedSamAlignments.countLengthOfCigar(right.getCigar());
+		int stop = stopRight;
+		if (stopLeft > stop) stop = stopLeft;
+
+		//any Is in left that preceed the start of right?
+		int numAdders = MergePairedSamAlignments.countIs(left.getCigar(), startRight-startLeft);
+
+		//make arrays to hold sequence and qualities in cigar space
+		int size = numAdders + stop-startLeft;
+
+		SamLayout leftLayout = new SamLayout(size);
+		SamLayout rightLayout = new SamLayout(size);
+
+		//layout data
+		leftLayout.layoutCigar(startLeft, left);
+		rightLayout.layoutCigar(startLeft-numAdders, right);
+
+		//System.out.println("\nNumAdders "+numAdders);
+		//System.out.println("PreFirstLayout");
+		//leftLayout.print();
+		//System.out.println("PreSecondLayout");
+		//rightLayout.print();
 
 
+		//merge layouts, modifies original layouts so print first if you want to see em before mods.
+		SamLayout mergedSamLayout = SamLayout.mergeLayouts(leftLayout, rightLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);
 
+		//System.out.println("MergedLayout");
+		//mergedSamLayout.print();
 
-	
-	/**Counts the number bases in the cigar string. Only counts M D I and N.*/
-	public int countLengthOfCigar (String cigar){
-		int length = 0;
-		//for each M D I or N block
-		Matcher mat = CIGAR_SUB.matcher(cigar);
-		while (mat.find()){
-			length += Integer.parseInt(mat.group(1));
+		if (mergedSamLayout == null) {
+			//add failed merge tag
+			left.addMergeTag(false);
+			right.addMergeTag(false);
+			return null;
 		}
-		return length;
+
+		else {
+			//calculate overlap
+			int[] overNonOver = SamLayout.countOverlappingBases(leftLayout, rightLayout);
+			numberOverlappingBases+= overNonOver[0];
+			numberNonOverlappingBases+= overNonOver[1];
+
+			//make merged
+			SamAlignment mergedSam = MergePairedSamAlignments.makeSamAlignment(left, right, mergedSamLayout, startLeft);
+
+			return mergedSam;
+		}
+
 	}
 
 	public void printSam(SamAlignment sam, int numberRepeats){
@@ -783,7 +783,7 @@ public class SamTranscriptomeParser{
 				"-a Maximum alignment score. Defaults to 90, smaller numbers are more stringent.\n" +
 				"      Approx 30pts per mismatch.\n"+
 				"-m Minimum mapping quality score, defaults to 0 (no filtering), larger numbers are\n" +
-				"      more stringent. Only applys to genomic matches, not splice junctions. Set to 13\n" +
+				"      more stringent. Only applies to genomic matches, not splice junctions. Set to 13\n" +
 				"      or more to require near unique alignments.\n"+
 				"-n Maximum number of locations each read may align, defaults to 1 (unique matches).\n"+
 				"-d If the maximum number of locations threshold fails, save one randomly picked repeat\n" +
@@ -792,9 +792,10 @@ public class SamTranscriptomeParser{
 				"      needed for proper same strand visualization of paired stranded Illumina data.\n"+
 				"-u Save unmapped reads and those that fail the alignment score.\n"+
 				"-c Don't remove chrAdapt and chrPhiX alignments.\n"+
-				"-p Merge proper paired alignments. Those that cannot be unambiguously merged are left\n" +
-				"      as pairs. Recommended to avoid double counting and accurrate read coverage.\n"+
-				"-q Maximum acceptible base pair distance for merging, defaults to 300000.\n"+
+				"-p Merge proper paired unique alignments. Those that cannot be unambiguously merged\n" +
+				"      are left as pairs. Recommended to avoid double counting errors and increase\n" +
+				"      base calling accuracy. \n"+
+				"-q Maximum acceptable  base pair distance for merging, defaults to 300000.\n"+
 				"-h Full path to a txt file containing a sam header, defaults to autogenerating the\n"+
 				"      header from the read data.\n"+
 
