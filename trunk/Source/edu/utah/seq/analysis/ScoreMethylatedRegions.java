@@ -196,16 +196,17 @@ public class ScoreMethylatedRegions {
 	}
 	
 	public double getMedian(ArrayList<Float> values) {
-		ArrayList<Float> tempVals = (ArrayList<Float>)values.clone();
-		Collections.sort(tempVals);
-		
-		int half = tempVals.size() / 2;
-		
-		if ((tempVals.size() % 2) == 1) {
-			return tempVals.get(half);
-		} else {
-			return (tempVals.get(half) + tempVals.get(half + 1)) / 2.0;
+		int num = values.size();
+		if (num == 0) return Float.NaN;
+		if (num == 1) return values.get(0);
+		if (values.size() == 2) {
+			float total = values.get(0) + values.get(1);
+			return total/ 2.0f;
 		}
+		//calc median
+		float[] f = Num.arrayListOfFloatToArray(values);
+		Arrays.sort(f);
+		return Num.median(f);
 	}
 	
 	private void printAggregateData(ArrayList<ArrayList<Float>> randomData, ArrayList<Float> regionData,int length) {
@@ -214,8 +215,6 @@ public class ScoreMethylatedRegions {
 		double realMed = getMedian(regionData);
 		ArrayList<ArrayList<Float>> realData = new ArrayList<ArrayList<Float>>();
 		int maxSize = Integer.MIN_VALUE;
-		
-		
 		
 		if (randomData != null) {
 			int numGreaterThan = 0;

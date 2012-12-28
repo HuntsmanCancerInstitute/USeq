@@ -177,23 +177,39 @@ public class RNAEditingPileUpParser {
 		float[] nonCon = Num.arrayListOfFloatToArray(nonConversions);
 		
 		//make non edited bases
-		PointData pd = new PointData();
-		Info info = new Info("NonEditedBases", versionedGenome, chromosome, strand, 1, null);
-		pd.setInfo(info);
-		pd.setPositions(pos);
-		pd.setScores(nonCon);
-		pd.writePointData(nonConvertedPointDataDirectory);
-		
+		ArrayList<Point> pts = new ArrayList<Point>(10000);
+		for (int i=0; i< pos.length; i++){
+			if (nonCon[i] !=0) pts.add(new Point(pos[i], nonCon[i]));
+		}
+		if (pts.size() != 0){
+			PointData pd = Point.extractPositionScores(pts);
+			Info info = pd.getInfo();
+			info.setName("NonEditedBases");
+			info.setVersionedGenome(versionedGenome);
+			info.setChromosome(chromosome);
+			info.setStrand(strand);
+			info.setReadLength(1);
+			pd.writePointData(nonConvertedPointDataDirectory);
+		}
+
 		//make edited bases
-		pd = new PointData();
-		info = new Info("EditedBases", versionedGenome, chromosome, strand, 1, null);
-		pd.setInfo(info);
-		pd.setPositions(pos);
-		pd.setScores(con);
-		pd.writePointData(convertedPointDataDirectory);
+		pts.clear();
+		for (int i=0; i< pos.length; i++){
+			if (con[i] !=0) pts.add(new Point(pos[i], con[i]));
+		}
+		if (pts.size() != 0){
+			PointData pd = Point.extractPositionScores(pts);
+			Info info = pd.getInfo();
+			info.setName("EditedBases");
+			info.setVersionedGenome(versionedGenome);
+			info.setChromosome(chromosome);
+			info.setStrand(strand);
+			info.setReadLength(1);
+			pd.writePointData(convertedPointDataDirectory);
+		}
 		
 		//make base fraction bases
-		ArrayList<Point> pts = new ArrayList<Point>();
+		pts.clear();
 		for (int i=0; i< pos.length; i++){
 			float total = con[i]+ nonCon[i];
 			if (total < minimumReadCoverage) continue;
@@ -203,16 +219,15 @@ public class RNAEditingPileUpParser {
 		}
 		
 		if (pts.size() != 0){
-			pd = Point.extractPositionScores(pts);
-			info = new Info("BaseFractionEdited", versionedGenome, chromosome, strand, 1, null);
-			pd.setInfo(info);
+			PointData pd = Point.extractPositionScores(pts);
+			Info info = pd.getInfo();
+			info.setName("BaseFractionEdited");
+			info.setVersionedGenome(versionedGenome);
+			info.setChromosome(chromosome);
+			info.setStrand(strand);
+			info.setReadLength(1);
 			pd.writePointData(baseFractionEdited);
 		}
-		
-		
-		pd.setInfo(info);
-		//save
-		pd.writePointData(baseFractionEdited);
 		
 	}
 

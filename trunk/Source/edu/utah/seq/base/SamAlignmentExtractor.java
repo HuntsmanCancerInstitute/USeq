@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.regex.*;
 import java.util.*;
 import net.sf.samtools.*;
+import net.sf.samtools.SAMFileReader.ValidationStringency;
 import util.bio.annotation.Bed;
 import util.gen.*;
 import edu.utah.seq.useq.data.RegionScoreText;
@@ -17,6 +18,7 @@ public class SamAlignmentExtractor {
 	//user defined fields
 	private File[] bamFiles;
 	private File bedFile;
+	private File saveFile;
 	private int minimumReadDepth = 1;
 	private int maximumReadDepth = -1;
 
@@ -48,6 +50,7 @@ public class SamAlignmentExtractor {
 		for (int i=0; i< samReaders.length; i++) {
 			samReaders[i] = new SAMFileReader(bamFiles[i]);
 			samReaders[i].enableIndexMemoryMapping(false);
+			samReaders[i].setValidationStringency(ValidationStringency.SILENT);
 		}
 	}
 
@@ -62,8 +65,8 @@ public class SamAlignmentExtractor {
 			makeSamReaders();
 
 			//make output writer
-			File intSam = new File (bedFile.getParentFile(), Misc.removeExtension(bedFile.getName())+".sam.gz");
-			samOut = new Gzipper(intSam);
+			if (saveFile != null) samOut = new Gzipper(saveFile);
+			else samOut = new Gzipper(new File (bedFile.getParentFile(), Misc.removeExtension(bedFile.getName())+".sam.gz"));
 			
 			//add header from first reader
 			String header = samReaders[0].getFileHeader().getTextHeader();
@@ -191,6 +194,7 @@ public class SamAlignmentExtractor {
 					switch (test){
 					case 'a': bamFiles = IO.extractFiles(args[++i], ".bam"); break;
 					case 'b': bedFile = new File(args[++i]); break;
+					case 's': saveFile = new File(args[++i]); break;
 					case 'i': minimumReadDepth = Integer.parseInt(args[++i]); break;
 					case 'x': maximumReadDepth = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
@@ -212,6 +216,9 @@ public class SamAlignmentExtractor {
 		//look for bed
 		if (bedFile == null || bedFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your bed file?\n");
 		chromRegions = Bed.parseBedFile(bedFile, true);
+		
+		//look for bed
+		if (saveFile != null && saveFile.getName().endsWith(".sam") == false) Misc.printErrAndExit("\nError: Your indicated save file doesn't end in .sam !\n");
 
 	}	
 
@@ -238,19 +245,22 @@ public class SamAlignmentExtractor {
 				"Given a bed file containing regions of interest, parses all of the intersecting sam\n" +
 				"alignments.\n\n"+
 
-				"Required Options:\n"+
+				"Options:\n"+
 
 				"-a Alignment directory containing one or more xxx.bam files with their associated\n" +
 				"       xxx.bai indexs sorted by coordinate.\n" +
 				"-b A bed file (chr, start, stop,...), full path, see,\n" +
 				"       http://genome.ucsc.edu/FAQ/FAQformat#format1\n"+
+				"-s Optional File for saving extracted alignments, must end in .sam. Defaults to a\n" +
+				"       permutation of the bed file.\n"+
 				"-i Minimum read depth, defaults to 1\n"+
 				"-x Maximum read depth, defaults to unlimited\n"+
 
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/SamAlignmentExtractor -a\n" +
-				"      /Data/ExonCaptureAlignmentsX1/ -b /Data/SNPCalls/9484X1Calls.bed.gz \n\n" +
+				"      /Data/ExonCaptureAlignmentsX1/ -b /Data/SNPCalls/9484X1Calls.bed.gz -x\n" +
+				"      /Data/9484X1Calls.sam\n\n" +
 
 		"**************************************************************************************\n");
 

@@ -46,32 +46,25 @@ public class VCFRecord {
 	private int position;
 	private String reference;
 	private String alternate;
+	private String quality;
 	private String filter;
 	private String info;
 	private String[] sample;
+	private VCFParser vcfParser;
 	
-	public static final int chromosomeIndex= 0;
-	public static final int positionIndex = 1;
-	public static final int referenceIndex = 3;
-	public static final int alternateIndex = 4;
-	public static final int filterIndex = 6;
-	public static final int infoIndex = 7;
-	public static final int sampleIndex = 9;
-	public static final int sampleGenotypeIndex =0;
-	public static final int sampleScoreIndex =7;
-	public static final int sampleRawReadDepthIndex=2;
-	public static final int numberColumnsInVCFRecord = 10;
 	public static final Pattern colon = Pattern.compile(":");
 	
 	/**Only extracts some of the fields from a record*/
-	public VCFRecord(String[] fields) throws Exception{
+	public VCFRecord(String[] fields, VCFParser vcfParser) throws Exception{
+		this.vcfParser = vcfParser;
 		//must subtract 1 from position to put it into interbase coordinates
-		position = Integer.parseInt(fields[positionIndex]) - 1;
-		reference = fields[referenceIndex];
-		alternate = fields[alternateIndex];
-		filter = fields[filterIndex];
-		info = fields[infoIndex];
-		sample = colon.split(fields[sampleIndex]);
+		position = Integer.parseInt(fields[vcfParser.positionIndex]) - 1;
+		reference = fields[vcfParser.referenceIndex];
+		alternate = fields[vcfParser.alternateIndex];
+		quality = fields[vcfParser.qualityIndex];
+		filter = fields[vcfParser.filterIndex];
+		info = fields[vcfParser.infoIndex];
+		sample = colon.split(fields[vcfParser.sampleIndex]);
 	}
 	
 	public String toStringSimple(){
@@ -91,29 +84,29 @@ public class VCFRecord {
 	}
 	
 	public String getSampleRawReadDepth(){
-		return sample[sampleRawReadDepthIndex];
+		return sample[vcfParser.sampleRawReadDepthIndex];
 	}
 	public String getSampleGenotype(){
-		return sample[sampleGenotypeIndex];
+		return sample[vcfParser.sampleGenotypeIndex];
 	}
 	
 	public boolean isGenotypeHomozygous(){
-		if (sample[sampleGenotypeIndex].equals("1/1") || sample[sampleGenotypeIndex].equals("0/0")) return true;
+		if (sample[vcfParser.sampleGenotypeIndex].equals("1/1") || sample[vcfParser.sampleGenotypeIndex].equals("0/0")) return true;
 		return false;
 	}
 	
 	/**Returns either the alternate+alternate, reference+alternate, alternate+reference, reference+reference based on the genotype 1/1, 0/1, 1/0, 0/0; or null if none found.*/
 	public String getCalledBases(){
-		if (sample[sampleGenotypeIndex].equals("1/1")) return alternate+alternate;
-		if (sample[sampleGenotypeIndex].equals("0/1")) return reference+alternate;
+		if (sample[vcfParser.sampleGenotypeIndex].equals("1/1")) return alternate+alternate;
+		if (sample[vcfParser.sampleGenotypeIndex].equals("0/1")) return reference+alternate;
 		//these should probably never be called
-		if (sample[sampleGenotypeIndex].equals("0/0")) return reference+reference;
-		if (sample[sampleGenotypeIndex].equals("1/0")) return alternate+reference;
+		if (sample[vcfParser.sampleGenotypeIndex].equals("0/0")) return reference+reference;
+		if (sample[vcfParser.sampleGenotypeIndex].equals("1/0")) return alternate+reference;
 		return null;
 	}
 	
 	public String getSampleScore(){
-		return sample[sampleScoreIndex];
+		return sample[vcfParser.sampleScoreIndex];
 		              
 	}
 	public String getSampleField(int index){
@@ -166,5 +159,9 @@ public class VCFRecord {
 
 	public void setSample(String[] sample) {
 		this.sample = sample;
+	}
+
+	public String getQuality() {
+		return quality;
 	}
 }

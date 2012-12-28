@@ -19,6 +19,20 @@ public class VCFParser {
 	private long numberVCFRecordsFailingFilter = 0;
 	private HashMap<String, VCFLookUp> chromVCFRecords = null;
 	private boolean excludeFilteredRecords = true;
+	
+	//fields for ripping vcf records
+	int chromosomeIndex= 0;
+	int positionIndex = 1;
+	int referenceIndex = 3;
+	int alternateIndex = 4;
+	int qualityIndex = 5;
+	int filterIndex = 6;
+	int infoIndex = 7;
+	int sampleIndex = 9;
+	int sampleGenotypeIndex =0;
+	int sampleScoreIndex =7;
+	int sampleRawReadDepthIndex=2;
+	int numberColumnsInVCFRecord = 10;
 
 	public VCFParser(File vcfFile, boolean excludeFilteredRecords){
 		this. vcfFile = vcfFile;
@@ -52,19 +66,19 @@ public class VCFParser {
 				}
 				//correct number of columns?
 				fields = TAB.split(line);
-				if (fields.length != VCFRecord.numberColumnsInVCFRecord){
+				if (fields.length != numberColumnsInVCFRecord){
 					System.err.println("Malformed VCF Record skipping -> "+line);
 					if (badCounter++ > 100) throw new Exception("\nToo many malformed VCF Records.\n");
 					continue;
 				}
 				//no info? skip it
-				if (fields[VCFRecord.sampleIndex].startsWith("./.:.:")) continue;
+				if (fields[sampleIndex].startsWith("./.:.:")) continue;
 				
 				//get chromosome and position
-				String chr = fields[VCFRecord.chromosomeIndex];
-				VCFRecord vcf = new VCFRecord(fields);
+				String chr = fields[chromosomeIndex];
+				VCFRecord vcf = new VCFRecord(fields, this);
 				//does it pass filter?
-				if (vcf.getFilter().equals("PASS") == false){
+				if (excludeFilteredRecords == true && vcf.getFilter().equals("PASS") == false){
 					numberVCFRecordsFailingFilter++;
 					continue;
 				}
