@@ -243,18 +243,24 @@ public class SamLayout{
 		return sl;
 	}
 	
-	/**Returns the number of overlapping bases and non-overlapping bases.*/
+	/**Returns the number of overlapping bases, non-overlapping bases, alignmentSize.*/
 	public static int[] countOverlappingBases(SamLayout f, SamLayout s){
 		int numNonOverlappingBases = 0;
 		int numOverlappingBases = 0;
+		int numBases = 0;
 		int length = f.call.length;
 		for (int i=0; i< length; i++){
 			boolean fBase = (f.call[i] == 'M' || f.call[i] == 'I');
 			boolean sBase = (s.call[i] == 'M' || s.call[i] == 'I');
-			if (fBase == true && sBase == true) numOverlappingBases++;
-			else if (fBase == true || sBase == true) numNonOverlappingBases++;
+			boolean gBase = (f.call[i] == '\u0000' && s.call[i] == '\u0000');
+			if (fBase==true || sBase==true || gBase==true){
+				numBases++;
+				if (fBase == true && sBase == true) numOverlappingBases++;
+				else if (fBase == true || sBase == true) numNonOverlappingBases++;
+			}
+			
 		}
-		return new int[]{numOverlappingBases, numNonOverlappingBases};
+		return new int[]{numOverlappingBases, numNonOverlappingBases, numBases};
 	}
 	
 	public String fetchCigar(){

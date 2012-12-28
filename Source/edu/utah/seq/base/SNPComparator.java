@@ -134,16 +134,19 @@ public class SNPComparator {
 				numberArraySnpsWithNoVcf++;
 				continue;
 			}
+
 			//vcfLookUp.fetchVCFRecordsDebug(snp.getStart(), snp.getStop());
 			
-			//check score
-			double score = Double.parseDouble(vcf[0].getSampleScore());
-
-			if (score > minimumVCFScore){
-				numberVCFsFailingMinimumScore++;
-				continue;
+			//check score?
+			if (minimumVCFScore != -1){
+				double score = Double.parseDouble(vcf[0].getSampleScore());
+				if (score > minimumVCFScore){
+					numberVCFsFailingMinimumScore++;
+					continue;
+				}
 			}
-			//compare bases
+			
+			//compare bases, should be only one vcf match!
 
 			if (snpsMatch(vcf[0], snp)){
 				//System.err.println("Match");
@@ -241,6 +244,7 @@ System.out.println("\trc "+basesRev);
 					switch (test){
 					case 'v': sequencingVCFFile = new File(args[++i]); break;
 					case 'b': arraySnpBedFile = new File(args[++i]); break;
+					case 'f': excludeFailingCalls = false; break;
 					case 'a': minimumArrayScore = Float.parseFloat(args[++i]); break;
 					case 's': minimumVCFScore = Double.parseDouble(args[++i]); break;
 					case 'g': genomeVersion = args[++i];
@@ -266,7 +270,7 @@ System.out.println("\trc "+basesRev);
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             SNP Comparator : Nov 2012                            **\n" +
+				"**                             SNP Comparator : Dec 2012                            **\n" +
 				"**************************************************************************************\n" +
 				"Beta.\n\n" +
 
@@ -274,8 +278,9 @@ System.out.println("\trc "+basesRev);
 				"-v VCF file (xxx.vcf(.gz/.zip OK).\n"+
 				"-b Bed file containing array snp calls.\n"+
 				"-a Minimum array SNP score, defaults to 0.9 .\n"+
-				"-s Minimum vcf variant score, defaults to 0.01 .\n"+
+				"-s Minimum vcf variant score, defaults to 0.01 . Set to -1 to disable filter.\n"+
 				"-g Genome version, defaults to hg19.\n"+
+				"-f Don't exclude vcf records lacking 'PASS' in the FILTER column, defaults to skip.\n"+
 
 				"\n"+
 

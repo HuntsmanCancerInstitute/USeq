@@ -25,6 +25,8 @@ public class MergePairedSamAlignments{
 	private float minimumMappingQualityScore = 13;
 	private boolean secondPairReverseStrand = false;
 	private boolean removeControlAlignments = false;
+	private boolean skipMergingPairs = false;
+	private boolean onlyMergeOverlappingAlignments = true;
 	private int minimumDiffQualScore = 3;
 	private double minimumFractionInFrameMismatch = 0.05;
 	private int maximumProperPairDistanceForMerging = 5000;
@@ -61,12 +63,12 @@ public class MergePairedSamAlignments{
 	//internal fields
 	private PrintWriter samOut;
 	private Gzipper failedSamOut = null;
-	private Gzipper failedMatePairOut = null;
 	private LinkedHashSet<String> samHeader = new LinkedHashSet<String>();
 	public static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MDIN])");
 	public static Pattern CIGAR_BAD = Pattern.compile(".*[^\\dMDIN].*");
 	private Histogram insertSize = new Histogram(0,2001,400);
 	private String programArguments;
+	private boolean alignmentsOverlap;
 
 	//constructors
 	public MergePairedSamAlignments(String[] args){
@@ -92,11 +94,6 @@ public class MergePairedSamAlignments{
 
 		//make gzipper for failed examples
 		String name = Misc.removeExtension(saveFile.getName());
-		File failedMateExamples = new File(saveFile.getParentFile(), name+"_FailedMateExamples.sam.gz");
-		failedMatePairOut = new Gzipper(failedMateExamples);
-		failedMatePairOut.println("#All of the following example pairs, max 10 each, were saved to the standard output file " +
-		"but failed an attempted merge for the noted reasons.  Use these as a diagnostic to evaluate your paticular sam processing pipeline.");
-
 		File failedReadOutputFile = new File(saveFile.getParentFile(), name+"_UnMappedPoorScore.sam.gz");
 		failedSamOut = new Gzipper(failedReadOutputFile);
 
@@ -111,7 +108,6 @@ public class MergePairedSamAlignments{
 
 		//close the writers
 		samOut.close();
-		failedMatePairOut.close();
 		failedSamOut.close();
 
 		//add header and output results, this deletes the outputFile too
@@ -146,13 +142,10 @@ public class MergePairedSamAlignments{
 		System.out.println("\t\t"+numberRepeatAlignmentsLackingMate+"\t# Repeat alignments lacking a mate");
 		System.out.println("\t\t"+(int)numberFailedMergedPairs+"\t# Proper paired alignments that could not be unambiguously merged");
 		System.out.println("\t\t"+(int)numberMergedPairs+"\t# Proper paired alignments that were merged");
-
-		double fractionFailed = numberFailedMergedPairs/ (numberFailedMergedPairs+ numberMergedPairs);
-		System.out.println("\t\t\t"+Num.formatNumber(fractionFailed, 4)+"\tFraction proper paired alignments that could not be merged");
 		double totalBases = numberNonOverlappingBases + numberOverlappingBases;
 		double fractionOverlap = numberOverlappingBases/totalBases;
 		String fractionString = Num.formatNumber(fractionOverlap, 4);
-		System.out.println("\t\t\t"+fractionString+"\tFraction overlapping bases in proper paired alignments");		
+		System.out.println("\t\t\t"+fractionString+"\tFraction overlapping bases in paired alignments");		
 		//histogram
 		if (insertSize.getTotalBinCounts() !=0){
 			System.out.println("\nMapped genomic insert length distribution for merged paired alignments:\n");
@@ -471,11 +464,6 @@ public class MergePairedSamAlignments{
 							samOut.println(firsts[i]);
 							samOut.println(seconds[j]);
 							numberPrintedAlignments+=2;
-							if (numberPairsFailingChrDistStrand < 10){
-								failedMatePairOut.println("#pair failing chr dist or strand check");
-								failedMatePairOut.println(firsts[i]);
-								failedMatePairOut.println(seconds[j]);
-							}
 							numberPairsFailingChrDistStrand++;
 						}
 						//regardless of out come set to null so they aren't processed again
@@ -533,11 +521,6 @@ public class MergePairedSamAlignments{
 					samOut.println(first);
 					samOut.println(second);
 					numberPrintedAlignments+=2;
-					if (numberPairsFailingMateCrossCoordinateCheck < 10){
-						failedMatePairOut.println("#pair failing mate cross coordinate validation");
-						failedMatePairOut.println(first);
-						failedMatePairOut.println(second);
-					}
 					numberPairsFailingMateCrossCoordinateCheck++;
 				}
 			}
@@ -550,11 +533,6 @@ public class MergePairedSamAlignments{
 			samOut.println(first);
 			samOut.println(second);
 			numberPrintedAlignments+=2;
-			if (numberPairsFailingChrDistStrand < 10){
-				failedMatePairOut.println("#pair failing chr dist or strand check");
-				failedMatePairOut.println(first);
-				failedMatePairOut.println(second);
-			}
 			numberPairsFailingChrDistStrand++;
 		}
 
@@ -565,25 +543,40 @@ public class MergePairedSamAlignments{
 		//collect string rep since the merge method will modify the SamAlignment while merging so if it fails you can output the unmodified SamAlignment
 		String firstSamString = first.toString();
 		String secondSamString = second.toString();
-		SamAlignment mergedSam = mergePairedAlignments(first, second);
-		if (mergedSam!=null) {
-			numberMergedPairs++;
-			samOut.println(mergedSam);
-			numberPrintedAlignments++;
-			//if (first.getCigar().contains("D") || second.getCigar().contains("D") || first.getCigar().contains("I") || second.getCigar().contains("I")){
-			//System.out.println(first.getName()+"\t"+first.getReferenceSequence()+"\t"+first.getPosition()+"\t"+first.getCigar()+"\t"+second.getCigar());
-			//}
-		}
-		else {
+		
+		//do they want to skip
+		if (skipMergingPairs){
 			samOut.println(firstSamString);
 			samOut.println(secondSamString);
 			numberPrintedAlignments+=2;
-			if (numberFailedMergedPairs < 10){
-				failedMatePairOut.println("#pair that failed merging, multiple INDELS?");
-				failedMatePairOut.println(firstSamString);
-				failedMatePairOut.println(secondSamString);
+			return;
+		}
+		
+		SamAlignment mergedSam = mergePairedAlignments(first, second);
+		
+		//do they want to not merge non overlapping alignemnts
+		if (onlyMergeOverlappingAlignments == true && alignmentsOverlap == false){
+			samOut.println(firstSamString);
+			samOut.println(secondSamString);
+			numberPrintedAlignments+=2;
+		}
+		
+		else {
+			//failed to merge?
+			if (mergedSam!=null) {
+				numberMergedPairs++;
+				samOut.println(mergedSam);
+				numberPrintedAlignments++;
+				//if (first.getCigar().contains("D") || second.getCigar().contains("D") || first.getCigar().contains("I") || second.getCigar().contains("I")){
+				//System.out.println(first.getName()+"\t"+first.getReferenceSequence()+"\t"+first.getPosition()+"\t"+first.getCigar()+"\t"+second.getCigar());
+				//}
 			}
-			numberFailedMergedPairs++;
+			else {
+				samOut.println(firstSamString);
+				samOut.println(secondSamString);
+				numberPrintedAlignments+=2;
+				numberFailedMergedPairs++;
+			}
 		}
 
 	}
@@ -625,6 +618,7 @@ public class MergePairedSamAlignments{
 
 	/**Attempts to merge alignments. Doesn't check if proper pairs!  Returns null if it cannot. This modifies the input SamAlignments so print first before calling*/
 	private SamAlignment mergePairedAlignments(SamAlignment first, SamAlignment second) {
+		
 		//trim them of soft clipped info
 		first.trimMaskingOfReadToFitAlignment();
 		second.trimMaskingOfReadToFitAlignment();
@@ -651,7 +645,7 @@ public class MergePairedSamAlignments{
 		int stop = stopRight;
 		if (stopLeft > stop) stop = stopLeft;
 
-		//any Is in left that preceed the start of right?
+		//any Is in left that precede the start of right?
 		int numAdders = countIs(left.getCigar(), startRight-startLeft);
 
 		//make arrays to hold sequence and qualities in cigar space
@@ -663,13 +657,24 @@ public class MergePairedSamAlignments{
 		//layout data
 		leftLayout.layoutCigar(startLeft, left);
 		rightLayout.layoutCigar(startLeft-numAdders, right);
-
-		//System.out.println("\nNumAdders "+numAdders);
-		//System.out.println("PreFirstLayout");
-		//leftLayout.print();
-		//System.out.println("PreSecondLayout");
-		//rightLayout.print();
-
+		
+		//increment overlap and insert size
+		int[] overNonOver = SamLayout.countOverlappingBases(leftLayout, rightLayout);
+		numberOverlappingBases+= overNonOver[0];
+		numberNonOverlappingBases+= overNonOver[1];
+		alignmentsOverlap = (overNonOver[0] !=0);
+		//set insert length
+		insertSize.count(overNonOver[2]);
+		
+		/*System.out.println("\nNumAdders "+numAdders);
+		System.out.println("PreFirstLayout");
+		leftLayout.print();
+		System.out.println("PreSecondLayout");
+		rightLayout.print();
+		Misc.printArray(overNonOver);*/
+		
+		//skip merging non overlapping alignments
+		if (onlyMergeOverlappingAlignments && alignmentsOverlap == false) return null;
 
 		//merge layouts, modifies original layouts so print first if you want to see em before mods.
 		SamLayout mergedSamLayout = SamLayout.mergeLayouts(leftLayout, rightLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);
@@ -683,19 +688,9 @@ public class MergePairedSamAlignments{
 			right.addMergeTag(false);
 			return null;
 		}
-
 		else {
-			//calculate overlap
-			int[] overNonOver = SamLayout.countOverlappingBases(leftLayout, rightLayout);
-			numberOverlappingBases+= overNonOver[0];
-			numberNonOverlappingBases+= overNonOver[1];
-
 			//make merged
 			SamAlignment mergedSam = makeSamAlignment(left, right, mergedSamLayout, startLeft);
-
-			//set insert length
-			insertSize.count(mergedSam.countLengthOfAlignment());
-
 			return mergedSam;
 		}
 
@@ -863,7 +858,9 @@ public class MergePairedSamAlignments{
 					case 's': saveFile = new File(args[++i]); break;
 					case 'c': removeControlAlignments = true; break;
 					case 'm': crossCheckMateCoordinates = false; break;
+					case 'o': onlyMergeOverlappingAlignments = false; break;
 					case 'r': secondPairReverseStrand = true; break;
+					case 'k': skipMergingPairs = true; break;
 					case 'd': maximumProperPairDistanceForMerging = Integer.parseInt(args[++i]); break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'q': minimumMappingQualityScore = Float.parseFloat(args[++i]); break;
@@ -913,7 +910,9 @@ public class MergePairedSamAlignments{
 		System.out.println(removeControlAlignments +"\tRemove control chrPhiX and chrAdapter alignments.");
 		System.out.println(secondPairReverseStrand +"\tSecond read pair's strand has been reversed.");
 		System.out.println(crossCheckMateCoordinates +"\tCross check read mate coordinates.");
-		System.out.println(maximumProperPairDistanceForMerging +"\tMaximum bp distance for merging paired alignments.\n");
+		System.out.println(maximumProperPairDistanceForMerging +"\tMaximum bp distance for merging paired alignments.");
+		System.out.println(onlyMergeOverlappingAlignments +"\tOnly merge overlapping alignments.");
+		if (skipMergingPairs) System.out.println(skipMergingPairs +"\tSkip merging paired alignments, useful for testing effect of merging on downstream analysis.");
 
 
 
@@ -925,12 +924,11 @@ public class MergePairedSamAlignments{
 				"**                          MergePairedSamAlignments: Dec 2012                      **\n" +
 				"**************************************************************************************\n" +
 				"Merges proper paired alignments that pass a variety of checks and thresholds. Only\n" +
-				"unambiguous pairs will be merged. Useful increasing base calling accuracy and for\n" +
-				"avoiding non-independent variant observations and other double counting issues when\n" +
-				"reads overlap. Identical overlapping bases are assigned the higher quality scores.\n" +
-				"Disagreements are resolved toward the higher quality base. If too close in quality the\n" +
-				"base quality is assigned to zero. Be certain your input bam/sam file(s) are sorted by\n" +
-				"query name, NOT coordinate. \n" +
+				"unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps\n" +
+				"avoid non-independent variant observations and other double counting issues. Identical\n" +
+				"overlapping bases are assigned the higher quality scores. Disagreements are resolved\n" +
+				"toward the higher quality base. If too close in quality, then the quality is set to 0.\n" +
+				"Be certain your input bam/sam file(s) are sorted by query name, NOT coordinate. \n" +
 
 				"\nOptions:\n"+
 				"-f The full path file or directory containing raw xxx.sam(.gz/.zip OK)/.bam file(s)\n" +
@@ -940,15 +938,18 @@ public class MergePairedSamAlignments{
 				"\nDefault Options:\n"+
 				"-s Save file, defaults to that inferred by -f. If an xxx.sam extension is provided,\n" +
 				"      the alignments won't be sorted by coordinate and saved as a bam file.\n"+
-				"-a Maximum alignment score. Defaults to 120, smaller numbers are more stringent.\n" +
-				"      Approx 30pts per mismatch for novoalignments.\n"+
+				"-a Maximum alignment score (AS:i: tag). Defaults to 120, smaller numbers are more\n" +
+				"      stringent. Approx 30pts per mismatch for novoalignments.\n"+
 				"-q Minimum mapping quality score, defaults to 13, larger numbers are more stringent.\n" +
 				"      Set to 0 if processing splice junction indexed RNASeq data.\n"+
 				"-r The second paired alignment's strand is reversed. Defaults to not reversed.\n" +
-				"-c Remove chrAdapt and chrPhiX alignments, defaults to not removing.\n"+
+				"-c Remove chrAdapt* and chrPhiX* alignments, defaults to not removing.\n"+
 				"-d Maximum acceptible base pair distance for merging, defaults to 5000.\n"+
 				"-m Don't cross check read mate coordinates, needed for merging repeat matches. Defaults\n" +
 				"      to checking.\n"+
+				"-o Merge all proper paired alignments. Defaults to only merging those that overlap.\n"+
+				"-k Skip merging paired alignments. Defaults to merging. Useful for testing effect of\n" +
+				"      merging on downstream analysis.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/MergePairedSamAlignments -f /Novo/Run7/\n" +
 				"     -c -s /Novo/STPParsedBams/run7.bam -d 10000 \n\n" +
