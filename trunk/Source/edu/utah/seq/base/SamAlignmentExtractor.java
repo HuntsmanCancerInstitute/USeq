@@ -150,7 +150,6 @@ public class SamAlignmentExtractor {
 
 		//for each region 
 		for (int i=0; i< regions.length; i++){
-			
 			//fetch the overlapping alignments
 			ArrayList<String> alignments = fetchOverlappingAlignments (regions[i]);
 			
