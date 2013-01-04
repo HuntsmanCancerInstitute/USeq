@@ -147,7 +147,7 @@ public class SamAlignmentExtractor {
 
 	private void scanRegions() throws IOException{
 		RegionScoreText[] regions = chromRegions.get(chromosome);
-
+		HashSet<String> uniqueAlignments = new HashSet<String>();
 		//for each region 
 		for (int i=0; i< regions.length; i++){
 			//fetch the overlapping alignments
@@ -162,7 +162,15 @@ public class SamAlignmentExtractor {
 				}
 				//print em
 				if (alignments.size() !=0) System.out.println("\t"+alignments.size()+"\t"+regions[i].toString());
-				samOut.println(alignments);
+				//strip those already fetched to avoid repeat extraction!
+				ArrayList<String> toPrint = new ArrayList<String>(alignments.size());
+				for (String sam: alignments){
+					if (uniqueAlignments.contains(sam) == false){
+						uniqueAlignments.add(sam);
+						toPrint.add(sam);
+					}
+				}
+				samOut.println(toPrint);
 			}
 			
 		}
@@ -238,7 +246,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Sam Alignment Extractor: Dec 2012                     **\n" +
+				"**                            Sam Alignment Extractor: Jan 2013                     **\n" +
 				"**************************************************************************************\n" +
 
 				"Given a bed file containing regions of interest, parses all of the intersecting sam\n" +
