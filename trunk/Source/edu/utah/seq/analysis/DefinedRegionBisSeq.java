@@ -252,6 +252,7 @@ public class DefinedRegionBisSeq {
 
 		//fetch paired base observations meeting minimum read coverage in both T and C
 		MethylatedBaseObservation[] mbo = fetchCommonBasesWithMinimumObservations (mergedTreatmentNonCon, mergedTreatmentCon, mergedControlNonCon, mergedControlCon, minimumReadCoverage);
+		
 		if (mbo == null) return;
 
 		//scan
