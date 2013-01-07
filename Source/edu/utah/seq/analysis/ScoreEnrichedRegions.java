@@ -58,7 +58,7 @@ public class ScoreEnrichedRegions {
 	//Files
 	private File outputFile ;
 	
-	/**Simple class that holds a string and a index.  Similar to R's named vector*/
+	/**Simple class that holds a string and a index.  Similar to R's named vector */
 	private class NameInteger {
 		private String name;
 		private Integer index;
