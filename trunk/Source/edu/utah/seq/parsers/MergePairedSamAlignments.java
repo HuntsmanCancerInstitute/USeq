@@ -196,6 +196,12 @@ public class MergePairedSamAlignments{
 				numberAlignments++;
 
 				if (checkSamAlignment(sa, line) == false) continue;
+				
+				//phiX? don't merge since this throws the per cycle error estimation
+				if (sa.getReferenceSequence().startsWith("chrPhiX")){
+					samOut.println(sa);
+					continue;
+				}
 
 				String readName = sa.getName();
 
@@ -328,18 +334,17 @@ public class MergePairedSamAlignments{
 			return false;
 		}
 
-		//skip phiX and adapter
+		//increment phiX
 		boolean firstIsPhiX = sa.getReferenceSequence().startsWith("chrPhiX");
 		if (firstIsPhiX){
 			numberPhiX++;
-			failedSamOut.println(line);
-			if (removeControlAlignments) return false;
 		}
+		
+		//skip adapter
 		boolean firstIsAdapt = sa.getReferenceSequence().startsWith("chrAdapt");
 		if (firstIsAdapt){
 			numberAdapter++;
-			failedSamOut.println(line);
-			if (removeControlAlignments) return false;
+			return false;
 		}
 
 		//does it pass the scores threshold?
@@ -856,7 +861,6 @@ public class MergePairedSamAlignments{
 					switch (test){
 					case 'f': forExtraction = new File(args[++i]); break;
 					case 's': saveFile = new File(args[++i]); break;
-					case 'c': removeControlAlignments = true; break;
 					case 'm': crossCheckMateCoordinates = false; break;
 					case 'o': onlyMergeOverlappingAlignments = false; break;
 					case 'r': secondPairReverseStrand = true; break;
@@ -943,7 +947,6 @@ public class MergePairedSamAlignments{
 				"-q Minimum mapping quality score, defaults to 13, larger numbers are more stringent.\n" +
 				"      Set to 0 if processing splice junction indexed RNASeq data.\n"+
 				"-r The second paired alignment's strand is reversed. Defaults to not reversed.\n" +
-				"-c Remove chrAdapt* and chrPhiX* alignments, defaults to not removing.\n"+
 				"-d Maximum acceptible base pair distance for merging, defaults to 5000.\n"+
 				"-m Don't cross check read mate coordinates, needed for merging repeat matches. Defaults\n" +
 				"      to checking.\n"+
