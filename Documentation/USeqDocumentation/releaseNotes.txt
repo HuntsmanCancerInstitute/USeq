@@ -1,3 +1,21 @@
+----USeq_8.5.0----
+CalculatePerCycleErrorRate
+* New app for calculating the per cycle error rate from phiX alignments.
+MergePairedSamAlignments
+* Modified so that it doesn't merge phiX alignments so that the CalculatePerCycleErrorRate app can be used on merged data.
+* Removes chrAdapt* alignments automatically, no option to not remove.  These are saved to the bad alignment file.
+
+----USeq_8.4.9----
+SamAlignmentExtractor
+* Now requiring that users provide a file name to save data.
+* Updated Picard and Sam tool jars to 1.8.3.  The old 1.6.5 was causing duplication of some extracted reads.  Bad bug in Picard package!
+MergePairedSamAlignments
+* Added option to skip merging to enable testing of merge effect on downstream analysis.
+* Added option to merge all alignments or just those that overlap (now the default).
+* Minor modifications to how insert and overlap are calculated, now done on all pairs.
+RNAEditingPileUpParser
+* Stripped zero values from exported point data.  These are unnecessary.
+
 ----USeq_8.4.8----
 MergePairedSamAlignments
 * New app for merging paired sam alignments.  Geared for processing exome and whole genome data.  Lots of paired stats. Will merge repeat matches.

@@ -91,7 +91,7 @@ public class RNAEditingScanSeqs {
 		smiAL.toArray(smoothingWindowInfo);
 
 		//save window data 
-		System.out.println("Saving serialized window data...");
+		System.out.println("\nSaving serialized window data...");
 		String ext = "";
 		if (plusStrand == true && minusStrand == true) ext = "";
 		else if (plusStrand) ext = "Plus";

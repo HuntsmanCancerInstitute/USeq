@@ -4367,6 +4367,17 @@ public class Num {
 		}
 		return sb.toString();
 	}
+	
+	/**Converts to String using delimiter.*/
+	public static String doubleArrayToString(double[] f, String delimiter){
+		StringBuilder sb = new StringBuilder();
+		sb.append(f[0]);
+		for (int i=1; i< f.length; i++){
+			sb.append(delimiter);
+			sb.append(f[i]);
+		}
+		return sb.toString();
+	}
 
 	/**Converts an array of int to a String seperated by the delimiter.  */
 	public static String intArrayToString(int[] d, String delimiter){
