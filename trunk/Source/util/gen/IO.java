@@ -413,6 +413,47 @@ public class IO {
 		}
 		return true;
 	}
+	
+	/**Attempts to uncompress a xxx.gz or xxx.zip file and write it to the same location without the extension.  
+	 * Returns null if any issues are encountered. If the uncompressed file already exists, it is returned.
+	 * If uncompressed file is null then it is created from the gzipOrZipCompressed's name.*/
+	public static File uncompress (File gzipOrZipCompressed, File uncompressed) {
+
+		File f = null;
+		PrintWriter out = null;
+		BufferedReader in = null;
+
+		try {
+			String name = gzipOrZipCompressed.getName();
+			if (name.endsWith(".zip")) name = name.substring(0, name.length()-4);
+			else if (name.endsWith(".gz")) name = name.substring(0, name.length()-3);
+			else return null;
+			
+			if (uncompressed != null) f = uncompressed;
+			else {
+				f = new File (gzipOrZipCompressed.getParentFile(), name);
+				if (f.exists() && f.length() > 40) return f;
+			}
+			out = new PrintWriter( new FileWriter(f));
+			in = IO.fetchBufferedReader(gzipOrZipCompressed);
+			String line;
+			while ((line = in.readLine()) != null) out.println(line);
+			
+			in.close();
+			out.close();
+			return f;
+		} catch (IOException e){
+			e.printStackTrace();
+			return null;
+		} finally {
+			try {
+				if (out != null) out.close();
+				if (in != null) in.close();
+			} catch (IOException e){
+				e.printStackTrace();
+			}
+		}
+	}
 
 	/**Copies a given directory and it's contents to the destination directory.
 	 * Use a extension (e.g. "class$|properties$") to limit the files copied over or set to null for all.*/
