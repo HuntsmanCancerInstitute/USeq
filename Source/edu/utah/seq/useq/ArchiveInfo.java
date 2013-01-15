@@ -67,7 +67,7 @@ public class ArchiveInfo {
 	public static final Pattern KEY_VALUE_SPLITTER = Pattern.compile("\\s*([^=\\s]+)\\s*=\\s*(.+)\\s*");
 
 	//constructors
-	public ArchiveInfo(String versionedGenome, String dataType){
+	public ArchiveInfo(String versionedGenome, String dataType, boolean printGenomeVersionWarning){
 		//instantiate keyValues Hash and add required fields
 		keyValues = new LinkedHashMap<String,String>();
 		keyValues.put(ARCHIVE_VERSION_KEY, ARCHIVE_VERSION_VALUE_ONE);
@@ -78,7 +78,7 @@ public class ArchiveInfo {
 		//set versioned genome
 		keyValues.put(VERSIONED_GENOME_KEY, versionedGenome);
 		//check to see if verisonedGenome follows form 
-		if (DAS2_VERSIONED_GENOME_FORM.matcher(versionedGenome).matches() == false) System.err.println("\nWARNING: Versioned genome does not follow recommended form (e.g. H_sapiens_Mar_2006) correct -> "+versionedGenome);
+		if (printGenomeVersionWarning == true && DAS2_VERSIONED_GENOME_FORM.matcher(versionedGenome).matches() == false) System.err.println("\nWARNING: Versioned genome does not follow recommended form (e.g. H_sapiens_Mar_2006) correct -> "+versionedGenome);
 	}
 	public ArchiveInfo(File readMeTxtFile) throws IOException{
 		loadTextArchiveReadMeFile(readMeTxtFile);

@@ -43,7 +43,9 @@ public class Text2USeq {
 	public boolean verbose = true;
 
 	//constructors
-	public Text2USeq(){}
+	public Text2USeq(boolean verbose){
+		this.verbose = verbose;
+	}
 
 	//for use with main, contains System.exit calls!
 	public Text2USeq(String[] args){
@@ -149,7 +151,7 @@ public class Text2USeq {
 
 	private void writeReadMeTxt(File sourceFile){
 		try {
-			ArchiveInfo ai = new ArchiveInfo(versionedGenome, null);
+			ArchiveInfo ai = new ArchiveInfo(versionedGenome, null, verbose);
 			//set data type, graph or region
 			if (endingColumnIndex == -1) {
 				ai.setDataType(ArchiveInfo.DATA_TYPE_VALUE_GRAPH);

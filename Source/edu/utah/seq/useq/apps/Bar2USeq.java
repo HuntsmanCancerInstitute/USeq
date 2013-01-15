@@ -121,7 +121,7 @@ public class Bar2USeq {
 
 	private void writeReadMeTxt(File sourceFile){
 		try {
-			ArchiveInfo ai = new ArchiveInfo(versionedGenome, null);
+			ArchiveInfo ai = new ArchiveInfo(versionedGenome, null, verbose);
 			//set data type, graph
 			ai.setDataType(ArchiveInfo.DATA_TYPE_VALUE_GRAPH);
 			ai.setInitialGraphStyle(GRAPH_STYLES[graphStyle]);

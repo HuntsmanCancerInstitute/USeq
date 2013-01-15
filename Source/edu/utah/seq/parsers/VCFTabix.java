@@ -139,7 +139,6 @@ public class VCFTabix{
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
-		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 		File forExtraction = null;
 		File tabixBinDirectory = null;
 		for (int i = 0; i<args.length; i++){
@@ -153,6 +152,7 @@ public class VCFTabix{
 					case 't': tabixBinDirectory = new File(args[++i]); break;
 					case 'f': overWriteExisting = true; break;
 					case 'd': deleteNonGzippedVCF = false; break;
+					case 'e': verbose = false; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -161,6 +161,7 @@ public class VCFTabix{
 				}
 			}
 		}
+		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 
 		//pull vcf files
 		File[][] tot = new File[3][];
@@ -193,6 +194,7 @@ public class VCFTabix{
 				"      http://sourceforge.net/projects/samtools/files/tabix/\n"+
 				"-f Force overwriting of existing indexed vcf files, defaults to skipping.\n"+
 				"-d Do not delete non gzipped vcf files after successful indexing, defaults to deleting.\n"+
+				"-e Only print error messages.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/VCFTabix -v /VarScan2/VCFFiles/\n" +
 				"     -t /Samtools/Tabix/tabix-0.2.6/ \n\n" +
