@@ -12,7 +12,8 @@ public class VCFTabix{
 	File[] vcfFiles2Convert;
 	File bgzip;
 	File tabix;
-
+	boolean overWriteExisting = false;
+	boolean deleteNonGzippedVCF = true;
 	boolean verbose = true;
 
 	//stand alone constructor
@@ -46,8 +47,32 @@ public class VCFTabix{
 		if (verbose) System.out.println("Converting:");
 		for (File vcf: filesToConvert){
 			if (verbose) System.out.println("\t"+vcf);
+			File parentDir = vcf.getParentFile();
+			
+			//check to see if it exists?
+			if (overWriteExisting == false){
+				String name = vcf.getName();
+				boolean compExists = true;
+				//if the current vcf isn't gzipped, look for a gzipped file
+				if (name.endsWith(".gz") == false) {
+					//does the gzipped version exist?
+					File existingComp = new File (parentDir, name+".gz");
+					if (existingComp.exists() == false) compExists = false;
+					name = name+".gz.tbi";
+				}
+				else name = name + ".tbi";
+				
+				//does index already exist?
+				File existingIndex = new File (parentDir, name);
+				if (existingIndex.exists() && compExists) {
+					if (verbose) System.out.println("\t\tIndexed files exist, skipping.");
+					if (deleteNonGzippedVCF && vcf.getName().endsWith(".gz") == false) vcf.delete();
+					continue;
+				}
+			}
+			
 			//copy the file, uncompressing if needed
-			File copy = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_tempCon.vcf");
+			File copy = new File (parentDir, Misc.removeExtension(vcf.getName())+"_tempCon.vcf");
 			if (vcf.getName().endsWith(".zip") || vcf.getName().endsWith(".gz")){
 				copy = IO.uncompress(vcf, copy);
 				if (copy == null) throw new IOException("\nFailed to uncompress "+vcf);
@@ -60,7 +85,7 @@ public class VCFTabix{
 			String[] cmd = { bgzip.getCanonicalPath(), "-f", copy.getCanonicalPath()};
 			String[] output = IO.executeCommandLineReturnAll(cmd);
 			copy.delete();
-			File compVCF = new File (copy.getParentFile(), copy.getName()+".gz");
+			File compVCF = new File (parentDir, copy.getName()+".gz");
 			if (output == null || output.length != 0 || compVCF.exists() == false){
 				compVCF.delete();
 				throw new IOException("\nFailed to bgzip compress vcf file "+vcf+" Error: "+Misc.stringArrayToString(output, "\n"));
@@ -69,7 +94,7 @@ public class VCFTabix{
 			//tabix
 			cmd = new String[]{ tabix.getCanonicalPath(), "-f", "-p", "vcf", compVCF.getCanonicalPath() };
 			output = IO.executeCommandLineReturnAll(cmd);
-			File indexVCF = new File (copy.getParentFile(), compVCF.getName()+".tbi");
+			File indexVCF = new File (parentDir, compVCF.getName()+".tbi");
 			if (output == null || output.length != 0 || indexVCF.exists() == false){
 				compVCF.delete();
 				indexVCF.delete();
@@ -77,7 +102,7 @@ public class VCFTabix{
 			}
 
 			//all looks good so rename
-			File newVCF = new File (compVCF.getParentFile(), compVCF.getName().replace("_tempCon.vcf.gz", ".vcf.gz"));
+			File newVCF = new File (parentDir, compVCF.getName().replace("_tempCon.vcf.gz", ".vcf.gz"));
 			if (newVCF.exists()) newVCF.delete();
 			if (compVCF.renameTo(newVCF) == false) {
 				compVCF.delete();
@@ -85,7 +110,7 @@ public class VCFTabix{
 				newVCF.delete();
 				throw new IOException("\nFailed to rename compressed VCF file "+newVCF+"\n");
 			}
-			File newIndex = new File (newVCF.getParentFile(), newVCF.getName()+".tbi");
+			File newIndex = new File (parentDir, newVCF.getName()+".tbi");
 			if (newIndex.exists()) newIndex.delete();
 			if (indexVCF.renameTo(newIndex) == false) {
 				compVCF.delete();
@@ -94,6 +119,9 @@ public class VCFTabix{
 				newIndex.delete();
 				throw new IOException("\nFailed to rename VCF index file "+newIndex+"\n");
 			}
+			
+			//delete uncompressed?
+			if (deleteNonGzippedVCF && vcf.getName().endsWith(".gz") == false) vcf.delete();
 
 		}
 	}
@@ -123,6 +151,8 @@ public class VCFTabix{
 					switch (test){
 					case 'v': forExtraction = new File(args[++i]); break;
 					case 't': tabixBinDirectory = new File(args[++i]); break;
+					case 'f': overWriteExisting = true; break;
+					case 'd': deleteNonGzippedVCF = false; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -155,12 +185,14 @@ public class VCFTabix{
 				"**************************************************************************************\n" +
 				"**                                VCFTabix: Jan 2013                                **\n" +
 				"**************************************************************************************\n" +
-				"Converts vcf files to a SAMTools compressed vcf tabix format. \n" +
+				"Converts vcf files to a SAMTools compressed vcf tabix format. Recursive.\n" +
 
 				"\nRequired Options:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s). Recursive!\n" +
 				"-t Full path tabix directory containing the compiled bgzip and tabix executables. See\n" +
 				"      http://sourceforge.net/projects/samtools/files/tabix/\n"+
+				"-f Force overwriting of existing indexed vcf files, defaults to skipping.\n"+
+				"-d Do not delete non gzipped vcf files after successful indexing, defaults to deleting.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/VCFTabix -v /VarScan2/VCFFiles/\n" +
 				"     -t /Samtools/Tabix/tabix-0.2.6/ \n\n" +
