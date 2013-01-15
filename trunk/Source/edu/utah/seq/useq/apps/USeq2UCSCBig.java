@@ -18,37 +18,51 @@ public class USeq2UCSCBig extends Thread{
 	private USeqArchive workingUSeqArchive;
 	private File ucscWig2BigWig;
 	private File ucscBed2BigBed;
-	private boolean verbose = false;
+	private boolean verbose = true;
 	private int lengthExtender = 10000;
 	private File chromLengths;
 	private File convertedFile;
 	private File tempFile;
 	private File tempFileSorted;
 	private boolean deleteTempFiles = true;
+	private boolean forceConversion = false;
 
 	//constructors
 	//stand alone
-	public USeq2UCSCBig (String[] args){		
-		
-		verbose = true;
+	public USeq2UCSCBig (String[] args){
+		long startTime = System.currentTimeMillis();
 		processArgs(args);
 
+		if (verbose) System.out.println("Processing:");
+		
+		//remove those that already exist?
+		if (forceConversion == false) {
+			useqArchives = USeq2UCSCBig.removeExistingConvertedUSeqArchives (useqArchives);
+			if (useqArchives.length == 0) {
+				if (verbose) System.out.println("\tNo unconverted xxx.useq archives were found.  Use the -f option to overwrite.\n");
+				System.exit(0);
+			}
+		}
+		
 		//for each archive
 		for (File u : useqArchives){
 			workingUSeqArchiveFile = u;
-			if (verbose) System.out.println("Processing: "+workingUSeqArchiveFile.getName());
+			if (verbose) System.out.println("\t"+workingUSeqArchiveFile);
 			convert();
 		}
 
-		if (verbose) System.out.println("\nDone!\n");
+		//finish and calc run time
+		double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
+		if (verbose) System.out.println("\nDone! "+Math.round(diffTime)+" Min\n");
 
 	}
 
-	//for GenoPub integration using threads, create the Object, call the fetchConvertedFileNames(), then start the thread
+	//for GenoPub/ GNomEx integration using threads, create the Object, call the fetchConvertedFileNames(), then start the thread
 	public USeq2UCSCBig (File ucscWig2BigWig, File ucscBed2BigBed, File useq){
 		this.ucscWig2BigWig = ucscWig2BigWig;
 		this.ucscBed2BigBed = ucscBed2BigBed;
 		workingUSeqArchiveFile = useq;
+		verbose = false;
 	}
 
 	//methods
@@ -225,11 +239,11 @@ public class USeq2UCSCBig extends Thread{
 	}
 
 	private void executeUCSCCommand(String[] command) throws Exception{
-		if (verbose) {
+		/*if (verbose) {
 			System.out.println("\nUnix Command:");
 			for (String c : command) System.out.println(c);
 			System.out.println();
-		}
+		}*/
 		//execute ucsc converter, nothing should come back for wigToBigWig and sort
 		String[] results = USeqUtilities.executeCommandLineReturnAll(command);
 		if (results.length !=0){
@@ -285,7 +299,6 @@ public class USeq2UCSCBig extends Thread{
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
-		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+USeqUtilities.stringArrayToString(args, " ")+"\n");
 		File ucscDir = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -296,6 +309,8 @@ public class USeq2UCSCBig extends Thread{
 					switch (test){
 					case 'u': useqArchives = USeqUtilities.fetchFilesRecursively(new File(args[++i]), USeqUtilities.USEQ_EXTENSION_WITH_PERIOD); break;
 					case 'd': ucscDir = new File (args[++i]); break;
+					case 'f': forceConversion = true; break;
+					case 'e': verbose = false; break;
 					case 'h': printDocs(); System.exit(0); break;
 					default: USeqUtilities.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -305,6 +320,8 @@ public class USeq2UCSCBig extends Thread{
 				}
 			}
 		}
+		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+USeqUtilities.stringArrayToString(args, " ")+"\n");
+		
 		//make files
 		if (ucscDir == null || ucscDir.isDirectory() == false) USeqUtilities.printExit("\nCannot find your directory containing the UCSC wig2BigWig and bed2BigBed apps -> "+ucscDir);
 		ucscWig2BigWig = new File( ucscDir, "wigToBigWig");
@@ -314,14 +331,37 @@ public class USeq2UCSCBig extends Thread{
 		if (useqArchives == null || useqArchives.length == 0) USeqUtilities.printExit("\nCannot find any xxx."+USeqUtilities.USEQ_EXTENSION_NO_PERIOD+" USeq archives?\n");
 		if (ucscWig2BigWig.canExecute() == false) USeqUtilities.printExit("\nCannot find or execute -> "+ucscWig2BigWig+"\n");
 		if (ucscBed2BigBed.canExecute() == false) USeqUtilities.printExit("\nCannot find or execute -> "+ucscBed2BigBed+"\n");
+		
 
 	}	
 
+	public static File[] removeExistingConvertedUSeqArchives (File[] useqFiles){
+		ArrayList<File> toReturn = new ArrayList<File>();
+		for (File useq: useqFiles){
+			String name = useq.getName().substring(0, useq.getName().length()-5);
+			File f = new File (useq.getParentFile(), name +".bw");
+			if (f.exists()) continue;
+			f = new File (useq.getParentFile(), name +"_Minus.bw");
+			if (f.exists()) continue;
+			f = new File (useq.getParentFile(), name +"_Plus.bw");
+			if (f.exists()) continue;
+			f = new File (useq.getParentFile(), name +".bb");
+			if (f.exists()) continue;
+			f = new File (useq.getParentFile(), name +"_Minus.bb");
+			if (f.exists()) continue;
+			f = new File (useq.getParentFile(), name +"_Plus.bb");
+			if (f.exists()) continue;
+			toReturn.add(useq);
+		}
+		File[] f = new File[toReturn.size()];
+		toReturn.toArray(f);
+		return f;
+	}
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              USeq 2 UCSC Big: Oct 2012                           **\n" +
+				"**                              USeq 2 UCSC Big: Jan 2013                           **\n" +
 				"**************************************************************************************\n" +
 				"Converts USeq archives to UCSC bigWig (xxx.bw) or bigBed (xxx.bb) archives based on\n" +
 				"the data type. WARNING: bigBed format conversion will clip any associated scores to\n" +
@@ -332,6 +372,9 @@ public class USeq2UCSCBig extends Thread{
 				"       if a directory is given.\n" +
 				"-d Full path directory containing the UCSC wigToBigWig and bedToBigBed apps, download\n" +
 				"       from http://hgdownload.cse.ucsc.edu/admin/exe/ and make executable with chmod.\n"+
+				"-f Force conversion of xxx.useq to xxx.bw or xxx.bb overwriting any UCSC big files.\n"+
+				"       Defaults to skipping those already converted.\n"+
+				"-e Only print error messages.\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/USeq2UCSCBig -u\n" +
 				"      /AnalysisResults/USeqDataArchives/ -d /Apps/UCSC/\n\n" +

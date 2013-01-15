@@ -10,13 +10,14 @@ import util.gen.IO;
 import util.gen.Misc;
 import edu.utah.seq.useq.USeqUtilities;
 
-/**Class to convert UCSC xxx.bb or xxx.bw archives to xxx.useq.*/
+/**Class to convert UCSC xxx.bb or xxx.bw archives to xxx.useq. Must know the genome build version.*/
 public class UCSCBig2USeq extends Thread{
 
 	private File[] ucscArchives;
 	private File bigWigToWig;
 	private File bigBedToBed;
-	private boolean verbose = false;
+	private boolean verbose = true;
+	private boolean forceConversion = false;
 	private File convertedUSeqArchive = null;
 	private File ucscArchiveToConvert;
 	private File tempTxtFile = null;
@@ -37,13 +38,22 @@ public class UCSCBig2USeq extends Thread{
 	//stand alone
 	public UCSCBig2USeq (String[] args){
 		try {
-			verbose = true;
 			processArgs(args);
-
+			if (verbose) System.out.println("Processing:");
+			
+			//remove those that already exist?
+			if (forceConversion == false) {
+				ucscArchives = UCSCBig2USeq.removeExistingConvertedBigFiles(ucscArchives);
+				if (ucscArchives.length == 0) {
+					if (verbose) System.out.println("\tNo unconverted xxx.bb/bw archives were found.  Use the -f option to overwrite.\n");
+					System.exit(0);
+				}
+			}
+			
 			//for each archive
 			for (File u : ucscArchives){
 				ucscArchiveToConvert = u;
-				if (verbose) System.out.println("Processing: "+ucscArchiveToConvert.getName());
+				if (verbose) System.out.println("\t"+ucscArchiveToConvert);
 				convert();
 				if (deleteTempFiles) tempTxtFile.delete();
 			}
@@ -51,6 +61,7 @@ public class UCSCBig2USeq extends Thread{
 			if (verbose) System.out.println("\nDone!\n");
 		} catch (Exception e){
 			e.printStackTrace();
+			System.exit(1);
 		}
 
 	}
@@ -94,7 +105,7 @@ public class UCSCBig2USeq extends Thread{
 				System.out.println(prependChr+"\tprepend 'chr'");
 			}
 			
-			Text2USeq t2u = new Text2USeq();
+			Text2USeq t2u = new Text2USeq(verbose);
 			t2u.setVersionedGenome(versionedGenome);
 			t2u.setChromosomeColumnIndex(0);
 			t2u.setBeginningColumnIndex(1);
@@ -118,7 +129,6 @@ public class UCSCBig2USeq extends Thread{
 			
 		}
 
-		//?
 		else throw new IOException("Unsupported UCSC big file format (e.g. xxx.bb or xxx.bw) -> "+ucscArchiveToConvert.getName());
 
 		return convertedUSeqArchive;
@@ -194,11 +204,11 @@ public class UCSCBig2USeq extends Thread{
 
 
 	private void executeUCSCCommand(String[] command) throws IOException{
-		if (verbose) {
+		/*if (verbose) {
 			System.out.println("\nUnix Command:");
 			for (String c : command) System.out.println(c);
 			System.out.println();
-		}
+		}*/
 		//execute ucsc converter, nothing should come back for wigToBigWig and sort
 		String[] results = USeqUtilities.executeCommandLineReturnAll(command);
 		if (results.length !=0){
@@ -230,7 +240,6 @@ public class UCSCBig2USeq extends Thread{
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		File forExtraction = null;
-		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+USeqUtilities.stringArrayToString(args, " ")+"\n");
 		File ucscDir = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -242,6 +251,8 @@ public class UCSCBig2USeq extends Thread{
 					case 'b': forExtraction = new File(args[++i]); break;
 					case 'd': ucscDir = new File (args[++i]); break;
 					case 'v': versionedGenome = args[++i]; break;
+					case 'e': verbose = false; break;
+					case 'f': forceConversion = true; break;
 					case 'h': printDocs(); System.exit(0); break;					
 					default: USeqUtilities.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -251,13 +262,14 @@ public class UCSCBig2USeq extends Thread{
 				}
 			}
 		}
+		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+USeqUtilities.stringArrayToString(args, " ")+"\n");
+
 		//versioned genome?
 		if (versionedGenome == null) USeqUtilities.printExit("\nError: you must supply a genome version. Goto http://genome.ucsc.edu/cgi-" +
 		"bin/hgGateway load your organism to find the associated genome version (e.g. H_sapiens_Mar_2006, H_sapiens_Feb_2009).\n");
 
 		//make files
 		if (ucscDir == null || ucscDir.isDirectory() == false) USeqUtilities.printExit("\nCannot find your directory containing the UCSC wig2BigWig and bed2BigBed apps -> "+ucscDir);
-		//bigWigToBedGraph = new File( ucscDir, "bigWigToBedGraph");
 		bigWigToWig = new File( ucscDir, "bigWigToWig");
 		bigBedToBed = new File( ucscDir, "bigBedToBed");
 
@@ -275,15 +287,31 @@ public class UCSCBig2USeq extends Thread{
 		ucscArchives = IO.collapseFileArray(tot);
 		if (ucscArchives == null || ucscArchives.length == 0 || ucscArchives[0].canRead() == false) Misc.printExit("\nError: cannot find or read any xxx.bb or xxx.bw file(s)!\n");
 
-
-
 	}	
+	
+	/**Removes and big files that have a converted xxx.useq file in the same directory.*/
+	public static File[] removeExistingConvertedBigFiles (File[] bigFiles){
+		ArrayList<File> toReturn = new ArrayList<File>();
+		for (File big: bigFiles){
+			//remove .bb or .bw extension
+			String name = big.getName().substring(0, big.getName().length()-3);
+			//remove _Minus or _Plus if then exist
+			if (name.endsWith("_Minus")) name = name.substring(0, name.length()-6);
+			else if (name.endsWith("_Plus")) name = name.substring(0, name.length()-5);
+			File f = new File (big.getParentFile(), name +".useq");
+			if (f.exists()) continue;
+			toReturn.add(big);
+		}
+		File[] f = new File[toReturn.size()];
+		toReturn.toArray(f);
+		return f;
+	}
 
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              UCSC Big 2 USeq: May 2012                           **\n" +
+				"**                              UCSC Big 2 USeq: Jan 2013                           **\n" +
 				"**************************************************************************************\n" +
 				"Converts UCSC bigWig (xxx.bw) or bigBed (xxx.bb) archives to xxx.useq archives.\n" +
 
@@ -296,6 +324,9 @@ public class UCSCBig2USeq extends Thread{
 				"-v Genome version (e.g. H_sapiens_Mar_2006), get from UCSC Browser,\n" +
 				"      http://genome.ucsc.edu/FAQ/FAQreleases or IGB \n" +
 				"      http://bioviz.org/igb/releases/current/igb-large.jnlp\n"+
+				"-f Force conversion of xxx.bw or xxx.bb overwriting any existing xxx.useq archives.\n"+
+				"       Defaults to skipping those already converted.\n"+
+				"-e Only print error messages.\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/USeq2UCSCBig -v M_musculus_Jul_2007 -u\n" +
 				"      /AnalysisResults/USeqDataArchives/ -d /MyApps/UCSC/\n\n" +

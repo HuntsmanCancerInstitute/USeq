@@ -102,7 +102,7 @@ public class Wig2USeq {
 
 	private void writeReadMeTxt(){
 		try {
-			ArchiveInfo ai = new ArchiveInfo(versionedGenome, null);
+			ArchiveInfo ai = new ArchiveInfo(versionedGenome, null, verbose);
 			//set data type, graph or region
 			ai.setDataType(ArchiveInfo.DATA_TYPE_VALUE_GRAPH);
 			ai.setInitialGraphStyle(Text2USeq.GRAPH_STYLES[graphStyle]);
