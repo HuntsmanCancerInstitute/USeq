@@ -266,7 +266,7 @@ public class MergePairedSamAlignments{
 
 			while (it.hasNext()) {
 				SAMRecord sam = it.next();
-				line = sam.getSAMString();
+				line = sam.getSAMString().trim();
 
 				if (++dotCounter > 1000000){
 					System.out.print(".");

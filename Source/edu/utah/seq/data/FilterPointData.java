@@ -148,7 +148,7 @@ public class FilterPointData {
 					File original = pd[x].getBarParser().getBarFile();
 					if (shiftPositions == 0){
 						System.out.println("\t\tNothing to filter copying "+pointDataDirectories[i].getName()+File.separator+original.getName());
-						IO.copy(original, new File(filteredPointDataDirectories[i],original.getName()));
+						IO.copyViaFileChannel(original, new File(filteredPointDataDirectories[i],original.getName()));
 					}
 					else {
 						System.out.println("\t\tNothing to filter shifting positions and saving "+pointDataDirectories[i].getName()+File.separator+original.getName());

@@ -197,7 +197,7 @@ public class SRAProcessor {
 			dir = new File (saveDirectory, srr);
 			dir.mkdir();
 			File cmdCopy = new File (dir, cmdFile.getName());
-			IO.copy(cmdFile, cmdCopy);
+			IO.copyViaFileChannel(cmdFile, cmdCopy);
 			File moved = new File (dir, srrFile.getName());
 			srrFile.renameTo(moved);
 			srrFile = moved;
