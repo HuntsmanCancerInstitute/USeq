@@ -396,8 +396,9 @@ public class IO {
 		}
 		return null;
 	}
-	/** Fast & simple file copy. From GForman http://www.experts-exchange.com/M_500026.html*/
-	public static boolean copy(File source, File dest){
+	/** Fast & simple file copy. From GForman http://www.experts-exchange.com/M_500026.html
+	 * Hit an odd bug with a "Size exceeds Integer.MAX_VALUE" error when copying a vcf file. -Nix.*/
+	public static boolean copyViaFileChannel(File source, File dest){
 		FileChannel in = null, out = null;
 		try {
 			in = new FileInputStream(source).getChannel();
@@ -413,6 +414,32 @@ public class IO {
 		}
 		return true;
 	}
+	
+	/** Copy via read line. Slower than channel copy but doesn't have Integer.MAX_Value problem.
+	 * Source file can be txt, txt.gz, or txt.zip. So decompresses if needed.
+	 * @author Nix*/
+	public static boolean copyViaReadLine(File source, File dest){
+		BufferedReader in = null;
+		PrintWriter out = null;
+		try {
+			in = IO.fetchBufferedReader(source);
+			out = new PrintWriter (new FileWriter (dest));
+			String line;
+			while ((line = in.readLine()) != null) out.println(line);
+			return true;
+		} catch (IOException e) {
+			e.printStackTrace();
+			return false;
+		} finally {
+				try {
+					if (in != null) in.close();
+					if (out != null) out.close();
+				} catch (IOException e) {}
+			
+		}
+	}
+	
+	
 	
 	/**Attempts to uncompress a xxx.gz or xxx.zip file and write it to the same location without the extension.  
 	 * Returns null if any issues are encountered. If the uncompressed file already exists, it is returned.
@@ -470,7 +497,7 @@ public class IO {
 				Matcher mat = pat.matcher(files[i].getName());
 				if (extension == null || mat.find()){
 					File copied = new File (destDir, files[i].getName());					
-					if (copy(files[i], copied) == false ) return false;
+					if (copyViaFileChannel(files[i], copied) == false ) return false;
 				}
 			}
 		}

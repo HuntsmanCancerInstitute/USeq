@@ -164,7 +164,7 @@ public class HierarchicalClustering {
 		tempDir.mkdir();
 		for (int i=0; i<celpFiles.length; i++){
 			File x = new File (tempDir,(i+1)+"");
-			IO.copy(celpFiles[i],x);
+			IO.copyViaFileChannel(celpFiles[i],x);
 			clusters.add(new Cluster(x,trimmedNames[i]));
 			results.append("\t"+x.getName()+"\t"+celpFiles[i].getName()+"\n");
 		}

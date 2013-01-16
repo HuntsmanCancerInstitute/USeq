@@ -78,7 +78,10 @@ public class VCFTabix{
 				if (copy == null) throw new IOException("\nFailed to uncompress "+vcf);
 			}
 			else {
-				if (IO.copy(vcf, copy) == false) throw new IOException("\nFailed to copy file "+vcf);
+				if (IO.copyViaReadLine(vcf, copy) == false) {
+					copy.delete();
+					throw new IOException("\nFailed to copy file "+vcf);
+				}
 			}
 
 			//force compress with bgzip, this will replace the copy
@@ -164,12 +167,13 @@ public class VCFTabix{
 		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 
 		//pull vcf files
+		if (forExtraction == null || forExtraction.exists() == false) Misc.printErrAndExit("\nError: please enter a path to a vcf file or directory containing such.\n");
 		File[][] tot = new File[3][];
 		tot[0] = IO.fetchFilesRecursively(forExtraction, ".vcf");
 		tot[1] = IO.fetchFilesRecursively(forExtraction,".vcf.gz");
 		tot[2] = IO.fetchFilesRecursively(forExtraction,".vcf.zip");
 		vcfFiles2Convert = IO.collapseFileArray(tot);
-		if (vcfFiles2Convert == null || vcfFiles2Convert.length ==0 || vcfFiles2Convert[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.vcf(.zip/.gz) file(s)!\n");
+		if (vcfFiles2Convert == null || vcfFiles2Convert.length ==0 || vcfFiles2Convert[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.vcf(.zip/.gz OK) file(s)!\n");
 
 		//pull executables
 		if (tabixBinDirectory == null) Misc.printExit("\nError: please point to your tabix executable directory (e.g. /Users/madonna/Desktop/VCF/tabix-0.2.6/ )\n");
