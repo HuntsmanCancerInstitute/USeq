@@ -4,6 +4,7 @@ import java.util.*;
 import util.bio.parsers.*;
 import util.bio.parsers.gff.Gff3Feature;
 import util.bio.seq.MakeSpliceJunctionFasta;
+import util.gen.Misc;
 
 /**
  * ExonIntron info. 
@@ -295,15 +296,16 @@ public class ExonIntron implements Comparable, Serializable {
 		Arrays.fill(fetchFalse, true);
 		for (int i=0; i< a.length; i++){
 			int start = a[i].start -min;
-			int stop = a[i].end-min;
+			int stop = a[i].end-min;		
 			for (int j=start; j< stop; j++) fetchFalse[j] = false;
 		}
 		for (int i=0; i< b.length; i++){
 			int start = b[i].start -min;
-			int stop = b[i].end-min;
+			int stop = b[i].end-min;		
 			for (int j=start; j< stop; j++) fetchFalse[j] = false;
 		}
 		//retrieve blocks, ends included
+
 		int[][] blocks = ExportIntergenicRegions.fetchFalseBlocks(fetchFalse, 0, 0);
 		//convert to interbase coordinate exon introls
 		ExonIntron[] ei = new ExonIntron[blocks.length];

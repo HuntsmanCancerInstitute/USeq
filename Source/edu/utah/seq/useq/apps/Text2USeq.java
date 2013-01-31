@@ -40,6 +40,7 @@ public class Text2USeq {
 	private ArrayList<File> files2Zip = new ArrayList<File>();
 	public static final Pattern PATTERN_TAB = Pattern.compile("\\t");
 	public static final Pattern PATTERN_STRAND = Pattern.compile(".*[+-\\.]$");
+	public static final Pattern PATTERN_COMMA = Pattern.compile(",");
 	public boolean verbose = true;
 
 	//constructors

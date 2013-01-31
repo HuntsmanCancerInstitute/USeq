@@ -97,6 +97,10 @@ public class UCSCGeneLine {
 					exons[j] = new ExonIntron(starts[j], stops[j]-numToSubtractFromEnd);
 				}
 				if (exonCount > 1) Arrays.sort(exons);
+				//check that last exon stop is == txEnd, this is a hack to catch bad UCSCLines!  
+				int lastExonEnd = exons[exonCount-1].getEnd();
+				if (lastExonEnd != txEnd) txEnd = lastExonEnd;
+				if (cdsEnd > lastExonEnd) cdsEnd = lastExonEnd;
 			}
 
 			//make introns

@@ -7,6 +7,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import util.gen.IO;
+import util.gen.Misc;
 import edu.utah.seq.useq.USeqArchive;
 import edu.utah.seq.useq.USeqUtilities;
 
@@ -118,18 +119,45 @@ public class USeq2UCSCBig extends Thread{
 		al.add(convertedFile);
 		return al;
 	}
+	
+	public static boolean dataPresent(File data){
+		try {
+			BufferedReader in = IO.fetchBufferedReader(data);
+			String line;
+			while ((line = in.readLine()) !=null){
+				if (line.startsWith("#") == false) return true;
+			}
+			in.close();
+		} catch (IOException e) {
+			System.err.println("Failed to make a buffered reader on data file: "+data);
+			e.printStackTrace();
+		}
+		return false;
+	}
 
 	private ArrayList<File> convertRegionData() throws Exception{
 		String name = workingUSeqArchiveFile.getName().replace(USeqUtilities.USEQ_EXTENSION_WITH_PERIOD, "");
 		tempFile = new File (workingUSeqArchiveFile.getCanonicalPath() + ".bed");
 
 		USeq2Text.print2TextFile(workingUSeqArchiveFile, tempFile, true, true);
+		
+		//any data written to tempFile?  this is a catch for bad bed12 files
+		if (dataPresent(tempFile) == false){
+			deleteAllFiles();
+			if (verbose) System.err.println("\t\tNo data written to bed file, skipping!");
+			return null;
+		}
 
 		//sort it using unix command
 		tempFileSorted = new File (workingUSeqArchiveFile.getCanonicalPath() + ".sorted.bed");
-		String shell = "sort -k1,1 -k2,2n "+tempFile.getCanonicalPath()+" > "+tempFileSorted.getCanonicalPath();
-		USeqUtilities.executeShellScript(shell, workingUSeqArchiveFile.getParentFile());
-
+		//String shell = "sort -k1,1 -k2,2n "+tempFile.getCanonicalPath()+" > "+tempFileSorted.getCanonicalPath();
+		//String[] output = USeqUtilities.executeShellScript(shell, workingUSeqArchiveFile.getParentFile());
+		String[] cmd = {"sort", "-k1,1", "-k2,2n", "-o", tempFileSorted.getCanonicalPath(), tempFile.getCanonicalPath(), };
+		String[] output = IO.executeCommandLineReturnAll(cmd);
+		if (output == null || output.length !=0 || tempFileSorted.exists() == false){
+			throw new IOException("Error sorting bed file: "+tempFileSorted+"\nError: "+Misc.stringArrayToString(output, "\n"));
+		}
+		
 		//convert to binary
 		convertedFile = new File (workingUSeqArchiveFile.getParentFile(), name + ".bb");
 		String[] command = new String[]{
@@ -239,11 +267,7 @@ public class USeq2UCSCBig extends Thread{
 	}
 
 	private void executeUCSCCommand(String[] command) throws Exception{
-		/*if (verbose) {
-			System.out.println("\nUnix Command:");
-			for (String c : command) System.out.println(c);
-			System.out.println();
-		}*/
+		
 		//execute ucsc converter, nothing should come back for wigToBigWig and sort
 		String[] results = USeqUtilities.executeCommandLineReturnAll(command);
 		if (results.length !=0){
