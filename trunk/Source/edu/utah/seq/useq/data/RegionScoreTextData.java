@@ -4,6 +4,8 @@ import java.io.*;
 import java.util.*;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+
+import util.gen.Misc;
 import edu.utah.seq.useq.*;
 import edu.utah.seq.useq.apps.*;
 
@@ -56,14 +58,37 @@ public class RegionScoreTextData extends USeqData{
 			String[] tokens = Text2USeq.PATTERN_TAB.split(sortedRegionScoreTexts[i].text);
 			if (fixScore){
 				int score = USeqUtilities.fixBedScore(sortedRegionScoreTexts[i].score);
-				if (tokens.length == 7) out.println(chrom+"\t"+sortedRegionScoreTexts[i].start+"\t"+sortedRegionScoreTexts[i].stop+"\t"+tokens[0] +"\t"+ score +"\t"+strand+"\t"+tokens[1]+"\t"+tokens[2]+"\t"+tokens[3]+"\t"+tokens[4]+"\t"+tokens[5]+"\t"+tokens[6]);
+				if (tokens.length == 7) {
+					//check end
+					int checkStop = checkBed12Stop(sortedRegionScoreTexts[i].start, sortedRegionScoreTexts[i].stop, tokens[5], tokens[6]);
+					int thickEnd = Integer.parseInt(tokens[2]);
+					if (thickEnd > checkStop) thickEnd = checkStop;
+					//check zero start
+					if (tokens[6].startsWith("0,")) out.println(chrom+"\t"+sortedRegionScoreTexts[i].start+"\t"+checkStop+"\t"+tokens[0] +"\t"+ score +"\t"+strand+"\t"+tokens[1]+"\t"+thickEnd+"\t"+tokens[3]+"\t"+tokens[4]+"\t"+tokens[5]+"\t"+tokens[6]);
+				
+				}
 				else out.println(chrom+"\t"+sortedRegionScoreTexts[i].start+"\t"+sortedRegionScoreTexts[i].stop+"\t"+sortedRegionScoreTexts[i].text +"\t"+ score +"\t"+strand);
 			}
 			else {
-				if (tokens.length == 7) out.println(chrom+"\t"+sortedRegionScoreTexts[i].start+"\t"+sortedRegionScoreTexts[i].stop+"\t"+tokens[0] +"\t"+ sortedRegionScoreTexts[i].score +"\t"+strand+"\t"+tokens[1]+"\t"+tokens[2]+"\t"+tokens[3]+"\t"+tokens[4]+"\t"+tokens[5]+"\t"+tokens[6]);
+				if (tokens.length == 7) {
+					//bed 12
+					int checkStop = checkBed12Stop(sortedRegionScoreTexts[i].start, sortedRegionScoreTexts[i].stop, tokens[5], tokens[6]);
+					int thickEnd = Integer.parseInt(tokens[2]);
+					if (thickEnd > checkStop) thickEnd = checkStop;
+					//check zero start
+					if (tokens[6].startsWith("0,")) out.println(chrom+"\t"+sortedRegionScoreTexts[i].start+"\t"+checkStop+"\t"+tokens[0] +"\t"+ sortedRegionScoreTexts[i].score +"\t"+strand+"\t"+tokens[1]+"\t"+thickEnd+"\t"+tokens[3]+"\t"+tokens[4]+"\t"+tokens[5]+"\t"+tokens[6]);
+				}
 				else out.println(chrom+"\t"+sortedRegionScoreTexts[i].start+"\t"+sortedRegionScoreTexts[i].stop+"\t"+sortedRegionScoreTexts[i].text +"\t"+ sortedRegionScoreTexts[i].score +"\t"+strand);
 			}
 		}
+	}
+	
+	public static int checkBed12Stop(int start, int stop, String lengths, String starts){
+		String[] t = Text2USeq.PATTERN_COMMA.split(lengths);
+		int lastLength = Integer.parseInt(t[t.length-1]);
+		t = Text2USeq.PATTERN_COMMA.split(starts);
+		int lastStart = Integer.parseInt(t[t.length-1]);
+		return start + lastLength + lastStart;
 	}
 
 	/**Writes native format to the PrintWriter*/

@@ -388,8 +388,9 @@ public class USeqUtilities {
 		return res;
 	}
 	
-	/**Executes a String of shell script commands via a temp file.  Only good for Unix.*/
-	public static String[] executeShellScript (String shellScript, File tempDirectory){
+	/**Executes a String of shell script commands via a temp file.  Only good for Unix.
+	 * @throws IOException */
+	public static String[] executeShellScript (String shellScript, File tempDirectory) throws IOException{
 		//make shell file
 		File shellFile = new File (tempDirectory, "tempFile_"+Passwords.createRandowWord(10) +".sh");
 		String fullPath = IO.getFullPathName(shellFile);
@@ -400,7 +401,7 @@ public class USeqUtilities {
 		String[] res = IO.executeCommandLineReturnAll(cmd);
 		if (res == null || res.length !=0 ) {
 			shellFile.delete();
-			return null;
+			throw new IOException ("Error found making shellscript executable : "+shellScript);
 		}
 		//execute
 		cmd = new String[]{fullPath};

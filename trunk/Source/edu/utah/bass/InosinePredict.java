@@ -316,7 +316,7 @@ public class InosinePredict {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Inosine Predic: Aug 2010                           **\n" +
+				"**                               Inosine Predict: Aug 2010                          **\n" +
 				"**************************************************************************************\n" +
 				"IP estimates the likelihood of ADAR RNA editing using the multiplicative 4L,4R model\n" +
 				"described in Eggington et. al. 2010.\n" +

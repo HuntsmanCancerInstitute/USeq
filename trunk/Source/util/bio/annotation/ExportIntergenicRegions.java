@@ -68,7 +68,7 @@ public class ExportIntergenicRegions {
 	}
 
 	public static int[][] fetchFalseBlocks(boolean[] b, int bpToTrim, int minSize){
-		ArrayList al = new ArrayList();
+		ArrayList<int[]> al = new ArrayList<int[]>();
 		int startFalse = 0;
 		boolean inTrue;
 		//check first base and set params
@@ -82,12 +82,12 @@ public class ExportIntergenicRegions {
 		for (int i=1; i< b.length; i++){
 			//true found?
 			if (b[i]) {
-				if (inTrue == false){
+				if (inTrue == false){					
 					int size = i - startFalse;
 					int left = startFalse + bpToTrim;
 					int right = (i-1) - bpToTrim;
 					size = right - left + 1;
-					if (right > left && size >= minSize){
+					if (right >= left && size >= minSize){
 						//make block, new true found
 						int[] block = {left, right};
 						al.add(block);
@@ -109,7 +109,7 @@ public class ExportIntergenicRegions {
 			int left = startFalse + bpToTrim;
 			int right = (b.length-1) - bpToTrim;
 			size = right - left + 1;
-			if (right > left && size >= minSize){
+			if (right >= left && size >= minSize){
 				//make block, new true found
 				int[] block = {left, right};
 				al.add(block);
