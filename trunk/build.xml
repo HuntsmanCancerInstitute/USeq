@@ -199,7 +199,7 @@
 					
 	<target name="build-release" depends="clean,master-jar,worker-jars,create-docs">
 		<zip destfile="${release.base.dir}/SourceCode.zip" basedir="${src.dir}"/>
-		<zip destfile="${base.dir}/USeq_${version}.zip" basedir="${release.base.dir}"/>
+		<zip destfile="${base.dir}/USeq_${version}.zip" basedir="${base.dir}" includes="${release.name}/**"/>
 	</target>
 	
 	<target name="mosbruger-release" depends="worker-jars">
