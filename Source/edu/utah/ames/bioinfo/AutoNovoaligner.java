@@ -107,44 +107,49 @@ public class AutoNovoaligner {
 
 		//loop the read block until all lines in the file are read
 		while ((line = br.readLine()) != null) {
-
+			
 			//split contents of tab-delimited file 
 			String dataValue[] = line.split("\t");
-			Sample s = new Sample(dataValue);
-
-			//parse out "Lab" from lab name string
-			Pattern p = Pattern.compile(".+(?=Lab)");
-			Matcher m = p.matcher(s.getLab());
-			if (m.find()) {
-				s.setLab(m.group());
-			}
 			
-			String genome = dataValue[s.genomeIndex];
-			//skip samples without organism or index info
-			if (s.getOrganism().toString().equals("Unknown") || s.getOrganism().toString().equals("Other") || 
-					s.getOrganism().toString().equals(null) || s.getGenome().toString().equals("None") || 
-					s.getGenome().toString().equals(null)) {
-				doNotAlign = true;
+			//check for correct number of columns in fresh data report
+			if (dataValue.length < 15) {
 				continue;
 			}
 			else {
-				s.setGenome(genome);
-				//call downstream methods to match samples with the correct novoindex
-				this.setCondSeqAppCode(s);
-			}
-			
-			//check for matching novoindex for the sample before creating new analysis report 
-			if (!(s.getNovoindex() == null)) {
-				//get new analysis report number for samples that have a matching novoindex
-				analysisNumber = hm.get(s.getRequestNumber());
-				if (analysisNumber == null) {
-					//populate with request numbers
-					analysisNumber = this.getAnalysisNumber(s);
-					s.setAnalysisNumber(analysisNumber);
-					hm.put(s.getRequestNumber(), analysisNumber);
+				Sample s = new Sample(dataValue);
+				//parse out "Lab" from lab name string
+				Pattern p = Pattern.compile(".+(?=Lab)");
+				Matcher m = p.matcher(s.getLab());
+				if (m.find()) {
+					s.setLab(m.group());
+				}
+				
+				String genome = dataValue[s.genomeIndex];
+				//skip samples without organism or index info
+				if (s.getOrganism().toString().equals("Unknown") || s.getOrganism().toString().equals("Other") || 
+						s.getOrganism().toString().equals(null) || s.getGenome().toString().equals("None") || 
+						s.getGenome().toString().equals(null)) {
+					doNotAlign = true;
+					continue;
 				}
 				else {
-					s.setAnalysisNumber(analysisNumber);
+					s.setGenome(genome);
+					//call downstream methods to match samples with the correct novoindex
+					this.setCondSeqAppCode(s);
+				}
+				//check for matching novoindex for the sample before creating new analysis report 
+				if (!(s.getNovoindex() == null)) {
+					//get new analysis report number for samples that have a matching novoindex
+					analysisNumber = hm.get(s.getRequestNumber());
+					if (analysisNumber == null) {
+						//populate with request numbers
+						analysisNumber = this.getAnalysisNumber(s);
+						s.setAnalysisNumber(analysisNumber);
+						hm.put(s.getRequestNumber(), analysisNumber);
+					}
+					else {
+						s.setAnalysisNumber(analysisNumber);
+					}
 				}
 			}
 		}
