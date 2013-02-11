@@ -153,8 +153,8 @@ public class AutoNovoaligner {
 		
 		//move the parsed fresh data report to the processedReports folder
 		File file = new File(freshDataReport);
-		boolean success = file.renameTo(new File(parsedFreshDataReports + freshDataReport.substring(41)));
-		//boolean success = file.renameTo(new File(parsedFreshDataReports + freshDataReport.substring(47)));
+		//boolean success = file.renameTo(new File(parsedFreshDataReports + freshDataReport.substring(41)));
+		boolean success = file.renameTo(new File(parsedFreshDataReports + freshDataReport.substring(47)));
 		if (!success) {
 			System.out.println("Error moving parsed fresh data report to the parsed directory.");
 		}
