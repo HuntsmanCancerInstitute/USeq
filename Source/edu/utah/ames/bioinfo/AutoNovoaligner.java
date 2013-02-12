@@ -187,7 +187,8 @@ public class AutoNovoaligner {
 				"-genomeBuild", s.getBuildCode(), "-analysisType", "Alignment", "-seqLane", s.getSequenceLaneNumber()};
 	
 		//launch the script and grab stdin/stdout and stderr
-		Process process = Runtime.getRuntime().exec(cmd, null, new File("/Users/darren/Desktop/novoalignerTestDir/create_analysis/"));
+		Process process = Runtime.getRuntime().exec(cmd, null, new File
+				("/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData"));
 		stderr = process.getErrorStream();
 		stdout = process.getInputStream();
 
