@@ -412,8 +412,10 @@ public class AutoNovoaligner {
 		String dest = tomatoJobDir + s.getRequestNumber() + "/" + s.getSampleID() + "/";
 		//laptop String dest = "/Users/darren/Desktop/novoalignerTestDir/testStuff/";
 		
-		//set name for input fastq file
+		//set name for input fastq files
 		String inputFile = s.getSampleID() + "_*.txt.gz";
+		String inputFile1 = s.getSampleID() + "_*1.txt.gz";
+		String inputFile2 = s.getSampleID() + "_*2.txt.gz";
 		
 		Process process = Runtime.getRuntime().exec(new String[] {"ln", "-s", target, dest});
 		
@@ -426,7 +428,8 @@ public class AutoNovoaligner {
 		//***TODO substitute requester email for mine when I know it works***
 		String bisulfiteMsg = "#e" + myEmail + " -ef" + "\n#a " + s.getAnalysisNumber() + "\n## Splitting bisulfite fastq files of " 
 				+ s.getRequestNumber() + " " + s.getProjectName() + " for " + s.getRequester() + " in the "
-				+ s.getLab() + "Lab " + "\n\nFileSplitter.jar" + " -f " + inputFile + " -n 100000000 " + "-g"
+				+ s.getLab() + "Lab " + "\n\nFileSplitter.jar" + " -f " + inputFile1 + " -n 100000000 " + "-g"
+				+ "\n\nFileSplitter.jar" + " -f " + inputFile2 + " -n 100000000 " + "-g"
 				+ "\n\nfor i in *_" + s.getSampleID() + "*; do n=${i%_" + s.getSampleID() + "_*}; mkdir $n; " 
 				+ "mv $i $n; cp bisAlignWait.txt $n; mv $n/bisAlignWait.txt $n/cmd.txt; touch $n/b; done\n";
 
