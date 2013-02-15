@@ -10,6 +10,8 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
+import org.apache.tools.ant.types.Path;
+
 /**
  * This class contains methods to automatically align fastq sequences after they come out of the HiSeq Pipeline.  
  * All the necessary input data is contained in the fresh data report that comes out of the HiSeq Pipeline.
@@ -36,7 +38,8 @@ public class AutoNovoaligner {
 	private static String novoindexNames = "/tomato/job/autoaligner/autoAlignerData/novoindexNameTable.txt";
 	//laptop private static String novoindexNames = "/Users/darren/Desktop/novoalignerTestDir/novoindexNameTable.txt";
 	//bio3 private static String parsedFreshDataReports = "/home/sbsuser/Pipeline/AutoAlignReport/reports/processedReports/";
-	private static String parsedFreshDataReports = "/Users/darren/Desktop/novoalignerTestDir/processedReports/";
+	//laptop private static String parsedFreshDataReports = "/Users/darren/Desktop/novoalignerTestDir/processedReports/";
+	private static String parsedFreshDataReports = "/tomato/job/autoaligner/processedReports/";
 	private static String requestYear;
 	private static String tomatoJobDir = "/tomato/job/autoaligner/alignments/";
 	//laptop private static String tomatoJobDir = "/Users/darren/Desktop/novoalignerTestDir/alignments/";
@@ -45,6 +48,7 @@ public class AutoNovoaligner {
 	static String LABNAMEREGEX = "\\w+\\s\\w+(?=\\WLab)"; //matches first and last name of lab using positive look
 	//bio3 private static String reportsDir = "/home/sbsuser/Pipeline/AutoAlignReport/reports/";
 	private static String reportsDir = "/tomato/job/autoaligner/reports/";
+	//laptop private static String reportsDir = "/Users/darren/Desktop/novoalignerTestDir/reports/";
 	private HashMap<String, String> genomeIndex;
 	private static boolean doNotAlign = false;
 	private static boolean isSmallRNA = false;
@@ -154,9 +158,10 @@ public class AutoNovoaligner {
 						s.setAnalysisNumber(analysisNumber);
 						hm.put(s.getRequestNumber(), analysisNumber);
 					}
-					else {
-						s.setAnalysisNumber(analysisNumber);
+					else if (hm.containsKey(s.getRequestNumber())) {
+						s.setAnalysisNumber(hm.get(s.getRequestNumber()));
 					}
+					this.createCmdFile(s);
 				}
 			}
 		}
@@ -165,9 +170,7 @@ public class AutoNovoaligner {
 
 		//move the parsed fresh data report to the processedReports folder
 		File file = new File(freshDataReport);
-		//bio3 boolean success = file.renameTo(new File(parsedFreshDataReports + freshDataReport.substring(47)));
-		boolean success = file.renameTo(new File(parsedFreshDataReports + freshDataReport.substring(32)));
-		//laptop boolean success = file.renameTo(new File(parsedFreshDataReports + freshDataReport.substring(49)));
+		boolean success = file.renameTo(new File(parsedFreshDataReports + file.getName()));
 		if (!success) {
 			System.out.println("Error moving parsed fresh data report to the parsed directory.");
 		}
@@ -177,7 +180,7 @@ public class AutoNovoaligner {
 	 * Runs an external shell script, writing params to stdin and collecting output in stderr/stdout. 
 	 * The method grabs a new analysis number in GNomEx for each unique request number that has 
 	 * a matching novoindex in the tomato/data directory. New analysis reports and their corresponding
-	 * experiment numbers are linked. 
+	 * experiment numbers are linked. Makes the new directory after fetching the new analysis number.
 	 * @param s
 	 * @throws IOException
 	 */
@@ -187,6 +190,7 @@ public class AutoNovoaligner {
 		InputStream stderr = null;
 		InputStream stdout = null;
 		String analysisNum = null;
+		String analysisPath = null;
 
 		//feed input params into string array
 		String cmd[] = {"./httpclient_create_analysis.sh", "-properties", "gnomex_httpclient.properties", 
@@ -197,6 +201,7 @@ public class AutoNovoaligner {
 		//launch the script and grab stdin/stdout and stderr
 		//bio3 Process process = Runtime.getRuntime().exec(cmd, null, new File("/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData/"));
 		Process process = Runtime.getRuntime().exec(cmd, null, new File("/tomato/job/autoaligner/autoAlignerData/"));
+		//laptop Process process = Runtime.getRuntime().exec(cmd, null, new File("/Users/darren/Desktop/novoalignerTestDir/create_analysis/"));
 		stderr = process.getErrorStream();
 		stdout = process.getInputStream();
 
@@ -218,11 +223,25 @@ public class AutoNovoaligner {
 					//System.out.println(s.getAnalysisNumber());
 				}
 			}
+			//capture path for new analysis report
+			String matchPath = "/\\w+";
+			Pattern p = Pattern.compile(matchPath);
+			Matcher m = p.matcher(line);
+			if (m.find()) {
+				//set the path in sample object
+				analysisPath = m.group();
+				s.setAnalysisNumberPath(analysisPath);
+			}
 			//clean this up so it reports an exception and then continues
+		}
+		//make the new analysis report dir
+		boolean success = (new File(s.getAnalysisNumberPath()).mkdir());
+		if (!success) {
+			System.out.println("\nproblem creating new analysis report directory.");
 		}
 		brCleanup.close();
 		//call method that creates the cmd.txt file
-		this.createCmdFile(s);
+		//this.createCmdFile(s);
 		return analysisNum;
 	}
 
@@ -241,7 +260,8 @@ public class AutoNovoaligner {
 		if (s.getSequencingApplicationCode().toString().equals("APP2") || 
 				s.getSequencingApplicationCode().toString().equals("APP3") || 
 				s.getSequencingApplicationCode().toString().equals("MRNASEQ") || 
-				s.getSequencingApplicationCode().toString().equals("SMRNASEQ")) {
+				s.getSequencingApplicationCode().toString().equals("SMRNASEQ") || 
+				s.getSequencingApplicationCode().toString().equals("DMRNASEQ")) {
 			s.setSequencingApplicationCode("_MRNASEQ_");
 		}
 		else if (s.getSequencingApplicationCode().toString().equals("APP1") || 
@@ -250,7 +270,8 @@ public class AutoNovoaligner {
 				s.getSequencingApplicationCode().toString().equals("APP4") || 
 				s.getSequencingApplicationCode().toString().equals("DNASEQ") || 
 				s.getSequencingApplicationCode().toString().equals("APP5") || 
-				s.getSequencingApplicationCode().toString().equals("CHIPSEQ")) {
+				s.getSequencingApplicationCode().toString().equals("CHIPSEQ") ||
+				s.getSequencingApplicationCode().toString().equals("MONNUCSEQ")) {
 			s.setSequencingApplicationCode("_DNASEQ");
 		}
 		else if (s.getSequencingApplicationCode().toString().equals("APP6")) {
@@ -383,15 +404,24 @@ public class AutoNovoaligner {
 	 * @throws InterruptedException 
 	 */
 	public String getCmdFileMsgGen(Sample s) throws IOException, InterruptedException {
-
-		//path for input fastq file
-		String inputFile = "/Repository/MicroarrayData/" + s.getRequestYear() + "/" + s.getRequestNumber()
-				+ "/Fastq/" + s.getSampleID() + "_*.txt.gz";
+		
+		//paths for soft linking input fastq files
+		String target = "/Repository/MicroarrayData/" + s.getRequestYear() + "/" + s.getRequestNumber()
+		+ "/Fastq/" + s.getSampleID() + "_*.txt.gz";
+		//laptop String target = "/Users/darren/Desktop/novoalignerTestDir/foo.sh";
+		String dest = tomatoJobDir + s.getRequestNumber() + "/" + s.getSampleID() + "/";
+		//laptop String dest = "/Users/darren/Desktop/novoalignerTestDir/testStuff/";
+		
+		//set name for input fastq file
+		String inputFile = s.getSampleID() + "_*.txt.gz";
+		
+		Process process = Runtime.getRuntime().exec(new String[] {"ln", "-s", target, dest});
+		
 		//set string for non-variable part of cmd.txt params
 		String msg = "#e " + myEmail + " -ef" + "\n#a " + s.getAnalysisNumber() + "\n## Novoalignments of " 
 				+ s.getRequestNumber() + " " + s.getProjectName() + "\n## Aligning to " 
-				+ s.getBuildCode() + " for " + s.getRequester() + " in the " + s.getLab() + "Lab " + "\n\n@align -novoalign " + 
-				"-g " + s.getNovoindex() + " -i " + inputFile + " -gzip ";
+				+ s.getBuildCode() + " for " + s.getRequester() + " in the " + s.getLab() + "Lab "
+				+ "\n\n@align -novoalign " + "-g " + s.getNovoindex() + " -i " + inputFile + " -gzip ";
 		//command string for splitting bisulfite files and preparing dirs for alignment
 		//***TODO substitute requester email for mine when I know it works***
 		String bisulfiteMsg = "#e" + myEmail + " -ef" + "\n#a " + s.getAnalysisNumber() + "\n## Splitting bisulfite fastq files of " 
