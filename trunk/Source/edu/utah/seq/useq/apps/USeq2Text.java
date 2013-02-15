@@ -238,13 +238,25 @@ public class USeq2Text {
 					}
 					//call appropriate maker
 					//Position
-					if (USeqUtilities.POSITION.matcher(extension).matches()) new PositionData (dis, si).writePositionScore(out);
+					if (USeqUtilities.POSITION.matcher(extension).matches()) {
+						System.out.println("POSITION");
+						new PositionData (dis, si).writePositionScore(out);
+					}
 					//PositionScore
-					else if (USeqUtilities.POSITION_SCORE.matcher(extension).matches()) new PositionScoreData (dis, si).writePositionScore(out);
+					else if (USeqUtilities.POSITION_SCORE.matcher(extension).matches()) {
+						System.out.println("POSITION_SCORE");
+						new PositionScoreData (dis, si).writePositionScore(out);
+					}
 					//PositionText
-					else if (USeqUtilities.POSITION_TEXT.matcher(extension).matches()) new PositionTextData (dis, si).writePositionScore(out);
+					else if (USeqUtilities.POSITION_TEXT.matcher(extension).matches()) {
+						System.out.println("POSITION_TEXT");
+						new PositionTextData (dis, si).writePositionScore(out);
+					}
 					//PositionScoreText
-					else if (USeqUtilities.POSITION_SCORE_TEXT.matcher(extension).matches()) new PositionScoreTextData (dis, si).writePositionScore(out);
+					else if (USeqUtilities.POSITION_SCORE_TEXT.matcher(extension).matches()) {
+						System.out.println("POSITION_SCORE_TEXT");
+						new PositionScoreTextData (dis, si).writePositionScore(out);
+					}
 					else  throw new IOException("\nThis USeq archive looks like it contains region data, not graph data.  Use the native text or bed file output option. \n");
 					dis.close();
 				}
@@ -377,12 +389,33 @@ public class USeq2Text {
 				else lastPosition = pos;
 				out.print(pos); out.print(tab); 
 				
+				
 				pos = positions[next]+1;
 				if (pos < lastPosition) pos = lastPosition;
 				else lastPosition = pos;
 				
 				out.print(pos); out.print(tab); 
 				out.println(scores[i]);
+			} else {
+				//look to see if next position is one off
+				if ((positions[next]-1) == positions[i]){
+					//zero?
+					if (skipZeroBlockBedGraphs && scores[i] == 0) continue;
+					out.print(chromosome); out.print(tab); 
+					
+					//check position
+					int pos = positions[i];
+					if (pos < lastPosition) pos = lastPosition;
+					else lastPosition = pos;
+					out.print(pos); out.print(tab); 
+					
+					pos = positions[next]+1;
+					if (pos < lastPosition) pos = lastPosition;
+					else lastPosition = pos;
+					
+					out.print(pos); out.print(tab); 
+					out.println(scores[i]);
+				}
 			}
 		}
 	}
