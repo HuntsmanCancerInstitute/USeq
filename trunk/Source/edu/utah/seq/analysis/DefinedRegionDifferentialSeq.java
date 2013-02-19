@@ -1682,16 +1682,14 @@ public class DefinedRegionDifferentialSeq {
 				"-e Minimum number alignments per gene/ region, defaults to 20.\n"+
 				"-i Score introns instead of exons.\n"+
 				"-p Perform a stranded analysis. Only collect reads from the same strand as the\n" +
-				"      annotation." +
-				"-a Perform a permutation based chi-square test for differential exon usage.\n"+
-				"      Needs 4 or more replicas per condition.\n"+
-				"-t Don't delete temp files (R script, R results, Rout, etc..).\n"+
+				"      annotation.\n" +
 				"-j Reverse stranded analysis.  Only collect reads from the opposite strand of the\n" +
 				"      annotation.  This setting should be used for the Illumina's strand-specific dUTP protocol.\n" +
 				"-k Second read flipped. This setting can be used to flip the strand of the second read in a pair.\n" +
-				"      This setting makes it easier to view in IGB, but can break other downstream applications. Do \n" +
-				"      not use this setting if you use IGV as your genome browser.\n"+	
-				
+				"      This setting makes it easier to view in IGB, but can break other downstream applications.\n" +
+				"-a Perform a permutation based chi-square test for differential exon usage.\n"+
+				"      Needs 4 or more replicas per condition.\n"+
+				"-t Don't delete temp files (R script, R results, Rout, etc..).\n"+
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/DefinedRegionDifferentialSeq -c\n" +
