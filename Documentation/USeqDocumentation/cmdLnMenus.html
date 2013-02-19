@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus tim_ep
+			<html><head><title>USeq Command Line Menus drds_v2
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -43,9 +43,13 @@
 				
 					<a href="#BisStatRegionMaker">BisStatRegionMaker</a><br>
 				
+					<a href="#CalculatePerCycleErrorRate">CalculatePerCycleErrorRate</a><br>
+				
 					<a href="#ChIPSeq">ChIPSeq</a><br>
 				
 					<a href="#CHPCAligner">CHPCAligner</a><br>
+				
+					<a href="#CompareIntersectingRegions">CompareIntersectingRegions</a><br>
 				
 					<a href="#CompareParsedAlignments">CompareParsedAlignments</a><br>
 				
@@ -130,6 +134,8 @@
 					<a href="#MaskExonsInFastaFiles">MaskExonsInFastaFiles</a><br>
 				
 					<a href="#MaskRegionsInFastaFiles">MaskRegionsInFastaFiles</a><br>
+				
+					<a href="#MergePairedSamAlignments">MergePairedSamAlignments</a><br>
 				
 					<a href="#MergePointData">MergePointData</a><br>
 				
@@ -231,11 +237,11 @@
 				
 					<a href="#USeq2Text">USeq2Text</a><br>
 				
+					<a href="#VCFTabix">VCFTabix</a><br>
+				
 					<a href="#Wig2Bar">Wig2Bar</a><br>
 				
 					<a href="#Wig2USeq">Wig2USeq</a><br>
-				
-					<a href="#TcrDriver">TcrDriver</a><br>
 				
 					<a href="#ScoreMethylatedRegions">ScoreMethylatedRegions</a><br>
 				
@@ -650,6 +656,23 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/BisStatRegionMaker -m 0.8 -x 1.0 -g 1
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="CalculatePerCycleErrorRate"><pre>**************************************************************************************
+**                        Calculate Per Cycle Error Rate : Jan 2013                 **
+**************************************************************************************
+Calculates per cycle error rates provided a sorted indexed bam file and a fasta
+sequence file. Only checks CIGAR M bases not masked or INDEL bases.
+
+Required Options:
+-b Full path to a coordinate sorted bam file (xxx.bam) or directory containing such.
+      Multiple files are processed independently.
+-f Full path to the fasta file you wish to use in calculating the per cycle error rate.
+
+Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate -b /Data/Bam/
+     -f /Fastas/chrPhiX_Illumina.fasta.gz 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="ChIPSeq"><pre>**************************************************************************************
 **                                  ChIPSeq: April 2012                             **
 **************************************************************************************
@@ -746,6 +769,24 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/CHPCAlign  -p '-F ILMFQ -t60 -rRandom
     -a /mnt/hci-ma/AnalysisData/2010/A115  -w 6 -e nix@gmail.com -t -b 
 
 **************************************************************************************
+</pre><br><p>
+				
+					<a name="CompareIntersectingRegions"><pre>**************************************************************************************
+**                        Compare Intersecting Regions: Nov 2012                    **
+**************************************************************************************
+Compares test region file(s) against a master set of regions for intersection.
+Reports the results as columns relative to the master. Assumes interbase coordinates.
+
+Options:
+-m Full path for the master bed file (tab delim: chr start stop ...).
+-t Full path to the test bed file to intersect or directory of files.
+-g Maximum bp gap allowed for scoring an intersection, defaults to 0 bp. Negative gaps
+     force overlaps, positive gaps allow non intersecting bases between regions.
+
+Example: java -Xmx4G -jar pathTo/Apps/CompareIntersectingRegions -g 1000
+        -m /All/mergedRegions.bed.gz -t /IndividualERs/
+
+************************************************************************************
 </pre><br><p>
 				
 					<a name="CompareParsedAlignments"><pre>**************************************************************************************
@@ -992,8 +1033,11 @@ Advanced Options:
 -e Minimum number alignments per gene/ region, defaults to 20.
 -i Score introns instead of exons.
 -p Perform a stranded analysis. Only collect reads from the same strand as the
-      annotation. Note for paired data, the second read in a pair is assumed to
-      be on the same strand as the first. See the SamTranscriptomeParser.
+      annotation.
+-j Reverse stranded analysis.  Only collect reads from the opposite strand of the
+      annotation.  This setting should be used for the Illumina's strand-specific dUTP protocol.
+-k Second read flipped. This setting can be used to flip the strand of the second read in a pair.
+      This setting makes it easier to view in IGB, but can break other downstream applications.
 -a Perform a permutation based chi-square test for differential exon usage.
       Needs 4 or more replicas per condition.
 -t Don't delete temp files (R script, R results, Rout, etc..).
@@ -1181,13 +1225,14 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/ElandSequenceParser -v hg18 -c 90
 </pre><br><p>
 				
 					<a name="ExportExons"><pre>**************************************************************************************
-**                              Export Exons    June 2009                          **
+**                              Export Exons    Jan 2013                            **
 **************************************************************************************
 EE takes a UCSC Gene table and prints the exons to a bed file.
 
 Parameters:
 -g Full path file text for the UCSC Gene table.
 -a Expand the size of each exon by X bp, defaults to 0
+-u Remove UTRs if present, defaults to including
 
 Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportExons -g /user/Jib/ucscPombe.txt
       -a 50
@@ -1710,6 +1755,42 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MaskRegionsInFastaFiles -f
       /Genomes/Hg18/MaskedFastas/
 
 ************************************************************************************
+</pre><br><p>
+				
+					<a name="MergePairedSamAlignments"><pre>**************************************************************************************
+**                          MergePairedSamAlignments: Dec 2012                      **
+**************************************************************************************
+Merges proper paired alignments that pass a variety of checks and thresholds. Only
+unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps
+avoid non-independent variant observations and other double counting issues. Identical
+overlapping bases are assigned the higher quality scores. Disagreements are resolved
+toward the higher quality base. If too close in quality, then the quality is set to 0.
+Be certain your input bam/sam file(s) are sorted by query name, NOT coordinate. 
+
+Options:
+-f The full path file or directory containing raw xxx.sam(.gz/.zip OK)/.bam file(s)
+      paired alignments that are sorted by query name (standard novoalign output).
+      Multiple files will be merged.
+
+Default Options:
+-s Save file, defaults to that inferred by -f. If an xxx.sam extension is provided,
+      the alignments won't be sorted by coordinate and saved as a bam file.
+-a Maximum alignment score (AS:i: tag). Defaults to 120, smaller numbers are more
+      stringent. Approx 30pts per mismatch for novoalignments.
+-q Minimum mapping quality score, defaults to 13, larger numbers are more stringent.
+      Set to 0 if processing splice junction indexed RNASeq data.
+-r The second paired alignment's strand is reversed. Defaults to not reversed.
+-d Maximum acceptible base pair distance for merging, defaults to 5000.
+-m Don't cross check read mate coordinates, needed for merging repeat matches. Defaults
+      to checking.
+-o Merge all proper paired alignments. Defaults to only merging those that overlap.
+-k Skip merging paired alignments. Defaults to merging. Useful for testing effect of
+      merging on downstream analysis.
+
+Example: java -Xmx1500M -jar pathToUSeq/Apps/MergePairedSamAlignments -f /Novo/Run7/
+     -c -s /Novo/STPParsedBams/run7.bam -d 10000 
+
+**************************************************************************************
 </pre><br><p>
 				
 					<a name="MergePointData"><pre>**************************************************************************************
@@ -2369,23 +2450,24 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/ReadCoverage -p
 </pre><br><p>
 				
 					<a name="RNAEditingPileUpParser"><pre>**************************************************************************************
-**                            RNA Editing PileUp Parser: Jan 2012                       **
+**                          RNA Editing PileUp Parser: Dec 2012                     **
 **************************************************************************************
 Parses a SAMTools mpileup output file for refseq A bases that show evidence of
-RNA editing via conversion to Gs, stranded. Bases passing the thresholds are
-written to file in bar format for viewing in IGB and subsequent clustering with
-the RNAEditingScanSeqs app.
+RNA editing via conversion to Gs, stranded. Base fraction editing is calculated for
+bases passing the thresholds for viewing in IGB and subsequent clustering with
+the RNAEditingScanSeqs app. The parsed PointData can be further processed using the
+methylome analysis applications.
 
 Options:
--p Path to pileup file (.gz or.zip OK) or directory containing such. Multiple files
-      are processed independently.
+-p Path to a mpileup file (.gz or.zip OK, use 'samtools mpileup -Q 13 -A -B' params).
 -v Versioned Genome (ie H_sapiens_Mar_2006), see UCSC Browser,
       http://genome.ucsc.edu/FAQ/FAQreleases.
+-s Save directory, full path, defaults to pileup file directory.
 -r Minimum read coverage, defaults to 5.
 -f Minimum fraction edited base, defaults to 0.01
 
-Example: java -Xmx4G -jar pathTo/USeq/Apps/RNAEditingPileUpParser -p /Pileups/
-      -v C_elegans_May_2008
+Example: java -Xmx4G -jar pathTo/USeq/Apps/RNAEditingPileUpParser -p 
+      /Pileups/N2.mpileup.gz -v C_elegans_Oct_2010
 
 **************************************************************************************
 </pre><br><p>
@@ -2437,6 +2519,12 @@ Options:
        SAM (.gz/.zip OK) files.
 -c Control alignment file directory, ditto.  
 -n Data is stranded. Only analyze reads from the same strand as the annotation.
+-j Reverse stranded analysis.  Only count reads from the opposite strand of the
+       annotation.  This setting should be used for the Illumina's strand-specific dUTP protocol.
+-k Second read flipped. This setting can be used to flip the strand of the second read in a pair.
+       This setting makes it easier to view in IGB, but can break other downstream applications.
+-x Max per base alignment depth, defaults to 50000. Genes containing such high
+       density coverage are ignored. Warnings are thrown.
 -v Genome version (e.g. H_sapiens_Feb_2009, M_musculus_Jul_2007), see UCSC FAQ,
       http://genome.ucsc.edu/FAQ/FAQreleases.
 -g UCSC RefFlat or RefSeq gene table file, full path. Tab delimited, see RefSeq Genes
@@ -2521,7 +2609,7 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/Sam2Fastq -a /SAM/unaligned.sam.gz -f
 </pre><br><p>
 				
 					<a name="Sam2USeq"><pre>**************************************************************************************
-**                                Sam 2 USeq : Aug 2012                             **
+**                                Sam 2 USeq : Dec 2012                             **
 **************************************************************************************
 Generates per base read depth stair-step graph files for genome browser visualization.
 By default, values are scaled per million mapped reads with no score thresholding. Can
@@ -2544,29 +2632,37 @@ Default Options:
       total number of genome wide alignments for that read.  Repeat alignments are
       thus given fractional count values at a given location. Requires that the IH
       tag was set.
+-b Path to a region bed file (tab delim: chr start stop ...) to use in calculating
+      read coverage statistics.  Be sure these do not overlap! Run the MergeRegions app
+      if in doubt.
 -c Print regions that meet a minimum # counts, defaults to 0, don't print.
 -l Print regions that also meet a minimum length, defaults to 0.
 
 Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r
-     -v H_sapiens_Feb_2009 -s
+     -v H_sapiens_Feb_2009 -b ccdsExons.bed.gz 
 
 **************************************************************************************
 </pre><br><p>
 				
 					<a name="SamAlignmentExtractor"><pre>**************************************************************************************
-**                            Sam Alignment Extractor: Aug 2012                     **
+**                            Sam Alignment Extractor: Jan 2013                     **
 **************************************************************************************
 Given a bed file containing regions of interest, parses all of the intersecting sam
 alignments.
 
-Required Options:
+Options:
 -a Alignment directory containing one or more xxx.bam files with their associated
        xxx.bai indexs sorted by coordinate.
 -b A bed file (chr, start, stop,...), full path, see,
        http://genome.ucsc.edu/FAQ/FAQformat#format1
+-s Optional File for saving extracted alignments, must end in .sam. Defaults to a
+       permutation of the bed file.
+-i Minimum read depth, defaults to 1
+-x Maximum read depth, defaults to unlimited
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/SamAlignmentExtractor -a
-      /Data/ExonCaptureAlignmentsX1/ -b /Data/SNPCalls/9484X1Calls.bed.gz 
+      /Data/ExonCaptureAlignmentsX1/ -b /Data/SNPCalls/9484X1Calls.bed.gz -x
+      /Data/9484X1Calls.sam
 
 **************************************************************************************
 </pre><br><p>
@@ -2596,7 +2692,7 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/SamParser -f /Novo/Run7/
 </pre><br><p>
 				
 					<a name="SamTranscriptomeParser"><pre>**************************************************************************************
-**                          Sam Transcriptome Parser: July 2012                     **
+**                          Sam Transcriptome Parser: Dec 2012                      **
 **************************************************************************************
 STP takes SAM alignment files that were aligned against chromosomes and extended
 splice junctions (see MakeTranscriptome app), converts the coordinates to genomic
@@ -2611,23 +2707,27 @@ Options:
 Default Options:
 -s Save file, defaults to that inferred by -f. If an xxx.sam extension is provided,
       the alignments won't be sorted by coordinate or saved as a bam file.
--a Maximum alignment score. Defaults to 60, smaller numbers are more stringent.
+-a Maximum alignment score. Defaults to 90, smaller numbers are more stringent.
       Approx 30pts per mismatch.
 -m Minimum mapping quality score, defaults to 0 (no filtering), larger numbers are
-      more stringent. Only applys to genomic matches, not splice junctions. Set to 13
+      more stringent. Only applies to genomic matches, not splice junctions. Set to 13
       or more to require near unique alignments.
 -n Maximum number of locations each read may align, defaults to 1 (unique matches).
 -d If the maximum number of locations threshold fails, save one randomly picked repeat
       alignment per read.
--o Don't reverse the strand of the second paired alignment. Reversing the strand is
+-r Reverse the strand of the second paired alignment. Reversing the strand is
       needed for proper same strand visualization of paired stranded Illumina data.
 -u Save unmapped reads and those that fail the alignment score.
 -c Don't remove chrAdapt and chrPhiX alignments.
--r Full path to a txt file containing a sam header, defaults to autogenerating the
+-p Merge proper paired unique alignments. Those that cannot be unambiguously merged
+      are left as pairs. Recommended to avoid double counting errors and increase
+      base calling accuracy. 
+-q Maximum acceptable  base pair distance for merging, defaults to 300000.
+-h Full path to a txt file containing a sam header, defaults to autogenerating the
       header from the read data.
 
 Example: java -Xmx1500M -jar pathToUSeq/Apps/SamTranscriptomeParser -f /Novo/Run7/
-     -m 20 /Novo/STPParsedBamFiles/run7.bam -u 
+     -m 20 -s /Novo/STPParsedBams/run7.bam -p -r 
 
 **************************************************************************************
 </pre><br><p>
@@ -3032,7 +3132,7 @@ Indexes for common formats:
 </pre><br><p>
 				
 					<a name="UCSCBig2USeq"><pre>**************************************************************************************
-**                              UCSC Big 2 USeq: May 2012                           **
+**                              UCSC Big 2 USeq: Jan 2013                           **
 **************************************************************************************
 Converts UCSC bigWig (xxx.bw) or bigBed (xxx.bb) archives to xxx.useq archives.
 
@@ -3045,6 +3145,9 @@ Options:
 -v Genome version (e.g. H_sapiens_Mar_2006), get from UCSC Browser,
       http://genome.ucsc.edu/FAQ/FAQreleases or IGB 
       http://bioviz.org/igb/releases/current/igb-large.jnlp
+-f Force conversion of xxx.bw or xxx.bb overwriting any existing xxx.useq archives.
+       Defaults to skipping those already converted.
+-e Only print error messages.
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/USeq2UCSCBig -v M_musculus_Jul_2007 -u
       /AnalysisResults/USeqDataArchives/ -d /MyApps/UCSC/
@@ -3053,7 +3156,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/USeq2UCSCBig -v M_musculus_Jul_2007 -
 </pre><br><p>
 				
 					<a name="USeq2UCSCBig"><pre>**************************************************************************************
-**                              USeq 2 UCSC Big: Oct 2012                           **
+**                              USeq 2 UCSC Big: Jan 2013                           **
 **************************************************************************************
 Converts USeq archives to UCSC bigWig (xxx.bw) or bigBed (xxx.bb) archives based on
 the data type. WARNING: bigBed format conversion will clip any associated scores to
@@ -3064,6 +3167,9 @@ Options:
        if a directory is given.
 -d Full path directory containing the UCSC wigToBigWig and bedToBigBed apps, download
        from http://hgdownload.cse.ucsc.edu/admin/exe/ and make executable with chmod.
+-f Force conversion of xxx.useq to xxx.bw or xxx.bb overwriting any UCSC big files.
+       Defaults to skipping those already converted.
+-e Only print error messages.
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/USeq2UCSCBig -u
       /AnalysisResults/USeqDataArchives/ -d /Apps/UCSC/
@@ -3086,6 +3192,25 @@ Options:
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/USeq2Text -f
       /AnalysisResults/USeqDataArchives/ 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCFTabix"><pre>**************************************************************************************
+**                                VCFTabix: Jan 2013                                **
+**************************************************************************************
+Converts vcf files to a SAMTools compressed vcf tabix format. Recursive.
+
+Required Options:
+-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s). Recursive!
+-t Full path tabix directory containing the compiled bgzip and tabix executables. See
+      http://sourceforge.net/projects/samtools/files/tabix/
+-f Force overwriting of existing indexed vcf files, defaults to skipping.
+-d Do not delete non gzipped vcf files after successful indexing, defaults to deleting.
+-e Only print error messages.
+
+Example: java -jar pathToUSeq/Apps/VCFTabix -v /VarScan2/VCFFiles/
+     -t /Samtools/Tabix/tabix-0.2.6/ 
 
 **************************************************************************************
 </pre><br><p>
@@ -3131,21 +3256,6 @@ Example: java -Xmx1G -jar path2/Apps/Wig2USeq -f /WigFiles/ -v H_sapiens_Feb_200
 
 **************************************************************************************
 </pre><br><p>
-				
-					<a name="TcrDriver"><pre>************************************************************************************************
-
-
-TcrDriver:  This software merges TCRs into groups.  The software first identifies the V and J regions.  The software then attempts to identify the conserved Cys in the V region and Phe in the J region. If found, the software merges TCRs that are similar between the Cys and Phe bases.  If not found, the software merges TCRs from the start to the end of the sequence.  Aside from TCR classifion, the software generates plots that show TCR length distribution
-
-
-Arguments:
-
-1) V region sequence file:  The sequences should start at the same location as the primer sequences
-2) J region sequence file:  The sequences should start at the same locaiton as the primer seqeunces
-3) TCR sequences file: Sequences should be in fastq format.
-4) Output Prefix.  Prefix of the the output files.
-5) Alignment Score. Identity scores at which TCRs are merged.
-************************************************************************************************</pre><br><p>
 				
 					<a name="ScoreMethylatedRegions"><pre>**************************************************************************************
 **                        Score Methylated Regions: March 2012                      **

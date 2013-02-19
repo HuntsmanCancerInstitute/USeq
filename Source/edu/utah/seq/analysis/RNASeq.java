@@ -740,6 +740,12 @@ public class RNASeq {
 				"       SAM (.gz/.zip OK) files.\n" +
 				"-c Control alignment file directory, ditto.  \n" +
 				"-n Data is stranded. Only analyze reads from the same strand as the annotation.\n"+
+				"-j Reverse stranded analysis.  Only count reads from the opposite strand of the\n" +
+				"       annotation.  This setting should be used for the Illumina's strand-specific dUTP protocol.\n" +
+				"-k Second read flipped. This setting can be used to flip the strand of the second read in a pair.\n" +
+				"       This setting makes it easier to view in IGB, but can break other downstream applications.\n" +
+				"-x Max per base alignment depth, defaults to 50000. Genes containing such high\n"+
+				"       density coverage are ignored. Warnings are thrown.\n"+
 				"-v Genome version (e.g. H_sapiens_Feb_2009, M_musculus_Jul_2007), see UCSC FAQ,\n"+
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
 				"-g UCSC RefFlat or RefSeq gene table file, full path. Tab delimited, see RefSeq Genes\n"+
@@ -752,12 +758,7 @@ public class RNASeq {
 				"       transcripts to genes. See the RNASeq usage guide for details.\n"+
 				"-r Full path to R, defaults to '/usr/bin/R'. Be sure to install Ander's DESeq\n" +
 				"       (http://www-huber.embl.de/users/anders/DESeq/) R library.\n"+
-				"-j Reverse stranded analysis.  Only count reads from the opposite strand of the\n" +
-				"       annotation.  This setting should be used for the Illumina's strand-specific dUTP protocol.\n" +
-				"-k Second read flipped. This setting can be used to flip the strand of the second read in a pair.\n" +
-				"       This setting makes it easier to view in IGB, but can break other downstream applications. Do\n" +
-				"-x Max per base alignment depth, defaults to 50000. Genes containing such high\n"+
-				"       density coverage are ignored. Warnings are thrown.\n"+
+				
 				
 				"\nAdvanced Options:\n"+
 				"-m Combine replicas and run single replica analysis using binomial based statistics,\n" +

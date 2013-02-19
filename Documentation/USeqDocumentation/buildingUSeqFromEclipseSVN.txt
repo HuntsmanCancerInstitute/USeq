@@ -30,14 +30,12 @@ Build From Eclipse
 4) Point eclipse to your ant installation (one time only).  Select from menu: 'Eclipse->Preferences->Ant->Runtime'. Click on the 'Ant Home' button and select the Ant installation directory (see step 1)
 5) Navigate to build.properties and change version to 'TestRelease1.0'
 6) Navigate to build.xml, right click on 'build-release' under the Outline View Tab and select 'Run As->Ant Build'
-7) Enjoy the magic.
 
 Build from command line
 
 4) Navigate to USeq directory.
 5) open build.properties and change version to 'TestRelease1.0'
 6) type 'ant' on the command line
-7) Embrace the magic.
 
 *Users can setup custom build tasks to make deployment to a server easier (See mosbruger-release).  Custom tasks can be executed with in Eclipse or run on the command line by typing: 'ant mosbruger-release'.
 
