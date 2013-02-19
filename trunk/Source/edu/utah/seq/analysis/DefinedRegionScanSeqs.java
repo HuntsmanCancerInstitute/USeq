@@ -11,6 +11,8 @@ import edu.utah.seq.data.*;
 
 /**Takes PointData and generates defined window scan statistics. See the help screen info below.
  * @author Nix
+ * 
+ * Modified: 2013/02/19: tmosbruger: Reports max coverage position when run on a single sampleset.
  * */
 public class DefinedRegionScanSeqs {
 
@@ -381,7 +383,7 @@ public class DefinedRegionScanSeqs {
 				}
 			}
 			else{
-				out.println("Sum\tSum+\tSum-\tTotalRegionBPs\tRPKM\t"+misc);
+				out.println("Sum\tSum+\tSum-\tTotalRegionBPs\tRPKM\tMaxPos\t"+misc);
 				for (int i=0; i< allGeneLines.length; i++){
 					String name;
 					if (allGeneLines[i].getDisplayName() !=null) name = allGeneLines[i].getDisplayName();
@@ -394,7 +396,7 @@ public class DefinedRegionScanSeqs {
 					//print second text?
 					if (allGeneLines[i].getDisplayName() !=null) out.print(allGeneLines[i].getName()+"\t");
 					float[] s = allGeneLines[i].getScores();
-					out.println(allGeneLines[i].coordinates()+"\t"+s[0]+"\t"+ s[1]+"\t"+ s[2]+"\t"+ s[3]+"\t"+ s[4]);
+					out.println(allGeneLines[i].coordinates()+"\t"+s[0]+"\t"+ s[1]+"\t"+ s[2]+"\t"+ s[3]+"\t"+ s[4] + "\t" + (int)s[5] );
 				}
 			}
 			out.close();
@@ -845,8 +847,14 @@ public class DefinedRegionScanSeqs {
 		//get UCSCGeneLine[]
 		UCSCGeneLine[] genes = geneModels.get(chromosome);
 
+		
+		
 		//for each gene 
 		for (int i=0; i< genes.length; i++){
+			//Largest Point
+			float max = 0;
+			float position = 0;
+			
 			//calculate totals
 			ExonIntron[] exons = genes[i].getExons();
 			//fetch scores
@@ -857,13 +865,29 @@ public class DefinedRegionScanSeqs {
 				int start = exons[j].getStart();
 				int stop = exons[j].getEnd();
 				totalBPs += stop - start;
+				float coverage = 0;
+				for (int k=start;k<stop;k++) {
+					float plusScore = 0;
+					float minusScore = 0;
+					if (treatmentChromPlus != null) {
+						plusScore = treatmentChromPlus.sumScoreBP(k,k+1);
+					}
+					if (treatmentChromMinus != null) {
+						minusScore = treatmentChromMinus.sumScoreBP(k,k+1);
+					}
+					coverage = plusScore + minusScore;
+					if (coverage > max) {
+						max = coverage;
+						position = k;
+					}
+				}
 				if (treatmentChromPlus != null) tSumPlus += treatmentChromPlus.sumScoreBP(start, stop); 
 				if (treatmentChromMinus != null)tSumMinus += treatmentChromMinus.sumScoreBP(start, stop); 
 			}
 			float tSum = tSumPlus+ tSumMinus;
 			float rpkm = calculateRPKM(millionMappedTreatmentReads, totalBPs, tSum);
 			//scores = tSum, tSumPlus,tSumMinus, total region bps, rpkm
-			float[] scores = new float[]{tSum,tSumPlus,tSumMinus, totalBPs, rpkm};
+			float[] scores = new float[]{tSum,tSumPlus,tSumMinus, totalBPs, rpkm,position};
 			//make window
 			genes[i].setScores(scores);
 		}
