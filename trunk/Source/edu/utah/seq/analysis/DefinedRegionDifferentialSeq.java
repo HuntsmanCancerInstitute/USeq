@@ -36,10 +36,13 @@ public class DefinedRegionDifferentialSeq {
 	private boolean filterOutliers = false;
 	private float minimumSpliceLog2Ratio = 1f;
 	private boolean performStrandedAnalysis = false;
+	private boolean performReverseStrandedAnalysis = false;
 	private boolean usePermutationSpliceTest = false;
 	private int maxRepeats = 0;
 	private boolean verbose = true;
 	private int maxAlignmentsDepth = 50000;
+	private boolean secondStrandFlipped = false;
+	private boolean isPaired = false;
 	
 	//internal fields
 	private UCSCGeneLine[] genes;
@@ -89,7 +92,8 @@ public class DefinedRegionDifferentialSeq {
 	}
 
 	/**For integration with RNASeq app.*/
-	public DefinedRegionDifferentialSeq(File treatmentBamDirectory, File controlBamDirectory, String genomeVersion, File saveDirectory,  File fullPathToR, File processedRefSeqFile, boolean scoreIntrons, boolean performStrandedAnalysis, boolean verbose){
+	public DefinedRegionDifferentialSeq(File treatmentBamDirectory, File controlBamDirectory, String genomeVersion, File saveDirectory,  File fullPathToR, File processedRefSeqFile, boolean scoreIntrons, boolean performStrandedAnalysis, 
+			boolean verbose, boolean reverse, boolean flipped, int maxAlignDepth){
 		this.treatmentBamDirectory = treatmentBamDirectory;
 		this.controlBamDirectory = controlBamDirectory;
 		this.saveDirectory = saveDirectory;
@@ -102,7 +106,9 @@ public class DefinedRegionDifferentialSeq {
 		this.verbose = verbose;
 		removeOverlappingRegions = false;
 		saveCounts = false;
-
+		this.secondStrandFlipped = flipped;
+		this.performReverseStrandedAnalysis = reverse;
+		this.maxAlignmentsDepth = maxAlignDepth;
 		run();
 	}
 
@@ -132,7 +138,7 @@ public class DefinedRegionDifferentialSeq {
 		//launch cluster analysis
 		if (verbose) System.out.println("Clustering genes and samples, BETA, ...");
 		clusterDifferentiallyExpressedGenes();
-
+		
 		//print final spreadsheet for all genes
 		printStatSpreadSheet();
 
@@ -260,11 +266,26 @@ public class DefinedRegionDifferentialSeq {
 		Matcher mat = BAD_NAME.matcher(samReadName);
 		if (mat.matches()) samReadName = mat.group(1);
 		
-		if (workingFragNameIndex.containsKey(samReadName)) index = workingFragNameIndex.get(samReadName);
+		if (workingFragNameIndex.containsKey(samReadName)) {
+			index = workingFragNameIndex.get(samReadName);
+		}
 
 		else {
-			if (sam.getReadNegativeStrandFlag()) index = new Integer(workingFragmentNameIndexMinus--);
-			else index = new Integer(workingFragmentNameIndexPlus++);
+			if (!secondStrandFlipped && sam.getReadPairedFlag()) {
+				if ((sam.getFirstOfPairFlag() && sam.getReadNegativeStrandFlag()) || (!sam.getSecondOfPairFlag() && !(sam.getReadNegativeStrandFlag()))) {
+					 index = new Integer(workingFragmentNameIndexMinus--);
+				}
+				else {
+					index = new Integer(workingFragmentNameIndexPlus++);
+				}
+			} else {
+				if (sam.getReadNegativeStrandFlag()) {
+					index = new Integer(workingFragmentNameIndexMinus--);
+				} else {
+					index = new Integer(workingFragmentNameIndexPlus++);
+				}
+			}
+			
 			workingFragNameIndex.put(samReadName, index);
 		}
 		return new NameInteger (samReadName, index);
@@ -286,7 +307,8 @@ public class DefinedRegionDifferentialSeq {
 		//assumes each read (first or second) has the same name
 
 		//make reader
-		SAMFileReader reader = new SAMFileReader(replica.getBamFile());			
+		SAMFileReader reader = new SAMFileReader(replica.getBamFile());	
+	
 
 		//fetch chromName: length for all chroms
 		HashMap<String, Integer> chromLength = new HashMap<String, Integer>();
@@ -294,6 +316,7 @@ public class DefinedRegionDifferentialSeq {
 		for (SAMSequenceRecord sr: seqs) chromLength.put(sr.getSequenceName(), sr.getSequenceLength());
 
 		SAMRecordIterator iterator = reader.iterator();
+		
 		HashSet<String> priorChroms = new HashSet<String>();
 		String chrom = null;
 
@@ -309,7 +332,9 @@ public class DefinedRegionDifferentialSeq {
 			if (alignmentFails(sam)) continue;
 			chrom = sam.getReferenceName();
 			//if (chrom.equals("chr7") == false) continue;
-			if (chromGenes.containsKey(chrom) == false) continue;
+			if (chromGenes.containsKey(chrom) == false) {
+				continue;
+			}
 			if (verbose) System.out.print(".");			
 			priorChroms.add(chrom);
 			chrStartBp = sam.getUnclippedStart()-1;
@@ -318,7 +343,9 @@ public class DefinedRegionDifferentialSeq {
 			break;
 		}
 		//any data found?
-		if (bpNames == null) return;		
+		if (bpNames == null) {
+				return;
+		} 
 
 		//reset working fields
 		workingFragNameIndex.clear();
@@ -378,10 +405,11 @@ public class DefinedRegionDifferentialSeq {
 
 			}
 		}
-
 		//add last
 		if (verbose) System.out.println();
-		if (chromGenes.containsKey(sam.getReferenceName())) loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases);
+		if (chromGenes.containsKey(sam.getReferenceName())) {
+			loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases);
+		}
 
 		reader.close();
 		bpNames = null;
@@ -412,16 +440,18 @@ public class DefinedRegionDifferentialSeq {
 		int lengthBpNames = bpNames.length -1;
 
 		//for each gene in the chromosome 
-		UCSCGeneLine[] chrGenes = chromGenes.get(chromosome);	
+		UCSCGeneLine[] chrGenes = chromGenes.get(chromosome);
 
 		for (int i=0; i< chrGenes.length; i++){
 			//flagged gene
+			
 			if (chrGenes[i].isFlagged()) continue;
+			
 			
 			String geneName = chrGenes[i].getDisplayNameThenName();
 			boolean plusStrand = chrGenes[i].getStrand().equals("+");					
 			allReads.clear();
-
+			
 			//get exons
 			ExonIntron[] exons = chrGenes[i].getExons();
 			int[] exonCounts = new int[exons.length];
@@ -449,6 +479,10 @@ public class DefinedRegionDifferentialSeq {
 						if (performStrandedAnalysis){
 							for (Integer id : bpNames[y]){
 								if ((id > 0 && plusStrand == true) || (id < 0 && plusStrand == false )) exonReads.add(id);
+							}
+						} else if (performReverseStrandedAnalysis) {
+							for (Integer id: bpNames[y]) {
+								if ((id > 0 && plusStrand == false) || (id < 0 && plusStrand == true)) exonReads.add(id);
 							}
 						}
 						else exonReads.addAll(bpNames[y]);
@@ -1117,7 +1151,7 @@ public class DefinedRegionDifferentialSeq {
 				if (stats.length!=3) Misc.printErrAndExit("One of the DESeq stats R results rows is malformed -> "+line);
 				float[] scores = new float[stats.length];
 				for (int i=0; i< stats.length; i++) {
-					if (stats[i].equals("Inf") || stats[i].equals("NA")) scores[i] = Float.MIN_VALUE;
+					if (stats[i].equals("Inf") || stats[i].equals("NA") || stats[i].equals("-Inf")) scores[i] = Float.MIN_VALUE;
 					else scores[i] = Float.parseFloat(stats[i]);
 				}
 				//pval
@@ -1527,6 +1561,8 @@ public class DefinedRegionDifferentialSeq {
 					case 'v': filterOutliers = true; break;
 					case 'g': genomeVersion = args[++i]; break;
 					case 'a': usePermutationSpliceTest = true; break;
+					case 'j': performReverseStrandedAnalysis = true; break;
+					case 'k': secondStrandFlipped = false; break;
 					case 'h': printDocs(); System.exit(0);
 					//hidden options!
 					case 'd': saveCounts = true; break;
@@ -1536,7 +1572,7 @@ public class DefinedRegionDifferentialSeq {
 				catch (Exception e){
 					Misc.printErrAndExit("\nSorry, something doesn't look right with this parameter: -"+test+"\n");
 				}
-			}
+			}	
 		}
 
 		//fetch genome version and make url
@@ -1566,6 +1602,11 @@ public class DefinedRegionDifferentialSeq {
 						"(http://www-huber.embl.de/users/anders/DESeq/)?  See the author's websites for installation instructions. Once installed, " +
 						"launch an R terminal and type 'library(DESeq)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
 			}
+		}
+		
+		//Make sure stranded and reverse aren't both set
+		if (performStrandedAnalysis == true && performReverseStrandedAnalysis == true) {
+			Misc.printErrAndExit("\nError: Stranded and reverse-stranded analyses both set to true, pick one and restart\n\n");
 		}
 
 		//look for estimateDispersions() function
@@ -1641,12 +1682,16 @@ public class DefinedRegionDifferentialSeq {
 				"-e Minimum number alignments per gene/ region, defaults to 20.\n"+
 				"-i Score introns instead of exons.\n"+
 				"-p Perform a stranded analysis. Only collect reads from the same strand as the\n" +
-				"      annotation. Note for paired data, the second read in a pair is assumed to\n" +
-				"      be on the same strand as the first. See the SamTranscriptomeParser.\n"+
+				"      annotation." +
 				"-a Perform a permutation based chi-square test for differential exon usage.\n"+
 				"      Needs 4 or more replicas per condition.\n"+
 				"-t Don't delete temp files (R script, R results, Rout, etc..).\n"+
-
+				"-j Reverse stranded analysis.  Only collect reads from the opposite strand of the\n" +
+				"      annotation.  This setting should be used for the Illumina's strand-specific dUTP protocol.\n" +
+				"-k Second read flipped. This setting can be used to flip the strand of the second read in a pair.\n" +
+				"      This setting makes it easier to view in IGB, but can break other downstream applications. Do \n" +
+				"      not use this setting if you use IGV as your genome browser.\n"+	
+				
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/DefinedRegionDifferentialSeq -c\n" +

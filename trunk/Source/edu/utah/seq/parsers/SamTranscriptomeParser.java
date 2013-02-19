@@ -76,7 +76,7 @@ public class SamTranscriptomeParser{
 	}
 
 	//for integration with RNASeq app
-	public SamTranscriptomeParser(File[] samFiles, File saveFile, float maximumAlignmentScore, String genomeVersion, int maxMatches, boolean verbose) throws IOException{
+	public SamTranscriptomeParser(File[] samFiles, File saveFile, float maximumAlignmentScore, String genomeVersion, int maxMatches, boolean verbose, boolean flipped) throws IOException{
 		this.dataFiles = samFiles;
 		this.saveFile = saveFile;
 		this.maximumAlignmentScore = maximumAlignmentScore;
@@ -84,6 +84,7 @@ public class SamTranscriptomeParser{
 		this.maxMatches = maxMatches;
 		this.randomPickAlignment = false;
 		this.verbose = verbose;
+		this.reverseStrand = flipped;
 		doWork();
 	}
 
