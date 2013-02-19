@@ -28,6 +28,8 @@ public class RNASeq {
 	private File rApplication = new File ("/usr/bin/R");
 	private File resultsDirectory;
 	private boolean stranded = false;
+	private boolean performReverseStrandedAnalysis = false;
+	private boolean secondStrandFlipped = false;
 	private File geneTableFile;
 	private boolean filterGeneTable = true;
 	private float maximumAlignmentScore = 120;
@@ -40,6 +42,7 @@ public class RNASeq {
 	private int maxMatches = 1;
 	private boolean useDESeq = true;
 	private boolean verbose = false;
+	private int maxAlignmentsDepth = 50000;
 
 	//internal fields
 	private File filteredGeneTableFile;
@@ -130,7 +133,7 @@ public class RNASeq {
 					System.out.println("\n"+treatmentReplicaDirectories[i]);
 					treatmentBamFiles[i] = new File (treatmentBamDirectory, treatmentReplicaDirectories[i].getName()+".bam");
 					File[] samFiles = fetchSamFiles(treatmentReplicaDirectories[i]);
-					SamTranscriptomeParser stp = new SamTranscriptomeParser(samFiles, treatmentBamFiles[i], maximumAlignmentScore, genomeVersion, maxMatches, verbose);
+					SamTranscriptomeParser stp = new SamTranscriptomeParser(samFiles, treatmentBamFiles[i], maximumAlignmentScore, genomeVersion, maxMatches, verbose, secondStrandFlipped );
 					if (stp.getNumberPassingAlignments() < 1000) Misc.printErrAndExit("\nError: too few passing alignments?  Are these in sam format?\n");
 				}
 			}
@@ -159,7 +162,7 @@ public class RNASeq {
 					System.out.println(controlReplicaDirectories[i]);
 					controlBamFiles[i] = new File (controlBamDirectory, controlReplicaDirectories[i].getName()+".bam");
 					File[] samFiles = fetchSamFiles(controlReplicaDirectories[i]);
-					SamTranscriptomeParser stp = new SamTranscriptomeParser(samFiles, controlBamFiles[i], maximumAlignmentScore, genomeVersion, maxMatches, verbose);
+					SamTranscriptomeParser stp = new SamTranscriptomeParser(samFiles, controlBamFiles[i], maximumAlignmentScore, genomeVersion, maxMatches, verbose, secondStrandFlipped);
 					if (stp.getNumberPassingAlignments() < 1000) Misc.printErrAndExit("\nError: too few passing alignments?  Are these in sam format?\n");
 				}
 			}
@@ -225,10 +228,10 @@ public class RNASeq {
 		
 		if (useDESeq) {
 			//score exons
-			DefinedRegionDifferentialSeq o = new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, genomeVersion, exons, rApplication, filteredGeneTableFile, false, stranded, verbose);
+			DefinedRegionDifferentialSeq o = new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, genomeVersion, exons, rApplication, filteredGeneTableFile, false, stranded, verbose, this.performReverseStrandedAnalysis, this.secondStrandFlipped, this.maxAlignmentsDepth);
 			System.out.println("Introns....");
 			//score introns
-			o= new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, genomeVersion, introns, rApplication, filteredGeneTableFile, true, stranded, verbose);
+			o= new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, genomeVersion, introns, rApplication, filteredGeneTableFile, true, stranded, verbose, this.performReverseStrandedAnalysis, this.secondStrandFlipped, this.maxAlignmentsDepth);
 	
 		}
 		else {
@@ -595,6 +598,11 @@ public class RNASeq {
 			if (numReps < 6) notes.append("\tWarning: Too few biological replicas. DESeq tends to be very conservative when analyzing data with < 4 replicas.\n");
 			
 		}
+		
+		if (this.performReverseStrandedAnalysis && this.stranded) {
+			notes.append("\tStranded and reverse-stranded are both set to true.  Please select one and try again\n");
+			passed = false;
+		}
 
 		//print out statement
 		if (passed){
@@ -688,6 +696,9 @@ public class RNASeq {
 					case 'n': stranded = true; break;
 					case 'e': verbose = true; break;
 					case 'm': useDESeq = false; break;
+					case 'j': performReverseStrandedAnalysis = true; break;
+					case 'k': secondStrandFlipped = true; break;
+					case 'x': maxAlignmentsDepth = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -741,15 +752,20 @@ public class RNASeq {
 				"       transcripts to genes. See the RNASeq usage guide for details.\n"+
 				"-r Full path to R, defaults to '/usr/bin/R'. Be sure to install Ander's DESeq\n" +
 				"       (http://www-huber.embl.de/users/anders/DESeq/) R library.\n"+
-
+				"-j Reverse stranded analysis.  Only count reads from the opposite strand of the\n" +
+				"       annotation.  This setting should be used for the Illumina's strand-specific dUTP protocol.\n" +
+				"-k Second read flipped. This setting can be used to flip the strand of the second read in a pair.\n" +
+				"       This setting makes it easier to view in IGB, but can break other downstream applications. Do\n" +
+				"-x Max per base alignment depth, defaults to 50000. Genes containing such high\n"+
+				"       density coverage are ignored. Warnings are thrown.\n"+
+				
 				"\nAdvanced Options:\n"+
 				"-m Combine replicas and run single replica analysis using binomial based statistics,\n" +
 				"       defaults to DESeq and a negative binomial test.\n"+
 				"-a Maximum alignment score. Defaults to 120, smaller numbers are more stringent.\n"+
 				"-d Minimum FDR threshold for filtering windows, defaults to 0.5\n"+
 				"-o Don't delete overlapping exons from the gene table.\n"+
-				"-e Print verbose output from each application.\n"+
-				
+				"-e Print verbose output from each application.\n"+				
 
 				"\n"+
 				"Example: java -Xmx2G -jar pathTo/USeq/Apps/RNASeq -v D_rerio_Dec_2008 -t \n" +
