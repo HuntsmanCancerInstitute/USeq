@@ -228,13 +228,14 @@ public class AutoNovoaligner {
 			}
 			
 			//capture path for new analysis report
-			String matchPath = "/\\w+";
+			String matchPath = "[/\\w]+[A][0-9]+";
 			Pattern p = Pattern.compile(matchPath);
 			Matcher m = p.matcher(line);
 			if (m.find()) {
 				//set the path in sample object
-				analysisPath = m.group();
+				analysisPath = m.group() + "/";
 				s.setAnalysisNumberPath(analysisPath);
+				System.out.println(s.getAnalysisNumberPath());
 			}
 			//clean this up so it reports an exception and then continues
 		}
