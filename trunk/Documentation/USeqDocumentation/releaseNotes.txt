@@ -6,6 +6,13 @@ VCFTabix
 USeq2UCSCBig and UCSCBig2USeq
 * Added new options for skipping for forcing overwrite of already converted files
 * Added options to silence all but error messages
+CalculatePerCycleErrorRate
+* Added ability to work with unsorted sam files
+* Added option to require read names start with a given prefix.  Novoalign is adding in some junk reads to their output?
+MergeUCSCGeneTable
+* Fixed bug where 1bp terminal exons were being skipped causing the conversion of bed12 useq files to bb to throw an error.
+SamTranscriptomeParser
+* Fixed bug where insertions or deletions that occurred at the splice junction were causing the failure to insert an appropriate number of Ns
 
 ----USeq_8.5.0----
 CalculatePerCycleErrorRate
