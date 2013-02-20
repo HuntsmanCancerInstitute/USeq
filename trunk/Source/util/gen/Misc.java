@@ -444,6 +444,17 @@ public class Misc {
 		for (int i=0; i<len; i++) System.out.println(array[i]);
 	}
 	
+	/**Prints a long[] to System.out*/
+	public static void printArray(long[] array){
+		if (array==null){
+			System.out.println("null");
+			return;
+		}
+		int len = array.length;
+		for (int i=0; i<len; i++) System.out.print(array[i]+"\t");
+		System.out.println();
+	}
+	
 	/**Prints a byte[] to System.out*/
 	public static void printArray(byte[] array){
 		if (array==null){

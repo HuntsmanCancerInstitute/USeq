@@ -936,7 +936,7 @@ public class EnrichedRegionMaker {
 	 * Assumes SmoothingWindows are sorted by position, smallest to largest*/
 	public int countEnrichedRegions(boolean setStrippedWindows, int scoreIndex, float threshold){
 		int numberERs = 0;
-
+		
 		//for each chromosome
 		for (int c =0; c< windowInfo.length; c++){
 
@@ -955,12 +955,12 @@ public class EnrichedRegionMaker {
 			good.toArray(windows);
 			if (setStrippedWindows) windowInfo[c].setSm(windows);
 			numberOfWindows = windows.length;
-
+			
 			//check if any windows for this chromosome
 			if (numberOfWindows > 0){
 
 				enrichedRegion = new EnrichedRegion (windows[0]);	
-				numberERs ++;
+				numberERs++;
 
 				//for each window
 				for (int x =1; x < numberOfWindows; x++){

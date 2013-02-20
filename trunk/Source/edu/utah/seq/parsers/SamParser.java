@@ -519,6 +519,7 @@ public class SamParser{
 		if (versionedGenome == null) Misc.printErrAndExit("\nPlease provide a versioned genome (e.g. H_sapiens_Mar_2006).\n");
 
 		//pull files
+		if (forExtraction == null ) Misc.printExit("\nError: cannot find your xxx.sam(.zip/.gz) or xxx.bam file(s)!\n");
 		File[][] tot = new File[4][];
 		tot[0] = IO.extractFiles(forExtraction,".sam");
 		tot[1] = IO.extractFiles(forExtraction,".sam.gz");

@@ -3,13 +3,15 @@ package edu.utah.seq.analysis;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
+
 import util.gen.*;
 import edu.utah.seq.data.*;
 import edu.utah.seq.parsers.*;
 import edu.utah.seq.useq.apps.Bar2USeq;
+import edu.utah.seq.useq.data.Region;
 import trans.tpmap.*;
 
-/**Takes PointData and generates sliding window scan statistics. Estimates FDRs using two different methods.
+/**Takes PointData and generates sliding window scan statistics. Estimates FDRs using random permutation.
  * @author Nix
  * */
 public class RNAEditingScanSeqs {
@@ -17,11 +19,21 @@ public class RNAEditingScanSeqs {
 	//user defined fields
 	private File[] pointDataDirs;
 	private File saveDirectory;
-	private int windowSize = 100;
-	private int minimumNumberObservationsInWindow = 7;
+	private int windowSize = 500;
+	private int minimumNumberObservationsInWindow = 5;
 	private boolean strandedAnalysis = false;
+	private int numberRandomPermutations = 100;
+	private double fractionToTrim = 0.2f;
+	private float minimumWindowPValue = 0.5f;
+	private float minimumBaseFractionEdit = 0.005f;
+	private float maximumBaseFractionEdit = 1.0f;
+	private String regionsFileName;
+	private LinkedHashMap<String,SmoothingWindow[]> chromosomeRegion;
 
 	//internal fields
+	private File trMeanDir;
+	private File fdrDir;
+	private File log2RatioDir;
 	private boolean plusStrand = true;
 	private boolean minusStrand =  true;
 	private HashMap<String,PointData[]> plusPointData;
@@ -33,7 +45,6 @@ public class RNAEditingScanSeqs {
 	private SmoothingWindow[] smoothingWindow;
 	private SmoothingWindowInfo[] smoothingWindowInfo;
 	private File swiFile;
-	private ArrayList<SmoothingWindow> allSmoothingWindowAL = new ArrayList<SmoothingWindow>();
 	private String[] scoreNames;
 	private String[] scoreDescriptions;
 	private String[] scoreUnits;
@@ -44,7 +55,7 @@ public class RNAEditingScanSeqs {
 	private PointData chromPointData = null;
 	private PointData chromPlus = null;
 	private PointData chromMinus = null;
-
+	private float[][] randomScores;
 
 	//constructor
 	public RNAEditingScanSeqs(String[] args){
@@ -52,6 +63,14 @@ public class RNAEditingScanSeqs {
 
 		//set fields
 		processArgs(args);
+		
+		//make window directories
+		trMeanDir = new File(saveDirectory, "TrMean");
+		trMeanDir.mkdir();
+		fdrDir = new File(saveDirectory, "FDR");
+		fdrDir.mkdir();
+		log2RatioDir = new File(saveDirectory, "Log2Ratio");
+		log2RatioDir.mkdir();
 
 		if (strandedAnalysis){
 			plusStrand = true;
@@ -59,12 +78,16 @@ public class RNAEditingScanSeqs {
 			scan();
 			//clear
 			smiAL.clear();
-			allSmoothingWindowAL.clear();
 			plusStrand = false;
 			minusStrand =  true;
 			scan();
 		}
 		else scan();
+		
+		//convert window data to useq
+		new Bar2USeq(trMeanDir, true);
+		new Bar2USeq(fdrDir, true);
+		new Bar2USeq(log2RatioDir, true);
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
@@ -72,39 +95,111 @@ public class RNAEditingScanSeqs {
 	}
 
 	//methods
-
 	public void scan(){
 		//fetch counts
 		loadPointDataArrays();
 
 		//for each chromosome
 		System.out.print("Scanning Chromosomes");
-		String[] chromosomes = fetchAllChromosomes();
-		for (int i=0; i< chromosomes.length; i++){
-			chromosome = chromosomes[i];
-			windowScanChromosome();
+		
+		if (chromosomeRegion == null){
+			String[] chromosomes = fetchAllChromosomes();
+			for (int i=0; i< chromosomes.length; i++){
+				chromosome = chromosomes[i];
+				windowScanChromosome();
+			}
 		}
-
+		else {
+			String[] chromosomes = fetchAllChromosomes();
+			for (int i=0; i< chromosomes.length; i++){
+				chromosome = chromosomes[i];
+				windowScanChromosome();
+			}
+		}
+		
 		//any data, make arrays
 		if (smiAL.size() == 0) Misc.printExit("\nNo windows found. Thresholds too strict?\n");
 		smoothingWindowInfo = new SmoothingWindowInfo[smiAL.size()];
 		smiAL.toArray(smoothingWindowInfo);
+		
+		//make EnrichedRegions 
+		System.out.println("\nEstimating FDRs...");
+		estimateFDRs();
 
 		//save window data 
-		System.out.println("\nSaving serialized window data...");
 		String ext = "";
 		if (plusStrand == true && minusStrand == true) ext = "";
 		else if (plusStrand) ext = "Plus";
 		else if (minusStrand) ext = "Minus";
 
+		System.out.println("Writing window objects for the EnrichedRegionMaker...");
 		swiFile = new File (saveDirectory, "windowData"+windowSize+"bp"+ext+".swi");
 		IO.saveObject(swiFile, smoothingWindowInfo);
 		
-		//save graph of pse
-		writeBarFileGraphs(ext);
+		System.out.println("Saving graph data...");
+		writeBarFileGraphs();
 
 	}
 
+	public void estimateFDRs(){
+		//collect all windows
+		ArrayList<SmoothingWindow> smAL = new ArrayList<SmoothingWindow>();
+		for (int i=0; i< smoothingWindowInfo.length; i++){
+			SmoothingWindow[] win = smoothingWindowInfo[i].getSm();
+			for (int j = 0; j< win.length; j++){
+				smAL.add(win[j]);
+			}
+		}
+		smoothingWindow = new SmoothingWindow[smAL.size()];
+		smAL.toArray(smoothingWindow);
+		
+		//window scores = numberObs, real mean, pval, random mean
+		
+		//sort windows by real mean score, smallest to largest
+		Arrays.sort(smoothingWindow, new ComparatorSmoothingWindowScore(1));
+		
+		EnrichedRegionMaker erm = new EnrichedRegionMaker(windowSize, smoothingWindowInfo);
+		
+		//for each window with diff score
+		float priorScore = 0;
+		float priorFDR = 0;
+		for (int i=0; i< smoothingWindow.length; i++){
+			//scores = numberObs, real mean, pval, random mean
+			float[] currScores = smoothingWindow[i].getScores();
+			if (currScores[1] != priorScore){
+				//diff score so calc fdr
+				double numReal = erm.countEnrichedRegions(false, 1, currScores[1]);
+				double numRand = erm.countEnrichedRegions(false, 3, currScores[1]);
+				
+				if (numRand == 0){
+					//no more random regions so assign last FDR * 1%
+					priorFDR = priorFDR * 1.01f;
+					for (; i< smoothingWindow.length; i++) {
+						currScores = smoothingWindow[i].getScores();
+						//set fdr
+						currScores[2] = priorFDR;
+					}
+					break;
+				}
+				float fdr = new Double(-10 * Num.log10(numRand/numReal)).floatValue();
+				//only increase the FDR with increasing stringent thresholds
+				if (fdr> priorFDR) priorFDR = fdr;
+				priorScore = currScores[1];
+			}
+			//set FDR
+			currScores[2] = priorFDR;
+		}
+		
+		//set log2Ratio 
+		for (SmoothingWindow w: smoothingWindow){
+			float[] currScores = w.getScores();
+			currScores[3] = Num.log2(currScores[1]/currScores[3]);
+			//if (currScores[2]>13) System.out.println(w);
+
+		}
+		
+		//final scores = numberObs	realMean	FDR	log2Ratio
+	}
 
 
 	/**Fetches the names of all the chromosomes in the data.*/
@@ -138,6 +233,24 @@ public class RNAEditingScanSeqs {
 			else if (pdAL.size() == 1) chromPointData = pdAL.get(0);
 		}
 		
+		//toss low values values
+		if (chromPointData != null){
+			ArrayList<Integer> goodPos = new ArrayList<Integer>(100000);
+			ArrayList<Float> goodVal = new ArrayList<Float>(100000);
+			int[] pos = chromPointData.getPositions();
+			float[] val = chromPointData.getScores();
+			for (int i=0; i< pos.length; i++){
+				if (val[i] >= minimumBaseFractionEdit && val[i] < maximumBaseFractionEdit){
+					goodPos.add(pos[i]);
+					goodVal.add(val[i]);
+				}
+			}
+			pos = Num.arrayListOfIntegerToInts(goodPos);
+			val = Num.arrayListOfFloatToArray(goodVal);
+			chromPointData.setPositions(pos);
+			chromPointData.setScores(val);
+		}
+		
 		if (chromPointData != null) return true;
 		return false;
 	}
@@ -163,16 +276,23 @@ public class RNAEditingScanSeqs {
 		System.out.print(".");
 		//make SmoothingWindow[] container
 		smoothingWindow = new SmoothingWindow[windows.length];
+		randomScores = new float [windows.length][numberRandomPermutations];
 		
-		//scan
-		scanWindows();
+		//scan for real scores
+		scanWindowsReal();
+		
+		//scan permutated base fractions
+		scanPermutedWindows();
+		
+		//calculate p-values
+		calculateWindowPValues();
 		
 		//save results
-		saveWindowDataToSMIArrayList();
+		addWindowDataToSMIArrayList();
 	}
 
 	/**Saves window data to SMI Array.*/
-	public void saveWindowDataToSMIArrayList(){
+	public void addWindowDataToSMIArrayList(){
 		Info info = chromPointData.getInfo();
 		HashMap<String,String> notes = new HashMap<String,String>();
 		notes.put(BarParser.WINDOW_SIZE, windowSize+"");
@@ -183,32 +303,89 @@ public class RNAEditingScanSeqs {
 		smiAL.add(new SmoothingWindowInfo(smoothingWindow, info));
 	}
 
+	private void calculateWindowPValues(){
+		//for each window 
+		ArrayList<SmoothingWindow> goodWindows = new ArrayList<SmoothingWindow>();
+		for (int i=0; i< smoothingWindow.length; i++){
+			//scores = numberObs, mean, startIndex, stopIndex
+			float[] scores = smoothingWindow[i].getScores();
+			//get array of permuted mean's
+			float[] rs = randomScores[i];
+			//count number greater than or equal to
+			float badTrials = 0;
+			for (int x=0; x< numberRandomPermutations; x++ ){
+				if (rs[x] >= scores[1]) badTrials++;
+			}
+			//pval
+			scores[2] = badTrials/(float)numberRandomPermutations;
+			if (scores[2] <= minimumWindowPValue) {
+				//random mean
+				scores[3] = Num.mean(rs);
+				goodWindows.add(smoothingWindow[i]);
+			}
+			//final scores = numberObs, real mean, pval, random mean
+			
+			
+		}
+		//replace unfiltered sms
+		SmoothingWindow[] sm = new SmoothingWindow[goodWindows.size()];
+		goodWindows.toArray(sm);
+		smoothingWindow = sm;
+	}
 
-
-
-
-
-	private void scanWindows(){
-		smoothingWindow = new SmoothingWindow[windows.length];
-		
+	private void scanPermutedWindows(){
+		for (int i=0; i<numberRandomPermutations; i++){
+			//randomize chromPointData values
+			float[] vals = chromPointData.getScores();
+			Num.randomize(vals, 0);
+			chromPointData.setScores(vals);
+			//scan it
+			scanWindowsRandom(i);
+		}
+	}
+	
+	private void scanWindowsRandom(int randomIndex){
+		//get scores
+		float[] fractions = chromPointData.getScores();
 		//for each window 
 		for (int i=0; i< windows.length; i++){
-			//fetch data
-			Point[] p = chromPointData.fetchPoints(windows[i][0], windows[i][1]);
-			int numPlus = 0;
-			int numMinus = 0;
-			if (chromPlus != null) numPlus = chromPlus.countPoints(windows[i][0], windows[i][1]);
-			if (chromMinus != null) numMinus = chromMinus.countPoints(windows[i][0], windows[i][1]);
-			
-			//calc pseudo median
-			float[] fractions = Point.extractScores(p);
-			float pse = (float)Num.pseudoMedian(fractions); 
-			
-			//scores = pse, numberObs
-			float[] scores = new float[]{pse, p.length, numPlus, numMinus};
+			//get start stop
+			//scores = numberObs, mean, startIndex, stopIndex
+			float[] winScores = smoothingWindow[i].getScores();
+			//num fractions
+			int numFrac = (int)(winScores[3]-winScores[2]);
+			//calc trimmed mean
+			float[] winFrac = new float[numFrac];
+			System.arraycopy(fractions, (int)winScores[2], winFrac, 0, numFrac);
+			Arrays.sort(winFrac);
+			float trimmedMean = (float)Num.trimmedMean(winFrac, fractionToTrim);
+			randomScores[i][randomIndex] = trimmedMean;
+		}
+	}
+
+
+	private void scanWindowsReal(){
+		//get scores
+		float[] fractions = chromPointData.getScores();
+		//for each window 
+		for (int i=0; i< windows.length; i++){
+			//fetch indexes
+			int[] indexStartStop = chromPointData.findIndexes(windows[i][0], windows[i][1]);
+			//get fractions
+			int numFrac = indexStartStop[1]-indexStartStop[0];
+			float[] winFrac = new float[numFrac];
+			System.arraycopy(fractions, indexStartStop[0], winFrac, 0, numFrac);
+			Arrays.sort(winFrac);
+			float trimmedMean = (float)Num.trimmedMean(winFrac, fractionToTrim);
+			//float mean = Num.mean(indexStartStop[0], indexStartStop[1], fractions);
+			//scores = numberObs, mean, startIndex, stopIndex
+			float[] scores = new float[]{numFrac, trimmedMean ,  (float)indexStartStop[0], (float)indexStartStop[1]};
 			//make window
 			smoothingWindow[i] = new SmoothingWindow (windows[i][0], windows[i][1], scores);
-			allSmoothingWindowAL.add(smoothingWindow[i]);
+			/*if (smoothingWindow[i].getStart() == 1011704	 && smoothingWindow[i].getStop() == 1012202) {
+				System.out.println(smoothingWindow[i]);
+				Misc.printArray(winFrac);
+			}*/
 		}
 	}
 
@@ -226,20 +403,6 @@ public class RNAEditingScanSeqs {
 		minusPointData = PointData.convertArrayList2Array(combo[1]);
 	}
 
-
-	/**Adds the toAdd to each int.*/
-	public static void addShift(int[] positions, int toAdd){
-		for (int i=0; i< positions.length; i++){
-			positions[i] += toAdd;
-			if (positions[i]<0) positions[i] = 0;
-		}
-	}
-
-
-
-
-
-
 	/**Makes a common set of windows using merged positions.*/
 	public void makeWindows(int[] positions){
 		windows = windowMaker.makeWindows(positions);
@@ -251,11 +414,7 @@ public class RNAEditingScanSeqs {
 	}
 
 	/**Writes stair step window bar graph files*/
-	public void writeBarFileGraphs(String extension){
-
-			//make directories
-			File sum = new File(saveDirectory, "Pse"+extension);
-			sum.mkdir();
+	public void writeBarFileGraphs(){
 
 			//for each chromosome
 			for (int i=0; i< smoothingWindowInfo.length; i++){
@@ -265,13 +424,11 @@ public class RNAEditingScanSeqs {
 				else if (minusStrand && plusStrand == false) info.setStrand("-");
 				else info.setStrand(".");
 				
-				saveSmoothedHeatMapData (0, sm, info, sum, "#FF00FF", false); //magenta
-				
-			}
-			
-			new Bar2USeq(sum, true);
-			
-		
+				//final scores = numberObs, real mean, FDR, log2Ratio
+				saveSmoothedHeatMapData (1, sm, info, trMeanDir, "#FF00FF", false); //magenta
+				saveSmoothedHeatMapData (2, sm, info, fdrDir, "#00FF00", false); //green
+				saveSmoothedHeatMapData (3, sm, info, log2RatioDir, "#FFFF00", false); //yellow
+			}	
 	}
 
 	/**Saves bar heatmap/ stairstep graph files*/
@@ -310,28 +467,26 @@ public class RNAEditingScanSeqs {
 		pd.nullPositionScoreArrays();
 	}
 
-
-
 	/**Sets score names/ descriptions/ units base on whether control data is present.*/
 	public void setScoreStrings(){
-		
+		//final scores = numberObs, real mean, FDR, log2Ratio
 			scoreNames = new String[]{
-					"Pse",
 					"Obs",
-					"Obs+",
-					"Obs-",
+					"TrMean",
+					"FDR",
+					"Log2Ratio"
 			};
 			scoreDescriptions = new String[]{
-					"Pseudo median of fraction edits",
-					"# edits",
-					"# edits plus strand",
-					"# edits minus strand",
+					"# non zero base fraction edits in window",
+					"Trimmed mean of the non zero base fraction edits in the window",
+					"FDR",
+					"Log2Ratio(obsMean/randomMean)"
 			};
 			scoreUnits = new String[]{
+					"Count",
 					"Fraction",
-					"Count",
-					"Count",
-					"Count",
+					"-10Log10(FDR)",
+					"Log2Ratio(obsMean/randomMean)"
 			};
 		
 	}
@@ -350,6 +505,7 @@ public class RNAEditingScanSeqs {
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		String strand = null;
+		File bedFile = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -358,10 +514,13 @@ public class RNAEditingScanSeqs {
 				try{
 					switch (test){
 					case 'p': pointDataDirs = IO.extractFiles(args[++i]); break;
+					case 'b': bedFile = new File(args[++i]); break;
 					case 'r': saveDirectory = new File(args[++i]); break;
 					case 's': strandedAnalysis = true; break;
 					case 'w': windowSize = Integer.parseInt(args[++i]); break;
 					case 'm': minimumNumberObservationsInWindow = Integer.parseInt(args[++i]); break;
+					case 'i': minimumBaseFractionEdit = Float.parseFloat(args[++i]); break;
+					case 'x': maximumBaseFractionEdit = Float.parseFloat(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -399,6 +558,21 @@ public class RNAEditingScanSeqs {
 
 		//set score items
 		setScoreStrings();
+		
+		//load regions
+		if (bedFile != null) {
+		HashMap<String, Region[]>cr = Region.parseStartStops(bedFile, 0, 0, 0);
+		chromosomeRegion = new LinkedHashMap<String, SmoothingWindow[]>();
+		for (String chr: cr.keySet()){
+			Region[] regions = cr.get(chr);
+			SmoothingWindow[] sw = new SmoothingWindow[regions.length];
+			for (int i=0; i< regions.length; i++){
+				sw[i] = new SmoothingWindow (regions[i].getStart(), regions[i].getStop(), new float[]{0,0,0,0,0,0});
+			}
+			chromosomeRegion.put(chr, sw);
+		}
+		regionsFileName = Misc.removeExtension(bedFile.getName());
+		}
 
 		
 
@@ -408,19 +582,24 @@ public class RNAEditingScanSeqs {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            RNA Editing Scan Seqs: Jan 2012                       **\n" +
+				"**                            RNA Editing Scan Seqs: Feb 2013                       **\n" +
 				"**************************************************************************************\n" +
 				"Beta.\n\n" +
 
 				"Options:\n"+
 				"-r Results directory, full path.\n"+
-				"-p PointData directories, full path, comma delimited from the RNAEditingPileUpParser.\n" +
+				"-p PointData directoryfrom the RNAEditingPileUpParser Base Fraction Edited.\n" +
 				"       These should contain stranded chromosome specific xxx_-/+_.bar.zip files. One\n" +
 				"       can also provide a single directory that contains multiple PointData\n" +
 				"       directories. These will be merged when scanning.\n" +
 				"-s Perform stranded analysis, defaults to unstranded.\n"+
-				"-w Window size, defaults to 100.\n"+
-				"-m Minimum number observations in window, defaults to 7. \n" +
+				"-w Window size, defaults to 500.\n"+
+				"-m Minimum number observations in window, defaults to 5. \n" +
+				"-i Minimum base fraction editing, defaults to 0.005 \n"+
+				"-x Maximum base fraction editing, defaults to 1. Set to > 1 to retain bases with \n" +
+				"       100% base fraction editing. These are often SNPs!\n"+
+				//"-b A bed file of regions to score (tab delimited: chr start stop ...), defaults to\n" +
+				//"       window scanning.\n"+
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/ \n\n" +

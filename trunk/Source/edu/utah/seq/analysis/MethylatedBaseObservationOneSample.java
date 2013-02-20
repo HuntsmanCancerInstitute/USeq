@@ -37,6 +37,10 @@ public class MethylatedBaseObservationOneSample {
 			return(nonCon+1)/(nonCon+con+2);
 		}
 		
+		public float getFractionMethylationNoAddOne() {
+			return(nonCon)/(nonCon+con);
+		}
+		
 		/**returns nonCon, con*/
 		public long[] getCounts() {
 			long[] counts = new long[2];

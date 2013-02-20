@@ -19,7 +19,6 @@ public class RNAEditingPileUpParser {
 	//user defined fields
 	private File pileupFile;
 	private float minimumReadCoverage = 5.0f;
-	private float minimumFractionEditedBase = 0.01f;
 	private String versionedGenome;
 	private File saveDirectory;
 	private File nonConvertedPointDataDirectory;
@@ -73,7 +72,7 @@ public class RNAEditingPileUpParser {
 			BufferedReader in = IO.fetchBufferedReader(pileupFile);
 			
 			//where to save base fraction edited
-			baseFractionEdited = new File (saveDirectory, "BaseFractionEdited_" +(int)minimumReadCoverage +"RC"+minimumFractionEditedBase+"FE");
+			baseFractionEdited = new File (saveDirectory, "BaseFractionEdited_" +(int)minimumReadCoverage +"RC");
 			baseFractionEdited.mkdir();
 			
 			//data output streams
@@ -214,7 +213,6 @@ public class RNAEditingPileUpParser {
 			float total = con[i]+ nonCon[i];
 			if (total < minimumReadCoverage) continue;
 			float fraction = con[i]/ total;
-			if (fraction < minimumFractionEditedBase) continue;
 			pts.add(new Point(pos[i], fraction));
 		}
 		
@@ -273,7 +271,6 @@ public class RNAEditingPileUpParser {
 					switch (test){
 					case 'p': pileupFile = new File(args[++i]); break;
 					case 'r': minimumReadCoverage = Float.parseFloat(args[++i]); break;
-					case 'f': minimumFractionEditedBase = Float.parseFloat(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); saveDirectory.mkdir(); break;
 					case 'v': versionedGenome = args[i+1]; i++; break;
 					case 'h': printDocs(); System.exit(0);
@@ -305,7 +302,6 @@ public class RNAEditingPileUpParser {
 		
 		
 		System.out.println(minimumReadCoverage+"\tMinimum Read Coverage");
-		System.out.println(minimumFractionEditedBase+"\tMinimum Fraction Edited Bases\n");
 		
 		
 	}	
@@ -315,7 +311,7 @@ public class RNAEditingPileUpParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          RNA Editing PileUp Parser: Dec 2012                     **\n" +
+				"**                          RNA Editing PileUp Parser: Jan 2013                     **\n" +
 				"**************************************************************************************\n" +
 				"Parses a SAMTools mpileup output file for refseq A bases that show evidence of\n" +
 				"RNA editing via conversion to Gs, stranded. Base fraction editing is calculated for\n" +
@@ -329,7 +325,6 @@ public class RNAEditingPileUpParser {
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
 				"-s Save directory, full path, defaults to pileup file directory.\n"+
 				"-r Minimum read coverage, defaults to 5.\n"+
-				"-f Minimum fraction edited base, defaults to 0.01\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/RNAEditingPileUpParser -p \n" +
 				"      /Pileups/N2.mpileup.gz -v C_elegans_Oct_2010\n\n" +

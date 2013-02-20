@@ -422,6 +422,20 @@ public class PointData {
 		return Point.makePoints(pos, vals);
 	}
 	
+	/**Returns an array of float containing the slice defined by the start and stop(excluded).*/
+	public float[] fetchScores (int startBp, int stopBp){
+		int[] indexes = findIndexes (startBp, stopBp);	
+		if (indexes == null || indexes[0] == indexes[1]) return null;
+		int num = indexes[1] - indexes[0];
+		if (num ==0) return null;
+		float[] vals = new float[num];
+		int counter = 0;
+		for (int i=indexes[0]; i< indexes[1]; i++){
+			vals[counter++] = scores[i];
+		}
+		return vals;
+	}
+	
 	/**Returns number of observations in the slice defined by the start and stop(excluded).*/
 	public int countPoints (int startBp, int stopBp){
 		int[] indexes = findIndexes (startBp, stopBp);	
