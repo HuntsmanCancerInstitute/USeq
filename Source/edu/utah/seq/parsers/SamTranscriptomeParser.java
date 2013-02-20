@@ -182,7 +182,7 @@ public class SamTranscriptomeParser{
 
 				SamAlignment sa;
 				try {
-					sa = new SamAlignment(line, false);
+					sa = new SamAlignment(line, true);
 				} catch (MalformedSamAlignmentException e) {
 					if (verbose) System.out.println("\nSkipping malformed sam alignment -> "+e.getMessage());
 					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
@@ -766,7 +766,7 @@ public class SamTranscriptomeParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Sam Transcriptome Parser: Dec 2012                      **\n" +
+				"**                          Sam Transcriptome Parser: Feb 2013                      **\n" +
 				"**************************************************************************************\n" +
 				"STP takes SAM alignment files that were aligned against chromosomes and extended\n" +
 				"splice junctions (see MakeTranscriptome app), converts the coordinates to genomic\n" +

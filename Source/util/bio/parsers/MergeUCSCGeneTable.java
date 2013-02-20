@@ -109,7 +109,7 @@ public class MergeUCSCGeneTable {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Merge UCSC Gene Table: Oct 2010                       **\n" +
+				"**                           Merge UCSC Gene Table: Feb  2013                       **\n" +
 				"**************************************************************************************\n" +
 				"Merges transcript models that share the same gene name (in column 0). Maximizes exons,\n" +
 				"minimizes introns. Assumes interbase coordinates.\n\n" +

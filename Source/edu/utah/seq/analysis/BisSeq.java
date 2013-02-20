@@ -3,6 +3,7 @@ package edu.utah.seq.analysis;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
+
 import util.gen.*;
 import edu.utah.seq.data.*;
 import edu.utah.seq.parsers.*;
@@ -28,6 +29,7 @@ public class BisSeq {
 	private float fdrThreshold = 30;
 	private float log2RatioThreshold = 1.585f;
 	private boolean printGraphs = true;
+	private boolean scrambleControlData = false;
 
 	//internal fields
 	private int maxGap = 0;
@@ -490,7 +492,7 @@ public class BisSeq {
 
 
 	public void windowScanChromosomeBPs(){
-
+//System.out.println("Here");
 		smoothingWindow = null;
 
 		//merge strands
@@ -515,6 +517,24 @@ public class BisSeq {
 		//fetch paired base observations meeting minimum read coverage in both T and C
 		MethylatedBaseObservation[] mbo = fetchCommonBasesWithMinimumObservations (mergedTreatmentNonCon, mergedTreatmentCon, mergedControlNonCon, mergedControlCon, minimumReadCoverage);
 		if (mbo == null) return;
+		
+		if (scrambleControlData){
+			//swap control observations, not positions
+			Random rng = new Random();       
+		    for (int n =0; n< mbo.length; n++) {
+		        int k = rng.nextInt(mbo.length); 
+		        MethylatedBaseObservation curr = mbo[n];
+		        float currCNon = curr.getNonConC();
+		        float currCCon = curr.getConC();
+		        MethylatedBaseObservation rand = mbo[k];
+		        float randCNon = rand.getNonConC();
+		        float randCCon = rand.getConC();
+		        curr.setNonConC(randCNon);
+		        curr.setConC(randCCon);
+		        rand.setNonConC(currCNon);
+		        rand.setConC(currCCon);
+		    }
+		}
 		
 		//fetch the positions
 		int[] positions = MethylatedBaseObservation.fetchPositions(mbo);
@@ -971,6 +991,7 @@ public class BisSeq {
 					case 'm': minNumObsInWindow = Integer.parseInt(args[++i]); break;
 					case 'd': minimumReadCoverage = Integer.parseInt(args[++i]); break;
 					case 'g': printGraphs = false; break;
+					case 'a': scrambleControlData = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -1036,6 +1057,7 @@ public class BisSeq {
 		System.out.println(minNumObsInWindow+"\tMinimum # obs in window");
 		System.out.println(minimumReadCoverage+"\tMinimum per base read coverage");
 		System.out.println(printGraphs+ "\tPrint graphs");
+		System.out.println(scrambleControlData+ "\tScramble control data");
 	}	
 
 
@@ -1043,7 +1065,7 @@ public class BisSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  BisSeq: May 2012                                **\n" +
+				"**                                  BisSeq: Feb 2013                                **\n" +
 				"**************************************************************************************\n" +
 				"Takes two condition (treatment and control) PointData from converted and non-converted\n" +
 				"C bisulfite sequencing data parsed using the NovoalignBisulfiteParser and scores\n" +
@@ -1067,6 +1089,7 @@ public class BisSeq {
 				"-C Control converted PointData directories, ditto. \n"+
 				"-n Treatment non-converted PointData directories, ditto. \n" +
 				"-N Control non-coverted PointData directories, ditto. \n"+
+				"-a Scramble control data.\n"+
 
 				"Default Options:\n"+
 				"-d Minimum per base read coverage, defaults to 5.\n"+

@@ -97,14 +97,14 @@ public class SamAlignment {
 	
 	/**Takes the original fastq sequence and formats it to match this cigar and orientation.*/
 	public String processOriginalSequence(String originalSequence){
-System.out.println(cigar+"\tcigar");
-System.out.println(sequence+"\tsequence");
-System.out.println(originalSequence+"\toriginal sequence");
+//System.out.println(cigar+"\tcigar");
+//System.out.println(sequence+"\tsequence");
+//System.out.println(originalSequence+"\toriginal sequence");
 		
 		String fixedSeq = new String (originalSequence);
 		//reverse sequence?
 		if (isReverseStrand()) {
-System.out.println("\treversing");
+//System.out.println("\treversing");
 			fixedSeq = Seq.reverseComplementDNA(originalSequence);
 		}
 		//trim?
@@ -112,21 +112,21 @@ System.out.println("\treversing");
 			//at start?
 			Matcher mat = CIGAR_STARTING_HARD_MASK.matcher(cigar);
 			if (mat.matches()){
-System.out.println("\tstart trim");
+//System.out.println("\tstart trim");
 				int basesToTrim = Integer.parseInt(mat.group(1));
 				fixedSeq = fixedSeq.substring(basesToTrim);
 			}
 			//at end?
 			mat = CIGAR_STOP_HARD_MASK.matcher(cigar);
 			if (mat.matches()){
-System.out.println("\tend trim");
+//System.out.println("\tend trim");
 				int basesToTrim = Integer.parseInt(mat.group(1));
 				int stopIndex = fixedSeq.length() - basesToTrim;
 				fixedSeq = fixedSeq.substring(0, stopIndex);
 			}
 		}
 		
-System.out.println(fixedSeq+"\tFixed");
+//System.out.println(fixedSeq+"\tFixed");
 		return fixedSeq;
 	}
 	
@@ -288,7 +288,8 @@ System.out.println(fixedSeq+"\tFixed");
 		inferredInsertSize = 0;
 	}
 
-	public boolean convertTranscriptomeAlignment(boolean tossMDAndRGTags) throws MalformedSamAlignmentException{		
+	public boolean convertTranscriptomeAlignment(boolean tossMDAndRGTags) throws MalformedSamAlignmentException{	
+		
 		//split on :
 		String[] segments = COLON.split(referenceSequence);
 		String coordinatesString = null;
@@ -434,7 +435,7 @@ if (debug) System.out.println("Seq "+sequence);*/
 		//for each block
 		mat = CIGAR_SUB.matcher(cigar);
 		while (mat.find()){
-//if (debug) System.out.println("Sub "+mat.group());
+//if (debug) System.out.println("\nSub "+mat.group());
 			String call = mat.group(2);
 			int numberBases = Integer.parseInt(mat.group(1));
 
@@ -453,15 +454,36 @@ if (debug) System.out.println("Seq "+sequence);*/
 				startPosition = cigarPosition.nextPosition;
 //if (debug) System.out.println("End\t"+cigarSB+"\t"+startPosition);
 			}
-			//an insertion, no need to change position
+			//an insertion, no need to change position, append N's though?
 			else if (call.equals("I")) {
 //if (debug) System.out.println("Start\t"+cigarSB+"\t"+startPosition);
 				cigarSB.append(mat.group());
+				//add Ns for cases where the I occurred in the gap
+				for (int i=0; i< startStop.length; i++){
+					if (startPosition == startStop[i][0]){
+						int len = startStop[i][0] - startStop[i-1][1];
+//if (debug) System.out.println("\tAppending "+len+"N for insertion");					
+						cigarSB.append(len);
+						cigarSB.append("N");
+						break;
+					}
+				}
 //if (debug) System.out.println("End\t"+cigarSB+"\t"+startPosition);
 			}
 			//a deletion
 			else if (call.equals("D")) {
-//if (debug) System.out.println("Start\t"+cigarSB+"\t"+startPosition);
+//if (debug) System.out.println("Start\t"+cigarSB+"\t"+startPosition);		
+				//add Ns for cases where D occurs on 1st base of next exon
+				for (int i=0; i< startStop.length; i++){
+					if (startPosition == startStop[i][0]){
+						int len = startStop[i][0] - startStop[i-1][1];
+//if (debug) System.out.println("\tAppending "+len+"N for deletion");					
+						cigarSB.append(len);
+						cigarSB.append("N");
+						break;
+					}
+				}
+				
 				cigarSB.append(mat.group());
 				//fetch the ss
 				int[] ss = null;
@@ -488,7 +510,7 @@ if (debug) System.out.println("Seq "+sequence);*/
 
 		//assign
 		cigar = cigarSB.toString();
-		////if (debug) System.out.println("Final CIGAR "+cigar);
+//if (debug) System.out.println("Final CIGAR "+cigar);
 
 		return true;
 	}
@@ -517,8 +539,8 @@ for (int[] ss: startStop){
 	System.out.println("\t"+ss[0]+"\t"+ss[1]);
 }
 System.out.println("Seq to cover "+seqLengthToCover);
-System.out.println("Start position "+startPosition);*/
-
+System.out.println("Start position "+startPosition);
+*/
 
 		//find starting chunk
 		for (int i=0; i< startStop.length; i++){

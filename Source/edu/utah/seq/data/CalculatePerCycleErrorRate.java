@@ -6,6 +6,9 @@ import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
+import edu.utah.seq.data.sam.MalformedSamAlignmentException;
+import edu.utah.seq.data.sam.PicardSortSam;
+import edu.utah.seq.data.sam.SamAlignment;
 import net.sf.samtools.*;
 import util.bio.parsers.MultiFastaParser;
 import util.gen.*;
@@ -16,8 +19,9 @@ import util.gen.*;
 public class CalculatePerCycleErrorRate {
 
 	//user fields
-	private File[] bamFiles;
+	private File[] alignmentFiles;
 	private File fastaFile;
+	private String readNamePrefix = null;
 
 	//internal
 	private String chromName;
@@ -33,6 +37,9 @@ public class CalculatePerCycleErrorRate {
 	private double[][] correctBases;
 	private double[][] incorrectBases;
 	private int fileIndex;
+	private boolean isBam;
+	private boolean deleteTempFiles = true;
+	private Pattern headerLine = Pattern.compile("^@[HSRPC][DQGO]\\s.+");
 
 	/**For stand alone app.*/
 	public CalculatePerCycleErrorRate(String[] args){
@@ -49,59 +56,90 @@ public class CalculatePerCycleErrorRate {
 	}
 
 	public void doWork(){
-		
+
 		//fetch seq
 		MultiFastaParser p = new MultiFastaParser(fastaFile);
 		chromSeq = p.getSeqs()[0].toUpperCase().toCharArray();
 		if (p.isFastaFound() == false) Misc.printErrAndExit("\nError: something is wrong with your fasta sequence.  Check that it is correct.\n");
 		chromLength = chromSeq.length+1;
 		chromName = p.getNames()[0];
-		
-		//make arrays to hold data
-		correctBases = new double[bamFiles.length][];
-		incorrectBases = new double[bamFiles.length][];
-		numberAlignments = new double[bamFiles.length];
-		numberAlignmentsWithInsertions = new double[bamFiles.length];
-		numberAlignmentsWithDeletions = new double[bamFiles.length];
-		numberAlignmentsWithSoftMasking = new double[bamFiles.length];
-		numberAlignmentsWithHardMasking = new double[bamFiles.length];
-		
-		//process each bam file
-		for (int i=0; i< bamFiles.length; i++){
-			fileIndex = i;
-			scanBamFile();
-		}
-		
-		printReport();
 
+		//make arrays to hold data
+		correctBases = new double[alignmentFiles.length][];
+		incorrectBases = new double[alignmentFiles.length][];
+		numberAlignments = new double[alignmentFiles.length];
+		numberAlignments = new double[alignmentFiles.length];
+		numberAlignmentsWithInsertions = new double[alignmentFiles.length];
+		numberAlignmentsWithDeletions = new double[alignmentFiles.length];
+		numberAlignmentsWithSoftMasking = new double[alignmentFiles.length];
+		numberAlignmentsWithHardMasking = new double[alignmentFiles.length];
+
+		//process each file
+		System.out.println("Processing...");
+		for (int i=0; i< alignmentFiles.length; i++){
+			fileIndex = i;
+			correctBases[fileIndex] = new double[1000];
+			incorrectBases[fileIndex] = new double[1000];
+			System.out.println("\t"+ alignmentFiles[fileIndex].getName());
+			isBam = alignmentFiles[fileIndex].getName().endsWith(".bam");
+			if (isBam) {
+				scanBamFile(alignmentFiles[fileIndex]);
+			}
+			else {
+				File tempSam = parseSamFile();
+				if (tempSam == null) {
+					System.out.println("\t\tError! No "+chromName+" matching alignments? Skipping.");
+				}
+				else {
+					try {
+						String name = Misc.removeExtension(tempSam.getCanonicalPath());
+						File tempBam = new File (name+".bam");
+						File tempBai = new File (name+".bai");
+						if (deleteTempFiles) {
+							tempBam.deleteOnExit();
+							tempBai.deleteOnExit();
+						}
+						//sort and convert to BAM
+						new PicardSortSam (tempSam, tempBam);
+						//scan it!
+						scanBamFile(tempBam);
+
+					} catch (IOException e) {
+						System.out.println("\nProblem sorting temp sam file "+tempSam);
+						e.printStackTrace();
+					}
+				}
+			}
+		}
+		printReport();
 	}
 
 	private void printReport() {
-		
+
 		System.out.println("Per cycle error rates for aligned bases:\n");
 		//print header
 		System.out.print("Cycle#");
-		for (int i=0; i< bamFiles.length; i++) System.out.print("\t"+Misc.removeExtension(bamFiles[i].getName()));
+		for (int i=0; i< alignmentFiles.length; i++) System.out.print("\t"+Misc.removeExtension(alignmentFiles[i].getName()));
 		System.out.println();
-		
+
 		//make array lists to hold errors
-		ArrayList<Double>[] fractionError = new ArrayList[bamFiles.length];
-		for (int i=0; i< bamFiles.length; i++) fractionError[i] = new ArrayList<Double>();
-		
+		ArrayList<Double>[] fractionError = new ArrayList[alignmentFiles.length];
+		for (int i=0; i< alignmentFiles.length; i++) fractionError[i] = new ArrayList<Double>();
+
 		//for each row that contains any data correctBases[fileIndex][0-1000]
 		for (int i=0; i< correctBases[0].length; i++){
 			//skip?
 			double total = 0;
-			for (int j=0; j< bamFiles.length; j++) {
+			for (int j=0; j< alignmentFiles.length; j++) {
 				total+= correctBases[j][i];
 				total+= incorrectBases[j][i];
 			}
 			if (total == 0.0) continue;
-			
+
 			StringBuilder sb = new StringBuilder();
 			sb.append(i+1);
 			//for each dataset
-			for (int j=0; j< bamFiles.length; j++){
+			for (int j=0; j< alignmentFiles.length; j++){
 				sb.append("\t");
 				double error = incorrectBases[j][i]/ (incorrectBases[j][i] + correctBases[j][i]);
 				sb.append(error);
@@ -110,90 +148,144 @@ public class CalculatePerCycleErrorRate {
 				sb.append(incorrectBases[j][i]);
 				sb.append("\t");
 				sb.append(correctBases[j][i]);
-				*/
+				 */
 			}
 			System.out.println(sb);
 		}
-		
+
 		//calculate average error
-		double[] averageError = new double[bamFiles.length];
-		for (int i=0; i< bamFiles.length; i++) {
+		double[] averageError = new double[alignmentFiles.length];
+		for (int i=0; i< alignmentFiles.length; i++) {
 			double[] err = Num.arrayListOfDoubleToArray(fractionError[i]);
 			averageError[i] = Num.mean(err);
 		}
 		System.out.println("\nMean\t"+Num.doubleArrayToString(averageError, "\t"));
-		
+
 		//print alignment stats
 		for (int i=0; i<numberAlignmentsWithInsertions.length; i++ ) numberAlignmentsWithInsertions[i] = 100* numberAlignmentsWithInsertions[i]/numberAlignments[i];
 		for (int i=0; i<numberAlignmentsWithDeletions.length; i++ ) numberAlignmentsWithDeletions[i] = 100* numberAlignmentsWithDeletions[i]/numberAlignments[i];
 		for (int i=0; i<numberAlignmentsWithSoftMasking.length; i++ ) numberAlignmentsWithSoftMasking[i] = 100* numberAlignmentsWithSoftMasking[i]/numberAlignments[i];
 		for (int i=0; i<numberAlignmentsWithHardMasking.length; i++ ) numberAlignmentsWithHardMasking[i] = 100* numberAlignmentsWithHardMasking[i]/numberAlignments[i];
-		
+
 		System.out.println("\n# Alignments\t"+Num.doubleArrayToString(numberAlignments, 0, "\t"));
 		System.out.println("% WithInsertions\t"+Num.doubleArrayToString(numberAlignmentsWithInsertions, 3, "\t"));
 		System.out.println("% WithDeletions\t"+Num.doubleArrayToString(numberAlignmentsWithDeletions, 3, "\t"));
 		System.out.println("% WithSoftMasking\t"+Num.doubleArrayToString(numberAlignmentsWithSoftMasking, 3, "\t"));
 		System.out.println("% WithHardMasking\t"+Num.doubleArrayToString(numberAlignmentsWithHardMasking, 3, "\t"));
-		
-		
-	}
-	
 
-	public void scanBamFile(){
-		
-		correctBases[fileIndex] = new double[1000];
-		incorrectBases[fileIndex] = new double[1000];
-		
+
+	}
+
+
+	public void scanBamFile(File bamFile){
+		numberCycles = estimateNumberOfCyclesBam(bamFile);
+
 		SAMFileReader samReader = null;
 
-			try {
-				samReader = new SAMFileReader(bamFiles[fileIndex]);
-				//calc number cycles for first and second reads (second read might be null)
-				numberCycles = estimateNumberOfCycles(samReader);
+		try {
+			samReader = new SAMFileReader(bamFile);
+
+			SAMRecordIterator it;
+			if (samReader.hasIndex()) it = samReader.queryOverlapping(chromName, 0, chromLength);
+			else it = samReader.iterator();
+
+			//int counter = 0;
+			while (it.hasNext()) {
+				SAMRecord sam = it.next();
+
+				//is it aligned?
+				if (sam.getReadUnmappedFlag()) continue;
+
+				//does it pass the vendor qc?
+				if (sam.getReadFailsVendorQualityCheckFlag()) continue;
 				
-				SAMRecordIterator it = samReader.queryOverlapping(chromName, 0, chromLength);
-
-				//int counter = 0;
-				while (it.hasNext()) {
-					SAMRecord sam = it.next();
-
-					//is it aligned?
-					if (sam.getReadUnmappedFlag()) continue;
-
-					//does it pass the vendor qc?
-					if (sam.getReadFailsVendorQualityCheckFlag()) continue;
-					
-					//if (sam.getReadNegativeStrandFlag() == false) continue;
-					//if (sam.getFirstOfPairFlag()) continue;
-					//second pair, reverse all
-					
-					//if (sam.getCigarString().equals("101M") == false) continue;
-					//if (sam.getReadString().contains("N") == false) continue;
-					
-					int numberMismatches = scoreAlignment(sam);
-					
-					//scoreAlignmentDebug(sam);
-					//if (counter++ == 9) break;
-					
-					
-					
-					//if (numberMismatches > 10) scoreAlignmentDebug(sam);
-					
-					
-
+				//prefix?
+				if (readNamePrefix != null) {
+					if (sam.getReadName().startsWith(readNamePrefix) == false) continue;
 				}
-				samReader.close();
-			} catch (Exception e){
-				System.err.println("\nError parsing sam file or writing split binary chromosome files.\n\nToo many open files exception? Too many chromosomes? " +
-				"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
-				e.printStackTrace();
-				System.exit(1);
+
+				scoreAlignment(sam);
 			}
+			samReader.close();
+		} catch (Exception e){
+			System.err.println("\nError parsing sam file or writing split binary chromosome files.\n\nToo many open files exception? Too many chromosomes? " +
+			"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
+			e.printStackTrace();
+			System.exit(1);
+		}
+	}
+
+	public File parseSamFile(){
+		BufferedReader in = null;
+		PrintWriter samOut = null;
+		int numBadLines = 0;
+		File samOutFile = null;
+		int numberAlignments = 0;
+		try {
+			//make print writer
+			samOutFile = new File(Misc.removeExtension(alignmentFiles[fileIndex].getCanonicalPath())+"_temp.sam");
+			if (deleteTempFiles) samOutFile.deleteOnExit();
+			samOut = new PrintWriter( new FileWriter (samOutFile));
+			in = IO.fetchBufferedReader(alignmentFiles[fileIndex]);
+			String line;
+			String sqMatcher = "SN:"+chromName;
+			while ((line=in.readLine())!= null) {
+				line = line.trim();
+				if (line.length() == 0) continue;
+				//is it a header line?
+				if (headerLine.matcher(line).matches()){
+					//an SQ?
+					if (line.startsWith("@SQ")){
+						if (line.contains(sqMatcher)) samOut.println(line);
+					}
+					else samOut.println(line);
+					continue;
+				}
+
+				SamAlignment sa;
+				try {
+					sa = new SamAlignment(line, true);
+				} catch (Exception e) {
+					System.err.println("Skipping malformed sam alignment -> "+e.getMessage());
+					if (numBadLines++ > 1000) Misc.printErrAndExit("Aboring: too many malformed SAM alignments");
+					continue;
+				}
+
+				//is it aligned? failed QC?
+				if (sa.isUnmapped() || sa.failedQC()) continue;
+
+				//map to fasta
+				if (sa.getReferenceSequence().equals(chromName) == false) continue;
+				
+				//prefix?
+				if (readNamePrefix != null) {
+					if (sa.getName().startsWith(readNamePrefix) == false) continue;
+				}
+
+				samOut.println(line);
+				numberAlignments++;
+
+			}
+		} catch (Exception e) {
+			System.err.println("\nError parsing SAM file.\n");
+			e.printStackTrace();
+		} finally {
+			try {
+				if (in != null) in.close();
+				if (samOut != null) samOut.close();
+			} catch (IOException e) {}
+		}
+		//any alignments?
+		if (numberAlignments == 0) return null;
+		return samOutFile;
 	}
 
 
-	private int[] estimateNumberOfCycles(SAMFileReader samReader) {
-		SAMRecordIterator it = samReader.queryOverlapping(chromName, 0, chromLength);
+	private int[] estimateNumberOfCyclesBam(File bamFile) {
+		SAMFileReader samReader = new SAMFileReader(bamFile);
+		SAMRecordIterator it;
+		if (samReader.hasIndex()) it = samReader.queryOverlapping(chromName, 0, chromLength);
+		else it = samReader.iterator();
 		int counter = 0;
 		int maxFirstPair = 0;
 		int maxSecondPair = 0;
@@ -206,7 +298,7 @@ public class CalculatePerCycleErrorRate {
 
 			//does it pass the vendor qc?
 			if (sam.getReadFailsVendorQualityCheckFlag()) continue;
-			
+
 			Matcher mat = pat.matcher(sam.getCigarString());
 			if (mat.matches()){
 				int cycles = Integer.parseInt(mat.group(1));
@@ -230,16 +322,16 @@ public class CalculatePerCycleErrorRate {
 		if (start < 0) return -1;
 		int end = sam.getAlignmentEnd();
 		if (end >= chromLength) return -2;
-		
+
 		numberAlignments[fileIndex]++;
-		
+
 		//need to flip index for negative strand reads!
 		int cycleSubtractor = 0;
 		if (sam.getReadNegativeStrandFlag()){
-			if (sam.getFirstOfPairFlag()) cycleSubtractor = numberCycles[0];
+			if (sam.getReadPairedFlag() == false || sam.getFirstOfPairFlag()) cycleSubtractor = numberCycles[0];
 			else cycleSubtractor = numberCycles[1];
 		}
-		
+
 		//walk through Ms
 		//for each cigar block
 		Matcher mat = cigarSub.matcher(sam.getCigarString());
@@ -250,7 +342,7 @@ public class CalculatePerCycleErrorRate {
 		boolean softMaskingFound = false;
 		boolean hardMaskingFound = false;
 		int numberMismatches = 0;
-		
+
 		while (mat.find()){
 			String call = mat.group(2);
 			int numberBases = Integer.parseInt(mat.group(1));
@@ -297,17 +389,17 @@ public class CalculatePerCycleErrorRate {
 			else Misc.printErrAndExit("\nError: unsupported CIGAR string see -> \n"+sam.getSAMString()+"\n");
 
 		}
-		
+
 		//increment counters
 		if (insertionFound) numberAlignmentsWithInsertions[fileIndex]++;
 		if (deletionFound) numberAlignmentsWithDeletions[fileIndex]++;
 		if (hardMaskingFound) numberAlignmentsWithHardMasking[fileIndex]++;
 		if (softMaskingFound) numberAlignmentsWithSoftMasking[fileIndex]++;
-		
+
 		return numberMismatches;
-		
+
 	}
-	
+
 	private int scoreAlignmentDebug(SAMRecord sam) {
 		//get start and end
 		int start = sam.getUnclippedStart() -1;
@@ -318,7 +410,7 @@ public class CalculatePerCycleErrorRate {
 		System.out.println(sam.getReadString());
 		for (int x=start; x< end; x++) System.out.print(chromSeq[x]);
 		System.out.println();
-		
+
 		//walk through Ms
 		//for each cigar block
 		Matcher mat = cigarSub.matcher(sam.getCigarString());
@@ -367,9 +459,9 @@ public class CalculatePerCycleErrorRate {
 			else Misc.printErrAndExit("\nError: unsupported CIGAR string see -> \n"+sam.getSAMString()+"\n");
 
 		}
-		
+
 		return numberMismatches;
-		
+
 	}
 
 
@@ -386,6 +478,7 @@ public class CalculatePerCycleErrorRate {
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
+		File forExtraction = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -393,8 +486,10 @@ public class CalculatePerCycleErrorRate {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'b': bamFiles = IO.extractFiles(new File (args[++i]), ".bam"); break;
+					case 'b': forExtraction = new File(args[i+1]); i++; break;
 					case 'f': fastaFile = new File (args[++i]); break;
+					case 't': deleteTempFiles = false; break;
+					case 'n': readNamePrefix = args[++i]; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -404,41 +499,52 @@ public class CalculatePerCycleErrorRate {
 				}
 			}
 		}
-		//check bam files
-		if (bamFiles == null || bamFiles.length == 0 || bamFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.bam file(s)!\n");
-		OverdispersedRegionScanSeqs.lookForBaiIndexes(bamFiles, false);
-		
+		//pull files
+		if (forExtraction == null ) Misc.printExit("\nError: cannot find your xxx.bam file(s) or xxx.sam(.zip/.gz)!\n");
+		File[][] tot = new File[4][];
+		tot[0] = IO.extractFiles(forExtraction,".sam");
+		tot[1] = IO.extractFiles(forExtraction,".sam.gz");
+		tot[2] = IO.extractFiles(forExtraction,".sam.zip");
+		tot[3] = IO.extractFiles(forExtraction,".bam");
+
+		alignmentFiles = IO.collapseFileArray(tot);
+		if (alignmentFiles == null || alignmentFiles.length==0) alignmentFiles = IO.extractFiles(forExtraction);
+		if (alignmentFiles == null || alignmentFiles.length ==0 || alignmentFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.bam file(s) or xxx.sam(.zip/.gz)!\n");
+
 		//check fasta
 		if (fastaFile == null || fastaFile.canRead() == false) Misc.printExit("\nError: cannot find or read your fasta file!\n");
-		
+		if (fastaFile.isDirectory()) Misc.printExit("\nError: please provide a single fasta file for scoring. Not a directory.\n");
+
 		//check results
 		if (fastaFile == null ) Misc.printExit("\nError: please enter a file for saving the results!\n");
 
 	}	
-	
+
 
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Calculate Per Cycle Error Rate : Jan 2013                 **\n" +
+				"**                        Calculate Per Cycle Error Rate : Feb 2013                 **\n" +
 				"**************************************************************************************\n" +
 				"Calculates per cycle error rates provided a sorted indexed bam file and a fasta\n" +
 				"sequence file. Only checks CIGAR M bases not masked or INDEL bases.\n\n" +
 
 				"Required Options:\n"+
-				"-b Full path to a coordinate sorted bam file (xxx.bam) or directory containing such.\n" +
-				"      Multiple files are processed independently.\n"+
-				"-f Full path to the fasta file you wish to use in calculating the per cycle error rate.\n" +
+				"-b Full path to a coordinate sorted bam file (xxx.bam) with its associated (xxx.bai)\n" +
+				"      index or directory containing such. Multiple files are processed independently.\n" +
+				"      Unsorted xxx.sam(.gz/.zip OK) files also work but are processed rather slowly.\n"+
+				"-f Full path to the single fasta file you wish to use in calculating the error rate.\n" +
+				"-n Require read names to begin with indicated text, defaults to accepting everything.\n"+
 
 				"\n"+
 
 				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate -b /Data/Bam/\n"+
-				"     -f /Fastas/chrPhiX_Illumina.fasta.gz \n\n"+
+				"     -f /Fastas/chrPhiX_Illumina.fasta.gz -n HWI\n\n"+
 
 		"**************************************************************************************\n");
 
 	}
-		
+
 
 }

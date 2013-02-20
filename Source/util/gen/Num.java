@@ -3760,6 +3760,7 @@ public class Num {
 	 * If trim number resolves to 0 will proceed returning mean.*/
 	public static double trimmedMean(float[] sortedFloat, double fraction){
 		int trimNumber = (int)Math.round(((double)sortedFloat.length) * fraction);
+		if (trimNumber == 0) trimNumber = 1;
 		return trimmedMean(sortedFloat, trimNumber);
 	}
 
@@ -4474,6 +4475,12 @@ public class Num {
 		float sumT=0;
 		for (int i=t.length-1; i>=0; i--) sumT+= t[i];
 		return sumT/(float)t.length;
+	}
+	/**Averages a float array, including startIndex, not including stopIndex.*/
+	public static float mean(int startIndex, int stopIndex, float[] t){
+		float sumT=0;
+		for (int i=startIndex; i< stopIndex; i++) sumT+= t[i];
+		return sumT/(float)(stopIndex-startIndex);
 	}
 	/**Averages two float[]s .*/
 	public static float[] mean(float[] one, float[] two){
