@@ -140,15 +140,15 @@ public class FetchGenomicSequences {
 	public static void printDocs(){ 
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          FetchGenomicSequences: Sept 2012                        **\n" +
+				"**                           FetchGenomicSequences: Feb 2013                        **\n" +
 				"**************************************************************************************\n" +
 				"Given a file containing genomic coordinates, fetches and saves the sequence (column\n" +
 				"output: chrom origStart origStop fetchedStart fetchedStop completeFetch seq).\n\n"+
 
-				"-f Full path file text to the file or directory containing tab delimited chrom, start,\n" +
-				"        stop files.  Interbabase coordinates (zero based, stop excluded).\n"+
+				"-f Full path to a file or directory containing tab delimited chrom, start,\n" +
+				"        stop text files.  Interbabase coordinates (zero based, stop excluded).\n"+
 				"-s Full path directory text containing containing genomic fasta files. The fasta\n" +
-				"        defines the text of the sequence, not the file text. \n"+
+				"        header defines the name of the sequence, not the file name. \n"+
 				"-b Fetch flanking bases, defaults to 0. Will set start to zero or stop to last base if\n" +
 				"        boundaries are exceeded.\n"+
 				"-r Reverse complement fetched sequences, defaults to returning the + genomic strand.\n"+
@@ -156,7 +156,7 @@ public class FetchGenomicSequences {
 
 
 				"\nExample: java -Xmx1000M -jar pathTo/T2/Apps/FetchGenomicSequences -f /data/miRNAs.txt\n" +
-				"      -c /genomes/human/v35.1/ -b 5000 -r   \n\n" +
+				"      -s /genomes/human/v35.1/ -b 5000 -r   \n\n" +
 
 				"\n" +
 		"**************************************************************************************\n");		
