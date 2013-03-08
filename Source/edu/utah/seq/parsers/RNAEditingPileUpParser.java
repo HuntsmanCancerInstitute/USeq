@@ -117,12 +117,6 @@ public class RNAEditingPileUpParser {
 					positionsPlus.add(position);
 					conversionsPlus.add(numGs);
 					nonConversionsPlus.add(numNonGs); 
-					/*if (position == 295083){
-						System.out.println("295083!!!!!");
-						System.out.println("Converted "+numGs);
-						System.out.println("Noncon    "+numNonGs);
-						System.out.println("Bases "+tokens[baseCallIndex]);
-					}*/
 				}
 				
 				//minus strand
