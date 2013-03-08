@@ -1,8 +1,10 @@
 package edu.utah.seq.analysis;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 
 import edu.utah.seq.data.PointData;
+import util.gen.Misc;
 import util.gen.Num;
 
 /**Container for holding methylation observations at a given base position.*/
@@ -23,6 +25,21 @@ public class MethylatedBaseObservationOneSample {
 		}
 		
 		//methods
+		public void subsample(int maxReadCoverage) {
+			int total = (int)(nonCon+con);
+			if (total > maxReadCoverage ){
+				boolean[] b = new boolean[total];
+				Arrays.fill(b, 0, (int)con, true);
+				Misc.randomize(b, 0l);
+				nonCon = 0f;
+				con = 0f;
+				for (int i=0; i< maxReadCoverage; i++){
+					if (b[i]) con++;
+					else nonCon++;
+				}
+			}
+
+		}
 		public String toString(){
 			StringBuilder sb = new StringBuilder();
 			sb.append(position +"\tposition\n");
