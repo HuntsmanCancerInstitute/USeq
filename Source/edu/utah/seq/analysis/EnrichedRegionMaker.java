@@ -1010,6 +1010,7 @@ public class EnrichedRegionMaker {
 
 	/**This method will process each argument and assign new varibles*/
 	public void processArgs(String[] args){
+		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		Pattern pat = Pattern.compile("-[a-z]");
 		String swiString = null;
 		for (int i = 0; i<args.length; i++){

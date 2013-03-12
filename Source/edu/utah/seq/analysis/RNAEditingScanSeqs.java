@@ -26,7 +26,7 @@ public class RNAEditingScanSeqs {
 	private float minimumPseMedian = 0.005f;
 
 	//internal fields
-	private int numberRandomPermutations = 1000;
+	private int numberRandomPermutations = 100;
 	private int targetNumberRandomWindows = 1000000;
 	private ChiSquareTest chiSquare = new ChiSquareTest();
 	private File meanDir;
@@ -77,7 +77,7 @@ public class RNAEditingScanSeqs {
 		pvalDir.mkdir();
 		
 		//make containers for randomScores
-		randomScores = new RandomScoreArray[windowSize];
+		randomScores = new RandomScoreArray[windowSize+10];
 
 		doWork();
 		
@@ -643,7 +643,8 @@ public class RNAEditingScanSeqs {
 				"-m Minimum number observations in window, defaults to 5. \n" +
 				"\n"+
 
-				"Example: java -Xmx4G -jar pathTo/USeq/Apps/ \n\n" +
+				"Example: java -Xmx4G -jar pathTo/USeq/Apps/RNAEditingScanSeqs -s /Results/RESS -p 0.01\n" +
+				"-e /PointData/Edited -r /PointData/Reference \n\n" +
 
 				"**************************************************************************************\n");
 
