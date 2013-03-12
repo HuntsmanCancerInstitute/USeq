@@ -69,7 +69,7 @@ public class AggregatePlotter {
 			String chromStrand = it.next();
 			chromosome = chromStrand.substring(0,chromStrand.length()-1);
 			strand = chromStrand.substring(chromStrand.length()-1);
-			if (strand.equals(".") && strandUsage != COMBINE) Misc.printErrAndExit("\nStrand usage has been indicated yet regions aren't stranded! Is your bed file properly formated (5 columns)? Aborting.\n");
+			if (strand.equals(".") && strandUsage != COMBINE) Misc.printErrAndExit("\nStrand usage has been indicated yet regions aren't stranded! Is your bed file properly formated (5 columns)? Aborting.\n"+chromStrand);
 
 			//fetch and shift positions or delog scores
 			if (halfPeakShift !=0 || delogScores || replaceScoresWithOne) shiftPositions();
@@ -338,6 +338,7 @@ public class AggregatePlotter {
 	private void shiftPositions(){
 		//fetch data 
 		PointData[] t = chromPointData.get(chromosome);
+		if (t== null) return;
 		if (t[0]!=null) {
 			int[] p = t[0].getPositions();
 			if (halfPeakShift !=0) addShift(p,halfPeakShift);
