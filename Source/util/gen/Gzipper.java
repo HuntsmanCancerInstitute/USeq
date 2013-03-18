@@ -33,6 +33,14 @@ public class Gzipper {
 		out.write(rtn);
 	}
 	
+	/**Adds a return onto each objects toString()*/
+	public void println(Object[] obj) throws IOException{
+		for (Object o: obj){
+			out.write(o.toString().getBytes());
+			out.write(rtn);
+		}
+	}
+	
 	public void print(String line) throws IOException{
 		out.write(line.getBytes());
 	}

@@ -5,6 +5,7 @@ import java.util.regex.*;
 import java.util.*;
 
 import net.sf.samtools.*;
+import net.sf.samtools.SAMFileReader.ValidationStringency;
 import util.bio.annotation.Bed;
 import util.bio.annotation.ExonIntron;
 import util.bio.parsers.*;
@@ -308,6 +309,7 @@ public class DefinedRegionDifferentialSeq {
 
 		//make reader
 		SAMFileReader reader = new SAMFileReader(replica.getBamFile());	
+		reader.setValidationStringency(ValidationStringency.SILENT);
 	
 
 		//fetch chromName: length for all chroms

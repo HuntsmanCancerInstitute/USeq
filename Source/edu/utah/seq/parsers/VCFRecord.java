@@ -52,7 +52,18 @@ public class VCFRecord {
 	private String[] sample;
 	private VCFParser vcfParser;
 	
+	private boolean matching = false;
 	public static final Pattern colon = Pattern.compile(":");
+	
+	public boolean matches(VCFRecord vcfRecord) {
+		//check position
+		if (this.position != vcfRecord.getPosition()) return false;
+		//check alternate
+		if (this.alternate.equals(vcfRecord.getAlternate()) == false) return false;
+		//check genotype
+		if (this.getSampleGenotype().equals(vcfRecord.getSampleGenotype()) == false) return false;
+		return true;
+	}
 	
 	/**Only extracts some of the fields from a record*/
 	public VCFRecord(String[] fields, VCFParser vcfParser) throws Exception{
@@ -164,4 +175,13 @@ public class VCFRecord {
 	public String getQuality() {
 		return quality;
 	}
+
+	public boolean isMatching() {
+		return matching;
+	}
+
+	public void setMatching(boolean matching) {
+		this.matching = matching;
+	}
+
 }
