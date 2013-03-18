@@ -7,6 +7,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.Pattern;
 
+import edu.utah.ames.bioinfo.Misc;
+import edu.utah.seq.useq.data.RegionScoreText;
+
 import util.gen.IO;
 import util.gen.Num;
 
@@ -38,6 +41,52 @@ public class VCFParser {
 		this. vcfFile = vcfFile;
 		this.excludeFilteredRecords = excludeFilteredRecords;
 		parseVCF();
+	}
+	
+	public void filterVCFRecords(HashMap<String,RegionScoreText[]> goodRegions){
+		long numRecordsPassing = 0;
+		HashMap<String, VCFLookUp> passing = new HashMap<String, VCFLookUp>();
+		for (String chr: goodRegions.keySet()){
+			VCFLookUp vcf = chromVCFRecords.get(chr);
+			if (vcf == null) continue;
+			//make boolean array representing covered bases
+			RegionScoreText[] r = goodRegions.get(chr);
+			int lastBase = RegionScoreText.findLastBase(r);
+			boolean[] coveredBases = new boolean[lastBase];
+			for (int i=0; i< r.length; i++){
+				int stop = r[i].getStop();
+				for (int j=r[i].getStart(); j< stop; j++){
+					coveredBases[j] = true;
+				}
+			}
+			//filter existing records
+			int[] positions = vcf.getBasePosition();
+			VCFRecord[] vcfRecords = vcf.getVcfRecord();
+			ArrayList<Integer> goodPositions = new ArrayList<Integer>();
+			ArrayList<VCFRecord> goodRecords = new ArrayList<VCFRecord>();
+			//for each position, is it covered?
+			for (int i=0; i< positions.length; i++){
+				if (coveredBases[positions[i]]) {
+					goodPositions.add(positions[i]);
+					goodRecords.add(vcfRecords[i]);
+				}
+			}
+			
+			//any records?
+			if (goodPositions.size() !=0){
+				positions = new int[goodPositions.size()];
+				positions = Misc.integerArrayListToIntArray(goodPositions);
+				vcfRecords = new VCFRecord[positions.length];
+				goodRecords.toArray(vcfRecords);
+				numRecordsPassing += positions.length;
+				passing.put(chr, new VCFLookUp(positions, vcfRecords));
+				vcf = null;
+			}
+		}
+		//reset counters
+		numberVCFRecordsFailingFilter = numberVCFRecords - numRecordsPassing;
+		numberVCFRecords = numRecordsPassing;
+		chromVCFRecords = passing;
 	}
 
 	public void parseVCF() {

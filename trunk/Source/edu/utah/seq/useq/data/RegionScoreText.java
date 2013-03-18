@@ -3,6 +3,7 @@ package edu.utah.seq.useq.data;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 
 /** @author david.nix@hci.utah.edu*/
 public class RegionScoreText extends RegionScore{
@@ -71,5 +72,15 @@ public class RegionScoreText extends RegionScore{
 	}
 	public void setText(String text) {
 		this.text = text;
+	}
+	/**Assumes interbase coordinates.*/
+	public static int countBases(HashMap<String,RegionScoreText[]> regions){
+		int total = 0;
+		for (RegionScoreText[] r : regions.values()){
+			for (int i=0; i< r.length; i++){
+				total += r[i].getLength();
+			}
+		}
+		return total;
 	}
 }
