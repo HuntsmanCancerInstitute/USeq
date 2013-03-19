@@ -1,4 +1,4 @@
-package edu.utah.seq.parsers;
+package edu.utah.seq.vcf;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -83,12 +83,12 @@ chr1	714427	rs12028261	G	A	57.36	PASS	AC=4;AF=1.00;AN=4;DB;DP=2;Dels=0.00;FS=0.0
 chr1	725822	rs199845677	G	A	45.59	PASS	AC=1;AF=0.167;AN=6;BaseQRankSum=-1.231;DB;DP=5;Dels=0.00;FS=3.979;HaplotypeScore=0.3333;MLEAC=1;MLEAF=0.167;MQ=70.00;MQ0=0;MQRankSum=0.358;QD=15.20;ReadPosRankSum=0.358;VQSLOD=11.31;culprit=HaplotypeScore	GT:AD:DP:GQ:PL	0/0:1,0:1:3:0,3,42	0/1:1,2:3:32:72,0,32	./.	./.	./.	0/0:1,0:1:3:0,3,43	./.
 
  */
-public class MultiSampleVCFParser {
+public class VCFParser {
 	//user defined fields
 	private File vcfFile;
 	
 	//internal fields
-	private MultiSampleVCFRecord[] vcfRecords;
+	private VCFRecord[] vcfRecords;
 	private String[] comments;
 	public static final Pattern TAB = Pattern.compile("\\t");
 	public static final Pattern COLON = Pattern.compile(":");
@@ -124,7 +124,7 @@ public class MultiSampleVCFParser {
 	int sampleGenotypeQualityGQIndex=3;
 	int samplePhredLikelihoodsPLIndex = 4;
 
-	public MultiSampleVCFParser(File vcfFile, boolean loadRecords){
+	public VCFParser(File vcfFile, boolean loadRecords){
 		this. vcfFile = vcfFile;
 		parseVCF(loadRecords);
 	}
@@ -137,7 +137,7 @@ public class MultiSampleVCFParser {
 		int badCounter = 0;
 		try {
 			in  = IO.fetchBufferedReader(vcfFile);
-			ArrayList<MultiSampleVCFRecord> records = new ArrayList<MultiSampleVCFRecord>(10000);
+			ArrayList<VCFRecord> records = new ArrayList<VCFRecord>(10000);
 			ArrayList<String> commentsAL = new ArrayList<String>();
 
 			//find "#CHROM" line and parse sample names
@@ -164,7 +164,7 @@ public class MultiSampleVCFParser {
 			//parse data
 			while ((line=in.readLine()) != null){
 				try {
-					MultiSampleVCFRecord vcf = new MultiSampleVCFRecord(line, this);
+					VCFRecord vcf = new VCFRecord(line, this);
 					records.add(vcf);
 				} catch (Exception e) {
 					System.err.println("Skipping malformed VCF Record-> "+line);
@@ -178,7 +178,7 @@ public class MultiSampleVCFParser {
 
 			
 			//save array
-			vcfRecords = new MultiSampleVCFRecord[records.size()];
+			vcfRecords = new VCFRecord[records.size()];
 			records.toArray(vcfRecords);
 
 			
@@ -195,7 +195,7 @@ public class MultiSampleVCFParser {
 	
 	public int countMatchingVCFRecords(String matchFilterText){
 		int numMatches = 0;
-		for (MultiSampleVCFRecord r : vcfRecords){
+		for (VCFRecord r : vcfRecords){
 			if (r.getFilter().equals(matchFilterText)) numMatches++;
 		}
 		return numMatches;
@@ -203,14 +203,14 @@ public class MultiSampleVCFParser {
 	
 	/**Sets the filter field in each record to the indicated text.*/
 	public void setFilterFieldOnAllRecords (String text){
-		for (MultiSampleVCFRecord r : vcfRecords) r.setFilter(text);
+		for (VCFRecord r : vcfRecords) r.setFilter(text);
 	}
 
-	public MultiSampleVCFRecord[] getVcfRecords() {
+	public VCFRecord[] getVcfRecords() {
 		return vcfRecords;
 	}
 
-	public void setVcfRecords(MultiSampleVCFRecord[] vcfRecords) {
+	public void setVcfRecords(VCFRecord[] vcfRecords) {
 		this.vcfRecords = vcfRecords;
 	}
 
@@ -241,7 +241,7 @@ public class MultiSampleVCFParser {
 			Gzipper outBad = new Gzipper(bad);
 			outGood.println(comments);
 			outBad.println(comments);
-			for (MultiSampleVCFRecord r : vcfRecords){
+			for (VCFRecord r : vcfRecords){
 				if (r.getFilter().equals(fieldPass)) outGood.println(r);
 				else outBad.println(r);
 			}

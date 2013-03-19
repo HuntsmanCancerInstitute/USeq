@@ -1,3 +1,9 @@
+----USeq_8.5.4----
+MultiSampleVCFFilter
+* New app for splitting multiple sample vcf file(s) records into those that pass or fail a variety of conditions and sample level thresholds
+DefinedRegionDifferentialSeq
+* Set the validation strigency on the Picard SAMReaders to silent
+
 ----USeq_8.5.3----
 DefinedRegionRNAEditing
 * New app for scoring user defined regions for RNAEditing, similar stats to RNAEditingScanSeqs

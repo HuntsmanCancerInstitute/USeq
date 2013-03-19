@@ -1,4 +1,5 @@
-package edu.utah.seq.parsers;
+package edu.utah.seq.vcf;
+
 
 /* GT:AD:DP:GQ:PL
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype"> 0/0, 0/1, 1/1
@@ -15,7 +16,7 @@ public class VCFSample {
 	private int genotypeQualityGQ;
 	private boolean noCall = false;
 
-	public VCFSample(String sample, MultiSampleVCFParser parser) throws Exception{
+	public VCFSample(String sample, VCFParser parser) throws Exception{
 		//is it a no call?
 		if (sample.equals("./.")){
 			noCall = true;
