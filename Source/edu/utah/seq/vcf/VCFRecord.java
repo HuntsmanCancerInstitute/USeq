@@ -1,7 +1,8 @@
-package edu.utah.seq.parsers;
+package edu.utah.seq.vcf;
+
 
 /**For parsing a VCFRecord with multiple samples*/
-public class MultiSampleVCFRecord {
+public class VCFRecord {
 	
 	//fields
 	private int position; //interbase coordinates! not 1 based
@@ -15,7 +16,7 @@ public class MultiSampleVCFRecord {
 	private String originalRecord;
 	
 	/**Only extracts some of the fields from a record*/
-	public MultiSampleVCFRecord(String record, MultiSampleVCFParser vcfParser) throws Exception{
+	public VCFRecord(String record, VCFParser vcfParser) throws Exception{
 		originalRecord = record;
 		String[] fields = vcfParser.TAB.split(record);
 		if (vcfParser.numberFields !=0){

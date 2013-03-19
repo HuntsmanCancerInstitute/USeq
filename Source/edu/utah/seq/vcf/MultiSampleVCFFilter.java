@@ -1,13 +1,11 @@
-package edu.utah.seq.base;
+package edu.utah.seq.vcf;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import edu.utah.seq.parsers.MultiSampleVCFParser;
-import edu.utah.seq.parsers.MultiSampleVCFRecord;
-import edu.utah.seq.parsers.VCFSample;
+
 import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
@@ -37,7 +35,7 @@ public class MultiSampleVCFFilter {
 		//for each file
 		System.out.println("\nFile\tFilterType\tStarting#\tEnding#");
 		for (int i=0; i< vcfFiles.length; i++){
-			MultiSampleVCFParser parser = new MultiSampleVCFParser(vcfFiles[i], true);
+			VCFParser parser = new VCFParser(vcfFiles[i], true);
 
 			//set everything to pass (note this won't change the original when you print because printing grabs the original record line)
 			parser.setFilterFieldOnAllRecords(pass);
@@ -69,22 +67,22 @@ public class MultiSampleVCFFilter {
 	private void printSampleNames() {
 		System.out.println("File\tSampleNames");
 		for (int i=0; i< vcfFiles.length; i++){
-			MultiSampleVCFParser parser = new MultiSampleVCFParser(vcfFiles[i], false);
+			VCFParser parser = new VCFParser(vcfFiles[i], false);
 			System.out.println(vcfFiles[i].getName()+ "\t"+ Misc.stringArrayToString(parser.getSampleNames(), ","));
 		}
 	}
 
 	/**Sets passing records to fail if any of the control samples that pass the read depth and genotype quality and are also homozygous for the non reference allele. 
 	 * Returns int[startingNumPassing, endingNumPassing]*/
-	private int[] controlHomozygousFilter(MultiSampleVCFParser parser) {
+	private int[] controlHomozygousFilter(VCFParser parser) {
 		//fetch indexes for controls
 		int[] controlSampleIndex = fetchControlIndexes(parser);
 		//fetch records
-		MultiSampleVCFRecord[] records = parser.getVcfRecords();
+		VCFRecord[] records = parser.getVcfRecords();
 		int startingRecordNumber = parser.countMatchingVCFRecords(pass);
 
 		//filter
-		for (MultiSampleVCFRecord test : records){
+		for (VCFRecord test : records){
 			//is it a passing record?
 			if (test.getFilter().equals(fail)) continue;
 
@@ -109,7 +107,7 @@ public class MultiSampleVCFFilter {
 	}
 
 
-	private int[] fetchControlIndexes(MultiSampleVCFParser parser) {
+	private int[] fetchControlIndexes(VCFParser parser) {
 		int[] indexes = new int[controlSampleNames.length];
 		String[] sampleNames = parser.getSampleNames();
 		for (int i=0; i< indexes.length; i++){
@@ -129,15 +127,15 @@ public class MultiSampleVCFFilter {
 
 	/**Sets passing records to fail if no cohort/ affected sample makes the read depth and genotype quality thresholds. 
 	 * Returns int[startingNumPassing, endingNumPassing]*/
-	private int[] filterAnySampleCohort(MultiSampleVCFParser parser) {
+	private int[] filterAnySampleCohort(VCFParser parser) {
 		//fetch indexes for controls
 		int[] cohortSampleIndex = fetchCohortIndexes(parser);
 		//fetch records
-		MultiSampleVCFRecord[] records = parser.getVcfRecords();
+		VCFRecord[] records = parser.getVcfRecords();
 		int startingRecordNumber = parser.countMatchingVCFRecords(pass);
 
 		//filter
-		for (MultiSampleVCFRecord test : records){
+		for (VCFRecord test : records){
 			//is it a passing record?
 			if (test.getFilter().equals(fail)) continue;
 
@@ -160,7 +158,7 @@ public class MultiSampleVCFFilter {
 	}
 
 
-	private int[] fetchCohortIndexes(MultiSampleVCFParser parser) {
+	private int[] fetchCohortIndexes(VCFParser parser) {
 		int[] indexes = new int[cohortSampleNames.length];
 		String[] sampleNames = parser.getSampleNames();
 		for (int i=0; i< indexes.length; i++){
@@ -181,12 +179,12 @@ public class MultiSampleVCFFilter {
 
 
 	/**Sets passing records to fail if no sample passes the sample read depth and genotype quality. Returns int[startingNumPassing, endingNumPassing]*/
-	private int[] filterAnySample(MultiSampleVCFParser parser) {
+	private int[] filterAnySample(VCFParser parser) {
 		//fetch records
-		MultiSampleVCFRecord[] records = parser.getVcfRecords();
+		VCFRecord[] records = parser.getVcfRecords();
 		int startingRecordNumber = parser.countMatchingVCFRecords(pass);
 		//filter
-		for (MultiSampleVCFRecord test : records){
+		for (VCFRecord test : records){
 			//is it a passing record?
 			if (test.getFilter().equals(fail)) continue;
 			boolean passes = false;
@@ -287,7 +285,9 @@ public class MultiSampleVCFFilter {
 				"**************************************************************************************\n" +
 				"Splits vcf file(s) containing multiple sample records into those that pass and fail\n" +
 				"the tests below. This works with VCFv4.1 files created by the GATK package. Note, the\n" +
-				"records are not modified.\n\n" +
+				"records are not modified. There is an incompatibility with the Tabix gzip function and\n" +
+				"java gzip reader on Linux.  If you find premature termination of your vcf file try\n" +
+				"uncompressing the file.\n\n" +
 
 				"Options:\n"+
 				"-v Full path to a multi sample vcf file or directory containing such\n" +

@@ -1,4 +1,4 @@
-package edu.utah.seq.parsers;
+package edu.utah.seq.vcf;
 
 import java.util.Arrays;
 
@@ -42,7 +42,7 @@ public class VCFLookUp {
 		int counter = 0;
 		for (int i=indexes[0]; i< indexes[1]; i++){
 			vals[counter++] = vcfRecord[i];
-			System.out.println("\tFound vcf "+vcfRecord[i].toStringSimple());
+			System.out.println("\tFound vcf "+vcfRecord[i].toString());
 		}
 		return vals ;
 	}
