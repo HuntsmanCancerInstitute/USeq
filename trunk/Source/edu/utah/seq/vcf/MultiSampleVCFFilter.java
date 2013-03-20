@@ -15,16 +15,17 @@ public class MultiSampleVCFFilter {
 	//user defined fields
 	private File[] vcfFiles;
 	private boolean filterAnySample = false;
+	private boolean controlHomozygousFilter = false;
+	private boolean oneOrMorePassingCohortFilter = false;
+	private boolean filterRecordQuality = false;
 	private int sampleMinimumReadDepthDP = 0;
 	private int sampleMinimumGenotypeQualityGQ = 0;
+	private float recordMinimumQUAL = 0;
 	private boolean printSampleNames = false;
 	private String[] controlSampleNames = null;
 	private String[] cohortSampleNames = null;
-	private boolean controlHomozygousFilter = false;
-	private boolean oneOrMorePassingCohortFilter = false;
-	private String pass = "PASS";
-	private String fail = "FAIL";
 
+	
 	public MultiSampleVCFFilter(String[] args){
 		long startTime = System.currentTimeMillis();
 
@@ -35,10 +36,15 @@ public class MultiSampleVCFFilter {
 		//for each file
 		System.out.println("\nFile\tFilterType\tStarting#\tEnding#");
 		for (int i=0; i< vcfFiles.length; i++){
-			VCFParser parser = new VCFParser(vcfFiles[i], true);
+			VCFParser parser = new VCFParser(vcfFiles[i], true, true);
 
 			//set everything to pass (note this won't change the original when you print because printing grabs the original record line)
-			parser.setFilterFieldOnAllRecords(pass);
+			parser.setFilterFieldOnAllRecords(VCFRecord.PASS);
+			
+			if (filterRecordQuality){
+				int[] startEndCounts = filterRecordQuality(parser);
+				System.out.println(vcfFiles[i].getName()+ "\tRecordQuality\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+			}
 
 			if (filterAnySample) {
 				int[] startEndCounts = filterAnySample(parser);
@@ -56,7 +62,7 @@ public class MultiSampleVCFFilter {
 			}
 
 			//print good and bad records 
-			parser.printRecords(pass);
+			parser.printRecords(VCFRecord.PASS);
 		}
 
 		//finish and calc run time
@@ -67,7 +73,7 @@ public class MultiSampleVCFFilter {
 	private void printSampleNames() {
 		System.out.println("File\tSampleNames");
 		for (int i=0; i< vcfFiles.length; i++){
-			VCFParser parser = new VCFParser(vcfFiles[i], false);
+			VCFParser parser = new VCFParser(vcfFiles[i], false, false);
 			System.out.println(vcfFiles[i].getName()+ "\t"+ Misc.stringArrayToString(parser.getSampleNames(), ","));
 		}
 	}
@@ -79,12 +85,12 @@ public class MultiSampleVCFFilter {
 		int[] controlSampleIndex = fetchControlIndexes(parser);
 		//fetch records
 		VCFRecord[] records = parser.getVcfRecords();
-		int startingRecordNumber = parser.countMatchingVCFRecords(pass);
+		int startingRecordNumber = parser.countMatchingVCFRecords(VCFRecord.PASS);
 
 		//filter
 		for (VCFRecord test : records){
 			//is it a passing record?
-			if (test.getFilter().equals(fail)) continue;
+			if (test.getFilter().equals(VCFRecord.FAIL)) continue;
 
 			boolean passes = true;
 			VCFSample[] samples = test.getSample();
@@ -99,10 +105,10 @@ public class MultiSampleVCFFilter {
 					break;
 				}
 			}
-			if (passes == false) test.setFilter(fail);
+			if (passes == false) test.setFilter(VCFRecord.FAIL);
 		}
 
-		int numStillPassing = parser.countMatchingVCFRecords(pass);
+		int numStillPassing = parser.countMatchingVCFRecords(VCFRecord.PASS);
 		return new int[]{startingRecordNumber, numStillPassing};
 	}
 
@@ -132,12 +138,12 @@ public class MultiSampleVCFFilter {
 		int[] cohortSampleIndex = fetchCohortIndexes(parser);
 		//fetch records
 		VCFRecord[] records = parser.getVcfRecords();
-		int startingRecordNumber = parser.countMatchingVCFRecords(pass);
+		int startingRecordNumber = parser.countMatchingVCFRecords(VCFRecord.PASS);
 
 		//filter
 		for (VCFRecord test : records){
 			//is it a passing record?
-			if (test.getFilter().equals(fail)) continue;
+			if (test.getFilter().equals(VCFRecord.FAIL)) continue;
 
 			boolean passes = false;
 			VCFSample[] samples = test.getSample();
@@ -150,10 +156,10 @@ public class MultiSampleVCFFilter {
 					break;
 				}
 			}
-			if (passes == false) test.setFilter(fail);
+			if (passes == false) test.setFilter(VCFRecord.FAIL);
 		}
 
-		int numStillPassing = parser.countMatchingVCFRecords(pass);
+		int numStillPassing = parser.countMatchingVCFRecords(VCFRecord.PASS);
 		return new int[]{startingRecordNumber, numStillPassing};
 	}
 
@@ -182,11 +188,11 @@ public class MultiSampleVCFFilter {
 	private int[] filterAnySample(VCFParser parser) {
 		//fetch records
 		VCFRecord[] records = parser.getVcfRecords();
-		int startingRecordNumber = parser.countMatchingVCFRecords(pass);
+		int startingRecordNumber = parser.countMatchingVCFRecords(VCFRecord.PASS);
 		//filter
 		for (VCFRecord test : records){
 			//is it a passing record?
-			if (test.getFilter().equals(fail)) continue;
+			if (test.getFilter().equals(VCFRecord.FAIL)) continue;
 			boolean passes = false;
 			for (VCFSample sample: test.getSample()){
 				//is it a passing record?
@@ -197,9 +203,24 @@ public class MultiSampleVCFFilter {
 					break;
 				}
 			}
-			if (passes == false) test.setFilter(fail);
+			if (passes == false) test.setFilter(VCFRecord.FAIL);
 		}
-		int numStillPassing = parser.countMatchingVCFRecords(pass);
+		int numStillPassing = parser.countMatchingVCFRecords(VCFRecord.PASS);
+		return new int[]{startingRecordNumber, numStillPassing};
+	}
+	
+	/**Sets passing records to fail if no sample passes the sample read depth and genotype quality. Returns int[startingNumPassing, endingNumPassing]*/
+	private int[] filterRecordQuality(VCFParser parser) {
+		//fetch records
+		VCFRecord[] records = parser.getVcfRecords();
+		int startingRecordNumber = parser.countMatchingVCFRecords(VCFRecord.PASS);
+		//filter
+		for (VCFRecord test : records){
+			//is it a passing record?
+			if (test.getFilter().equals(VCFRecord.FAIL)) continue;
+			if (test.getQuality() < recordMinimumQUAL) test.setFilter(VCFRecord.FAIL);
+		}
+		int numStillPassing = parser.countMatchingVCFRecords(VCFRecord.PASS);
 		return new int[]{startingRecordNumber, numStillPassing};
 	}
 
@@ -207,6 +228,7 @@ public class MultiSampleVCFFilter {
 
 	private void printOptions() {
 		System.out.println("Options:");
+		System.out.println(filterRecordQuality+"\tFail records with QUAL scores < "+ recordMinimumQUAL);
 		System.out.println(filterAnySample + "\tPass records where any sample passses thresholds");
 		System.out.println(controlHomozygousFilter + "\tFail records where any control is homozygous non reference and also passes the sample thresholds");
 		if (controlHomozygousFilter) System.out.println(Misc.stringArrayToString(controlSampleNames, ",")+ "\tControl sample names");
@@ -242,6 +264,7 @@ public class MultiSampleVCFFilter {
 					case 'c': oneOrMorePassingCohortFilter = true; break;
 					case 'g': sampleMinimumGenotypeQualityGQ = Integer.parseInt(args[++i]); break;
 					case 'r': sampleMinimumReadDepthDP = Integer.parseInt(args[++i]); break;
+					case 'd': recordMinimumQUAL = Float.parseFloat(args[++i]); filterRecordQuality = true; break;
 					case 's': printSampleNames = true; break;
 					case 'o': cohortSampleNames = args[++i].split(","); break;
 					case 'n': controlSampleNames = args[++i].split(","); break;
@@ -276,6 +299,8 @@ public class MultiSampleVCFFilter {
 		if (oneOrMorePassingCohortFilter){
 			if (cohortSampleNames == null || cohortSampleNames.length ==0) Misc.printExit("\nError: please enter a comma delimited list (no spaces) of the cohort/ affected sample names.\n");
 		}
+		
+		
 	}	
 
 	public static void printDocs(){
@@ -290,14 +315,15 @@ public class MultiSampleVCFFilter {
 				"uncompressing the file.\n\n" +
 
 				"Options:\n"+
-				"-v Full path to a multi sample vcf file or directory containing such\n" +
+				"-v Full path to a sorted multi sample vcf file or directory containing such\n" +
 				"      (xxx.vcf(.gz/.zip OK)). \n"+
 				"-a Fail records where no sample passes the sample thresholds.\n"+
 				"-b Fail records where any of the control samples that pass the sample thresholds also\n" +
 				"      contain the homozygous non reference allele. Requires setting -n .\n"+
 				"-c Fail records where none of the cohort/ affected samples pass the sample thresholds.\n" +
 				"      Requires setting -o .\n"+
-				"-g Minimum sample genotype quality GQ, defaults to 0, recommend >= 13 .\n"+
+				"-d Minimum record QUAL score, defaults to 0, recommend >=20 .\n"+
+				"-g Minimum sample genotype quality GQ, defaults to 0, recommend >= 20 .\n"+
 				"-r Minimum sample read depth DP, defaults to 0, recommend >=10 .\n"+
 				"-o Comma delimited (no spaces) list of cohort/ affected sample names.\n"+
 				"-n Comma delimited (no spaces) list of control sample names.\n"+
@@ -305,8 +331,8 @@ public class MultiSampleVCFFilter {
 
 				"\n"+
 
-				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/MultiSampleVCFFilter -b -c -g 13 -r 10\n" +
-				"     -n norm5,norm6,norm7  -o cancer1,cancer2,cancer3,cancer4\n\n"+
+				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/MultiSampleVCFFilter -b -c -g 20 -r 10\n" +
+				"     -d 20 -n norm5,norm6,norm7  -o cancer1,cancer2,cancer3,cancer4\n\n"+
 
 		"**************************************************************************************\n");
 

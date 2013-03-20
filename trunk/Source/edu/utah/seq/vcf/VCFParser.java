@@ -5,9 +5,13 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.regex.Pattern;
 
 import edu.utah.ames.bioinfo.Misc;
+import edu.utah.ames.bioinfo.Num;
+import edu.utah.seq.useq.data.RegionScoreText;
 
 import util.gen.Gzipper;
 import util.gen.IO;
@@ -84,16 +88,19 @@ chr1	725822	rs199845677	G	A	45.59	PASS	AC=1;AF=0.167;AN=6;BaseQRankSum=-1.231;DB
 
  */
 public class VCFParser {
+	
 	//user defined fields
 	private File vcfFile;
-	
+
 	//internal fields
 	private VCFRecord[] vcfRecords;
 	private String[] comments;
 	public static final Pattern TAB = Pattern.compile("\\t");
 	public static final Pattern COLON = Pattern.compile(":");
 	private ArrayList<String> badVcfRecords = new ArrayList<String>();
-	
+	private HashMap<String, VCFLookUp> chromosomeVCFRecords = null;
+	private boolean loadRecords = true;
+	private boolean loadSamples = true;
 	//indexs for ripping vcf records
 	int chromosomeIndex= 0;
 	int positionIndex = 1;
@@ -106,7 +113,7 @@ public class VCFParser {
 	int firstSampleIndex = 9;
 	int minimumNumberFields = 10;
 	int numberFields = 0;
-	
+
 	//indexes for ripping the vcf sample GT:AD:DP:GQ:PL
 	/*
 	##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
@@ -114,24 +121,35 @@ public class VCFParser {
 	##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth (reads with MQ=255 or with bad mates are filtered)">
 	##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
 	##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification">
-	*/
+	 */
+	String expectedSampleFormat = null;
+	int numberFieldsInSample = -1;
+	int sampleGenotypeGTIndex = -1;
+	int sampleAllelicDepthADIndex = -1;
+	int sampleReadDepthDPIndex = -1;
+	int sampleGenotypeQualityGQIndex= -1;
+	int samplePhredLikelihoodsPLIndex = -1;
+	
 	private String[] sampleNames = null;
-	String expectedSampleFormat = "GT:AD:DP:GQ:PL";
-	int numberFieldsInSample = 5;
-	int sampleGenotypeGTIndex = 0;
-	int sampleAllelicDepthADIndex =1;
-	int sampleReadDepthDPIndex =2;
-	int sampleGenotypeQualityGQIndex=3;
-	int samplePhredLikelihoodsPLIndex = 4;
-
-	public VCFParser(File vcfFile, boolean loadRecords){
+	
+	
+	
+	//Constructors
+	/**If loadRecords is false then just the header and #CHROM line with sample names is parsed.
+	 * If loadSamples is false then none of the sample info is loaded, just the required vcf fields. */
+	public VCFParser(File vcfFile, boolean loadRecords, boolean loadSamples) {
 		this. vcfFile = vcfFile;
-		parseVCF(loadRecords);
+		this.loadRecords = loadRecords;
+		this.loadSamples = loadSamples;
+		parseVCF();
 	}
 	
 	
+	
+	//Methods
 
-	public void parseVCF(boolean loadRecords) {
+	/**Parses a sorted vcf file. Indicate whether you want to load the data and not just parse the header and #CHROM line.*/
+	public void parseVCF() {
 		BufferedReader in = null;
 		String line = null;
 		int badCounter = 0;
@@ -157,15 +175,29 @@ public class VCFParser {
 			if (sampleNames == null) throw new Exception("\nFailed to find the #CHROM header line.");
 			comments = new String[commentsAL.size()];
 			commentsAL.toArray(comments);
-			
+
 			//load data?
 			if (loadRecords == false) return;
-			
-			//parse data
+
+			//parse first data record to load sample format, chrom, and position
+			String oldChrom = null;
+			int oldPosition = 0;
+			HashSet<String> chromNames = new HashSet<String>();
 			while ((line=in.readLine()) != null){
 				try {
-					VCFRecord vcf = new VCFRecord(line, this);
+					//load sample Format
+					VCFRecord dummy = new VCFRecord(line, this, false);
+					expectedSampleFormat = dummy.getFormat();
+					if (setSampleIndexes() == false){
+						Misc.printErrAndExit("\nFailed to recongize the sampleFormat '"+expectedSampleFormat+"', could not set appropriate sample value indexes. Aborting.\n");
+					}
+					//reload it for everything
+					VCFRecord vcf = new VCFRecord(line, this, loadSamples);
 					records.add(vcf);
+					oldChrom = vcf.getChromosome();
+					chromNames.add(oldChrom);
+					oldPosition = vcf.getPosition();
+					break;
 				} catch (Exception e) {
 					System.err.println("Skipping malformed VCF Record-> "+line);
 					System.err.println("Error-> "+e.getMessage());
@@ -176,12 +208,41 @@ public class VCFParser {
 				}
 			}
 
-			
+			//load remaining making sure it is sorted
+			while ((line=in.readLine()) != null){
+				try {
+					VCFRecord vcf = new VCFRecord(line, this, loadSamples);
+					//old chrom
+					if (vcf.getChromosome().equals(oldChrom)){
+						//check position
+						if (vcf.getPosition() < oldPosition) throw new Exception("New vcf record position is < prior position!  Is this file sorted?");
+					}
+					//nope new
+					else {
+						//chrom seen before?
+						if (chromNames.contains(vcf.getChromosome())) throw new Exception("New vcf record chromosome has been seen before!  Is this file sorted?");
+						oldChrom = vcf.getChromosome();
+						chromNames.add(oldChrom);
+					}
+					//add record and set position
+					records.add(vcf);
+					oldPosition = vcf.getPosition();
+
+				} catch (Exception e) {
+					System.err.println("Skipping malformed VCF Record-> "+line);
+					System.err.println("Error-> "+e.getMessage());
+					//if (badCounter++ > 100) {
+					if (badCounter++ > 5) {
+						throw new Exception("\nToo many malformed VCF Records.\n");
+					}
+					badVcfRecords.add(line);
+				}
+			}
+
 			//save array
 			vcfRecords = new VCFRecord[records.size()];
 			records.toArray(vcfRecords);
 
-			
 		}catch (Exception e) {
 			System.err.println("\nAborting, problem parsing vcf file -> "+vcfFile);
 			e.printStackTrace();
@@ -193,6 +254,127 @@ public class VCFParser {
 		}
 	}
 	
+	/**Add in formats as needed. Note, not all of these fields are parsed in the VCFSample.*/
+	public boolean setSampleIndexes(){
+		//unified genotyper
+		if (expectedSampleFormat.equals("GT:AD:DP:GQ:PL")){
+			numberFieldsInSample = 5;
+			sampleGenotypeGTIndex = 0;
+			sampleAllelicDepthADIndex =1;
+			sampleReadDepthDPIndex =2;
+			sampleGenotypeQualityGQIndex=3;
+			samplePhredLikelihoodsPLIndex = 4;
+			return true;
+		}
+		//ensembl
+		if (expectedSampleFormat.equals("GT:AD:DP:PL")){
+			numberFieldsInSample = 4;
+			sampleGenotypeGTIndex = 0;
+			sampleAllelicDepthADIndex =1;
+			sampleReadDepthDPIndex =2;
+			samplePhredLikelihoodsPLIndex = 3;
+			return true;
+		}
+		return false;
+	}
+
+	/**This reloads the chromosomeVCFRecords HashMap<String (chromosome), VCFLookUp>() with the current vcfRecords. */
+	public void splitVCFRecordsByChromosome() {
+		try {
+			chromosomeVCFRecords = new HashMap<String, VCFLookUp>();
+
+			String oldChrom = vcfRecords[0].getChromosome();
+			int oldPosition = vcfRecords[0].getPosition();
+			ArrayList<VCFRecord> recordsAL = new ArrayList<VCFRecord>();
+			recordsAL.add(vcfRecords[0]);
+			ArrayList<Integer> positionsAL = new ArrayList<Integer>();
+			positionsAL.add(oldPosition);
+			//for each record
+			for (int i=1; i< vcfRecords.length; i++){
+				String testChrom = vcfRecords[i].getChromosome();
+				int testPosition = vcfRecords[i].getPosition();
+				//is it the same chrom?
+				if (oldChrom.equals(testChrom) ){
+					//check position
+					if (testPosition < oldPosition) throw new Exception("\nError: subsequent vcf record's position is less than prior position!  Is this file sorted? See -> "+vcfRecords[i]);
+				}
+				//nope so close old and start new
+				else {
+					//close old
+					VCFRecord[] v = new VCFRecord[recordsAL.size()];
+					recordsAL.toArray(v);
+					recordsAL.clear();
+					chromosomeVCFRecords.put(oldChrom, new VCFLookUp(Num.arrayListOfIntegerToInts(positionsAL), v));
+					positionsAL.clear();
+					//create new
+					//has new chrom been seen before?
+					if (chromosomeVCFRecords.containsKey(testChrom)) throw new Exception ("\nError: subsequent vcf record's reference chromosome has been seen before! Is this file sorted? See -> "+vcfRecords[i]);
+					oldChrom = testChrom;
+				}
+				//save info
+				recordsAL.add(vcfRecords[i]);
+				positionsAL.add(testPosition);
+				oldPosition = testPosition;
+			}
+			//set last
+			VCFRecord[] v = new VCFRecord[recordsAL.size()];
+			recordsAL.toArray(v);
+			chromosomeVCFRecords.put(oldChrom, new VCFLookUp(Num.arrayListOfIntegerToInts(positionsAL), v));
+		} catch (Exception e){
+			System.err.println("\nError spliting records by chromosome!");
+			e.printStackTrace();
+		}
+	}
+
+	public void filterVCFRecords(HashMap<String,RegionScoreText[]> goodRegions){
+		//call chrom splitter
+		getChromosomeVCFRecords();
+
+		//set all records to fail
+		setFilterFieldOnAllRecords(VCFRecord.FAIL);
+
+		//for each interrogated region
+		for (String chr: goodRegions.keySet()){
+			VCFLookUp vcf = chromosomeVCFRecords.get(chr);
+			if (vcf == null) continue;
+			//make boolean array representing covered bases
+			RegionScoreText[] r = goodRegions.get(chr);
+			int lastBase = RegionScoreText.findLastBase(r);
+			boolean[] coveredBases = new boolean[lastBase];
+			for (int i=0; i< r.length; i++){
+				int stop = r[i].getStop();
+				for (int j=r[i].getStart(); j< stop; j++){
+					coveredBases[j] = true;
+				}
+			}
+			VCFRecord[] vcfRecords = vcf.getVcfRecord();
+			//for each vcf position, is it covered?
+			for (int i=0; i< vcfRecords.length; i++){
+				if (coveredBases[vcfRecords[i].getPosition()]) {
+					vcfRecords[i].setFilter(VCFRecord.PASS);
+				}
+			}
+		}
+		//remove records that are failing
+		filterVCFRecords(VCFRecord.PASS);
+	}
+
+	/**This is a hard filter that only keeps VCFRecords whose Filter field matches the matchFilterText2Keep.
+	 * Will reload the chromosomeVCFRecords if needed.*/
+	public void filterVCFRecords(String matchFilterText2Keep){
+			ArrayList<VCFRecord> keep = new ArrayList<VCFRecord>();
+			for (VCFRecord r : vcfRecords){
+				if (r.getFilter().equals(matchFilterText2Keep)) keep.add(r);
+			}
+			vcfRecords = new VCFRecord[keep.size()];
+			keep.toArray(vcfRecords);
+
+			//remake split chrom data?
+			if (chromosomeVCFRecords != null) splitVCFRecordsByChromosome();
+
+		
+	}
+
 	public int countMatchingVCFRecords(String matchFilterText){
 		int numMatches = 0;
 		for (VCFRecord r : vcfRecords){
@@ -200,10 +382,48 @@ public class VCFParser {
 		}
 		return numMatches;
 	}
-	
+
 	/**Sets the filter field in each record to the indicated text.*/
 	public void setFilterFieldOnAllRecords (String text){
 		for (VCFRecord r : vcfRecords) r.setFilter(text);
+	}
+	
+	/**Sets the GQ sample score as the thresholding score in each VCFRecord.
+	 * Returns the min and max scores found.*/
+	public float[] setGenotypeQualityGQScore(int sampleIndex) {
+		float minScore = vcfRecords[0].getSample()[sampleIndex].getGenotypeQualityGQ();
+		float maxScore = minScore;
+		for (VCFRecord r : vcfRecords) {
+			float score = r.getSample()[sampleIndex].getGenotypeQualityGQ();
+			if (score < minScore) minScore = score;
+			if (score > maxScore) maxScore = score;
+			r.setScore((float)score);
+		}
+		return new float[]{minScore, maxScore};
+	}
+	
+	/**Prints out two gzipped vcf files with records that match the fieldPass and those that don't.
+	 * Note, the original, unmodified record is printed in either case.*/
+	public void printRecords(String fieldPass) {
+		try {
+			String fullPathName = Misc.removeExtension(vcfFile.getCanonicalPath());
+			File good = new File(fullPathName+ "_Pass.vcf.gz");
+			File bad = new File(fullPathName+ "_Fail.vcf.gz");
+			Gzipper outGood = new Gzipper(good);
+			Gzipper outBad = new Gzipper(bad);
+			outGood.println(comments);
+			outBad.println(comments);
+			for (VCFRecord r : vcfRecords){
+				if (r.getFilter().equals(fieldPass)) outGood.println(r);
+				else outBad.println(r);
+			}
+
+			outGood.close();
+			outBad.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
 	}
 
 	public VCFRecord[] getVcfRecords() {
@@ -230,34 +450,23 @@ public class VCFParser {
 		this.sampleNames = sampleNames;
 	}
 
-	/**Prints out two gzipped vcf files with records that match the fieldPass and those that don't.
-	 * Note, the original, unmodified record is printed in either case.*/
-	public void printRecords(String fieldPass) {
-		try {
-			String fullPathName = Misc.removeExtension(vcfFile.getCanonicalPath());
-			File good = new File(fullPathName+ "_Pass.vcf.gz");
-			File bad = new File(fullPathName+ "_Fail.vcf.gz");
-			Gzipper outGood = new Gzipper(good);
-			Gzipper outBad = new Gzipper(bad);
-			outGood.println(comments);
-			outBad.println(comments);
-			for (VCFRecord r : vcfRecords){
-				if (r.getFilter().equals(fieldPass)) outGood.println(r);
-				else outBad.println(r);
-			}
-			
-			outGood.close();
-			outBad.close();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		
-	}
-
 	public ArrayList<String> getBadVcfRecords() {
 		return badVcfRecords;
 	}
 
-	
+	public HashMap<String, VCFLookUp> getChromosomeVCFRecords() {
+		if (chromosomeVCFRecords == null) splitVCFRecordsByChromosome();
+		return chromosomeVCFRecords;
+	}
+
+	public String getExpectedSampleFormat() {
+		return expectedSampleFormat;
+	}
+
+	public void setExpectedSampleFormat(String expectedSampleFormat) {
+		this.expectedSampleFormat = expectedSampleFormat;
+	}
+
+
 
 }
