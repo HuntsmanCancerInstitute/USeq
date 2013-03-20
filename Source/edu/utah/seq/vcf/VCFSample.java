@@ -24,9 +24,9 @@ public class VCFSample {
 		else {
 			String[] fields = parser.COLON.split(sample);
 			if (fields.length != parser.numberFieldsInSample) throw new Exception("Incorrect number of fields in sample -> "+sample);
-			genotypeGT = fields[parser.sampleGenotypeGTIndex];
-			readDepthDP = Integer.parseInt(fields[parser.sampleReadDepthDPIndex]);
-			genotypeQualityGQ = Integer.parseInt(fields[parser.sampleGenotypeQualityGQIndex]);
+			if (parser.sampleGenotypeGTIndex !=-1) genotypeGT = fields[parser.sampleGenotypeGTIndex];
+			if (parser.sampleReadDepthDPIndex !=-1) readDepthDP = Integer.parseInt(fields[parser.sampleReadDepthDPIndex]);
+			if (parser.sampleGenotypeQualityGQIndex !=-1) genotypeQualityGQ = Integer.parseInt(fields[parser.sampleGenotypeQualityGQIndex]);
 		}
 	}
 
