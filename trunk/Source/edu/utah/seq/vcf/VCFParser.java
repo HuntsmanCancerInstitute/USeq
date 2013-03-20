@@ -113,22 +113,6 @@ public class VCFParser {
 	int firstSampleIndex = 9;
 	int minimumNumberFields = 10;
 	int numberFields = 0;
-
-	//indexes for ripping the vcf sample GT:AD:DP:GQ:PL
-	/*
-	##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-	##FORMAT=<ID=AD,Number=.,Type=Integer,Description="Allelic depths for the ref and alt alleles in the order listed">
-	##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Approximate read depth (reads with MQ=255 or with bad mates are filtered)">
-	##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype Quality">
-	##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Normalized, Phred-scaled likelihoods for genotypes as defined in the VCF specification">
-	 */
-	String expectedSampleFormat = null;
-	int numberFieldsInSample = -1;
-	int sampleGenotypeGTIndex = -1;
-	int sampleAllelicDepthADIndex = -1;
-	int sampleReadDepthDPIndex = -1;
-	int sampleGenotypeQualityGQIndex= -1;
-	int samplePhredLikelihoodsPLIndex = -1;
 	
 	private String[] sampleNames = null;
 	
@@ -179,19 +163,12 @@ public class VCFParser {
 			//load data?
 			if (loadRecords == false) return;
 
-			//parse first data record to load sample format, chrom, and position
+			//parse first data record to load chrom and position
 			String oldChrom = null;
 			int oldPosition = 0;
 			HashSet<String> chromNames = new HashSet<String>();
 			while ((line=in.readLine()) != null){
 				try {
-					//load sample Format
-					VCFRecord dummy = new VCFRecord(line, this, false);
-					expectedSampleFormat = dummy.getFormat();
-					if (setSampleIndexes() == false){
-						Misc.printErrAndExit("\nFailed to recongize the sampleFormat '"+expectedSampleFormat+"', could not set appropriate sample value indexes. Aborting.\n");
-					}
-					//reload it for everything
 					VCFRecord vcf = new VCFRecord(line, this, loadSamples);
 					records.add(vcf);
 					oldChrom = vcf.getChromosome();
@@ -201,7 +178,7 @@ public class VCFParser {
 				} catch (Exception e) {
 					System.err.println("Skipping malformed VCF Record-> "+line);
 					System.err.println("Error-> "+e.getMessage());
-					if (badCounter++ > 100) {
+					if (badCounter++ > 10) {
 						throw new Exception("\nToo many malformed VCF Records.\n");
 					}
 					badVcfRecords.add(line);
@@ -231,8 +208,7 @@ public class VCFParser {
 				} catch (Exception e) {
 					System.err.println("Skipping malformed VCF Record-> "+line);
 					System.err.println("Error-> "+e.getMessage());
-					//if (badCounter++ > 100) {
-					if (badCounter++ > 5) {
+					if (badCounter++ > 10) {
 						throw new Exception("\nToo many malformed VCF Records.\n");
 					}
 					badVcfRecords.add(line);
@@ -254,30 +230,6 @@ public class VCFParser {
 		}
 	}
 	
-	/**Add in formats as needed. Note, not all of these fields are parsed in the VCFSample.*/
-	public boolean setSampleIndexes(){
-		//unified genotyper
-		if (expectedSampleFormat.equals("GT:AD:DP:GQ:PL")){
-			numberFieldsInSample = 5;
-			sampleGenotypeGTIndex = 0;
-			sampleAllelicDepthADIndex =1;
-			sampleReadDepthDPIndex =2;
-			sampleGenotypeQualityGQIndex=3;
-			samplePhredLikelihoodsPLIndex = 4;
-			return true;
-		}
-		//ensembl
-		if (expectedSampleFormat.equals("GT:AD:DP:PL")){
-			numberFieldsInSample = 4;
-			sampleGenotypeGTIndex = 0;
-			sampleAllelicDepthADIndex =1;
-			sampleReadDepthDPIndex =2;
-			samplePhredLikelihoodsPLIndex = 3;
-			return true;
-		}
-		return false;
-	}
-
 	/**This reloads the chromosomeVCFRecords HashMap<String (chromosome), VCFLookUp>() with the current vcfRecords. */
 	public void splitVCFRecordsByChromosome() {
 		try {
@@ -350,7 +302,7 @@ public class VCFParser {
 			VCFRecord[] vcfRecords = vcf.getVcfRecord();
 			//for each vcf position, is it covered?
 			for (int i=0; i< vcfRecords.length; i++){
-				if (coveredBases[vcfRecords[i].getPosition()]) {
+				if (vcfRecords[i].getPosition() < lastBase && coveredBases[vcfRecords[i].getPosition()] == true) {
 					vcfRecords[i].setFilter(VCFRecord.PASS);
 				}
 			}
@@ -395,6 +347,20 @@ public class VCFParser {
 		float maxScore = minScore;
 		for (VCFRecord r : vcfRecords) {
 			float score = r.getSample()[sampleIndex].getGenotypeQualityGQ();
+			if (score < minScore) minScore = score;
+			if (score > maxScore) maxScore = score;
+			r.setScore((float)score);
+		}
+		return new float[]{minScore, maxScore};
+	}
+	
+	/**Sets the QUAL score as the thresholding score in each VCFRecord.
+	 * Returns the min and max scores found.*/
+	public float[] setRecordQUALAsScore() {
+		float minScore = vcfRecords[0].getQuality();
+		float maxScore = minScore;
+		for (VCFRecord r : vcfRecords) {
+			float score = r.getQuality();
 			if (score < minScore) minScore = score;
 			if (score > maxScore) maxScore = score;
 			r.setScore((float)score);
@@ -457,14 +423,6 @@ public class VCFParser {
 	public HashMap<String, VCFLookUp> getChromosomeVCFRecords() {
 		if (chromosomeVCFRecords == null) splitVCFRecordsByChromosome();
 		return chromosomeVCFRecords;
-	}
-
-	public String getExpectedSampleFormat() {
-		return expectedSampleFormat;
-	}
-
-	public void setExpectedSampleFormat(String expectedSampleFormat) {
-		this.expectedSampleFormat = expectedSampleFormat;
 	}
 
 
