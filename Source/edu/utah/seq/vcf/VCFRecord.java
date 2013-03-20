@@ -17,7 +17,7 @@ public class VCFRecord {
 	private String originalRecord;
 	public static final String PASS = "PASS";
 	public static final String FAIL = "FAIL";
-	public float score = 0;
+	private float score = 0;
 	
 	/**Only extracts some of the fields from a record*/
 	public VCFRecord(String record, VCFParser vcfParser, boolean loadSamples) throws Exception{
@@ -34,18 +34,16 @@ public class VCFRecord {
 		position = Integer.parseInt(fields[vcfParser.positionIndex]) - 1;
 		reference = fields[vcfParser.referenceIndex];
 		alternate = fields[vcfParser.alternateIndex];
-		quality = Float.parseFloat(fields[vcfParser.qualityIndex]);
+		if (fields[vcfParser.qualityIndex].equals(".")) quality = 0;
+		else quality = Float.parseFloat(fields[vcfParser.qualityIndex]);
 		filter = fields[vcfParser.filterIndex];
 		info = fields[vcfParser.infoIndex];
 		format = fields[vcfParser.formatIndex];
 		
 		if (loadSamples){
-			//check format
-			if (format.equals(vcfParser.expectedSampleFormat) == false) throw new Exception("\nSample format does not match expected format ('"+vcfParser.expectedSampleFormat+ "') for record -> "+record);
-			//make samples
 			sample = new VCFSample[fields.length - vcfParser.firstSampleIndex];
 			int index = 0;
-			for (int i=vcfParser.firstSampleIndex; i< fields.length; i++) sample[index++] = new VCFSample(fields[i], vcfParser);
+			for (int i=vcfParser.firstSampleIndex; i< fields.length; i++) sample[index++] = new VCFSample(fields[i], format);
 		}
 	}
 	

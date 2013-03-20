@@ -12,7 +12,7 @@ import util.bio.annotation.ExportIntergenicRegions;
 import util.bio.seq.Seq;
 import util.gen.*;
 
-/**Compares variant lists
+/**Compares variant lists, uses the vcf QUAL score to filter.
  * @author Nix
  * */
 public class VCFComparator {
@@ -22,26 +22,18 @@ public class VCFComparator {
 	private File bedKey;
 	private File vcfTest;
 	private File bedTest;
-	private boolean requireGenotypeMatch = true;
+	private boolean requireGenotypeMatch = false;
 	
 	private HashMap<String,RegionScoreText[]> keyRegions;
 	private HashMap<String,RegionScoreText[]> testRegions;
 	private HashMap<String,RegionScoreText[]> commonRegions;
 	private VCFParser keyParser;
 	private VCFParser testParser;
-	private int sampleIndexForScore = 0;
-	private float[] minMaxScoreThresholds;
+	private VCFMatch[] testMatchingVCF;
+	private VCFRecord[] testNonMatchingVCF;
 	
-	private ArrayList<String> matches = new ArrayList<String>();
-	private ArrayList<String> misMatches = new ArrayList<String>();
-	private int totalNumberArraySnps = 0;
-	private int numberArraySnpsFailingMinimumScore = 0;
-	private int numberArraySnpsWithNoVcf = 0;
-	private int numberVCFsFailingMinimumScore = 0;
-	private int numberSNPMatches = 0;
-	private int numberSNPNoMatches;
-	private static final Pattern UNDERSCORE = Pattern.compile("_");
-	private String url;
+	private float[] minMaxScoreThresholds;
+
 	
 	
 	//constructor
@@ -57,10 +49,13 @@ public class VCFComparator {
 		parseFilterFiles();
 		
 		//set genotypeQualityGQ from sampleIndexForScore as VCFRecord score for thresholding
-		minMaxScoreThresholds = testParser.setGenotypeQualityGQScore(sampleIndexForScore);
+		minMaxScoreThresholds = testParser.setRecordQUALAsScore();
+		System.out.println(minMaxScoreThresholds[0]+"\tMinimum test score");
+		System.out.println(minMaxScoreThresholds[1]+"\tMaximum test score");
+		
 		
 		//compare calls in common interrogated regions
-		System.out.print("\nComparing calls...");
+		System.out.println("\nComparing calls...");
 		thresholdAndCompareCalls();
 
 		//finish and calc run time
@@ -76,70 +71,121 @@ public class VCFComparator {
 	public void thresholdAndCompareCalls(){
 			//starting totals
 			float totalKey = keyParser.getVcfRecords().length;
-			float totalTest = testParser.getVcfRecords().length;
-			//intersect and remove non intersecting
-			compareCalls();
-			float subKey = keyParser.getVcfRecords().length;
-			float subTest = testParser.getVcfRecords().length;
 			
-			String r = formatResults(minMaxScoreThresholds[0], totalKey, totalTest, subKey, subTest);
+			//intersect and split test into matching and non matching
+			intersectVCF();
+			
+			//sort by score smallest to largest
+			Arrays.sort(testNonMatchingVCF, new ComparatorVCFRecordScore());
+			Arrays.sort(testMatchingVCF);
+			
+			System.out.println("QUALThreshold\tNumMatchTest\tNumNonMatchTest\tTPR=matchTest/totalKey\tFPR=nonMatchTest/totalKey\tFDR=nonMatchTest/(matchTest+nonMatchTest)\tPPV=matchTest/(matchTest+nonMatchTest)");
+			String r = formatResults(-1, totalKey, testMatchingVCF.length, testNonMatchingVCF.length);
 			System.out.println(r);
+			System.out.println();
+			
+			//for each score in the nonMatching
+			float oldScore = Float.MIN_NORMAL;
+			for (int i=0; i< testNonMatchingVCF.length; i++){
+				float score = testNonMatchingVCF[i].getScore();
+				if (score == oldScore) continue;
+				int numNonMatches = testNonMatchingVCF.length - i;
+				int numMatches = countNumberMatches(score);
+				String res = formatResults(score, totalKey, numMatches, numNonMatches);
+				System.out.println(res);
+				if (numNonMatches == 0 || numMatches == 0) break;
+				oldScore = score;
+			}
 			
 		
 	}
 	
-	public String formatResults(float threshold, float totalKey, float totalTest, float intKey, float intTest){
+	private int countNumberMatches(float score) {
+		for (int i=0; i< testMatchingVCF.length; i++){
+			if (testMatchingVCF[i].score >= score){
+				return testMatchingVCF.length - i;
+			}
+		}
+		return 0;
+	}
+
+	public String formatResults(float threshold, float totalKey, float intTest, float nonIntTest ){
 		StringBuilder sb = new StringBuilder();
-		//threshold
 		sb.append(threshold); sb.append("\t");
-		sb.append((int)totalKey); sb.append("\t");
-		sb.append((int)totalTest); sb.append("\t");
-		sb.append((int)intKey); sb.append("\t");
-		sb.append((int)intTest);
+		sb.append((int)intTest); sb.append("\t");
+		sb.append((int)nonIntTest); sb.append("\t");
+		//tpr intTest/totalKey
+		sb.append(Num.formatNumber(intTest/totalKey, 3)); sb.append("\t");
+		//fpr nonIntTest/totalKey
+		sb.append(Num.formatNumber(nonIntTest/totalKey, 3)); sb.append("\t");
+		//fdr nonIntTest/totalTest
+		sb.append(Num.formatNumber(nonIntTest/(nonIntTest + intTest), 3));
+		//ppv intTest/totalTest
+		sb.append(Num.formatNumber(intTest/(nonIntTest + intTest), 3));
 		return sb.toString();
 	}
 	
-	public void compareCalls(){
-		//set fail
-		keyParser.setFilterFieldOnAllRecords(VCFRecord.FAIL);
-		testParser.setFilterFieldOnAllRecords(VCFRecord.FAIL);
-		
+	public void intersectVCF(){
+		ArrayList<VCFMatch> matches = new ArrayList<VCFMatch>();
+		ArrayList<VCFRecord> nonMatches = new ArrayList<VCFRecord>();
 		//for each test record
 		for (String chr: testParser.getChromosomeVCFRecords().keySet()){
 			VCFLookUp key = keyParser.getChromosomeVCFRecords().get(chr);
-			if (key == null) continue;
 			VCFLookUp test = testParser.getChromosomeVCFRecords().get(chr);
-			countMatches(key, test);
-		}
-		
-		//reduce to those that pass
-		keyParser.filterVCFRecords(VCFRecord.PASS);
-		testParser.filterVCFRecords(VCFRecord.PASS);
+			if (key == null) {
+				//add all test to nonMatch
+				for (VCFRecord r: test.getVcfRecord()) nonMatches.add(r);
+				continue;
+			}
+			countMatches(key, test, matches, nonMatches);
+		} 
+		if (matches.size() == 0) Misc.printExit("\tNo matching vcf records?! Aborting.\n");
+		//set arrays
+		testMatchingVCF = new VCFMatch[matches.size()];
+		testNonMatchingVCF = new VCFRecord[nonMatches.size()];
+		matches.toArray(testMatchingVCF);
+		nonMatches.toArray(testNonMatchingVCF);
 		
 	}
-	
-	public void countMatches(VCFLookUp key, VCFLookUp test){
 		
-		//for each record in the key
-		int numKey = key.getBasePosition().length;
-		int numTest = test.getBasePosition().length;
-		VCFLookUp walk = key;
-		VCFLookUp lookup = test;
-		if (numKey > numTest){
-			walk = test;
-			lookup = key;
-		}
-		int[] pos = walk.getBasePosition();
-		VCFRecord[] rec = walk.getVcfRecord();
-		for (int i=0; i< pos.length; i++){
-			//fetch records from lookup, should only be one
-			VCFRecord[] matchingLookup = lookup.fetchVCFRecords(pos[i], pos[i]+1);
-			if (matchingLookup == null) continue;
-			if (matchingLookup.length !=1) Misc.printErrAndExit("\nMore than one vcf record found to match ->\n\t"+rec[i]+"\n\t"+matchingLookup[0]);
-			if (rec[i].matchesAlternateAlleleGenotype(matchingLookup[0], requireGenotypeMatch)){
-				rec[i].setFilter(VCFRecord.PASS);
-				matchingLookup[0].setFilter(VCFRecord.PASS);
+	
+	
+	public void countMatches(VCFLookUp key, VCFLookUp test, ArrayList<VCFMatch> matches, ArrayList<VCFRecord> nonMatches){
+		//for each record in the test
+		int[] posTest = test.getBasePosition();
+		VCFRecord[] vcfTest = test.getVcfRecord();
+		for (int i=0; i< vcfTest.length; i++){
+			//fetch records from key
+			VCFRecord[] matchingKey = key.fetchVCFRecords(posTest[i], posTest[i]+1);
+			//no records found
+			if (matchingKey == null) {
+				nonMatches.add(vcfTest[i]);
 			}
+			else {
+				//check to see only one of the key was found
+				if (matchingKey.length !=1) Misc.printErrAndExit("\nMore than one vcf record in the key was found to match \ntest\t"+vcfTest[i]+"\nkey[0]\t"+matchingKey[0]);
+				//check to see if it matches
+				if (vcfTest[i].matchesAlternateAlleleGenotype(matchingKey[0], requireGenotypeMatch)) matches.add(new VCFMatch(matchingKey[0], vcfTest[i]));
+				else nonMatches.add(vcfTest[i]);
+			}
+		}
+	}
+	
+	private class VCFMatch implements Comparable<VCFMatch>{
+		float score;
+		VCFRecord key;
+		VCFRecord test;
+		
+		private VCFMatch (VCFRecord key, VCFRecord test){
+			this.key = key;
+			this.test = test;
+			score = test.getScore();
+		}
+		/**Sorts by score, smallest to largest*/
+		public int compareTo(VCFMatch second) {
+			if (this.score < second.score) return -1;
+			if (this.score > second.score) return 1;
+			return 0;
 		}
 	}
 	
@@ -202,10 +248,10 @@ public class VCFComparator {
 		keyParser.filterVCFRecords(commonRegions);
 		System.out.println(keyParser.getVcfRecords().length +"\tKey variants in common regions");
 		
-		testParser = new VCFParser(vcfTest, false, true);
-		System.out.println(keyParser.getVcfRecords().length +"\tTest variants");
+		testParser = new VCFParser(vcfTest, true, true);
+		System.out.println(testParser.getVcfRecords().length +"\tTest variants");
 		testParser.filterVCFRecords(commonRegions);
-		System.out.println(keyParser.getVcfRecords().length +"\tTest variants in common regions");
+		System.out.println(testParser.getVcfRecords().length +"\tTest variants in common regions");
 	}
 	
 
@@ -257,16 +303,14 @@ public class VCFComparator {
 				"**************************************************************************************\n" +
 				"**                             VCF Comparator : March 2013                          **\n" +
 				"**************************************************************************************\n" +
-				"Compares a test vcf file against a gold standard key vcf file. Be sure each of your\n" +
-				"region files don't contain overlaping regions, run the MergeRegions application if\n" +
-				"needed. BETAAAAAAAAAA \n\n" +
+				"Compares a test vcf file against a gold standard key vcf file. \n\n" +
 
 				"Options:\n"+
 				"-a VCF file for the key dataset (xxx.vcf(.gz/.zip OK)).\n"+
 				"-b Bed file of interrogated regions for the key dataset (xxx.bed(.gz/.zip OK)).\n"+
 				"-c VCF file for the test dataset (xxx.vcf(.gz/.zip OK)).\n"+
 				"-d Bed file of interrogated regions for the test dataset (xxx.bed(.gz/.zip OK)).\n"+
-				//"-n Don't require the genotype to match, just the presence of the alternate allele.\n"+
+				"-n Don't require the genotype to match, just the presence of the alternate allele.\n"+
 
 				"\n"+
 

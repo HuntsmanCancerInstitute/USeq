@@ -10,23 +10,30 @@ package edu.utah.seq.vcf;
  */
 public class VCFSample {
 
-	//fields
-	private String genotypeGT;
-	private int readDepthDP;
-	private int genotypeQualityGQ;
+	//fields, default to null or -1
+	private String genotypeGT = null;
+	private int readDepthDP = -1;
+	private int genotypeQualityGQ = -1;
 	private boolean noCall = false;
 
-	public VCFSample(String sample, VCFParser parser) throws Exception{
+	/**Finding vcf files with mixed sample formats so must determine each record by record :( 
+	 * Add rippers as needed.*/
+	public VCFSample(String sample, String sampleFormat) throws Exception{
 		//is it a no call?
 		if (sample.equals("./.")){
 			noCall = true;
 		}
 		else {
-			String[] fields = parser.COLON.split(sample);
-			if (fields.length != parser.numberFieldsInSample) throw new Exception("Incorrect number of fields in sample -> "+sample);
-			if (parser.sampleGenotypeGTIndex !=-1) genotypeGT = fields[parser.sampleGenotypeGTIndex];
-			if (parser.sampleReadDepthDPIndex !=-1) readDepthDP = Integer.parseInt(fields[parser.sampleReadDepthDPIndex]);
-			if (parser.sampleGenotypeQualityGQIndex !=-1) genotypeQualityGQ = Integer.parseInt(fields[parser.sampleGenotypeQualityGQIndex]);
+			String[] data = VCFParser.COLON.split(sample);
+			String[] format = VCFParser.COLON.split(sampleFormat);
+			if (data.length != format.length) throw new Exception("Incorrect number of fields in sample -> "+sample+" for indicated format -> "+sampleFormat);
+			//attempt to parse GT, DP, GQ
+			for (int i=0; i< format.length; i++){
+				if (format[i].equals("GT")) genotypeGT = data[i];
+				else if (format[i].equals("DP")) readDepthDP = Integer.parseInt(data[i]);
+				else if (format[i].equals("GQ")) genotypeQualityGQ = Integer.parseInt(data[i]);
+			}
+			
 		}
 	}
 
