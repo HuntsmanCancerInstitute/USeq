@@ -23,6 +23,8 @@ public class VCFComparator {
 	private File vcfTest;
 	private File bedTest;
 	private boolean requireGenotypeMatch = false;
+	private boolean removeSNPs = false;
+	private boolean removeNonSNPs = false;
 	
 	private HashMap<String,RegionScoreText[]> keyRegions;
 	private HashMap<String,RegionScoreText[]> testRegions;
@@ -243,12 +245,17 @@ public class VCFComparator {
 		System.out.println(num +"\tInterrogated bps in common ");
 		
 		keyParser = new VCFParser(vcfKey, true, true);
+		if (removeSNPs) keyParser.removeSNPs();
+		if (removeNonSNPs) keyParser.removeNonSNPs();
 		System.out.println(keyParser.getVcfRecords().length+"\tKey variants");
 		//remove all non intersecting records
 		keyParser.filterVCFRecords(commonRegions);
 		System.out.println(keyParser.getVcfRecords().length +"\tKey variants in common regions");
 		
 		testParser = new VCFParser(vcfTest, true, true);
+		if (removeSNPs) testParser.removeSNPs();
+		if (removeNonSNPs) testParser.removeNonSNPs();
+		
 		System.out.println(testParser.getVcfRecords().length +"\tTest variants");
 		testParser.filterVCFRecords(commonRegions);
 		System.out.println(testParser.getVcfRecords().length +"\tTest variants in common regions");
@@ -281,7 +288,9 @@ public class VCFComparator {
 					case 'b': bedKey = new File(args[++i]); break;
 					case 'c': vcfTest = new File(args[++i]); break;
 					case 'd': bedTest = new File(args[++i]); break;
-					//case 'n': requireGenotypeMatch = false; break;
+					case 'g': requireGenotypeMatch = true; break;
+					case 's': removeNonSNPs = true; break;
+					case 'n': removeSNPs = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -296,7 +305,25 @@ public class VCFComparator {
 				bedKey == null || bedKey.canRead() == false ||
 				vcfTest == null || vcfTest.canRead() == false ||
 				bedTest == null || bedTest.canRead() == false ) Misc.printExit("\nError: looks like you are missing or cannot read one of the four required files!\n");
+		
+		printOptions();
 	}	
+
+	private void printOptions() {
+		System.out.println("VCF Comparator Settings:");
+		System.out.println(vcfKey+"\tKey vcf file");
+		System.out.println(bedKey+"\tKey interrogated regions file");
+		System.out.println(vcfTest+"\tTest vcf file");
+		System.out.println(bedTest+"\tTest interrogated regions file");
+		System.out.println(requireGenotypeMatch+"\tRequire matching genotypes");
+		boolean all = removeSNPs == false && removeNonSNPs == false;
+		System.out.println(all+"\tCompare all variants");
+		if (all == false){
+			System.out.println(removeSNPs+"\tCompare non-SNP variants, not SNPs");
+			System.out.println(removeNonSNPs+"\tCompare SNPs, not non-SNP variants");
+		}
+		System.out.println();
+	}
 
 	public static void printDocs(){
 		System.out.println("\n" +
@@ -310,7 +337,10 @@ public class VCFComparator {
 				"-b Bed file of interrogated regions for the key dataset (xxx.bed(.gz/.zip OK)).\n"+
 				"-c VCF file for the test dataset (xxx.vcf(.gz/.zip OK)).\n"+
 				"-d Bed file of interrogated regions for the test dataset (xxx.bed(.gz/.zip OK)).\n"+
-				"-n Don't require the genotype to match, just the presence of the alternate allele.\n"+
+				"-g Require the genotype to match, defaults to scoring a match when then alternate\n" +
+				"       allele is present.\n"+
+				"-s Only compare SNPs, defaults to all.\n"+
+				"-n Only compare non SNPs, defaults to all.\n"+
 
 				"\n"+
 
