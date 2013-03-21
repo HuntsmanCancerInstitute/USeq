@@ -375,21 +375,29 @@ public class VCFParser {
 			String fullPathName = Misc.removeExtension(vcfFile.getCanonicalPath());
 			File good = new File(fullPathName+ "_Pass.vcf.gz");
 			File bad = new File(fullPathName+ "_Fail.vcf.gz");
-			Gzipper outGood = new Gzipper(good);
-			Gzipper outBad = new Gzipper(bad);
+			printRecords(fieldPass, good, bad);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	/**Prints out two gzipped vcf files with records that match the fieldPass and those that don't.
+	 * Note, the original, unmodified record is printed in either case.*/
+	public void printRecords(String fieldPass, File pass, File fail) {
+		try {
+			Gzipper outGood = new Gzipper(pass);
+			Gzipper outBad = new Gzipper(fail);
 			outGood.println(comments);
 			outBad.println(comments);
 			for (VCFRecord r : vcfRecords){
 				if (r.getFilter().equals(fieldPass)) outGood.println(r);
 				else outBad.println(r);
 			}
-
 			outGood.close();
 			outBad.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-
 	}
 	
 	public void removeSNPs() {
@@ -397,7 +405,7 @@ public class VCFParser {
 		setFilterFieldOnAllRecords(VCFRecord.PASS);
 		//set snps to fail
 		for (VCFRecord r : vcfRecords){
-			if (r.getAlternate().length() == 1 && r.getReference().length() == 1) r.setFilter(VCFRecord.FAIL);
+			if (r.isSNP()) r.setFilter(VCFRecord.FAIL);
 		}
 		//remove fails
 		filterVCFRecords(VCFRecord.PASS);
@@ -408,7 +416,7 @@ public class VCFParser {
 		setFilterFieldOnAllRecords(VCFRecord.FAIL);
 		//set snps to Pass
 		for (VCFRecord r : vcfRecords){
-			if (r.getAlternate().length() == 1 && r.getReference().length() == 1) r.setFilter(VCFRecord.PASS);
+			if (r.isSNP()) r.setFilter(VCFRecord.PASS);
 		}
 		//keep pass
 		filterVCFRecords(VCFRecord.PASS);

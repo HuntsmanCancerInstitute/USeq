@@ -64,6 +64,9 @@ public class RegionScoreText extends RegionScore{
 	public String getBedLine (String chromosome){
 		return chromosome+"\t"+start+"\t"+stop+"\t"+text+"\t"+score+"\t.";
 	}
+	public String getBedLineJustCoordinates (String chromosome){
+		return chromosome+"\t"+start+"\t"+stop;
+	}
 	public String toString(){
 		return start+"\t"+stop+"\t"+score+"\t"+text;
 	}

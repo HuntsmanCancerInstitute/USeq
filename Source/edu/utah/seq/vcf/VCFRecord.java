@@ -150,5 +150,10 @@ public class VCFRecord {
 		this.quality = quality;
 	}
 
+	public boolean isSNP() {
+		if (alternate.length() == 1 && reference.length() == 1 && alternate.equals(".") == false) return true;
+		return false;
+	}
+
 
 }
