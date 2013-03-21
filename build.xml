@@ -24,7 +24,7 @@
 		<delete file="${release.build.dir}/JavaxComOrgInfoNetClasses.zip"/>
 		
 		
-		<javac srcdir="${src.dir}" destdir="${classes.dir}">
+		<javac srcdir="${src.dir}" destdir="${classes.dir}" encoding="ISO-8859-1">
 			 <exclude name="**/AutoNovoaligner.java"/>
 			 <exclude name="**/SNPComparator.java"/>
 			   <classpath>
@@ -58,7 +58,9 @@
 			</sequential>
 		</for>
 		
+		
 		<!-- Build the jar -->
+		<mkdir dir="${release.master.jar.dir}"/>
 		<jar destfile="${release.master.jar.dir}/bioToolsCodeLibrary.jar" basedir="${release.build.dir}" compress="false">
 			<manifest>
 				<attribute name="Manifest-Version" value="1.0"/>
