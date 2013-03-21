@@ -51,7 +51,8 @@ public class SubSamplePointData {
 			}
 		}
 		//merge
-		HashMap<String,PointData[]> merged = PointData.combinePointData(al, true);
+		//HashMap<String,PointData[]> merged = PointData.combinePointData(al, true);
+		HashMap<String,PointData[]> merged = PointData.combinePointDataToHashMap(al, true); 
 		HashMap<String,PointData>[] split = PointData.splitStrandedPointData(merged);
 
 		//save

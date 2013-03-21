@@ -1277,8 +1277,9 @@ public class PointData {
 		return pdSum;
 	}
 
+	//public static HashMap<String,PointData[]> combinePointData(ArrayList<HashMap<String,PointData[]>> al, boolean nullOriginalPosVal){
 	/**Combines point data without summing scores. Thus duplicates likely.  Maintains strandedness*/
-	public static HashMap<String,PointData[]> combinePointData(ArrayList<HashMap<String,PointData[]>> al, boolean nullOriginalPosVal){
+	public static HashMap<String,PointData[]> combinePointDataToHashMap(ArrayList<HashMap<String,PointData[]>> al, boolean nullOriginalPosVal){
 		//split by strand
 		HashMap<String,ArrayList<PointData>> plus = new HashMap<String,ArrayList<PointData>>();
 		HashMap<String,ArrayList<PointData>> minus = new HashMap<String,ArrayList<PointData>>();
