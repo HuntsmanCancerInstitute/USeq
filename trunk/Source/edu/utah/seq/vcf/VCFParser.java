@@ -391,6 +391,28 @@ public class VCFParser {
 		}
 
 	}
+	
+	public void removeSNPs() {
+		//set all to pass
+		setFilterFieldOnAllRecords(VCFRecord.PASS);
+		//set snps to fail
+		for (VCFRecord r : vcfRecords){
+			if (r.getAlternate().length() == 1 && r.getReference().length() == 1) r.setFilter(VCFRecord.FAIL);
+		}
+		//remove fails
+		filterVCFRecords(VCFRecord.PASS);
+	}
+	
+	public void removeNonSNPs() {
+		//set all to fail
+		setFilterFieldOnAllRecords(VCFRecord.FAIL);
+		//set snps to Pass
+		for (VCFRecord r : vcfRecords){
+			if (r.getAlternate().length() == 1 && r.getReference().length() == 1) r.setFilter(VCFRecord.PASS);
+		}
+		//keep pass
+		filterVCFRecords(VCFRecord.PASS);
+	}
 
 	public VCFRecord[] getVcfRecords() {
 		return vcfRecords;
@@ -424,6 +446,7 @@ public class VCFParser {
 		if (chromosomeVCFRecords == null) splitVCFRecordsByChromosome();
 		return chromosomeVCFRecords;
 	}
+
 
 
 
