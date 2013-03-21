@@ -18,12 +18,14 @@ public class MultiSampleVCFFilter {
 	private boolean controlHomozygousFilter = false;
 	private boolean oneOrMorePassingCohortFilter = false;
 	private boolean filterRecordQuality = false;
+	private boolean requireOneObservationInCases = false;
 	private int sampleMinimumReadDepthDP = 0;
 	private int sampleMinimumGenotypeQualityGQ = 0;
 	private float recordMinimumQUAL = 0;
 	private boolean printSampleNames = false;
 	private String[] controlSampleNames = null;
 	private String[] cohortSampleNames = null;
+	
 
 	
 	public MultiSampleVCFFilter(String[] args){
@@ -60,6 +62,13 @@ public class MultiSampleVCFFilter {
 				int[] startEndCounts = filterAnySampleCohort(parser);
 				System.out.println(vcfFiles[i].getName()+ "\tAnyCohortSample\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
 			}
+			
+			if (requireOneObservationInCases) {
+				int[] startEndCounts = requireOneObservationFilter(parser);
+				System.out.println(vcfFiles[i].getName()+ "\tAtLeastOneObservationAboveThresholds\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+			}
+			
+			
 
 			//print good and bad records 
 			parser.printRecords(VCFRecord.PASS);
@@ -95,7 +104,7 @@ public class MultiSampleVCFFilter {
 			boolean passes = true;
 			VCFSample[] samples = test.getSample();
 			for (int i=0; i< controlSampleIndex.length; i++){
-				VCFSample s = samples[i];
+				VCFSample s = samples[controlSampleIndex[i]];
 				if (s.isNoCall()== true ||  
 						s.getReadDepthDP() < sampleMinimumReadDepthDP || 
 						s.getGenotypeQualityGQ() < sampleMinimumGenotypeQualityGQ) continue;
@@ -110,6 +119,44 @@ public class MultiSampleVCFFilter {
 
 		int numStillPassing = parser.countMatchingVCFRecords(VCFRecord.PASS);
 		return new int[]{startingRecordNumber, numStillPassing};
+	}
+	
+	
+	private int[] requireOneObservationFilter(VCFParser parser) {
+		//get indexes for cases
+		int[] cohortSampleIndex = this.fetchCohortIndexes(parser);
+		
+		VCFRecord[] records = parser.getVcfRecords();
+		int startingRecordNumber = parser.countMatchingVCFRecords(VCFRecord.PASS);
+		
+		//Run filtering
+		for (VCFRecord test: records) {
+			//Make sure it's a passing record
+			if (test.getFilter().equals(VCFRecord.FAIL)) {
+				continue;
+			}
+			
+			boolean passes = false;
+			VCFSample[] samples = test.getSample();
+			for (int i=0; i<cohortSampleIndex.length; i++) {
+				VCFSample s = samples[cohortSampleIndex[i]];
+				if ((s.isNoCall())) {
+					continue;
+				}
+				if ((s.getGenotypeGT().equals("0/1") || s.getGenotypeGT().equals("1/1")) && 
+						s.getReadDepthDP() >= sampleMinimumReadDepthDP &&
+						s.getGenotypeQualityGQ() >= sampleMinimumGenotypeQualityGQ) {
+					passes = true;
+					break;
+				}
+			}
+			if (passes == false) {
+				test.setFilter(VCFRecord.FAIL);
+			}
+		}
+		
+		int numStillPassing = parser.countMatchingVCFRecords(VCFRecord.PASS);
+		return new int[] {startingRecordNumber, numStillPassing};
 	}
 
 
@@ -130,6 +177,7 @@ public class MultiSampleVCFFilter {
 		}
 		return indexes;
 	}
+
 
 	/**Sets passing records to fail if no cohort/ affected sample makes the read depth and genotype quality thresholds. 
 	 * Returns int[startingNumPassing, endingNumPassing]*/
@@ -231,8 +279,11 @@ public class MultiSampleVCFFilter {
 		System.out.println(filterRecordQuality+"\tFail records with QUAL scores < "+ recordMinimumQUAL);
 		System.out.println(filterAnySample + "\tPass records where any sample passses thresholds");
 		System.out.println(controlHomozygousFilter + "\tFail records where any control is homozygous non reference and also passes the sample thresholds");
-		if (controlHomozygousFilter) System.out.println(Misc.stringArrayToString(controlSampleNames, ",")+ "\tControl sample names");
 		System.out.println(oneOrMorePassingCohortFilter + "\tFail records where no cohort/ affected sample passes the sample thresholds");
+		if (requireOneObservationInCases) {
+			System.out.println(requireOneObservationInCases+"\tFail records where no cohort sample is homozygous or heterozgous for alt allele above the sample thresholds");
+		}
+		if (controlHomozygousFilter) System.out.println(Misc.stringArrayToString(controlSampleNames, ",")+ "\tControl sample names");
 		if (oneOrMorePassingCohortFilter) System.out.println(Misc.stringArrayToString(cohortSampleNames, ",")+ "\tCohort/ affected sample names");
 		System.out.println(sampleMinimumReadDepthDP + "\tMinimum sample read depth DP");
 		System.out.println(sampleMinimumGenotypeQualityGQ + "\tMinimum sample genotype quality GQ");
@@ -262,6 +313,7 @@ public class MultiSampleVCFFilter {
 					case 'a': filterAnySample = true; break;
 					case 'b': controlHomozygousFilter = true; break;
 					case 'c': oneOrMorePassingCohortFilter = true; break;
+					case 'e': requireOneObservationInCases = true; break;
 					case 'g': sampleMinimumGenotypeQualityGQ = Integer.parseInt(args[++i]); break;
 					case 'r': sampleMinimumReadDepthDP = Integer.parseInt(args[++i]); break;
 					case 'd': recordMinimumQUAL = Float.parseFloat(args[++i]); filterRecordQuality = true; break;
@@ -322,6 +374,8 @@ public class MultiSampleVCFFilter {
 				"      contain the homozygous non reference allele. Requires setting -n .\n"+
 				"-c Fail records where none of the cohort/ affected samples pass the sample thresholds.\n" +
 				"      Requires setting -o .\n"+
+				"-e Fail records where none of the cohort/ affected samples have alt observations\n" +
+				"      above the specified GQ and DP threshholds.\n" +
 				"-d Minimum record QUAL score, defaults to 0, recommend >=20 .\n"+
 				"-g Minimum sample genotype quality GQ, defaults to 0, recommend >= 20 .\n"+
 				"-r Minimum sample read depth DP, defaults to 0, recommend >=10 .\n"+
