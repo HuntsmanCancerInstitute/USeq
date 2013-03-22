@@ -2,6 +2,7 @@ package edu.utah.ames.bioinfo;
 
 import java.io.*;
 import java.text.DateFormat;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.Matcher;
@@ -22,68 +23,73 @@ import javax.mail.internet.MimeMessage;
  * @author darren.ames@hci.utah.edu
  */
 
-//TODO: add this class and dependencies to jar file
-
 public class Ketchup {
 
 	//fields
-	private String path = "/tomato/job/";
+	 private static String path = "/tomato/job/";
+	//local: private static String path = "/Users/darren/Desktop/testDir/";
 	//regex to find email addresses
 	static String REGEX = "^#e\\s+(.+@.+)";
 	static HashMap<File, Long> fileDates = null;
-	//set warn cutoff time: 5 days ago
-	private long warnDate = System.currentTimeMillis()
-			- (5L * 24 * 60 * 60 * 1000);
-	//set delete cutoff time: 7 days ago
-	private long deleteDate = System.currentTimeMillis()
-			- (7L * 24 * 60 * 60 * 1000);
-	private long fileSize = 1048576;
-	private String smtpHostName = "mail.inscc.utah.edu";
-
+	//set warn cutoff time: 10 days ago
+	private static long warnDate = System.currentTimeMillis()
+			- (10L * 24 * 60 * 60 * 1000);
+	//set delete cutoff time: 17 days ago
+	private static long deleteDate = System.currentTimeMillis()
+			- (17L * 24 * 60 * 60 * 1000);
+	//filesize cutoff: 10Mb
+	private static long fileSize = 10485760;
+	private static SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
+	//date file deletion begins
+	Date startDate = sdf.parse("2013/03/31");
+	Date todayDate = new Date();
+	
 	//constructor
-	public Ketchup (String[] args) {
-		
+	public Ketchup (String[] args) throws ParseException {
+
 		processArgs(args);
-		
 		File tomatoDir = new File(path);
-		File savedFileDates = new File(tomatoDir, "savedFileDates.ser");
-		
+
+		//make serialized file with file objects and their last modified dates
+		File savedFileDates = new File(tomatoDir, ".savedFileDates.ser");
+
 		//fetch file dates and save in serialized file
 		fileDates = fetchFileDates(savedFileDates);
 
 		//create File object 
 		File[] dirs = tomatoDir.listFiles();
 		ArrayList<User> users = fetchUsers(dirs);
-		
+
 		for (User user : users) {
-			
+
 			//find email addresses for each user
 			fetchEmailAddress(user);
 
 			//start walking
 			walk(user);
-			
+
 			//send some emails!
-			Ketchup.sendMail(user);
+			sendMail(user);
 		}
 		Stuff.saveObject(savedFileDates, fileDates);
 	}
-	
+
 	/**
 	 * Descends through files in each user's job directory.
 	 * @param user
 	 * @throws IOException
 	 */
 	public void walk(User user) {
-		
-		
+
+		//make arraylist of files
 		ArrayList<File> alFiles = fetchAllFilesRecursively(user.getDirectory());
-		
+
+		//for each user's files...
 		for (File f : alFiles) {
 			checkFile(user, f);
 		}
 	}
-	
+
 	/**
 	 * Fetches files that don't start with a '.' from a directory recursing through sub directories
 	 * @param directory
@@ -107,7 +113,7 @@ public class Ketchup {
 		}
 		return files;
 	}
-	
+
 	/**
 	 * Compares file last modified dates to see if action is necessary.
 	 * @param user
@@ -127,18 +133,21 @@ public class Ketchup {
 					fileDate = System.currentTimeMillis();
 					fileDates.put(fileObject, fileDate);
 				} else {
-					//warn cutoff? >=5 days ago && < 7 days ago
+					//warn cutoff? >=10 days ago && < 17 days ago
 					if ((fileDate.longValue() <= warnDate)
 							&& (fileDate.longValue() > deleteDate))
 						//add fileObject to warnFiles ArrayList
 						user.getWarnFiles().add(fileObject);
-					else
-						//delete cutoff >=7 days ago
+					else {
+						//delete cutoff >=17 days ago
 						if (fileDate.longValue() <= deleteDate)
 							//add fileObject to deleteFiles ArrayList
 							user.getDeleteFiles().add(fileObject);
-					//****uncomment this to start deleting offending files****
-					//fileObject.deleteOnExit();
+					}
+					if (todayDate.after(startDate)) {
+						//****uncomment this to start deleting offending files****
+						//fileObject.deleteOnExit();
+					}
 				}
 			}
 		}
@@ -153,7 +162,7 @@ public class Ketchup {
 	 * @param files
 	 * @return
 	 */
-	public static ArrayList<User> fetchUsers(File[] files) {
+	public ArrayList<User> fetchUsers(File[] files) {
 
 		//create ArrayList to hold User names
 		ArrayList<User> userNames = new ArrayList<User>();
@@ -165,6 +174,7 @@ public class Ketchup {
 
 				//add user names to user objects
 				userNames.add(user);
+				//System.out.println(user.getName());
 			}
 		}
 		return userNames;
@@ -175,7 +185,7 @@ public class Ketchup {
 	 * @param user
 	 * @throws IOException
 	 */
-	public static void fetchEmailAddress(User user) {
+	public void fetchEmailAddress(User user) {
 
 		try {
 			//call pattern to find valid email addresses within a file
@@ -210,76 +220,125 @@ public class Ketchup {
 			System.exit(1);
 		}
 	}
+	
 	/**
-	 * Grabs file modified dates from each user's directories and saves in a serialized File object.
+	 * Grabs file modified dates from each user's directories and saves in a serialized File object in their directory.
 	 * @param serFile
 	 * @return
 	 */
-	public static HashMap<File, Long> fetchFileDates(File serFile) {
+	@SuppressWarnings("unchecked")
+	public HashMap<File, Long> fetchFileDates(File serFile) {
 
 		if (serFile.canRead() == false || !serFile.exists()) {
 			return new HashMap<File, Long>();
 		}
 		return (HashMap<File, Long>) Stuff.fetchObject(serFile);
 	}
-
+	
 	/**
 	 * method to compose email body
 	 * @param msg
 	 * @param user
 	 * @return
 	 * @throws IOException
+	 * @throws ParseException 
 	 */
-	public static String getMessage(String msg, User user) throws IOException {
+	public String getMessage(String msg, User user) throws IOException, ParseException {
 		
 		//instantiate new StringBuffer object for holding email message body
 		StringBuffer message = new StringBuffer();
 		message.append("Hello Tomato user,"
 				+ "\n\n"
 				+ "Our system indicates that you have data files in your Tomato jobs directory that are scheduled for deletion. " 
-				+ "\nWe ask that you either move or delete these files before they are removed. Details are below. " 
-				+ "\nPlease contact a member of the Bioinformatics Core if this message was received in error, or if you"
-				+ "\nneed greater space allocation and also happen to make excellent brownies."
+				+ "\nWe ask that you move these files to an Analysis Report in GNomEx or delete them or before they are removed."
+				+ "\nDetails are below. Please contact a member of the Bioinformatics Core if this message was received in error,"
+				+ "\nor if you need greater space allocation."
 				+ "\n\nThank you," + "\n\nU of U Bioinformatics Core");
+		
+		//first Ketchup run
+		if (todayDate.before(startDate)) {
+			message.append("\n\n\nThe following files will be deleted on Sunday March 31, 2013:\n");
+			//check if warnFiles are deleteFiles ArrayList are empty
+			if (user.getWarnFiles().isEmpty() == true && user.getDeleteFiles().isEmpty() == true) {
+				message.append("\nNone\n");
+			}
+			else {
+				int counter = 0;
+				//for each user with offending files in the warnFiles ArrayList
+				for (int i = 0; i < user.getWarnFiles().size(); i++) {
 
-		message.append("\n\n\nWarn files (scheduled for deletion):\n");
-		
-		//check if warnFiles ArrayList is empty
-		if (user.getWarnFiles().isEmpty() == true) {
-			message.append("\nnone\n");
+					//get files in warnFile ArrayList
+					File warnFile = user.getWarnFiles().get(i);
+
+					//format lastModifiedDate so it's readable
+					long format = warnFile.lastModified();
+					DateFormat sdf = SimpleDateFormat.getInstance();
+					message.append("\n" + (++counter) + ".\t" + "Name: " + warnFile.getCanonicalPath() + 
+							"\n" + "\tSize: " + (warnFile.length()/1000000) + "MB\n" + 
+							"\tLast modified: " + sdf.format(format) + "\n");
+				}
+				//for each user with offending files in the deleteFiles ArrayList
+				for (int i = 0; i < user.getDeleteFiles().size(); i++) {
+
+					//get files in the deleteFile ArrayList
+					File deleteFile = user.getDeleteFiles().get(i);
+					//format lastModifiedDate so it's readable
+					long format = deleteFile.lastModified();
+					DateFormat sdf = SimpleDateFormat.getInstance();
+					message.append("\n" + (++counter) + ".\t" + "Name: " + deleteFile.getCanonicalPath() + 
+							"\n" + "\tSize: " + (deleteFile.length()/1000000) + "MB\n" + 
+							"\tLast modified: " + sdf.format(format) + "\n");
+				}
+			}
 		}
-		
-		//for each user with offending files in the warnFiles ArrayList
-		for (int i = 0; i < user.getWarnFiles().size(); i++) {
-			
-			//get files in warnFile ArrayList
-			File warnFile = user.getWarnFiles().get(i);
-			
-			//format lastModifiedDate so it's readable
-			long format = warnFile.lastModified();
-			DateFormat sdf = SimpleDateFormat.getInstance();
-			message.append("\n" + warnFile.getCanonicalPath() + "/" + warnFile.getName() + "\t" + (warnFile.length()/1000000) + "MB\t" + sdf.format(format));
+		//every other Ketchup run after the first one
+		else {
+			int counter = 0;
+			message.append("\n\n\nThe following files will be deleted in 1 week:\n");
+			if (user.getWarnFiles().isEmpty() == true) {
+				message.append("\nNone\n");
+			}
+			else {
+				//for each user with offending files in the warnFiles ArrayList
+				for (int i = 0; i < user.getWarnFiles().size(); i++) {
+
+					//get files in warnFile ArrayList
+					File warnFile = user.getWarnFiles().get(i);
+
+					//format lastModifiedDate so it's readable
+					long format = warnFile.lastModified();
+					DateFormat sdf = SimpleDateFormat.getInstance();
+					message.append("\n" + (++counter) + ".\t" + "Name: " + warnFile.getCanonicalPath() + 
+							"\n" + "\tSize: " + (warnFile.length()/1000000) + "MB\n" + 
+							"\tLast modified: " + sdf.format(format) + "\n\n");
+				}
+			}
+			//print the list of deleted files
+			message.append("\nDeleted files:\n");
+
+			//check if deleteFiles ArrayList is empty
+			if (user.getDeleteFiles().isEmpty() == true) {
+				message.append("\nNone\n");
+			}
+			else {
+				//for each user with offending files in the deleteFiles ArrayList
+				for (int i = 0; i < user.getDeleteFiles().size(); i++) {
+
+					//get files in the deleteFile ArrayList
+					File deleteFile = user.getDeleteFiles().get(i);
+					//format lastModifiedDate so it's readable
+					long format = deleteFile.lastModified();
+					DateFormat sdf = SimpleDateFormat.getInstance();
+					message.append("\n" + (++counter) + ".\t" + "Name: " + deleteFile.getCanonicalPath() + 
+							"\n" + "\tSize: " + (deleteFile.length()/1000000) + "MB\n" + 
+							"\tLast modified: " + sdf.format(format) + "\n");
+				}
+			}
 		}
-		message.append("\nDeleted files:\n");
-		
-		//check if deleteFiles ArrayList is empty
-		if (user.getDeleteFiles().isEmpty() == true) {
-			message.append("\nnone\n");
-		}
-		
-		//for each user with offending files in the deleteFiles ArrayList
-		for (int i = 0; i < user.getDeleteFiles().size(); i++) {
-			
-			//get files in the deleteFile ArrayList
-			File deleteFile = user.getDeleteFiles().get(i);
-			//format lastModifiedDate so it's readable
-			long format = deleteFile.lastModified();
-			DateFormat sdf = SimpleDateFormat.getInstance();
-			message.append("\n" + deleteFile.getCanonicalPath() + "/" + deleteFile.getName() + "\t" + (deleteFile.length()/1000000) + "MB\t" + sdf.format(format));
-		}
+		System.out.println(message.toString());
 		return message.toString();
 	}
-	
+
 	/**
 	 * Emailing method that configures mailing params
 	 * @param recipients
@@ -288,39 +347,39 @@ public class Ketchup {
 	 * @param from
 	 * @throws MessagingException
 	 */
-	public static void postMail(String recipients, String subject, String message, String from) throws MessagingException {
-		
+	public void postMail(String recipients, String subject, String message, String from) throws MessagingException {
+
 		//set the host smtp address
 		Properties props = new Properties();
 		props.put("mail.smtp.host", "hci-mail.hci.utah.edu");
-		
+
 		//create some properties and get the default Session
 		javax.mail.Session session = javax.mail.Session.getDefaultInstance(props, null);
-		
+
 		//create message
 		Message msg = new MimeMessage(session);
-		
+
 		//set the from and to address
 		InternetAddress addressFrom = new InternetAddress(from);
 		msg.setFrom(addressFrom);
 		msg.setRecipients(Message.RecipientType.TO, InternetAddress.parse(recipients, false));
-		
+
 		//optional: can also set custom headers here in the Email if wanted
 		//msg.addHeader("MyHeaderName", "myHeaderValue");
-		
+
 		//setting the Subject and Content type
 		msg.setSubject(subject);
 		msg.setContent(message, "text/plain");
 		Transport.send(msg);
 	}
-	
+
 	/**
 	 * Magic. Do not touch.
 	 * @param a
 	 * @param separator
 	 * @return
 	 */
-	public static String arrayToString(String[] a, String separator) {
+	public String arrayToString(String[] a, String separator) {
 		if (a == null || separator == null) {
 			return null;
 		}
@@ -334,18 +393,19 @@ public class Ketchup {
 		}
 		return result.toString();
 	}
-	
+
 	/**
 	 * Method to send mail to users if they have warnFiles or deleteFiles.
 	 * @param user
+	 * @throws ParseException 
 	 */
-	public static void sendMail(User user) {
+	public void sendMail(User user) throws ParseException {
 		String msg = null;
-		
-		//determine if there are files in the delete files ArrayList
-		if (user.getDeleteFiles().isEmpty() != true) {
+
+		//determine if there are files in the delete/warn files ArrayLists
+		if (user.getDeleteFiles().isEmpty() != true || user.getWarnFiles().isEmpty() != true) {
 			String[] emails = new String[user.getEmail().size()];
-			
+
 			int i = 0;
 			for (String e : user.getEmail()) {
 				emails[i] = e;
@@ -353,35 +413,15 @@ public class Ketchup {
 			}
 			try {
 				//try sending email to user with list of delete files
-				Ketchup.postMail(Ketchup.arrayToString(emails, ","), "TOMATO JOB DIRECTORY CLEANUP!!!", Ketchup.getMessage(msg, user), "doNotReply@nobody.com");
+				this.postMail(this.arrayToString(emails, ","), "Tomato job directory cleanup", this.getMessage(msg, user), "doNotReply@hci.utah.edu");
 			} catch (MessagingException e1) {
 				e1.printStackTrace();
 			} catch (IOException e1) {
 				e1.printStackTrace();
 			}
 		}
-		else {
-			//determine if there are files in the warn files ArrayList
-			if (user.getWarnFiles().isEmpty() != true) {
-				String[] emails = new String[user.getEmail().size()];
-						
-				int i = 0;
-				for (String e : user.getEmail()) {
-					emails[i] = e;
-					i++;
-				}
-				//try sending email to user with list of warn files
-				try {
-					Ketchup.postMail(Ketchup.arrayToString(emails, ","), "TOMATO JOB DIRECTORY CLEANUP!!!", Ketchup.getMessage(msg, user), "doNotReply@nobody.com");
-				} catch (MessagingException e1) {
-					e1.printStackTrace();
-				} catch (IOException e1) {
-					e1.printStackTrace();
-				}
-			}
-		}
 	}
-	
+
 	/**
 	 * This method will process each argument and assign new variables.
 	 * @param args
@@ -399,7 +439,6 @@ public class Ketchup {
 				try {
 					switch (test) {
 					case 'p': path = new String(args[++i]); break;
-					case 'h': smtpHostName = new String(args[++i]); break;
 					case 's': fileSize = Long.parseLong(args[++i]); break; //file size cutoff
 					case 'd': deleteDate = Long.parseLong(args[++i]); break;	//delete date cutoff
 					case 'w': warnDate = Long.parseLong(args[++i]); break;	//warn date cutoff
@@ -412,21 +451,25 @@ public class Ketchup {
 			}
 		}
 	}
-	
+
 	/**
 	 * @param args
 	 * @throws IOException
 	 * @throws MessagingException
 	 */
 	public static void main(String[] args) throws IOException, MessagingException {
-		
+
 		if (args.length == 0) {
 			printDocs();
 			System.exit(0);
 		}
-		new Ketchup(args);
+		try {
+			new Ketchup(args);
+		} catch (ParseException e) {
+			e.printStackTrace();
+		}
 	}
-	
+
 	public static void printDocs() {
 		System.out.println("\n" +
 				"**********************************************************************************\n" +
@@ -435,26 +478,23 @@ public class Ketchup {
 				"Ketchup identifies users in the Tomato jobs directory, creates a User object for \n" +
 				"each, and then for each user, finds and stores their associated email addresses to \n" +
 				"be used for notification of impending file deletion. Files are grouped into either \n" +
-				"warn files (to be deleted in 2 days) or delete files (passing delete criteria and \n" +
-				"removed from file system). Current criteria based upon file size (>1MB by default) \n" +
+				"warn files (to be deleted in 1 wk) or delete files (passing delete criteria and \n" +
+				"removed from file system). Current criteria based upon file size (>10MB by default) \n" +
 				"and file last modified date. Users are sent an email with a list of warn files or \n" +
 				"those that have been deleted.\n" +
 
 				"\nOptions:\n" +
 				"-p Full path for directory where Ketchup will start walking.\n" +
-				"   Default: /Users/darren/Desktop/testDir/\n" +
-				"-h SMTP host name for emailing purposes.\n"+
-				"	Default: mail.inscc.utah.edu\n" +
+				"   Default: /tomato/job/\n" +
 				"-d Delete date in number of days (int) old relative to current system time.\n" +
-				"	Default: 7 days ago.\n"+
+				"	Default: 17 days ago.\n"+
 				"-w Warn date in number of days (int) old relative to current system time.\n" +
-				"	Default: 5 days ago.\n"+
+				"	Default: 10 days ago.\n"+
 				"-s Minimum file size cutoff for identifying big files.\n"+
-				"	Default: 1048576 bytes (1 MB)\n" +
-				
-				"\nExample: java pathToUSeq/Apps/Ketchup -p /tomato/job/\n" +
-				"     -h mail.inscc.utah.edu\n\n" +
+				"	Default: 10485760 bytes (10 MB)\n" +
 
-		"**************************************************************************************\n");
+				"\nExample: java pathToUSeq/Apps/Ketchup -p /tomato/job/\n\n" +
+				"Questions or comments about this app? Contact: darren.ames@hci.utah.edu\n\n" +
+				"**************************************************************************************\n");
 	}
 }
