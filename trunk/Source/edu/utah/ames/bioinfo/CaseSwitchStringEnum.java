@@ -6,26 +6,25 @@ package edu.utah.ames.bioinfo;
  *
  */
 
-public class Bar {
+public class CaseSwitchStringEnum {
 	
 	private static enum Apps {
 		APP2, APP3, MRNASEQ, APP1, EXCAPNIM, TDNASEQ, SMRNASEQ, APP4, DNASEQ, APP5, APP6;
 	}
-	static String value = "APP1"; // assume input
+	static String value = "APP2"; // assume input
 	static Apps apps = Apps.valueOf(value); // surround with try/catch
 	
 	public static void main(String[] args) {
 		figureThisOut();
-		//doStuff1();
-		//doStuff2();
-		//doStuff3();
-		//doStuff4();
 	}
 	
 	public static void figureThisOut() {
 		 try {
 			 switch(apps) {
-			    case APP2: doStuff1(); break;
+			    case APP2: doStuff1(); 
+			    doStuff2();
+			    doStuff3();
+			    break;
 			    case APP1: doStuff2(); break;
 			    case MRNASEQ: doStuff4(); break;
 			    case APP5: doStuff3(); break;

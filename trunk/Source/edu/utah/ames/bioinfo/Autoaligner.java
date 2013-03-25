@@ -10,6 +10,8 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
+import util.gen.Misc;
+
 
 /**
  * This class contains methods to automatically align fastq sequences after they come out of the HiSeq Pipeline.  
@@ -27,22 +29,22 @@ import javax.mail.internet.MimeMessage;
  *
  */
 
-public class AutoNovoaligner {
+public class Autoaligner {
 
 	//fields
-	private static String requestNum; 
+	//private static String requestNum; 
 	private static String analysisNumber;
 	private static String myEmail = "darren.ames@hci.utah.edu"; //TODO change this when I know it works correctly
-	//bio3 private static String freshDataReport = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoalign_*.txt";
-	private static String freshDataReport = "/tomato/job/autoaligner/reports/autoalign_*.txt";
-	//laptop private static String freshDataReport = "/Users/darren/Desktop/novoalignerTestDir/reports/autoalign_*.txt";
+	//bio3 private static String autoalignReport = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoalign_*.txt";
+	private static String autoalignReport = "/tomato/job/autoaligner/reports/autoalign_*.txt";
+	//laptop private static String autoalignReport = "/Users/darren/Desktop/novoalignerTestDir/reports/autoalign_*.txt";
 	//bio3 private static String novoindexNames = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData/novoindexNameTable.txt";
 	private static String novoindexNames = "/tomato/job/autoaligner/autoAlignerData/novoindexNameTable.txt";
 	//laptop private static String novoindexNames = "/Users/darren/Desktop/novoalignerTestDir/novoindexNameTable.txt";
 	//bio3 private static String parsedFreshDataReports = "/home/sbsuser/Pipeline/AutoAlignReport/reports/processedReports/";
 	//laptop private static String parsedFreshDataReports = "/Users/darren/Desktop/novoalignerTestDir/processedReports/";
 	private static String parsedFreshDataReports = "/tomato/job/autoaligner/processedReports/";
-	private static String requestYear;
+	//private static String requestYear;
 	private static String tomatoJobDir = "/tomato/job/autoaligner/alignments/";
 	//laptop private static String tomatoJobDir = "/Users/darren/Desktop/novoalignerTestDir/alignments/";
 	private String smtpHostName = "mail.inscc.utah.edu"; //default
@@ -54,10 +56,11 @@ public class AutoNovoaligner {
 	private HashMap<String, String> genomeIndex;
 	private static boolean doNotAlign = false;
 	private static boolean isSmallRNA = false;
-	private static boolean hasNovoindex = true;
+	//private static boolean hasNovoindex = true;
+	private static String refSeqFile = "/tomato/data/hg19.fasta";
 
 	//constructor
-	public AutoNovoaligner(String[] args) {	
+	public Autoaligner(String[] args) {	
 		processArgs(args);
 	}
 
@@ -68,7 +71,7 @@ public class AutoNovoaligner {
 			printDocs();
 			System.exit(0);
 		}
-		AutoNovoaligner an = new AutoNovoaligner(args);
+		Autoaligner an = new Autoaligner(args);
 		an.parseFreshDataReport();
 	}
 
@@ -111,7 +114,7 @@ public class AutoNovoaligner {
 		//load novoindex hash
 		genomeIndex = loadNovoindexList();
 		//create buffered reader to read fresh data report
-		BufferedReader br = new BufferedReader(new FileReader(freshDataReport));
+		BufferedReader br = new BufferedReader(new FileReader(autoalignReport));
 		String line;
 		//skip first line in file
 		br.readLine();
@@ -125,11 +128,14 @@ public class AutoNovoaligner {
 			String dataValue[] = line.split("\t");
 
 			//check for correct number of columns in fresh data report
-			if (dataValue.length < 15) {
+			if (dataValue.length < 16) {
 				continue;
 			}
 			else {
 				Sample s = new Sample(dataValue);
+				String path = "/Repository/MicroarrayData/" + s.getRequestYear() + "/" + s.getRequestNumber()
+						+ "/Fastq/";
+				s.setFastqFilePath(path);
 				//parse out "Lab" from lab name string
 				Pattern p = Pattern.compile(".+(?=Lab)");
 				Matcher m = p.matcher(s.getLab());
@@ -172,7 +178,7 @@ public class AutoNovoaligner {
 		br.close();
 
 		//move the parsed fresh data report to the processedReports folder
-		File file = new File(freshDataReport);
+		File file = new File(autoalignReport);
 		boolean success = file.renameTo(new File(parsedFreshDataReports + file.getName()));
 		if (!success) {
 			System.out.println("Error moving parsed fresh data report to the parsed directory.");
@@ -190,8 +196,8 @@ public class AutoNovoaligner {
 	public String getAnalysisNumber(Sample s) throws IOException {
 
 		String line;
-		InputStream stderr = null;
 		InputStream stdout = null;
+		InputStream stderr = null;
 		String analysisNum = null;
 		String analysisPath = null;
 
@@ -235,7 +241,7 @@ public class AutoNovoaligner {
 				//set the path in sample object
 				analysisPath = m.group() + "/";
 				s.setAnalysisNumberPath(analysisPath);
-				System.out.println(s.getAnalysisNumberPath());
+				//System.out.println(s.getAnalysisNumberPath());
 			}
 			//clean this up so it reports an exception and then continues
 		}
@@ -245,6 +251,19 @@ public class AutoNovoaligner {
 		if (!success) {
 			System.out.println("\nproblem creating new analysis report directory.");
 		}
+		
+		//set path
+		String path = s.getAnalysisNumberPath();
+		//make other dirs in the new analysis report dir
+		File alignDir = new File(path + "rawAlignments");
+		File bamDir = new File(path + "processedAlignments");
+		File coverageDir = new File(path + "coverageTracks");
+		File logsDir = new File(path + "logs");
+		alignDir.mkdir();
+		coverageDir.mkdir();
+		bamDir.mkdir();
+		logsDir.mkdir();
+		
 		brCleanup.close();
 		//call method that creates the cmd.txt file
 		//this.createCmdFile(s);
@@ -258,10 +277,14 @@ public class AutoNovoaligner {
 	 */
 	public void setCondSeqAppCode(Sample s) throws Exception {
 		
+		//set isPaired flag
+		if (s.getSingleOrPairedEnd().toString().equals("Paired-end reads")) {
+			s.setPairedEnd(true);
+		}
 		//set reverse strand flag for paired-end stranded (m)RNA sequencing
 		if ((s.getSequencingApplicationCode().toString().equals("APP2") || 
 				s.getSequencingApplicationCode().toString().equals("APP3")) && 
-				s.getSingleOrPairedEnd().toString().equals("Paired-end reads")) {
+				s.isPairedEnd() == true) {
 			s.setReverseStrand(true);
 		}
 		else {
@@ -384,10 +407,6 @@ public class AutoNovoaligner {
 	 */
 	public void createCmdFile(Sample s) throws IOException {
 		
-		//set isPaired flag
-		if (s.getSingleOrPairedEnd().toString().equals("Paired-end reads")) {
-			boolean isPaired = true;
-		}
 		String jobDirPath = tomatoJobDir + s.getRequestNumber() + "/" + s.getSampleID();
 		try {
 			//first make sure an index exists before continuing
@@ -420,7 +439,25 @@ public class AutoNovoaligner {
 			System.exit(0);
 		}
 	}
+	
+	/**
+	 * This method matches input fastq files in Repository from sampleID and then soft links
+	 * them to the appropriate Tomato job directory.
+	 * @param s
+	 * @param dirPath
+	 * @throws IOException
+	 */
+	public void softLinkFiles(Sample s, String dirPath) throws IOException {
 
+		//dir path where fastq files are located
+		File dir = new File("/Repository/MicroarrayData/" + s.getRequestYear() + "/" + s.getRequestNumber()
+				+ "/Fastq/");
+		String jobDirPath = tomatoJobDir + s.getRequestNumber() + "/" + s.getSampleID();
+
+		Process process = Runtime.getRuntime().exec(new String[] {"ln", "-s", (dir.toString() + "/" 
+				+ s.getFastqFileName()), jobDirPath});
+	}
+	
 	/**
 	 * Generates the general body of the cmd.txt file using sample-specific params and calls appropriate methods to do 
 	 * the actual populating of application-specific params based on whether sequencing application is 
@@ -433,34 +470,26 @@ public class AutoNovoaligner {
 	 */
 	public String getCmdFileMsgGen(Sample s) throws IOException, InterruptedException {
 
-		//paths for soft linking input fastq files
-		String target = "/Repository/MicroarrayData/" + s.getRequestYear() + "/" + s.getRequestNumber()
-				+ "/Fastq/" + s.getSampleID() + "_*.txt.gz";
-		//laptop String target = "/Users/darren/Desktop/novoalignerTestDir/foo.sh";
-		String dest = tomatoJobDir + s.getRequestNumber() + "/" + s.getSampleID() + "/";
-		//laptop String dest = "/Users/darren/Desktop/novoalignerTestDir/testStuff/";
-
 		//set name for input fastq files
-		String inputFile = s.getSampleID() + "_*.txt.gz";
-		String inputFile1 = s.getSampleID() + "_*1.txt.gz";
-		String inputFile2 = s.getSampleID() + "_*2.txt.gz";
-
-		Process process = Runtime.getRuntime().exec(new String[] {"ln", "-s", target, dest});
+		String pairedInputFile1 = s.getSampleID() + "_*1.txt.gz";
+		String pairedInputFile2 = s.getSampleID() + "_*2.txt.gz";
 
 		//set string for non-variable part of cmd.txt params
 		String msg = "#e " + myEmail + " -ef" + "\n#a " + s.getAnalysisNumber() + "\n## Novoalignments of " 
 				+ s.getRequestNumber() + " " + s.getProjectName() + "\n## Aligning to " 
 				+ s.getBuildCode() + " for " + s.getRequester() + " in the " + s.getLab() + "Lab "
-				+ "\n\n./fastqc " + inputFile + " --noextract" 
-				+ "\n\n@align -novoalign " + "-g " + s.getNovoindex() + " -i " + inputFile + " -gzip ";
+				+ "\n\n./FastQC/fastqc " + s.getFastqFileName() + " --noextract" 
+				+ "\n\n@align -novoalign " + "-g " + s.getNovoindex() + " -i " + s.getFastqFileName() + " -gzip ";
 		
 		//command string for splitting bisulfite files and preparing dirs for alignment
 		//***TODO substitute requester email for mine when I know it works***
+		
+		//****TODO**** Check to see how paired-end filenames are specified. file1/file2 may not be necessary
 		String bisulfiteMsg = "#e" + myEmail + " -ef" + "\n#a " + s.getAnalysisNumber() + "\n## Splitting bisulfite fastq files of " 
 				+ s.getRequestNumber() + " " + s.getProjectName() + " for " + s.getRequester() + " in the "
-				+ s.getLab() + "Lab " + "\n\n./fastqc " + inputFile + " --noextract" 
-				+ "\n\nFileSplitter.jar" + " -f " + inputFile1 + " -n 100000000 " + "-g"
-				+ "\n\nFileSplitter.jar" + " -f " + inputFile2 + " -n 100000000 " + "-g"
+				+ s.getLab() + "Lab " + "\n\n./FastQC/fastqc " + s.getFastqFileName() + " --noextract" 
+				+ "\n\nFileSplitter.jar" + " -f " + pairedInputFile1 + " -n 100000000 " + "-g"
+				+ "\n\nFileSplitter.jar" + " -f " + pairedInputFile2 + " -n 100000000 " + "-g"
 				+ "\n\nfor i in *_" + s.getSampleID() + "*; do n=${i%_" + s.getSampleID() + "_*}; mkdir $n; " 
 				+ "mv $i $n; cp bisAlignWait.txt $n; mv $n/bisAlignWait.txt $n/cmd.txt; touch $n/b; done\n";
 
@@ -492,83 +521,65 @@ public class AutoNovoaligner {
 				sb.append(msg);
 				sb.append(this.getCmdFileMessageGenomic(s));
 			}
-			//nope, it's something freaky that isn't currently supported in AutoNovoaligner 
+			//nope, it's something freaky that isn't currently supported in Autoaligner 
 			else {
 				doNotAlign = true;	
 			}
 		}
-		//System.out.println(sb.toString());
+		//soft link input files
+		String dirPath = "/Repository/MicroarrayData/" + s.getRequestYear() + "/" + s.getRequestNumber()
+				+ "/Fastq/";
+		this.softLinkFiles(s, dirPath);
 		//start the job by creating the b file
 		this.startTomatoJob(s);
 		return sb.toString();
 	}
 	/**
-	 * exome, genomic DNA, mononucleosome, ChIP alignment params
+	 * Exome, genomic DNA, mononucleosome, ChIP alignment params
 	 * @param s
 	 * @return
 	 */
 	public String getCmdFileMessageGenomic(Sample s) {
-		s.setParams(" [-r None -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC " +
-				"AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -H -k]" +
-				"\n\nSamTranscriptomeParser.jar -f " + s.getSampleID() + "*.sam.gz" +
-				"\n\nCalculatePerCycleErrorRate.jar -b " + s.getSampleID() + "*.bam -f " +
-				"/home/Genomes/Mouse/Mm9/Fastas/chrPhiX_Illumina.fasta.gz" +
-				"\n\nSam2USeq.jar -f " + s.getSampleID() + "*.bam -v " + s.getVersionedGenome());
+		s.setParams(" [-o SAM -r None -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC " +
+				"AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -H -k]");
 		return s.getParams();
 	}
 
 	/**
-	 * bisulfite alignment params
+	 * Bisulfite alignment params
 	 * @param s
 	 * @return
 	 */
 	public String getCmdFileMessageBisulfite(Sample s) {
+		//TODO check fastqFileName to make sure it's reported correctly***
 		s.setParams("#e " + myEmail + "\n#a " + s.getAnalysisNumber() + "\n## Novoalignments of " + 
-				s.getRequestNumber() + " " + s.getProjectName() + "\n## Aligning to " + s.getBuildCode()
-				+ " for " + s.getRequester() + " in the " + s.getLab() + "Lab " + "\n\n@align -novoalign " +
-				"[-o SAM -r Random -t 240 -h 120 -b 2] -i *.txt.gz -g " + s.getNovoindex() + " -p bisulphite -gzip"
-				+ "\n\nSam2USeq.jar -f " + s.getSampleID() + "*.sam.gz -v " + s.getVersionedGenome());
+				s.getRequestNumber() + " " + s.getProjectName() + "\n## Aligning to " + s.getBuildCode() +
+				" for " + s.getRequester() + " in the " + s.getLab() + "Lab " + "\n\n@align -novoalign " +
+				"[-o SAM -r Random -t 240 -h 120 -b 2] -i *.txt.gz -g " + s.getNovoindex() + " -p bisulphite -gzip" +
+				"\n\nrm *_" + s.getFastqFileName() + "\n\nmv *.zip logs/");
 		return s.getParams();	
 	}
 
 	/**
-	 * small RNA alignment params
+	 * Small RNA alignment params
 	 * @param s
 	 * @return
 	 */
 	public String getCmdFileMessageSmallRNA(Sample s) {
 		//includes 3' adapter stripping prior to alignment
 		//***this is NOT the standard Illumina Gex Adapter 2 used as default by novoalign
-		s.setParams(" [-o SAM -r All 50 -m -a ATCTCGTATGCCGTCTTCTGCTTG -l 15 -t 30]" +
-				"\n\nSamTranscriptomeParser.jar -f " + s.getSampleID() + "*.sam.gz" +
-				"\n\nSam2USeq.jar -f " + s.getSampleID() + "*.bam -v " + s.getVersionedGenome());
+		s.setParams(" [-o SAM -r All 50 -m -a ATCTCGTATGCCGTCTTCTGCTTG -l 15 -t 30]");
 		return s.getParams();
 	}
 
 	/**
-	 * standard mRNA alignment params
+	 * Standard mRNA alignment params. 
 	 * @param s
 	 * @return
 	 */
 	public String getCmdFileMessageStdParams(Sample s) {
-		//set processing params for paired-end (not stranded)
-		if (s.getSingleOrPairedEnd().toString().equals("Paired-end reads") && s.isReverseStrand() == false) {
-			s.setParams(" [-o SAM -r All 50]" + "\n\nSamTranscriptomeParser.jar -f " +
-					s.getSampleID() + "*.sam.gz -p" + "\n\nSam2USeq.jar -f " + s.getSampleID() + "*.bam -v " 
-					+ s.getVersionedGenome());
-		}
-		//set processing params for single-end
-		else if (s.getSingleOrPairedEnd().toString().equals("Single-end reads") && s.isReverseStrand() == false) {
-			s.setParams(" [-o SAM -r All 50]" + "\n\nSamTranscriptomeParser.jar -f " +
-					s.getSampleID() + "*.sam.gz" + "\n\nSam2USeq.jar -f " + s.getSampleID() + "*.bam -v " 
-					+ s.getVersionedGenome());
-		}
-		//set processing params for paired-end stranded
-		else if (s.getSingleOrPairedEnd().toString().equals("Paired-end reads") && s.isReverseStrand() == true) {
-			s.setParams(" [-o SAM -r All 50]" + "\n\nSamTranscriptomeParser.jar -f " +
-					s.getSampleID() + "*.sam.gz -p -r" + "\n\nSam2USeq.jar -f " + s.getSampleID() +
-					"*.bam -v " + s.getVersionedGenome());
-		}
+		//stranded and paired-end
+			s.setParams(" [-o SAM -r All 50]");
 		return s.getParams(); 
 	}
 
@@ -651,7 +662,7 @@ public class AutoNovoaligner {
 					//case 'c': cmdFilePath = new String(args[++i]); break;
 					//case 'g': genomeBuild = args[i+1]; i++; break;
 					case 'd': reportsDir = new String(args[++i]); break;
-					case 'f': freshDataReport = new String(args[++i]); break; 
+					case 'f': autoalignReport = new String(args[++i]); break; 
 					//case 'u': submitter = new String(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem--unknown option used!" + mat.group());
 					}
@@ -673,11 +684,11 @@ public class AutoNovoaligner {
 	public static void printDocs() {
 		System.out.println("\n" +
 				"**********************************************************************************\n" +
-				"**                        AutoNovoaligner: Feb 2013                          **\n" +
+				"**                        Autoaligner: Feb 2013                          **\n" +
 				"**********************************************************************************\n" + 
 				"This class contains methods to automatically align fastq sequences using novoalign via\n" +
 				"Tomato after they come out of the HiSeq Pipeline. All the necessary input data is contained\n" +
-				"in the fresh data report that comes out of the HiSeq Pipeline. Files are run individually.\n" +
+				"in the autoalign report that comes out of the HiSeq Pipeline. Files are run individually.\n" +
 				"A new analysis report is created in GNomEx (linked to experiment numbers) for all\n" +
 				"samples of the same request number. The requester is notified via email when jobs start\n" +
 				"and finish (except bisulfite at the moment). Bisulphite files are split into smaller chunks\n" +
@@ -685,12 +696,12 @@ public class AutoNovoaligner {
 				"appended to the same GNomEx analysis report. In the case of bisulfite alignments, Tomato\n" +
 				"will only email the user if there are exceptions and/or job failures\n (-ef option,\n" +
 				"i.e. #e email@nobody.com -ef). All input fastq files are first run through fastqc app.\n" +
-				"Genomic/RNA-Seq alignments are run through the SamTranscriptomeParser and relative read\n" +
-				"coverage tracks generated using Sam2USeq. Genomic alignments are also pushed through the\n" + 
-				"CalculatePerCycleErrorRate app prior to making read coverage .useq files.\n" +
+				"\nParameters: \n\n" +
+				"-d full path to reports directory containing autoalign reports\n" +
+				"-f filename for autoalign report to process\n\n" +
 
 				"Usage:\n\n" +
-				"java -jar -Xmx2G pathTo/AutoNovoaligner -d pathTo/jobDir/\n" +
+				"java -jar -Xmx2G pathTo/Autoaligner -d pathTo/reports/ -f autoalign_2013_01_01.txt\n" +
 				"**********************************************************************************\n");
 	}
 }

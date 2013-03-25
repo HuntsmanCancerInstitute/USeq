@@ -13,6 +13,8 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
+import util.gen.Misc;
+
 /**
  * This class identifies users in the Tomato jobs directory, creates a User object for
  * each, and then for each user, finds and stores their associated email
