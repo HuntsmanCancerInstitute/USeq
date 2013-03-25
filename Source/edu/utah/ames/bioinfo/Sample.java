@@ -5,51 +5,36 @@ import java.util.HashSet;
 
 /**
  * This class holds info about a sequenced sample. Use these methods to populate a cmd.txt
- * file for Tomato alignment and to create an analysis report in GNomEx
- * If tabbed content of flowcell_contents_to_tomato_launcher.txt changes, just modify
- * the index numbers of the fields below
+ * file for Tomato alignment and to create an analysis report in GNomEx. If tabbed content
+ * of the input autoalign report changes, just modify the index numbers of the fields below.
  * 
  * @author darren.ames@hci.utah.edu
  *
  */
 public class Sample {
 	
-	//fields
+	//fields from autoalign report
 	private String runID;
 	private String lane;
 	private String requestNum; 
 	private String requester; 
 	private String lab;
 	private String sequencingApplicationCode; 
-	private String sequencingApplication;
-	private String singleOrPairedEnd; //RunType
+	private String singleOrPairedEnd;
 	private String numberOfCycles;
 	private String sampleName;
 	private String organism;
 	private String genome; 
+	private String requesterEmail;
 	private String experimentFolder;
 	private String requestYear;
 	private String projectName;
 	private String sampleID;
-	private String labNum;
-	private String buildCode;
-	private String sampleInfo;
+	private String sequenceLaneNumber;
 	private String fastqFileName;
-	private String cmdFilePath;
-	private String novoindex;
-	private String alignParams;
-	private String indexCode;
-	private File[] paramsFile;
-	private File[] fastqFiles;
-	private HashSet<String> emails = new HashSet<String>();
-	private boolean isBisSeq = false;
-	private boolean isRNASeq = false;
-	private boolean isChIPSeq = false;
-	private boolean isSmallRNA = false;
-	private boolean isNewGenome = false;
-	private boolean sequenceFilesAreNew = false;
-	private boolean hasGenomeBuild = false;
-	private boolean hasNovoindex = false;
+	private String adapterSequence;
+	
+	//index fields
 	public static final int laneIndex = 8;
 	public static final int requestNumIndex = 2; 
 	public static final int requesterIndex = 1;
@@ -63,6 +48,37 @@ public class Sample {
 	public static final int sampleIDIndex = 4;
 	public static final int sampleNameIndex = 5;
 	public static final int requestYearIndex = 12;
+	public static final int requesterEmailIndex = 13;
+	public static final int sequenceLaneNumberIndex = 14;
+	public static final int fastqFileNameIndex = 15;
+	public static final int adapterSequenceIndex = 16;
+	
+	//worker fields
+	private String sequencingApplication;
+	private String versionedGenome;
+	private String labNum;
+	private String buildCode;
+	private String sampleInfo;
+	private String fastqFilePath;
+	private String analysisNumber;
+	private String analysisNumberPath;
+	private String cmdFilePath;
+	private String novoindex;
+	private String params;
+	private String indexCode;
+	private File[] paramsFile;
+	private File[] fastqFiles;
+	private HashSet<String> emails = new HashSet<String>();
+	private boolean isPairedEnd = false;
+	private boolean isBisSeq = false;
+	private boolean isRNASeq = false;
+	private boolean isChIPSeq = false;
+	private boolean isSmallRNA = false;
+	private boolean isNewGenome = false;
+	private boolean sequenceFilesAreNew = false;
+	private boolean hasGenomeBuild = false;
+	private boolean hasNovoindex = false;
+	private boolean reverseStrand = false;
 	
 	//constructor
 	public Sample(String[] dataValue) {
@@ -79,14 +95,18 @@ public class Sample {
 		sampleID = dataValue[sampleIDIndex];
 		projectName = dataValue[projectNameIndex];
 		requestYear = dataValue[requestYearIndex];
+		requesterEmail = dataValue[requesterEmailIndex];
+		sequenceLaneNumber = dataValue[sequenceLaneNumberIndex];
+		fastqFileName = dataValue[fastqFileNameIndex];
+		adapterSequence = dataValue[adapterSequenceIndex];
 	}
 
-	public String getFastqFileName() {
-		return fastqFileName;
+	public String getFastqFilePath() {
+		return fastqFilePath;
 	}
 
-	public void setFastqFileName(String fastqFileName) {
-		this.fastqFileName = fastqFileName;
+	public void setFastqFilePath(String fastqFilePath) {
+		this.fastqFilePath = fastqFilePath;
 	}
 
 	public String getCmdFilePath() {
@@ -345,12 +365,12 @@ public class Sample {
 		this.buildCode = buildCode;
 	}
 
-	public String getAlignParams() {
-		return alignParams;
+	public String getParams() {
+		return params;
 	}
 
-	public void setAlignParams(String alignParams) {
-		this.alignParams = alignParams;
+	public void setParams(String alignParams) {
+		this.params = alignParams;
 	}
 
 	public String getIndexCode() {
@@ -360,5 +380,76 @@ public class Sample {
 	public void setIndexCode(String indexCode) {
 		this.indexCode = indexCode;
 	}
+
+	public String getAnalysisNumber() {
+		return analysisNumber;
+	}
+
+	public void setAnalysisNumber(String analysisNumber) {
+		this.analysisNumber = analysisNumber;
+	}
+
+	public String getRequesterEmail() {
+		return requesterEmail;
+	}
+
+	public void setRequesterEmail(String requesterEmail) {
+		this.requesterEmail = requesterEmail;
+	}
 	
+	public String getSequenceLaneNumber() {
+		return sequenceLaneNumber;
+	}
+
+	public void setSequenceLaneNumber(String sequenceLaneNumber) {
+		this.sequenceLaneNumber = sequenceLaneNumber;
+	}
+
+	public String getAnalysisNumberPath() {
+		return analysisNumberPath;
+	}
+
+	public void setAnalysisNumberPath(String analysisNumberPath) {
+		this.analysisNumberPath = analysisNumberPath;
+	}
+
+	public String getVersionedGenome() {
+		return versionedGenome;
+	}
+
+	public void setVersionedGenome(String versionedGenome) {
+		this.versionedGenome = versionedGenome;
+	}
+
+	public boolean isPairedEnd() {
+		return isPairedEnd;
+	}
+
+	public void setPairedEnd(boolean isPairedEnd) {
+		this.isPairedEnd = isPairedEnd;
+	}
+
+	public boolean isReverseStrand() {
+		return reverseStrand;
+	}
+
+	public void setReverseStrand(boolean reverseStrand) {
+		this.reverseStrand = reverseStrand;
+	}
+
+	public String getFastqFileName() {
+		return fastqFileName;
+	}
+
+	public void setFastqFileName(String fastqFileName) {
+		this.fastqFileName = fastqFileName;
+	}
+
+	public String getAdapterSequence() {
+		return adapterSequence;
+	}
+
+	public void setAdapterSequence(String adapterSequence) {
+		this.adapterSequence = adapterSequence;
+	}
 }

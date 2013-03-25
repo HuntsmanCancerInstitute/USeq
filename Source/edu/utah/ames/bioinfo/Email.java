@@ -9,6 +9,9 @@ package edu.utah.ames.bioinfo;
 import javax.mail.*;
 import javax.mail.internet.*;
 import javax.activation.*;
+
+import util.gen.Misc;
+
 import java.util.*;
 
 public class Email{
