@@ -41,7 +41,7 @@ public class Ketchup {
 	private static long fileSize = 10485760;
 	private static SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
 	//date file deletion begins
-	Date startDate = sdf.parse("2013/03/31");
+	Date startDate = sdf.parse("2013/04/01");
 	Date todayDate = new Date();
 	
 	//constructor
@@ -257,7 +257,7 @@ public class Ketchup {
 		
 		//first Ketchup run
 		if (todayDate.before(startDate)) {
-			message.append("\n\n\nThe following files will be deleted on Sunday March 31, 2013:\n");
+			message.append("\n\n\nThe following files will be deleted on Monday April 1, 2013:\n");
 			//check if warnFiles are deleteFiles ArrayList are empty
 			if (user.getWarnFiles().isEmpty() == true && user.getDeleteFiles().isEmpty() == true) {
 				message.append("\nNone\n");
@@ -335,7 +335,7 @@ public class Ketchup {
 				}
 			}
 		}
-		System.out.println(message.toString());
+		//System.out.println(message.toString());
 		return message.toString();
 	}
 
@@ -473,7 +473,7 @@ public class Ketchup {
 	public static void printDocs() {
 		System.out.println("\n" +
 				"**********************************************************************************\n" +
-				"**                                Ketchup: Oct 2012                             **\n" +
+				"**                                Ketchup: Mar 2013                             **\n" +
 				"**********************************************************************************\n" +
 				"Ketchup identifies users in the Tomato jobs directory, creates a User object for \n" +
 				"each, and then for each user, finds and stores their associated email addresses to \n" +
