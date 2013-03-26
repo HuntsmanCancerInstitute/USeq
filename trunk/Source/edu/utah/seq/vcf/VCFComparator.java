@@ -300,12 +300,12 @@ public class VCFComparator {
 			String keyName = Misc.removeExtension(vcfKey.getName()); 
 			File matchingKey = new File (saveDirectory, "match_"+filter+keyName+".vcf.gz");
 			File noMatchingKey = new File (saveDirectory, "noMatch_"+filter+keyName+".vcf.gz");
-			keyParser.printRecords(VCFRecord.PASS, matchingKey, noMatchingKey);
+			//keyParser.printRecords(VCFRecord.PASS, matchingKey, noMatchingKey);
 
 			String testName = Misc.removeExtension(vcfTest.getName()); 
 			File matchingTest = new File (saveDirectory, "match_"+filter+testName+".vcf.gz");
 			File noMatchingTest = new File (saveDirectory, "noMatch_"+filter+testName+".vcf.gz");
-			testParser.printRecords(VCFRecord.PASS, matchingTest, noMatchingTest);
+			//testParser.printRecords(VCFRecord.PASS, matchingTest, noMatchingTest);
 
 			//print results 
 			File intersection = new File (saveDirectory, "comparison_"+filter+keyName+"_"+testName+".xls");
