@@ -104,6 +104,7 @@ public class VCFParser {
 	//indexs for ripping vcf records
 	int chromosomeIndex= 0;
 	int positionIndex = 1;
+	int rsIndex = 2;
 	int referenceIndex = 3;
 	int alternateIndex = 4;
 	int qualityIndex = 5;
@@ -368,14 +369,25 @@ public class VCFParser {
 		return new float[]{minScore, maxScore};
 	}
 	
+
 	/**Prints out two gzipped vcf files with records that match the fieldPass and those that don't.
 	 * Note, the original, unmodified record is printed in either case.*/
 	public void printRecords(String fieldPass) {
+		printRecords(fieldPass,false);
+	}
+	
+	
+	/**Prints two gzipped vcf files with records that match the fieldPass and those that don't.
+	 * If modified is set to true, any changes made to the record will be written
+	 * @param fieldPass
+	 * @param modified
+	 */
+	public void printRecords(String fieldPass,boolean modified) {
 		try {
 			String fullPathName = Misc.removeExtension(vcfFile.getCanonicalPath());
 			File good = new File(fullPathName+ "_Pass.vcf.gz");
 			File bad = new File(fullPathName+ "_Fail.vcf.gz");
-			printRecords(fieldPass, good, bad);
+			printRecords(fieldPass, good, bad, modified);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -383,16 +395,27 @@ public class VCFParser {
 	
 	/**Prints out two gzipped vcf files with records that match the fieldPass and those that don't.
 	 * Note, the original, unmodified record is printed in either case.*/
-	public void printRecords(String fieldPass, File pass, File fail) {
+	public void printRecords(String fieldPass, File pass, File fail, boolean modified) {
 		try {
 			Gzipper outGood = new Gzipper(pass);
 			Gzipper outBad = new Gzipper(fail);
 			outGood.println(comments);
 			outBad.println(comments);
-			for (VCFRecord r : vcfRecords){
-				if (r.getFilter().equals(fieldPass)) outGood.println(r);
-				else outBad.println(r);
+			if (modified) {
+				for (VCFRecord r: vcfRecords) {
+					if (r.getFilter().equals(fieldPass)) {
+						outGood.println(r.getModifiedRecord());
+					} else {
+						outBad.println(r.getModifiedRecord());
+					}
+				}
+			} else {
+				for (VCFRecord r : vcfRecords){
+					if (r.getFilter().equals(fieldPass)) outGood.println(r);
+					else outBad.println(r);
+				}
 			}
+			
 			outGood.close();
 			outBad.close();
 		} catch (Exception e) {

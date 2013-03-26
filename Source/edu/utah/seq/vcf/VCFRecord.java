@@ -7,11 +7,12 @@ public class VCFRecord {
 	//fields
 	private String chromosome;
 	private int position; //interbase coordinates! not 1 based
+	private String rsNumber;
 	private String reference;
 	private String alternate;
 	private float quality;
 	private String filter;
-	private String info;
+	private VCFInfo info;
 	private String format;
 	private VCFSample[] sample;
 	private String originalRecord;
@@ -34,10 +35,12 @@ public class VCFRecord {
 		position = Integer.parseInt(fields[vcfParser.positionIndex]) - 1;
 		reference = fields[vcfParser.referenceIndex];
 		alternate = fields[vcfParser.alternateIndex];
+		rsNumber = fields[vcfParser.rsIndex];
 		if (fields[vcfParser.qualityIndex].equals(".")) quality = 0;
 		else quality = Float.parseFloat(fields[vcfParser.qualityIndex]);
 		filter = fields[vcfParser.filterIndex];
-		info = fields[vcfParser.infoIndex];
+		info = new VCFInfo();
+		info.parseInfoGatk(fields[vcfParser.infoIndex]);
 		format = fields[vcfParser.formatIndex];
 		
 		if (loadSamples){
@@ -45,6 +48,16 @@ public class VCFRecord {
 			int index = 0;
 			for (int i=vcfParser.firstSampleIndex; i< fields.length; i++) sample[index++] = new VCFSample(fields[i], format);
 		}
+	}
+	
+	/**Return modified record line.*/
+	public String getModifiedRecord() {
+		String modifiedRecord = String.format("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",this.chromosome,String.valueOf(this.position+1),
+				this.rsNumber,this.reference,this.alternate,String.valueOf(this.quality),this.filter,this.getInfoString(),this.format);
+		for (VCFSample s: this.sample) {
+			modifiedRecord += "\t" + s.getUnmodifiedSampleString();
+		}
+		return modifiedRecord;
 	}
 	
 	/**Return original unmodified record line.*/
@@ -95,15 +108,19 @@ public class VCFRecord {
 		this.filter = filter;
 	}
 
-	public String getInfo() {
-		return info;
+	public String getInfoString() {
+		return info.getInfoString();
 	}
 
-	public void setInfo(String info) {
-		this.info = info;
+	public void setInfoString(String info) {
+		this.info.overwriteInfoString(info);
 	}
 	public float getQuality() {
 		return quality;
+	}
+	
+	public VCFInfo getInfoObject() {
+		return this.info;
 	}
 
 	public VCFSample[] getSample() {
@@ -154,6 +171,6 @@ public class VCFRecord {
 		if (alternate.length() == 1 && reference.length() == 1 && alternate.equals(".") == false) return true;
 		return false;
 	}
-
+	
 
 }

@@ -15,10 +15,14 @@ public class VCFSample {
 	private int readDepthDP = -1;
 	private int genotypeQualityGQ = -1;
 	private boolean noCall = false;
+	private String originalRecord = null;
+	private String originalFormat = null;
 
 	/**Finding vcf files with mixed sample formats so must determine each record by record :( 
 	 * Add rippers as needed.*/
 	public VCFSample(String sample, String sampleFormat) throws Exception{
+		this.originalRecord = sample;
+		this.originalFormat = sampleFormat;
 		//is it a no call?
 		if (sample.equals("./.")){
 			noCall = true;
@@ -56,5 +60,8 @@ public class VCFSample {
 	public void setNoCall(boolean noCall) {
 		this.noCall = noCall;
 	}
-
+	
+	public String getUnmodifiedSampleString() {
+		return this.originalRecord;
+	}
 }
