@@ -77,8 +77,8 @@ public class RegionScoreText extends RegionScore{
 		this.text = text;
 	}
 	/**Assumes interbase coordinates.*/
-	public static int countBases(HashMap<String,RegionScoreText[]> regions){
-		int total = 0;
+	public static long countBases(HashMap<String,RegionScoreText[]> regions){
+		long total = 0;
 		for (RegionScoreText[] r : regions.values()){
 			for (int i=0; i< r.length; i++){
 				total += r[i].getLength();

@@ -141,6 +141,7 @@ public class Sam2USeq {
 			ChromData data = null;
 			try {
 				samReader = new SAMFileReader(samFile);
+				samReader.setValidationStringency(SAMFileReader.ValidationStringency.SILENT);
 				SAMRecordIterator it = samReader.iterator();
 
 				while (it.hasNext()) {

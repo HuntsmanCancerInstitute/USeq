@@ -26,6 +26,7 @@ public class VCFComparator {
 	private boolean requireGenotypeMatch = false;
 	private boolean removeSNPs = false;
 	private boolean removeNonSNPs = false;
+	private boolean removeNonPass = false;
 	
 	private HashMap<String,RegionScoreText[]> keyRegions;
 	private HashMap<String,RegionScoreText[]> testRegions;
@@ -34,11 +35,8 @@ public class VCFComparator {
 	private VCFParser testParser;
 	private VCFMatch[] testMatchingVCF;
 	private VCFRecord[] testNonMatchingVCF;
-	private VCFRecord[] keyNonMatchingVCF;
 	private StringBuilder results = new StringBuilder();
 	private String options;
-	
-	private float[] minMaxScoreThresholds;
 
 	//constructor
 	public VCFComparator(String[] args){
@@ -53,7 +51,7 @@ public class VCFComparator {
 		parseFilterFiles();
 		
 		//set record QUAL score as thresholding score for roc curve data
-		minMaxScoreThresholds = testParser.setRecordQUALAsScore();
+		testParser.setRecordQUALAsScore();
 		
 		//compare calls in common interrogated regions
 		System.out.println("\nComparing calls...");
@@ -77,19 +75,26 @@ public class VCFComparator {
 			Arrays.sort(testNonMatchingVCF, new ComparatorVCFRecordScore());
 			Arrays.sort(testMatchingVCF);
 			
-			results.append("QUALThreshold\tNumMatchTest\tNumNonMatchTest\tTPR=matchTest/totalKey\tFPR=nonMatchTest/totalKey\tFDR=nonMatchTest/(matchTest+nonMatchTest)\tPPV=matchTest/(matchTest+nonMatchTest)\n");
-			String r = formatResults(-1, totalKey, testMatchingVCF.length, testNonMatchingVCF.length);
-			results.append(r.toString());
-			results.append("\n\n");
+			results.append("QUALThreshold\tNumMatchTest\tNumNonMatchTest\tFDR=nonMatchTest/(matchTest+nonMatchTest)\tdecreasingFDR\tTPR=matchTest/totalKey\tFPR=nonMatchTest/totalKey\tPPV=matchTest/(matchTest+nonMatchTest)\n");
+			
+			//first do without thresholds
+			float oldScore = testNonMatchingVCF[0].getScore();
+			int numNonMatches = testNonMatchingVCF.length;
+			int numMatches = testMatchingVCF.length;
+			float oldFDR = ((float)numNonMatches)/((float)(numMatches + numNonMatches));
+			String res = formatResults(Float.MIN_NORMAL, totalKey, oldFDR, numMatches, numNonMatches);
+			results.append(res.toString());
+			results.append("\n");
 			
 			//for each score in the nonMatching
-			float oldScore = Float.MIN_NORMAL;
 			for (int i=0; i< testNonMatchingVCF.length; i++){
 				float score = testNonMatchingVCF[i].getScore();
 				if (score == oldScore) continue;
-				int numNonMatches = testNonMatchingVCF.length - i;
-				int numMatches = countNumberMatches(score);
-				String res = formatResults(score, totalKey, numMatches, numNonMatches);
+				numNonMatches = testNonMatchingVCF.length - i;
+				numMatches = countNumberMatches(score);
+				float fdr = ((float)numNonMatches)/((float)(numMatches + numNonMatches));
+				if (fdr < oldFDR) oldFDR = fdr;
+				res = formatResults(score, totalKey, oldFDR, numMatches, numNonMatches);
 				results.append(res.toString());
 				results.append("\n");
 				if (numNonMatches == 0 || numMatches == 0) break;
@@ -108,19 +113,25 @@ public class VCFComparator {
 		return 0;
 	}
 
-	public String formatResults(float threshold, float totalKey, float intTest, float nonIntTest ){
+	public String formatResults(float threshold, float totalKey, float ratchetFDR, float intTest, float nonIntTest ){
 		StringBuilder sb = new StringBuilder();
-		sb.append(threshold); sb.append("\t");
+		if (threshold == Float.MIN_NORMAL) {
+			sb.append("none");
+			sb.append("\t");
+		}
+		else sb.append(threshold);sb.append("\t");
 		sb.append((int)intTest); sb.append("\t");
 		sb.append((int)nonIntTest); sb.append("\t");
-		//tpr intTest/totalKey
-		sb.append(Num.formatNumber(intTest/totalKey, 3)); sb.append("\t");
-		//fpr nonIntTest/totalKey
-		sb.append(Num.formatNumber(nonIntTest/totalKey, 3)); sb.append("\t");
 		//fdr nonIntTest/totalTest
-		sb.append(Num.formatNumber(nonIntTest/(nonIntTest + intTest), 3)); sb.append("\t");
+		sb.append(nonIntTest/(nonIntTest + intTest)); sb.append("\t");
+		//ratchet fdr (always decreasing or the prior FDR)
+		sb.append(ratchetFDR); sb.append("\t");
+		//tpr intTest/totalKey
+		sb.append(intTest/totalKey); sb.append("\t");
+		//fpr nonIntTest/totalKey
+		sb.append(nonIntTest/totalKey); sb.append("\t");
 		//ppv intTest/totalTest
-		sb.append(Num.formatNumber(intTest/(nonIntTest + intTest), 3));
+		sb.append(intTest/(nonIntTest + intTest));
 		return sb.toString();
 	}
 	
@@ -163,15 +174,20 @@ public class VCFComparator {
 				nonMatches.add(vcfTest[i]);
 			}
 			else {
-				//check to see only one of the key was found
-				if (matchingKey.length !=1) Misc.printErrAndExit("\nMore than one vcf record in the key was found to match \ntest\t"+vcfTest[i]+"\nkey[0]\t"+matchingKey[0]);
-				//check to see if it matches
-				if (vcfTest[i].matchesAlternateAlleleGenotype(matchingKey[0], requireGenotypeMatch)) {
-					matchingKey[0].setFilter(VCFRecord.PASS);
-					vcfTest[i].setFilter(VCFRecord.PASS);
-					matches.add(new VCFMatch(matchingKey[0], vcfTest[i]));
+				//for each match
+				boolean matchFound = false;
+				for (int x=0; x< matchingKey.length; x++){
+					//check to see if it matches
+					if (vcfTest[i].matchesAlternateAlleleGenotype(matchingKey[x], requireGenotypeMatch)) {
+						matchingKey[x].setFilter(VCFRecord.PASS);
+						vcfTest[i].setFilter(VCFRecord.PASS);
+						matches.add(new VCFMatch(matchingKey[x], vcfTest[i]));
+						matchFound = true;
+						break;
+					}
 				}
-				else nonMatches.add(vcfTest[i]);
+				
+				if (matchFound == false) nonMatches.add(vcfTest[i]);
 			}
 		}
 	}
@@ -194,9 +210,9 @@ public class VCFComparator {
 		}
 	}
 	
-	public int overlapRegions(){
+	public long overlapRegions(){
 		commonRegions = new HashMap<String,RegionScoreText[]> ();
-		int numberCommonBases = 0;
+		long numberCommonBases = 0;
 		for (String chr: testRegions.keySet()){
 			//fetch arrays
 			RegionScoreText[] key = keyRegions.get(chr);
@@ -217,13 +233,14 @@ public class VCFComparator {
 			for (int i=0; i< test.length; i++){
 				for (int j=test[i].getStart(); j < test[i].getStop(); j++) testBases[j] = true;
 			}
+			boolean[] good = new boolean[lastBase];
+			Arrays.fill(good, true);
 			for (int i=0; i<lastBase; i++){
 				//both true, then set false, otherwise set true
-				if (keyBases[i] == true && testBases[i] == true) testBases[i] = false;
-				else testBases[i] = true;
+				if (keyBases[i] == true && testBases[i] == true) good[i] = false;
 			}
 			//not intergenic, so add one to end.
-			int[][] blocks = ExportIntergenicRegions.fetchFalseBlocks(testBases, 0, 0);
+			int[][] blocks = ExportIntergenicRegions.fetchFalseBlocks(good, 0, 0);
 			RegionScoreText[] common = new RegionScoreText[blocks.length];
 			for (int i=0; i< blocks.length; i++){
 				common[i] = new RegionScoreText(blocks[i][0], blocks[i][1]+1, 0.0f, null);
@@ -235,25 +252,46 @@ public class VCFComparator {
 		return numberCommonBases;
 	}
 	
+	public static HashMap<String, RegionScoreText[]> fixRegionChromosomeNames(HashMap<String, RegionScoreText[]> hash){
+		HashMap<String, RegionScoreText[]> fixed = new HashMap<String, RegionScoreText[]>();
+		for (String chr : hash.keySet()){
+			RegionScoreText[] regions = hash.get(chr);
+			if (chr.startsWith("chr")) fixed.put(chr, regions);
+			else fixed.put("chr"+chr, regions);
+		}
+		return fixed;
+	}
+	
 	public void parseFilterFiles(){
+
+		//key regions
 		keyRegions = Bed.parseBedFile(bedKey, true);
-		int numberBasesInKey = RegionScoreText.countBases(keyRegions);
+		keyRegions = fixRegionChromosomeNames(keyRegions);
+		long numberBasesInKey = RegionScoreText.countBases(keyRegions);
 		String res = numberBasesInKey +"\tInterrogated bps in key\n";
 		System.out.print(res);
 		results.append(res);
+		
+		//test regions
 		testRegions = Bed.parseBedFile(bedTest, true);
-		int numberBasesInTest = RegionScoreText.countBases(testRegions);
+		testRegions = fixRegionChromosomeNames (testRegions);
+		long numberBasesInTest = RegionScoreText.countBases(testRegions);
 		res = numberBasesInTest +"\tInterrogated bps in test\n";
 		System.out.print(res);
 		results.append(res);
 		
 		//find common intersected regions common 
-		int num = overlapRegions();
+		long num = overlapRegions();
 		res = num +"\tInterrogated bps in common\n";
 		System.out.print(res);
 		results.append(res);
 		
 		keyParser = new VCFParser(vcfKey, true, true);
+		if (removeNonPass){
+			keyParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
+			keyParser.filterVCFRecords(VCFRecord.PASS);
+		}
+		keyParser.appendChr();
 		if (removeSNPs) keyParser.removeSNPs();
 		if (removeNonSNPs) keyParser.removeNonSNPs();
 		res = keyParser.getVcfRecords().length+"\tKey variants\n";
@@ -266,6 +304,11 @@ public class VCFComparator {
 		results.append(res);
 		
 		testParser = new VCFParser(vcfTest, true, true);
+		if (removeNonPass){
+			testParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
+			testParser.filterVCFRecords(VCFRecord.PASS);
+		}
+		testParser.appendChr();
 		if (removeSNPs) testParser.removeSNPs();
 		if (removeNonSNPs) testParser.removeNonSNPs();
 		res = testParser.getVcfRecords().length +"\tTest variants\n";
@@ -346,6 +389,7 @@ public class VCFComparator {
 					case 'g': requireGenotypeMatch = true; break;
 					case 's': removeNonSNPs = true; break;
 					case 'n': removeSNPs = true; break;
+					case 'e': removeNonPass = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -382,6 +426,7 @@ public class VCFComparator {
 		res.append(bedTest+"\tTest interrogated regions file\n");
 		res.append(saveDirectory+"\tSave directory for parsed datasets\n");
 		res.append(requireGenotypeMatch+"\tRequire matching genotypes\n");
+		res.append(removeNonPass+ "\tExclude non PASS or . records\n");
 		boolean all = removeSNPs == false && removeNonSNPs == false;
 		res.append(all+"\tCompare all variant\n");
 		if (all == false){
@@ -413,6 +458,7 @@ public class VCFComparator {
 				"-s Only compare SNPs, defaults to all.\n"+
 				"-n Only compare non SNPs, defaults to all.\n"+
 				"-p Provide a full path directory for saving the parsed data.\n"+
+				"-e Exclude records whose FILTER field is not . or PASS. Defaults to scoring all.\n"+
 
 				"\n"+
 

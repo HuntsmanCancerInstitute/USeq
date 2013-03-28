@@ -4,7 +4,7 @@ import java.util.ArrayList;
 
 
 /**For parsing a VCFRecord with multiple samples*/
-public class VCFRecord {
+public class VCFRecord implements Comparable<VCFRecord> {
 	
 	//fields
 	private String chromosome;
@@ -194,5 +194,15 @@ public class VCFRecord {
 		return false;
 	}
 	
+	public int compareTo(VCFRecord other) {
+		//sort by chromosome
+		int x = this.chromosome.compareTo(other.chromosome);
+		if (x !=0) return x;
+		//sort by position
+		if (this.position < other.position) return -1;
+		if (this.position > other.position) return 1;
+		return 0;
+	}
+
 
 }
