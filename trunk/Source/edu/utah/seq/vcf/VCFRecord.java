@@ -1,5 +1,7 @@
 package edu.utah.seq.vcf;
 
+import java.util.ArrayList;
+
 
 /**For parsing a VCFRecord with multiple samples*/
 public class VCFRecord {
@@ -51,14 +53,23 @@ public class VCFRecord {
 	}
 	
 	/**Return modified record line.*/
-	public String getModifiedRecord() {
+	public String getModifiedRecord(ArrayList<String> infoToUse, Integer style) {
+		String infoLine;
+		if (infoToUse == null) {
+			infoLine = this.getInfoString();
+		} else {
+			infoLine = this.getInfoString(infoToUse,style);
+		}
+		
 		String modifiedRecord = String.format("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",this.chromosome,String.valueOf(this.position+1),
-				this.rsNumber,this.reference,this.alternate,String.valueOf(this.quality),this.filter,this.getInfoString(),this.format);
+				this.rsNumber,this.reference,this.alternate,String.valueOf(this.quality),this.filter,infoLine,this.format);
 		for (VCFSample s: this.sample) {
 			modifiedRecord += "\t" + s.getUnmodifiedSampleString();
 		}
 		return modifiedRecord;
 	}
+	
+	
 	
 	/**Return original unmodified record line.*/
 	public String toString(){
@@ -108,6 +119,17 @@ public class VCFRecord {
 		this.filter = filter;
 	}
 
+	/** get subset of modified info fields */
+	public String getInfoString(ArrayList<String> infoToUse) {
+		return info.buildInfoString(infoToUse, VCFInfo.UNMODIFIED);
+	}
+	
+	/** get subset of modified info fields in a specific style */
+	public String getInfoString(ArrayList<String> infoToUse, int style) {
+		return info.buildInfoString(infoToUse, style);
+	}
+	
+	/** get raw, unmodified info fields */
 	public String getInfoString() {
 		return info.getInfoString();
 	}

@@ -27,6 +27,8 @@ public class VCFAnnovar {
 	//User specified options
 	private File[] vcfFiles;
 	private String dbSnpFile;
+	private String espFile = "esp6500_all";
+	private String cosmicFile= "cosmic63";
 	
 	//Shared variables
 	private HashMap<String,AnnovarCommand> commandMap = new HashMap<String,AnnovarCommand>() {{
@@ -93,6 +95,7 @@ public class VCFAnnovar {
 		
 			//Write VCF file
 			parsedVCF.printRecords(VCFRecord.PASS,true);
+			
 		}
 
 		//finish and calc run time
@@ -146,9 +149,9 @@ public class VCFAnnovar {
     	//Annovar gene
     	cmdName = "ENSEMBL";
     	ProcessBuilder pbEnsembl = new ProcessBuilder(this.pathToAnnovar,"--geneanno","--buildver","hg19","-dbtype","ensgene",this.inputname,this.pathToRespository);
-    	String il1Ensembl = new String("##INFO=<ID=VarType,Number=1,Type=String,Description=\"Exonic variant location (Annovar)\">");
+    	String il1Ensembl = new String("##INFO=<ID=VarType,Number=1,Type=String,Description=\"Exonic variant effect (Annovar)\">");
     	String il2Ensembl = new String("##INFO=<ID=VarDesc,Number=1,Type=String,Description=\"Exonic variant description (Annovar)\">");
-    	String il3Ensembl = new String("##INFO=<ID=EnsemblRegion,Number=1,Type=String,Description=\"Location of variation (Annovar)\">");
+    	String il3Ensembl = new String("##INFO=<ID=EnsemblRegion,Number=1,Type=String,Description=\"Variation location (Annovar)\">");
     	String il4Ensembl = new String("##INFO=<ID=EnsemblName,Number=1,Type=String,Description=\"Closest Ensembl gene (Annovar)\">");
     	OutputParser op1Ensembl = new OutputParser(new int[]{0,1},new String[]{"EnsemblRegion","EnsemblName"},new String[]{il3Ensembl,il4Ensembl},null,"STANDARD","variant_function");
     	OutputParser op2Ensembl = new OutputParser(new int[]{1,2},new String[]{"VarType","VarDesc"},new String[]{il1Ensembl,il2Ensembl},3,"UNSORTED","exonic_variant_function");
@@ -159,8 +162,8 @@ public class VCFAnnovar {
     	//Annovar refseq
     	cmdName = "REFSEQ";
     	ProcessBuilder pbRefseq = new ProcessBuilder(this.pathToAnnovar,"--geneanno","--buildver","hg19","-dbtype","gene",this.inputname,this.pathToRespository);
-    	String il1Refseq = new String("##INFO=<ID=RefSeq,Number=1,Type=String,Description=\"Closest refseq gene (Annovar)\">");
-    	OutputParser op1Refseq = new OutputParser(new int[]{1},new String[]{"Refseq"},new String[]{il1Refseq},null,"STANDARD","variant_function");
+    	String il1Refseq = new String("##INFO=<ID=RefSeq,Number=1,Type=String,Description=\"Closest Refseq gene (Annovar)\">");
+    	OutputParser op1Refseq = new OutputParser(new int[]{1},new String[]{"RefSeq"},new String[]{il1Refseq},null,"STANDARD","variant_function");
     	OutputParser op2Refseq = new OutputParser("exonic_variant_function");
     	commandMap.get(cmdName).addCommand(pbRefseq);
     	commandMap.get(cmdName).addOutputParser(op1Refseq);
@@ -169,7 +172,7 @@ public class VCFAnnovar {
     	//Annovar TFBS
     	cmdName = "TFBS";
     	ProcessBuilder pbTfbs = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","tfbs",this.inputname,this.pathToRespository);
-    	String il1Tfbs = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"TFBS identifier (Annovar)\">");
+    	String il1Tfbs = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"TFBS score and identifer (Annovar)\">");
     	OutputParser op1Tfbs = new OutputParser(cmdName,il1Tfbs,"hg19_tfbsConsSites");
     	commandMap.get(cmdName).addCommand(pbTfbs);
     	commandMap.get(cmdName).addOutputParser(op1Tfbs);
@@ -177,7 +180,7 @@ public class VCFAnnovar {
     	//Annovar Segdup
     	cmdName = "SEGDUP";
     	ProcessBuilder pbSegdup = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","segdup",this.inputname ,this.pathToRespository);
-    	String il1Segdup = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Segdup identifier (Annovar)\">");
+    	String il1Segdup = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Segdup score and identifier (Annovar)\">");
     	OutputParser op1Segdup = new OutputParser(cmdName,il1Segdup,"hg19_genomicSuperDups");
     	commandMap.get(cmdName).addCommand(pbSegdup);
     	commandMap.get(cmdName).addOutputParser(op1Segdup);
@@ -185,7 +188,7 @@ public class VCFAnnovar {
     	//Annovar DGV
     	cmdName = "DGV";
     	ProcessBuilder pbDgv = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","dgv",this.inputname,this.pathToRespository);
-    	String il1Dgv = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"DGV identifier (Annovar)\">");
+    	String il1Dgv = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Database of genomic variants identifier (Annovar)\">");
     	OutputParser op1Dgv= new OutputParser(cmdName,il1Dgv,"hg19_dgv");
     	commandMap.get(cmdName).addCommand(pbDgv);
     	commandMap.get(cmdName).addOutputParser(op1Dgv);
@@ -193,8 +196,8 @@ public class VCFAnnovar {
     	//Annovar DBSNP
     	cmdName = "DBSNP";
     	ProcessBuilder pbSnp = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",this.dbSnpFile,this.inputname,this.pathToRespository);
-    	String il1Snp = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"dbSNP identifer, " + this.dbSnpFile + " (Annovar) \">");
-    	OutputParser op1Snp = new OutputParser(this.dbSnpFile,il1Snp,"hg19_" + this.dbSnpFile + "_dropped");
+    	String il1Snp = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"dbSNP identifer, using database: " + this.dbSnpFile + " (Annovar) \">");
+    	OutputParser op1Snp = new OutputParser(cmdName,il1Snp,"hg19_" + this.dbSnpFile + "_dropped");
     	OutputParser op2Snp = new OutputParser("hg19_" + this.dbSnpFile + "_filtered");
     	commandMap.get(cmdName).addCommand(pbSnp);
     	commandMap.get(cmdName).addOutputParser(op1Snp);
@@ -254,7 +257,7 @@ public class VCFAnnovar {
     	//Annovar 1K Genomes
     	cmdName = "ONEK";
     	ProcessBuilder pbOneK = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",this.ethnicityMap.get(this.usedEthnicity),this.inputname,this.pathToRespository);
-    	String il1OneK = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Float,Description=\"1000 Genomes observation Frequency " + this.ethnicityMap.get(this.usedEthnicity) + " (Annovar) \">");
+    	String il1OneK = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Float,Description=\"1000 Genomes observation Frequency, using database: " + this.ethnicityMap.get(this.usedEthnicity) + " (Annovar) \">");
     	OutputParser op1OneK = new OutputParser(cmdName,il1OneK,"hg19_" + this.usedEthnicity + ".sites.2012_04_dropped");
     	OutputParser op2OneK = new OutputParser("hg19_" + this.usedEthnicity + ".sites.2012_04_filtered");
     	commandMap.get(cmdName).addCommand(pbOneK);
@@ -263,8 +266,8 @@ public class VCFAnnovar {
     	
     	//Annovar COSMIC
     	cmdName = "COSMIC";
-    	ProcessBuilder pbCosmic = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype","cosmic63",this.inputname,this.pathToRespository);
-    	String il1Cosmic = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"COSMIC annotation (Annovar)\">");
+    	ProcessBuilder pbCosmic = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",this.cosmicFile,this.inputname,this.pathToRespository);
+    	String il1Cosmic = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"COSMIC database identifier and occurances, using database: " + this.cosmicFile + " (Annovar)\">");
     	OutputParser op1Cosmic = new OutputParser(cmdName,il1Cosmic,"hg19_cosmic63_dropped");
     	OutputParser op2Cosmic = new OutputParser("hg19_cosmic63_filtered");
     	commandMap.get(cmdName).addCommand(pbCosmic);
@@ -273,8 +276,8 @@ public class VCFAnnovar {
     	
     	//Annovar ESP
     	cmdName = "ESP";
-    	ProcessBuilder pbEsp = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype","esp6500_all",this.inputname,this.pathToRespository);
-    	String il1Esp = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"ESP annotation (Annovar)\">");
+    	ProcessBuilder pbEsp = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",this.espFile,this.inputname,this.pathToRespository);
+    	String il1Esp = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"NHLBI-ESP frequency, using database: " + this.espFile + " (Annovar)\">");
     	OutputParser op1Esp = new OutputParser(cmdName,il1Esp,"hg19_esp6500_all_dropped");
     	OutputParser op2Esp = new OutputParser("hg19_esp6500_all_filtered");
     	commandMap.get(cmdName).addCommand(pbEsp);
@@ -284,7 +287,7 @@ public class VCFAnnovar {
     	//Annovar GWAS
     	cmdName = "GWAS";
     	ProcessBuilder pbGwas = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","gwascatalog",this.inputname,this.pathToRespository);
-    	String il1Gwas = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"GWAS catalog annotation (Annovar)\">");
+    	String il1Gwas = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"GWAS catalog associations (Annovar)\">");
     	OutputParser op1Gwas = new OutputParser(cmdName,il1Gwas,"hg19_gwasCatalog");
     	commandMap.get(cmdName).addCommand(pbGwas);
     	commandMap.get(cmdName).addOutputParser(op1Gwas);
@@ -292,7 +295,7 @@ public class VCFAnnovar {
     	//Annovar OMIM
     	cmdName = "OMIM";
     	ProcessBuilder pbOmim = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_omim.gff3",this.inputname,this.pathToRespository);
-    	String il1Omim = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"OMIM annotations (UofU)\">");
+    	String il1Omim = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"OMIM identifiers and associated diseases (UofU)\">");
     	OutputParser op1Omim = new OutputParser(cmdName,il1Omim,"hg19_gff3");
     	commandMap.get(cmdName).addCommand(pbOmim);
     	commandMap.get(cmdName).addOutputParser(op1Omim);
@@ -307,7 +310,7 @@ public class VCFAnnovar {
 	private void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Multi Sample VCF Annotation: March 2013                 **\n" +
+				"**                          VCF Annotator : March 2013                              **\n" +
 				"**************************************************************************************\n" +
 				"Adds annotations from several different sources to VCF file INFO line.  Only hg19 \n " +
 				"is supported at this time.\n\n\n" +
@@ -569,28 +572,9 @@ public class VCFAnnovar {
 
 		
 		private void insertInfo() {
-			//Add updated info lines to comments section
-			int insertIndex=0;
-			boolean found = false;
-			Pattern p = Pattern.compile("##INFO.*");
-		    ArrayList<String> comments = new ArrayList<String>(Arrays.asList(this.parsedVCF.getComments()));
-			for (int i=0; i < comments.size(); i++) {
-				insertIndex = i;
-				Matcher m = p.matcher(comments.get(i));
-				if (m.matches()) {
-					found = true;
-				} else if (found) {
-					break;
-				}
-				
-			}
-			
 			for (String info: this.infoLine) {
-				comments.add(insertIndex,info);
-				insertIndex++;
+				this.parsedVCF.getVcfComments().addInfo(info);
 			}
-			
-			this.parsedVCF.setComments(comments.toArray(new String[comments.size()]));
 		}
 		
 		/** The standard match method is for output files that have one line of data for each line of the 
@@ -607,7 +591,8 @@ public class VCFAnnovar {
 					String[] roItems = roLine.split("\t");
 					
 					for (int i=0; i<this.ids.length; i++) {
-						record.getInfoObject().addInfo(this.ids[i], roItems[this.columns[i]].replace(' ','_'));
+						
+						record.getInfoObject().addInfo(this.ids[i], (roItems[this.columns[i]].replace(' ','_')).replace(';',','));
 					}
 					
 				}
@@ -650,7 +635,7 @@ public class VCFAnnovar {
 					String index = String.format("%s:%s-%s",chrom,vr.getPosition()+1,endPosition);
 					if (outputHash.containsKey(index)) {
 						for (int i=0; i<this.ids.length; i++) {
-							vr.getInfoObject().addInfo(this.ids[i], outputHash.get(index)[this.columns[i]].replace(' ','_'));
+							vr.getInfoObject().addInfo(this.ids[i], (outputHash.get(index)[this.columns[i]].replace(' ','_')).replace(';',','));
 						}
 					}
 				}

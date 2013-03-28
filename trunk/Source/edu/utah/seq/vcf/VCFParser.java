@@ -94,7 +94,7 @@ public class VCFParser {
 
 	//internal fields
 	private VCFRecord[] vcfRecords;
-	private String[] comments;
+	private VCFComments comments;
 	public static final Pattern TAB = Pattern.compile("\\t");
 	public static final Pattern COLON = Pattern.compile(":");
 	private ArrayList<String> badVcfRecords = new ArrayList<String>();
@@ -158,8 +158,7 @@ public class VCFParser {
 				}
 			}
 			if (sampleNames == null) throw new Exception("\nFailed to find the #CHROM header line.");
-			comments = new String[commentsAL.size()];
-			commentsAL.toArray(comments);
+			comments = new VCFComments(commentsAL);
 
 			//load data?
 			if (loadRecords == false) return;
@@ -376,37 +375,63 @@ public class VCFParser {
 		printRecords(fieldPass,false);
 	}
 	
-	
-	/**Prints two gzipped vcf files with records that match the fieldPass and those that don't.
-	 * If modified is set to true, any changes made to the record will be written
+	/**Prints out two gzipped vcf files with records that match the fieldPass and those that don't
+	 * The modified record with all info fields is printed
 	 * @param fieldPass
 	 * @param modified
 	 */
 	public void printRecords(String fieldPass,boolean modified) {
+		printRecords(fieldPass,modified,null);
+	}
+	
+	/**Prints two gzipped vcf files with records that match the fieldPass and those that don't.
+	 * The modified records with a user-specied subest of info fields is printed.
+	 * @param fieldPass
+	 * @param modified
+	 */
+	public void printRecords(String fieldPass,boolean modified, ArrayList<String> infoToUse) {
+		printRecords(fieldPass,modified,infoToUse,VCFInfo.UNMODIFIED);
+	}
+
+	
+	/**Prints two gzipped vcf files with records that match the fieldPass and those that don't.
+	 * The modified records with a user-specied subest of info fields is printed in a specific style
+	 * @param fieldPass
+	 * @param modified
+	 */
+	public void printRecords(String fieldPass,boolean modified, ArrayList<String> infoToUse, Integer style) {
 		try {
 			String fullPathName = Misc.removeExtension(vcfFile.getCanonicalPath());
 			File good = new File(fullPathName+ "_Pass.vcf.gz");
 			File bad = new File(fullPathName+ "_Fail.vcf.gz");
-			printRecords(fieldPass, good, bad, modified);
+			printRecords(fieldPass, good, bad, modified, infoToUse, style);
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
 	
+	
+	
 	/**Prints out two gzipped vcf files with records that match the fieldPass and those that don't.
 	 * Note, the original, unmodified record is printed in either case.*/
-	public void printRecords(String fieldPass, File pass, File fail, boolean modified) {
+	public void printRecords(String fieldPass, File pass, File fail, boolean modified, ArrayList<String> infoToUse, Integer style) {
 		try {
 			Gzipper outGood = new Gzipper(pass);
 			Gzipper outBad = new Gzipper(fail);
-			outGood.println(comments);
-			outBad.println(comments);
+			if (infoToUse != null) {
+				outGood.println(this.getStringComments(infoToUse));
+				outBad.println(this.getStringComments(infoToUse));
+			} else {
+				outGood.println(this.getStringComments());
+				outBad.println(this.getStringComments());
+			}
+			
 			if (modified) {
 				for (VCFRecord r: vcfRecords) {
 					if (r.getFilter().equals(fieldPass)) {
-						outGood.println(r.getModifiedRecord());
+						outGood.println(r.getModifiedRecord(infoToUse,style));
 					} else {
-						outBad.println(r.getModifiedRecord());
+						outBad.println(r.getModifiedRecord(infoToUse,style));
 					}
 				}
 			} else {
@@ -453,12 +478,16 @@ public class VCFParser {
 		this.vcfRecords = vcfRecords;
 	}
 
-	public String[] getComments() {
+	public String[] getStringComments() {
+		return comments.getComments();
+	}
+	
+	public VCFComments getVcfComments() {
 		return comments;
 	}
-
-	public void setComments(String[] comments) {
-		this.comments = comments;
+	
+	public String[] getStringComments(ArrayList<String> infoFieldsToUse) {
+		return comments.getComments(infoFieldsToUse);
 	}
 
 	public String[] getSampleNames() {

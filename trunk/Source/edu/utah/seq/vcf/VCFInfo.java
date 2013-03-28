@@ -2,6 +2,9 @@ package edu.utah.seq.vcf;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 //##INFO=<ID=AC,Number=A,Type=Integer,Description="Allele count in genotypes, for each ALT allele, in the same order as listed">
 //##INFO=<ID=AF,Number=A,Type=Float,Description="Allele Frequency, for each ALT allele, in the same order as listed">
@@ -29,32 +32,11 @@ import java.util.HashMap;
 //##INFO=<ID=culprit,Number=1,Type=String,Description="The annotation which was the worst performing in the Gaussian mixture model, likely the reason why the variant was filtered out">
 
 public class VCFInfo {	
-	private HashMap<String, String> hashInfoString = new HashMap<String,String>() {{
-		put("RU",null);
-		put("culprit",null);
-		put("DB",null);
-		put("DS",null);
-		put("STR",null);
-		put("BaseQRankSum",null);
-		put("Dels",null);
-		put("FS",null);
-		put("HaplotypeScore",null);
-		put("InbreedingCoeff",null);
-		put("MQ",null);
-		put("MQRankSum",null);
-		put("QD",null);
-		put("ReadPosRankSum",null);
-		put("VQSLOD",null);
-		put("AN",null);
-		put("DP",null);
-		put("END",null);
-		put("MQ0",null);
-		put("AF",null);
-		put("MLEAF",null);
-		put("MLEAC",null);
-		put("AC",null);
-		put("RPA",null);
-	}};
+	private HashMap<String, String> hashInfoString = new HashMap<String,String>();
+	
+	public static int UNMODIFIED = 0;
+	public static int SHORT = 1;
+	
 	
 	private String infoString = null;
 	
@@ -70,7 +52,7 @@ public class VCFInfo {
 			this.infoString = infoString;
 					
 			//Get key-par, account for flag values
-			String[] keyValue = e.split("=");
+			String[] keyValue = e.split("=",2);
 			String key = keyValue[0];
 			String value = null;
 			
@@ -80,30 +62,120 @@ public class VCFInfo {
 				value = keyValue[1];
 			}
 			
-			if (hashInfoString.containsKey(key)) {
-				hashInfoString.put(key,value);
-			} else {
-				System.out.println("Did not recognize the info entry, skipping..." + keyValue[0]);
-				continue;
-			}
+			hashInfoString.put(key,value);
 		}
 	}
 	
+	/** This method replaces the raw info string, which is built simply by appending added info fields */
 	public void overwriteInfoString(String infoString) {
 		this.infoString = infoString;
 	}
 	
+	/** This method returns the raw info string, which is built simply by appending added info fields */
 	public String getInfoString() {
 		return this.infoString;
 	}
 	
+	/** This method adds a new piece of data to the info object. The data will be added to the end of the raw
+	 * info string and can be used when buiding custom info strings.
+	 * @param identifier  name of info field
+	 * @param info        value of info field
+	 */
 	public void addInfo(String identifier,String info) {
 		this.hashInfoString.put(identifier, info);
 		this.infoString += ";" + identifier + "=" + info;
 	}
 	
 	
+	/** Checks for the existence of a peice of inforamtion.  Returns true if the info object has data for the field
+	 * and false if it doesn't
+	 * @param entry
+	 * @return
+	 */
+	public boolean doesInfoEntryExist(String entry) {
+		if (hashInfoString.containsKey(entry)) {
+			return true;
+		} else {
+			return false;
+		}
+	}
 	
+	/** Returns value of key.  If key doesn't exist, then an empty string is returned. If a style is 
+	 * specified, certain strings will be reformatted */
+	public String getInfo(String key, int outFormat) {
+		if (doesInfoEntryExist(key)) {
+			String unmodified = hashInfoString.get(key);
+			return checkForMods(key,unmodified,outFormat);
+		} else {
+			return "";
+		}
+	}
 	
+	private String checkForMods(String key, String value, int outFormat) {
+		String moddedValue;
+		if (outFormat == VCFInfo.SHORT && key.equals("SIFT")) {
+			moddedValue = String.valueOf(1-Float.parseFloat(value));
+		} else if (outFormat == VCFInfo.SHORT && key.equals("VarDesc")) {
+			moddedValue = value.split(",")[0];
+		} else {
+			moddedValue = value;
+		}
+		
+		return moddedValue;
+	}
+
+	/** This method builds a custom info string by adding values from the info fields listed in infoToAdd.
+	 * 
+	 * @param infoToAdd    Info fields that will make up the infostring
+	 * @return             custom infostring
+	 */
+	public String buildInfoString(ArrayList<String> infoToAdd, int outFormat) {
+		StringBuilder infoString = new StringBuilder(""); 
+		for (String info: infoToAdd) {
+			if (hashInfoString.containsKey(info)) {
+				String value = hashInfoString.get(info);
+				if (value == "true") {
+					infoString.append(";" + info);
+				} else {
+					infoString.append(";" + info + "=" + getInfo(info,outFormat));
+
+				}
+			}
+		}
+		return infoString.toString().replaceFirst(";","");
+	}
+	
+	/**This method builds an annotation string for an output table.
+	 * 
+	 */
+	public String buildInfoForTable(ArrayList<String> infoToAdd, int outFormat) {
+		StringBuilder infoString = new StringBuilder("");
+		for (String info: infoToAdd) {
+			if (hashInfoString.containsKey(info)) {
+				infoString.append("\t" + getInfo(info,outFormat));
+			}
+		}
+		return infoString.toString().replaceFirst("\t","");
+	}
+	
+	/** This method creates a to add list from a to skip list.  Its not efficient to parse the header for each record, so this run just once.
+	 * 
+	 * @param infoToSkip   Info fields that will not be part of the infostring
+	 * @param vcfComments  Comments section of the VCF file
+	 * @return             custom infostring
+	 */
+	public static ArrayList<String> buildToAddFromToSkip(ArrayList<String> infoToSkip,String[] vcfComments) {
+		HashSet<String> skipSet = new HashSet<String>(infoToSkip);
+		ArrayList<String> infoToAdd = new ArrayList<String>();
+		Pattern p = Pattern.compile("##INFO=<ID=(.+?),.+");
+		for (String comment: vcfComments) {
+			Matcher m = p.matcher(comment);
+			if (m.matches() && !skipSet.contains(m.group(1))) {
+				infoToAdd.add(m.group(1));
+			}
+		}
+		return infoToAdd;
+	}
+
 
 }
