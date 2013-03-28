@@ -8,13 +8,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.regex.Pattern;
-
-import edu.utah.ames.bioinfo.Misc;
-import edu.utah.ames.bioinfo.Num;
 import edu.utah.seq.useq.data.RegionScoreText;
 
 import util.gen.Gzipper;
 import util.gen.IO;
+import util.gen.Misc;
+import util.gen.Num;
 
 /*
 ##fileformat=VCFv4.1
@@ -129,9 +128,14 @@ public class VCFParser {
 		parseVCF();
 	}
 	
-	
-	
 	//Methods
+	
+	/**Adds a chr onto chromosome names that lack it.*/
+	public void appendChr(){
+		for (VCFRecord r : vcfRecords){
+			if (r.getChromosome().startsWith("chr") == false) r.setChromosome("chr"+r.getChromosome());
+		}
+	}
 
 	/**Parses a sorted vcf file. Indicate whether you want to load the data and not just parse the header and #CHROM line.*/
 	public void parseVCF() {
@@ -338,6 +342,13 @@ public class VCFParser {
 	/**Sets the filter field in each record to the indicated text.*/
 	public void setFilterFieldOnAllRecords (String text){
 		for (VCFRecord r : vcfRecords) r.setFilter(text);
+	}
+	
+	/**Sets the filter field in each record to the indicated text if it is '.'*/
+	public void setFilterFieldPeriodToTextOnAllRecords (String text){
+		for (VCFRecord r : vcfRecords) {
+			if (r.getFilter().equals(".")) r.setFilter(text);
+		}
 	}
 	
 	/**Sets the GQ sample score as the thresholding score in each VCFRecord.
