@@ -329,7 +329,7 @@ public class VCFAnnovar {
 				"      annotations.  Use a comma-separated list of keys to specify a custom set. Avaiable\n" +
 				"      annotations with (keys): refSeq gene (GENE), transcription factor binding site \n " +
 				"      (TFBS), segmental duplicaton (SEGDUP), database of genomic variants (DGV), sift \n" +
-				"      score (SIFT), polyphen score (POLY), 1K genomes frequency (TENK) and dbSNP rs \n" +
+				"      score (SIFT), polyphen score (POLY), 1K genomes frequency (ONEK) and dbSNP rs \n" +
 				"      (DBSNP)\n"+
 				"-p Path to annovar directory.  Full path to the annovar directory, \n" +
 				"\n\n"+

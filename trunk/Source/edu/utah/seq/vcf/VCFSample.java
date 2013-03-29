@@ -17,6 +17,7 @@ public class VCFSample {
 	private boolean noCall = false;
 	private String originalRecord = null;
 	private String originalFormat = null;
+	private String alleleCounts = null;
 
 	/**Finding vcf files with mixed sample formats so must determine each record by record :( 
 	 * Add rippers as needed.*/
@@ -36,10 +37,18 @@ public class VCFSample {
 				if (format[i].equals("GT")) genotypeGT = data[i];
 				else if (format[i].equals("DP")) readDepthDP = Integer.parseInt(data[i]);
 				else if (format[i].equals("GQ")) genotypeQualityGQ = Integer.parseInt(data[i]);
+				else if (format[i].equals("AD")) {
+					alleleCounts = data[i];
+				}
 			}
 			
 		}
 	}
+	
+	public String getAlleleCount() {
+		return alleleCounts;
+	}
+
 
 	public String getGenotypeGT() {
 		return genotypeGT;
