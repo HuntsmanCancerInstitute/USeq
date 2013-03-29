@@ -153,6 +153,8 @@ public class VCFInfo {
 		for (String info: infoToAdd) {
 			if (hashInfoString.containsKey(info)) {
 				infoString.append("\t" + getInfo(info,outFormat));
+			} else {
+				infoString.append("\tNA");
 			}
 		}
 		return infoString.toString().replaceFirst("\t","");

@@ -203,6 +203,31 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		if (this.position > other.position) return 1;
 		return 0;
 	}
+	
+	private Integer maxInt(Integer val1, Integer val2) {
+		if (val1 >= val2) {
+			return val1;
+		} else {
+			return val2;
+		}
+	}
+	
+	public String getSpreadsheetOutput(ArrayList<String> infoToAdd, int style) {
+		String endPos = String.valueOf(this.getPosition() + 1 + this.maxInt(this.getReference().length()-1,0));
+		StringBuffer full = new StringBuffer(this.getChromosome() + "\t" + this.getPosition() + "\t" + endPos + "\t" + this.getReference() + "\t" + 
+							this.getAlternate() + "\t" + String.valueOf(this.getQuality()));
+		full.append("\t" + this.info.buildInfoForTable(infoToAdd, style));
+		for (VCFSample sample: this.sample) {
+			String genotype = sample.getGenotypeGT();
+			if (sample.isNoCall()) {
+				full.append("\tNA");
+			} else {
+				full.append("\tGT:" + genotype + ":" + sample.getAlleleCount());
+			}
+		}
+		full.append("\n");
+		return full.toString();
+	}	
 
 
 }
