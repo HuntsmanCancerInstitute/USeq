@@ -21,6 +21,7 @@ public class CalculatePerCycleErrorRate {
 	//user fields
 	private File[] alignmentFiles;
 	private File fastaFile;
+	private File logFile;
 	private String readNamePrefix = null;
 
 	//internal
@@ -115,63 +116,76 @@ public class CalculatePerCycleErrorRate {
 	}
 
 	private void printReport() {
-
-		System.out.println("Per cycle error rates for aligned bases:\n");
-		//print header
-		System.out.print("Cycle#");
-		for (int i=0; i< alignmentFiles.length; i++) System.out.print("\t"+Misc.removeExtension(alignmentFiles[i].getName()));
-		System.out.println();
-
-		//make array lists to hold errors
-		ArrayList<Double>[] fractionError = new ArrayList[alignmentFiles.length];
-		for (int i=0; i< alignmentFiles.length; i++) fractionError[i] = new ArrayList<Double>();
-
-		//for each row that contains any data correctBases[fileIndex][0-1000]
-		for (int i=0; i< correctBases[0].length; i++){
-			//skip?
-			double total = 0;
-			for (int j=0; j< alignmentFiles.length; j++) {
-				total+= correctBases[j][i];
-				total+= incorrectBases[j][i];
+		PrintStream oldStream = System.out;
+		try {
+			if (logFile != null) {
+				System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream(logFile))));
 			}
-			if (total == 0.0) continue;
-
-			StringBuilder sb = new StringBuilder();
-			sb.append(i+1);
-			//for each dataset
-			for (int j=0; j< alignmentFiles.length; j++){
-				sb.append("\t");
-				double error = incorrectBases[j][i]/ (incorrectBases[j][i] + correctBases[j][i]);
-				sb.append(error);
-				fractionError[j].add(error);
-				/*sb.append("\t");
-				sb.append(incorrectBases[j][i]);
-				sb.append("\t");
-				sb.append(correctBases[j][i]);
-				 */
+	
+			System.out.println("Per cycle error rates for aligned bases:\n");
+			//print header
+			System.out.print("Cycle#");
+			for (int i=0; i< alignmentFiles.length; i++) System.out.print("\t"+Misc.removeExtension(alignmentFiles[i].getName()));
+			System.out.println();
+	
+			//make array lists to hold errors
+			ArrayList<Double>[] fractionError = new ArrayList[alignmentFiles.length];
+			for (int i=0; i< alignmentFiles.length; i++) fractionError[i] = new ArrayList<Double>();
+	
+			//for each row that contains any data correctBases[fileIndex][0-1000]
+			for (int i=0; i< correctBases[0].length; i++){
+				//skip?
+				double total = 0;
+				for (int j=0; j< alignmentFiles.length; j++) {
+					total+= correctBases[j][i];
+					total+= incorrectBases[j][i];
+				}
+				if (total == 0.0) continue;
+	
+				StringBuilder sb = new StringBuilder();
+				sb.append(i+1);
+				//for each dataset
+				for (int j=0; j< alignmentFiles.length; j++){
+					sb.append("\t");
+					double error = incorrectBases[j][i]/ (incorrectBases[j][i] + correctBases[j][i]);
+					sb.append(error);
+					fractionError[j].add(error);
+					/*sb.append("\t");
+					sb.append(incorrectBases[j][i]);
+					sb.append("\t");
+					sb.append(correctBases[j][i]);
+					 */
+				}
+				System.out.println(sb);
 			}
-			System.out.println(sb);
+	
+			//calculate average error
+			double[] averageError = new double[alignmentFiles.length];
+			for (int i=0; i< alignmentFiles.length; i++) {
+				double[] err = Num.arrayListOfDoubleToArray(fractionError[i]);
+				averageError[i] = Num.mean(err);
+			}
+			System.out.println("\nMean\t"+Num.doubleArrayToString(averageError, "\t"));
+	
+			//print alignment stats
+			for (int i=0; i<numberAlignmentsWithInsertions.length; i++ ) numberAlignmentsWithInsertions[i] = 100* numberAlignmentsWithInsertions[i]/numberAlignments[i];
+			for (int i=0; i<numberAlignmentsWithDeletions.length; i++ ) numberAlignmentsWithDeletions[i] = 100* numberAlignmentsWithDeletions[i]/numberAlignments[i];
+			for (int i=0; i<numberAlignmentsWithSoftMasking.length; i++ ) numberAlignmentsWithSoftMasking[i] = 100* numberAlignmentsWithSoftMasking[i]/numberAlignments[i];
+			for (int i=0; i<numberAlignmentsWithHardMasking.length; i++ ) numberAlignmentsWithHardMasking[i] = 100* numberAlignmentsWithHardMasking[i]/numberAlignments[i];
+	
+			System.out.println("\n# Alignments\t"+Num.doubleArrayToString(numberAlignments, 0, "\t"));
+			System.out.println("% WithInsertions\t"+Num.doubleArrayToString(numberAlignmentsWithInsertions, 3, "\t"));
+			System.out.println("% WithDeletions\t"+Num.doubleArrayToString(numberAlignmentsWithDeletions, 3, "\t"));
+			System.out.println("% WithSoftMasking\t"+Num.doubleArrayToString(numberAlignmentsWithSoftMasking, 3, "\t"));
+			System.out.println("% WithHardMasking\t"+Num.doubleArrayToString(numberAlignmentsWithHardMasking, 3, "\t"));
+			
+			System.out.close();
+			System.setOut(oldStream);
+		} catch (FileNotFoundException ex) {
+			System.out.println("Could not create the log file: " + ex.getMessage());
+			ex.printStackTrace();
+			System.exit(1);
 		}
-
-		//calculate average error
-		double[] averageError = new double[alignmentFiles.length];
-		for (int i=0; i< alignmentFiles.length; i++) {
-			double[] err = Num.arrayListOfDoubleToArray(fractionError[i]);
-			averageError[i] = Num.mean(err);
-		}
-		System.out.println("\nMean\t"+Num.doubleArrayToString(averageError, "\t"));
-
-		//print alignment stats
-		for (int i=0; i<numberAlignmentsWithInsertions.length; i++ ) numberAlignmentsWithInsertions[i] = 100* numberAlignmentsWithInsertions[i]/numberAlignments[i];
-		for (int i=0; i<numberAlignmentsWithDeletions.length; i++ ) numberAlignmentsWithDeletions[i] = 100* numberAlignmentsWithDeletions[i]/numberAlignments[i];
-		for (int i=0; i<numberAlignmentsWithSoftMasking.length; i++ ) numberAlignmentsWithSoftMasking[i] = 100* numberAlignmentsWithSoftMasking[i]/numberAlignments[i];
-		for (int i=0; i<numberAlignmentsWithHardMasking.length; i++ ) numberAlignmentsWithHardMasking[i] = 100* numberAlignmentsWithHardMasking[i]/numberAlignments[i];
-
-		System.out.println("\n# Alignments\t"+Num.doubleArrayToString(numberAlignments, 0, "\t"));
-		System.out.println("% WithInsertions\t"+Num.doubleArrayToString(numberAlignmentsWithInsertions, 3, "\t"));
-		System.out.println("% WithDeletions\t"+Num.doubleArrayToString(numberAlignmentsWithDeletions, 3, "\t"));
-		System.out.println("% WithSoftMasking\t"+Num.doubleArrayToString(numberAlignmentsWithSoftMasking, 3, "\t"));
-		System.out.println("% WithHardMasking\t"+Num.doubleArrayToString(numberAlignmentsWithHardMasking, 3, "\t"));
 
 
 	}
@@ -490,6 +504,7 @@ public class CalculatePerCycleErrorRate {
 					case 'f': fastaFile = new File (args[++i]); break;
 					case 't': deleteTempFiles = false; break;
 					case 'n': readNamePrefix = args[++i]; break;
+					case 'o': logFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -536,6 +551,7 @@ public class CalculatePerCycleErrorRate {
 				"      Unsorted xxx.sam(.gz/.zip OK) files also work but are processed rather slowly.\n"+
 				"-f Full path to the single fasta file you wish to use in calculating the error rate.\n" +
 				"-n Require read names to begin with indicated text, defaults to accepting everything.\n"+
+				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
 
 				"\n"+
 
