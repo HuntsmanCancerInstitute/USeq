@@ -27,6 +27,7 @@ public class Sam2USeq {
 	//user fields
 	private File[] samFiles;
 	private File tempDirectory;
+	private File logFile;
 	private String versionedGenome;
 	private boolean makeRelativeTracks = true;
 	private boolean scaleRepeats = false;
@@ -589,6 +590,7 @@ public class Sam2USeq {
 					case 'c': minimumCounts  = Float.parseFloat(args[++i]); break;
 					case 'l': minimumLength  = Integer.parseInt(args[++i]); break;
 					case 'b': regionFile = new File(args[i+1]); i++; break;
+					case 'o': logFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -658,6 +660,11 @@ public class Sam2USeq {
 	}	
 	
 	public void printHistogramStats(){
+		try {
+			PrintStream oldOut = System.out;
+			if (logFile != null) {
+				System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream(logFile))));		
+			}
 			System.out.println("\nInterrogated region read depth coverage statistics");
 			int[] counts = histogram.getBinCounts();
 			double total = histogram.getTotalBinCounts();
@@ -672,6 +679,13 @@ public class Sam2USeq {
 				if (numCounts == total) break;
 			}
 			System.out.println("Total interrogated bases "+(int)total);
+			System.out.close();
+			System.setOut(oldOut);
+		} catch (FileNotFoundException e) {
+			System.out.println("Could not open log file");
+			e.printStackTrace();
+			System.exit(1);
+		}
 
 	}
 
@@ -706,6 +720,7 @@ public class Sam2USeq {
 				"      if in doubt.\n"+ 
 				"-c Print regions that meet a minimum # counts, defaults to 0, don't print.\n"+
 				"-l Print regions that also meet a minimum length, defaults to 0.\n"+
+				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
 
 				"\n"+
 

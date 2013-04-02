@@ -16,6 +16,10 @@ public class Gzipper {
 		out = new GZIPOutputStream(new FileOutputStream(gzipFile));
 	}
 	
+	public Gzipper(OutputStream gzipFile) throws IOException {
+		out = new GZIPOutputStream(gzipFile);
+	}
+	
 	/**Be sure to call this to clear the final buffer when done!*/
 	public void close() throws IOException{
 		out.close();
