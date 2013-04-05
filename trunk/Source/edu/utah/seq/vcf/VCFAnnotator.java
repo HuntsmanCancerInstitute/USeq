@@ -141,8 +141,10 @@ public class VCFAnnotator {
 				
 				if (m.matches()) {
 					String key = "chr" + m.group(3) + ":" + m.group(2);
-					vaastHash.put(key, new String[]{m.group(1),""});
-					batch.add(key);
+					if (!vaastHash.containsKey(key)) {
+						vaastHash.put(key, new String[]{m.group(1),""});
+						batch.add(key);
+					}
 				} else if (m1.matches()) {
 					for (String key: batch) {
 						vaastHash.get(key)[1] = m1.group(1);
@@ -167,7 +169,7 @@ public class VCFAnnotator {
 		}
 		
 		//Add Info lines to VCF
-		parser.getVcfComments().addInfo("##INFO=<ID=V_LRS,Number=1,Type=String,Description=\"VAAST Likelihood ratio score.  The higher the score"
+		parser.getVcfComments().addInfo("##INFO=<ID=V_LRS,Number=1,Type=String,Description=\"VAAST Likelihood ratio score.  The higher the score "
 				+ "the more likely the variant is disease-causing.  Scores are only listed for exonic variants.\">");
 		parser.getVcfComments().addInfo("##INFO=<ID=V_RANK,Number=1,Type=String,Description=\"VAAST gene rank.  The lower the rank, the more "
 				+ "more likely the gene is causal.  Rank will only be listed next to exonic variants\">");
@@ -216,18 +218,18 @@ public class VCFAnnotator {
     	//Annovar gene
     	cmdName = "ENSEMBL";
     	ProcessBuilder pbEnsembl = new ProcessBuilder(this.pathToAnnovar,"--geneanno","--buildver","hg19","-dbtype","ensgene",this.inputname,this.pathToRespository);
-    	String il1Ensembl = new String("##INFO=<ID=VarType,Number=1,Type=String,Description=\"Exonic variant effect.  If the variant is exonic, this column lists the"
+    	String il1Ensembl = new String("##INFO=<ID=VarType,Number=1,Type=String,Description=\"Exonic variant effect.  If the variant is exonic, this column lists the "
     			+ "functional consequences of the change.  Possible values and (precedence): frameshift insertion (1), frameshift deletion (2), frameshift block "
     			+ "substitution (3), stopgain (4), stoploss (5), nonframeshift insertion (6), nonframeshift deletion (7), nonframeshift block substitution (8), "
     			+ "nonsynonymous SNV (9), synonymous SNV (10), unknown (11)\">");
-    	String il2Ensembl = new String("##INFO=<ID=VarDesc,Number=1,Type=String,Description=\"Exonic variant description.  This column lists the gene name,"
+    	String il2Ensembl = new String("##INFO=<ID=VarDesc,Number=1,Type=String,Description=\"Exonic variant description.  This column lists the gene name, "
     			+ "transcript identifier and sequence change of the corresponding transcript.  If the variant affects multiple transcripts, all will be listed. "
     			+ "If the annotationStyle of the VCF/Report is CLEAN, only the first transcript is reported.  This reduces the size of the field for easier viewing "
     			+ "in IGV\">");
     	String il3Ensembl = new String("##INFO=<ID=EnsemblRegion,Number=1,Type=String,Description=\"Variant location, using ENSEMBL gene definitions.  "
     			+ "Possible values and (precedence): exonic (1), splicing (1), ncRNA (2), UTR5 (3), UTR3 (3), intronic (4), upstream (5), downstream (5), "
     			+ "intergenic (6).\">");
-    	String il4Ensembl = new String("##INFO=<ID=EnsemblName,Number=1,Type=String,Description=\"Closest ENSEMBL gene.  If the variant intersects multiple genes,"
+    	String il4Ensembl = new String("##INFO=<ID=EnsemblName,Number=1,Type=String,Description=\"Closest ENSEMBL gene.  If the variant intersects multiple genes, "
     			+ "both will be listed.  If the variant doesn't intersect any gene, the closest upstream and downstream genes are listed with distances.\">");
     	OutputParser op1Ensembl = new OutputParser(new int[]{0,1},new String[]{"EnsemblRegion","EnsemblName"},new String[]{il3Ensembl,il4Ensembl},null,"STANDARD","variant_function");
     	OutputParser op2Ensembl = new OutputParser(new int[]{1,2},new String[]{"VarType","VarDesc"},new String[]{il1Ensembl,il2Ensembl},3,"UNSORTED","exonic_variant_function");
@@ -260,7 +262,7 @@ public class VCFAnnotator {
     	cmdName = "SEGDUP";
     	ProcessBuilder pbSegdup = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","segdup",this.inputname ,this.pathToRespository);
     	String il1Segdup = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Segmental duplications (SEGDUP). If the variant intersects with a "
-    			+ "known segmental duplication, the identifer and score are listed.  Variants that map to known segmental duplications are often alignment errors and "
+    			+ "known segmental duplication, the identifier and score are listed.  Variants that map to known segmental duplications are often alignment errors and "
     			+ "could be false positives.\">");
     	OutputParser op1Segdup = new OutputParser(cmdName,il1Segdup,"hg19_genomicSuperDups");
     	commandMap.get(cmdName).addCommand(pbSegdup);
@@ -270,7 +272,7 @@ public class VCFAnnotator {
     	cmdName = "DGV";
     	ProcessBuilder pbDgv = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","dgv",this.inputname,this.pathToRespository);
     	String il1Dgv = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Database of genomic variants (DGV).  If the variant intersects with a "
-    			+ "previously reported structural variant listed in DGV, the DGV identifer is listed.  In the case of insertions and deletions, only 1bp of overlap "
+    			+ "previously reported structural variant listed in DGV, the DGV identifier is listed.  In the case of insertions and deletions, only 1bp of overlap "
     			+ "is required for a successful intersection.\">");
     	OutputParser op1Dgv= new OutputParser(cmdName,il1Dgv,"hg19_dgv");
     	commandMap.get(cmdName).addCommand(pbDgv);
@@ -279,7 +281,7 @@ public class VCFAnnotator {
     	//Annovar DBSNP
     	cmdName = "DBSNP";
     	ProcessBuilder pbSnp = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",this.dbSnpFile,this.inputname,this.pathToRespository);
-    	String il1Snp = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"dbSNP identifer, using database: " + this.dbSnpFile + ".  If the database "
+    	String il1Snp = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"dbSNP identifier, using database: " + this.dbSnpFile + ".  If the database "
     			+ "is listed as NonFlagged, dbSNP variants with < 1% minor allele frequency or map only once to the reference assembly are not used in the annotation. \">");
     	OutputParser op1Snp = new OutputParser(cmdName,il1Snp,"hg19_" + this.dbSnpFile + "_dropped");
     	OutputParser op2Snp = new OutputParser("hg19_" + this.dbSnpFile + "_filtered");
@@ -292,7 +294,7 @@ public class VCFAnnotator {
     	ProcessBuilder pbSift = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype","avsift",this.inputname,this.pathToRespository);
     	String il1Sift = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Float,Description=\"SIFT score.  Standard SIFT scores below 0.05 are considered damaging. "
     			+ "If the annovarStyle of the VCF/Report is CLEAN, the SIFT score is reported as 1-SIFT_SCORE, making higher scores more damaging.  This is done "
-    			+ "to make the SIFT scores compatible with Polyphen2, MutationTaster and other fucntional effect predictors.\">");
+    			+ "to make the SIFT scores compatible with Polyphen2, MutationTaster and other functional effect predictors.\">");
     	OutputParser op1Sift = new OutputParser(cmdName,il1Sift,"hg19_avsift_dropped");
     	OutputParser op2Sift = new OutputParser("hg19_avsift_filtered");
     	commandMap.get(cmdName).addCommand(pbSift);
@@ -358,7 +360,7 @@ public class VCFAnnotator {
     	cmdName = "COSMIC";
     	ProcessBuilder pbCosmic = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",this.cosmicFile,this.inputname,this.pathToRespository);
     	String il1Cosmic = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Catalogue of Somatic Mutations in Cancer (COSMIC) annotations, using "
-    			+ "database: " + this.cosmicFile + ".  If the variant intersects with a COSMIC annotation, the variant identifer and number of observations are listed.\">");
+    			+ "database: " + this.cosmicFile + ".  If the variant intersects with a COSMIC annotation, the variant identifier and number of observations are listed.\">");
     	OutputParser op1Cosmic = new OutputParser(cmdName,il1Cosmic,"hg19_cosmic63_dropped");
     	OutputParser op2Cosmic = new OutputParser("hg19_cosmic63_filtered");
     	commandMap.get(cmdName).addCommand(pbCosmic);
@@ -369,7 +371,7 @@ public class VCFAnnotator {
     	cmdName = "ESP";
     	ProcessBuilder pbEsp = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",this.espFile,this.inputname,this.pathToRespository);
     	String il1Esp = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"NHLBI exome sequencing project (ESP) annotations using: " + this.espFile + ". "
-    			+ "Variation frequency in the 6500 exomes sequenced in the project.  The samples are from healty individuals as well as subjects with different diseases.\">");
+    			+ "Variation frequency in the 6500 exomes sequenced in the project.  The samples are from healthy individuals as well as subjects with different diseases.\">");
     	OutputParser op1Esp = new OutputParser(cmdName,il1Esp,"hg19_esp6500_all_dropped");
     	OutputParser op2Esp = new OutputParser("hg19_esp6500_all_filtered");
     	commandMap.get(cmdName).addCommand(pbEsp);
@@ -388,7 +390,7 @@ public class VCFAnnotator {
     	//Annovar OMIM
     	cmdName = "OMIM";
     	ProcessBuilder pbOmim = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_omim.gff3",this.inputname,this.pathToRespository);
-    	String il1Omim = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Online Mendelian Inheritance in Man (OMIM) annotations.  If the variant insersects "
+    	String il1Omim = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Online Mendelian Inheritance in Man (OMIM) annotations.  If the variant intersects "
     			+ "a OMIM gene, the gene identifier and associated diseases are listed.\">");
     	OutputParser op1Omim = new OutputParser(cmdName,il1Omim,"hg19_gff3");
     	commandMap.get(cmdName).addCommand(pbOmim);

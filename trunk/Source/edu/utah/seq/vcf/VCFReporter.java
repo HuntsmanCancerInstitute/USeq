@@ -132,12 +132,12 @@ public class VCFReporter {
 			
 			//Write key if exists
 			if (genKey) {
-				BufferedWriter bwKey = new BufferedWriter(new FileWriter(outFile.getName() + "_key"));
+				BufferedWriter bwKey = new BufferedWriter(new FileWriter(outFile.getName().substring(0,outFile.getName().length()-3) + "key.txt"));
 				int keyIndex = 0;
 				bwKey.write("Annotation Report Column Descriptions for: " + vcfInFile.getName() + "\n\n\n");
 				bwKey.write("Style: " + this.reportStyle + "\n\n");
 				
-				bwKey.write(String.valueOf(++keyIndex) + ". Chrom: Chromsome containing variant\n");
+				bwKey.write(String.valueOf(++keyIndex) + ". Chrom: Chromosome containing variant\n");
 				bwKey.write(String.valueOf(++keyIndex) + ". Start: Variant start coordinate (1-based)\n");
 				bwKey.write(String.valueOf(++keyIndex) + ". End: Variant end coordinate\n");
 				bwKey.write(String.valueOf(++keyIndex) + ". Ref: Reference base\n");
@@ -147,12 +147,20 @@ public class VCFReporter {
 				int columnIndex = -1;
 				for (String desc: vcfFile.getVcfComments().getInfoDesc(this.columnsToUse)) {
 					columnIndex += 1;
+					keyIndex += 1;
 					if (desc == null) {
 						continue;
 					}
 					bwKey.write(String.valueOf(keyIndex) + ". " + this.columnsToUse.get(columnIndex)+ ": " + desc + "\n");
-					keyIndex += 1;
+					
 				}
+				bwKey.write(String.valueOf(++keyIndex) + ". Genotype/Coverage data:  The remaining columns contain genotype and coverage data for the samples in the multi-sample VCF file. "
+						+ "The format of the genotype/coverage string is GT:genotype:coverage, so in the case of: 'GT:0/1:4,5', 0/1 would be the genotype and 4,5 would be the coverage. "
+						+ "A zero in the genotype field signifies the reference base and 1 through N represent alternate alleles.  0/1 would be heterozygous for first alternate allele, 0/0 homozygous for the reference, "
+						+ "and 1/1 homozygous for the first alternate. A genotype of 0/2 would mean the sample was heterozygous for the second alternate allele.  The coverage field contains the "
+						+ "number of reads representing each allele, separated by commas.  The first value is the number of observed reference bases, the second value is the number of observed "
+						+ "first alternate bases.  There there was more than one alternate allele observed at the position, there will be more than two coverage values.");
+				
 				bwKey.close();
 			}
 			
