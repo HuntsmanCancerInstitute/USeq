@@ -34,8 +34,8 @@ import java.util.regex.Pattern;
 public class VCFInfo {	
 	private HashMap<String, String> hashInfoString = new HashMap<String,String>();
 	
-	public static int UNMODIFIED = 0;
-	public static int SHORT = 1;
+	public static String UNMODIFIED = "UNMODIFIED";
+	public static String CLEAN = "CLEAN";
 	
 	
 	private String infoString = null;
@@ -102,25 +102,24 @@ public class VCFInfo {
 	
 	/** Returns value of key.  If key doesn't exist, then an empty string is returned. If a style is 
 	 * specified, certain strings will be reformatted */
-	public String getInfo(String key, int outFormat) {
+	public String getInfo(String key, String style) {
 		if (doesInfoEntryExist(key)) {
 			String unmodified = hashInfoString.get(key);
-			return checkForMods(key,unmodified,outFormat);
+			return checkForMods(key,unmodified,style);
 		} else {
 			return "";
 		}
 	}
 	
-	private String checkForMods(String key, String value, int outFormat) {
+	private String checkForMods(String key, String value, String style) {
 		String moddedValue;
-		if (outFormat == VCFInfo.SHORT && key.equals("SIFT")) {
+		if (style.equals(VCFInfo.CLEAN) && key.equals("SIFT")) {
 			moddedValue = String.valueOf(1-Float.parseFloat(value));
-		} else if (outFormat == VCFInfo.SHORT && key.equals("VarDesc")) {
+		} else if (style.equals(VCFInfo.CLEAN) && key.equals("VarDesc")) {
 			moddedValue = value.split(",")[0];
 		} else {
 			moddedValue = value;
 		}
-		
 		return moddedValue;
 	}
 
@@ -129,16 +128,15 @@ public class VCFInfo {
 	 * @param infoToAdd    Info fields that will make up the infostring
 	 * @return             custom infostring
 	 */
-	public String buildInfoString(ArrayList<String> infoToAdd, int outFormat) {
+	public String buildInfoString(ArrayList<String> infoToAdd, String style) {
 		StringBuilder infoString = new StringBuilder(""); 
 		for (String info: infoToAdd) {
 			if (hashInfoString.containsKey(info)) {
 				String value = hashInfoString.get(info);
-				if (value == "true") {
+				if (value.equals("true")) {
 					infoString.append(";" + info);
 				} else {
-					infoString.append(";" + info + "=" + getInfo(info,outFormat));
-
+					infoString.append(";" + info + "=" + getInfo(info,style));
 				}
 			}
 		}
@@ -148,16 +146,24 @@ public class VCFInfo {
 	/**This method builds an annotation string for an output table.
 	 * 
 	 */
-	public String buildInfoForTable(ArrayList<String> infoToAdd, int outFormat) {
+	public String buildInfoForTable(ArrayList<String> infoToAdd, String style, VCFComments comments) {
 		StringBuilder infoString = new StringBuilder("");
 		for (String info: infoToAdd) {
 			if (hashInfoString.containsKey(info)) {
-				infoString.append("\t" + getInfo(info,outFormat));
-			} else {
-				infoString.append("\tNA");
+				if (comments.getFormat().get(info).equals("Flag")) {
+					infoString.append("\t1");
+				} else {
+					infoString.append("\t" + getInfo(info,style));
+				}
+			}else {
+				if (comments.getFormat().get(info).equals("Flag")) {
+					infoString.append("\t0");
+				} else {
+					infoString.append("\tNA");
+				}
 			}
 		}
-		return infoString.toString().replaceFirst("\t","");
+		return infoString.toString().trim();
 	}
 	
 	/** This method creates a to add list from a to skip list.  Its not efficient to parse the header for each record, so this run just once.

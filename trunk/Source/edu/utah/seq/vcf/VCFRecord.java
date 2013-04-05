@@ -53,13 +53,10 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	}
 	
 	/**Return modified record line.*/
-	public String getModifiedRecord(ArrayList<String> infoToUse, Integer style) {
+	public String getModifiedRecord(ArrayList<String> infoToUse, String style) {
 		String infoLine;
-		if (infoToUse == null) {
-			infoLine = this.getInfoString();
-		} else {
-			infoLine = this.getInfoString(infoToUse,style);
-		}
+		
+		infoLine = this.getModifiedInfoString(infoToUse,style);
 		
 		String modifiedRecord = String.format("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",this.chromosome,String.valueOf(this.position+1),
 				this.rsNumber,this.reference,this.alternate,String.valueOf(this.quality),this.filter,infoLine,this.format);
@@ -118,19 +115,19 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	public void setFilter(String filter) {
 		this.filter = filter;
 	}
-
+	
 	/** get subset of modified info fields */
-	public String getInfoString(ArrayList<String> infoToUse) {
+	public String getModifiedInfoString(ArrayList<String> infoToUse) {
 		return info.buildInfoString(infoToUse, VCFInfo.UNMODIFIED);
 	}
 	
 	/** get subset of modified info fields in a specific style */
-	public String getInfoString(ArrayList<String> infoToUse, int style) {
+	public String getModifiedInfoString(ArrayList<String> infoToUse, String style) {
 		return info.buildInfoString(infoToUse, style);
 	}
 	
 	/** get raw, unmodified info fields */
-	public String getInfoString() {
+	public String getUnmodifiedInfoString() {
 		return info.getInfoString();
 	}
 
@@ -212,11 +209,11 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		}
 	}
 	
-	public String getSpreadsheetOutput(ArrayList<String> infoToAdd, int style) {
+	public String getSpreadsheetOutput(ArrayList<String> infoToAdd, String style, VCFComments comments) {
 		String endPos = String.valueOf(this.getPosition() + 1 + this.maxInt(this.getReference().length()-1,0));
 		StringBuffer full = new StringBuffer(this.getChromosome() + "\t" + this.getPosition() + "\t" + endPos + "\t" + this.getReference() + "\t" + 
 							this.getAlternate() + "\t" + String.valueOf(this.getQuality()));
-		full.append("\t" + this.info.buildInfoForTable(infoToAdd, style));
+		full.append("\t" + this.info.buildInfoForTable(infoToAdd, style, comments));
 		for (VCFSample sample: this.sample) {
 			String genotype = sample.getGenotypeGT();
 			if (sample.isNoCall()) {

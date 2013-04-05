@@ -13,8 +13,12 @@ import util.gen.Misc;
 public class MultiSampleVCFFilter {
 
 	//user defined fields
-	private File[] vcfFiles;
+	private File vcfInFile;
+	private File vcfOutFile;
+	private String pathToTabix = "/tomato/app/tabix/";
 	private boolean filterAnySample = false;
+	private boolean passing = true;
+	private boolean compressOutput = true;
 	private boolean controlHomozygousFilter = false;
 	private boolean oneOrMorePassingCohortFilter = false;
 	private boolean filterRecordQuality = false;
@@ -37,43 +41,50 @@ public class MultiSampleVCFFilter {
 
 		//for each file
 		System.out.println("\nFile\tFilterType\tStarting#\tEnding#");
-		for (int i=0; i< vcfFiles.length; i++){
-			VCFParser parser = new VCFParser(vcfFiles[i], true, true);
+		
+		VCFParser parser = new VCFParser(vcfInFile, true, true);
 
-			//set everything to pass (note this won't change the original when you print because printing grabs the original record line)
-			parser.setFilterFieldOnAllRecords(VCFRecord.PASS);
-			
-			if (filterRecordQuality){
-				int[] startEndCounts = filterRecordQuality(parser);
-				System.out.println(vcfFiles[i].getName()+ "\tRecordQuality\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
-			}
-
-			if (filterAnySample) {
-				int[] startEndCounts = filterAnySample(parser);
-				System.out.println(vcfFiles[i].getName()+ "\tAnySample\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
-			}
-
-			if (controlHomozygousFilter){
-				int[] startEndCounts = controlHomozygousFilter(parser);
-				System.out.println(vcfFiles[i].getName()+ "\tAnyControlHomozygous\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
-			}
-
-			if (oneOrMorePassingCohortFilter){
-				int[] startEndCounts = filterAnySampleCohort(parser);
-				System.out.println(vcfFiles[i].getName()+ "\tAnyCohortSample\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
-			}
-			
-			if (requireOneObservationInCases) {
-				int[] startEndCounts = requireOneObservationFilter(parser);
-				System.out.println(vcfFiles[i].getName()+ "\tAtLeastOneObservationAboveThresholds\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
-			}
-			
-			
-
-			//print good and bad records 
-			parser.printRecords(VCFRecord.PASS);
+		//set everything to pass (note this won't change the original when you print because printing grabs the original record line)
+		parser.setFilterFieldOnAllRecords(VCFRecord.PASS);
+		
+		if (filterRecordQuality){
+			int[] startEndCounts = filterRecordQuality(parser);
+			System.out.println(vcfInFile.getName()+ "\tRecordQuality\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
 		}
 
+		if (filterAnySample) {
+			int[] startEndCounts = filterAnySample(parser);
+			System.out.println(vcfInFile.getName()+ "\tAnySample\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+		}
+
+		if (controlHomozygousFilter){
+			int[] startEndCounts = controlHomozygousFilter(parser);
+			System.out.println(vcfInFile.getName()+ "\tAnyControlHomozygous\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+		}
+
+		if (oneOrMorePassingCohortFilter){
+			int[] startEndCounts = filterAnySampleCohort(parser);
+			System.out.println(vcfInFile.getName()+ "\tAnyCohortSample\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+		}
+		
+		if (requireOneObservationInCases) {
+			int[] startEndCounts = requireOneObservationFilter(parser);
+			System.out.println(vcfInFile.getName()+ "\tAtLeastOneObservationAboveThresholds\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+		}
+		
+		
+
+		//print good or bad records 
+		if (this.passing) {
+			parser.printFilteredRecords(this.vcfOutFile,VCFRecord.PASS);
+		} else {
+			parser.printFilteredRecords(this.vcfOutFile, VCFRecord.FAIL);
+		}
+		
+		if (this.compressOutput) {
+			VCFUtilities.createTabix(this.vcfOutFile, this.pathToTabix);
+		}
+		
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
@@ -81,10 +92,9 @@ public class MultiSampleVCFFilter {
 
 	private void printSampleNames() {
 		System.out.println("File\tSampleNames");
-		for (int i=0; i< vcfFiles.length; i++){
-			VCFParser parser = new VCFParser(vcfFiles[i], false, false);
-			System.out.println(vcfFiles[i].getName()+ "\t"+ Misc.stringArrayToString(parser.getSampleNames(), ","));
-		}
+		
+		VCFParser parser = new VCFParser(vcfOutFile, false, false);
+		System.out.println(vcfOutFile.getName()+ "\t"+ Misc.stringArrayToString(parser.getSampleNames(), ","));
 	}
 
 	/**Sets passing records to fail if any of the control samples that pass the read depth and genotype quality and are also homozygous for the non reference allele. 
@@ -301,7 +311,11 @@ public class MultiSampleVCFFilter {
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
-		File forExtraction = null;
+		
+		File inputFile = null;
+		String outputFile = null;
+		
+		
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -309,7 +323,10 @@ public class MultiSampleVCFFilter {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'v': forExtraction = new File(args[++i]); break;
+					case 'v': inputFile = new File(args[++i]); break;
+					case 'p': outputFile = args[++i]; break;
+					case 't': this.pathToTabix = args[++i]; break;
+					case 'f': passing = false; break;
 					case 'a': filterAnySample = true; break;
 					case 'b': controlHomozygousFilter = true; break;
 					case 'c': oneOrMorePassingCohortFilter = true; break;
@@ -329,14 +346,43 @@ public class MultiSampleVCFFilter {
 				}
 			}
 		}
-		//pull files
-		if (forExtraction == null || forExtraction.canRead() == false) Misc.printExit("\nError: please indicate a vcf file to filter.\n");
-		File[][] tot = new File[3][];
-		tot[0] = IO.extractFiles(forExtraction,".vcf");
-		tot[1] = IO.extractFiles(forExtraction,".vcf.gz");
-		tot[2] = IO.extractFiles(forExtraction,".vcf.zip");
-		vcfFiles = IO.collapseFileArray(tot);
-		if (vcfFiles == null || vcfFiles.length ==0 || vcfFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.vcf(.zip/.gz) file(s)!\n");
+		
+		if (inputFile == null) {
+			System.out.println("Input file was not specified, exiting");
+			System.exit(1);
+		} else if (!inputFile.exists()) {
+			System.out.println("Input file does not exist, exiting");
+			System.exit(1);
+		} else if (Pattern.matches(".+?.vcf",inputFile.getName())) {
+			this.vcfInFile = inputFile;
+		} else if (Pattern.matches(".+?.vcf.gz",inputFile.getName())) {
+			this.vcfInFile = VCFUtilities.unzipTabix(inputFile,this.pathToTabix);
+		} else {
+			System.out.println("Input file does not appear to be a XXX.vcf/XXX.vcf.gz file");
+			System.exit(1);
+		}
+		
+		
+		if (outputFile == null) {
+			System.out.println("Output file was no specified, exiting");
+			System.exit(1);
+		} else if (Pattern.matches(".+?.vcf",outputFile)) {
+			this.compressOutput = false;
+			this.vcfOutFile = new File(outputFile);
+		} else if (Pattern.matches(".+?.vcf.gz",outputFile)) {
+			File vcfOutComp = new File(outputFile);
+			if (vcfOutComp.exists()) {
+				System.out.println("Tabix won't overwrite an existing file, rename the output or delete exisiting file");
+				System.exit(1);
+			}
+			
+			this.vcfOutFile = new File(outputFile.substring(0,outputFile.length()-3));
+			
+			this.compressOutput = true;
+		} else {
+			System.out.println("Output file does not appear to be a XXX.vcf/XXX.vcf.gz file");
+			System.exit(1);
+		}
 
 		if (printSampleNames) {
 			printSampleNames();
@@ -360,15 +406,16 @@ public class MultiSampleVCFFilter {
 				"**************************************************************************************\n" +
 				"**                          Multi Sample VCF Filter  : March 2013                   **\n" +
 				"**************************************************************************************\n" +
-				"Splits vcf file(s) containing multiple sample records into those that pass and fail\n" +
+				"Filters a vcf file containing multiple sample records into those that pass or fail\n" +
 				"the tests below. This works with VCFv4.1 files created by the GATK package. Note, the\n" +
-				"records are not modified. There is an incompatibility with the Tabix gzip function and\n" +
-				"java gzip reader on Linux.  If you find premature termination of your vcf file try\n" +
-				"uncompressing the file.\n\n" +
+				"records are not modified. \n\n" +
 
-				"Options:\n"+
-				"-v Full path to a sorted multi sample vcf file or directory containing such\n" +
-				"      (xxx.vcf(.gz/.zip OK)). \n"+
+				"Required:\n"+
+				"-v Full path to a sorted multi sample vcf file (xxx.vcf/xxx.vcf.gz)). \n"+
+				"-p Full path to the output VCF (xxx.vcf/xxx.vcf.gz).  Specifying xxx.vcf.gz will compress\n " +
+				"      and index the VCF using tabix\n\n" +
+				"Optional:\n" +
+				"-f Report failing records instead of passing\n" +
 				"-a Fail records where no sample passes the sample thresholds.\n"+
 				"-b Fail records where any of the control samples that pass the sample thresholds also\n" +
 				"      contain the homozygous non reference allele. Requires setting -n .\n"+
@@ -382,11 +429,12 @@ public class MultiSampleVCFFilter {
 				"-o Comma delimited (no spaces) list of cohort/ affected sample names.\n"+
 				"-n Comma delimited (no spaces) list of control sample names.\n"+
 				"-s Print sample names and exit.\n"+
+				"-t Path to tabix\n" +
 
 				"\n"+
 
-				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/MultiSampleVCFFilter -b -c -g 20 -r 10\n" +
-				"     -d 20 -n norm5,norm6,norm7  -o cancer1,cancer2,cancer3,cancer4\n\n"+
+				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/MultiSampleVCFFilter -v 9901R.vcf -b -c -g 20 -r 10\n" +
+				"     -o 9901R_filtered.vcf -d 20 -n norm5,norm6,norm7  -o cancer1,cancer2,cancer3,cancer4\n\n"+
 
 		"**************************************************************************************\n");
 

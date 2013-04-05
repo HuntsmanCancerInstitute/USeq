@@ -7,17 +7,33 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class VCFComments {
-	//This class only handles the info section right now
-
-	private ArrayList<String> preInfo = new ArrayList<String>();
-	private ArrayList<String> postInfo = new ArrayList<String>();
+	//This class was made to handle info data, it be expanded to handle other fields.
+	private ArrayList<String> nonStandardComments = new ArrayList<String>();
+	
+	//INFO related data
 	private ArrayList<String> infoOrder = new ArrayList<String>();
-	private ArrayList<String> sampleList = new ArrayList<String>();
 	private HashMap<String,String> infoData = new HashMap<String,String>();
 	private HashMap<String,String> infoDesc = new HashMap<String,String>();
 	private HashMap<String,String> infoFormat = new HashMap<String,String>();
-	private Pattern p = Pattern.compile("##INFO=<ID=(.+?),.+?Type=(.+?).+?Description=\"(.+?)\">");
-	private Pattern sp = Pattern.compile("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t(.+?)");
+	private Pattern infoPattern = Pattern.compile("##INFO=<ID=(.+?),.+?Type=(.+?),Description=\"(.+?)\">");
+	
+	//FILTER related data
+	private ArrayList<String> filterComments = new ArrayList<String>();
+	private Pattern filterPattern = Pattern.compile("##FILTER.+");
+	
+	//FORMAT related data
+	private ArrayList<String> formatComments = new ArrayList<String>();
+	private Pattern formatPattern = Pattern.compile("##FORMAT.+");
+	
+	//COLUMN related data
+	private String sampleString = null;
+	private ArrayList<String> sampleList = new ArrayList<String>();
+	private Pattern samplePattern = Pattern.compile("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t(.+?)");
+	
+	//VCF style
+	private String styleString = null;
+	private String style = null;
+	private Pattern stylePattern = Pattern.compile("##annotationStyle=(.+?)");
 	
 	public VCFComments(ArrayList<String> comments) {
 		setComments(comments.toArray(new String[0]));
@@ -26,14 +42,18 @@ public class VCFComments {
 	/** Get comment array, restrict info lines to those in the list */
 	public String[] getComments(ArrayList<String> infoFieldsToUse) {
 		ArrayList<String> fullComments = new ArrayList<String>();
-		fullComments.addAll(preInfo);
+		fullComments.addAll(nonStandardComments);
+		if (styleString != null) {
+			fullComments.add(styleString);
+		}
 		for (String info: infoOrder) {
 			if (infoFieldsToUse.contains(info)) {
 				fullComments.add(infoData.get(info));
 			}
-			
 		}
-		fullComments.addAll(postInfo);
+		fullComments.addAll(filterComments);
+		fullComments.addAll(formatComments);
+		fullComments.add(sampleString);
 		
 		return fullComments.toArray(new String[0]);
 	}
@@ -44,46 +64,63 @@ public class VCFComments {
 	}
 	
 	public void addInfo(String infofield) {
-		Matcher m = p.matcher(infofield);
+		Matcher m = infoPattern.matcher(infofield);
 		if (!m.matches()) {
 			System.out.println("Info header line is not properly formatted");
 			System.exit(1);
 		}
-		
 		infoOrder.add(m.group(1));
 		infoData.put(m.group(1), infofield);	
 	}
 	
 	public void setComments(String[] comments) {
-		boolean found = false;
 		for (String comment: comments) {
-			Matcher m = p.matcher(comment);
-			Matcher sm = sp.matcher(comment);
-			if (m.matches()) {
-				found = true;
-				infoOrder.add(m.group(1));
-				infoData.put(m.group(1), comment);
-				infoFormat.put(m.group(1),m.group(2));
-				infoDesc.put(m.group(1), m.group(3));
-			} else if (sm.matches()) {
-				sampleList.addAll(Arrays.asList(sm.group(1).split("\t")));
-			} else if (found) {
-				postInfo.add(comment);
+			Matcher infoMatcher = infoPattern.matcher(comment);
+			Matcher filterMatcher = filterPattern.matcher(comment);
+			Matcher formatMatcher = formatPattern.matcher(comment);
+			Matcher sampleMatcher = samplePattern.matcher(comment);
+			Matcher styleMatcher = stylePattern.matcher(comment);
+			if (infoMatcher.matches()) {
+				String infoName = infoMatcher.group(1);
+				infoOrder.add(infoName);
+				infoData.put(infoName, comment);
+				infoFormat.put(infoName, infoMatcher.group(2));
+				infoDesc.put(infoName,infoMatcher.group(3));
+			} else if (filterMatcher.matches()) {
+				filterComments.add(comment);
+			} else if (formatMatcher.matches()) {
+				formatComments.add(comment);
+			} else if (sampleMatcher.matches()) {
+				sampleString = comment;
+				String[] sampleNames = sampleMatcher.group(1).split("\t");
+				for (String sn: sampleNames) {
+					sampleList.add(sn);
+				}
+			} else if (styleMatcher.matches()) {
+				styleString = comment;
+				style = styleMatcher.group(1);
 			} else {
-				preInfo.add(comment);
+				nonStandardComments.add(comment);
 			}
-		}
+		}	
+	}
+	
+	public String getAnnotationStyle() {
+		return style;
+	}
+	
+	public void setAnnotationStyle(String style) {
+		this.styleString = "##annotationStyle=" + style;
 	}
 	
 	public ArrayList<String> getInfoDesc(ArrayList<String> infoToUse) {
 		ArrayList<String> result = new ArrayList<String>();
-		for (String info: infoToUse) {
-			if (infoDesc.containsKey(info)) {
-				result.add(infoDesc.get(info));
-			} else {
-				result.add(null);
+		for (String key: infoDesc.keySet()) {
+			if (infoToUse.contains(key)) {
+				result.add(infoDesc.get(key));
 			}
 		}
+		
 		return result;
 	}
 	
@@ -102,6 +139,8 @@ public class VCFComments {
 	public ArrayList<String> getSampleList() {
 		return this.sampleList;
 	}
+	
+	
 
 }
  
