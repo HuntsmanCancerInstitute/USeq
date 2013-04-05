@@ -1,8 +1,9 @@
 package edu.utah.seq.vcf;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -10,9 +11,7 @@ import java.util.HashSet;
 import java.util.regex.Pattern;
 import edu.utah.seq.useq.data.RegionScoreText;
 
-import util.gen.Gzipper;
 import util.gen.IO;
-import util.gen.Misc;
 import util.gen.Num;
 
 /*
@@ -379,85 +378,93 @@ public class VCFParser {
 		return new float[]{minScore, maxScore};
 	}
 	
-
-	/**Prints out two gzipped vcf files with records that match the fieldPass and those that don't.
-	 * Note, the original, unmodified record is printed in either case.*/
-	public void printRecords(String fieldPass) {
-		printRecords(fieldPass,false);
+    /**Prints out all unmodified records to a file with the specified suffix
+     * 
+     * @param suffix
+     */
+	public void printRecords(File outfile) {
+		printRecords(outfile,false);
 	}
 	
-	/**Prints out two gzipped vcf files with records that match the fieldPass and those that don't
-	 * The modified record with all info fields is printed
-	 * @param fieldPass
+	/**Prints out all modified records to a file with the given suffix 
+	 * 
+	 * @param suffix
 	 * @param modified
 	 */
-	public void printRecords(String fieldPass,boolean modified) {
-		printRecords(fieldPass,modified,null);
+	public void printRecords(File outfile,boolean modified) {
+		printRecords(outfile,modified,this.getVcfComments().getInfoOrder());
 	}
 	
-	/**Prints two gzipped vcf files with records that match the fieldPass and those that don't.
-	 * The modified records with a user-specied subest of info fields is printed.
-	 * @param fieldPass
+	/**Prints out all modified records to a file with the given suffix.  Only specified INFO fields are used.
+	 * 
+	 * @param suffix
 	 * @param modified
+	 * @param infoToUse
 	 */
-	public void printRecords(String fieldPass,boolean modified, ArrayList<String> infoToUse) {
-		printRecords(fieldPass,modified,infoToUse,VCFInfo.UNMODIFIED);
+	public void printRecords(File outfile,boolean modified, ArrayList<String> infoToUse) {
+		printRecords(outfile,modified,infoToUse,VCFInfo.UNMODIFIED);
 	}
-
 	
-	/**Prints two gzipped vcf files with records that match the fieldPass and those that don't.
-	 * The modified records with a user-specied subest of info fields is printed in a specific style
-	 * @param fieldPass
-	 * @param modified
-	 */
-	public void printRecords(String fieldPass,boolean modified, ArrayList<String> infoToUse, Integer style) {
+	
+	/** The method that actually writes the records to file. This version of the method writes to a single file*/
+	public void printRecords(File records, boolean modified, ArrayList<String> infoToUse, String style) {
 		try {
-			String fullPathName = Misc.removeExtension(vcfFile.getCanonicalPath());
-			File good = new File(fullPathName+ "_Pass.vcf.gz");
-			File bad = new File(fullPathName+ "_Fail.vcf.gz");
-			printRecords(fieldPass, good, bad, modified, infoToUse, style);
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-	}
-	
-	
-	
-	/**Prints out two gzipped vcf files with records that match the fieldPass and those that don't.
-	 * Note, the original, unmodified record is printed in either case.*/
-	public void printRecords(String fieldPass, File pass, File fail, boolean modified, ArrayList<String> infoToUse, Integer style) {
-		try {
-			Gzipper outGood = new Gzipper(pass);
-			Gzipper outBad = new Gzipper(fail);
+			BufferedWriter bw = new BufferedWriter(new FileWriter(records));
+			
+			//Write header
+			this.getVcfComments().setAnnotationStyle(style);
+			String[] comments;
 			if (infoToUse != null) {
-				outGood.println(this.getStringComments(infoToUse));
-				outBad.println(this.getStringComments(infoToUse));
+				comments = this.getStringComments(infoToUse);
 			} else {
-				outGood.println(this.getStringComments());
-				outBad.println(this.getStringComments());
+				comments = this.getStringComments();
+			}
+			for (String comment: comments) {
+				bw.write(comment + "\n");
 			}
 			
+			//Write body
 			if (modified) {
 				for (VCFRecord r: vcfRecords) {
-					if (r.getFilter().equals(fieldPass)) {
-						outGood.println(r.getModifiedRecord(infoToUse,style));
-					} else {
-						outBad.println(r.getModifiedRecord(infoToUse,style));
-					}
+					bw.write(r.getModifiedRecord(infoToUse, style) + "\n");
 				}
 			} else {
-				for (VCFRecord r : vcfRecords){
-					if (r.getFilter().equals(fieldPass)) outGood.println(r);
-					else outBad.println(r);
+				for (VCFRecord r: vcfRecords) {
+					bw.write(r + "\n");
 				}
 			}
+			bw.close();
+		} catch (Exception ex) {
+			ex.printStackTrace();
+		}
+	}
+
+	
+	/**The method that actually writes the records to file.  This version writes Passed/Failed records to separate files*/
+	public void printFilteredRecords(File records, String filter) {
+		try {
+			BufferedWriter bw = new BufferedWriter(new FileWriter(records));
 			
-			outGood.close();
-			outBad.close();
+			String[] comments = this.getStringComments();
+			
+			for (String comment: comments) {
+				bw.write(comment + "\n");
+			}
+			
+			for (VCFRecord r: vcfRecords) {
+				if (r.getFilter().equals(filter)) {
+					bw.write(r + "\n");
+				}
+			}
+			bw.close();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
+	
+	
+	
+	
 	
 	public void removeSNPs() {
 		//set all to pass
