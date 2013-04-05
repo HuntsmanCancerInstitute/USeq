@@ -115,9 +115,9 @@ public class VCFComments {
 	
 	public ArrayList<String> getInfoDesc(ArrayList<String> infoToUse) {
 		ArrayList<String> result = new ArrayList<String>();
-		for (String key: infoDesc.keySet()) {
-			if (infoToUse.contains(key)) {
-				result.add(infoDesc.get(key));
+		for (String info: infoToUse) {
+			if (infoDesc.containsKey(info)) {
+				result.add(infoDesc.get(info));
 			}
 		}
 		
