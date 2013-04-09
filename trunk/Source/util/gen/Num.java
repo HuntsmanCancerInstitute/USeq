@@ -4636,4 +4636,17 @@ public class Num {
 		}
 		return rev;
 	}
+
+	public static short[] arrayListOfShortToArray(ArrayList<Short> s) {
+		int size = s.size();
+		short[] c = new short[size];
+		for (int i=0; i< size; i++) c[i] = s.get(i);
+		return c;
+	}
+
+	public static double mean(short[] c) {
+		double total = 0;
+		for (short s: c) total += s;
+		return total/((double)c.length);
+	}
 }
