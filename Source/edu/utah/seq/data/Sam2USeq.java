@@ -58,6 +58,8 @@ public class Sam2USeq {
 	private PrintWriter bedOut = null;
 	private boolean verbose = true;
 	private File useqOutputFile;
+	private ArrayList<Short> baseCoverage = new ArrayList<Short>();
+	private Short zeroShort = new Short((short)0);
 
 	private int maxNumberBases;
 
@@ -118,19 +120,24 @@ public class Sam2USeq {
 	public void finishReadDepthStats(){
 		if (regions != null){
 			
-			//increment regions not scanned
+			//increment chroms not scanned
 			for (String chromStrand: countedChromosomes) regions.remove(chromStrand);
 			for (Region[] chromRegions: regions.values()){
 				for (Region r: chromRegions){
 					int length = r.getLength();					
-					for (int i=0; i < length; i++) histogram.count(0);
+					for (int i=0; i < length; i++) {
+						histogram.count(0);
+						baseCoverage.add(zeroShort);
+					}
 				}
 			}
 			
-			//print histogram
-			printHistogramStats();
+			//print histogram and summary stats
+			printStats();
+
 		}
 	}
+
 
 	public void splitSamBamFiles(){
 		for (File samFile: samFiles){
@@ -386,9 +393,15 @@ public class Sam2USeq {
 						//before counted bases? past end? Add zeros to all bases
 						for (int i=start; i< stop; i++){
 							//before or after scored bases
-							if (i < 0 || i >= baseCounts.length) histogram.count(0);
+							if (i < 0 || i >= baseCounts.length) {
+								histogram.count(0);
+								baseCoverage.add(zeroShort);
+							}
 							//nope inside
-							else histogram.count(baseCounts[i]);
+							else {
+								histogram.count(baseCounts[i]);
+								baseCoverage.add((short)baseCounts[i]);
+							}
 						}
 					}
 				}
@@ -659,7 +672,7 @@ public class Sam2USeq {
 
 	}	
 	
-	public void printHistogramStats(){
+	public void printStats(){
 		try {
 			PrintStream oldOut = System.out;
 			if (logFile != null) {
@@ -678,7 +691,21 @@ public class Sam2USeq {
 				numCounts += counts[i];
 				if (numCounts == total) break;
 			}
-			System.out.println("Total interrogated bases "+(int)total);
+			System.out.println("\nTotal interrogated bases\t"+(int)total);
+			
+			//print summary stats
+
+			 short[] c = Num.arrayListOfShortToArray(baseCoverage);
+			 Arrays.sort(c);
+			//calc mean
+			 double mean = Num.mean(c);
+			 short min = c[0];
+			 short max = c[c.length-1];
+			//calc median
+			double median = Num.median(c);
+			System.out.println("Mean Coverage\t"+mean+"\nMedian Coverage\t"+median+"\nMinimum\t"+min+"\nMaximum\t"+max);
+			
+			
 			System.out.close();
 			System.setOut(oldOut);
 		} catch (FileNotFoundException e) {
@@ -688,11 +715,12 @@ public class Sam2USeq {
 		}
 
 	}
+	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam 2 USeq : Dec 2012                             **\n" +
+				"**                               Sam 2 USeq : April 2013                            **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
