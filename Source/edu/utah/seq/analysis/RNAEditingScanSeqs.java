@@ -24,6 +24,7 @@ public class RNAEditingScanSeqs {
 	private double errorRateMinOne;
 	private int minimumBaseCoverage = 5;
 	private float minimumPseMedian = 0.005f;
+	private boolean runStrandedAnalysis = false;
 
 	//internal fields
 	private int numberRandomPermutations = 100;
@@ -39,8 +40,6 @@ public class RNAEditingScanSeqs {
 	private HashMap<String,PointData[]> nonConvertedMinusPointData;
 	private ArrayList<SmoothingWindowInfo> smiAL = new ArrayList<SmoothingWindowInfo>();
 	private RandomScoreArray[] randomScores;
-	//private float[] randomPseMedians = new float[targetNumberRandomWindows];
-	//private int randomPseMedianIndex = 0;
 
 	private WindowMaker windowMaker; 
 	private int[][] windows;
@@ -70,17 +69,45 @@ public class RNAEditingScanSeqs {
 		//set fields
 		processArgs(args);
 		
-		//make window directories
-		meanDir = new File(saveDirectory, "Mean");
-		meanDir.mkdir();
-		pvalDir = new File(saveDirectory, "PVal");
-		pvalDir.mkdir();
+		//set initial score items
+		setScoreStrings(false);
 		
 		//make containers for randomScores
 		randomScores = new RandomScoreArray[windowSize+10];
-
-		doWork();
 		
+		//load data pointers
+		loadPointDataArrays();
+
+		//stranded analysis?
+		if (runStrandedAnalysis){
+			meanDir = new File(saveDirectory, "MeanPlus");
+			meanDir.mkdir();
+			pvalDir = new File(saveDirectory, "PValPlus");
+			pvalDir.mkdir();
+			plusStrand = true;
+			minusStrand =  false;
+			doWork();
+			//reset
+			setScoreStrings(false);
+			randomScores = new RandomScoreArray[windowSize+10];
+			smiAL.clear();
+			meanDir = new File(saveDirectory, "MeanMinus");
+			meanDir.mkdir();
+			pvalDir = new File(saveDirectory, "PValMinus");
+			pvalDir.mkdir();
+			plusStrand = false;
+			minusStrand =  true;
+			doWork();
+		}
+		//combine analysis
+		else {
+			meanDir = new File(saveDirectory, "Mean");
+			meanDir.mkdir();
+			pvalDir = new File(saveDirectory, "PVal");
+			pvalDir.mkdir();
+			doWork();
+		}
+
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
@@ -90,8 +117,6 @@ public class RNAEditingScanSeqs {
 	//methods
 	
 	public void doWork(){
-		//fetch counts
-		loadPointDataArrays();
 
 		//for each chromosome
 		System.out.print("Scanning Chromosomes");
@@ -125,14 +150,13 @@ public class RNAEditingScanSeqs {
 
 		//save window data 
 		System.out.println("Writing window objects for the EnrichedRegionMaker...");
-		swiFile = new File (saveDirectory, "windowData"+windowSize+"bp.swi");
+		String strand = "";
+		if (runStrandedAnalysis){
+			if (plusStrand) strand = "Plus";
+			else strand = "Minus";
+		}
+		swiFile = new File (saveDirectory, "windowData"+windowSize+"bp"+strand+".swi");
 		IO.saveObject(swiFile, smoothingWindowInfo);
-		
-		//print info on random pseudomedians
-		//System.out.println("Random pseudomedian statistics:");
-		//Num.statFloatArray(randomPseMedians, true);
-
-
 	}
 
 	private void convertPValuesToFDRs() {
@@ -222,50 +246,60 @@ public class RNAEditingScanSeqs {
 	/**Fetches the names of all the chromosomes in the data*/
 	public String[] fetchAllChromosomes(){
 		HashSet<String> c = new HashSet<String>();
-		Iterator<String> it = convertedPlusPointData.keySet().iterator();
-		while (it.hasNext()) c.add(it.next());
-		it = convertedMinusPointData.keySet().iterator();
-		while (it.hasNext()) c.add(it.next());
-		it = nonConvertedPlusPointData.keySet().iterator();
-		while (it.hasNext()) c.add(it.next());
-		it = nonConvertedMinusPointData.keySet().iterator();
-		while (it.hasNext()) c.add(it.next());
+		Iterator<String> it;
+		if (plusStrand){
+			it = convertedPlusPointData.keySet().iterator();
+			while (it.hasNext()) c.add(it.next());
+			it = nonConvertedPlusPointData.keySet().iterator();
+			while (it.hasNext()) c.add(it.next());
+		}
+		if (minusStrand){
+			it = convertedMinusPointData.keySet().iterator();
+			while (it.hasNext()) c.add(it.next());
+			it = nonConvertedMinusPointData.keySet().iterator();
+			while (it.hasNext()) c.add(it.next());
+		}
 		return Misc.hashSetToStringArray(c);
 	}
 	
 	/**Fetchs the data for a particular chromosome. Returns true if all four datasets were found.*/
-	public boolean fetchDataAndRemove(){
+	public boolean fetchData(){
 		ArrayList<PointData> al = null;
 		PointData[] pd;
 		//merge converted
 		convertedMergedChromPlus = null;
-		if (convertedPlusPointData.containsKey(chromosome)) {
+		if (plusStrand == true && convertedPlusPointData.containsKey(chromosome)) {
 			pd = convertedPlusPointData.remove(chromosome);
 			al = PointData.convertArray2ArrayList(pd);
 			convertedMergedChromPlus = PointData.mergePointData(al, false, true);
 		}
 		convertedMergedChromMinus = null;
-		if (convertedMinusPointData.containsKey(chromosome)) {
+		if (minusStrand == true && convertedMinusPointData.containsKey(chromosome)) {
 			pd = convertedMinusPointData.remove(chromosome);
 			al = PointData.convertArray2ArrayList(pd);
 			convertedMergedChromMinus = PointData.mergePointData(al, false, true);
 		}
 		//merge nonConverted
 		nonConvertedMergedChromPlus = null;
-		if (nonConvertedPlusPointData.containsKey(chromosome)) {
+		if (plusStrand == true && nonConvertedPlusPointData.containsKey(chromosome)) {
 			pd = nonConvertedPlusPointData.remove(chromosome);
 			al = PointData.convertArray2ArrayList(pd);
 			nonConvertedMergedChromPlus = PointData.mergePointData(al, false, true);
 		}
 		nonConvertedMergedChromMinus = null;
-		if (nonConvertedMinusPointData.containsKey(chromosome)) {
+		if (minusStrand == true && nonConvertedMinusPointData.containsKey(chromosome)) {
 			pd = nonConvertedMinusPointData.remove(chromosome);
 			al = PointData.convertArray2ArrayList(pd);
 			nonConvertedMergedChromMinus = PointData.mergePointData(al, false, true);
 		}
 		pd = null;
 		al = null;
-		if ( convertedMergedChromPlus == null || nonConvertedMergedChromPlus == null || convertedMergedChromMinus == null || nonConvertedMergedChromMinus == null) return false;
+		if (plusStrand){
+			if (convertedMergedChromPlus == null || nonConvertedMergedChromPlus == null) return false;
+		}
+		if (minusStrand){
+			if (convertedMergedChromMinus == null || nonConvertedMergedChromMinus == null) return false;
+		}
 		return true;
 	}
 
@@ -274,16 +308,27 @@ public class RNAEditingScanSeqs {
 	/**Window scans a chromosome collecting read count data and calculating binomial p-values.*/
 	public void windowScanChromosome(){
 		//fetch data
-		if (fetchDataAndRemove() == false) {
-			System.out.println("\n\tSkipping "+chromosome+". Failed to find all four PointData sets.");
+		if (fetchData() == false) {
+			System.out.println("\n\tSkipping "+chromosome+". Failed to find required PointData sets.");
 			return;
 		}
-		//calculate base level pvalues
-		convertedChrom = PointData.mergePairedPointDataNoSumming(convertedMergedChromPlus, convertedMergedChromMinus);
-		nonConvertedChrom = PointData.mergePairedPointDataNoSumming(nonConvertedMergedChromPlus, nonConvertedMergedChromMinus);
-			
-
+		//stranded analysis?
+		if (runStrandedAnalysis){
+			if (plusStrand){
+				convertedChrom = convertedMergedChromPlus;
+				nonConvertedChrom = nonConvertedMergedChromPlus;
+			}
+			else {
+				convertedChrom = convertedMergedChromMinus;
+				nonConvertedChrom = nonConvertedMergedChromMinus;
+			}
+		}
+		else {
+			convertedChrom = PointData.mergePairedPointDataNoSumming(convertedMergedChromPlus, convertedMergedChromMinus);
+			nonConvertedChrom = PointData.mergePairedPointDataNoSumming(nonConvertedMergedChromPlus, nonConvertedMergedChromMinus);
+		}
 		methylatedBases = MethylatedBaseObservationOneSample.fetchCommonBasesWithMinimumObservations(nonConvertedChrom, convertedChrom, minimumBaseCoverage);
+		
 		//remove those 100% edited (likely snvs)
 		ArrayList<MethylatedBaseObservationOneSample> good = new ArrayList<MethylatedBaseObservationOneSample>();
 		for (int i=0; i< methylatedBases.length; i++){
@@ -331,8 +376,10 @@ public class RNAEditingScanSeqs {
 		notes.put(BarParser.WINDOW_SIZE, windowSize+"");
 		notes.put(BarParser.DESCRIPTION_TAG, Misc.stringArrayToString(scoreNames, ","));
 		notes.put(BarParser.UNIT_TAG, Misc.stringArrayToString(scoreUnits, ","));
-		info.setNotes(notes);
-		info.setStrand(".");		
+		info.setNotes(notes);	
+		if (plusStrand && minusStrand == false) info.setStrand("+");
+		else if (minusStrand && plusStrand == false) info.setStrand("-");
+		else info.setStrand(".");
 		smiAL.add(new SmoothingWindowInfo(smoothingWindow, info));
 	}
 
@@ -462,9 +509,8 @@ public class RNAEditingScanSeqs {
 
 
 
-	/**Collects and calculates a bunch of stats re the PointData.*/
+	
 	private void loadPointDataArrays(){
-		//fetch converted PointData and calculate total observations
 		HashMap<String, ArrayList<PointData>>[] combo = PointData.fetchStrandedPointDataNoMerge (convertedPointDirs);
 		convertedPlusPointData = PointData.convertArrayList2Array(combo[0]);
 		convertedMinusPointData = PointData.convertArrayList2Array(combo[1]);
@@ -574,6 +620,7 @@ public class RNAEditingScanSeqs {
 					case 'w': windowSize = Integer.parseInt(args[++i]); break;
 					case 'm': minimumNumberObservationsInWindow = Integer.parseInt(args[++i]); break;
 					case 'p': minimumPseMedian = Float.parseFloat(args[++i]); break;
+					case 't': runStrandedAnalysis = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -610,19 +657,13 @@ public class RNAEditingScanSeqs {
 		if (saveDirectory == null) Misc.printExit("\nError: enter a directory text to save results.\n");
 		if (saveDirectory.exists() == false) saveDirectory.mkdir();
 
-
-		//set initial score items
-		setScoreStrings(false);
-
-		
-
 	}	
 
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           RNA Editing Scan Seqs: March 2013                      **\n" +
+				"**                           RNA Editing Scan Seqs: April 2013                      **\n" +
 				"**************************************************************************************\n" +
 				"RESS attempts to identify clustered editing sites across a genome using a sliding\n" +
 				"window approach.  Each window is scored for the pseudomedian of the base fraction\n" +
@@ -641,6 +682,7 @@ public class RNAEditingScanSeqs {
 				"-p Minimum pseudomedian, defaults to 0.005.\n"+
 				"-w Window size, defaults to 50.\n"+
 				"-m Minimum number observations in window, defaults to 5. \n" +
+				"-t Run a stranded analysis, defaults to non-stranded.\n"+
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/RNAEditingScanSeqs -s /Results/RESS -p 0.01\n" +

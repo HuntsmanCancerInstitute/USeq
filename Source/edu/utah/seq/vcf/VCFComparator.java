@@ -47,14 +47,14 @@ public class VCFComparator {
 		processArgs(args);
 		
 		//parse vcf file
-		System.out.println("Parsing and filtering variant data for common interrogated regions...\n");
+		System.out.println("Parsing and filtering variant data for common interrogated regions...");
 		parseFilterFiles();
 		
 		//set record QUAL score as thresholding score for roc curve data
 		testParser.setRecordQUALAsScore();
 		
 		//compare calls in common interrogated regions
-		System.out.println("\nComparing calls...");
+		System.out.println("Comparing calls...");
 		thresholdAndCompareCalls();
 		
 		if (saveDirectory != null) printParsedDatasets();
@@ -115,11 +115,10 @@ public class VCFComparator {
 
 	public String formatResults(float threshold, float totalKey, float ratchetFDR, float intTest, float nonIntTest ){
 		StringBuilder sb = new StringBuilder();
-		if (threshold == Float.MIN_NORMAL) {
-			sb.append("none");
-			sb.append("\t");
-		}
-		else sb.append(threshold);sb.append("\t");
+		//threshold
+		if (threshold == Float.MIN_NORMAL) sb.append("none");
+		else sb.append(threshold);
+		sb.append("\t");
 		sb.append((int)intTest); sb.append("\t");
 		sb.append((int)nonIntTest); sb.append("\t");
 		//fdr nonIntTest/totalTest
@@ -269,7 +268,7 @@ public class VCFComparator {
 		keyRegions = fixRegionChromosomeNames(keyRegions);
 		long numberBasesInKey = RegionScoreText.countBases(keyRegions);
 		String res = numberBasesInKey +"\tInterrogated bps in key\n";
-		System.out.print(res);
+		//System.out.print(res);
 		results.append(res);
 		
 		//test regions
@@ -277,30 +276,27 @@ public class VCFComparator {
 		testRegions = fixRegionChromosomeNames (testRegions);
 		long numberBasesInTest = RegionScoreText.countBases(testRegions);
 		res = numberBasesInTest +"\tInterrogated bps in test\n";
-		System.out.print(res);
+		//System.out.print(res);
 		results.append(res);
 		
 		//find common intersected regions common 
 		long num = overlapRegions();
 		res = num +"\tInterrogated bps in common\n";
-		System.out.print(res);
 		results.append(res);
 		
 		keyParser = new VCFParser(vcfKey, true, true);
-		if (removeNonPass){
-			keyParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
-			keyParser.filterVCFRecords(VCFRecord.PASS);
-		}
+		//if (removeNonPass){
+			//keyParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
+			//keyParser.filterVCFRecords(VCFRecord.PASS);
+		//}
 		keyParser.appendChr();
 		if (removeSNPs) keyParser.removeSNPs();
 		if (removeNonSNPs) keyParser.removeNonSNPs();
 		res = keyParser.getVcfRecords().length+"\tKey variants\n";
-		System.out.print(res);
 		results.append(res);
 		
 		keyParser.filterVCFRecords(commonRegions);
 		res = keyParser.getVcfRecords().length +"\tKey variants in shared regions\n";
-		System.out.print(res);
 		results.append(res);
 		
 		testParser = new VCFParser(vcfTest, true, true);
@@ -312,12 +308,10 @@ public class VCFComparator {
 		if (removeSNPs) testParser.removeSNPs();
 		if (removeNonSNPs) testParser.removeNonSNPs();
 		res = testParser.getVcfRecords().length +"\tTest variants\n";
-		System.out.print(res);
 		results.append(res);
 		
 		testParser.filterVCFRecords(commonRegions);
 		res = testParser.getVcfRecords().length +"\tTest variants in shared regions\n";
-		System.out.print(res);
 		results.append(res);
 		results.append("\n");
 	}
@@ -441,7 +435,7 @@ public class VCFComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             VCF Comparator : March 2013                          **\n" +
+				"**                             VCF Comparator : April 2013                          **\n" +
 				"**************************************************************************************\n" +
 				"Compares a test vcf file against a gold standard key of trusted vcf calls. Only calls\n" +
 				"that fall in the common interrogated regions are compared. \n\n" +
@@ -453,12 +447,12 @@ public class VCFComparator {
 				"-d Bed file of interrogated regions for the test dataset (xxx.bed(.gz/.zip OK)).\n"+
 				
 				"\nOptional Options:\n"+
-				"-g Require the genotype to match, defaults to scoring a match when then alternate\n" +
+				"-g Require the genotype to match, defaults to scoring a match when the alternate\n" +
 				"       allele is present.\n"+
 				"-s Only compare SNPs, defaults to all.\n"+
 				"-n Only compare non SNPs, defaults to all.\n"+
-				"-p Provide a full path directory for saving the parsed data.\n"+
-				"-e Exclude records whose FILTER field is not . or PASS. Defaults to scoring all.\n"+
+				"-p Provide a full path directory for saving the parsed data. Defaults to not saving.\n"+
+				"-e Exclude test records whose FILTER field is not . or PASS. Defaults to scoring all.\n"+
 
 				"\n"+
 
