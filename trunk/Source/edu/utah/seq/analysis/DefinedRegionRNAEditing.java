@@ -22,8 +22,11 @@ public class DefinedRegionRNAEditing {
 	private File[] nonConvertedPointDirs;
 	private double errorRateMinOne;
 	private int minimumBaseCoverage = 5;
+	private boolean runStrandedAnalysis = false;
 
 	//internal fields
+	private boolean plusStrand = true;
+	private boolean minusStrand =  true;
 	private int numberRandomPermutations = 10;
 	private int targetNumberRandomRegions = 1000000;
 	private ChiSquareTest chiSquare = new ChiSquareTest();
@@ -57,23 +60,28 @@ public class DefinedRegionRNAEditing {
 
 		//set fields
 		processArgs(args);
-
-		//make containers for randomScores
-		randomScores = new RandomScoreArray[maxSize+10];
-
-		doWork();
-
+		
+		//load data pointers
+		loadPointDataArrays();
+		
+		if (runStrandedAnalysis){
+			plusStrand = true;
+			minusStrand = false;
+			doWork();
+			plusStrand = false;
+			minusStrand = true;
+		}
+		else doWork();
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
 	}
-
-	//methods
-
+	
 	public void doWork(){
-		//fetch counts
-		loadPointDataArrays();
+
+		//make containers for randomScores
+		randomScores = new RandomScoreArray[maxSize+10];
 
 		//for each chromosome
 		System.out.print("Scanning Chromosomes:\n\t");
@@ -91,13 +99,17 @@ public class DefinedRegionRNAEditing {
 		//print spreadsheet
 		printSpreadSheet();
 
-
 	}
 
 	/**Writes out an excel compatible tab delimited spreadsheet with hyperlinks for IGB.*/
 	public void printSpreadSheet(){
 		try{
-			File file = new File(regionsFile.getParentFile(), Misc.removeExtension(regionsFile.getName())+"_DRRE.xls");
+			String strand = "";
+			if (runStrandedAnalysis){
+				if (plusStrand) strand = "Plus";
+				else strand = "Minus";
+			}
+			File file = new File(regionsFile.getParentFile(), Misc.removeExtension(regionsFile.getName())+"_DRRE"+strand+".xls");
 			PrintWriter out = new PrintWriter (new FileWriter (file));
 			//print header line
 			out.println("#"+genomeVersion+"_IGBHyperLinks\tChr\tStart\tStop\tNumberObservations\tPseudoMedianBaseFractionEditing\t-10Log10(FDR)");
@@ -175,42 +187,46 @@ public class DefinedRegionRNAEditing {
 		}
 	}
 
-
-
 	/**Fetchs the data for a particular chromosome. Returns true if all four datasets were found.*/
-	public boolean fetchDataAndRemove(){
+	public boolean fetchData(){
 		ArrayList<PointData> al = null;
 		PointData[] pd;
 		//merge converted
 		convertedMergedChromPlus = null;
-		if (convertedPlusPointData.containsKey(chromosome)) {
+		if (plusStrand == true && convertedPlusPointData.containsKey(chromosome)) {
 			pd = convertedPlusPointData.remove(chromosome);
 			al = PointData.convertArray2ArrayList(pd);
 			convertedMergedChromPlus = PointData.mergePointData(al, false, true);
 		}
 		convertedMergedChromMinus = null;
-		if (convertedMinusPointData.containsKey(chromosome)) {
+		if (minusStrand == true && convertedMinusPointData.containsKey(chromosome)) {
 			pd = convertedMinusPointData.remove(chromosome);
 			al = PointData.convertArray2ArrayList(pd);
 			convertedMergedChromMinus = PointData.mergePointData(al, false, true);
 		}
 		//merge nonConverted
 		nonConvertedMergedChromPlus = null;
-		if (nonConvertedPlusPointData.containsKey(chromosome)) {
+		if (plusStrand == true && nonConvertedPlusPointData.containsKey(chromosome)) {
 			pd = nonConvertedPlusPointData.remove(chromosome);
 			al = PointData.convertArray2ArrayList(pd);
 			nonConvertedMergedChromPlus = PointData.mergePointData(al, false, true);
 		}
 		nonConvertedMergedChromMinus = null;
-		if (nonConvertedMinusPointData.containsKey(chromosome)) {
+		if (minusStrand == true && nonConvertedMinusPointData.containsKey(chromosome)) {
 			pd = nonConvertedMinusPointData.remove(chromosome);
 			al = PointData.convertArray2ArrayList(pd);
 			nonConvertedMergedChromMinus = PointData.mergePointData(al, false, true);
 		}
 		pd = null;
 		al = null;
-		if ( convertedMergedChromPlus == null || nonConvertedMergedChromPlus == null || convertedMergedChromMinus == null || nonConvertedMergedChromMinus == null) return false;
-		if (genomeVersion == null) genomeVersion = convertedMergedChromPlus.getInfo().getVersionedGenome();
+		if (plusStrand){
+			if (convertedMergedChromPlus == null || nonConvertedMergedChromPlus == null) return false;
+			if (genomeVersion == null) genomeVersion = convertedMergedChromPlus.getInfo().getVersionedGenome();
+		}
+		if (minusStrand){
+			if (convertedMergedChromMinus == null || nonConvertedMergedChromMinus == null) return false;
+			if (genomeVersion == null) genomeVersion = convertedMergedChromMinus.getInfo().getVersionedGenome();
+		}
 		return true;
 	}
 
@@ -219,13 +235,27 @@ public class DefinedRegionRNAEditing {
 	/**Region scans a chromosome collecting read count data and calculating binomial p-values.*/
 	public void regionScanChromosome(){
 		//fetch data
-		if (fetchDataAndRemove() == false) {
-			System.out.println("\n\tSkipping "+chromosome+". Failed to find all four PointData sets.");
+		if (fetchData() == false) {
+			System.out.println("\n\tSkipping "+chromosome+". Failed to find all required PointData sets.");
 			return;
 		}
-		//fetch base data
-		convertedChrom = PointData.mergePairedPointDataNoSumming(convertedMergedChromPlus, convertedMergedChromMinus);
-		nonConvertedChrom = PointData.mergePairedPointDataNoSumming(nonConvertedMergedChromPlus, nonConvertedMergedChromMinus);
+			
+		//stranded analysis?
+		if (runStrandedAnalysis){
+			if (plusStrand){
+				convertedChrom = convertedMergedChromPlus;
+				nonConvertedChrom = nonConvertedMergedChromPlus;
+			}
+			else {
+				convertedChrom = convertedMergedChromMinus;
+				nonConvertedChrom = nonConvertedMergedChromMinus;
+			}
+		}
+		else {
+			convertedChrom = PointData.mergePairedPointDataNoSumming(convertedMergedChromPlus, convertedMergedChromMinus);
+			nonConvertedChrom = PointData.mergePairedPointDataNoSumming(nonConvertedMergedChromPlus, nonConvertedMergedChromMinus);
+		}
+
 		editedBases = MethylatedBaseObservationOneSample.fetchCommonBasesWithMinimumObservations(nonConvertedChrom, convertedChrom, minimumBaseCoverage);
 
 		//remove those 100% edited (likely snvs)
@@ -414,7 +444,6 @@ public class DefinedRegionRNAEditing {
 	}
 
 
-	/**Collects and calculates a bunch of stats re the PointData.*/
 	private void loadPointDataArrays(){
 		//fetch converted PointData and calculate total observations
 		HashMap<String, ArrayList<PointData>>[] combo = PointData.fetchStrandedPointDataNoMerge (convertedPointDirs);
@@ -450,6 +479,7 @@ public class DefinedRegionRNAEditing {
 					case 'r': convertedPointDirs = IO.extractFiles(args[++i]); break;
 					case 'e': nonConvertedPointDirs = IO.extractFiles(args[++i]); break;
 					case 'b': regionsFile = new File(args[++i]); break;
+					case 't': runStrandedAnalysis = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -500,7 +530,7 @@ public class DefinedRegionRNAEditing {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Defined Region RNA Editing: March 2013                 **\n" +
+				"**                           Defined Region RNA Editing: April 2013                 **\n" +
 				"**************************************************************************************\n" +
 				"DRRE scores regions for the pseudomedian of the base fraction edits as well as the\n" +
 				"probability that the observations occured by chance using a permutation test based on\n" +
@@ -513,6 +543,7 @@ public class DefinedRegionRNAEditing {
 				"       can also provide a single directory that contains multiple PointData\n" +
 				"       directories. These will be merged when scanning.\n" +
 				"-r Reference PointData directory from the RNAEditingPileUpParser. Ditto.\n" +
+				"-t Run a stranded analysis, defaults to non-stranded.\n"+
 
 				"\n"+
 

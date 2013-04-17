@@ -1,3 +1,7 @@
+----USeq_8.5.6----
+DefinedRegionRNAEditing
+* Added option to perform stranded analysis.
+
 ----USeq_8.5.5----
 Ketchup
 * New app that cleans up big old files in user's Tomato job directories
@@ -5,6 +9,8 @@ Sam2USeq
 * Added mean, median, min, max coverage stats for users defined regions
 VCFComparator
 * New app for comparing a key of trusted variant calls to a test vcf file. Generates stats for ROC curves and allows unambiguous comparisons between processing pipelines.
+RNAEditingScanSeqs
+* Added option to perform stranded analysis.
 
 ----USeq_8.5.4----
 MultiSampleVCFFilter

@@ -46,9 +46,16 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		format = fields[vcfParser.formatIndex];
 		
 		if (loadSamples){
-			sample = new VCFSample[fields.length - vcfParser.firstSampleIndex];
-			int index = 0;
-			for (int i=vcfParser.firstSampleIndex; i< fields.length; i++) sample[index++] = new VCFSample(fields[i], format);
+			ArrayList<VCFSample> al = new ArrayList<VCFSample>();
+			//must watch out for blank samples
+			for (int i=vcfParser.firstSampleIndex; i< fields.length; i++) {
+				if (fields[i].equals(".") == false) al.add(new VCFSample(fields[i], format));
+			}
+			if (al.size()!= 0){
+				sample = new VCFSample[al.size()];
+				al.toArray(sample);
+			}
+			else sample = null;
 		}
 	}
 	

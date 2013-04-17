@@ -17,7 +17,7 @@ public class VCFMerger {
 	private File[] vcfFiles;
 	private VCFParser[] vcfParsers;
 	private Gzipper out;
-	private int fileIndexOfConsensus = 2;
+	private int fileIndexOfConsensus = 1;
 
 	public VCFMerger(String[] args){
 		try {	
@@ -157,7 +157,7 @@ public class VCFMerger {
 				"**************************************************************************************\n" +
 				"**                             VCF Comparator : March 2013                          **\n" +
 				"**************************************************************************************\n" +
-				" \n\n" +
+				"Not for distribution.\n\n" +
 
 				"Required Options:\n"+
 				"-v VCF files \n"+
