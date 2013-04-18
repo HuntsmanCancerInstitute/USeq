@@ -39,6 +39,8 @@ public class DefinedRegionRNAEditing {
 	private RandomScoreArray[] randomScores;
 	private SmoothingWindow[] regions;
 	private String genomeVersion = null;
+	private int numberRegions;
+	private float[][] regionScoresPlus = null;
 
 	//by chromosome
 	private String chromosome;
@@ -65,11 +67,15 @@ public class DefinedRegionRNAEditing {
 		loadPointDataArrays();
 		
 		if (runStrandedAnalysis){
+			//scan plus
 			plusStrand = true;
 			minusStrand = false;
 			doWork();
+			collectScoresPlus();
+			//scan minus
 			plusStrand = false;
 			minusStrand = true;
+			doWork();
 		}
 		else doWork();
 
@@ -79,6 +85,7 @@ public class DefinedRegionRNAEditing {
 	}
 	
 	public void doWork(){
+		numberRegionsWithData = 0;
 
 		//make containers for randomScores
 		randomScores = new RandomScoreArray[maxSize+10];
@@ -100,23 +107,34 @@ public class DefinedRegionRNAEditing {
 		printSpreadSheet();
 
 	}
+	
+	public void collectScoresPlus(){
+		regionScoresPlus = new float[numberRegions][];
+		int index = 0;
+		for (String chr: chromosomeRegion.keySet()){
+			for (SmoothingWindow sw : chromosomeRegion.get(chr)){
+				regionScoresPlus[index++] = sw.getScores();
+				sw.setScores(null);
+			}
+		}
+
+	}
 
 	/**Writes out an excel compatible tab delimited spreadsheet with hyperlinks for IGB.*/
 	public void printSpreadSheet(){
 		try{
 			String strand = "";
-			if (runStrandedAnalysis){
-				if (plusStrand) strand = "Plus";
-				else strand = "Minus";
-			}
-			File file = new File(regionsFile.getParentFile(), Misc.removeExtension(regionsFile.getName())+"_DRRE"+strand+".xls");
+			if (regionScoresPlus != null) strand = "Stranded";
+			File file = new File(regionsFile.getParentFile(), Misc.removeExtension(regionsFile.getName())+"_DRRE"+ strand+ ".xls");
 			PrintWriter out = new PrintWriter (new FileWriter (file));
 			//print header line
-			out.println("#"+genomeVersion+"_IGBHyperLinks\tChr\tStart\tStop\tNumberObservations\tPseudoMedianBaseFractionEditing\t-10Log10(FDR)");
+			if (regionScoresPlus == null ) out.println("#"+genomeVersion+"_IGBHyperLinks\tChr\tStart\tStop\tNumberObservations\tPseudoMedianBaseFractionEditing\t-10Log10(FDR)");
+			else out.println("#"+genomeVersion+"_IGBHyperLinks\tChr\tStart\tStop\tNumberObservationsPlus\tPseudoMedianBaseFractionEditingPlus\t-10Log10(FDR)Plus\tNumberObservationsMinus\tPseudoMedianBaseFractionEditingMinus\t-10Log10(FDR)Minus");
 			String url = "=HYPERLINK(\"http://localhost:7085/UnibrowControl?version="+genomeVersion+"&seqid=";
 			String tab = "\t";
 			//for each region
 			int index = 0;
+			int regionIndex = 0;
 			for (String chr: chromosomeRegion.keySet()){
 				for (SmoothingWindow sw : chromosomeRegion.get(chr)){
 					//url
@@ -130,6 +148,21 @@ public class DefinedRegionRNAEditing {
 					out.print(sw.getStart()); out.print(tab);
 					//stop
 					out.print(sw.getStop()); out.print(tab);
+					//print plus strand scores?
+					if (regionScoresPlus !=null){
+						float[] scores = regionScoresPlus[regionIndex++];
+						if (scores == null) {
+							out.print("0\t0\t0\t"); 
+						}
+						else {
+							//	num
+							out.print((int)scores[0]); out.print(tab);
+							//	pse
+							out.print(scores[1]); out.print(tab);
+							//	FDR
+							out.print(scores[2]); out.print(tab);
+						}
+					}
 					//scores = numberObs, pseMedian, pval
 					float[] scores = sw.getScores();
 					if (scores == null) {
@@ -513,6 +546,7 @@ public class DefinedRegionRNAEditing {
 		for (String chr: cr.keySet()){
 			Region[] regions = cr.get(chr);
 			SmoothingWindow[] sw = new SmoothingWindow[regions.length];
+			numberRegions+= sw.length;
 			for (int i=0; i< regions.length; i++){
 				sw[i] = new SmoothingWindow (regions[i].getStart(), regions[i].getStop(), null);
 				int size = regions[i].getLength();
@@ -520,8 +554,6 @@ public class DefinedRegionRNAEditing {
 			}
 			chromosomeRegion.put(chr, sw);
 		}
-
-
 
 
 	}	
