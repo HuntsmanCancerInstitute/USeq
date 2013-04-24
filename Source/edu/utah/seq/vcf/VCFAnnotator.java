@@ -185,7 +185,7 @@ public class VCFAnnotator {
 			for(VCFRecord vr: parser.getVcfRecords()) {
 				String chrom = vr.getChromosome().replace("chr", "");
 				String endPosition = String.valueOf(this.getAnnovarEndPosition(vr));
-				String altAllele = vr.getAlternate().split(",")[0];
+				String altAllele = vr.getAlternate()[0];
 				bw.write(chrom + "\t" + String.valueOf(vr.getPosition() + 1) + "\t" + endPosition + "\t" + vr.getReference() + "\t" + altAllele + "\n");
 			}
 			

@@ -3,6 +3,7 @@ package edu.utah.seq.vcf;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -11,6 +12,7 @@ import java.util.HashSet;
 import java.util.regex.Pattern;
 import edu.utah.seq.useq.data.RegionScoreText;
 
+import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Num;
 
@@ -95,6 +97,7 @@ public class VCFParser {
 	private VCFComments comments;
 	public static final Pattern TAB = Pattern.compile("\\t");
 	public static final Pattern COLON = Pattern.compile(":");
+	public static final Pattern COMMA = Pattern.compile(",");
 	private ArrayList<String> badVcfRecords = new ArrayList<String>();
 	private HashMap<String, VCFLookUp> chromosomeVCFRecords = null;
 	private boolean loadRecords = true;
@@ -378,6 +381,21 @@ public class VCFParser {
 		return new float[]{minScore, maxScore};
 	}
 	
+	/**Sets the VQSLOD score as the thresholding score in each VCFRecord.
+	 * Returns the min and max scores found.
+	 * Throw an exception in the VQSLOD can't be found or parsed as a double.*/
+	public float[] setRecordVQSLODAsScore() throws Exception{
+		float minScore = vcfRecords[0].getInfoObject().getInfoFloat("VQSLOD");
+		float maxScore = minScore;
+		for (VCFRecord r : vcfRecords) {
+			float score = r.getInfoObject().getInfoFloat("VQSLOD");
+			if (score < minScore) minScore = score;
+			if (score > maxScore) maxScore = score;
+			r.setScore((float)score);
+		}
+		return new float[]{minScore, maxScore};
+	}
+	
     /**Prints out all unmodified records to a file with the specified suffix
      * 
      * @param suffix
@@ -437,6 +455,22 @@ public class VCFParser {
 		} catch (Exception ex) {
 			ex.printStackTrace();
 		}
+	}
+	
+	public void printRecords(VCFRecord[] sortedRecords, File file) {
+		try {
+			Gzipper out = new Gzipper(file);
+			//print header
+			for (String c: comments.getComments()) out.println(c);
+			//print records
+			for (VCFRecord r: sortedRecords) out.println(r);
+			out.close();
+		} catch (Exception e) {
+			System.err.println("\nProblem printing out vcf records for "+file);
+			e.printStackTrace();
+			System.exit(1);
+		}
+		
 	}
 
 	
@@ -524,6 +558,8 @@ public class VCFParser {
 		if (chromosomeVCFRecords == null) splitVCFRecordsByChromosome();
 		return chromosomeVCFRecords;
 	}
+
+
 
 
 
