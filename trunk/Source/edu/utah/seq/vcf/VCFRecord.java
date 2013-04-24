@@ -11,7 +11,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	private int position; //interbase coordinates! not 1 based
 	private String rsNumber;
 	private String reference;
-	private String alternate;
+	private String[] alternate;
 	private float quality;
 	private String filter;
 	private VCFInfo info;
@@ -27,16 +27,16 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		originalRecord = record;
 		String[] fields = vcfParser.TAB.split(record);
 		if (vcfParser.numberFields !=0){
-			if (fields.length != vcfParser.numberFields) throw new Exception("\nIncorrect number of fields in -> "+record);
+			if (fields.length != vcfParser.numberFields) throw new Exception("\nIncorrect number of fields in -> "+record+"\nTry uncompressing the vcf file?");
 		}
-		else if (fields.length < vcfParser.minimumNumberFields ) throw new Exception("\nIncorrect number of fields in -> "+record);
+		else if (fields.length < vcfParser.minimumNumberFields ) throw new Exception("\nIncorrect number of fields in -> "+record+"\nTry uncompressing the vcf file?");
 		else if (vcfParser.numberFields == 0) vcfParser.numberFields = fields.length;
 		
 		//must subtract 1 from position to put it into interbase coordinates
 		chromosome = fields[vcfParser.chromosomeIndex] ;
 		position = Integer.parseInt(fields[vcfParser.positionIndex]) - 1;
 		reference = fields[vcfParser.referenceIndex];
-		alternate = fields[vcfParser.alternateIndex];
+		alternate = VCFParser.COMMA.split(fields[vcfParser.alternateIndex]);
 		rsNumber = fields[vcfParser.rsIndex];
 		if (fields[vcfParser.qualityIndex].equals(".")) quality = 0;
 		else quality = Float.parseFloat(fields[vcfParser.qualityIndex]);
@@ -80,10 +80,21 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		return originalRecord;
 	}
 	
-	/**Checks that alternate allele and optionally that the genotype of the first sample are identical.*/
+	/**Checks if any of the alternate alleles match and optionally that the genotype of the first sample are identical.*/
 	public boolean matchesAlternateAlleleGenotype(VCFRecord vcfRecord, boolean requireGenotypeMatch) {
 		//check alternate allele
-		if (vcfRecord.getAlternate().equals(alternate) == false) return false;
+		String[] otherAlts = vcfRecord.getAlternate();
+		boolean match = false;
+		for (String o : otherAlts){
+			for (String t : alternate){
+				if (o.equals(t)){
+					match = true;
+					break;
+				}
+			}
+		}
+		if (match == false) return false;
+		
 		//check genotype of first sample
 		if (requireGenotypeMatch){
 			if (vcfRecord.getSample()[0].getGenotypeGT().equals(sample[0].getGenotypeGT()) == false) return false;
@@ -107,11 +118,11 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		this.reference = reference;
 	}
 
-	public String getAlternate() {
+	public String[] getAlternate() {
 		return alternate;
 	}
 
-	public void setAlternate(String alternate) {
+	public void setAlternate(String[] alternate) {
 		this.alternate = alternate;
 	}
 
@@ -194,7 +205,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	}
 
 	public boolean isSNP() {
-		if (alternate.length() == 1 && reference.length() == 1 && alternate.equals(".") == false) return true;
+		if (alternate[0].length() == 1 && reference.length() == 1 && alternate.equals(".") == false) return true;
 		return false;
 	}
 	
