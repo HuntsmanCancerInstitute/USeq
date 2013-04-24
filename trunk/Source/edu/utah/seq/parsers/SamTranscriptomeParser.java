@@ -43,6 +43,7 @@ public class SamTranscriptomeParser{
 	private static final Pattern TAB = Pattern.compile("\\t");
 	private Pattern CIGAR_BAD = Pattern.compile(".*[^\\dMDIN].*");
 	private boolean reverseStrand = false;
+	private boolean reverseBoth = false;
 	private boolean removeControlAlignments = true;
 	private boolean randomPickAlignment = false;
 	private HashSet<SamAlignment> uniques = new HashSet<SamAlignment>();
@@ -76,7 +77,7 @@ public class SamTranscriptomeParser{
 	}
 
 	//for integration with RNASeq app
-	public SamTranscriptomeParser(File[] samFiles, File saveFile, float maximumAlignmentScore, String genomeVersion, int maxMatches, boolean verbose, boolean flipped) throws IOException{
+	public SamTranscriptomeParser(File[] samFiles, File saveFile, float maximumAlignmentScore, String genomeVersion, int maxMatches, boolean verbose, boolean flipped, boolean bothFlipped) throws IOException{
 		this.dataFiles = samFiles;
 		this.saveFile = saveFile;
 		this.maximumAlignmentScore = maximumAlignmentScore;
@@ -85,6 +86,7 @@ public class SamTranscriptomeParser{
 		this.randomPickAlignment = false;
 		this.verbose = verbose;
 		this.reverseStrand = flipped;
+		this.reverseBoth = bothFlipped;
 		doWork();
 	}
 
@@ -250,6 +252,19 @@ public class SamTranscriptomeParser{
 
 				//set inferred insert size and mate position to zero
 				sa.setInferredInsertSize(0);
+				
+				//reverse strands of both alignments
+				if (reverseBoth) {
+					if (saf == null) {
+						saf = new SamAlignmentFlags(sa.getFlags());
+					}
+					if (saf.isReverseStrand()) {
+						saf.setReverseStrand(false);
+					} else {
+						saf.setReverseStrand(true);
+					}
+					sa.setFlags(saf.getFlags());
+				}
 
 				//reverse second alignment?
 				if (reverseStrand && sa.isSecondPair()) {
@@ -696,6 +711,7 @@ public class SamTranscriptomeParser{
 					case 's': saveFile = new File(args[++i]); break;
 					case 'h': replacementHeader = new File(args[++i]); break;
 					case 'c': removeControlAlignments = false; break;
+					case 'b': reverseBoth = true; break;
 					case 'd': randomPickAlignment = true; break;
 					case 'p': mergePairedAlignments = true; break;
 					case 'q': maximumProperPairDistanceForMerging = Integer.parseInt(args[++i]); mergePairedAlignments = true; break;
@@ -753,6 +769,7 @@ public class SamTranscriptomeParser{
 			System.out.println(minimumMappingQualityScore+ "\tMinimum mapping quality score.");
 			System.out.println(maxMatches+"\tMaximum locations each read may align.");
 			System.out.println(reverseStrand +"\tReverse the strand of the second paired alignemnt.");
+			System.out.println(reverseBoth + "\tReverse the strand of both alignments.");
 			System.out.println(saveUnmappedAndFailedScore +"\tSave unmapped and low score reads.");
 			System.out.println(removeControlAlignments +"\tRemove control chrPhiX and chrAdapter alignments.");
 			System.out.println(randomPickAlignment +"\tRandomly choose an alignment from read blocks that fail the max locations threshold.");
@@ -791,6 +808,9 @@ public class SamTranscriptomeParser{
 				"      alignment per read.\n"+
 				"-r Reverse the strand of the second paired alignment. Reversing the strand is\n" +
 				"      needed for proper same strand visualization of paired stranded Illumina data.\n"+
+				"-b Reverse the strand of both pairs.  Use this option if you would like the orientation\n" +
+				"      of the alignments to match the orientation of the annotation in Illumina stranded \n" +
+				"      UTP sequencing.  This is purely cosmetic and isn't necessary for downstream pipelines\n" +
 				"-u Save unmapped reads and those that fail the alignment score.\n"+
 				"-c Don't remove chrAdapt and chrPhiX alignments.\n"+
 				"-p Merge proper paired unique alignments. Those that cannot be unambiguously merged\n" +
