@@ -1,6 +1,19 @@
 ----USeq_8.5.6----
 DefinedRegionRNAEditing
 * Added option to perform stranded analysis.
+MultiSampleVCFFilter
+*Added additional filtering options.  Now supports Tabix instead of standard gzip.
+VCFAnnotator
+*New app that annotates a VCF file with information from several different databases.  The user has the option of selecting the set of 
+annotations they want or can use the default set.
+VCFReporter
+*New app that converts an annotated VCF file into tabular report, comapatible with excel. User can select which annotations to include in 
+the report
+ParseExonMetrics
+*New app that reads in the output from several different diagnostic programs and creates a PDF document summarizing the metrics.
+SamTranscriptomeParser
+*Added option to flip the orientation of both reads.  This is for cosmetic purposes only.  It allows user to see reads in the same
+orientation as the gene.
 
 ----USeq_8.5.5----
 Ketchup

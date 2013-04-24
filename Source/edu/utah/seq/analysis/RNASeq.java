@@ -30,6 +30,7 @@ public class RNASeq {
 	private boolean stranded = false;
 	private boolean performReverseStrandedAnalysis = false;
 	private boolean secondStrandFlipped = false;
+	private boolean bothFlipped = false;
 	private File geneTableFile;
 	private boolean filterGeneTable = true;
 	private float maximumAlignmentScore = 120;
@@ -133,7 +134,7 @@ public class RNASeq {
 					System.out.println("\n"+treatmentReplicaDirectories[i]);
 					treatmentBamFiles[i] = new File (treatmentBamDirectory, treatmentReplicaDirectories[i].getName()+".bam");
 					File[] samFiles = fetchSamFiles(treatmentReplicaDirectories[i]);
-					SamTranscriptomeParser stp = new SamTranscriptomeParser(samFiles, treatmentBamFiles[i], maximumAlignmentScore, genomeVersion, maxMatches, verbose, secondStrandFlipped );
+					SamTranscriptomeParser stp = new SamTranscriptomeParser(samFiles, treatmentBamFiles[i], maximumAlignmentScore, genomeVersion, maxMatches, verbose, secondStrandFlipped, bothFlipped);
 					if (stp.getNumberPassingAlignments() < 1000) Misc.printErrAndExit("\nError: too few passing alignments?  Are these in sam format?\n");
 				}
 			}
@@ -162,7 +163,7 @@ public class RNASeq {
 					System.out.println(controlReplicaDirectories[i]);
 					controlBamFiles[i] = new File (controlBamDirectory, controlReplicaDirectories[i].getName()+".bam");
 					File[] samFiles = fetchSamFiles(controlReplicaDirectories[i]);
-					SamTranscriptomeParser stp = new SamTranscriptomeParser(samFiles, controlBamFiles[i], maximumAlignmentScore, genomeVersion, maxMatches, verbose, secondStrandFlipped);
+					SamTranscriptomeParser stp = new SamTranscriptomeParser(samFiles, controlBamFiles[i], maximumAlignmentScore, genomeVersion, maxMatches, verbose, secondStrandFlipped, bothFlipped);
 					if (stp.getNumberPassingAlignments() < 1000) Misc.printErrAndExit("\nError: too few passing alignments?  Are these in sam format?\n");
 				}
 			}
@@ -698,6 +699,7 @@ public class RNASeq {
 					case 'm': useDESeq = false; break;
 					case 'j': performReverseStrandedAnalysis = true; break;
 					case 'k': secondStrandFlipped = true; break;
+					case 'b': bothFlipped = true; break;
 					case 'x': maxAlignmentsDepth = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
@@ -744,6 +746,9 @@ public class RNASeq {
 				"       annotation.  This setting should be used for the Illumina's strand-specific dUTP protocol.\n" +
 				"-k Second read flipped. This setting can be used to flip the strand of the second read in a pair.\n" +
 				"       This setting makes it easier to view in IGB, but can break other downstream applications.\n" +
+				"-b Reverse the strand of both pairs.  Use this option if you would like the orientation\n" +
+				"      of the alignments to match the orientation of the annotation in Illumina stranded \n" +
+				"      UTP sequencing.  This is purely cosmetic and isn't necessary for downstream pipelines\n" +
 				"-x Max per base alignment depth, defaults to 50000. Genes containing such high\n"+
 				"       density coverage are ignored. Warnings are thrown.\n"+
 				"-v Genome version (e.g. H_sapiens_Feb_2009, M_musculus_Jul_2007), see UCSC FAQ,\n"+
