@@ -14,6 +14,7 @@ public class StatBarFiles {
 		for (int i=0; i< barFiles.length; i++){
 			parser.readBarFile(barFiles[i], true);
 			float[] delogged = Num.antiLog(parser.getValues(), 2);
+			//float[] delogged = parser.getValues();
 			System.out.println("\n"+barFiles[i].getName());
 			Num.statFloatArray(delogged, false);
 		}

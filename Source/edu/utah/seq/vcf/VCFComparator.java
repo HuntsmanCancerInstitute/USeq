@@ -70,7 +70,7 @@ public class VCFComparator {
 				try {
 					testParser.setRecordVQSLODAsScore();
 				} catch (Exception e) {
-					System.err.println("\nProblem parsing VQSLOD from INFO?\n");
+					System.err.println("\nProblem parsing VQSLOD from INFO? Was the GATK ApplyRecalibration run on your vcf file?\n");
 					e.printStackTrace();
 					System.exit(0);
 				}
@@ -333,6 +333,11 @@ public class VCFComparator {
 		
 		res = keyParser.getVcfRecords().length +"\tKey variants in shared regions\n";
 		results.append(res);
+		
+		if (keyParser.getVcfRecords().length == 0) {
+			System.out.println(results);
+			Misc.printErrAndExit("\nNo key variants in shared regions? Aboring.\n");
+		}
 
 		testParser = new VCFParser(vcfTest, true, true);
 		if (removeNonPass){
@@ -349,6 +354,12 @@ public class VCFComparator {
 		res = testParser.getVcfRecords().length +"\tTest variants in shared regions\n";
 		results.append(res);
 		results.append("\n");
+		
+		if (testParser.getVcfRecords().length == 0) {
+			System.out.println(results);
+			Misc.printErrAndExit("\nNo test variants in shared regions? Aboring.\n");
+		}
+		
 	}
 
 	public void printParsedDatasets(){

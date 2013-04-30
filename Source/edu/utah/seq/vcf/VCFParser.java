@@ -340,6 +340,14 @@ public class VCFParser {
 		}
 		return numMatches;
 	}
+	
+	public int countNonMatchingVCFRecords(String matchFilterText){
+		int numNonMatches = 0;
+		for (VCFRecord r : vcfRecords){
+			if (r.getFilter().equals(matchFilterText) == false) numNonMatches++;
+		}
+		return numNonMatches;
+	}
 
 	/**Sets the filter field in each record to the indicated text.*/
 	public void setFilterFieldOnAllRecords (String text){
