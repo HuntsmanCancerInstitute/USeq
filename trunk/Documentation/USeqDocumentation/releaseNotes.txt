@@ -1,3 +1,9 @@
+----USeq_8.5.7----
+MultiSampleVCFFilter
+* Added option to filter on VQSLOD scores
+MethylationArrayScanSeqs
+* New app for identifying DMRs from array based methylation assays.  Will work for other types of array data too.
+
 ----USeq_8.5.6----
 DefinedRegionRNAEditing
 * Added option to perform stranded analysis.

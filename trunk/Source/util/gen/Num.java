@@ -1688,6 +1688,24 @@ public class Num {
 	    }
 	}
 	
+	/**Randomized the paired arrays, keeping the indexed scores matched.*/
+	public static void randomizePairedValues (float[] array, float[] array2, long seed){
+	    Random rng = new Random(seed);       
+	    // n is the number of items left to shuffle
+	    for (int n = array.length; n > 1; n--) {
+	        // Pick a random element to move to the end
+	        int k = rng.nextInt(n);  // 0 <= k <= n - 1.
+	        // Simple swap of variables, keeping array and array2 together
+	        int nMinOne = n-1;
+	        float tmp = array[k];
+	        array[k] = array[nMinOne];
+	        array[nMinOne] = tmp;
+	        float tmp2 = array2[k];
+	        array2[k] = array2[nMinOne];
+	        array2[nMinOne] = tmp2;
+	    }
+	}
+	
 	public static void randomize (int[] array, long seed){
 	    Random rng = new Random(seed);       
 	    // n is the number of items left to shuffle

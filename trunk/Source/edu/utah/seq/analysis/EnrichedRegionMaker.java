@@ -136,7 +136,7 @@ public class EnrichedRegionMaker {
 
 		//want to select reduced regions?
 		if (invertScores) {
-			if (verbose) System.out.println("Multiplying scores by -1");
+			if (verbose) System.out.println("\n\tMultiplying scores by -1\n");
 			invertScores();
 		}
 
@@ -1222,7 +1222,8 @@ public class EnrichedRegionMaker {
 		al.toArray(enrichedRegions);
 	}
 
-	/**Multiplies normDiff, qvalFDR, and empFDR by -1*/
+	/**Multiplies normDiff, qvalFDR, and empFDR by -1
+	 * This is ugly!*/
 	public void invertScores(){
 		//for each chromosome
 		for (int i=0; i< windowInfo.length; i++){
@@ -1231,12 +1232,16 @@ public class EnrichedRegionMaker {
 			//for each sm
 			for (int j=0; j< windows.length; j++){
 				float[] scores = windows[j].getScores();
+				int numScores = scores.length;
 				//invert 
 				//scores = pVal, qValFDR, eFDR, pValSkew, Log2((sumT+1)/(sumC+1)), tSumPlus, tSumMinus, cSumPlus, cSumMinus
 				//or
 				//scores = FDR and Log2Ratio, note FDR is all positive so don't invert
-				if (scores.length==2){
+				if (numScores==2){
 					scores[1] *=-1;
+				}
+				else if (numScores==4){
+					scores[0] *=-1;
 				}
 				else {
 					scores[0] *=-1;
@@ -1257,12 +1262,16 @@ public class EnrichedRegionMaker {
 			//flip best window;
 			SmoothingWindow sm = er.getBestWindow();
 			float[] scores = sm.getScores();
+			int numScores = scores.length;
 			//invert 
 			//scores = pVal, qValFDR, eFDR, pValSkew, Log2((sumT+1)/(sumC+1)), tSumPlus, tSumMinus, cSumPlus, cSumMinus
 			//or
 			//scores = FDR and Log2Ratio, note FDR is all positive so don't invert
-			if (scores.length==2){
+			if (numScores==2){
 				scores[1] *=-1;
+			}
+			else if (numScores==4){
+				scores[0] *=-1;
 			}
 			else {
 				scores[0] *=-1;
@@ -1278,6 +1287,18 @@ public class EnrichedRegionMaker {
 
 	public ArrayList<EnrichedRegion> getEnrichedRegionsAL() {
 		return enrichedRegionsAL;
+	}
+	public SmoothingWindowInfo[] getWindowInfo() {
+		return windowInfo;
+	}
+	public void setWindowInfo(SmoothingWindowInfo[] windowInfo) {
+		this.windowInfo = windowInfo;
+	}
+	public boolean isInvertScores() {
+		return invertScores;
+	}
+	public void setInvertScores(boolean invertScores) {
+		this.invertScores = invertScores;
 	}
 
 
