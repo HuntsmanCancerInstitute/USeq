@@ -3,12 +3,8 @@ package edu.utah.seq.parsers;
 
 import java.io.*;
 import java.util.regex.*;
-
-import util.bio.seq.Seq;
 import util.gen.*;
-
 import java.util.*;
-
 import edu.utah.seq.data.sam.*;
 
 /**
@@ -19,7 +15,7 @@ public class SamTranscriptomeParser{
 	private File[] dataFiles;
 	private File saveFile;
 	private File outputFile;
-	private File replacementHeader;
+	private String replacementHeader = null;
 	private float maximumAlignmentScore = 90;
 	private float minimumMappingQualityScore = 0;
 	private int numberAlignments = 0;
@@ -34,7 +30,7 @@ public class SamTranscriptomeParser{
 	private double numberOverlappingBases = 0;
 	private double numberNonOverlappingBases = 0;
 	private int maxMatches = 1;
-	private PrintWriter samOut;
+	private Gzipper samOut;
 	private Gzipper failedSamOut = null;
 	private boolean saveUnmappedAndFailedScore = false;
 	private HashMap <String, Integer> chromLength = new HashMap <String, Integer>();
@@ -92,13 +88,16 @@ public class SamTranscriptomeParser{
 
 	public void doWork() throws IOException{
 		//make print writer
-		outputFile = new File(saveFile+"_temp");
-		samOut = new PrintWriter( new FileWriter (outputFile));
+		outputFile = new File(saveFile+"_temp.sam.gz");
+		//samOut = new PrintWriter( new FileWriter (outputFile));
+		samOut = new Gzipper(outputFile);
+		if (replacementHeader != null) samOut.println(replacementHeader);
 
 		if (saveUnmappedAndFailedScore) {
 			String name = Misc.removeExtension(saveFile.getName());
 			File failedReadOutputFile = new File(saveFile.getParentFile(), name+"_UnMappedPoorScore.sam.gz");
 			failedSamOut = new Gzipper(failedReadOutputFile);
+			if (replacementHeader != null) failedSamOut.println(replacementHeader);
 		}
 
 		//for each file, parse and save to disk	
@@ -114,9 +113,16 @@ public class SamTranscriptomeParser{
 		if (saveUnmappedAndFailedScore) failedSamOut.close();
 
 		//add header and output results, this deletes the outputFile too
-		if (saveFile.getName().endsWith(".sam")){
-			if (verbose) System.out.println("\nAdding SAM header and gzip compressing xxx.sam file...");
-			addHeaderAndCompress();
+		if (saveFile.getName().endsWith(".sam.gz")){
+			//replacement header present? just change name
+			if (replacementHeader != null){
+				outputFile.renameTo(saveFile);
+			}
+			//nope, have to append header
+			else {
+				if (verbose) System.out.println("\nAdding SAM header and gzip compressing xxx.sam file...");
+				addHeaderAndCompress();
+			}
 		}
 		else {
 			if (verbose) System.out.println("\nAdding SAM header, sorting, and writing bam output with Picard's SortSam...");
@@ -252,7 +258,7 @@ public class SamTranscriptomeParser{
 
 				//set inferred insert size and mate position to zero
 				sa.setInferredInsertSize(0);
-				
+
 				//reverse strands of both alignments
 				if (reverseBoth) {
 					if (saf == null) {
@@ -366,7 +372,7 @@ public class SamTranscriptomeParser{
 					first.setMateReferenceSequence(second.getReferenceSequence());
 					first.setMatePosition(second.getPosition());
 				}
-				
+
 				//merge pairs?
 				if (mergePairedAlignments) {
 					//same chromosome?
@@ -429,7 +435,7 @@ public class SamTranscriptomeParser{
 		//trim them of soft clipped info
 		first.trimMaskingOfReadToFitAlignment();
 		second.trimMaskingOfReadToFitAlignment();
-		
+
 		//look for bad CIGARs
 		if (CIGAR_BAD.matcher(first.getCigar()).matches()) Misc.printErrAndExit("\nError: unsupported cigar string! See -> "+first.toString()+"\n");
 		if (CIGAR_BAD.matcher(second.getCigar()).matches()) Misc.printErrAndExit("\nError: unsupported cigar string! See -> "+second.toString()+"\n");
@@ -439,50 +445,50 @@ public class SamTranscriptomeParser{
 		int stopBaseFirst = startBaseFirst + countLengthOfCigar(first.getCigar());
 		int startBaseSecond = second.getPosition();
 		int stopBaseSecond = startBaseSecond + countLengthOfCigar(second.getCigar());
-		
+
 		//make arrays to hold sequence and qualities
 		int start = startBaseFirst;
 		if (startBaseSecond < start) start = startBaseSecond;
 		int stop = stopBaseFirst;
 		if (stopBaseSecond > stop) stop = stopBaseSecond;
 		int size = stop-start;
-	
+
 		SamLayout firstLayout = new SamLayout(size);
 		SamLayout secondLayout = new SamLayout(size);
-		
+
 		//layout data
 		firstLayout.layoutCigar(start, first);
 		secondLayout.layoutCigar(start, second);
-		
 
-		
+
+
 		//merge layouts, modifies original layouts so print first if you want to see em before mods.
 		SamLayout mergedSamLayout = SamLayout.mergeLayouts(firstLayout, secondLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);
 
 		if (mergedSamLayout == null) {
 			//if (true){
 
-				
+
 				//add failed merge tag
 				first.addMergeTag(false);
 				second.addMergeTag(false);
-				
+
 			return null;
 		}
-		
+
 		else {
 			//calculate overlap
 			int[] overNonOver = SamLayout.countOverlappingBases(firstLayout, secondLayout);
 			numberOverlappingBases+= overNonOver[0];
 			numberNonOverlappingBases+= overNonOver[1];
-			
+
 			//make merged
 			SamAlignment mergedSam = makeSamAlignment(first, second, mergedSamLayout, start);
 			return mergedSam;
 		}
-		
+
 	}*/
-	
+
 	/**Attempts to merge alignments. Doesn't check if proper pairs!  Returns null if it cannot. This modifies the input SamAlignments so print first before calling*/
 	private SamAlignment mergePairedAlignments(SamAlignment first, SamAlignment second) {
 		//trim them of soft clipped info
@@ -558,7 +564,7 @@ public class SamTranscriptomeParser{
 
 	}
 
-	public void printSam(SamAlignment sam, int numberRepeats){
+	public void printSam(SamAlignment sam, int numberRepeats) throws IOException{
 		numberPrintedAlignments++;
 		//add/ replace IH tag for number of "Number of stored alignments in SAM that contains the query in the current record"
 		sam.addRepeatTag(numberRepeats);
@@ -609,36 +615,26 @@ public class SamTranscriptomeParser{
 
 	public ArrayList<String> fetchSamHeader() {
 		ArrayList<String> al = new ArrayList<String>();
-
-		if (replacementHeader !=null){
-			String[] lines = IO.loadFile(replacementHeader);
-			for (String l: lines) al.add(l);
-			//add program
-			al.add("@PG\tID:SamTranscriptomeParser\tCL: args "+programArguments);
-		}
-		else {
-			//add unsorted
-			al.add("@HD\tVN:1.0\tSO:unsorted");
-			//add program
-			al.add("@PG\tID:SamTranscriptomeParser\tCL: args "+programArguments);
-			//add readgroup
-			al.add("@RG\tID:unknownReadGroup\tSM:unknownSample");
-			//as sq lines for each chromosome @SQ	SN:chr10	AS:mm9	LN:129993255
-			String gv = "";
-			if (genomeVersion != null) gv = "\tAS:" +genomeVersion;
-			//remove = chromosomes
-			chromLength.remove("=");
-			for (String chromosome: chromLength.keySet()){
-				int length = chromLength.get(chromosome);
-				al.add("@SQ\tSN:"+chromosome+ gv+ "\tLN:"+length);
-			}
+		//add unsorted
+		al.add("@HD\tVN:1.0\tSO:unsorted");
+		//add program
+		al.add("@PG\tID:SamTranscriptomeParser\tCL: args "+programArguments);
+		//add readgroup
+		al.add("@RG\tID:unknownReadGroup\tSM:unknownSample");
+		//as sq lines for each chromosome @SQ	SN:chr10	AS:mm9	LN:129993255
+		String gv = "";
+		if (genomeVersion != null) gv = "\tAS:" +genomeVersion;
+		//remove = chromosomes
+		chromLength.remove("=");
+		for (String chromosome: chromLength.keySet()){
+			int length = chromLength.get(chromosome);
+			al.add("@SQ\tSN:"+chromosome+ gv+ "\tLN:"+length);
 		}
 		return al;
 	}
 
 	public void addHeaderAndCompress() throws IOException{
-		File gzippedFile = new File (saveFile+".gz");
-		Gzipper gz = new Gzipper(gzippedFile);
+		Gzipper gz = new Gzipper(saveFile);
 
 		//add header lines
 		ArrayList<String> header = fetchSamHeader();
@@ -651,32 +647,39 @@ public class SamTranscriptomeParser{
 		gz.close();
 
 		//delete old files
-		saveFile.delete();
 		outputFile.delete();
 	}
 
 	public void addHeaderAndSort() throws IOException{
-		File headerFile = new File (saveFile+"_temp.sam");
-		PrintWriter out = new PrintWriter(new FileWriter(headerFile));
 
-		//add header lines
-		ArrayList<String> header = fetchSamHeader();
-		for (String s : header) out.println(s);
+		//if no header need to add header and copy over sam data
+		File toSortFile;
+		if (replacementHeader == null){
 
-		//add file contents
-		BufferedReader in = new BufferedReader (new FileReader(outputFile));
-		String line;
-		while ((line = in.readLine()) != null) out.println(line);
+			toSortFile = new File (saveFile+"_temp.sam");
+			PrintWriter out = new PrintWriter(new FileWriter(toSortFile));
 
-		//close 
-		in.close();
-		out.close();
+			//add header lines
+			ArrayList<String> header = fetchSamHeader();
+			for (String s : header) out.println(s);
+
+			//add file contents
+			BufferedReader in = IO.fetchBufferedReader(outputFile);
+			String line;
+			while ((line = in.readLine()) != null) out.println(line);
+
+			//close 
+			in.close();
+			out.close();
+
+		}
+		else toSortFile = outputFile;
 
 		//sort and convert to BAM
-		new PicardSortSam (headerFile, saveFile);
+		new PicardSortSam (toSortFile, saveFile);
 
 		//delete old files
-		headerFile.delete();
+		toSortFile.delete();
 		outputFile.delete();
 	}
 
@@ -694,6 +697,7 @@ public class SamTranscriptomeParser{
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		File forExtraction = null;
+		File replacementHeaderFile = null;
 		String useqVersion = IO.fetchUSeqVersion();
 		programArguments = useqVersion+" "+Misc.stringArrayToString(args, " ");
 		if (verbose) System.out.println("\n"+useqVersion+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
@@ -709,7 +713,7 @@ public class SamTranscriptomeParser{
 					case 'r': reverseStrand = true; break;
 					case 'u': saveUnmappedAndFailedScore = true; break;
 					case 's': saveFile = new File(args[++i]); break;
-					case 'h': replacementHeader = new File(args[++i]); break;
+					case 'h': replacementHeaderFile = new File(args[++i]); break;
 					case 'c': removeControlAlignments = false; break;
 					case 'b': reverseBoth = true; break;
 					case 'd': randomPickAlignment = true; break;
@@ -744,13 +748,10 @@ public class SamTranscriptomeParser{
 
 		//check save file
 		if (saveFile != null){
-			try {
-				saveFile.createNewFile();
-			} catch (IOException e) {
-				e.printStackTrace();
-			}
-			if (saveFile.canWrite() == false) Misc.printErrAndExit("\nError: cannot create or modify your indicated save file -> "+saveFile);
 			if (saveFile.getName().endsWith(".sam") == false && saveFile.getName().endsWith(".bam") == false)  Misc.printErrAndExit("\nError: your indicated save file must end with xxx.sam or xxx.bam -> "+saveFile);
+			if (saveFile.getName().endsWith(".sam") ){
+				saveFile = new File (saveFile.getParentFile(), saveFile.getName()+".gz");
+			}
 		}
 		else {
 			String saveFileString;
@@ -762,6 +763,21 @@ public class SamTranscriptomeParser{
 			if (minimumMappingQualityScore !=0) mq = ((int)minimumMappingQualityScore)+"MQ";
 			saveFile = new File (saveFileString+"_STP"+mq+maxMatches+"N"+randomSelected+(int)maximumAlignmentScore+"A.bam");
 		}
+
+		//load header?
+		if (replacementHeaderFile != null){
+			StringBuilder sb = new StringBuilder();
+			String[] lines = IO.loadFile(replacementHeaderFile);
+			if (lines.length ==0) Misc.printErrAndExit("\nError: replacement header contains no comment lines?\n");
+			for (String l: lines) {
+				sb.append(l);
+				sb.append("\n");
+			}
+			//add program
+			sb.append("@PG\tID:SamTranscriptomeParser\tCL: args "+programArguments);
+			replacementHeader = sb.toString();
+		}
+
 
 		//print info
 		if (verbose) {
@@ -783,7 +799,7 @@ public class SamTranscriptomeParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Sam Transcriptome Parser: Feb 2013                      **\n" +
+				"**                          Sam Transcriptome Parser: May 2013                      **\n" +
 				"**************************************************************************************\n" +
 				"STP takes SAM alignment files that were aligned against chromosomes and extended\n" +
 				"splice junctions (see MakeTranscriptome app), converts the coordinates to genomic\n" +
@@ -810,7 +826,7 @@ public class SamTranscriptomeParser{
 				"      needed for proper same strand visualization of paired stranded Illumina data.\n"+
 				"-b Reverse the strand of both pairs.  Use this option if you would like the orientation\n" +
 				"      of the alignments to match the orientation of the annotation in Illumina stranded \n" +
-				"      UTP sequencing.  This is purely cosmetic and isn't necessary for downstream pipelines\n" +
+				"      UTP sequencing.\n" +
 				"-u Save unmapped reads and those that fail the alignment score.\n"+
 				"-c Don't remove chrAdapt and chrPhiX alignments.\n"+
 				"-p Merge proper paired unique alignments. Those that cannot be unambiguously merged\n" +
