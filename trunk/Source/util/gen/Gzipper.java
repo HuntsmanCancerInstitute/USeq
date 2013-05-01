@@ -73,8 +73,9 @@ public class Gzipper {
 		}
 	}
 	
+	/**Prints txt, txt.gz, or txt.zip*/
 	public void print(File file) throws IOException{
-		BufferedInputStream in = new BufferedInputStream(new FileInputStream(file));
+		BufferedInputStream in = new BufferedInputStream(IO.fetchInputStream(file));
 		//add file contents
 		byte[] buf = new byte[1024];
 		int i;

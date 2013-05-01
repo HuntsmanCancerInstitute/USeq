@@ -1,3 +1,8 @@
+----USeq_8.5.8----
+SamTranscriptomeParser
+* Modified app to gzip temp files and when a header is provided to directly write out the results without an intermediate file.  Should cut down on disk usage.
+
+
 ----USeq_8.5.7----
 MultiSampleVCFFilter
 * Added option to filter on VQSLOD scores
