@@ -45,7 +45,6 @@ public class Autoaligner {
 	private HashMap<String, String> genomeIndex;
 	private static boolean doNotAlign = false;
 	private static boolean isSmallRNA = false;
-	private static String refSeqFile = "/tomato/data/hg19.fasta";
 
 	//constructor
 	public Autoaligner(String[] args) {	
@@ -268,11 +267,11 @@ public class Autoaligner {
 		File alignDir = new File(path + "rawAlignments");
 		File bamDir = new File(path + "processedAlignments");
 		File coverageDir = new File(path + "coverageTracks");
-		File logsDir = new File(path + "logs");
+		File qcDir = new File(path + "QC");
 		alignDir.mkdir();
 		coverageDir.mkdir();
 		bamDir.mkdir();
-		logsDir.mkdir();
+		qcDir.mkdir();
 		
 		brCleanup.close();
 		//call method that creates the cmd.txt file
@@ -552,7 +551,7 @@ public class Autoaligner {
 	 */
 	public String getCmdFileMessageGenomic(Sample s) {
 		s.setParams(" [-o SAM -r None -a " + s.getRead1Adapter() + " " + s.getRead2Adapter() +
-				" -H -k]");
+				" -H -k]" + "\n\nmv *.zip QC/");
 		return s.getParams();
 	}
 
@@ -567,7 +566,7 @@ public class Autoaligner {
 				" for " + s.getRequester() + " in the " + s.getLab() + "Lab " + "\n\n@align -novoalign " +
 				"[-o SAM -r Random -t 240 -h 120 -b 2] -i " + s.getSampleID() + "*.txt.gz -g " 
 				+ s.getNovoindex() + " -p bisulphite -gzip" 
-				+ "\n\nrm *_" + s.getFastqFile1() + " *_" + s.getFastqFile2() + "\n\nmv *.zip logs/");
+				+ "\n\nrm *_" + s.getFastqFile1() + " *_" + s.getFastqFile2() + "\n\nmv *.zip QC/");
 		return s.getParams();	
 	}
 
@@ -579,7 +578,8 @@ public class Autoaligner {
 	public String getCmdFileMessageSmallRNA(Sample s) {
 		//includes 3' adapter stripping prior to alignment
 		//***this is NOT the standard Illumina Gex Adapter 2 used as default by novoalign
-		s.setParams(" [-o SAM -r All 50 -m -a ATCTCGTATGCCGTCTTCTGCTTG -l 15 -t 30]");
+		s.setParams(" [-o SAM -r All 50 -m -a ATCTCGTATGCCGTCTTCTGCTTG -l 15 -t 30]" 
+				+ "\n\nmv *.zip QC/");
 		return s.getParams();
 	}
 
@@ -590,7 +590,8 @@ public class Autoaligner {
 	 */
 	public String getCmdFileMessageStdParams(Sample s) {
 		//stranded and paired-end
-			s.setParams(" [-o SAM -r All 50 -a " + s.getRead1Adapter() + " " + s.getRead2Adapter() + "]");
+			s.setParams(" [-o SAM -r All 50 -a " + s.getRead1Adapter() + " " + s.getRead2Adapter() + "]"
+					+ "\n\nmv *.zip QC/");
 		return s.getParams(); 
 	}
 
