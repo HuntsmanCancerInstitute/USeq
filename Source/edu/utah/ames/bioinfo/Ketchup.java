@@ -19,8 +19,8 @@ import util.gen.Misc;
  * This class identifies users in the Tomato jobs directory, creates a User object for
  * each, and then for each user, finds and stores their associated email
  * addresses to be used for notification of impending file deletion. Files are grouped into
- * either warnFiles or deleteFiles based on size and lastModifiedDate. Emails users
- * who have warnFiles and/or deleteFiles that they have files pending deletion.
+ * either warnFiles or deleteFiles based on size and lastModifiedDate. Soft linked files are
+ * skipped. Users with warnFiles and/or deleteFiles are emailed a list of offending files.
  * 
  * @author darren.ames@hci.utah.edu
  */
@@ -115,7 +115,28 @@ public class Ketchup {
 		}
 		return files;
 	}
-
+	
+	/**
+	 * Tests if a file is a symbolic (soft) link
+	 * @param file
+	 * @return
+	 * @throws IOException
+	 */
+	public boolean isSymlink(File file) throws IOException {
+		if (file == null) {
+			throw new NullPointerException("File must not be null");
+		}
+		File canon;
+		if (file.getParent() == null) {
+			canon = file;
+		}
+		else {
+			File canonDir = file.getParentFile().getCanonicalFile();
+			canon = new File(canonDir, file.getName());
+		}
+		return !canon.getCanonicalFile().equals(canon.getAbsoluteFile());
+	}
+	
 	/**
 	 * Compares file last modified dates to see if action is necessary.
 	 * @param user
@@ -125,30 +146,33 @@ public class Ketchup {
 	public void checkFile(User user, File fileObject) {
 
 		try {
-			//is the file too big?
-			if (fileObject.length() > fileSize) {
-				//Long fileDate = fileDates.get(f);
-				Long fileDate = Long.valueOf(fileObject.lastModified());
+			//check to make sure file is not a soft-link, otherwise it follows the path regardless
+			if (!this.isSymlink(fileObject)) {
+				//is the file too big?
+				if (fileObject.getCanonicalFile().length() > fileSize) {
+					//Long fileDate = fileDates.get(f);
+					Long fileDate = Long.valueOf(fileObject.lastModified());
 
-				//check for fileDate, if null, set to current time
-				if (fileDate == null) {
-					fileDate = System.currentTimeMillis();
-					fileDates.put(fileObject, fileDate);
-				} else {
-					//warn cutoff? >=10 days ago && < 17 days ago
-					if ((fileDate.longValue() <= warnDate)
-							&& (fileDate.longValue() > deleteDate))
-						//add fileObject to warnFiles ArrayList
-						user.getWarnFiles().add(fileObject);
-					else {
-						//delete cutoff >=17 days ago
-						if (fileDate.longValue() <= deleteDate)
-							//add fileObject to deleteFiles ArrayList
-							user.getDeleteFiles().add(fileObject);
-					}
-					if (todayDate.after(startDate)) {
-						//****uncomment this to start deleting offending files****
-						//fileObject.deleteOnExit();
+					//check for fileDate, if null, set to current time
+					if (fileDate == null) {
+						fileDate = System.currentTimeMillis();
+						fileDates.put(fileObject, fileDate);
+					} else {
+						//warn cutoff? >=10 days ago && < 17 days ago
+						if ((fileDate.longValue() <= warnDate)
+								&& (fileDate.longValue() > deleteDate))
+							//add fileObject to warnFiles ArrayList
+							user.getWarnFiles().add(fileObject);
+						else {
+							//delete cutoff >=17 days ago
+							if (fileDate.longValue() <= deleteDate)
+								//add fileObject to deleteFiles ArrayList
+								user.getDeleteFiles().add(fileObject);
+						}
+						if (todayDate.after(startDate)) {
+							//****uncomment this to start deleting offending files****
+							//fileObject.deleteOnExit();
+						}
 					}
 				}
 			}

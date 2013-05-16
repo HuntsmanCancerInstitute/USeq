@@ -31,8 +31,13 @@ public class Sample {
 	private String projectName;
 	private String sampleID;
 	private String sequenceLaneNumber;
-	private String fastqFileName;
-	private String adapterSequence;
+	private String read1Adapter;
+	private String read2Adapter;
+	private String fastqFilePath;
+	private String fastqFilePath1;
+	private String fastqFilePath2;
+	private String fastqFile1;
+	private String fastqFile2;
 	
 	//index fields
 	public static final int laneIndex = 8;
@@ -50,16 +55,17 @@ public class Sample {
 	public static final int requestYearIndex = 12;
 	public static final int requesterEmailIndex = 13;
 	public static final int sequenceLaneNumberIndex = 14;
-	public static final int fastqFileNameIndex = 15;
-	public static final int adapterSequenceIndex = 16;
+	public static final int read1AdapterIndex = 15;
+	public static final int read2AdapterIndex = 16;
+	public static final int fastqFilePathIndex = 17;
 	
 	//worker fields
+	private String fastqFileName;
 	private String sequencingApplication;
 	private String versionedGenome;
 	private String labNum;
 	private String buildCode;
 	private String sampleInfo;
-	private String fastqFilePath;
 	private String analysisNumber;
 	private String analysisNumberPath;
 	private String cmdFilePath;
@@ -97,16 +103,9 @@ public class Sample {
 		requestYear = dataValue[requestYearIndex];
 		requesterEmail = dataValue[requesterEmailIndex];
 		sequenceLaneNumber = dataValue[sequenceLaneNumberIndex];
-		fastqFileName = dataValue[fastqFileNameIndex];
-		adapterSequence = dataValue[adapterSequenceIndex];
-	}
-
-	public String getFastqFilePath() {
-		return fastqFilePath;
-	}
-
-	public void setFastqFilePath(String fastqFilePath) {
-		this.fastqFilePath = fastqFilePath;
+		read1Adapter = dataValue[read1AdapterIndex];
+		read2Adapter = dataValue[read2AdapterIndex];
+		fastqFilePath = dataValue[fastqFilePathIndex];
 	}
 
 	public String getCmdFilePath() {
@@ -437,6 +436,14 @@ public class Sample {
 		this.reverseStrand = reverseStrand;
 	}
 
+	public String getFastqFilePath() {
+		return fastqFilePath;
+	}
+
+	public void setFastqFilePath(String fastqFilePath) {
+		this.fastqFilePath = fastqFilePath;
+	}
+
 	public String getFastqFileName() {
 		return fastqFileName;
 	}
@@ -445,11 +452,51 @@ public class Sample {
 		this.fastqFileName = fastqFileName;
 	}
 
-	public String getAdapterSequence() {
-		return adapterSequence;
+	public String getRead1Adapter() {
+		return read1Adapter;
 	}
 
-	public void setAdapterSequence(String adapterSequence) {
-		this.adapterSequence = adapterSequence;
+	public void setRead1Adapter(String read1Adapter) {
+		this.read1Adapter = read1Adapter;
+	}
+
+	public String getRead2Adapter() {
+		return read2Adapter;
+	}
+
+	public void setRead2Adapter(String read2Adapter) {
+		this.read2Adapter = read2Adapter;
+	}
+
+	public String getFastqFilePath1() {
+		return fastqFilePath1;
+	}
+
+	public void setFastqFilePath1(String fastqFilePath1) {
+		this.fastqFilePath1 = fastqFilePath1;
+	}
+
+	public String getFastqFilePath2() {
+		return fastqFilePath2;
+	}
+
+	public void setFastqFilePath2(String fastqFilePath2) {
+		this.fastqFilePath2 = fastqFilePath2;
+	}
+
+	public String getFastqFile1() {
+		return fastqFile1;
+	}
+
+	public void setFastqFile1(String fastqFile1) {
+		this.fastqFile1 = fastqFile1;
+	}
+
+	public String getFastqFile2() {
+		return fastqFile2;
+	}
+
+	public void setFastqFile2(String fastqFile2) {
+		this.fastqFile2 = fastqFile2;
 	}
 }
