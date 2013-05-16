@@ -32,31 +32,19 @@ import util.gen.Misc;
 public class Autoaligner {
 
 	//fields
-	//private static String requestNum; 
 	private static String analysisNumber;
 	private static String myEmail = "darren.ames@hci.utah.edu"; //TODO change this when I know it works correctly
-	//bio3 private static String autoalignReport = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoalign_*.txt";
-	private static String autoalignReport = "/tomato/job/autoaligner/reports/autoalign_*.txt";
-	//laptop private static String autoalignReport = "/Users/darren/Desktop/novoalignerTestDir/reports/autoalign_*.txt";
-	//bio3 private static String novoindexNames = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData/novoindexNameTable.txt";
-	private static String novoindexNames = "/tomato/job/autoaligner/autoAlignerData/novoindexNameTable.txt";
-	//laptop private static String novoindexNames = "/Users/darren/Desktop/novoalignerTestDir/novoindexNameTable.txt";
-	//bio3 private static String parsedFreshDataReports = "/home/sbsuser/Pipeline/AutoAlignReport/reports/processedReports/";
-	//laptop private static String parsedFreshDataReports = "/Users/darren/Desktop/novoalignerTestDir/processedReports/";
-	private static String parsedFreshDataReports = "/tomato/job/autoaligner/processedReports/";
-	//private static String requestYear;
+	private static String autoalignReport = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoalign_*.txt";
+	private static String novoindexNames = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData/novoindexNameTable.txt";
+	private static String parsedFreshDataReports = "/home/sbsuser/Pipeline/AutoAlignReport/reports/processedReports/";
 	private static String tomatoJobDir = "/tomato/job/autoaligner/alignments/";
-	//laptop private static String tomatoJobDir = "/Users/darren/Desktop/novoalignerTestDir/alignments/";
 	private String smtpHostName = "mail.inscc.utah.edu"; //default
 	static String EMAILREGEX = "^#e\\s+(.+@.+)"; //email address pattern
 	static String LABNAMEREGEX = "\\w+\\s\\w+(?=\\WLab)"; //matches first and last name of lab using positive look
-	//bio3 private static String reportsDir = "/home/sbsuser/Pipeline/AutoAlignReport/reports/";
-	private static String reportsDir = "/tomato/job/autoaligner/reports/";
-	//laptop private static String reportsDir = "/Users/darren/Desktop/novoalignerTestDir/reports/";
+	private static String reportsDir = "/home/sbsuser/Pipeline/AutoAlignReport/reports/";
 	private HashMap<String, String> genomeIndex;
 	private static boolean doNotAlign = false;
 	private static boolean isSmallRNA = false;
-	//private static boolean hasNovoindex = true;
 	private static String refSeqFile = "/tomato/data/hg19.fasta";
 
 	//constructor
@@ -128,14 +116,38 @@ public class Autoaligner {
 			String dataValue[] = line.split("\t");
 
 			//check for correct number of columns in fresh data report
-			if (dataValue.length < 16) {
+			if (dataValue.length < 18) {
 				continue;
 			}
 			else {
 				Sample s = new Sample(dataValue);
-				String path = "/Repository/MicroarrayData/" + s.getRequestYear() + "/" + s.getRequestNumber()
-						+ "/Fastq/";
-				s.setFastqFilePath(path);
+				
+				//if paired-end
+				if (s.getSingleOrPairedEnd().toString().equals("Paired-end reads")) {
+					s.setPairedEnd(true);
+					//split comma-separated file into 2 groups
+					Pattern p = Pattern.compile("(.+?),*(.*)");
+					Matcher m = p.matcher(s.getFastqFilePath());
+					if (m.find()) {
+						//set file1 and file2 names and paths
+						s.setFastqFilePath1(m.group(1));
+						s.setFastqFilePath2(m.group(2));
+						String p1 = s.getFastqFilePath1();
+						String p2 = s.getFastqFilePath2();
+						String f1 = new File(p1).getName();
+						String f2 = new File(p2).getName();
+						s.setFastqFile1(f1);
+						s.setFastqFile2(f2);
+					}
+				}
+				//single-end
+				else {
+					//set fastq file name
+					String path = s.getFastqFilePath();
+					String fastqFileName = new File(path).getName();
+					s.setFastqFileName(fastqFileName);
+				}
+				
 				//parse out "Lab" from lab name string
 				Pattern p = Pattern.compile(".+(?=Lab)");
 				Matcher m = p.matcher(s.getLab());
@@ -208,9 +220,7 @@ public class Autoaligner {
 				"-genomeBuild", s.getBuildCode(), "-analysisType", "Alignment", "-seqLane", s.getSequenceLaneNumber()};
 
 		//launch the script and grab stdin/stdout and stderr
-		//bio3 Process process = Runtime.getRuntime().exec(cmd, null, new File("/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData/"));
-		Process process = Runtime.getRuntime().exec(cmd, null, new File("/tomato/job/autoaligner/autoAlignerData/"));
-		//laptop Process process = Runtime.getRuntime().exec(cmd, null, new File("/Users/darren/Desktop/novoalignerTestDir/create_analysis/"));
+		Process process = Runtime.getRuntime().exec(cmd, null, new File("/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData/"));
 		stderr = process.getErrorStream();
 		stdout = process.getInputStream();
 
@@ -448,14 +458,19 @@ public class Autoaligner {
 	 * @throws IOException
 	 */
 	public void softLinkFiles(Sample s, String dirPath) throws IOException {
-
-		//dir path where fastq files are located
-		File dir = new File("/Repository/MicroarrayData/" + s.getRequestYear() + "/" + s.getRequestNumber()
-				+ "/Fastq/");
+		
+		//job folder
 		String jobDirPath = tomatoJobDir + s.getRequestNumber() + "/" + s.getSampleID();
 
-		Process process = Runtime.getRuntime().exec(new String[] {"ln", "-s", (dir.toString() + "/" 
-				+ s.getFastqFileName()), jobDirPath});
+		//paired-end reads?
+		if (s.isPairedEnd() == true) {
+			Process p1 = Runtime.getRuntime().exec(new String[] {"ln", "-s", s.getFastqFilePath1(), jobDirPath});
+			Process p2 = Runtime.getRuntime().exec(new String[] {"ln", "-s", s.getFastqFilePath2(), jobDirPath});
+		}
+		//single-end reads
+		else {
+			Process process = Runtime.getRuntime().exec(new String[] {"ln", "-s", s.getFastqFilePath(), jobDirPath});
+		}
 	}
 	
 	/**
@@ -470,26 +485,22 @@ public class Autoaligner {
 	 */
 	public String getCmdFileMsgGen(Sample s) throws IOException, InterruptedException {
 
-		//set name for input fastq files
-		String pairedInputFile1 = s.getSampleID() + "_*1.txt.gz";
-		String pairedInputFile2 = s.getSampleID() + "_*2.txt.gz";
-
 		//set string for non-variable part of cmd.txt params
 		String msg = "#e " + myEmail + " -ef" + "\n#a " + s.getAnalysisNumber() + "\n## Novoalignments of " 
 				+ s.getRequestNumber() + " " + s.getProjectName() + "\n## Aligning to " 
 				+ s.getBuildCode() + " for " + s.getRequester() + " in the " + s.getLab() + "Lab "
-				+ "\n\n./FastQC/fastqc " + s.getFastqFileName() + " --noextract" 
-				+ "\n\n@align -novoalign " + "-g " + s.getNovoindex() + " -i " + s.getFastqFileName() + " -gzip ";
+				+ "\n\n./FastQC/fastqc " + s.getSampleID() + "*.gz" + " --noextract" 
+				+ "\n\n@align -novoalign " + "-g " + s.getNovoindex() + " -i " + s.getSampleID() + "*.gz"
+				+ " -gzip ";
 		
 		//command string for splitting bisulfite files and preparing dirs for alignment
 		//***TODO substitute requester email for mine when I know it works***
 		
-		//****TODO**** Check to see how paired-end filenames are specified. file1/file2 may not be necessary
 		String bisulfiteMsg = "#e" + myEmail + " -ef" + "\n#a " + s.getAnalysisNumber() + "\n## Splitting bisulfite fastq files of " 
 				+ s.getRequestNumber() + " " + s.getProjectName() + " for " + s.getRequester() + " in the "
-				+ s.getLab() + "Lab " + "\n\n./FastQC/fastqc " + s.getFastqFileName() + " --noextract" 
-				+ "\n\nFileSplitter.jar" + " -f " + pairedInputFile1 + " -n 100000000 " + "-g"
-				+ "\n\nFileSplitter.jar" + " -f " + pairedInputFile2 + " -n 100000000 " + "-g"
+				+ s.getLab() + "Lab " + "\n\n./FastQC/fastqc " + s.getSampleID() + "*.gz" + " --noextract" 
+				+ "\n\nFileSplitter.jar" + " -f " + s.getFastqFile1() + " -n 100000000 " + "-g"
+				+ "\n\nFileSplitter.jar" + " -f " + s.getFastqFile2() + " -n 100000000 " + "-g"
 				+ "\n\nfor i in *_" + s.getSampleID() + "*; do n=${i%_" + s.getSampleID() + "_*}; mkdir $n; " 
 				+ "mv $i $n; cp bisAlignWait.txt $n; mv $n/bisAlignWait.txt $n/cmd.txt; touch $n/b; done\n";
 
@@ -540,8 +551,8 @@ public class Autoaligner {
 	 * @return
 	 */
 	public String getCmdFileMessageGenomic(Sample s) {
-		s.setParams(" [-o SAM -r None -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCAC " +
-				"AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT -H -k]");
+		s.setParams(" [-o SAM -r None -a " + s.getRead1Adapter() + " " + s.getRead2Adapter() +
+				" -H -k]");
 		return s.getParams();
 	}
 
@@ -551,12 +562,12 @@ public class Autoaligner {
 	 * @return
 	 */
 	public String getCmdFileMessageBisulfite(Sample s) {
-		//TODO check fastqFileName to make sure it's reported correctly***
 		s.setParams("#e " + myEmail + "\n#a " + s.getAnalysisNumber() + "\n## Novoalignments of " + 
 				s.getRequestNumber() + " " + s.getProjectName() + "\n## Aligning to " + s.getBuildCode() +
 				" for " + s.getRequester() + " in the " + s.getLab() + "Lab " + "\n\n@align -novoalign " +
-				"[-o SAM -r Random -t 240 -h 120 -b 2] -i *.txt.gz -g " + s.getNovoindex() + " -p bisulphite -gzip" +
-				"\n\nrm *_" + s.getFastqFileName() + "\n\nmv *.zip logs/");
+				"[-o SAM -r Random -t 240 -h 120 -b 2] -i " + s.getSampleID() + "*.txt.gz -g " 
+				+ s.getNovoindex() + " -p bisulphite -gzip" 
+				+ "\n\nrm *_" + s.getFastqFile1() + " *_" + s.getFastqFile2() + "\n\nmv *.zip logs/");
 		return s.getParams();	
 	}
 
@@ -579,7 +590,7 @@ public class Autoaligner {
 	 */
 	public String getCmdFileMessageStdParams(Sample s) {
 		//stranded and paired-end
-			s.setParams(" [-o SAM -r All 50]");
+			s.setParams(" [-o SAM -r All 50 -a " + s.getRead1Adapter() + " " + s.getRead2Adapter() + "]");
 		return s.getParams(); 
 	}
 
