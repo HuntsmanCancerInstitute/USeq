@@ -109,7 +109,7 @@ public class DefinedRegionBisSeq {
 	/**Writes out an excel compatible tab delimited spreadsheet with hyperlinks for IGB.*/
 	public void printSpreadSheet(){
 		try{
-			File file = new File(saveDirectory, regionsFileName+"_DRSSMinRC"+minimumReadCoverage+".xls");
+			File file = new File(saveDirectory, regionsFileName+"_DRBSMinRC"+minimumReadCoverage+".xls");
 			PrintWriter out = new PrintWriter (new FileWriter (file));
 			//print header line
 			out.println("#"+genomeVersion+"_IGBHyperLinks\tChr\tStart\tStop\tPseMedianLog2Ratio\tFDR\t#Obs\t#TCon\t#TNonCon\t#CCon\t#CNonCon\tPseMedianLog2TFractions\tPseMedianLog2CFractions");

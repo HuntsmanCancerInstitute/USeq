@@ -24,6 +24,7 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 	private SAMRecord sam;
 	private NovoalignBisulfiteParser parser;
 	private String cigar;
+	private int minScore;
 	
 	char[] refSeqChar = null;
 	char[] sequenceChar = null;
@@ -48,7 +49,8 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 			baseQualities = sam.getBaseQualityString();
 			cigar = sam.getCigarString();
 			this.parser = parser;
-
+			minScore = parser.getMinimumBaseScore();
+			
 			//trim sam info for hard and soft masking
 			trimMaskingOfReadToFitAlignment();
 
@@ -85,6 +87,7 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 		sequence = dis.readUTF().toUpperCase();
 		baseQualities = dis.readUTF();
 		this.parser = parser;
+		minScore = parser.getMinimumBaseScore();
 		String baseCalls ;
 		if (samFormat){
 			String x = dis.readUTF();
@@ -114,8 +117,6 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 	}
 	
 	private void scanSAM(){
-		//System.out.println (readID +" "+cigar+" "+ position+" "+ sequence+" "+ baseQualities+" "+ Misc.stringArrayToString(baseObservations, " "));
-
 			ArrayList<BaseObservation> boALX = null;
 			if (baseObservations[0].equals("CT")) boALX = processLineCTObject(position, sequenceChar, baseScores, baseObservations);
 			else if (baseObservations[0].equals("GA")) boALX = processLineGAObject(position, sequenceChar, baseScores, baseObservations);
@@ -125,8 +126,6 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 	}
 
 	private void scan(){
-		//System.out.println (readID +" "+cigar+" "+ position+" "+ sequence+" "+ baseQualities+" "+ Misc.stringArrayToString(baseObservations, " "));
-
 		//scan for insertions and deletions
 		boolean foundInsertion = false;
 		boolean foundDoubleInsertion = false;
@@ -359,7 +358,13 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 		for (int i=0; i< bases.length; i++){
 			if (bases[i] == 'C'){
 				//check score?
-				if (containsIndels == false && scores[i] < parser.getMinimumBaseScore()) continue;
+				if (containsIndels == false) {
+					if (scores[i] < minScore) {
+						parser.incrementBPFailQual();
+						continue;
+					}
+				}
+				parser.incrementBPPassQual();
 				start = i + position;
 				//watch out for out of bounds sequence due to partial matches to sequence termini
 				if (start < 2 || start > parser.getGenomicSequenceLengthMinus3()) continue;
@@ -380,7 +385,14 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 			if (mat.matches()){
 				int relPos = Integer.parseInt(mat.group(1)) - 1;
 				//check score?
-				if (containsIndels == false && scores[relPos] < parser.getMinimumBaseScore()) continue;
+				if (containsIndels == false) {
+					if (scores[relPos] < minScore) {
+						parser.incrementBPFailQual();
+						continue;
+					}
+				}
+				parser.incrementBPPassQual();
+				
 				start = relPos + position;
 				//watch out for out of bounds sequence due to partial matches to sequence termini
 				if (start < 2 || start > parser.getGenomicSequenceLengthMinus3()) continue;
@@ -413,7 +425,14 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 		for (int i=0; i< bases.length; i++){
 			if (bases[i] == 'G'){
 				//check score?
-				if (containsIndels == false && scores[i] < parser.getMinimumBaseScore()) continue;
+				if (containsIndels == false) {
+					if (scores[i] < minScore) {
+						parser.incrementBPFailQual();
+						continue;
+					}
+				}
+				parser.incrementBPPassQual();
+
 				int start = i + position;
 				//watch out for out of bounds sequence due to partial matches to sequence termini
 				if (start < 2 || start > parser.getGenomicSequenceLengthMinus3()) continue;
@@ -435,7 +454,14 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 			if (mat.matches()){
 				int relPos = Integer.parseInt(mat.group(1)) - 1;
 				//check score?
-				if (containsIndels == false && scores[relPos] < parser.getMinimumBaseScore()) continue;
+				if (containsIndels == false) {
+					if (scores[relPos] < minScore) {
+						parser.incrementBPFailQual();
+						continue;
+					}
+				}
+				parser.incrementBPPassQual();
+
 				int start = relPos + position;
 				//watch out for out of bounds sequence due to partial matches to sequence termini
 				if (start < 2 || start > parser.getGenomicSequenceLengthMinus3()) continue;

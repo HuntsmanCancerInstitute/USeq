@@ -102,6 +102,7 @@ public class VCFParser {
 	private HashMap<String, VCFLookUp> chromosomeVCFRecords = null;
 	private boolean loadRecords = true;
 	private boolean loadSamples = true;
+	private boolean loadInfo = true;
 	//indexs for ripping vcf records
 	int chromosomeIndex= 0;
 	int positionIndex = 1;
@@ -123,10 +124,11 @@ public class VCFParser {
 	//Constructors
 	/**If loadRecords is false then just the header and #CHROM line with sample names is parsed.
 	 * If loadSamples is false then none of the sample info is loaded, just the required vcf fields. */
-	public VCFParser(File vcfFile, boolean loadRecords, boolean loadSamples) {
+	public VCFParser(File vcfFile, boolean loadRecords, boolean loadSamples, boolean loadInfo) {
 		this. vcfFile = vcfFile;
 		this.loadRecords = loadRecords;
 		this.loadSamples = loadSamples;
+		this.loadInfo = loadInfo;
 		parseVCF();
 	}
 	
@@ -175,7 +177,7 @@ public class VCFParser {
 			HashSet<String> chromNames = new HashSet<String>();
 			while ((line=in.readLine()) != null){
 				try {
-					VCFRecord vcf = new VCFRecord(line, this, loadSamples);
+					VCFRecord vcf = new VCFRecord(line, this, loadSamples, loadInfo);
 					records.add(vcf);
 					oldChrom = vcf.getChromosome();
 					chromNames.add(oldChrom);
@@ -194,7 +196,7 @@ public class VCFParser {
 			//load remaining making sure it is sorted
 			while ((line=in.readLine()) != null){
 				try {
-					VCFRecord vcf = new VCFRecord(line, this, loadSamples);
+					VCFRecord vcf = new VCFRecord(line, this, loadSamples, loadInfo);
 					//old chrom
 					if (vcf.getChromosome().equals(oldChrom)){
 						//check position
@@ -234,6 +236,17 @@ public class VCFParser {
 				in.close();
 			} catch (IOException e) {}
 		}
+	}
+	
+	public double calculateTiTvRatio(){
+		double numTransitions = 0;
+		double numTransversions = 0;
+		for (VCFRecord r: vcfRecords) {
+			if (r.isSNP() == false) continue;
+			if (r.isTransition()) numTransitions++;
+			else numTransversions++;
+		}
+		return numTransitions/numTransversions;
 	}
 	
 	/**This reloads the chromosomeVCFRecords HashMap<String (chromosome), VCFLookUp>() with the current vcfRecords. */
@@ -292,7 +305,7 @@ public class VCFParser {
 		setFilterFieldOnAllRecords(VCFRecord.FAIL);
 
 		//for each interrogated region
-		for (String chr: goodRegions.keySet()){
+		for (String chr: goodRegions.keySet()){		
 			VCFLookUp vcf = chromosomeVCFRecords.get(chr);
 			if (vcf == null) continue;
 			//make boolean array representing covered bases

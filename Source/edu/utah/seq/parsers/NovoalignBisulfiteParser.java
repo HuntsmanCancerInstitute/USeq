@@ -24,8 +24,8 @@ public class NovoalignBisulfiteParser{
 	private File convertedCPointDataDirectory;
 	private float minimumPosteriorProbability = 13;
 	private float maximumAlignmentScore = 300;
-	private int minimumBaseScore = 20;
-	private int minimumStandAloneBaseScore = 30;
+	private int minimumBaseScore = 13;
+	private int minimumStandAloneBaseScore = 13;
 	private boolean printBed = false;
 	private boolean uniquesOnly = false;
 	private boolean reverseSecondPairsStrand = true;
@@ -55,6 +55,8 @@ public class NovoalignBisulfiteParser{
 	private long totalNonConvertedCsSequenced = 0;
 	private long bpPairedSequence = 0;
 	private long bpPairedOverlappingSequence = 0;
+	private double bpPassQual = 0;
+	private double bpFailQual = 0;
 	private ArrayList<BaseObservation> boAL = new ArrayList<BaseObservation>();
 	private HashMap<Integer, BaseObservation> firstHM = new HashMap<Integer, BaseObservation>();
 
@@ -141,6 +143,11 @@ public class NovoalignBisulfiteParser{
 		System.out.println(totalConvertedCsSequenced +"\tTotal converted Cs sequenced");
 		double fractionNonConverted = (double)(totalNonConvertedCsSequenced)/(double)(totalNonConvertedCsSequenced+totalConvertedCsSequenced);
 		System.out.println(Num.formatNumber(fractionNonConverted,3) +"\tFraction non converted C's.");
+		
+		System.out.println();
+		double fractionPassQual = bpPassQual / (bpFailQual+ bpPassQual);
+		System.out.println(Num.formatNumber(fractionPassQual,3)+ "\tFraction bp passing quality ("+minimumBaseScore+")"); 
+
 
 		if (bpPairedOverlappingSequence != 0){
 			System.out.println();
@@ -417,7 +424,7 @@ public class NovoalignBisulfiteParser{
 			DataOutputStream dos = null;
 			while ((line = in.readLine()) !=null){
 				//print status blip
-				if (++counter == 25000){
+				if (++counter == 2500000){
 					System.out.print(".");
 					counter = 0;
 				}
@@ -552,7 +559,7 @@ public class NovoalignBisulfiteParser{
 			int numBadLines = 0;
 			while ((line = in.readLine()) !=null){
 				//print status blip
-				if (++counter == 25000){
+				if (++counter == 2500000){
 					System.out.print(".");
 					counter = 0;
 				}
@@ -777,14 +784,6 @@ public class NovoalignBisulfiteParser{
 	}
 
 
-
-
-	/**Returns the score if it's better than the minimum otherwise returns 'x'*/
-	public char checkBase(int score, char base){
-		if (score >= minimumBaseScore) return base;
-		else return 'x';
-	}
-
 	public static void main(String[] args) {
 		if (args.length ==0){
 			printDocs();
@@ -848,7 +847,7 @@ public class NovoalignBisulfiteParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Novoalign Bisulfite Parser: Sept 2012                     **\n" +
+				"**                        Novoalign Bisulfite Parser: May 2013                      **\n" +
 				"**************************************************************************************\n" +
 				"Parses Novoalign single and paired bisulfite sequence alignment files into xxx.bed\n" +
 				"and PointData file formats. Generates several summary statistics on converted and non-\n" +
@@ -870,9 +869,9 @@ public class NovoalignBisulfiteParser{
 				"-q Minimum mapping quality score. Defaults to 13, bigger numbers are more stringent.\n" +
 				"      This is a phred-scaled posterior probability that the mapping position of read\n" +
 				"      is incorrect. For RNASeq data, set this to 0.\n" +
-				"-b Minimum base quality score for reporting a non/converted C, defaults to 20.\n"+
+				"-b Minimum base quality score for reporting a non/converted C, defaults to 13.\n"+
 				"-c Minimum base quality score for reporting a overlapping non/converted C not found\n" +
-				"      in the other pair, defaults to 30.\n"+
+				"      in the other pair, defaults to 13.\n"+
 				"-u Unique alignments only, defaults to all. For SAM format, you need to run the\n" +
 				"      Picard MarkDuplicates app first.\n"+
 
@@ -902,6 +901,14 @@ public class NovoalignBisulfiteParser{
 
 	public String getStrand() {
 		return strand;
+	}
+
+	public void incrementBPPassQual() {
+		bpPassQual++;
+	}
+
+	public void incrementBPFailQual() {
+		bpFailQual++;
 	}	
 
 }
