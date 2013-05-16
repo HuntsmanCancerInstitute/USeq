@@ -23,7 +23,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	private float score = 0;
 	
 	/**Only extracts some of the fields from a record*/
-	public VCFRecord(String record, VCFParser vcfParser, boolean loadSamples) throws Exception{
+	public VCFRecord(String record, VCFParser vcfParser, boolean loadSamples, boolean loadInfo) throws Exception{
 		originalRecord = record;
 		String[] fields = vcfParser.TAB.split(record);
 		if (vcfParser.numberFields !=0){
@@ -41,8 +41,10 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		if (fields[vcfParser.qualityIndex].equals(".")) quality = 0;
 		else quality = Float.parseFloat(fields[vcfParser.qualityIndex]);
 		filter = fields[vcfParser.filterIndex];
-		info = new VCFInfo();
-		info.parseInfoGatk(fields[vcfParser.infoIndex]);
+		if (loadInfo){
+			info = new VCFInfo();
+			info.parseInfoGatk(fields[vcfParser.infoIndex]);
+		}
 		format = fields[vcfParser.formatIndex];
 		
 		if (loadSamples){
@@ -242,6 +244,33 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		}
 		full.append("\n");
 		return full.toString();
+	}
+
+	/**Looks to see if any of the alternates are an A <-> G or T <-> C change. 
+	 * If not returns false.  Note all non SNPs will be false. 
+	 * So you might want to check it first.*/
+	public boolean isTransition() {
+		if (reference.equals("A")){
+			for (String base : alternate){
+				if (base.equals("G")) return true;
+			}
+		}
+		else if (reference.equals("T")){
+			for (String base : alternate){
+				if (base.equals("C")) return true;
+			}
+		}
+		else if (reference.equals("G")){
+			for (String base : alternate){
+				if (base.equals("A")) return true;
+			}
+		}
+		else if (reference.equals("C")){
+			for (String base : alternate){
+				if (base.equals("T")) return true;
+			}
+		}
+		return false;
 	}	
 
 

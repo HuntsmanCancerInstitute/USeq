@@ -1,7 +1,9 @@
 ----USeq_8.5.8----
 SamTranscriptomeParser
 * Modified app to gzip temp files and when a header is provided to directly write out the results without an intermediate file.  Should cut down on disk usage.
-
+NovoalignBisulfiteParser
+* Reduced the default thresholds for minimum base quality to 13.  New bis-seq data is showing reduced qualities (probably due to different calibration) causing some datasets to show a significant reduction in data.
+* Added a fraction bases passing base quality to report out this statistic and flag such cases.
 
 ----USeq_8.5.7----
 MultiSampleVCFFilter

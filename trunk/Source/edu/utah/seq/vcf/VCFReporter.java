@@ -40,7 +40,7 @@ public class VCFReporter {
 
 
 		//Parse the vcf file
-		VCFParser parsedVcf = new VCFParser(this.vcfInFile,true,true);
+		VCFParser parsedVcf = new VCFParser(this.vcfInFile,true,true, true);
 		
 		//Grab the info part of the header
 		HashMap<String,String> infoLines = parsedVcf.getVcfComments().getInfo();

@@ -84,7 +84,7 @@ public class VCFAnnotator {
 
 		//for each file
 
-		VCFParser parsedVCF = new VCFParser(vcfFile, true, true);
+		VCFParser parsedVCF = new VCFParser(vcfFile, true, true, true);
 
 		String[] fileParts = vcfFile.getName().split("\\.(?=[^\\.]+$)");
 

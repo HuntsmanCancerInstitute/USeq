@@ -46,7 +46,7 @@ public class MultiSampleVCFFilter {
 		//for each file
 		System.out.println("\nFile\tFilterType\tStarting#\tEnding#");
 
-		VCFParser parser = new VCFParser(vcfInFile, true, true);
+		VCFParser parser = new VCFParser(vcfInFile, true, true, true);
 		
 		//set everything to pass (note this won't change the original when you print because printing grabs the original record line)?
 		if (failNonPassRecords) {
@@ -108,7 +108,7 @@ public class MultiSampleVCFFilter {
 	private void printSampleNames() {
 		System.out.println("File\tSampleNames");
 
-		VCFParser parser = new VCFParser(vcfOutFile, false, false);
+		VCFParser parser = new VCFParser(vcfOutFile, false, false, false);
 		System.out.println(vcfOutFile.getName()+ "\t"+ Misc.stringArrayToString(parser.getSampleNames(), ","));
 	}
 

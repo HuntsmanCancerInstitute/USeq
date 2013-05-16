@@ -32,7 +32,7 @@ import edu.utah.seq.useq.apps.Text2USeq;
 /**
  * @author Nix
  * */
-public class MethylationArrayScanSeqs {
+public class MethylationArrayScanner {
 
 	//fields
 	private int windowSize = 1000;
@@ -74,7 +74,7 @@ public class MethylationArrayScanSeqs {
 
 	//constructor
 
-	public MethylationArrayScanSeqs(String[] args){	
+	public MethylationArrayScanner(String[] args){	
 		long startTime = System.currentTimeMillis();
 		//set fields
 		processArgs(args);
@@ -465,7 +465,7 @@ public class MethylationArrayScanSeqs {
 			printDocs();
 			System.exit(0);
 		}
-		new MethylationArrayScanSeqs(args);
+		new MethylationArrayScanner(args);
 	}		
 
 	/**This method will process each argument and assign new variables*/
@@ -483,7 +483,6 @@ public class MethylationArrayScanSeqs {
 					case 's': saveDirectory = new File (args[++i]); break;
 					case 't': treatmentPairedSamples = args[++i]; break;
 					case 'c': controlPairedSamples = args[++i]; break;
-					case 'v': versionedGenome = args[++i]; break;
 					case 'w': windowSize = Integer.parseInt(args[++i]); break;
 					case 'o': minimumNumberObservationsInWindow = Integer.parseInt(args[++i]); break;
 					case 'r': numberRandomTrials = Integer.parseInt(args[++i]); break;
@@ -539,7 +538,7 @@ public class MethylationArrayScanSeqs {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Methylation Array Scan Seqs: April 2013                   **\n" +
+				"**                        Methylation Array Scanner: April 2013                     **\n" +
 				"**************************************************************************************\n" +
 				"MASS takes paired sample PointData representing beta values (0-1) from arrays and\n" +
 				"attempts to identify regions with enriched/ reduced signal using a sliding window\n" +
@@ -558,8 +557,6 @@ public class MethylationArrayScanSeqs {
 				"-t Names of the treatment sample directories in -d, comma delimited, no spaces.\n"+
 				"-c Ditto but for the control samples, the ordering is critical and describes how to\n"+
 				"      pair the samples.\n"+
-				"-v Genome version (e.g. H_sapiens_Feb_2009, M_musculus_Jul_2007), see UCSC FAQ,\n"+
-				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
 
 				"\nAdvanced Options:\n"+
 				"-w Window size, defaults to 1000.\n"+
@@ -569,7 +566,7 @@ public class MethylationArrayScanSeqs {
 
 				"\n"+
 
-				"Example: java -Xmx4G -jar pathTo/USeq/Apps/MethylationArrayScanSeqs -s ~/MASS/Res\n" +
+				"Example: java -Xmx4G -jar pathTo/USeq/Apps/MethylationArrayScanner -s ~/MASS/Res\n" +
 				"     -v H_sapiens_Feb_2009 -d ~/MASS/Bar/ -t Early1,Early2,Early3 -c Late1,Late2,Late3\n" +
 				"     -w 1500\n\n" +
 

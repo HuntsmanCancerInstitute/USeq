@@ -44,6 +44,9 @@ public class VCFComparator {
 	private long testBps;
 	private long commonBps;
 	private int numberUnfilteredKeyVariants;
+	private ArrayList<Float> tprAL = new ArrayList<Float>();
+	private ArrayList<Float> fdrAL = new ArrayList<Float>();
+	private ArrayList<ScoredCalls> scoredCallsAL = new ArrayList<ScoredCalls>();
 
 	//constructor
 	public VCFComparator(String[] args){
@@ -83,20 +86,106 @@ public class VCFComparator {
 			//compare calls in common interrogated regions
 			System.out.println("Comparing calls...");
 			thresholdAndCompareCalls();
+			
+			//make scoredCalls
+			scoredCallsAL.add(new ScoredCalls(Misc.removeExtension(vcfTest.getName())));
 
 			//call after comparing!
 			if (saveDirectory != null) printParsedDatasets();
 
 		}
+		
+		//print out composite scoredCalls?
+		if (saveDirectory !=null && scoredCallsAL.size() >1) printScoredCalls();
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
 	}
 
+	private void printScoredCalls() {
+		ScoredCalls[] sc = new ScoredCalls[scoredCallsAL.size()];
+		scoredCallsAL.toArray(sc);
+		
+		//find max row length
+		int maxLength = 0;
+		for (ScoredCalls s: sc){
+			if (s.fdr.length > maxLength) maxLength = s.fdr.length;
+		}
+		
+		//make writer
+		String filter = "All.xls";
+		if (removeSNPs) filter = "NonSNP.xls";
+		else if (removeNonSNPs) filter = "SNP.xls";
+		File f = new File (saveDirectory, "fdrTprSummary"+filter);
+		PrintWriter out;
+		
+		try {
+			out = new PrintWriter( new FileWriter(f));
+			
+			//print header
+			out.print("dFDR\t");
+			out.print(sc[0].name);
+			for (int i=1; i< sc.length; i++){
+				out.print("\tdFDR\t");
+				out.print(sc[i].name);
+			}
+			out.println();
+			
+			//print first row with 1 for fdr
+			out.print("1.0\t");
+			out.print(sc[0].tpr[0]);
+			for (int i=1; i< sc.length; i++){
+				out.print("\t1.0\t");
+				out.print(sc[i].tpr[0]);  
+			}
+			out.println();
+
+			//print data
+			//for each row
+			for (int i=0; i< maxLength; i++){
+				
+				//print first sample
+				if (i>= sc[0].fdr.length) out.print("\t");
+				else {
+					out.print(sc[0].fdr[i]);
+					out.print("\t");
+					out.print(sc[0].tpr[i]);
+				}
+				//for each sample
+				for (int j=1; j< sc.length; j++){
+					//past length?
+					if (i>= sc[j].fdr.length) out.print("\t\t");
+					else {
+						out.print("\t");
+						out.print(sc[j].fdr[i]);
+						out.print("\t");
+						out.print(sc[j].tpr[i]);
+					}
+				}
+				out.println();
+			}
+
+			
+			out.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
+		
+	}
+
 	public void thresholdAndCompareCalls(){
 		//starting totals
 		float totalKey = keyParser.getVcfRecords().length;
+		
+System.out.println("Num in key "+totalKey);		
+		
+		//clear old results
+		tprAL.clear();
+		fdrAL.clear();
 
 		//intersect and split test into matching and non matching
 		intersectVCF();
@@ -142,6 +231,18 @@ public class VCFComparator {
 		}
 		return 0;
 	}
+	
+	private class ScoredCalls{
+		String name;
+		float[] tpr;
+		float[] fdr;
+		
+		public ScoredCalls(String name){
+			this.name = name;
+			tpr = Num.arrayListOfFloatToArray(tprAL);
+			fdr = Num.arrayListOfFloatToArray(fdrAL);
+		}
+	}
 
 	public String formatResults(float threshold, float totalKey, float ratchetFDR, float intTest, float nonIntTest ){
 		StringBuilder sb = new StringBuilder();
@@ -155,7 +256,10 @@ public class VCFComparator {
 		sb.append(nonIntTest/(nonIntTest + intTest)); sb.append("\t");
 		//ratchet fdr (always decreasing or the prior FDR)
 		sb.append(ratchetFDR); sb.append("\t");
+		fdrAL.add(ratchetFDR);
 		//tpr intTest/totalKey
+		float tpr = intTest/totalKey;
+		tprAL.add(tpr);
 		sb.append(intTest/totalKey); sb.append("\t");
 		//fpr nonIntTest/totalKey
 		sb.append(nonIntTest/totalKey); sb.append("\t");
@@ -174,6 +278,7 @@ public class VCFComparator {
 
 		//for each test record
 		for (String chr: testParser.getChromosomeVCFRecords().keySet()){
+System.out.println("\tIntersecting "+chr);			
 			VCFLookUp key = keyParser.getChromosomeVCFRecords().get(chr);
 			VCFLookUp test = testParser.getChromosomeVCFRecords().get(chr);
 			if (key == null) {
@@ -316,17 +421,17 @@ public class VCFComparator {
 		res = commonBps +"\tInterrogated bps in common\n";
 		results.append(res);
 
-		if (keyParser == null){
-			keyParser = new VCFParser(vcfKey, true, true);
-			if (removeNonPass){
+		if (keyParser == null){			
+			keyParser = new VCFParser(vcfKey, true, true, false);
+			if (removeNonPass){				
 				keyParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
 				keyParser.filterVCFRecords(VCFRecord.PASS);
-			}
-			keyParser.appendChr();
+			}			
+			keyParser.appendChr();			
 			if (removeSNPs) keyParser.removeSNPs();
 			if (removeNonSNPs) keyParser.removeNonSNPs();
+			numberUnfilteredKeyVariants = keyParser.getVcfRecords().length;		
 			keyParser.filterVCFRecords(commonRegions);
-			numberUnfilteredKeyVariants = keyParser.getVcfRecords().length;
 		}
 		res = numberUnfilteredKeyVariants +"\tKey variants\n";
 		results.append(res);
@@ -334,12 +439,15 @@ public class VCFComparator {
 		res = keyParser.getVcfRecords().length +"\tKey variants in shared regions\n";
 		results.append(res);
 		
+		res = keyParser.calculateTiTvRatio() +"\tShared key variants Ti/Tv\n";
+		results.append(res);
+		
 		if (keyParser.getVcfRecords().length == 0) {
 			System.out.println(results);
 			Misc.printErrAndExit("\nNo key variants in shared regions? Aboring.\n");
 		}
 
-		testParser = new VCFParser(vcfTest, true, true);
+		testParser = new VCFParser(vcfTest, true, true, useVQSLOD);
 		if (removeNonPass){
 			testParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
 			testParser.filterVCFRecords(VCFRecord.PASS);
@@ -353,6 +461,9 @@ public class VCFComparator {
 		testParser.filterVCFRecords(commonRegions);
 		res = testParser.getVcfRecords().length +"\tTest variants in shared regions\n";
 		results.append(res);
+		res = testParser.calculateTiTvRatio() +"\tShared test variants Ti/Tv\n";
+		results.append(res);
+		
 		results.append("\n");
 		
 		if (testParser.getVcfRecords().length == 0) {

@@ -156,7 +156,7 @@ public class Sam2USeq {
 					SAMRecord sam = it.next();
 
 					//print status blip
-					if (++counter == 200000){
+					if (++counter == 2000000){
 						if (verbose) System.out.print(".");
 						counter = 0;
 					}
