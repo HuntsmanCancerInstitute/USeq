@@ -179,9 +179,7 @@ public class VCFComparator {
 
 	public void thresholdAndCompareCalls(){
 		//starting totals
-		float totalKey = keyParser.getVcfRecords().length;
-		
-System.out.println("Num in key "+totalKey);		
+		float totalKey = keyParser.getVcfRecords().length;		
 		
 		//clear old results
 		tprAL.clear();
@@ -277,8 +275,7 @@ System.out.println("Num in key "+totalKey);
 		ArrayList<VCFRecord> testNonMatches = new ArrayList<VCFRecord>();
 
 		//for each test record
-		for (String chr: testParser.getChromosomeVCFRecords().keySet()){
-System.out.println("\tIntersecting "+chr);			
+		for (String chr: testParser.getChromosomeVCFRecords().keySet()){			
 			VCFLookUp key = keyParser.getChromosomeVCFRecords().get(chr);
 			VCFLookUp test = testParser.getChromosomeVCFRecords().get(chr);
 			if (key == null) {
