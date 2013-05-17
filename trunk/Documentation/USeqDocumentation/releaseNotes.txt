@@ -4,6 +4,8 @@ SamTranscriptomeParser
 NovoalignBisulfiteParser
 * Reduced the default thresholds for minimum base quality to 13.  New bis-seq data is showing reduced qualities (probably due to different calibration) causing some datasets to show a significant reduction in data.
 * Added a fraction bases passing base quality to report out this statistic and flag such cases.
+VCFComparator
+* Added a new spreadsheet of just dFDR and TPR for each sample when more than one to make graphing easier.  
 
 ----USeq_8.5.7----
 MultiSampleVCFFilter
