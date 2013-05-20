@@ -447,8 +447,11 @@ public class MethylationArrayScanner {
 		if (pd == null || pd.keySet().size() == 0) Misc.printErrAndExit("\nError: failed to load PointData from -> "+f);
 		//check and or set positions
 		for (String chrom: pd.keySet()){
+			
 			int[] existingPos = chromPositions.get(chrom);
-			int[] pdPos = pd.get(chrom).getPositions();
+			PointData p = pd.get(chrom);
+			int[] pdPos = p.getPositions();
+			if (versionedGenome == null) versionedGenome = p.getInfo().getVersionedGenome();
 			if (existingPos == null) chromPositions.put(chrom, pdPos);
 			else {
 				if (existingPos.length != pdPos.length) Misc.printErrAndExit("\nError: lengths of PointData don't match.");

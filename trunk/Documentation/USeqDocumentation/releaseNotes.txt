@@ -1,3 +1,8 @@
+----USeq_8.5.9----
+MethylationArrayScanSeqs
+* Renamed to MethylationArrayScanner
+* Fixed a bug with genome versions that was causing the app to throw a null pointer error and exit.
+
 ----USeq_8.5.8----
 SamTranscriptomeParser
 * Modified app to gzip temp files and when a header is provided to directly write out the results without an intermediate file.  Should cut down on disk usage.
