@@ -3,52 +3,36 @@ package edu.utah.seq.analysis;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
-
-import net.sf.samtools.*;
-import net.sf.samtools.SAMFileReader.ValidationStringency;
+import trans.main.WilcoxonRankSumTest;
 import trans.main.WilcoxonSignedRankTest;
-import trans.tpmap.WindowMaker;
-import util.bio.annotation.Bed;
-import util.bio.annotation.ExonIntron;
-import util.bio.parsers.*;
 import util.gen.*;
-import edu.utah.seq.analysis.multi.Condition;
-import edu.utah.seq.analysis.multi.GeneCount;
-import edu.utah.seq.analysis.multi.Replica;
 import edu.utah.seq.data.ComparatorPointAscendingScore;
 import edu.utah.seq.data.ComparatorPointPosition;
-import edu.utah.seq.data.ComparatorSmoothingWindowScore;
-import edu.utah.seq.data.HeatMapMaker;
-import edu.utah.seq.data.Info;
+import edu.utah.seq.data.MethylationArraySamplePair;
 import edu.utah.seq.data.Point;
 import edu.utah.seq.data.PointData;
 import edu.utah.seq.data.SmoothingWindow;
-import edu.utah.seq.data.SmoothingWindowInfo;
-import edu.utah.seq.parsers.BarParser;
-import edu.utah.seq.useq.apps.Bar2USeq;
-import edu.utah.seq.useq.apps.Text2USeq;
 import edu.utah.seq.useq.data.Region;
 
-
-/**
+/** Application for looking at user defined regions for changes in methylation.  I've hacked in a non paired analysis on top of the original app.
  * @author Nix
  * */
 public class MethylationArrayDefinedRegionScanner {
 
 	//fields
-	private String regionsFileName;
 	private LinkedHashMap<String,SmoothingWindow[]> chromosomeRegion;
 	private int minimumObservations = 3;
-	private boolean skipNoDataRegions = true;
+	private boolean skipNoDataRegions = false;
+	private boolean performPairedAnalysis = true;
+	private File bedFile;
 	
-	private HashMap<String, SamplePair[]> chromSamplePairs;
+	private HashMap<String, MethylationArraySamplePair[]> chromSamplePairs;
 	private HashMap<String, int[]> chromPositions = new HashMap<String, int[]>();
 	private String chromosome;
 	private int[] positions;
-	private SamplePair[] pairs;
+	private MethylationArraySamplePair[] pairs;
 	private SmoothingWindow[] smoothingWindow;
 	private ArrayList<SmoothingWindow> smALAll = new ArrayList<SmoothingWindow>();
-	private File saveDirectory;
 	private int pseIndex = 0;
 	private int pvalueBHFDRIndex = 1;
 	private int numObsIndex = 2;
@@ -63,6 +47,7 @@ public class MethylationArrayDefinedRegionScanner {
 
 	public MethylationArrayDefinedRegionScanner(String[] args){	
 		long startTime = System.currentTimeMillis();
+		
 		//set fields
 		processArgs(args);
 
@@ -109,7 +94,7 @@ public class MethylationArrayDefinedRegionScanner {
 	/**Writes out an excel compatible tab delimited spreadsheet with hyperlinks for IGB.*/
 	public void printSpreadSheet(){
 		try{
-			File file = new File(saveDirectory, regionsFileName+"_MADRS.xls");
+			File file = new File(bedFile.getParentFile(), Misc.removeExtension(bedFile.getName())+"_MADRS.xls");
 			PrintWriter out = new PrintWriter (new FileWriter (file));
 			//print header line
 			out.println("#"+genomeVersion+"_IGBHyperLinks\tChr\tStart\tStop\t#Obs\tPseMedianLog2Ratio\tFDR\tTreatmentPse\tControlPse");
@@ -184,6 +169,7 @@ public class MethylationArrayDefinedRegionScanner {
 		for (int i=0; i< smoothingWindow.length; i++){
 			float scores[] = smoothingWindow[i].getScores();
 			scores[pvalueBHFDRIndex] = pvals[i].getScore();
+			if (scores[pvalueBHFDRIndex] < 0) scores[pvalueBHFDRIndex] = 0;
 		}
 	}
 
@@ -199,12 +185,12 @@ public class MethylationArrayDefinedRegionScanner {
 			
 			//fetch indexes
 			int startIndex = Num.findClosestStartIndex(positions, smoothingWindow[i].getStart());
-			int stopIndex = Num.findClosestEndIndex(positions, smoothingWindow[i].getStop()) +1;
+			int stopIndex = Num.findClosestEndIndex(positions, smoothingWindow[i].getStop());
 			if (stopIndex > positions.length) stopIndex = positions.length;
 			
-			//add scores from each sample pair
+			//add scores from each sample pair, stopIndex is included
 			for (int x=0; x< pairs.length; x++){
-				pairs[x].fetchScoresViaIndex(startIndex, stopIndex, treatmentAL, controlAL);
+				pairs[x].fetchScoresByIndex(startIndex, stopIndex, treatmentAL, controlAL);
 			}
 			
 			//any obs?
@@ -212,26 +198,52 @@ public class MethylationArrayDefinedRegionScanner {
 				smoothingWindow[i].setScores(null);
 				continue;
 			}
-
+			
 			float[] treatment = Num.arrayListOfFloatToArray(treatmentAL);
 			float[] control = Num.arrayListOfFloatToArray(controlAL);
-			double[] fraction = Num.ratio(treatment, control);
-			Num.log2(fraction);
-			float pse = pseudoMedianWithChecker(fraction);
-			float tPse = pseudoMedianWithChecker(treatment);
-			float cPse = pseudoMedianWithChecker(control);
-			WilcoxonSignedRankTest w = new WilcoxonSignedRankTest(treatment, control);
-			float pvalue = (float)w.getTransformedPValue();
+			float pseT = pseudoMedianWithChecker(treatment);
+			float pseC = pseudoMedianWithChecker(control);
+			float pse = 0;
+			float pvalue = 0;
+			
+			//paired?
+			if (performPairedAnalysis){
+				double[] fraction = Num.ratio(treatment, control);
+				Num.log2(fraction);
+				pse = pseudoMedianWithChecker(fraction);
+				
+				//calculate pval if > 4 pairs
+				if (treatment.length > 4){
+					WilcoxonSignedRankTest w = new WilcoxonSignedRankTest(treatment, control);
+					pvalue = (float)w.getTransformedPValue();
+				}
+			}
+			//non-paired
+			else{
+				pse = Num.log2(pseT/pseC);
+				//calc pval if more than 9 obs
+				if (treatment.length > 9 && control.length > 9){
+					WilcoxonRankSumTest w = new WilcoxonRankSumTest();
+					pvalue = (float)w.test(treatment, control);
+				}
+			}
 			
 			//scores = pse, pvalFDR, # obs, treatPse, controlPse            
 			float[] scores = new float[5];
 			scores[pseIndex] = pse;
 			scores[pvalueBHFDRIndex] = pvalue;
 			scores[numObsIndex] = treatment.length;
-			scores[pseTreatementIndex] = tPse;
-			scores[pseControlIndex] = cPse;
+			scores[pseTreatementIndex] = pseT;
+			scores[pseControlIndex] = pseC;
 			smoothingWindow[i].setScores(scores);
 			smALAll.add(smoothingWindow[i]);
+			
+			/*if (smoothingWindow[i].getStart() == 179456){
+				System.out.println(smoothingWindow[i]);
+				Misc.printArray(treatment);
+				Misc.printArray(control);
+				System.exit(0);
+			}*/
 		}
 	}
 	
@@ -256,7 +268,7 @@ public class MethylationArrayDefinedRegionScanner {
 		String[] controlNames = controlPairedSamples.split(",");
 		if (treatmentNames.length != controlNames.length) Misc.printErrAndExit("\nError: the number of treatment and control samples differ?");
 
-		HashMap<String, ArrayList<SamplePair>> pairs = new HashMap<String, ArrayList<SamplePair>>();
+		HashMap<String, ArrayList<MethylationArraySamplePair>> pairs = new HashMap<String, ArrayList<MethylationArraySamplePair>>();
 
 		for (int i=0; i< treatmentNames.length; i++){
 			System.out.println("\t"+ treatmentNames[i] +"\t"+ controlNames[i]);
@@ -270,10 +282,10 @@ public class MethylationArrayDefinedRegionScanner {
 			allChroms.addAll(pdT.keySet());
 			allChroms.addAll(pdC.keySet());
 			for (String chrom: allChroms){
-				SamplePair sp = new SamplePair(pdT.get(chrom).getScores(), pdC.get(chrom).getScores());
-				ArrayList<SamplePair> al = pairs.get(chrom);
+				MethylationArraySamplePair sp = new MethylationArraySamplePair(pdT.get(chrom).getScores(), pdC.get(chrom).getScores(), performPairedAnalysis);
+				ArrayList<MethylationArraySamplePair> al = pairs.get(chrom);
 				if (al == null){
-					al = new ArrayList<SamplePair>();
+					al = new ArrayList<MethylationArraySamplePair>();
 					pairs.put(chrom, al);
 				}
 				al.add(sp);
@@ -281,39 +293,17 @@ public class MethylationArrayDefinedRegionScanner {
 		}
 
 		//convert to []s
-		chromSamplePairs = new HashMap<String, SamplePair[]>();
+		chromSamplePairs = new HashMap<String, MethylationArraySamplePair[]>();
 		for (String chrom: pairs.keySet()){
-			ArrayList<SamplePair> al = pairs.get(chrom);
+			ArrayList<MethylationArraySamplePair> al = pairs.get(chrom);
 			if (al.size() != treatmentNames.length) Misc.printErrAndExit("\nError: One or more samples are missing a chromosome PointData set.");
-			SamplePair[] sp = new SamplePair[treatmentNames.length];
+			MethylationArraySamplePair[] sp = new MethylationArraySamplePair[treatmentNames.length];
 			al.toArray(sp);
 			chromSamplePairs.put(chrom, sp);
 		}
 	}
 
-	class SamplePair{
-
-		float[] treatment;
-		float[] control;
-
-		public SamplePair(float[] treatment, float[] control) {
-			this.treatment = treatment;
-			this.control = control;
-		}
-
-		public void randomize() {
-			Num.randomizePairedValues(treatment, control, System.currentTimeMillis());
-		}
-
-		public void fetchScoresViaIndex(int startIndex, int stopIndex, ArrayList<Float> treatmentAL, ArrayList<Float> controlAL){
-			for (int i=startIndex; i< stopIndex; i++){
-				if (treatment[i] !=0.0f && control[i] != 0.0f){
-					treatmentAL.add(treatment[i]);
-					controlAL.add(control[i]);
-				}
-			}
-		}
-	}
+	
 
 	/**Does a variety of checks, also sets the positions for each chrom.*/
 	public HashMap<String, PointData> loadPointData(String name){
@@ -348,7 +338,7 @@ public class MethylationArrayDefinedRegionScanner {
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
-		File bedFile = null;
+		bedFile = null;
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -359,11 +349,11 @@ public class MethylationArrayDefinedRegionScanner {
 					switch (test){
 					case 'b': bedFile = new File(args[++i]); break;
 					case 'd': dataDirectory = new File (args[++i]); break;
-					case 's': saveDirectory = new File (args[++i]); break;
 					case 't': treatmentPairedSamples = args[++i]; break;
 					case 'c': controlPairedSamples = args[++i]; break;
 					case 'z': skipNoDataRegions = true; break;
 					case 'o': minimumObservations = Integer.parseInt(args[++i]); break;
+					case 'n': performPairedAnalysis = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -378,10 +368,6 @@ public class MethylationArrayDefinedRegionScanner {
 
 		//samples
 		if (treatmentPairedSamples == null || controlPairedSamples == null) Misc.printErrAndExit("\nError: please enter at least one paired treatment control sample set to contrast.\n");
-
-		//look for and or create the save directory
-		if (saveDirectory == null) Misc.printExit("\nError: enter a directory text to save results.\n");
-		if (saveDirectory.exists() == false) saveDirectory.mkdir();
 		
 		//load regions
 		if (bedFile == null) Misc.printExit("\nError: please provide a text bed file (tab delimited: chr start stop) of regions to score for differential methylation.\n");
@@ -395,10 +381,6 @@ public class MethylationArrayDefinedRegionScanner {
 			}
 			chromosomeRegion.put(chr, sw);
 		}
-		regionsFileName = Misc.removeExtension(bedFile.getName());
-		saveDirectory = bedFile.getParentFile();
-
-		
 	}	
 
 
@@ -410,8 +392,11 @@ public class MethylationArrayDefinedRegionScanner {
 				"**************************************************************************************\n" +
 				"MADRS takes paired sample PointData representing beta values (0-1) from arrays and\n" +
 				"a list of regions to score for differential methylation using a B&H corrected Wilcoxon\n" +
-				"signed rank test and pseudo median of the log2(treat/control) ratios.\n" +
-				"\n"+
+				"signed rank test and pseudo median of the paired log2(treat/control) ratios. Pairs\n" +
+				"containing a zero value are ignored. It generates a spreadsheet of statistics for each\n" +
+				"region. If a non-paired analysis is selected, a Wilcoxon rank sum test and\n" +
+				"log2(pseT/pseC) are calculated on each region. Note this is a very underpowered test\n" +
+				"requiring >30 observations to see any significant FDRs.\n" +
 
 				"\nRequired Options:\n"+
 				"-b A bed file of regions to score (tab delimited: chr start stop ...)\n"+
@@ -419,9 +404,10 @@ public class MethylationArrayDefinedRegionScanner {
 				"      which should contain chromosome split bar files (e.g. chr1.bar, chr2.bar, ...)\n"+
 				"-t Names of the treatment sample directories in -d, comma delimited, no spaces.\n"+
 				"-c Ditto but for the control samples, the ordering is critical and describes how to\n"+
-				"      pair the samples.\n"+
+				"      pair the samples for a paired analysis.\n"+
 				"-o Minimum number paired observations in window, defaults to 3.\n" +
-				"-s Skip printing regions with less than minimum observations.\n"+
+				"-z Skip printing regions with less than minimum observations.\n"+
+				"-n Run a non-paired analysis where t and c are treated as groups and pooled.\n"+
 
 				"\n"+
 

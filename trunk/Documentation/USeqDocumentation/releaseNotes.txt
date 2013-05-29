@@ -2,6 +2,9 @@
 MethylationArrayScanSeqs
 * Renamed to MethylationArrayScanner
 * Fixed a bug with genome versions that was causing the app to throw a null pointer error and exit.
+* Fixed a bug where the last observation in a window was not always included in the summary stats.
+MethylationArrayDefinedRegionScanner
+* New app, companion to MAS, user defined regions are scored instead of a window scanning.
 
 ----USeq_8.5.8----
 SamTranscriptomeParser

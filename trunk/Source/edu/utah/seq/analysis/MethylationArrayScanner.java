@@ -3,48 +3,40 @@ package edu.utah.seq.analysis;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
-
-import net.sf.samtools.*;
-import net.sf.samtools.SAMFileReader.ValidationStringency;
+import trans.main.WilcoxonRankSumTest;
 import trans.main.WilcoxonSignedRankTest;
 import trans.tpmap.WindowMaker;
-import util.bio.annotation.Bed;
-import util.bio.annotation.ExonIntron;
-import util.bio.parsers.*;
 import util.gen.*;
-import edu.utah.seq.analysis.multi.Condition;
-import edu.utah.seq.analysis.multi.GeneCount;
-import edu.utah.seq.analysis.multi.Replica;
 import edu.utah.seq.data.ComparatorPointAscendingScore;
 import edu.utah.seq.data.ComparatorPointPosition;
-import edu.utah.seq.data.ComparatorSmoothingWindowScore;
 import edu.utah.seq.data.HeatMapMaker;
 import edu.utah.seq.data.Info;
+import edu.utah.seq.data.MethylationArraySamplePair;
 import edu.utah.seq.data.Point;
 import edu.utah.seq.data.PointData;
 import edu.utah.seq.data.SmoothingWindow;
 import edu.utah.seq.data.SmoothingWindowInfo;
 import edu.utah.seq.parsers.BarParser;
 import edu.utah.seq.useq.apps.Bar2USeq;
-import edu.utah.seq.useq.apps.Text2USeq;
 
 
-/**
+/** Application for looking for changes in methylation array data across a genome.  I've hacked in a non paired analysis on top of the original app.
  * @author Nix
  * */
 public class MethylationArrayScanner {
 
 	//fields
 	private int windowSize = 1000;
-	private int minimumNumberObservationsInWindow = 20;
+	private int minimumNumberObservationsInWindow = 10;
 	private float minimumPseudoMedianRatio = 0.2f;
 	private int numberRandomTrials = 5;
-	
-	private HashMap<String, SamplePair[]> chromSamplePairs;
+	private boolean performPairedAnalysis = true;
+
+	private HashMap<String, MethylationArraySamplePair[]> chromMethylationArraySamplePairs;
 	private HashMap<String, int[]> chromPositions = new HashMap<String, int[]>();
 	private String chromosome;
 	private int[] positions;
-	private SamplePair[] pairs;
+	private MethylationArraySamplePair[] pairs;
 	private WindowMaker windowMaker; 
 	private int[][] windows;
 	private SmoothingWindow[] smoothingWindow;
@@ -69,8 +61,9 @@ public class MethylationArrayScanner {
 	private File dataDirectory;
 	private String treatmentPairedSamples;
 	private String controlPairedSamples;
-	private int numberSamplePairs;
+	private int numberMethylationArraySamplePairs;
 	private double numberRandomWindows;
+
 
 	//constructor
 
@@ -90,20 +83,21 @@ public class MethylationArrayScanner {
 	public void run(){
 		//load data hashes
 		System.out.println("Loading paired samples...");
-		loadSamplePairs();
+		loadMethylationArraySamplePairs();
 
 		//make window maker, compensate for multiple samples
-		int minObs = (int)Math.round(((double)minimumNumberObservationsInWindow / (double) numberSamplePairs));
+		int minObs = (int)Math.round(((double)minimumNumberObservationsInWindow / (double) numberMethylationArraySamplePairs));
 		if (minObs == 1) minObs = 2;
 		windowMaker = new WindowMaker(windowSize,(int)minObs);
 
 		//for each chromosome
 		System.out.println("\nWindow scanning...");
-		for (String chrom: chromSamplePairs.keySet()){
+		for (String chrom: chromMethylationArraySamplePairs.keySet()){
 			//fetch data
-			chromosome = chrom;
+			chromosome = chrom;		
+			
 			positions = chromPositions.get(chromosome);
-			pairs = chromSamplePairs.get(chromosome);
+			pairs = chromMethylationArraySamplePairs.get(chromosome);
 
 			//make windows
 			windows = windowMaker.makeWindows(positions);
@@ -119,7 +113,7 @@ public class MethylationArrayScanner {
 
 			for (int i=0; i< numberRandomTrials; i++){
 				//randomize pairs data
-				for (SamplePair sp: pairs) sp.randomize();
+				for (MethylationArraySamplePair sp: pairs) sp.randomize();
 				//scan for random
 				scanWindowsRandom();
 			}
@@ -130,24 +124,24 @@ public class MethylationArrayScanner {
 		smiAL.toArray(smoothingWindowInfo);
 		allSmoothingWindows = new SmoothingWindow[smALAll.size()];
 		smALAll.toArray(allSmoothingWindows);
-		
+
 		//calculate permutation FDRs, do this first!
 		System.out.println("\nCalculating permutation FDRs...");
 		calculatePermutationFDRs();
-		
+
 		//multiple test correct the pvalues with B&H, do this second since it modifies the pVal
 		System.out.println("Converting wilcoxon pvalues to FDRs with B&H...");
 		convertPValuesToFDRs();
 
 		//write out graph data
-		System.out.println("\nSaving graph data...");
+		System.out.println("Saving graph data...");
 		writeBarFileGraphs();
 
 		//convert graph data to useq
 		new Bar2USeq(pseDir, true);
 		new Bar2USeq(fdrDir, true);
 		new Bar2USeq(baseRatioDir, true);
-		
+
 		//save window data 
 		System.out.println("Writing window objects for the EnrichedRegionMaker...");
 		File swiFile = new File (saveDirectory, "windowData"+windowSize+"bp"+Num.formatNumberOneFraction(minimumPseudoMedianRatio)+"MinPse.swi");
@@ -159,19 +153,19 @@ public class MethylationArrayScanner {
 		//sort RandomScores 
 		float[] rs = Num.arrayListOfFloatToArray(randomPValues);
 		Arrays.sort(rs);
-		
+
 		//score windows passing pseudoMedian threshold
 		for (SmoothingWindow sw: allSmoothingWindows){
 			float[] scores = sw.getScores();
 			float permFDR = 0;
 			if (scores[pseIndex] >= minimumPseudoMedianRatio) {
-				 permFDR = calculateTransformedPValue(scores[pvalueBHFDRIndex], rs, numberRandomWindows);
+				permFDR = calculateTransformedPValue(scores[pvalueBHFDRIndex], rs, numberRandomWindows);
 			}
 			scores[permFDRIndex] = permFDR;
 			//if (permFDR !=0) System.out.println("PermFDR "+permFDR+"\tPVal "+scores[pvalueBHFDRIndex]);
 		}
 	}
-	
+
 	public static float calculateTransformedPValue (float realScore, float[] sortedRandomScores, double totalNumberRandomScores){
 		int index = Num.findClosestIndexToValue(sortedRandomScores, realScore);
 		double count = sortedRandomScores.length - index;
@@ -194,7 +188,9 @@ public class MethylationArrayScanner {
 		//assign FDRs to pVals
 		for (int i=0; i< allSmoothingWindows.length; i++){
 			float scores[] = allSmoothingWindows[i].getScores();
-			scores[pvalueBHFDRIndex] = pvals[i].getScore();
+			float fdr = pvals[i].getScore();
+			if (fdr > 0) scores[pvalueBHFDRIndex] = fdr;
+			else scores[pvalueBHFDRIndex] = 0.0f;
 		}
 	}
 
@@ -259,44 +255,64 @@ public class MethylationArrayScanner {
 		ArrayList<Float> treatmentAL = new ArrayList<Float>();
 		ArrayList<Float> controlAL = new ArrayList<Float>();
 		smALChrom.clear();
-		
-		//for each window 
+
+		//for each window (startIndex, stopIndex)
 		for (int i=0; i< windows.length; i++){
 			treatmentAL.clear();
 			controlAL.clear();
 
-			//fetch scores from each sample pair
+			//fetch scores from each sample 
 			for (int x=0; x< pairs.length; x++){
-				pairs[x].fetchScores(windows[i][0], windows[i][1], treatmentAL, controlAL);
+				pairs[x].fetchScoresByIndex(windows[i][0], windows[i][1], treatmentAL, controlAL);
 			}
-			
+
 			//enough obs?
 			if (treatmentAL.size() < minimumNumberObservationsInWindow) continue;
 
 			float[] treatment = Num.arrayListOfFloatToArray(treatmentAL);
 			float[] control = Num.arrayListOfFloatToArray(controlAL);
-			double[] fraction = Num.ratio(treatment, control);
-			Num.log2(fraction);
-			float pse = (float)Num.pseudoMedian(fraction);
-			WilcoxonSignedRankTest w = new WilcoxonSignedRankTest(treatment, control);
-			float pvalue = (float)w.getTransformedPValue();
-
-			//scores = pse, pvalFDR, permFDR, # obs             
+			double pvalue = 0;
+			double pse = 0;
+			
+			//paired analysis
+			if (performPairedAnalysis){
+				double[] fraction = Num.ratio(treatment, control);
+				Num.log2(fraction);
+				pse = Num.pseudoMedian(fraction);
+				//calculate pval if > 4 pairs
+				if (treatment.length > 4){
+					WilcoxonSignedRankTest w = new WilcoxonSignedRankTest(treatment, control);
+					pvalue = w.getTransformedPValue();
+				}
+			}
+			//non paired analysis
+			else{
+				//calc ratio
+				double pseT = Num.pseudoMedian(treatment);
+				double pseC = Num.pseudoMedian(control);
+				pse = Num.log2(pseT/pseC);
+				//calc pval if more than 9 obs
+				if (treatment.length > 9 && control.length > 9){
+					WilcoxonRankSumTest w = new WilcoxonRankSumTest();
+					pvalue = w.test(treatment, control);
+				}
+			}
+			
+			//scores = pse, pvalFDR, permFDR, # obs   
 			float[] scores = new float[4];
-			scores[pseIndex] = pse;
-			scores[pvalueBHFDRIndex] = pvalue;
+			scores[pseIndex] = (float) pse;
+			scores[pvalueBHFDRIndex] = (float) pvalue;
 			scores[numObsIndex] = treatment.length;
 
 			//make window
 			SmoothingWindow win = new SmoothingWindow (positions[windows[i][0]], positions[windows[i][1]]+1, scores);
 			smALChrom.add(win);
-			
-			/*if (treatmentAL.size() < 20){
-				System.out.println("\n"+chromosome+":"+ positions[windows[i][0]]+"-"+ (positions[windows[i][1]]+1));
-				Misc.printArray(scores);
+
+			/*if (win.getStart() == 179456){
+				System.out.println(win);
 				Misc.printArray(treatment);
 				Misc.printArray(control);
-				Misc.printArray(fraction);
+				System.exit(0);
 			}*/
 
 		}
@@ -312,35 +328,58 @@ public class MethylationArrayScanner {
 		for (int i=0; i< windows.length; i++){
 			treatmentAL.clear();
 			controlAL.clear();
-			//fetch scores from each sample pair
+			
+			//fetch scores from each sample pair, stopIndex is included
 			for (int x=0; x< pairs.length; x++){
-				pairs[x].fetchScores(windows[i][0], windows[i][1], treatmentAL, controlAL);
+				pairs[x].fetchScoresByIndex(windows[i][0], windows[i][1], treatmentAL, controlAL);
 			}
 			//enough obs?
 			if (treatmentAL.size() < minimumNumberObservationsInWindow) continue;
-			numberRandomWindows++;
+			
+			
 			float[] treatment = Num.arrayListOfFloatToArray(treatmentAL);
 			float[] control = Num.arrayListOfFloatToArray(controlAL);
-			double[] fraction = Num.ratio(treatment, control);
-			Num.log2(fraction);
-			float pse = (float)Num.pseudoMedian(fraction);
-			if (Math.abs(pse) < minimumPseudoMedianRatio) continue;
-			WilcoxonSignedRankTest w = new WilcoxonSignedRankTest(treatment, control);
-			float pvalue = (float)w.getTransformedPValue();
-			randomPValues.add(pvalue);
+			double pvalue = 0;
+			
+			//paired analysis
+			if (performPairedAnalysis){
+				double[] fraction = Num.ratio(treatment, control);
+				Num.log2(fraction);
+				if (Math.abs(Num.pseudoMedian(fraction)) < minimumPseudoMedianRatio) continue;
+				//calculate pval if > 4 pairs
+				if (treatment.length > 4){
+					WilcoxonSignedRankTest w = new WilcoxonSignedRankTest(treatment, control);
+					pvalue = w.getTransformedPValue();
+				}
+			}
+			//non paired analysis
+			else{
+				//calc ratio
+				double pseT = Num.pseudoMedian(treatment);
+				double pseC = Num.pseudoMedian(control);
+				if (Math.abs(Num.log2(pseT/pseC)) < minimumPseudoMedianRatio) continue;
+				//calc pval if more than 9 obs
+				if (treatment.length > 9 && control.length > 9){
+					WilcoxonRankSumTest w = new WilcoxonRankSumTest();
+					pvalue = w.test(treatment, control);
+				}
+			}
+			randomPValues.add((float)pvalue);
+			numberRandomWindows++;
+			
 		}
 
 	}
 
 
-	public void loadSamplePairs(){
+	public void loadMethylationArraySamplePairs(){
 		//parse names
 		String[] treatmentNames = treatmentPairedSamples.split(",");
 		String[] controlNames = controlPairedSamples.split(",");
 		if (treatmentNames.length != controlNames.length) Misc.printErrAndExit("\nError: the number of treatment and control samples differ?");
-		numberSamplePairs = treatmentNames.length;
+		numberMethylationArraySamplePairs = treatmentNames.length;
 
-		HashMap<String, ArrayList<SamplePair>> pairs = new HashMap<String, ArrayList<SamplePair>>();
+		HashMap<String, ArrayList<MethylationArraySamplePair>> pairs = new HashMap<String, ArrayList<MethylationArraySamplePair>>();
 
 		for (int i=0; i< treatmentNames.length; i++){
 			System.out.println("\t"+ treatmentNames[i] +"\t"+ controlNames[i]);
@@ -354,10 +393,10 @@ public class MethylationArrayScanner {
 			allChroms.addAll(pdT.keySet());
 			allChroms.addAll(pdC.keySet());
 			for (String chrom: allChroms){
-				SamplePair sp = new SamplePair(pdT.get(chrom).getScores(), pdC.get(chrom).getScores());
-				ArrayList<SamplePair> al = pairs.get(chrom);
+				MethylationArraySamplePair sp = new MethylationArraySamplePair(pdT.get(chrom).getScores(), pdC.get(chrom).getScores(), performPairedAnalysis);
+				ArrayList<MethylationArraySamplePair> al = pairs.get(chrom);
 				if (al == null){
-					al = new ArrayList<SamplePair>();
+					al = new ArrayList<MethylationArraySamplePair>();
 					pairs.put(chrom, al);
 				}
 				al.add(sp);
@@ -365,13 +404,13 @@ public class MethylationArrayScanner {
 		}
 
 		//convert to []s
-		chromSamplePairs = new HashMap<String, SamplePair[]>();
+		chromMethylationArraySamplePairs = new HashMap<String, MethylationArraySamplePair[]>();
 		for (String chrom: pairs.keySet()){
-			ArrayList<SamplePair> al = pairs.get(chrom);
+			ArrayList<MethylationArraySamplePair> al = pairs.get(chrom);
 			if (al.size() != treatmentNames.length) Misc.printErrAndExit("\nError: One or more samples are missing a chromosome PointData set.");
-			SamplePair[] sp = new SamplePair[treatmentNames.length];
+			MethylationArraySamplePair[] sp = new MethylationArraySamplePair[treatmentNames.length];
 			al.toArray(sp);
-			chromSamplePairs.put(chrom, sp);
+			chromMethylationArraySamplePairs.put(chrom, sp);
 		}
 	}
 
@@ -413,31 +452,6 @@ public class MethylationArrayScanner {
 
 	}
 
-	class SamplePair{
-
-		float[] treatment;
-		float[] control;
-
-		public SamplePair(float[] treatment, float[] control) {
-			this.treatment = treatment;
-			this.control = control;
-		}
-
-		public void randomize() {
-			Num.randomizePairedValues(treatment, control, System.currentTimeMillis());
-		}
-
-		public void fetchScores(int startIndex, int stopIndex, ArrayList<Float> treatmentAL, ArrayList<Float> controlAL){
-			for (int i=startIndex; i< stopIndex; i++){
-				if (treatment[i] !=0.0f && control[i] != 0.0f){
-					treatmentAL.add(treatment[i]);
-					controlAL.add(control[i]);
-				}
-			}
-		}
-
-	}
-
 	/**Does a variety of checks, also sets the positions for each chrom.*/
 	public HashMap<String, PointData> loadPointData(String name){
 		File f = new File (dataDirectory, name);
@@ -445,9 +459,9 @@ public class MethylationArrayScanner {
 		if (f.isDirectory() == false) Misc.printErrAndExit("\nError: sample doesn't appear to be a directory -> "+f);
 		HashMap<String, PointData> pd = PointData.fetchPointData (f, null, false);
 		if (pd == null || pd.keySet().size() == 0) Misc.printErrAndExit("\nError: failed to load PointData from -> "+f);
+		
 		//check and or set positions
 		for (String chrom: pd.keySet()){
-			
 			int[] existingPos = chromPositions.get(chrom);
 			PointData p = pd.get(chrom);
 			int[] pdPos = p.getPositions();
@@ -490,6 +504,7 @@ public class MethylationArrayScanner {
 					case 'o': minimumNumberObservationsInWindow = Integer.parseInt(args[++i]); break;
 					case 'r': numberRandomTrials = Integer.parseInt(args[++i]); break;
 					case 'p': minimumPseudoMedianRatio = Float.parseFloat(args[++i]); break;
+					case 'n': performPairedAnalysis = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -509,15 +524,15 @@ public class MethylationArrayScanner {
 		if (saveDirectory == null) Misc.printExit("\nError: enter a directory text to save results.\n");
 		if (saveDirectory.exists() == false) saveDirectory.mkdir();
 
-		pseDir = new File(saveDirectory, "WindowPseLog2Rto");
+		pseDir = new File(saveDirectory, "WindowLog2Rto");
 		pseDir.mkdirs();
 		fdrDir = new File(saveDirectory, "WindowWilcoxFDR");
 		fdrDir.mkdirs();
-		baseRatioDir = new File(saveDirectory, "BaseLog2Ratio");
+		baseRatioDir = new File(saveDirectory, "BPLog2Ratio");
 		baseRatioDir.mkdirs();
 
 		scoreNames = new String[]{
-				"PseLog2Rto",
+				"Log2Rto",
 				"WilcoxFDR",
 				"PermFDR",
 				"#Obs",
@@ -534,6 +549,11 @@ public class MethylationArrayScanner {
 				"-10Log10(PermFDR)",
 				"count",
 		};
+		//change for non paired
+		if (performPairedAnalysis == false){
+			scoreDescriptions[0] = "log2( pseudomedian treatments/ pseudomedian controls) ratio";
+			scoreUnits[0] = "log2(pseT/pseC)";
+		}
 	}	
 
 
@@ -541,36 +561,38 @@ public class MethylationArrayScanner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Methylation Array Scanner: April 2013                     **\n" +
+				"**                        Methylation Array Scanner: May 2013                      **\n" +
 				"**************************************************************************************\n" +
-				"MASS takes paired sample PointData representing beta values (0-1) from arrays and\n" +
-				"attempts to identify regions with enriched/ reduced signal using a sliding window\n" +
-				"approach. A B&H corrected Wilcoxon signed rank test, pseudo median of the\n" +
-				"log2(treat/control) ratios, and permutation test FDR is calculated for each window.\n" +
-				"Use the EnrichedRegionMaker to identify enriched and reduced regions by picking\n" +
-				"thresholds (e.g. -i 0,1 -s 0.2,13).  MASS generates several data tracks for\n" +
-				"visualization in IGB including paired sample bp log2 ratios, window level Wilcoxon\n" +
-				"FDRs, and window level pseudomedian log2 ratios. \n" +
-				"\n"+
+				"MAS takes paired or non-paired sample PointData representing beta values (0-1) from\n" +
+				"arrays and scores regions with enriched/ reduced signal using a sliding window\n" +
+				"approach. A B&H corrected Wilcoxon signed rank (or rank sum test for non-paired),\n" +
+				"pseudo median of the log2(treat/control) ratios (or log2(pseT/pseC) for non-paired),\n" +
+				"and permutation test FDR is calculated for each window. Use the EnrichedRegionMaker\n" +
+				"to identify enriched and reduced regions by picking thresholds (e.g. -i 0,1 -s 0.2,13).\n" +
+				"MAS generates several data tracks for visualization in IGB including paired sample bp\n" +
+				"log2 ratios, window level Wilcoxon FDRs, and window level pseudomedian log2 ratios. \n" +
+				"Note, non-paired analysis are very underpowered and require > 30 obs/ window to see\n" +
+				"any significant FDRs.\n"+
 
-				"\nRequired Options:\n"+
+				"Required Options:\n"+
 				"-s Path to a directory for saving the results.\n"+
 				"-d Path to a directory containing individual sample PointData directories, each of\n"+
 				"      which should contain chromosome split bar files (e.g. chr1.bar, chr2.bar, ...)\n"+
 				"-t Names of the treatment sample directories in -d, comma delimited, no spaces.\n"+
 				"-c Ditto but for the control samples, the ordering is critical and describes how to\n"+
-				"      pair the samples.\n"+
+				"      pair the samples for a paired analysis.\n"+
 
 				"\nAdvanced Options:\n"+
+				"-n Run a non-paired analysis where t and c are treated as groups and pooled.\n"+
 				"-w Window size, defaults to 1000.\n"+
-				"-o Minimum number paired observations in window, defaults to 20.\n" +
+				"-o Minimum number observations in window, defaults to 10.\n" +
 				"-p Minimum pseudomedian log2 ratio for estimating the permutation FDR, defaults to 0.2\n" +
 				"-r Number permutations, defaults to 5\n"+
 
 				"\n"+
 
-				"Example: java -Xmx4G -jar pathTo/USeq/Apps/MethylationArrayScanner -s ~/MASS/Res\n" +
-				"     -v H_sapiens_Feb_2009 -d ~/MASS/Bar/ -t Early1,Early2,Early3 -c Late1,Late2,Late3\n" +
+				"Example: java -Xmx4G -jar pathTo/USeq/Apps/MethylationArrayScanner -s ~/MAS/Res\n" +
+				"     -v H_sapiens_Feb_2009 -d ~/MAS/Bar/ -t Early1,Early2,Early3 -c Late1,Late2,Late3\n" +
 				"     -w 1500\n\n" +
 
 		"**************************************************************************************\n");
