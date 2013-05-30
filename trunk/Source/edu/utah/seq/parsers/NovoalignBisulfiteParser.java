@@ -6,7 +6,11 @@ import util.bio.parsers.MultiFastaParser;
 import util.bio.seq.Seq;
 import util.gen.*;
 import java.util.*;
+
+import net.sf.samtools.SAMFileReader;
 import net.sf.samtools.SAMRecord;
+import net.sf.samtools.SAMRecordIterator;
+import net.sf.samtools.SAMFileReader.ValidationStringency;
 import edu.utah.seq.data.*;
 import edu.utah.seq.data.sam.SamAlignment;
 
@@ -27,7 +31,6 @@ public class NovoalignBisulfiteParser{
 	private int minimumBaseScore = 13;
 	private int minimumStandAloneBaseScore = 13;
 	private boolean printBed = false;
-	private boolean uniquesOnly = false;
 	private boolean reverseSecondPairsStrand = true;
 	private static Pattern TAB = Pattern.compile("\\t");
 	public static final Pattern COMMENT = Pattern.compile("^#.*");
@@ -37,7 +40,6 @@ public class NovoalignBisulfiteParser{
 	private boolean useParsedFiles = false;
 	private String adapter = "chrAdapt";
 	private String phiX = "chrPhiX";
-	//private String lambda = "chrLambda";
 	private PrintWriter nonConvertedCs = null;
 	private PrintWriter convertedCs = null;
 	private HashMap<String, Long> nonConvertedCTypes = new HashMap<String, Long>();
@@ -77,14 +79,12 @@ public class NovoalignBisulfiteParser{
 	private int baseCallCommentIndex = 13;
 	
 	//alignment counts for sam files
-	private long numberAlignmentsFailingDuplicateCheck = 0;
 	private long numberAlignmentsFailingQualityScore = 0;
 	private long numberAlignmentsFailingAlignmentScore = 0;
 	private long numberControlAlignments = 0;
 	private long numberAlignmentsFailingQC = 0;
 	private long numberAlignmentsUnmapped = 0;
 	private long numberPassingAlignments = 0;
-
 
 	//constructors
 	public NovoalignBisulfiteParser(String[] args){
@@ -104,7 +104,8 @@ public class NovoalignBisulfiteParser{
 				System.out.print("\t"+workingFile);
 				//parse
 				boolean  parsed;
-				if (workingFile.getName().endsWith(".sam.gz") || workingFile.getName().endsWith(".sam")) {
+				String name = workingFile.getName();
+				if (name.endsWith(".sam.gz") || name.endsWith(".sam") || name.endsWith(".bam")) {
 					samFormat = true;
 					System.out.print(" (SAM format) ");
 					parsed = parseWorkingSAMFile();
@@ -119,9 +120,8 @@ public class NovoalignBisulfiteParser{
 			closeWriters();
 			
 			//Alignment filtering stats
-			double total = numberAlignmentsFailingDuplicateCheck + numberAlignmentsFailingQualityScore + numberAlignmentsFailingAlignmentScore + numberControlAlignments + numberAlignmentsFailingQC + numberAlignmentsUnmapped + numberPassingAlignments;
+			double total = numberAlignmentsFailingQualityScore + numberAlignmentsFailingAlignmentScore + numberControlAlignments + numberAlignmentsFailingQC + numberAlignmentsUnmapped + numberPassingAlignments;
 			System.out.println("\nFiltering statistics for "+(int)total+" alignments:");
-			System.out.println(numberAlignmentsFailingDuplicateCheck +"\tFailed duplicate flag");
 			System.out.println(numberAlignmentsFailingQualityScore +"\tFailed mapping quality score ("+minimumPosteriorProbability+")");
 			System.out.println(numberAlignmentsFailingAlignmentScore +"\tFailed alignment score ("+maximumAlignmentScore+")");
 			System.out.println(numberControlAlignments +"\tAligned to phiX or adapters");
@@ -452,12 +452,6 @@ public class NovoalignBisulfiteParser{
 					continue;
 				}
 
-				//check for unique alignments?
-				if (uniquesOnly && tokens[alignmentStatusIndex].equals("U") == false) {
-					numberAlignmentsFailingDuplicateCheck++;
-					continue;
-				}
-
 				//check scores
 				//check probability threshold
 				float probScore = Float.parseFloat(tokens[posteriorProbabilityIndex]);
@@ -548,7 +542,9 @@ public class NovoalignBisulfiteParser{
 		return true;
 	}
 
-	public boolean parseWorkingSAMFile(){
+	/*public boolean parseWorkingSAMFile(){
+		if (picard) return parseWorkingSAMFilePicard();
+		
 		try{
 			//get reader
 			BufferedReader in = IO.fetchBufferedReader(workingFile);
@@ -558,18 +554,20 @@ public class NovoalignBisulfiteParser{
 			DataOutputStream dos = null;
 			int numBadLines = 0;
 			while ((line = in.readLine()) !=null){
+				line = line.trim();
+				//skip header and blank lines
+				if (line.length() == 0 || line.startsWith("@")) continue;
+				
 				//print status blip
 				if (++counter == 2500000){
 					System.out.print(".");
 					counter = 0;
 				}
-				line = line.trim();
-				//skip header and blank lines
-				if (line.length() == 0 || line.startsWith("@")) continue;
 
 				SamAlignment sa;
 				try {
 					sa = new SamAlignment(line, false);
+					//if (counter < 50) System.out.println(picard+"\t"+sa.getName()+"\t"+sa.getMappingQuality() +"\t"+sa.getAlignmentScore()+"\t"+line);
 				} catch (Exception e) {
 					System.out.println("\nSkipping malformed sam alignment ->\n"+line+"\n"+e.getMessage());
 					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
@@ -701,6 +699,159 @@ public class NovoalignBisulfiteParser{
 			return false;
 		}
 		return true;
+	}*/
+
+	public boolean parseWorkingSAMFile(){
+		try{
+			//make reader
+			SAMFileReader reader = new SAMFileReader(workingFile);	
+			reader.setValidationStringency(ValidationStringency.SILENT);
+			SAMRecordIterator iterator = reader.iterator();
+			
+			int counter =0;
+			String currentChromStrand = "";
+			DataOutputStream dos = null;
+			int numBadLines = 0;
+			//for each record
+			while (iterator.hasNext()){
+				SAMRecord samRecord = iterator.next();
+				
+				//print status blip
+				if (++counter == 2500000){
+					System.out.print(".");
+					counter = 0;
+				}
+
+				//this is a bit inefficient but gives absolute control on the sam data
+				SamAlignment sa;
+				try {
+					sa = new SamAlignment(samRecord.getSAMString().trim(), false);
+				} catch (Exception e) {
+					System.out.println("\nSkipping malformed sam alignment ->\n"+samRecord.getSAMString()+"\n"+e.getMessage());
+					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
+					continue;
+				}
+				
+				//is it aligned?
+				if (sa.isUnmapped()) {
+					numberAlignmentsUnmapped++;
+					continue;
+				}
+				
+				//does it pass the vendor qc?
+				if (sa.failedQC()) {
+					numberAlignmentsFailingQC++;
+					continue;
+				}
+				
+				//skip phiX and adapter
+				if (sa.getReferenceSequence().startsWith(phiX) || sa.getReferenceSequence().startsWith(adapter)) {
+					numberControlAlignments++;
+					continue;
+				}
+
+				//does it pass the scores threshold?
+				if (sa.getAlignmentScore() > maximumAlignmentScore) {
+					numberAlignmentsFailingAlignmentScore++;
+					continue;
+				}
+				if (sa.getMappingQuality() < minimumPosteriorProbability) {
+					numberAlignmentsFailingQualityScore++;
+					continue;
+				}
+
+				//increment counter
+				numberPassingAlignments++;
+				
+				//make readID
+				String firstSecond = "";
+				if (sa.isFirstPair()) firstSecond = "/1";
+				if (sa.isSecondPair()) firstSecond = "/2";
+				String readID = sa.getName()+ firstSecond;
+				
+				//make chromosome strand, note stranded second pair reads should use opp strand
+				String chromosomeStrand = null;
+				if (reverseSecondPairsStrand && sa.isSecondPair()){
+					if (sa.isReverseStrand()) chromosomeStrand = sa.getReferenceSequence() + "+";
+					else chromosomeStrand = sa.getReferenceSequence() + "-";
+				}
+				else {
+					if (sa.isReverseStrand()) chromosomeStrand = sa.getReferenceSequence() + "-";
+					else chromosomeStrand = sa.getReferenceSequence() + "+";
+				}
+				
+				//set position
+				int position = sa.getPosition();
+				
+				//clear masking references
+				sa.trimMaskingOfReadToFitAlignment();
+
+				//set isGA based on strand
+				String isGA; 
+				//is it part of a paired alignment? the need to set it to the ori of the 1st read
+				if (sa.isPartOfAPairedAlignment()){
+					if (sa.isFirstPair() && sa.isReverseStrand() == false) isGA = "f";
+					else if (sa.isSecondPair() && sa.isReverseStrand()) isGA = "f";
+					else isGA = "t";
+				}
+				else if (sa.isReverseStrand()) isGA = "t";
+				else isGA = "f";
+
+				//get PrintWriter
+				if (currentChromStrand.equals(chromosomeStrand) == false){
+					currentChromStrand = chromosomeStrand;
+					if (chromOut.containsKey(currentChromStrand)) dos = chromOut.get(currentChromStrand);
+					else {
+						//make and set file
+						File f = new File(saveDirectory, currentChromStrand);
+						parsedBinaryDataFiles.add(f);
+						dos = new DataOutputStream(new BufferedOutputStream (new FileOutputStream(f)));
+						chromOut.put(currentChromStrand, dos);
+					}
+				}
+				
+				//save data: readID, position, sequence, baseScores, t or f + cigar
+				dos.writeUTF(readID);
+				dos.writeInt(position);
+				dos.writeUTF(sa.getSequence());
+				dos.writeUTF(sa.getQualities());
+				dos.writeUTF(isGA + sa.getCigar());
+
+				//calculate fraction overlap for paired reads
+				//is it a L read?
+				if (sa.isFirstPair() && sa.isPartOfAPairedAlignment()){
+					//check that chrom is same
+					if (sa.getMateReferenceSequence().equals("=") || sa.getMateReferenceSequence().equals(sa.getReferenceSequence())) {
+						//calc diff
+						int leftPos = position;
+						int rightPos = sa.getMatePosition();
+						int l;
+						int r;
+						if (leftPos > rightPos) {
+							l = rightPos;
+							r = leftPos;
+						}
+						else {
+							l = leftPos;
+							r = rightPos;
+						} 
+						int sequenceLength = sa.getSequence().length();
+						int stopL = l+ sequenceLength;
+						long diff = stopL - r;
+						if (diff >= 0) bpPairedOverlappingSequence += diff;
+						bpPairedSequence += (2 * sequenceLength);
+					}
+				}
+			}
+			reader.close();
+			System.out.println();
+		} catch (Exception e){
+			System.err.println("\nError parsing Novoalign file or writing split binary chromosome files.\nToo many open files? Too many chromosomes? " +
+			"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
+			e.printStackTrace();
+			return false;
+		}
+		return true;
 	}
 
 
@@ -809,7 +960,6 @@ public class NovoalignBisulfiteParser{
 					case 's': saveDirectory = new File(args[++i]); saveDirectory.mkdir(); break;
 					case 'v': versionedGenome = args[i+1]; i++; break;
 					case 'p': printBed = true; break;
-					case 'u': uniquesOnly = true; break;
 					case 'z': useParsedFiles = true; break;
 					case 'b': minimumBaseScore = Integer.parseInt(args[++i]);break;
 					case 'c': minimumStandAloneBaseScore = Integer.parseInt(args[++i]);break;
@@ -852,12 +1002,11 @@ public class NovoalignBisulfiteParser{
 				"Parses Novoalign single and paired bisulfite sequence alignment files into xxx.bed\n" +
 				"and PointData file formats. Generates several summary statistics on converted and non-\n" +
 				"converted C contexts. Flattens overlapping reads in a pair to call consensus bps.\n" +
-				"Note: for paired read RNA-Seq data run through the SamTranscriptomeParser, be sure to\n" +
-				"disable the reversing of the 2nd read's strand (e.g. use the -o option).\n" +
+				"Note: for paired read RNA-Seq data run through the SamTranscriptomeParser.\n" +
 
 				"\nOptions:\n"+
 				"-a Alignment file or directory containing novoalignments in native xxx.txt(.zip/.gz)\n" +
-				"      or SAM (xxx.sam(.zip/.gz OK)) format. Multiple files will be merged.\n" +
+				"      or SAM/BAM (xxx.sam(.zip/.gz OK) or xxx.bam) format. Multiple files are merged.\n" +
 				"-f Fasta file directory, chromosome specific xxx.fa/.fasta(.zip/.gz OK) files.\n" +
 				"-s Save directory.\n"+
 				"-v Versioned Genome (ie H_sapiens_Mar_2006), see UCSC Browser,\n"+
@@ -872,10 +1021,8 @@ public class NovoalignBisulfiteParser{
 				"-b Minimum base quality score for reporting a non/converted C, defaults to 13.\n"+
 				"-c Minimum base quality score for reporting a overlapping non/converted C not found\n" +
 				"      in the other pair, defaults to 13.\n"+
-				"-u Unique alignments only, defaults to all. For SAM format, you need to run the\n" +
-				"      Picard MarkDuplicates app first.\n"+
 
-				"\nExample: java -Xmx25G -jar pathToUSeq/Apps/NovoalignBisulfiteParser -u -a\n" +
+				"\nExample: java -Xmx25G -jar pathToUSeq/Apps/NovoalignBisulfiteParser -x 240 -a\n" +
 				"      /Novo/Run7/ -f /Genomes/Hg19/Fastas/ -v H_sapiens_Feb_2009 -s /Novo/Run7/NBP \n\n" +
 
 

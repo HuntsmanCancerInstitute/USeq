@@ -1,3 +1,8 @@
+----USeq_8.6.0----
+NovoalignBisulfiteParser
+* Added option to parse xxx.bam files
+* Removed -u unique alignment option since this only works with native novo format and was confusing the sam folks
+
 ----USeq_8.5.9----
 MethylationArrayScanSeqs
 * Renamed to MethylationArrayScanner
