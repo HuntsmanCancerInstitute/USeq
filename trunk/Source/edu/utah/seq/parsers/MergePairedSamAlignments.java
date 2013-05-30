@@ -695,19 +695,19 @@ public class MergePairedSamAlignments{
 		}
 		else {
 			//make merged
-			SamAlignment mergedSam = makeSamAlignment(left, right, mergedSamLayout, startLeft);
+			SamAlignment mergedSam = makeSamAlignment(first.isReverseStrand(), left, right, mergedSamLayout, startLeft);
 			return mergedSam;
 		}
 
 	}
 
-	public static SamAlignment makeSamAlignment(SamAlignment first, SamAlignment second, SamLayout merged, int position){
+	public static SamAlignment makeSamAlignment(boolean isReverseStrand, SamAlignment first, SamAlignment second, SamLayout merged, int position){
 		SamAlignment mergedSam = new SamAlignment();
 		//<QNAME>
 		mergedSam.setName(first.getName());
 		//<FLAG>
 		SamAlignmentFlags saf = new SamAlignmentFlags();
-		saf.setReverseStrand(first.isReverseStrand());
+		saf.setReverseStrand(isReverseStrand);
 		mergedSam.setFlags(saf.getFlags());
 		//<RNAME>
 		mergedSam.setReferenceSequence(first.getReferenceSequence());

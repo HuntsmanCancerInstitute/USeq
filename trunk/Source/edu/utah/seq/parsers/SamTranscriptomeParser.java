@@ -387,8 +387,9 @@ public class SamTranscriptomeParser{
 							}
 							else if (first.isReverseStrand() != second.isReverseStrand()) merge = true;
 							//attempt a merge?
-							if (merge){
+							if (merge){								
 								SamAlignment mergedSam = mergePairedAlignments (first, second);
+
 								//success?
 								if (mergedSam != null) {
 									printSam(mergedSam,1);
@@ -557,7 +558,7 @@ public class SamTranscriptomeParser{
 			numberNonOverlappingBases+= overNonOver[1];
 
 			//make merged
-			SamAlignment mergedSam = MergePairedSamAlignments.makeSamAlignment(left, right, mergedSamLayout, startLeft);
+			SamAlignment mergedSam = MergePairedSamAlignments.makeSamAlignment(first.isReverseStrand(), left, right, mergedSamLayout, startLeft);
 
 			return mergedSam;
 		}
@@ -831,7 +832,7 @@ public class SamTranscriptomeParser{
 				"-c Don't remove chrAdapt and chrPhiX alignments.\n"+
 				"-p Merge proper paired unique alignments. Those that cannot be unambiguously merged\n" +
 				"      are left as pairs. Recommended to avoid double counting errors and increase\n" +
-				"      base calling accuracy. \n"+
+				"      base calling accuracy. For paired Illumina UTP data, use -p -r -b .\n"+
 				"-q Maximum acceptable  base pair distance for merging, defaults to 300000.\n"+
 				"-h Full path to a txt file containing a sam header, defaults to autogenerating the\n"+
 				"      header from the read data.\n"+

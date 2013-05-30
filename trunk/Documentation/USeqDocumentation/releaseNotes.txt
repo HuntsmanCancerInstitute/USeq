@@ -2,6 +2,8 @@
 NovoalignBisulfiteParser
 * Added option to parse xxx.bam files
 * Removed -u unique alignment option since this only works with native novo format and was confusing the sam folks
+SamTranscriptomeParser
+* Fixed a bug with merging paired RNASeq datasets that was causing the strand to be incorrectly assigned to the merged alignment.
 
 ----USeq_8.5.9----
 MethylationArrayScanSeqs
