@@ -68,7 +68,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		infoLine = this.getModifiedInfoString(infoToUse,style);
 		
 		String modifiedRecord = String.format("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",this.chromosome,String.valueOf(this.position+1),
-				this.rsNumber,this.reference,this.alternate,String.valueOf(this.quality),this.filter,infoLine,this.format);
+				this.rsNumber,this.reference,this.alternate[0],String.valueOf(this.quality),this.filter,infoLine,this.format);
 		for (VCFSample s: this.sample) {
 			modifiedRecord += "\t" + s.getUnmodifiedSampleString();
 		}
@@ -232,7 +232,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	public String getSpreadsheetOutput(ArrayList<String> infoToAdd, String style, VCFComments comments) {
 		String endPos = String.valueOf(this.getPosition() + 1 + this.maxInt(this.getReference().length()-1,0));
 		StringBuffer full = new StringBuffer(this.getChromosome() + "\t" + this.getPosition() + "\t" + endPos + "\t" + this.getReference() + "\t" + 
-							this.getAlternate() + "\t" + String.valueOf(this.getQuality()));
+							this.getAlternate()[0] + "\t" + String.valueOf(this.getQuality()));
 		full.append("\t" + this.info.buildInfoForTable(infoToAdd, style, comments));
 		for (VCFSample sample: this.sample) {
 			String genotype = sample.getGenotypeGT();
