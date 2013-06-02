@@ -57,6 +57,8 @@ public class VCFAnnotator {
 		put("OMIM",new AnnovarCommand("OMIM Annotations"));
 		put("V_FLAG",new AnnovarCommand("V_FLAG Annotations"));
 		put("ACMG",new AnnovarCommand("ACMG Annotations"));
+		put("NIST",new AnnovarCommand("NIST Annotations"));
+		
 	}};
 	
 	private HashMap<String,String> ethnicityMap = new HashMap<String,String>() {{
@@ -217,7 +219,7 @@ public class VCFAnnotator {
     	
     	//Annovar gene
     	cmdName = "ENSEMBL";
-    	ProcessBuilder pbEnsembl = new ProcessBuilder(this.pathToAnnovar,"--geneanno","--buildver","hg19","-dbtype","ensgene",this.inputname,this.pathToRespository);
+    	ProcessBuilder pbEnsembl = new ProcessBuilder(this.pathToAnnovar,"--geneanno","--buildver","hg19","-dbtype","ensgene","-splicing_threshold","25","-hgvs",this.inputname,this.pathToRespository);
     	String il1Ensembl = new String("##INFO=<ID=VarType,Number=1,Type=String,Description=\"Exonic variant effect.  If the variant is exonic, this column lists the "
     			+ "functional consequences of the change.  Possible values and (precedence): frameshift insertion (1), frameshift deletion (2), frameshift block "
     			+ "substitution (3), stopgain (4), stoploss (5), nonframeshift insertion (6), nonframeshift deletion (7), nonframeshift block substitution (8), "
@@ -413,6 +415,14 @@ public class VCFAnnotator {
     	OutputParser op1Vflag = new OutputParser(cmdName,il1Vflag,"hg19_gff3",true);
     	commandMap.get(cmdName).addCommand(pbVflag);
     	commandMap.get(cmdName).addOutputParser(op1Vflag);
+    	
+    	//Annovar NIST
+    	cmdName = "NIST";
+    	ProcessBuilder pbNist = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_nist.gff3",this.inputname,this.pathToRespository);
+    	String il1Nist = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Flag,Description=\"Regions that can be resolved with high certainty using Illumina sequencing according to NIST.\">");
+    	OutputParser op1Nist = new OutputParser(cmdName,il1Nist,"hg19_gff3",true);
+    	commandMap.get(cmdName).addCommand(pbNist);
+    	commandMap.get(cmdName).addOutputParser(op1Nist);
  
     }
 	
@@ -447,8 +457,8 @@ public class VCFAnnotator {
 				"      of genomic variants (DGV), sift scores (SIFT), polyphen scores (PP2), mutation taster\n" +
 				"      scores (MT), LRT scores (LRT), Phylop score (PHYLOP), GWAS catalog annotations (GWAS),\n" +
 				"      dbsnp annotations (DBSNP), 1K genomes annotations (ONEK), COSMIC annotations (COSMIC), \n" +
-				"      ESP annotations (ESP), OMIM genes and diseases (OMIM), Flagged VAAST genes (V-FLAG) \n" +
-				"      and ACMG genes\n" +
+				"      ESP annotations (ESP), OMIM genes and diseases (OMIM), Flagged VAAST genes (V-FLAG), \n" +
+				"      ACMG genes, and NIST callable ragions (NIST)\n" +
 				"-n VAAST output.  If a VAAST output file is specified, variation score and gene rank \n" +
 				"      is added the VCF file\n" +
 				"-p Path to annovar directory.\n" +
@@ -537,7 +547,7 @@ public class VCFAnnotator {
 			}
 		} else {
 			//Set up default command, command map keys aren't sorted, so manually set it up
-			String[] ctr = new String[]{"ENSEMBL","REFSEQ","DBSNP","ONEK","COSMIC","ESP","SIFT","PP2","MT","LRT","PHYLOP","SEGDUP","GWAS","OMIM","ACMG","V_FLAG"};
+			String[] ctr = new String[]{"ENSEMBL","REFSEQ","DBSNP","ONEK","COSMIC","ESP","SIFT","PP2","MT","LRT","PHYLOP","SEGDUP","GWAS","OMIM","ACMG","V_FLAG","NIST"};
 			//String[] ctr = new String[]{"ENSEMBL","REFSEQ"};
 			this.annsToRun.addAll(Arrays.asList(ctr));
 		}

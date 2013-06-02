@@ -3,6 +3,7 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -19,19 +20,22 @@ public class MultiSampleVCFFilter {
 	private boolean filterAnySample = false;
 	private boolean passing = true;
 	private boolean compressOutput = true;
-	private boolean controlHomozygousFilter = false;
-	private boolean oneOrMorePassingCohortFilter = false;
+	//private boolean controlHomozygousFilter = false;
+	//private boolean oneOrMorePassingCohortFilter = false;
 	private boolean filterRecordQuality = false;
-	private boolean filterRecordVQSLOD = false;
 	private boolean failNonPassRecords = false;
-	private boolean requireOneObservationInCases = false;
+	//private boolean requireOneObservationInCases = false;
 	private int sampleMinimumReadDepthDP = 0;
 	private int sampleMinimumGenotypeQualityGQ = 0;
 	private float recordMinimumQUAL = 0;
 	private float recordMinimumVQSLOD = 0;
 	private boolean printSampleNames = false;
-	private String[] controlSampleNames = null;
-	private String[] cohortSampleNames = null;
+	private boolean filterByGenotype = false;
+	//private String[] controlSampleNames = null;
+	//private String[] cohortSampleNames = null;
+	
+	private String[][] samplesByGroup = null;
+	private String[] flagsByGroup = null;
 
 
 
@@ -62,31 +66,17 @@ public class MultiSampleVCFFilter {
 			System.out.println(vcfInFile.getName()+ "\tRecordQuality\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
 		}
 
-		if (filterRecordVQSLOD){
-			int[] startEndCounts = filterRecordVQSLOD(parser);
-			System.out.println(vcfInFile.getName()+ "\tRecordVQSLOD\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
-		}
-
 		if (filterAnySample) {
 			int[] startEndCounts = filterAnySample(parser);
 			System.out.println(vcfInFile.getName()+ "\tAnySample\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
 		}
-
-		if (controlHomozygousFilter){
-			int[] startEndCounts = controlHomozygousFilter(parser);
-			System.out.println(vcfInFile.getName()+ "\tAnyControlHomozygous\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+		
+		if (filterByGenotype) {
+			int[] startEndCounts = filterByGenotype(parser);
+			System.out.println(vcfInFile.getName() + "\tGenotypeFilter\t" + startEndCounts[0]+"\t"+startEndCounts[1]);
 		}
 
-		if (oneOrMorePassingCohortFilter){
-			int[] startEndCounts = filterAnySampleCohort(parser);
-			System.out.println(vcfInFile.getName()+ "\tAnyCohortSample\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
-		}
-
-		if (requireOneObservationInCases) {
-			int[] startEndCounts = requireOneObservationFilter(parser);
-			System.out.println(vcfInFile.getName()+ "\tAtLeastOneObservationAboveThresholds\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
-		}
-
+		
 
 
 		//print good or bad records 
@@ -112,149 +102,96 @@ public class MultiSampleVCFFilter {
 		System.out.println(vcfOutFile.getName()+ "\t"+ Misc.stringArrayToString(parser.getSampleNames(), ","));
 	}
 
-	/**Sets passing records to fail if any of the control samples that pass the read depth and genotype quality and are also homozygous for the non reference allele. 
-	 * Returns int[startingNumPassing, endingNumPassing]*/
-	private int[] controlHomozygousFilter(VCFParser parser) {
-		//fetch indexes for controls
-		int[] controlSampleIndex = fetchControlIndexes(parser);
+	/**Fails records where groups don't match their flags */
+	private int[] filterByGenotype(VCFParser parser) {
 		//fetch records
 		VCFRecord[] records = parser.getVcfRecords();
 		int startingRecordNumber = parser.countMatchingVCFRecords(VCFRecord.PASS);
+		
+		
 
 		//filter
 		for (VCFRecord test : records){
 			//is it a passing record?
 			if (test.getFilter().equals(VCFRecord.FAIL)) continue;
-
-			boolean passes = true;
-			VCFSample[] samples = test.getSample();
-			for (int i=0; i< controlSampleIndex.length; i++){
-				VCFSample s = samples[controlSampleIndex[i]];
-				if (s.isNoCall()== true ||  
-						s.getReadDepthDP() < sampleMinimumReadDepthDP || 
-						s.getGenotypeQualityGQ() < sampleMinimumGenotypeQualityGQ) continue;
-				//check if homozygous non reference
-				if (s.getGenotypeGT().equals("1/1")){
-					passes = false;
-					break;
+			
+			boolean passFlag;
+			boolean foundFlag;
+			boolean globalPass = true;
+			
+			for (int i=0; i<flagsByGroup.length; i++) {
+				passFlag = true;
+				foundFlag = false;
+				
+				int[] groupSamples = this.fetchGroupIndexes(parser, i);
+				VCFSample[] samples = test.getSample();
+				
+				for (int j=0; j<groupSamples.length; j++) {
+					VCFSample s = samples[groupSamples[j]];
+					if (s.isNoCall()== true || s.getReadDepthDP() < sampleMinimumReadDepthDP || 
+							s.getGenotypeQualityGQ() < sampleMinimumGenotypeQualityGQ) {
+						continue;
+					} 
+					
+					if (!checkFlag(s.getGenotypeGT(),this.flagsByGroup[i])) {
+						passFlag = false;
+					} else {
+						foundFlag = true;
+					}
+				}
+				
+				if (passFlag != true || foundFlag != true) {
+					globalPass = false;
 				}
 			}
-			if (passes == false) test.setFilter(VCFRecord.FAIL);
-		}
-
-		int numStillPassing = parser.countMatchingVCFRecords(VCFRecord.PASS);
-		return new int[]{startingRecordNumber, numStillPassing};
-	}
-
-
-	private int[] requireOneObservationFilter(VCFParser parser) {
-		//get indexes for cases
-		int[] cohortSampleIndex = this.fetchCohortIndexes(parser);
-
-		VCFRecord[] records = parser.getVcfRecords();
-		int startingRecordNumber = parser.countMatchingVCFRecords(VCFRecord.PASS);
-
-		//Run filtering
-		for (VCFRecord test: records) {
-			//Make sure it's a passing record
-			if (test.getFilter().equals(VCFRecord.FAIL)) {
-				continue;
-			}
-
-			boolean passes = false;
-			VCFSample[] samples = test.getSample();
-			for (int i=0; i<cohortSampleIndex.length; i++) {
-				VCFSample s = samples[cohortSampleIndex[i]];
-				if ((s.isNoCall())) {
-					continue;
-				}
-				if ((s.getGenotypeGT().equals("0/1") || s.getGenotypeGT().equals("1/1")) && 
-						s.getReadDepthDP() >= sampleMinimumReadDepthDP &&
-						s.getGenotypeQualityGQ() >= sampleMinimumGenotypeQualityGQ) {
-					passes = true;
-					break;
-				}
-			}
-			if (passes == false) {
+			
+			if (globalPass != true) {
 				test.setFilter(VCFRecord.FAIL);
 			}
-		}
-
-		int numStillPassing = parser.countMatchingVCFRecords(VCFRecord.PASS);
-		return new int[] {startingRecordNumber, numStillPassing};
-	}
-
-
-	private int[] fetchControlIndexes(VCFParser parser) {
-		int[] indexes = new int[controlSampleNames.length];
-		String[] sampleNames = parser.getSampleNames();
-		for (int i=0; i< indexes.length; i++){
-			boolean found = false;
-			for (int j=0; j< sampleNames.length; j++){
-				if (controlSampleNames[i].equals(sampleNames[j])){
-					indexes[i] = j;
-					found = true;
-					break;
-				}
-			}
-			if (found == false) Misc.printErrAndExit("\nCannot find a matching control sample name for '"+
-					controlSampleNames[i]+"' in the list of sample names : "+Misc.stringArrayToString(sampleNames, ",") +"\n");
-		}
-		return indexes;
-	}
-
-
-	/**Sets passing records to fail if no cohort/ affected sample makes the read depth and genotype quality thresholds. 
-	 * Returns int[startingNumPassing, endingNumPassing]*/
-	private int[] filterAnySampleCohort(VCFParser parser) {
-		//fetch indexes for controls
-		int[] cohortSampleIndex = fetchCohortIndexes(parser);
-		//fetch records
-		VCFRecord[] records = parser.getVcfRecords();
-		int startingRecordNumber = parser.countMatchingVCFRecords(VCFRecord.PASS);
-
-		//filter
-		for (VCFRecord test : records){
-			//is it a passing record?
-			if (test.getFilter().equals(VCFRecord.FAIL)) continue;
-
-			boolean passes = false;
-			VCFSample[] samples = test.getSample();
-			for (int i=0; i< cohortSampleIndex.length; i++){
-				VCFSample s = samples[i];
-				if (s.isNoCall()== false &&  
-						s.getReadDepthDP() >= sampleMinimumReadDepthDP && 
-						s.getGenotypeQualityGQ() >= sampleMinimumGenotypeQualityGQ) {
-					passes = true;
-					break;
-				}
-			}
-			if (passes == false) test.setFilter(VCFRecord.FAIL);
+			
 		}
 
 		int numStillPassing = parser.countMatchingVCFRecords(VCFRecord.PASS);
 		return new int[]{startingRecordNumber, numStillPassing};
 	}
+	
+	private boolean checkFlag(String genotype,String flag) {
+		boolean retVal =  false;
+		if (flag.equals("W") && genotype.equals("0/0")) {
+			retVal = true;
+		} else if (flag.equals("H") && genotype.equals("0/1")) {
+			retVal = true;
+		} else if (flag.equals("M") && genotype.equals("1/1")) {
+			retVal = true;
+		} else if (flag.equals("-W") && !genotype.equals("0/0")) {
+			retVal = true;
+		} else if (flag.equals("-H") && !genotype.equals("0/1")) {
+			retVal = true;
+		} else if (flag.equals("-M") && !genotype.equals("0/1")) {
+			retVal = true;
+		}
+		
+		return retVal;
+	}
 
-
-	private int[] fetchCohortIndexes(VCFParser parser) {
-		int[] indexes = new int[cohortSampleNames.length];
+	
+	private int[] fetchGroupIndexes(VCFParser parser, int group) {
+		int[] indexes = new int[this.samplesByGroup[group].length];
 		String[] sampleNames = parser.getSampleNames();
-		for (int i=0; i< indexes.length; i++){
+		for (int i=0; i < indexes.length; i++) {
 			boolean found = false;
-			for (int j=0; j< sampleNames.length; j++){
-				if (cohortSampleNames[i].equals(sampleNames[j])){
+			for (int j=0; j<sampleNames.length; j++) {
+				if (this.samplesByGroup[group][i].equals(sampleNames[j])) {
 					indexes[i] = j;
 					found = true;
 					break;
 				}
 			}
-			if (found == false) Misc.printErrAndExit("\nCannot find a matching cohort sample name for '"+
-					cohortSampleNames[i]+"' in the list of sample names : "+Misc.stringArrayToString(sampleNames, ",") +"\n");
+			if (found == false) Misc.printErrAndExit("\nCannot find a matching sample for '" + this.samplesByGroup[group][i] + 
+					"' in the list of sample names "+Misc.stringArrayToString(sampleNames, ",") +"\n");
 		}
 		return indexes;
 	}
-
 
 
 	/**Sets passing records to fail if no sample passes the sample read depth and genotype quality. Returns int[startingNumPassing, endingNumPassing]*/
@@ -328,15 +265,22 @@ public class MultiSampleVCFFilter {
 		System.out.println(failNonPassRecords + "\tFail records where the original FILTER field is not 'PASS' or '.'");
 		System.out.println(filterRecordQuality+"\tFail records with QUAL scores < "+ recordMinimumQUAL);
 		System.out.println(filterAnySample + "\tPass records where any sample passses thresholds");
-		System.out.println(controlHomozygousFilter + "\tFail records where any control is homozygous non reference and also passes the sample thresholds");
-		System.out.println(oneOrMorePassingCohortFilter + "\tFail records where no cohort/ affected sample passes the sample thresholds");
-		if (requireOneObservationInCases) {
-			System.out.println(requireOneObservationInCases+"\tFail records where no cohort sample is homozygous or heterozgous for alt allele above the sample thresholds");
-		}
-		if (controlHomozygousFilter) System.out.println(Misc.stringArrayToString(controlSampleNames, ",")+ "\tControl sample names");
-		if (oneOrMorePassingCohortFilter) System.out.println(Misc.stringArrayToString(cohortSampleNames, ",")+ "\tCohort/ affected sample names");
+		
 		System.out.println(sampleMinimumReadDepthDP + "\tMinimum sample read depth DP");
 		System.out.println(sampleMinimumGenotypeQualityGQ + "\tMinimum sample genotype quality GQ");
+		
+		if (this.filterByGenotype) {
+			for (int i=0; i<this.flagsByGroup.length;i++) {
+				System.out.println("\nGroup: " + i);
+				System.out.println("Flag: " + this.flagsByGroup[i]);
+				for (int j=0; j<this.samplesByGroup[i].length; j++) {
+					System.out.println("\tSample: " + this.samplesByGroup[i][j]);
+				}
+			}
+		}
+		
+		
+		
 	}
 
 	public static void main(String[] args) {
@@ -354,6 +298,9 @@ public class MultiSampleVCFFilter {
 
 		File inputFile = null;
 		String outputFile = null;
+		
+		String[] sampleNames = null;
+		String[] groups = null;
 
 
 		for (int i = 0; i<args.length; i++){
@@ -368,17 +315,21 @@ public class MultiSampleVCFFilter {
 					case 't': this.pathToTabix = args[++i]; break;
 					case 'f': passing = false; break;
 					case 'a': filterAnySample = true; break;
-					case 'b': controlHomozygousFilter = true; break;
-					case 'c': oneOrMorePassingCohortFilter = true; break;
-					case 'e': requireOneObservationInCases = true; break;
+					//case 'b': controlHomozygousFilter = true; break;
+					//case 'c': oneOrMorePassingCohortFilter = true; break;
+					//case 'e': requireOneObservationInCases = true; break;
 					case 'g': sampleMinimumGenotypeQualityGQ = Integer.parseInt(args[++i]); break;
 					case 'i': failNonPassRecords = true; break;
+					case 'b': filterByGenotype = true; break;
 					case 'r': sampleMinimumReadDepthDP = Integer.parseInt(args[++i]); break;
 					case 'd': recordMinimumQUAL = Float.parseFloat(args[++i]); filterRecordQuality = true; break;
-					case 'q': recordMinimumVQSLOD = Float.parseFloat(args[++i]); filterRecordVQSLOD = true; break;
 					case 's': printSampleNames = true; break;
-					case 'o': cohortSampleNames = args[++i].split(","); break;
-					case 'n': controlSampleNames = args[++i].split(","); break;
+					//case 'o': cohortSampleNames = args[++i].split(","); break;
+					//case 'n': controlSampleNames = args[++i].split(","); break;
+					case 'n': sampleNames = args[++i].split(","); break;
+					case 'u': groups = args[++i].split(","); break;
+					case 'l': flagsByGroup = args[++i].split(","); break;
+					
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -388,6 +339,84 @@ public class MultiSampleVCFFilter {
 				}
 			}
 		}
+		
+		//Check sample name / group / flag information
+		//Make sure sample number == group numbers
+		if (filterByGenotype) {
+			if (sampleNames == null) {
+				System.out.println("If filtering by genotype, you must specify sample names (-n)\n");
+				System.exit(1);
+				
+			}
+			if (groups == null) {
+				System.out.println("If filtering by genotype, you must specify groups (-u)\n");
+				System.exit(1);
+				
+			}
+			if (this.flagsByGroup == null) {
+				System.out.println("If filtering by genotype, you must specify flags by group (-l)\n");
+				System.exit(1);
+				
+			}
+			
+			int total = 0;
+			for (String group: groups) {
+				total += Integer.parseInt(group);
+			}
+			if (total != sampleNames.length) {
+				System.out.println("Error: The number of samples listed does not match the number of group assignments. Samples: " + sampleNames.length + " Groups: " + total + "\n");
+				System.exit(1);
+			}
+			
+			if (groups.length != flagsByGroup.length) {
+				System.out.println("Error: The number of flags does not match the number of groups. Groups: " + groups.length + " Flags: " + flagsByGroup.length + "\n");
+				System.exit(1);
+			}
+			
+			
+			//Check flag
+			HashMap<String,Integer> flagChoice = new HashMap<String,Integer>();
+			flagChoice.put("W", 0);
+			flagChoice.put("H", 0);
+			flagChoice.put("M", 0);
+			flagChoice.put("-W", 0);
+			flagChoice.put("-H", 0);
+			flagChoice.put("-M", 0);
+			
+			for (String flag: flagsByGroup) {
+				if (!flagChoice.containsKey(flag)) {
+					System.out.println("Error: Don't recognize the specified flag: " + flag + "\n");
+					System.exit(1);
+				} else {
+					int count = flagChoice.get(flag);
+					flagChoice.put(flag, count++);
+				}
+			}
+			
+			for (Integer val: flagChoice.values()) {
+				if (val > 1) {
+					System.out.println("Error: Flag specified more than once\n");
+					System.exit(1);
+				}
+			}
+			
+			int nameIndex = 0;
+			int groupIndex = 0;
+			this.samplesByGroup = new String[groups.length][];
+			for (String group: groups) {
+				int count = Integer.parseInt(group);
+				this.samplesByGroup[groupIndex] = new String[count];
+				int sampleIndex = 0;
+				for (int i = nameIndex; i< nameIndex+count; i++) {
+					this.samplesByGroup[groupIndex][sampleIndex] = sampleNames[i];
+					sampleIndex += 1;
+				}
+				nameIndex += count;
+				groupIndex += 1;
+			}
+
+		}
+	
 
 		if (inputFile == null) {
 			System.out.println("Input file was not specified, exiting.\n");
@@ -431,22 +460,12 @@ public class MultiSampleVCFFilter {
 			System.out.println();
 			System.exit(0);
 		}
-
-		if (controlHomozygousFilter){
-			if (controlSampleNames == null || controlSampleNames.length ==0) Misc.printExit("\nError: please enter a comma delimited list (no spaces) of the control sample names.\n");
-		}
-
-		if (oneOrMorePassingCohortFilter){
-			if (cohortSampleNames == null || cohortSampleNames.length ==0) Misc.printExit("\nError: please enter a comma delimited list (no spaces) of the cohort/ affected sample names.\n");
-		}
-
-
 	}	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Multi Sample VCF Filter  : April 2013                   **\n" +
+				"**                          Multi Sample VCF Filter  : May 2013                     **\n" +
 				"**************************************************************************************\n" +
 				"Filters a vcf file containing multiple sample records into those that pass or fail\n" +
 				"the tests below. This works with VCFv4.1 files created by the GATK package. Note, the\n" +
@@ -460,20 +479,22 @@ public class MultiSampleVCFFilter {
 				"Optional:\n" +
 				"-f Print out failing records, defaults to printing those passing the filters.\n" +
 				"-a Fail records where no sample passes the sample thresholds.\n"+
-				"-b Fail records where any of the control samples that pass the sample thresholds also\n" +
-				"      contain the homozygous non reference allele. Requires setting -n .\n"+
-				"-c Fail records where none of the cohort/ affected samples pass the sample thresholds.\n" +
-				"      Requires setting -o .\n"+
-				"-e Fail records where none of the cohort/ affected samples have alt observations\n" +
-				"      above the specified GQ and DP threshholds.\n" +
 				"-i Fail records where the original FILTER field is not 'PASS' or '.'\n"+
+				"-b Filter by genotype flags.  -n, -u and -l must be set.\n" +
+				"-n Sample names ordered by category.  \n" +
+				"-u Number of samples in each category.  \n" +
+				"-l Requirement flags for each category. All samples that pass the specfied filters must \n" +
+				"   meet the flag requirements, or the variant isn't reported.  At least one sample in each \n" +
+				"   group must pass the specified filters, or the variant isn't reported \n" +
+				"		a) 'W' : homozygous common \n" +
+				"		b) 'H' : heterozygous \n" +
+				"		c) 'M' : homozygous rare \n" +
+				"		d) '-W' : not homozygous common \n" +
+				"		e) '-H' : not heterozygous \n" +
+				"		f) '-M' : not homozygous rare\n" +		
 				"-d Minimum record QUAL score, defaults to 0, recommend >=20 .\n"+
 				"-g Minimum sample genotype quality GQ, defaults to 0, recommend >= 20 .\n"+
 				"-r Minimum sample read depth DP, defaults to 0, recommend >=10 .\n"+
-				"-q Minimum VQSLOD, defaults to 0, recommend >=4 . Requires that the GATK\n" +
-				"      ApplyRecalibration was run on the vcf file.\n"+
-				"-o Comma delimited (no spaces) list of cohort/ affected sample names.\n"+
-				"-n Comma delimited (no spaces) list of control sample names.\n"+
 				"-s Print sample names and exit.\n"+
 				"-t Path to tabix\n" +
 

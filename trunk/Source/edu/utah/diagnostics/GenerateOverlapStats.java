@@ -9,6 +9,7 @@ import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -176,16 +177,30 @@ public class GenerateOverlapStats {
 				boolean priorSet = false;
 				ArrayList<SamAlignment> alignmentsToSave = new ArrayList<SamAlignment>();
 				int dotCounter = 0;
+				int timCounter = 0;
+				int matched = 0;
+				int unmatched = 0;
 
 				samReader = new SAMFileReader(bamFile);
 				
 				HashMap<String,SamAlignment> storedReads = new HashMap<String,SamAlignment>();
+				HashSet<String> skipped = new HashSet<String>();
 
 				SAMRecordIterator it = samReader.iterator();
 
 				while (it.hasNext()) {
 					SAMRecord sam = it.next();
 					line = sam.getSAMString().trim();
+					
+					if (++timCounter > 100000) {
+						System.out.println(matched + "  " + unmatched + " " + storedReads.size() + " " + skipped.size());
+//						for (SamAlignment s: storedReads.values()) {
+//							if (sam.getAlignmentStart() - s.getPosition() > 1000) {
+//								System.out.println(s.toString());
+//							}
+//						}
+						timCounter = 0;
+					}
 
 					if (++dotCounter > 1000000){
 						System.out.print(".");
@@ -201,15 +216,40 @@ public class GenerateOverlapStats {
 						continue;
 					}
 					numberAlignments++;
-
-					if (checkSamAlignment(sa, line) == false) continue;
-
+					
 					String readName = sa.getName();
+
+					if (checkSamAlignment(sa, line) == false) {
+						if (storedReads.containsKey(readName)) {
+							storedReads.remove(readName);
+						} else {
+							if (skipped.contains(readName)) {
+								skipped.remove(readName);
+							} else {
+								skipped.add(readName);
+							}
+							
+						}
+						continue;
+					}
+					
+					if (skipped.contains(readName)) {
+						skipped.remove(readName);
+						continue;
+					}
+
+					
+					if (Math.abs(sam.getInferredInsertSize()) > 10000 || sam.getReferenceIndex() != sam.getMateReferenceIndex() || sa.isMateUnMapped() || sa.isUnmapped()) {
+						continue;
+					}
 					
 					if (!storedReads.containsKey(readName)) {
 						storedReads.put(readName,sa);
+						unmatched += 1;
 						continue;
 					}
+					
+					matched += 1;
 					
 					//Grab first observed
 					SamAlignment firstObserved = storedReads.get(readName);

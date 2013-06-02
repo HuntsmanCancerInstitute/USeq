@@ -16,6 +16,7 @@ import util.gen.Misc;
 
 public class CountChromosomes {
 	private File inputFile = null;
+	private File path = null;
 	private SAMFileHeader header = null;
 	private File outputFile = null;
 	private String reference = null;
@@ -56,6 +57,7 @@ public class CountChromosomes {
 			add("chr22");
 			add("chrX");
 			add("chrY");
+			add("chrM");
 		}};
 		
 		ArrayList<String> phiX = new ArrayList<String>() {{
@@ -88,12 +90,12 @@ public class CountChromosomes {
 		ProcessBuilder pb = null;
 		
 		//Grab the total number of reads
-		pb = new ProcessBuilder("/tomato/app/samtools/samtools","view","-c",inputFile.toString());
+		pb = new ProcessBuilder(path.toString(),"view","-c",inputFile.toString());
 		allReads = this.runSystemCommand(pb, "Count all Reads");
 		
 		//Create standard command
 		ArrayList<String> stdCommand = new ArrayList<String>();
-		stdCommand.add("/tomato/app/samtools/samtools");
+		stdCommand.add(path.toString());
 		stdCommand.add("view");
 		stdCommand.add("-F");
 		stdCommand.add("0x4");
@@ -234,6 +236,7 @@ public class CountChromosomes {
 					case 'i': inputFile = new File(args[++i]); break;
 					case 'o': outputFile = new File(args[++i]); break;
 					case 'r': reference = args[++i]; break;
+					case 'p': path = new File(args[++i]); break;
 					case 'h': usage(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -279,6 +282,7 @@ public class CountChromosomes {
 		System.out.println("* -i Input file (bam format)                                  *");
 		System.out.println("* -o Output file (.txt format)                                *");
 		System.out.println("* -r Reference (hg19, hg18, mm10, mm9 etc.                    *");
+		System.out.println("* -p path to samtools                                         *");   
 		System.out.println("***************************************************************\n");
 	}
 	

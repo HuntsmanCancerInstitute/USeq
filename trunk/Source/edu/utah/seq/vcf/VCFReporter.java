@@ -222,10 +222,10 @@ public class VCFReporter {
 					case 'x': damaging = true; break;
 					case 'a': standard = true; break;
 					case 'h': printDocs(); System.exit(0);
+					case 'p': this.pathToTabix = args[++i]; break;
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
-				}
-				catch (Exception e){
+				} catch (Exception e){
 					Misc.printExit("\nSorry, something doesn't look right with this parameter: -"+test+"\n");
 				}
 			}
@@ -262,6 +262,7 @@ public class VCFReporter {
 			this.columnsToUse.add("V_RANK");
 			this.columnsToUse.add("V_FLAG");
 			this.columnsToUse.add("ACMG");
+			this.columnsToUse.add("NIST");
 			if (desiredColumns != null) {
 				System.out.println("********************************** WARNING ****************************************");
 				System.out.println("Since standard settings were selected, skipping option -d\n");
@@ -376,6 +377,7 @@ public class VCFReporter {
 				"-a Annotations only.  Report standard annotations in CLEAN format.  Skip info fields reported \n" + 
 				"      by GATK to reduce clutter in IGV.\n" +
 				"-x Damaging only.  Only report nonsynonymous, frameshift or splicing variants\n" +
+				"-p Path to tabix directory.  Set this variable if the application is not run on moab/alta\n" +
 				"\nTab-delimited only options\n" +
 				"-k Generate key.  Text document that lists descriptions of each column in the output table\n" +
 				"\n\n"+

@@ -30,7 +30,7 @@ public class VCFUtilities {
 		File uncompressed = new File(fm.group(1));
 		uncompressed.deleteOnExit();
 		
-		ProcessBuilder pb = new ProcessBuilder(pathToTabix + "/bgzip","-c","-d",tabixFile.getName());
+		ProcessBuilder pb = new ProcessBuilder(pathToTabix + "/bgzip","-c","-d",tabixFile.getAbsoluteFile().toString());
 		
 		
 		try {
@@ -84,8 +84,8 @@ public class VCFUtilities {
 		//Create file pointing to compressed file
 		File compressed = new File(fm.group(0) + ".gz");
 		
-		ProcessBuilder pb1 = new ProcessBuilder(pathToTabix + "/bgzip",vcfFile.getName());
-		ProcessBuilder pb2 = new ProcessBuilder(pathToTabix + "/tabix","-p","vcf",compressed.getName());
+		ProcessBuilder pb1 = new ProcessBuilder(pathToTabix + "/bgzip",vcfFile.getAbsoluteFile().toString());
+		ProcessBuilder pb2 = new ProcessBuilder(pathToTabix + "/tabix","-p","vcf",compressed.getAbsoluteFile().toString());
 		
 		ArrayList<ProcessBuilder> pbList = new ArrayList<ProcessBuilder>(); 
 		pbList.add(pb1);
