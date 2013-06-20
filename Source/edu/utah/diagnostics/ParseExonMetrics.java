@@ -68,7 +68,7 @@ public class ParseExonMetrics {
 	//Various files
 	private File insertGraph = null;
 	private File errorGraph = null;
-	private File coverageGraph = null;
+	//private File coverageGraph = null;
 	private File coverageGraph2 = null;
 
 	public ParseExonMetrics(String[] args) {
@@ -92,7 +92,6 @@ public class ParseExonMetrics {
 		this.parseAlignmentMetrics();
 	
 		System.out.println("Parsing USeq's MergePairedAlignments...");
-		//ProcessBuilder mergedProcess = new ProcessBuilder("java","-Xmx4g","-jar","/home/BioApps/USeq/Apps/MergePairedAlignments","-f",inputFile.toString());
 		this.parseMerged();
 		
 		System.out.println("Parsing Picard's Mark Duplicate Metrics...");
@@ -145,8 +144,8 @@ public class ParseExonMetrics {
 				}
 			}
 			
-			this.generateRBarplot(coverage, fraction, "PEM.cov.txt", "Coverage across CCDS Bases", "Depth of Coverage", "Fraction At Given Coverage", coverageGraph);
-			this.generateRBarplot(coverage, fractionOrGreater, "PEM.cov2.txt", "Coverage across CCDS Bases", "Depth of Coverage", "Fraction At Given Coverage or Greater", coverageGraph2);
+			//this.generateRBarplot(coverage, fraction, "PEM.cov.txt", "Coverage across CCDS Bases", "Depth of Coverage", "Fraction At Given Coverage", coverageGraph, "depth");
+			this.generateRBarplot(coverage, fractionOrGreater, "PEM.cov2.txt", "Coverage across CCDS Bases", "Depth of Coverage", "Fraction At Given Coverage or Greater", coverageGraph2,"depth");
 			
 			br.close();
 			
@@ -181,7 +180,7 @@ public class ParseExonMetrics {
 			
 			this.meanErrorRate = Float.parseFloat(br.readLine().split("\t")[1]);
 			
-			this.generateRBarplot(xaxis, values, ".PEM.error.txt", "Per Base Error Rate", "Position", "Error Rate", errorGraph);
+			this.generateRBarplot(xaxis, values, ".PEM.error.txt", "Per Base Error Rate", "Position", "Error Rate", errorGraph,"error");
 			
 			
 			br.close();
@@ -323,7 +322,7 @@ public class ParseExonMetrics {
 				values.add(Float.parseFloat(items[1]));
 			}
 			
-			this.generateRBarplot(xaxis, values, "PEM.insert.txt", "Insert Size Distribution", "Insert Size", "Counts", insertGraph);
+			this.generateRBarplot(xaxis, values, "PEM.insert.txt", "Insert Size Distribution", "Insert Size", "Counts", insertGraph,"insert");
 			br.close();
 			
 		} catch (IOException ioex) {
@@ -337,7 +336,27 @@ public class ParseExonMetrics {
 		}
 	}
 	
-	private void generateRBarplot(ArrayList<Integer> xvalues, ArrayList<Float> yvalues,String suffix, String title, String xaxis, String yaxis, File output) {
+	
+	private void errorRatePlot(StringBuffer sb,String xaxis,String yaxis) {
+		sb.append("p=ggplot(data,aes(x=V1,y=V2)) + geom_bar(stat='identity') + ");
+		sb.append("scale_x_continuous('" + xaxis + "',breaks=round(seq(min(data$V1), max(data$V1), by=10),1)) + ");
+		sb.append("scale_y_continuous('" + yaxis + "',limits=c(0,0.0200)) +");
+	}
+	
+	private void insertSizePlot(StringBuffer sb,String xaxis,String yaxis) {
+		sb.append("p=ggplot(data,aes(x=V1,y=V2)) + geom_bar(stat='identity') + ");
+		sb.append("scale_x_continuous('" + xaxis + "',breaks=round(seq(50,750, by=50),1),limits=c(50,750)) + ");
+		sb.append("scale_y_continuous('" + yaxis + "') +");
+	}
+	
+	private void depthStandardPlot(StringBuffer sb, String xaxis, String yaxis) {
+		sb.append("p=ggplot(data,aes(x=V1,y=V2)) + geom_bar(stat='identity') + ");
+		sb.append("scale_x_continuous('" + xaxis + "',breaks=round(seq(0, 50, by=1),0),limits=c(0,50)) + ");
+		sb.append("scale_y_continuous('" + yaxis + "',breaks=round(seq(min(data$V1),max(data$V1), by=0.10),2)) +");
+	}
+	
+	
+	private void generateRBarplot(ArrayList<Integer> xvalues, ArrayList<Float> yvalues,String suffix, String title, String xaxis, String yaxis, File output, String style) {
 		
 		BufferedWriter bw = null;
 		
@@ -360,9 +379,20 @@ public class ParseExonMetrics {
 			
 			sb.append("library(ggplot2)\n");
 			sb.append("data=read.table('" + insertData.getCanonicalPath() + "')\n");
-			sb.append("p=ggplot(data,aes(x=V1,y=V2)) + geom_bar(stat='identity') + ");
-			sb.append("scale_x_discrete('" + xaxis + "',breaks=round(seq(min(data$V1), max(data$V1), by=50),1)) + ");
-			sb.append("scale_y_continuous('" + yaxis + "') +");
+			
+			if (style.equals("insert")) {
+				insertSizePlot(sb,xaxis,yaxis);
+			} else if (style.equals("error")) {
+				errorRatePlot(sb,xaxis,yaxis);
+			} else if (style.equals("depth")) {
+				depthStandardPlot(sb,xaxis,yaxis);
+			} else {
+				System.out.println("Don't recognize graph style, exiting");
+				System.exit(1);
+			}
+			//sb.append("p=ggplot(data,aes(x=V1,y=V2)) + geom_bar(stat='identity') + ");
+			//sb.append("scale_x_discrete('" + xaxis + "',breaks=round(seq(min(data$V1), max(data$V1), by=50),1)) + ");
+			//sb.append("scale_y_continuous('" + yaxis + "') +");
 			sb.append("ggtitle(paste('" + outputFile.getName() + "','" + title + "',sep=': '))\n");
 			sb.append("ggsave(p,file='" + output.getCanonicalPath() + "',width=6,height=3)\n");
 	
@@ -531,18 +561,18 @@ public class ParseExonMetrics {
 			//Write coverage
 			bw.write("\\section{Coverage}\n");
 			bw.write("\\paragraph{}\n");
-			bw.write("Depth of coverage plots across CCDS exons can be found in \\textbf{Figure~\\ref{fig:3}} and \\textbf{Figure~\\ref{fig:4}}.  \\emph{Data generated by USeq's Sam2USeq.}\n");
+			bw.write("Depth of coverage plots across CCDS exons can be found in \\textbf{Figure~\\ref{fig:3}}.  \\emph{Data generated by USeq's Sam2USeq.}\n");
 			
 			//Insert histogram
-			bw.write("\\begin{figure}[H]");
-			bw.write("\\centerline{\\includegraphics{"+coverageGraph.getCanonicalPath()+"}}\n");
-			bw.write("\\caption{Fraction of bases at each level of coverage.\\label{fig:3}}\n");
-			bw.write("\\end{figure}\n\n");
-			
+//			bw.write("\\begin{figure}[H]");
+//			bw.write("\\centerline{\\includegraphics{"+coverageGraph.getCanonicalPath()+"}}\n");
+//			bw.write("\\caption{Fraction of bases at each level of coverage.\\label{fig:3}}\n");
+//			bw.write("\\end{figure}\n\n");
+//			
 			//Insert histogram
 			bw.write("\\begin{figure}[H]");
 			bw.write("\\centerline{\\includegraphics{"+coverageGraph2.getCanonicalPath()+"}}\n");
-			bw.write("\\caption{Fraction of bases at each level of coverage or greater.\\label{fig:4}}\n");
+			bw.write("\\caption{Fraction of bases at each level of coverage or greater.\\label{fig:3}}\n");
 			bw.write("\\end{figure}\n\n");
 			
 			
@@ -577,9 +607,9 @@ public class ParseExonMetrics {
 		
 		
 		toDelete.add(outputFile + ".out");
-		toDelete.add(outputFile + ".tex");
+		//toDelete.add(outputFile + ".tex");
 		toDelete.add(outputFile + ".aux");
-		toDelete.add(outputFile + ".log");
+		//toDelete.add(outputFile + ".log");
 
 		
 		
@@ -682,20 +712,20 @@ public class ParseExonMetrics {
 		
 		this.insertGraph = new File(this.outputFile + "_insert.pdf");
 		this.errorGraph = new File(this.outputFile + "_error.pdf");
-		this.coverageGraph = new File(this.outputFile + "_coverage.pdf");
+		//this.coverageGraph = new File(this.outputFile + "_coverage.pdf");
 		this.coverageGraph2 = new File(this.outputFile + "_coverage2.pdf");
 		
-		this.insertGraph.deleteOnExit();
-		this.errorGraph.deleteOnExit();
-		this.coverageGraph.deleteOnExit();
-		this.coverageGraph2.deleteOnExit();
+		//this.insertGraph.deleteOnExit();
+		//this.errorGraph.deleteOnExit();
+		//this.coverageGraph.deleteOnExit();
+		//this.coverageGraph2.deleteOnExit();
 		
 	}
 	
 	private void exitMessage(String message) {
 		usage();
 		System.out.println(message);
-		System.exit(1);
+		System.exit(0);
 	}
 	
 	private void usage() {
