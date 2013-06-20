@@ -10,6 +10,7 @@ import edu.utah.seq.data.sam.MalformedSamAlignmentException;
 import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.data.sam.SamAlignment;
 import net.sf.samtools.*;
+import net.sf.samtools.SAMFileReader.ValidationStringency;
 import util.bio.parsers.MultiFastaParser;
 import util.gen.*;
 
@@ -296,7 +297,9 @@ public class CalculatePerCycleErrorRate {
 
 
 	private int[] estimateNumberOfCyclesBam(File bamFile) {
+		SAMFileReader.setDefaultValidationStringency(ValidationStringency.SILENT);
 		SAMFileReader samReader = new SAMFileReader(bamFile);
+		//samReader.setValidationStringency(ValidationStringency.SILENT);
 		SAMRecordIterator it;
 		if (samReader.hasIndex()) it = samReader.queryOverlapping(chromName, 0, chromLength);
 		else it = samReader.iterator();
@@ -306,7 +309,7 @@ public class CalculatePerCycleErrorRate {
 		Pattern pat = Pattern.compile("(\\d+)M");
 		while (it.hasNext()) {
 			SAMRecord sam = it.next();
-
+		
 			//is it aligned?
 			if (sam.getReadUnmappedFlag()) continue;
 
@@ -323,6 +326,7 @@ public class CalculatePerCycleErrorRate {
 			}
 			//exit
 			if (counter++ > 10000) break;
+			
 
 		}
 		it.close();
