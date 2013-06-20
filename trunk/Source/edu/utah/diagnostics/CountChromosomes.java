@@ -289,7 +289,7 @@ public class CountChromosomes {
 	private void exitMessage(String message) {
 		usage();
 		System.out.println(message);
-		System.exit(1);
+		System.exit(0);
 	}
 
 }

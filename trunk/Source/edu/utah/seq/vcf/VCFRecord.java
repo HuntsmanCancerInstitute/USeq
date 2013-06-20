@@ -67,8 +67,14 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		
 		infoLine = this.getModifiedInfoString(infoToUse,style);
 		
+		String altString = "";
+		for (String alt: this.alternate) {
+			altString += "," + alt;
+		}
+		altString = altString.substring(1);
+		
 		String modifiedRecord = String.format("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",this.chromosome,String.valueOf(this.position+1),
-				this.rsNumber,this.reference,this.alternate[0],String.valueOf(this.quality),this.filter,infoLine,this.format);
+				this.rsNumber,this.reference,altString,String.valueOf(this.quality),this.filter,infoLine,this.format);
 		for (VCFSample s: this.sample) {
 			modifiedRecord += "\t" + s.getUnmodifiedSampleString();
 		}

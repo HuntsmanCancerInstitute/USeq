@@ -401,7 +401,7 @@ public class VCFAnnotator {
     	//Annovar ACMG
     	cmdName = "ACMG";
     	ProcessBuilder pbAcmg = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_acmg.gff3",this.inputname,this.pathToRespository);
-    	String il1Acmg = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Flag,Description=\"American College of Medical Genetics and Genomics (ACMG) annotations.  ACMG recommends reporting variants "
+    	String il1Acmg = new String("##INFO=<ID=" + cmdName + ",Number=0,Type=Flag,Description=\"American College of Medical Genetics and Genomics (ACMG) annotations.  ACMG recommends reporting variants "
     			+ "with this flag, since they are contained within clinically relevant genes.\">");
     	OutputParser op1Acmg = new OutputParser(cmdName,il1Acmg,"hg19_gff3",true);
     	commandMap.get(cmdName).addCommand(pbAcmg);
@@ -410,7 +410,7 @@ public class VCFAnnotator {
     	//Annovar OMIM
     	cmdName = "V_FLAG";
     	ProcessBuilder pbVflag = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_vflag.gff3",this.inputname,this.pathToRespository);
-    	String il1Vflag = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Flag,Description=\"Incendentalome annotations. Variants marked with this flag are within genes that "
+    	String il1Vflag = new String("##INFO=<ID=" + cmdName + ",Number=0,Type=Flag,Description=\"Incendentalome annotations. Variants marked with this flag are within genes that "
     			+ "commonly come up as positive in VAAST runs.\">");
     	OutputParser op1Vflag = new OutputParser(cmdName,il1Vflag,"hg19_gff3",true);
     	commandMap.get(cmdName).addCommand(pbVflag);
@@ -419,7 +419,7 @@ public class VCFAnnotator {
     	//Annovar NIST
     	cmdName = "NIST";
     	ProcessBuilder pbNist = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_nist.gff3",this.inputname,this.pathToRespository);
-    	String il1Nist = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Flag,Description=\"Regions that can be resolved with high certainty using Illumina sequencing according to NIST.\">");
+    	String il1Nist = new String("##INFO=<ID=" + cmdName + ",Number=0,Type=Flag,Description=\"Regions that can be resolved with high certainty using Illumina sequencing according to NIST.\">");
     	OutputParser op1Nist = new OutputParser(cmdName,il1Nist,"hg19_gff3",true);
     	commandMap.get(cmdName).addCommand(pbNist);
     	commandMap.get(cmdName).addOutputParser(op1Nist);

@@ -56,7 +56,7 @@ public class TomatoFarmer {
 	public TomatoFarmer(String args[]) {
 		if (args.length == 0) {
 			printDocs();
-			System.exit(1);
+			System.exit(0);
 		}
 		processArgs(args);
 		
