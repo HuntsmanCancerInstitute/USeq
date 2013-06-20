@@ -8,7 +8,6 @@ import util.bio.annotation.Bed;
 import util.bio.annotation.ExonIntron;
 import util.bio.parsers.*;
 import util.gen.*;
-import edu.utah.seq.analysis.multi.MultipleConditionRNASeq;
 import edu.utah.seq.data.sam.SamAlignment;
 import edu.utah.seq.useq.apps.Text2USeq;
 
@@ -1311,7 +1310,7 @@ public class OverdispersedRegionScanSeqs {
 						"launch an R terminal and type 'library(DESeq)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
 			}
 			//look for estimateDispersions() function
-			boolean useEstimateDispersions = MultipleConditionRNASeq.estimateDispersions(fullPathToR, saveDirectory);
+			boolean useEstimateDispersions = DefinedRegionDifferentialSeq.estimateDispersions(fullPathToR, saveDirectory);
 			if (useEstimateDispersions == false){
 				Misc.printErrAndExit("\nError: Please upgrade DESeq to the latest version, see http://www-huber.embl.de/users/anders/DESeq/ \n");
 			}

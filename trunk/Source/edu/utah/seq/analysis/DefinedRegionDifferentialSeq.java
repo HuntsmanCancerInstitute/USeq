@@ -28,7 +28,7 @@ public class DefinedRegionDifferentialSeq {
 	private File bedFile;
 	private File refSeqFile;
 	private String genomeVersion;
-	private float minFDR = 10;
+	private float minFDR = 13;
 	private float minLog2Ratio = 1f;
 	private boolean scoreIntrons = false;
 	private boolean removeOverlappingRegions = false;
@@ -43,21 +43,22 @@ public class DefinedRegionDifferentialSeq {
 	private boolean verbose = true;
 	private int maxAlignmentsDepth = 50000;
 	private boolean secondStrandFlipped = false;
-	private boolean isPaired = false;
 	
 	//internal fields
 	private UCSCGeneLine[] genes;
 	private HashMap<String,UCSCGeneLine[]> chromGenes;
 	private HashMap<String, UCSCGeneLine> genesWithExons;
+	private HashMap<String, UCSCGeneLine> name2Gene;
 	private Condition[] conditions;
 	private HashSet<String> flaggedGeneNames = new HashSet<String>();
 	private HashSet<String> geneNamesPassingThresholds = new HashSet<String>();
 	private HashSet<String> geneNamesWithMinimumCounts = new HashSet<String>();
+	private ArrayList<String> geneNamesPassingThresholdsEdgeR;
 	private File serializedConditons = null;
 	private String url;
 	private static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSDHN])");
 	public static final Pattern BAD_NAME = Pattern.compile("(.+)/[12]$");
-	public boolean saveCounts = false;
+	public boolean saveCounts = true;
 
 	//paired diff expression
 	private UCSCGeneLine[] workingGenesToTest = null;
@@ -78,6 +79,7 @@ public class DefinedRegionDifferentialSeq {
 	//from RNASeq app integration
 	private File treatmentBamDirectory;
 	private File controlBamDirectory;
+	
 
 	//constructors
 	/**Stand alone.*/
@@ -127,17 +129,25 @@ public class DefinedRegionDifferentialSeq {
 		System.out.println("Running pairwise DESeq analysis "+varianceFiltered+" variance outlier filtering to identify differentially expressed and spliced genes...");
 		analyzeForDifferentialExpression();
 		System.out.println("\n\t"+geneNamesPassingThresholds.size()+"\tgenes differentially expressed (FDR "+Num.formatNumber(minFDR, 2)+", log2Ratio "+Num.formatNumber(minLog2Ratio, 2)+")\n");
-
-		//too many?
-		if (geneNamesPassingThresholds.size() > 5000 && minFDR <=13) if (verbose) System.out.println("WARNING: too many differentially expressed genes?! This may freeze the R clustering. Consider more stringent thresholds (e.g. FDR of 20 or 30)\n");
-
+		String thresholdName = Num.formatNumber(minFDR,1)+"FDR"+Num.formatNumber(minLog2Ratio, 1)+"Lg2Rto";
+		File f = new File (saveDirectory, "diffExprGenes_DESeqAllPair_"+thresholdName+".txt");
+		IO.writeHashSet(geneNamesPassingThresholds, f);
+		
+		
+		//launch all pair ANOVA-like edgeR analysis
+		if (conditions.length > 2){
+			System.out.println("Launching ANOVA-like edgeR any condition analysis...");
+			runEdgeRAllConditionAnalysis();
+			System.out.println("\t"+geneNamesPassingThresholdsEdgeR.size()+"\tGenes/ regions identified as differentially expressed.\n");
+			File e = new File (saveDirectory, "diffExprGenes_EdgeRANOVALike_"+thresholdName+".txt");
+			IO.writeArrayList(geneNamesPassingThresholdsEdgeR, e);
+		}
+		
 		//sort by max pvalue
 		Arrays.sort(genes, new UCSCGeneLineComparatorMaxPValue());
-		//sort by max abs log2 ratio, this is only set for diff expressed genes so non diffs are at the bottom
-		Arrays.sort(genes, new UCSCGeneLineComparatorMaxAbsLog2Ratio());
 
 		//launch cluster analysis
-		if (verbose) System.out.println("Clustering genes and samples, BETA, ...");
+		if (verbose) System.out.println("Clustering genes and samples...");
 		clusterDifferentiallyExpressedGenes();
 		
 		//print final spreadsheet for all genes
@@ -146,6 +156,163 @@ public class DefinedRegionDifferentialSeq {
 
 	}
 
+
+	private void runEdgeRAllConditionAnalysis() {
+		//find genes with at least 20 reads across all conditions and haven't been flagged
+		ArrayList<String> genesToTest = new ArrayList<String>();
+		Iterator<String> it = geneNamesWithMinimumCounts.iterator();
+		while (it.hasNext()){
+			String geneName = it.next();
+			if (flaggedGeneNames.contains(geneName) == false) genesToTest.add(geneName);
+		}
+
+		//write it out
+		workingCountTable = new File(saveDirectory, "countTable_EdgeRANOVA.txt");
+		writeCountTable(Misc.stringArrayListToStringArray(genesToTest), workingCountTable);
+		
+		//create and execute script
+		String[] results = launchEdgeRANOVA(genesToTest.size());
+		
+		//parse results and append FDRs to genes
+		parseEdgeRANOVAResults(results);
+		
+		//append result to gene txt
+		appendGeneTxtWithEdgeRANOVA();
+	}
+	
+	private void appendGeneTxtWithEdgeRANOVA() {
+		geneNamesPassingThresholdsEdgeR = new ArrayList<String>();
+		//append header
+		spreadSheetHeader.append("\tEdgeR_ANOVALike_FDR\tMaxAbsVarCorLog2Rto");
+		//for each gene
+		for (int i=0; i< genes.length; i++){
+			StringBuilder txt = genes[i].getText();
+			txt.append("\t");
+			txt.append(genes[i].getFdrEdgeR());
+			txt.append("\t");
+			txt.append(genes[i].getMaxAbsLog2Ratio());
+			if (genes[i].getFdrEdgeR() >= minFDR && genes[i].getMaxAbsLog2Ratio() >= minLog2Ratio) geneNamesPassingThresholdsEdgeR.add(genes[i].getDisplayNameThenName());
+		}
+	}
+
+	/*Parses edgeR ANOVA like results table
+	 * genes	logFC.GV	logFC.ICM	logFC.MI	logFC.MII	logFC.MOR	logFC.PN	logFC.TROPH	logCPM	LR	PValue	FDR
+	13350	ENSG00000179046_TRIML2	-1.328269e+01	 9.853460e-01	-1.328269e+01	-1.328269e+01	 7.211705e-01	-6.308912e+00	 5.338231e-01	 5.0623416637	4.832502e+03	 0.000000e+00	 0.000000e+00
+	5808	ENSG00000129824_RPS4Y1	-1.258739e+01	 2.077325e+00	-1.258739e+01	-1.258739e+01	 1.975965e+00	-5.544523e+00	 2.389599e+00	 5.6126126090	5.412190e+03	 0.000000e+00	 0.000000e+00
+	4908	ENSG00000121570_DPPA4	-1.252600e+01	 2.049318e+00	-1.056383e+01	-1.252600e+01	 1.466659e+00	-5.974433e+00	 1.463207e+00	 5.1144759329	7.345167e+03	 0.000000e+00	 0.000000e+00
+	 */
+	private void parseEdgeRANOVAResults(String[] results) {
+		Pattern tab = Pattern.compile("\\t");
+		//find max fdr, not transformed so smallest
+		String[] geneNames = new String[results.length];
+		double[] fdrs = new double[results.length];
+		
+		//parse first one skipping header line
+		String[] tokens = tab.split(results[1]);
+		int numCol = tokens.length;
+		if (numCol != (conditions.length + 5)) Misc.printErrAndExit("\nError: too few columns found in edgeR ANOVA- like output?! Aborting, see -> "+results[1]+"\n");
+		int fdrColIndex = numCol - 1; 
+		geneNames[1] = tokens[1];
+		fdrs[1] = Double.parseDouble(tokens[fdrColIndex]);
+		double maxFDR = fdrs[1];
+		
+		//parse remainder
+		for (int i=2; i< results.length; i++){
+			tokens = tab.split(results[i]);
+			if (tokens.length != numCol) Misc.printErrAndExit("\nError: different number of columns in edgeR ANOVA-like results line?! Aborting, see -> "+results[i]+"\n");
+			geneNames[i] = tokens[1];
+			fdrs[i] = Double.parseDouble(tokens[fdrColIndex]);
+			if (maxFDR == 0) maxFDR = fdrs[i];
+			else if (fdrs[i] !=0 && fdrs[i] < maxFDR) maxFDR = fdrs[i];
+		}
+		//transform maxFDR
+		float transMaxFDR = (float)(Num.minus10log10(maxFDR) * 1.01);
+		
+		//modify genes edgeR fdr, watch for NaN or infinity?
+		for (int i=1; i< geneNames.length; i++){
+			UCSCGeneLine gene = name2Gene.get(geneNames[i]);
+			if (fdrs[i] == 0) gene.setFdrEdgeR(transMaxFDR);
+			else gene.setFdrEdgeR((float)(Num.minus10log10(fdrs[i])));
+		}
+	}
+
+	private String[] launchEdgeRANOVA(int numGenesToTest) {
+		//create & write out edgeR script
+		File edgeRResults = new File(saveDirectory, "results_EdgeRANOVA.txt");
+		String script = createEdgeRANOVAScript(edgeRResults);
+		File edgeRScript = new File(saveDirectory, "script_EdgeRANOVA.txt");
+		IO.writeString(script, edgeRScript);
+		File rOut = new File(saveDirectory, "script_EdgeRANOVA.txt.Rout");
+		
+		//make command
+		String[] command = new String[] {
+				fullPathToR.toString(),
+				"CMD",
+				"BATCH",
+				"--no-save",
+				"--no-restore",
+				edgeRScript.toString(),
+				rOut.toString()};
+
+		//execute command
+		IO.executeCommandLine(command);
+
+		//check for errors and warnings in the rOut file
+		String[] res = IO.loadFile(rOut);
+		for (String s: res) {
+			if (s.contains("Error")){
+				Misc.printErrAndExit("\nError thrown by edgeR application, aborting:\n"+Misc.stringArrayToString(res, "\n")+"\n");
+			}
+		}
+		for (String s: res) {
+			if (s.contains("Warning")){
+				System.err.println("\nWarning thrown by edgeR application:\n"+Misc.stringArrayToString(res, "\n")+"\n");
+			}
+		}
+
+		//any results? problems?
+		if (edgeRResults.exists() == false) Misc.printErrAndExit("\nError: no edgeR results file found? Check temp files for problems -> "+rOut.toString()+"\n");
+		
+		res = IO.loadFile(edgeRResults);
+		if ((res.length -1) != numGenesToTest) Misc.printErrAndExit("\nError: edgeR results file contains a different number of rows than tested genes?! Aborting, see temp files for issues -> "+rOut.toString()+"\n");
+		
+		//clean up
+		if (deleteTempFiles) {
+			workingCountTable.deleteOnExit();
+			edgeRResults.deleteOnExit();
+			edgeRScript.deleteOnExit();
+			rOut.deleteOnExit();
+		}
+		
+		return res;
+		
+	}
+
+	private String createEdgeRANOVAScript(File results) {
+		StringBuilder sb = new StringBuilder();
+		sb.append("library(edgeR)\n");
+		sb.append("rawdata = read.delim('"+workingCountTable.toString()+"', check.names=FALSE, stringsAsFactors=FALSE)\n");
+		//created groups
+		ArrayList<String> conNames = new ArrayList<String>();
+		//for each condition
+		for (Condition c: conditions){
+			String name = c.getName();
+			//for each replica
+			for (Replica r: c.getReplicas()) conNames.add(name);		
+		}
+		sb.append("group = factor(c('"+Misc.stringArrayListToString(conNames, "','")+"'))\n");
+		sb.append("y = DGEList(counts=rawdata[,2:length(colnames(rawdata))], genes=rawdata[,1], group=group)\n");
+		sb.append("y = calcNormFactors(y)\n");
+		sb.append("design = model.matrix(~group,y$samples)\n");
+		sb.append("colnames(design) = levels(y$samples$group)\n");
+		sb.append("y <- estimateGLMCommonDisp(y,design)\n");
+		sb.append("y <- estimateGLMTrendedDisp(y,design)\n");
+		sb.append("y <- estimateGLMTagwiseDisp(y,design)\n");
+		sb.append("fit <- glmFit(y, design)\n");
+		sb.append("lrt = glmLRT(fit, coef=2:length(levels(y$samples$group)))\n");
+		sb.append("write.table(as.matrix(topTags(lrt,n=100000000)$table),file='"+results.toString()+"',sep='\\t',quote=FALSE)\n");
+		return sb.toString();
+	}
 
 	private void loadConditions(){
 
@@ -240,7 +407,6 @@ public class DefinedRegionDifferentialSeq {
 			}
 		}
 	}
-
 
 	/**Assumes interbase coordinates for start and returned blocks.*/
 	public static ArrayList<int[]> fetchAlignmentBlocks(String cigar, int start){
@@ -651,7 +817,6 @@ public class DefinedRegionDifferentialSeq {
 			sb.append("heatmap( as.matrix( dists ), symm=TRUE, scale='none', margins=c(10,10), col = colorRampPalette(c('darkblue','white'))(100), labRow = paste( pData(cds)$condition, pData(cds)$type ) )\n");
 			sb.append("dev.off()\n");
 
-
 			//write script to file
 			File scriptFile = new File (saveDirectory, "allGene_RScript.txt");
 			File rOut = new File(saveDirectory, "allGene_RScript.txt.Rout");
@@ -742,8 +907,6 @@ public class DefinedRegionDifferentialSeq {
 		gl.setControlExonCounts(cCounts);
 		gl.setScores(new float[]{totalTCounts, totalCCounts});
 	}
-
-
 
 	public void estimateDifferencesInReadDistributionsWithPermutationTest(Condition one, Condition two){
 		ArrayList<UCSCGeneLine> al = new ArrayList<UCSCGeneLine>();
@@ -863,7 +1026,6 @@ public class DefinedRegionDifferentialSeq {
 			if ((tCounts[i] + cCounts[i]) < 10) continue;
 			//check ratio
 			log2Ratios[i] = calculateLog2Ratio(tCounts[i], cCounts[i], scalarTC, scalarCT);
-			//if (gene.getName().equals("ENSG00000211896_IGHG1")) if (verbose) System.out.println("XXX "+log2Ratios[i]+" "+tCounts[i]+ " "+cCounts[i]+ " "+scalarTC+" "+scalarCT);
 			float logRatio = Math.abs(log2Ratios[i]);
 			if (logRatio > maxLogRatio) {
 				maxLogRatio = logRatio;
@@ -1070,8 +1232,9 @@ public class DefinedRegionDifferentialSeq {
 
 			//print second name?
 			if (secondNamePresent) {
+				text.append("\"");
 				text.append(genes[i].getName());
-				text.append("\t");
+				text.append("\"\t");
 			}
 			
 			//status? OK or sectioned or read depth
@@ -1186,14 +1349,15 @@ public class DefinedRegionDifferentialSeq {
 				if (workingGenesToTest[i].getpValue() > workingGenesToTest[i].getMaxPValue()) workingGenesToTest[i].setMaxPValue(workingGenesToTest[i].getpValue());
 				//check adjPVal
 				if (workingGenesToTest[i].getFdr() == Float.MIN_VALUE) workingGenesToTest[i].setFdr(maxAdjPVal);
-				//does it log2ration difference  thresholds?
+				//does it log2ratio difference  thresholds?
 				float absLog2Ratio = Math.abs(workingGenesToTest[i].getLog2Ratio());
 				if (workingGenesToTest[i].getFdr() >= minFDR && absLog2Ratio >= minLog2Ratio){
 					geneNamesPassingThresholds.add(workingGenesToTest[i].getDisplayNameThenName());
 					numberWorkingGenesPassingFilters++;
 					workingGenesPassingFilters.add(workingGenesToTest[i]);
-					if (workingGenesToTest[i].getMaxAbsLog2Ratio() < absLog2Ratio) workingGenesToTest[i].setMaxAbsLog2Ratio(absLog2Ratio);
 				}
+				//set max log2ratio?
+				if (workingGenesToTest[i].getMaxAbsLog2Ratio() < absLog2Ratio) workingGenesToTest[i].setMaxAbsLog2Ratio(absLog2Ratio);
 			}
 			//clean up
 			if (deleteTempFiles) {
@@ -1355,8 +1519,11 @@ public class DefinedRegionDifferentialSeq {
 					Iterator<String> it = geneCounts.keySet().iterator();
 					while (it.hasNext()){
 						String geneName = it.next();
-						//has this been flagged?
-						if (flaggedGeneNames.contains(geneName)) continue;
+						//has this been flagged? Hmmm. I thought these were already removed from all of the conditions?
+						if (flaggedGeneNames.contains(geneName)) {
+							Misc.printErrAndExit("\nFlagged gene found! Exiting\n");
+							continue;
+						}
 						GeneCount gc = geneCounts.get(geneName);
 						if (gc != null && gc.getCount()> minimumCounts) {
 							genesToTest.add(geneName);
@@ -1504,13 +1671,17 @@ public class DefinedRegionDifferentialSeq {
 		chromGenes = reader.getChromSpecificGeneLines();
 
 		genesWithExons = new HashMap<String, UCSCGeneLine>();
+		name2Gene = new HashMap<String, UCSCGeneLine>();
 		for (UCSCGeneLine gl: genes) {
-			if (gl.getExons().length > 1) genesWithExons.put(gl.getDisplayNameThenName(), gl);
+			String name = gl.getDisplayNameThenName();
+			if (gl.getExons().length > 1) genesWithExons.put(name, gl);
+			name2Gene.put(name, gl);
+			
 		}
 	}
 
 
-	/**Loades the geneNamesWithMinimumCounts hash with gene names that pass the minimumCounts array.
+	/**Loads the geneNamesWithMinimumCounts hash with gene names that pass the minimumCounts array.
 	 * No need to call if scanGenes called.*/
 	private void loadMinimumCountsHash(){
 		geneNamesWithMinimumCounts.clear();
@@ -1564,7 +1735,7 @@ public class DefinedRegionDifferentialSeq {
 					case 'g': genomeVersion = args[++i]; break;
 					case 'a': usePermutationSpliceTest = true; break;
 					case 'j': performReverseStrandedAnalysis = true; break;
-					case 'k': secondStrandFlipped = false; break;
+					case 'k': secondStrandFlipped = true; break;
 					case 'h': printDocs(); System.exit(0);
 					//hidden options!
 					case 'd': saveCounts = true; break;
@@ -1613,7 +1784,7 @@ public class DefinedRegionDifferentialSeq {
 
 		//look for estimateDispersions() function
 		if (estimateDispersions(fullPathToR, saveDirectory) == false){
-			Misc.printErrAndExit("\nError: Please upgrade DESeq to the latest version, see http://www-huber.embl.de/users/anders/DESeq/ \n");
+			Misc.printErrAndExit("\nError: Please upgrade R, Bioconductor, DESeq and edgeR to the latest versions, see http://www.bioconductor.org \n");
 		}
 
 		//look for bed file
@@ -1625,9 +1796,9 @@ public class DefinedRegionDifferentialSeq {
 	/**Returns true if DESeq uses the estimateDispersions function otherwise false.*/
 	public static boolean estimateDispersions(File fullPathToR, File tempDir){
 		//this will return an error
-		String error = IO.runRCommandLookForError("library(DESeq); estimateDispersions(5);", fullPathToR, tempDir);
+		String error = IO.runRCommandLookForError("library(DESeq); estimateDispersions(5); library(edgeR)", fullPathToR, tempDir);
 		if (error.contains("could not find function")) {
-			System.err.println("\nWARNING: You have installed an obsolete version of DESeq. Update R, Bioconductor, and DESeq to latest versions. Key changes have been implemented to control for variance outliers. Don't use this old version!\n");
+			System.err.println("\nWARNING: Please install and update R, Bioconductor, DESeq, and edgeR to latest versions.\n");
 			return false;
 		}
 		return true;
@@ -1636,14 +1807,15 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Defined Region Differential Seq: Sept 2012                **\n" +
+				"**                        Defined Region Differential Seq: June 2013                **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +
 				"identifies differentially expressed genes under any pairwise comparison using DESeq.\n" +
 				"DESeq's variance corrected count data is used to heirachically cluster the \n" +
 				"differentially expressed genes as well as the samples. See the DESeq manual for\n" +
-				"details. Alternative splicing is estimated using a chi-square test of independence.\n" +
+				"details. An ANOVA-like any condition differential expression analysis is also run using\n" +
+				"edgeR. Alternative splicing is estimated using a chi-square test of independence.\n" +
 				"In addition to the cluster plots, a spread sheet is created with the pValue,\n" +
 				"FDR, and variance corrected log2Ratios for each of the pairwise comparisons as well as\n" +
 				"the raw, FPKM, and log2 variance corrected alignment counts.  Use the later for\n" +
@@ -1656,9 +1828,9 @@ public class DefinedRegionDifferentialSeq {
 				"       condition. The BAM files should be sorted by coordinate using Picard's SortSam.\n" +
 				"       All spice junction coordinates should be converted to genomic coordinates, see\n" +
 				"       USeq's SamTranscriptomeParser.\n" +
-				"-r Full path to R loaded with DESeq library, defaults to '/usr/bin/R' file, see\n" +
-				"       http://www-huber.embl.de/users/anders/DESeq/ . Type 'library(DESeq)' in\n" +
-				"       an R terminal to see if it is installed. \n"+
+				"-r Full path to R (version 3+) loaded with DESeq and edgeR, defaults to '/usr/bin/R'\n" +
+				"       file, see http://www.bioconductor.org . Type 'library(DESeq) and library(edgeR)'\n" +
+				"       in an R terminal to see if they are installed. \n"+
 				"-u UCSC RefFlat or RefSeq gene table file, full path. Tab delimited, see RefSeq Genes\n"+
 				"       http://genome.ucsc.edu/cgi-bin/hgTables, (uniqueName1 name2(optional) chrom\n" +
 				"       strand txStart txEnd cdsStart cdsEnd exonCount (commaDelimited)exonStarts\n" +
@@ -1679,16 +1851,17 @@ public class DefinedRegionDifferentialSeq {
 				"       density coverage are ignored. Warnings are thrown.\n"+
 				"-n Max number repeat alignments. Defaults to all.  Assumes 'IH' tags have been set by\n" +
 				"       processing raw alignments with the SamTranscriptomeProcessor.\n"+
-				"-f Minimum FDR threshold for sorting, defaults to 10 (-10Log10(FDR=0.1)).\n"+
+				"-f Minimum FDR threshold for sorting, defaults to 13 (-10Log10(FDR=0.05)).\n"+
 				"-l Minimum absolute varCorLog2Rto threshold for sorting, defaults to 1 (2x).\n"+
 				"-e Minimum number alignments per gene/ region, defaults to 20.\n"+
 				"-i Score introns instead of exons.\n"+
 				"-p Perform a stranded analysis. Only collect reads from the same strand as the\n" +
 				"      annotation.\n" +
 				"-j Reverse stranded analysis.  Only collect reads from the opposite strand of the\n" +
-				"      annotation.  This setting should be used for the Illumina's strand-specific dUTP protocol.\n" +
-				"-k Second read flipped. This setting can be used to flip the strand of the second read in a pair.\n" +
-				"      This setting makes it easier to view in IGB, but can break other downstream applications.\n" +
+				"      annotation.  This setting should be used for the Illumina's strand-specific\n" +
+				"      dUTP protocol.\n" +
+				"-k Second read's strand is flipped. Otherwise, assumes this was not done in the \n" +
+				"      SamTranscriptomeParser.\n" +
 				"-a Perform a permutation based chi-square test for differential exon usage.\n"+
 				"      Needs 4 or more replicas per condition.\n"+
 				"-t Don't delete temp files (R script, R results, Rout, etc..).\n"+

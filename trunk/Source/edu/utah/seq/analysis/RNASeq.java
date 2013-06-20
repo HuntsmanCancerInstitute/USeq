@@ -1,7 +1,5 @@
 package edu.utah.seq.analysis;
 import java.io.*;
-
-import edu.utah.seq.analysis.multi.MultipleConditionRNASeq;
 import edu.utah.seq.data.Sam2USeq;
 import edu.utah.seq.data.SmoothingWindowInfo;
 import edu.utah.seq.parsers.*;
@@ -547,7 +545,7 @@ public class RNASeq {
 				}
 				
 				//look for estimateDispersions() function
-				boolean useEstimateDispersions = MultipleConditionRNASeq.estimateDispersions(rApplication, resultsDirectory);
+				boolean useEstimateDispersions = DefinedRegionDifferentialSeq.estimateDispersions(rApplication, resultsDirectory);
 				if (useEstimateDispersions == false){
 					Misc.printErrAndExit("\nError: Please upgrade DESeq to the latest version, see http://www-huber.embl.de/users/anders/DESeq/ \n");
 				}
@@ -748,7 +746,7 @@ public class RNASeq {
 				"       This setting makes it easier to view in IGB, but can break other downstream applications.\n" +
 				"-b Reverse the strand of both pairs.  Use this option if you would like the orientation\n" +
 				"      of the alignments to match the orientation of the annotation in Illumina stranded \n" +
-				"      UTP sequencing.  This is purely cosmetic and isn't necessary for downstream pipelines\n" +
+				"      UTP sequencing.\n" +
 				"-x Max per base alignment depth, defaults to 50000. Genes containing such high\n"+
 				"       density coverage are ignored. Warnings are thrown.\n"+
 				"-v Genome version (e.g. H_sapiens_Feb_2009, M_musculus_Jul_2007), see UCSC FAQ,\n"+
