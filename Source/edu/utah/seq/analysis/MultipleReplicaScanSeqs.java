@@ -5,7 +5,6 @@ import java.util.regex.*;
 import java.util.*;
 import trans.tpmap.WindowMaker;
 import util.gen.*;
-import edu.utah.seq.analysis.multi.MultipleConditionRNASeq;
 import edu.utah.seq.data.*;
 import edu.utah.seq.parsers.BarParser;
 import util.bio.cluster.*;
@@ -96,7 +95,7 @@ public class MultipleReplicaScanSeqs {
 		this.verbose = verbose;
 		
 		//check DESeq?
-		MultipleConditionRNASeq.estimateDispersions(fullPathToR, saveDirectory);
+		DefinedRegionDifferentialSeq.estimateDispersions(fullPathToR, saveDirectory);
 		
 		//System.out.println("ED? "+useEstimateDispersions);
 		
@@ -808,7 +807,7 @@ public class MultipleReplicaScanSeqs {
 		}
 		
 		//look for estimateDispersions() function
-		MultipleConditionRNASeq.estimateDispersions(fullPathToR, saveDirectory);
+		DefinedRegionDifferentialSeq.estimateDispersions(fullPathToR, saveDirectory);
 
 		//make matrixFile
 		tempRDirectory = new File (saveDirectory, "TempRDir_"+Passwords.createRandowWord(7));

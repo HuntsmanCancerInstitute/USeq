@@ -1,3 +1,12 @@
+----USeq_8.6.1----
+RandomizeTextFile
+* Added ability to process all files in a directory.
+* Gzipping output.
+FetchGenomicSequences
+* Enabled working with gzipped fasta data
+DefinedRegionDifferentialSeq
+* Added ANOVA-like edgeR analysis to the output for runs with more than 2 conditions.
+
 ----USeq_8.6.0----
 NovoalignBisulfiteParser
 * Added option to parse xxx.bam files

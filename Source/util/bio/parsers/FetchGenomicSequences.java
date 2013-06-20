@@ -61,6 +61,8 @@ public class FetchGenomicSequences {
 				System.out.println("\tLoading "+chrom);
 				File chromFastaFile = new File (genomicSequenceDirectory,chrom+".fasta");
 				if (chromFastaFile.exists() ==  false ) chromFastaFile = new File (genomicSequenceDirectory,chrom+".fa");
+				if (chromFastaFile.exists() ==  false ) chromFastaFile = new File (genomicSequenceDirectory,chrom+".fasta.gz");
+				if (chromFastaFile.exists() ==  false ) chromFastaFile = new File (genomicSequenceDirectory,chrom+".fa.gz");
 				if (chromFastaFile.exists() ==  false ){
 					Misc.printExit("Error: Cannot find genomic sequence file for -> "+chrom +" Aborting.");
 				}

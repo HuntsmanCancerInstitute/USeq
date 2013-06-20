@@ -1536,7 +1536,7 @@ public class IO {
 
 	/**Loads a file's lines into a String[], will save blank lines. gz/zip OK*/
 	public static String[] loadFile(File file){
-		ArrayList a = new ArrayList();
+		ArrayList<String> a = new ArrayList<String>();
 		try{
 			BufferedReader in = IO.fetchBufferedReader(file);
 			String line;
@@ -1992,6 +1992,22 @@ public class IO {
 			while (it.hasNext()){
 				Object obj = it.next();
 				out.println(obj+"\t"+hashMap.get(obj));
+			}
+			out.close();
+		}catch (Exception e){
+			e.printStackTrace();
+			return false;
+		}
+		return true;	
+	}
+	
+	/**Writes each key tab value on a separate line to the file.*/
+	public static boolean writeHashSet(HashSet set, File file){
+		try{
+			PrintWriter out  = new PrintWriter(new FileWriter(file));
+			Iterator it = set.iterator();
+			while (it.hasNext()){
+				out.println(it.next());
 			}
 			out.close();
 		}catch (Exception e){

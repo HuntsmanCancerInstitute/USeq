@@ -461,7 +461,7 @@ public class RNAEditingScanSeqs {
 			//calc pseMedian
 			//if (addFraction) randomPseMedians[randomPseMedianIndex++] = (float)Num.pseudoMedian(fractions);
 			
-			//calc chiSquare
+			//calc chiSquare stat
 			double chi = chiSquare.chiSquare(expect, observed);
 			randomScores[numBases].countScore(chi);
 		}
@@ -494,7 +494,7 @@ public class RNAEditingScanSeqs {
 				index++;
 			}
 			
-			//calc chiSquare
+			//calc chiSquare stat
 			double chi = chiSquare.chiSquare(expect, observed);
 			
 			float pseMean = (float)Num.pseudoMedian(fractions);

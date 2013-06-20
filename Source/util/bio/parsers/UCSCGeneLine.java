@@ -35,6 +35,8 @@ public class UCSCGeneLine {
 	private int splicingExon = 0;
 	private StringBuilder text;
 	private boolean flagged = false;
+	//all condition edgeR ANOVA
+	private float fdrEdgeR = 0;
 	
 
 
@@ -667,5 +669,11 @@ public class UCSCGeneLine {
 	}
 	public void setFlagged(boolean flaggedGene) {
 		this.flagged = flaggedGene;
+	}
+	public float getFdrEdgeR() {
+		return fdrEdgeR;
+	}
+	public void setFdrEdgeR(float fdrEdgeR) {
+		this.fdrEdgeR = fdrEdgeR;
 	}
 }
