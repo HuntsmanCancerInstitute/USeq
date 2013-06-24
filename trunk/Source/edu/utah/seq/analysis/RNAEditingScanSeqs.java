@@ -20,10 +20,11 @@ public class RNAEditingScanSeqs {
 	private File[] nonConvertedPointDirs;
 	private File saveDirectory;
 	private int windowSize = 50;
-	private int minimumNumberObservationsInWindow = 5;
+	private int minimumNumberObservationsInWindow = 3;
 	private double errorRateMinOne;
 	private int minimumBaseCoverage = 5;
 	private float minimumPseMedian = 0.005f;
+	private float minimumBaseFractionEdited = 0.01f;
 	private boolean runStrandedAnalysis = false;
 
 	//internal fields
@@ -329,10 +330,11 @@ public class RNAEditingScanSeqs {
 		}
 		methylatedBases = MethylatedBaseObservationOneSample.fetchCommonBasesWithMinimumObservations(nonConvertedChrom, convertedChrom, minimumBaseCoverage);
 		
-		//remove those 100% edited (likely snvs)
+		//remove those 100% edited (likely snvs) and fail the minimumBaseFractionEdited
 		ArrayList<MethylatedBaseObservationOneSample> good = new ArrayList<MethylatedBaseObservationOneSample>();
 		for (int i=0; i< methylatedBases.length; i++){
-			if (methylatedBases[i].getCon() != 0) good.add(methylatedBases[i]);
+			float bfe = methylatedBases[i].getFractionMethylationNoAddOne();
+			if (bfe != 1.0f && bfe >= minimumBaseFractionEdited) good.add(methylatedBases[i]);
 		}
 		methylatedBases = new MethylatedBaseObservationOneSample[good.size()];
 		good.toArray(methylatedBases);
@@ -620,6 +622,7 @@ public class RNAEditingScanSeqs {
 					case 'w': windowSize = Integer.parseInt(args[++i]); break;
 					case 'm': minimumNumberObservationsInWindow = Integer.parseInt(args[++i]); break;
 					case 'p': minimumPseMedian = Float.parseFloat(args[++i]); break;
+					case 'b': minimumBaseFractionEdited = Float.parseFloat(args[++i]); break;
 					case 't': runStrandedAnalysis = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
@@ -663,7 +666,7 @@ public class RNAEditingScanSeqs {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           RNA Editing Scan Seqs: April 2013                      **\n" +
+				"**                           RNA Editing Scan Seqs: June 2013                       **\n" +
 				"**************************************************************************************\n" +
 				"RESS attempts to identify clustered editing sites across a genome using a sliding\n" +
 				"window approach.  Each window is scored for the pseudomedian of the base fraction\n" +
@@ -680,8 +683,9 @@ public class RNAEditingScanSeqs {
 				
 				"\nAdvanced Options:\n"+
 				"-p Minimum pseudomedian, defaults to 0.005.\n"+
+				"-b Minimum base fraction edited to use in analysis, defaults to 0.01\n"+
 				"-w Window size, defaults to 50.\n"+
-				"-m Minimum number observations in window, defaults to 5. \n" +
+				"-m Minimum number observations in window, defaults to 3. \n" +
 				"-t Run a stranded analysis, defaults to non-stranded.\n"+
 				"\n"+
 
