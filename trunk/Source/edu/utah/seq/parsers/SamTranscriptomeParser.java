@@ -54,6 +54,7 @@ public class SamTranscriptomeParser{
 	private int maximumProperPairDistanceForMerging = 300000;
 	private double numberMergedPairs = 0;
 	private double numberFailedMergedPairs = 0;
+	private int maximumMappingQuality = 0;
 
 	//constructors
 	public SamTranscriptomeParser(String[] args){
@@ -240,6 +241,11 @@ public class SamTranscriptomeParser{
 						if (saveUnmappedAndFailedScore) failedSamOut.println(line);
 						continue;
 					}
+				}
+				
+				//reset maximumMappingQuality?
+				if (maximumMappingQuality !=0){
+					if (sa.getMappingQuality() > maximumMappingQuality) sa.setMappingQuality(maximumMappingQuality);
 				}
 
 				//modify second read if phiX or adapter; some paired reads have a mate hitting the control chroms
@@ -721,6 +727,7 @@ public class SamTranscriptomeParser{
 					case 'p': mergePairedAlignments = true; break;
 					case 'q': maximumProperPairDistanceForMerging = Integer.parseInt(args[++i]); mergePairedAlignments = true; break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
+					case 'x': maximumMappingQuality = Integer.parseInt(args[++i]); break;
 					case 'm': minimumMappingQualityScore = Float.parseFloat(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -800,7 +807,7 @@ public class SamTranscriptomeParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Sam Transcriptome Parser: May 2013                      **\n" +
+				"**                          Sam Transcriptome Parser: June 2013                     **\n" +
 				"**************************************************************************************\n" +
 				"STP takes SAM alignment files that were aligned against chromosomes and extended\n" +
 				"splice junctions (see MakeTranscriptome app), converts the coordinates to genomic\n" +
@@ -820,6 +827,8 @@ public class SamTranscriptomeParser{
 				"-m Minimum mapping quality score, defaults to 0 (no filtering), larger numbers are\n" +
 				"      more stringent. Only applies to genomic matches, not splice junctions. Set to 13\n" +
 				"      or more to require near unique alignments.\n"+
+				"-x Maximum mapping quality, reset reads with a mapping quality greater than the max to\n"+
+				"      this max.\n"+
 				"-n Maximum number of locations each read may align, defaults to 1 (unique matches).\n"+
 				"-d If the maximum number of locations threshold fails, save one randomly picked repeat\n" +
 				"      alignment per read.\n"+
