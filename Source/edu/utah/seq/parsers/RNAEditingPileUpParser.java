@@ -23,12 +23,15 @@ public class RNAEditingPileUpParser {
 	private File saveDirectory;
 	private File nonConvertedPointDataDirectory;
 	private File convertedPointDataDirectory;
+	private boolean nonStrandedParsing = true;
 	
 	//internal fields
 	private Pattern space = Pattern.compile("\\t");
 	private Pattern GBase = Pattern.compile("G");
 	private Pattern cBase = Pattern.compile("c");
 	private Pattern rBase = Pattern.compile("[\\.,]");
+	private Pattern rBasePlus = Pattern.compile("\\.");
+	private Pattern rBaseMinus = Pattern.compile(",");
 	private int chromIndex = 0;
 	private int positionIndex = 1;
 	private int refseqIndex = 2;
@@ -68,12 +71,14 @@ public class RNAEditingPileUpParser {
 	
 	public void parseFile(File pileupFile){
 		try {
+			//stranded analysis?
+			if (nonStrandedParsing){
+				rBasePlus = rBase;
+				rBaseMinus = rBase;
+			}
+			
 			//input streams
 			BufferedReader in = IO.fetchBufferedReader(pileupFile);
-			
-			//where to save base fraction edited
-			baseFractionEdited = new File (saveDirectory, "BaseFractionEdited_" +(int)minimumReadCoverage +"RC");
-			baseFractionEdited.mkdir();
 			
 			//data output streams
 			String chromosome = null;
@@ -112,21 +117,23 @@ public class RNAEditingPileUpParser {
 					tokens[baseCallIndex] = removeINDELS(tokens[baseCallIndex]);
 					//look for upper case G's, (conversion of A to G on plus strand)
 					float numGs = countGs(tokens[baseCallIndex]);
-					float numNonGs = countRefs(tokens[baseCallIndex]);
+					//look for periods ....
+					float numNonGs = countRefs(tokens[baseCallIndex], rBasePlus);
 					//save em
 					positionsPlus.add(position);
 					conversionsPlus.add(numGs);
 					nonConversionsPlus.add(numNonGs); 
 				}
 				
-				//minus strand
+				//minus strand,
 				else if (refSeqBase.equals("T")){
 					Integer position = Integer.parseInt(tokens[positionIndex]) -1;
 					//remove INDELS
 					tokens[baseCallIndex] = removeINDELS(tokens[baseCallIndex]);
 					//look for lower case c's, (conversion of A to G on minus strand)
 					float numCs = countCs(tokens[baseCallIndex]);
-					float numNonCs = countRefs(tokens[baseCallIndex]);
+					//look for commas ,,,
+					float numNonCs = countRefs(tokens[baseCallIndex], rBaseMinus);
 					//save em
 					positionsMinus.add(position);
 					conversionsMinus.add(numCs);
@@ -237,7 +244,7 @@ public class RNAEditingPileUpParser {
 		return num;
 	}
 	
-	public float countRefs(String baseCalls){
+	public float countRefs(String baseCalls, Pattern rBase){
 		Matcher mat = rBase.matcher(baseCalls);
 		float num = 0;
 		while (mat.find()) num++;
@@ -267,6 +274,7 @@ public class RNAEditingPileUpParser {
 					case 'r': minimumReadCoverage = Float.parseFloat(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); saveDirectory.mkdir(); break;
 					case 'v': versionedGenome = args[i+1]; i++; break;
+					case 't': nonStrandedParsing = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -285,13 +293,19 @@ public class RNAEditingPileUpParser {
 			String baseName = Misc.capitalizeFirstLetter(Misc.removeExtension(pileupFile.getName()));
 			saveDirectory = new File (pileupFile.getParentFile(), baseName);
 		}
-		
-		File pointDataDirectory = new File (saveDirectory, "PointData");
+		String strand = "Stranded_";
+		if (nonStrandedParsing) strand = "NonStranded_";
+		File pointDataDirectory = new File (saveDirectory, strand+"PointData");
 		pointDataDirectory.mkdirs();
 		nonConvertedPointDataDirectory = new File (pointDataDirectory, "Reference");
 		nonConvertedPointDataDirectory.mkdir();
 		convertedPointDataDirectory = new File (pointDataDirectory, "Edited");
 		convertedPointDataDirectory.mkdir();
+		
+		
+		//where to save base fraction edited
+		baseFractionEdited = new File (saveDirectory, strand+"BaseFractionEdited_" +(int)minimumReadCoverage +"RC");
+		baseFractionEdited.mkdir();
 		
 		
 		
@@ -305,7 +319,7 @@ public class RNAEditingPileUpParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          RNA Editing PileUp Parser: Jan 2013                     **\n" +
+				"**                          RNA Editing PileUp Parser: June 2013                    **\n" +
 				"**************************************************************************************\n" +
 				"Parses a SAMTools mpileup output file for refseq A bases that show evidence of\n" +
 				"RNA editing via conversion to Gs, stranded. Base fraction editing is calculated for\n" +
@@ -319,8 +333,10 @@ public class RNAEditingPileUpParser {
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
 				"-s Save directory, full path, defaults to pileup file directory.\n"+
 				"-r Minimum read coverage, defaults to 5.\n"+
+				"-t Generate stranded specific reference calls, defaults to non stranded. Required for\n" +
+				"      stranded down stream analysis.\n"+
 
-				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/RNAEditingPileUpParser -p \n" +
+				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/RNAEditingPileUpParser -t -p \n" +
 				"      /Pileups/N2.mpileup.gz -v C_elegans_Oct_2010\n\n" +
 
 		"**************************************************************************************\n");
