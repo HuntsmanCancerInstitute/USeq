@@ -1,3 +1,9 @@
+----USeq_8.6.2----
+RNAEditingScanSeqs
+* Added a minimum base fraction edited option to app to restrict what base observations are allowed into the analysis.
+RNAEditingPileUpParser
+* Fixed a bug where the parser was counting all of the reference reads (both plus and minus) when scoring a base for editing instead of just reads mapping to the matched strand when a stranded parsing was selected.
+
 ----USeq_8.6.1----
 RandomizeTextFile
 * Added ability to process all files in a directory.
