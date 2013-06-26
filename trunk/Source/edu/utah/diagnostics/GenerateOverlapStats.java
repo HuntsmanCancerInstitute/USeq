@@ -35,7 +35,7 @@ public class GenerateOverlapStats {
 		private File saveFile;
 		private File outputFile;
 		private float maximumAlignmentScore = 120;
-		private float minimumMappingQualityScore = 13;
+		private float minimumMappingQualityScore = 0;
 		private boolean secondPairReverseStrand = false;
 		private boolean removeControlAlignments = false;
 		private boolean skipMergingPairs = false;
@@ -351,7 +351,7 @@ public class GenerateOverlapStats {
 			}
 
 			//is it not part of a proper pair?
-			if (sa.isAProperPairedAlignment() == false){
+			if (!sa.isAProperPairedAlignment() && !sa.isUnmapped() && !sa.isMateUnMapped()){
 				numberNonProperPairedAlignments++;
 				numberPrintedAlignments++;
 				return false;

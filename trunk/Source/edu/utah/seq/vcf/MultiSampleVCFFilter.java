@@ -1,13 +1,10 @@
 package edu.utah.seq.vcf;
 import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -20,19 +17,14 @@ public class MultiSampleVCFFilter {
 	private boolean filterAnySample = false;
 	private boolean passing = true;
 	private boolean compressOutput = true;
-	//private boolean controlHomozygousFilter = false;
-	//private boolean oneOrMorePassingCohortFilter = false;
 	private boolean filterRecordQuality = false;
 	private boolean failNonPassRecords = false;
-	//private boolean requireOneObservationInCases = false;
 	private int sampleMinimumReadDepthDP = 0;
 	private int sampleMinimumGenotypeQualityGQ = 0;
 	private float recordMinimumQUAL = 0;
-	private float recordMinimumVQSLOD = 0;
 	private boolean printSampleNames = false;
 	private boolean filterByGenotype = false;
-	//private String[] controlSampleNames = null;
-	//private String[] cohortSampleNames = null;
+
 	
 	private String[][] samplesByGroup = null;
 	private String[] flagsByGroup = null;
@@ -46,45 +38,77 @@ public class MultiSampleVCFFilter {
 		processArgs(args);
 
 		printOptions();
-
-		//for each file
-		System.out.println("\nFile\tFilterType\tStarting#\tEnding#");
-
-		VCFParser parser = new VCFParser(vcfInFile, true, true, true);
 		
-		//set everything to pass (note this won't change the original when you print because printing grabs the original record line)?
-		if (failNonPassRecords) {
-			parser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
-			int pass  = parser.countMatchingVCFRecords(VCFRecord.PASS);
-			int total = parser.getVcfRecords().length;
-			System.out.println(vcfInFile.getName()+ "\tPASSRecordFILTER\t"+total+"\t"+pass);
+		//Count vcf records
+		ArrayList<File> tempVcfFiles = new ArrayList<File>();
+		int recordCount = VCFUtilities.countReads(vcfInFile);
+		int chunks = recordCount / VCFUtilities.readsToChunk + 1;
+		
+		if (chunks > 1) {
+			System.out.println("File too big to intersect all in one go, splitting into " + chunks + " chunks\n");
 		}
-		else parser.setFilterFieldOnAllRecords(VCFRecord.PASS);
-
-		if (filterRecordQuality){
-			int[] startEndCounts = filterRecordQuality(parser);
-			System.out.println(vcfInFile.getName()+ "\tRecordQuality\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+				
+		//make tempDirectory
+		File tempDir = new File("tempVCF");
+		if (tempDir.exists()) {
+			IO.deleteDirectory(tempDir);
 		}
-
-		if (filterAnySample) {
-			int[] startEndCounts = filterAnySample(parser);
-			System.out.println(vcfInFile.getName()+ "\tAnySample\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+		tempDir.mkdir();
+		
+		for (int i=0;i<chunks;i++) {
+			System.out.println("Working on file chunk: " + (i + 1));
+			//Create temporary vcf files
+			File tempVcf = new File(tempDir,"tempVcf_" + i + ".vcf");
+			tempVcfFiles.add(tempVcf);
+			
+		
+			//for each file
+			System.out.println("\nFile\tFilterType\tStarting#\tEnding#");
+			
+			
+			VCFParser parser =  new VCFParser(vcfInFile, true, true, true, i,VCFUtilities.readsToChunk);
+			
+			//set everything to pass (note this won't change the original when you print because printing grabs the original record line)?
+			if (failNonPassRecords) {
+				parser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
+				int pass  = parser.countMatchingVCFRecords(VCFRecord.PASS);
+				int total = parser.getVcfRecords().length;
+				System.out.println(vcfInFile.getName()+ "\tPASSRecordFILTER\t"+total+"\t"+pass);
+			}
+			else parser.setFilterFieldOnAllRecords(VCFRecord.PASS);
+	
+			if (filterRecordQuality){
+				int[] startEndCounts = filterRecordQuality(parser);
+				System.out.println(vcfInFile.getName()+ "\tRecordQuality\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+			}
+	
+			if (filterAnySample) {
+				int[] startEndCounts = filterAnySample(parser);
+				System.out.println(vcfInFile.getName()+ "\tAnySample\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+			}
+			
+			if (filterByGenotype) {
+				int[] startEndCounts = filterByGenotype(parser);
+				System.out.println(vcfInFile.getName() + "\tGenotypeFilter\t" + startEndCounts[0]+"\t"+startEndCounts[1]);
+			}
+	
+			//print good or bad records 
+			if (this.passing) {
+				parser.printFilteredRecords(tempVcf,VCFRecord.PASS);
+			} else {
+				parser.printFilteredRecords(tempVcf, VCFRecord.FAIL);
+			}
+			
+			parser = null;
+			
+			System.out.println("\n\n");
 		}
 		
-		if (filterByGenotype) {
-			int[] startEndCounts = filterByGenotype(parser);
-			System.out.println(vcfInFile.getName() + "\tGenotypeFilter\t" + startEndCounts[0]+"\t"+startEndCounts[1]);
-		}
-
-		
-
-
-		//print good or bad records 
-		if (this.passing) {
-			parser.printFilteredRecords(this.vcfOutFile,VCFRecord.PASS);
-		} else {
-			parser.printFilteredRecords(this.vcfOutFile, VCFRecord.FAIL);
-		}
+		//Merge vcf file
+		VCFUtilities.mergeVcf(tempVcfFiles, this.vcfOutFile);
+				
+		//delete temp files
+		IO.deleteDirectory(tempDir);
 
 		if (this.compressOutput) {
 			VCFUtilities.createTabix(this.vcfOutFile, this.pathToTabix);
@@ -234,32 +258,6 @@ public class MultiSampleVCFFilter {
 		return new int[]{startingRecordNumber, numStillPassing};
 	}
 
-	/**Sets passing records to fail if no sample passes the sample read depth and genotype quality. Returns int[startingNumPassing, endingNumPassing]*/
-	private int[] filterRecordVQSLOD(VCFParser parser) {
-		try {
-			//fetch records
-			VCFRecord[] records = parser.getVcfRecords();
-			int startingRecordNumber = parser.countMatchingVCFRecords(VCFRecord.PASS);
-			//filter
-			for (VCFRecord test : records){
-				//is it a passing record?
-				if (test.getFilter().equals(VCFRecord.FAIL)) continue;
-				float score = test.getInfoObject().getInfoFloat("VQSLOD");
-				if (score < recordMinimumVQSLOD) test.setFilter(VCFRecord.FAIL);
-			}
-			int numStillPassing = parser.countMatchingVCFRecords(VCFRecord.PASS);
-			return new int[]{startingRecordNumber, numStillPassing};
-			
-		} catch (Exception e) {
-			System.err.println("\nProblem parsing VQSLOD from INFO? Was the GATK ApplyRecalibration run on your vcf file?\n");
-			e.printStackTrace();
-			System.exit(0);
-		}
-		return null;
-	}
-
-
-
 	private void printOptions() {
 		System.out.println("Options:");
 		System.out.println(failNonPassRecords + "\tFail records where the original FILTER field is not 'PASS' or '.'");
@@ -278,6 +276,8 @@ public class MultiSampleVCFFilter {
 				}
 			}
 		}
+		
+		System.out.println("\n\n");
 		
 		
 		
@@ -315,17 +315,12 @@ public class MultiSampleVCFFilter {
 					case 't': this.pathToTabix = args[++i]; break;
 					case 'f': passing = false; break;
 					case 'a': filterAnySample = true; break;
-					//case 'b': controlHomozygousFilter = true; break;
-					//case 'c': oneOrMorePassingCohortFilter = true; break;
-					//case 'e': requireOneObservationInCases = true; break;
 					case 'g': sampleMinimumGenotypeQualityGQ = Integer.parseInt(args[++i]); break;
 					case 'i': failNonPassRecords = true; break;
 					case 'b': filterByGenotype = true; break;
 					case 'r': sampleMinimumReadDepthDP = Integer.parseInt(args[++i]); break;
 					case 'd': recordMinimumQUAL = Float.parseFloat(args[++i]); filterRecordQuality = true; break;
 					case 's': printSampleNames = true; break;
-					//case 'o': cohortSampleNames = args[++i].split(","); break;
-					//case 'n': controlSampleNames = args[++i].split(","); break;
 					case 'n': sampleNames = args[++i].split(","); break;
 					case 'u': groups = args[++i].split(","); break;
 					case 'l': flagsByGroup = args[++i].split(","); break;
@@ -465,16 +460,18 @@ public class MultiSampleVCFFilter {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Multi Sample VCF Filter  : May 2013                     **\n" +
+				"**                            Multi Sample VCF Filter  : May 2013                   **\n" +
 				"**************************************************************************************\n" +
-				"Filters a vcf file containing multiple sample records into those that pass or fail\n" +
-				"the tests below. This works with VCFv4.1 files created by the GATK package. Note, the\n" +
-				"records are not modified. \n\n" +
+				"Filters a vcf file containing multiple sample records into those that pass or fail the\n" +
+				"tests below. This works with VCFv4.1 files created by the GATK package. Note, the \n" +
+				"records are not modified. If the number of records in the VCF file is greater than \n" +
+				"500,000, the VCF file is intersected in chunks. The chunks are merged and compressed \n" + 
+				"automatically at the end of the application.\n\n" +
 
 				"Required:\n"+
 				"-v Full path to a sorted multi sample vcf file (xxx.vcf/xxx.vcf.gz)). \n"+
-				"-p Full path to the output VCF (xxx.vcf/xxx.vcf.gz).  Specifying xxx.vcf.gz will\n" +
-				"      compress and index the VCF using tabix (set -t too).\n\n" +
+				"-p Full path to the output VCF (xxx.vcf/xxx.vcf.gz).  Specifying xxx.vcf.gz will \n" + 
+				"       compress and index the VCF using tabix (set -t too).\n\n" +
 				
 				"Optional:\n" +
 				"-f Print out failing records, defaults to printing those passing the filters.\n" +
@@ -483,15 +480,15 @@ public class MultiSampleVCFFilter {
 				"-b Filter by genotype flags.  -n, -u and -l must be set.\n" +
 				"-n Sample names ordered by category.  \n" +
 				"-u Number of samples in each category.  \n" +
-				"-l Requirement flags for each category. All samples that pass the specfied filters must \n" +
-				"   meet the flag requirements, or the variant isn't reported.  At least one sample in each \n" +
-				"   group must pass the specified filters, or the variant isn't reported \n" +
-				"		a) 'W' : homozygous common \n" +
-				"		b) 'H' : heterozygous \n" +
-				"		c) 'M' : homozygous rare \n" +
-				"		d) '-W' : not homozygous common \n" +
-				"		e) '-H' : not heterozygous \n" +
-				"		f) '-M' : not homozygous rare\n" +		
+				"-l Requirement flags for each category. All samples that pass the specfied filters \n" + 
+				"       must meet the flag requirements, or the variant isn't reported.  At least one \n" +
+				"       sample in each group must pass the specified filters, or the variant isn't reported.\n" +
+				"		   a) 'W' : homozygous common \n" +
+				"		   b) 'H' : heterozygous \n" +
+				"		   c) 'M' : homozygous rare \n" +
+				"		   d) '-W' : not homozygous common \n" +
+				"	 	   e) '-H' : not heterozygous \n" +
+				"		   f) '-M' : not homozygous rare\n" +		
 				"-d Minimum record QUAL score, defaults to 0, recommend >=20 .\n"+
 				"-g Minimum sample genotype quality GQ, defaults to 0, recommend >= 20 .\n"+
 				"-r Minimum sample read depth DP, defaults to 0, recommend >=10 .\n"+
@@ -500,11 +497,11 @@ public class MultiSampleVCFFilter {
 
 				"\n"+
 
-				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/MultiSampleVCFFilter -v 9901R.vcf -b -c\n" +
-				"     -i -g 20 -r 10 -o 9901R_filtered.vcf -d 20 -n norm5,norm6,norm7 \n" +
-				"     -o cancer1,cancer2,cancer3,cancer4\n\n"+
+				"Example: java -Xmx10G -jar pathTo/USeq/Apps/MultiSampleVCFFilter \n" +
+				"       -v DEMO.passing.vcf.gz -p DEMO.intersection.vcf.gz -b \n" +
+				"       -n SRR504516,SRR776598,SRR504515,SRR504517,SRR504483 -u 2,2,1 -l M,H,-M \n\n" +
 
-		"**************************************************************************************\n");
+				"**************************************************************************************\n");
 
 	}
 

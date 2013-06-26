@@ -20,6 +20,7 @@ import javax.mail.MessagingException;
 import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
+import javax.mail.Session;
 
 
 import util.gen.IO;
@@ -195,7 +196,7 @@ public class TomatoFarmer {
 		props.put("mail.smtp.host", "hci-mail.hci.utah.edu");
 
 		//create some properties and get the default Session
-		javax.mail.Session session = javax.mail.Session.getDefaultInstance(props, null);
+		Session session = Session.getDefaultInstance(props, null);
 
 		//create message
 		Message msg = new MimeMessage(session);
@@ -218,9 +219,10 @@ public class TomatoFarmer {
 	private void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		
-		File configFile = null;
+		String targetType = null;
 		String analysisType = null;
 		File directory = null;
+		File configFile = null;
 		String email = null;
 		Integer wallTime = null;
 		String logLevel = "INFO";
@@ -244,7 +246,7 @@ public class TomatoFarmer {
 					case 'w': wallTime = Integer.parseInt(args[++i]); break;
 					case 'c': splitChroms = true; break;
 					case 'y': analysisType = args[++i].toLowerCase(); break;
-					case 'g': configFile = new File(args[++i]); break;
+					case 't': targetType = args[++i]; break;
 					case 'f': manualFail = true; break;
 					case 'l': logLevel = args[++i]; break;
 					case 'b': heartbeat = Integer.parseInt(args[++i]); break;
@@ -327,26 +329,46 @@ public class TomatoFarmer {
 		if (analysisType == null) {
 			logFile.writeErrorMessage("You must set runtype",false);
 			System.exit(1);
-		} else if (!TFConstants.validTypes.contains(analysisType)) {
-			logFile.writeErrorMessage("Specifed run type is not valid: " + analysisType + ". See help for options.",false);
-			System.exit(1);
 		}
-		
+	
 		//Specify the configuration file
-		if (analysisType.equals(TFConstants.ANALYSIS_CUSTOM)) {
-			if (configFile == null) {
-				logFile.writeErrorMessage("Configuration file (-g) not specified",false);
-			} else if (!configFile.exists()) {
-				logFile.writeErrorMessage("Specified configuration file does not exist, exiting",false);
-			} 
-		} else {
+		if (TFConstants.validTypes.contains(analysisType)) {
 			configFile = new File(TFConstants.templateDir,"defaults/" + analysisType + ".default.txt");
 			if (!configFile.exists()) {
-				logFile.writeErrorMessage("Default configuration file does not exist", true);
+				logFile.writeErrorMessage("Default configuration file for runtype " + analysisType + " does not exist", true);
+				System.exit(1);
+			}
+		} else {
+			configFile = new File(analysisType);
+			logFile.writeInfoMessage("Non-standard analysis type, looking for custom configuration file");
+			if (!configFile.exists()) {
+				logFile.writeErrorMessage("Specified configuration file does not exist, exiting",false);
 				System.exit(1);
 			}
 		}
 		
+		//Make sure the target capture is valid
+		File targetFile = null;
+		
+		if (targetType != null) {
+			File targetDirectory = new File(TFConstants.templateDir,"captureRegions");
+			if (TFConstants.validTargets.contains(targetType)) {
+				targetFile = new File(targetDirectory,targetType + ".bed");
+				if (!targetFile.exists()) {
+					logFile.writeErrorMessage("The target capture bed file is missing: " + targetFile.getAbsolutePath(), true);
+					System.exit(1);
+				}
+			} else {
+				logFile.writeInfoMessage("Non-standard target capture, looking for custom target file");
+				targetFile = new File(targetType);
+				if (!targetFile.exists()) {
+					logFile.writeErrorMessage("Specified target region file does not exist, exiting", false);
+					System.exit(1);
+				}
+			}
+		}
+		
+
 		//Validate configuration file
 		commandList = new ArrayList<TFCommand>();
 		
@@ -377,7 +399,7 @@ public class TomatoFarmer {
 					}
 					scanner.close();
 				} 
-				TFCommand cmd = TFCommand.getCommandObject(TFConstants.templateDir, directory, commandString, logFile, email, wallTime, heartbeat, failmax, jobNumber, suppressEmail, studyName, splitChroms);
+				TFCommand cmd = TFCommand.getCommandObject(TFConstants.templateDir, directory, commandString, logFile, email, wallTime, heartbeat, failmax, jobNumber, suppressEmail, studyName, splitChroms, targetFile);
 				commandList.add(cmd);
 			}
 			br.close();
@@ -425,56 +447,74 @@ public class TomatoFarmer {
 	private static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               TomatoFarmer: June 2013                            **\n" +
+				"**                                TomatoFarmer: June 2013                           **\n" +
 				"**************************************************************************************\n" +
-				"TomatoFarmer controls an exome analysis from start to finish.  It creates alignment jobs\n" +
-				"for each of the samples in your directory, waits for all jobs to finish, then launches\n" +
-				"metrics and variant calling jobs.  Jobs will be resubmitted up to a set number of times \n" +
-				"if they fail to account for spurious CHPC errors.\n" +
+				"TomatoFarmer controls an exome analysis from start to finish.  It creates alignment \n" +
+				"jobs for each of the samples in your directory, waits for all jobs to finish and then \n" +
+				"launches metrics and variant calling jobs.  Jobs will be resubmitted up to a set \n" +
+				"number of times to combat spurious CHPC erors.  Job directories are left behind so \n" +
+				"you can save your log files.\n\n" +
 				
-				"\n\nRequired Arguments:\n\n"+
-				"-d Job directory.  This directory must be a subdirectory of /tomato/version/job, but can\n"+
-				"       be several levels below.\n"+
-				"-e Email address.  You will be emailed as tomato jobs start and finish. This will happen\n" +
-				"       several times during the run,\n" + 
-				"-y Analysis pipeline. The analysis pipeline you want to run.  Current options are: \n" +
-				"       1) exome_bwa - Full exome analysis (bwa)\n" +
-				"       2) exome_novoalign - Full exome analysis (novoalign) \n" +
-				"       3) exome_align_bwa - Alignment/recalibration only (bwa)\n" +
-				"       4) exome_align_novoalign - Align/recalibration only (novoalign)\n" +
-				"       5) exome_metrics - Sample QC metrics only\n" +
-				"       6) exome_variant_raw - Variant detection and filtering (raw)\n " + 
-				"       7) custom - Specify your own configuration file.\n" +		
-				"   If you specify 'custom', you must use the option -g and specify an exiting configuration file. \n" +
-				"   'Custom' allows you to to run older versions of the pipeline.  Non-custom pipelines always use \n " + 
-				"   the most recent versions of each command.\n" +
+				"\nRequired Arguments:\n\n"+
+				"-d Job directory.  This directory must be a subdirectory of /tomato/version/job. Can \n" +
+				"       can be several directory levels below /tomato/version/job. \n" +
+				"       Example: '-d /tomato/version/job/krustofsky/demo'. \n" +
+				"-e Email address.  TomatoFarmer emails you once the job completes/fails. You can also\n" +
+				"       opt to get all tomato emails as individual jobs start/end (see option -x).\n" +
+				"       Example: '-e hershel.krustofsky@hci.utah.edu'.\n" +
+				"-y Analysis pipeline. The analysis pipeline or step to run.  Current options are: \n" +
+				"          1) exome_bwa - Full exome analysis (bwa).\n" +
+				"          2) exome_novoalign - Full exome analysis (novoalign). \n" +
+				"          3) exome_align_bwa - Alignment/recalibration only (bwa).\n" +
+				"          4) exome_align_novoalign - Align/recalibration only (novoalign).\n" +
+				"          5) exome_metrics - Sample QC metrics only.\n" +
+				"          6) exome_variant_raw - Variant detection and filtering (raw settings).\n " + 
+				"          7) path to configuration file.  This allows you to use older versions of \n" +
+				"             the pipeline.\n" +		
+				"      If you want run older versions of the pipeline, you must provide a configuration\n" +
+				"      file, otherwise the most recent versions of each command are used. \n" +
+				"      Example: '-y exome_bwa'.\n" + 
 
-				"\n\nOptional Arguments:\n\n"+
-				"-g Configuration file.  If 'custom' is specified as the Analysis Pipeline, you must specify \n" +
-				"      an existing configuration file to work off of. \n" +
-				"-w Wall time.  Set this if you want less wall time than the default 240 hours. Useful\n" +
-				"      when there is upcoming CHPC downtime\n" +
-				"-s Study name.  Set this if you want your VCF files to have a prefix other than 'STUDY'\n" +
-				"-c Split chromsome.  Set this option if you want to run variant calling on each \n" +
+				"\nOptional Arguments:\n\n"+
+				"-t Target regions. Setting this argument will restrict coverage metrics and variant \n" +
+				"      detection to targeted regions.  This speeds up the variation detection process\n" +
+				"      and reduces noise. Options are:\n" +
+				"          1) agilent\n" +
+				"          2) nimblegen\n" +
+				"          3) truseq\n" +
+				"          4) path to custom targed bed file.\n" +
+				"      If nothing is specifed for this argument, the full genome will be queried for \n" +
+				"      variants and ccds exomes will be used for capture metrics. Example: '-t truseq'.\n" +
+				"-w Wall time.  Use this option followed by a new wall time, in hours, if you want less\n" +
+				"      wall time than the default 240 hours. Useful when there is upcoming CHPC \n" +
+				"      downtime. Example: '-w 40'. \n" +
+				"-s Study name.  Set this if you want your VCF files to have a prefix other than \n" +
+				"      'STUDY'. Example: '-s DEMO'.\n" +
+				"-c Split chromsomes.  Set this option if you want to run variant calling on each \n" +
 				"      chromosome separately.  This is good for large projects (>15 exomes). They  \n" +
-				"      will be merged once they are all finished.\n" +
-				"-x Unsuppress tomato emails.  Recieve both tomato and TomatoFarmer emails\n" +
+				"      will be merged once they are all finished. Example: '-c'.\n" +
+				"-x Unsuppress tomato emails.  Receive both tomato and TomatoFarmer emails. \n" +
+				"      Example: '-x'.\n" +
 				
 				
-				"\n\nAdmin Arguments:\n\n" +
-				"-f Manually set failure level.  If this variable is set, the user will be prompted to set the number \n" +
-				"      of allowed failures for each analysis step before the analysis begins.  If exome_align is set to \n" +
-				"      3, once four failures are reached across all spawned threads, everything will be shut down.  You might think \n" +
-				"      about changing the default settings if you're running lots of samples. Note that outright tomato failures \n" +
-				"      (job never actually starts) don't count against the cap.  Must be between 1 and 20. \n" + 	
+				"\nAdmin Arguments:\n\n" +
+				"-f Manually set failure level.  If this variable is set, the user will be prompted to \n" + 
+				"      override default allowed failures for each analysis step before the analysis \n" + 
+				"      begins.  If exome_align is set to 3, once four failures are reached across all \n" +
+				"      spawned threads, everything will be shut down.  You might think about changing \n" +
+				"      the default settings if you're running lots of samples. Note that outright \n" + 
+				"      tomato failures (job never actually starts) don't count against the cap.  Must \n" +
+				"      be between 1 and 20. \n" + 	
 				"-l Logging level.  Level of logging you want to see.  Options INFO, WARNING, ERROR.\n" +
-				"      ERROR just displays error messages, WARNING displays warning and error messages. \n" +
-				"      INFO shows all three levels. Default value is INFO\n" +
-				"-b Heatbeat frequency.  How often you want a thread heartbeat message in minutes, default 30\n" +
-				"-j Number of jobs at a time, don't abuse this.  Default 5 jobs.\n" +
+				"      ERROR just displays error messages, WARNING displays warning and error messages.\n" +
+				"      INFO shows all three levels. Default: INFO.\n" +
+				"-b Heatbeat frequency.  How often you want a thread heartbeat message in minutes. \n" + 
+				"      Default: 30 mins.\n" +
+				"-j Number of jobs at a time. Don't abuse this, big brother is watching you. Default:\n" +
+				"      5 jobs.\n" +
 			
-				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/TomatoFarmer -d /tomato/version/test/ -e \n" +
-				"              bob.bobson@hci.utah.edu -s DEMO -c\n\n" +
+				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/TomatoFarmer -d /tomato/version/job/demo/\n" +
+				"      -e herschel.krustofsky@hci.utah.edu -y exome_bwa -s DEMO -c -t agilent\n\n" +
 
 				"**************************************************************************************\n");
 
@@ -493,8 +533,9 @@ public class TomatoFarmer {
 		 			postMail(email, "TomatoFarmer failed, check logs", "", "Farmer@tomatosareawesome.org");
 		 		} catch (MessagingException e) {
 		 			logFile.writeErrorMessage("Failed to send ending email", true);
-		 			e.printStackTrace();
-		 		} 
+		 		} catch (NoClassDefFoundError ncdfe) {
+		 			logFile.writeErrorMessage("Failed to send ending email", true);
+		 		}
 		     }
 		     
 		     try {

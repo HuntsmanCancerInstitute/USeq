@@ -42,6 +42,7 @@ public class CalculatePerCycleErrorRate {
 	private boolean isBam;
 	private boolean deleteTempFiles = true;
 	private Pattern headerLine = Pattern.compile("^@[HSRPC][DQGO]\\s.+");
+	
 
 	/**For stand alone app.*/
 	public CalculatePerCycleErrorRate(String[] args){
@@ -204,8 +205,9 @@ public class CalculatePerCycleErrorRate {
 			if (samReader.hasIndex()) it = samReader.queryOverlapping(chromName, 0, chromLength);
 			else it = samReader.iterator();
 
-			//int counter = 0;
+			int counter = 0;
 			while (it.hasNext()) {
+				counter++;
 				SAMRecord sam = it.next();
 
 				//is it aligned?
@@ -219,7 +221,9 @@ public class CalculatePerCycleErrorRate {
 					if (sam.getReadName().startsWith(readNamePrefix) == false) continue;
 				}
 
+				
 				scoreAlignment(sam);
+					
 			}
 			samReader.close();
 		} catch (Exception e){
@@ -303,7 +307,8 @@ public class CalculatePerCycleErrorRate {
 		SAMRecordIterator it;
 		if (samReader.hasIndex()) it = samReader.queryOverlapping(chromName, 0, chromLength);
 		else it = samReader.iterator();
-		int counter = 0;
+		int counter1 = 0;
+		int counter2 = 0;
 		int maxFirstPair = 0;
 		int maxSecondPair = 0;
 		Pattern pat = Pattern.compile("(\\d+)M");
@@ -320,12 +325,19 @@ public class CalculatePerCycleErrorRate {
 			if (mat.matches()){
 				int cycles = Integer.parseInt(mat.group(1));
 				if (sam.getReadNegativeStrandFlag()) {
-					if (maxSecondPair < cycles) maxSecondPair = cycles;
+					if (maxSecondPair < cycles) {
+						maxSecondPair = cycles;
+						counter1++;
+					}
+
 				}
-				else if (maxFirstPair < cycles) maxFirstPair = cycles;
+				else if (maxFirstPair < cycles) {
+					maxFirstPair = cycles;
+					counter2++;
+				}
 			}
-			//exit
-			if (counter++ > 10000) break;
+			//Removing exit condition.  There are instances were the first 10000 reads are read1 and when a read2 is encountered, the program crashes.
+			if (counter1 > 10000 && counter2 > 10000) break;
 			
 
 		}
@@ -360,10 +372,14 @@ public class CalculatePerCycleErrorRate {
 		boolean softMaskingFound = false;
 		boolean hardMaskingFound = false;
 		int numberMismatches = 0;
+		
+		
 
 		while (mat.find()){
 			String call = mat.group(2);
 			int numberBases = Integer.parseInt(mat.group(1));
+			
+			
 			//a match
 			if (call.equals("M")) {
 				for (int i = 0; i< numberBases; i++) {

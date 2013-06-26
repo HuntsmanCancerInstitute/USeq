@@ -25,6 +25,8 @@ public class ParseExonMetrics {
 	private File countFile = null;
 	private File errorFile = null;
 	private File mergedFile = null;
+	private boolean html = false;
+	private String name = "Full Genome";
 	
 	//Alignments
 	private Integer[] totalReads = {null,null,null};
@@ -68,7 +70,6 @@ public class ParseExonMetrics {
 	//Various files
 	private File insertGraph = null;
 	private File errorGraph = null;
-	//private File coverageGraph = null;
 	private File coverageGraph2 = null;
 
 	public ParseExonMetrics(String[] args) {
@@ -101,11 +102,17 @@ public class ParseExonMetrics {
 		this.parseCoverage();
 		
 		//Generate Latexfile
-		File latexFile = new File(outputFile + ".tex");
-		this.generateLatex(latexFile);
-		ProcessBuilder latexProcess = new ProcessBuilder("pdflatex","--halt-on-error",latexFile.toString()); 
-		this.runSystemCommand(latexProcess,"pdfLatex");
-		this.runSystemCommand(latexProcess,"pdfLatex");
+		if (this.html) {
+			File htmlFile = new File(outputFile + ".html");
+			this.generateHtml(htmlFile);
+		} else {
+			File latexFile = new File(outputFile + ".tex");
+			this.generateLatex(latexFile);
+			ProcessBuilder latexProcess = new ProcessBuilder("pdflatex","--halt-on-error",latexFile.toString()); 
+			this.runSystemCommand(latexProcess,"pdfLatex");
+			this.runSystemCommand(latexProcess,"pdfLatex");
+		}
+		
 		
 		this.deleteFiles();
 		
@@ -145,7 +152,7 @@ public class ParseExonMetrics {
 			}
 			
 			//this.generateRBarplot(coverage, fraction, "PEM.cov.txt", "Coverage across CCDS Bases", "Depth of Coverage", "Fraction At Given Coverage", coverageGraph, "depth");
-			this.generateRBarplot(coverage, fractionOrGreater, "PEM.cov2.txt", "Coverage across CCDS Bases", "Depth of Coverage", "Fraction At Given Coverage or Greater", coverageGraph2,"depth");
+			this.generateRBarplot(coverage, fractionOrGreater, "PEM.cov2.txt", "Coverage across " + this.name, "Depth of Coverage", "Fraction At Given Coverage or Greater", coverageGraph2,"depth");
 			
 			br.close();
 			
@@ -282,7 +289,7 @@ public class ParseExonMetrics {
 		try {
 			BufferedReader br = new BufferedReader(new FileReader(mergedFile));
 			Pattern p1 = Pattern.compile("\\s+(\\d+)\\s+# Non proper paired alignments");
-			Pattern p2 = Pattern.compile("\\s+(\\d+)\\s+# Alignments missing mate paired alignment");
+			Pattern p2 = Pattern.compile("\\s+(\\d+)\\s+# Non mapped mate paired alignments");
 			Pattern p3 = Pattern.compile("\\s+(.+?)\\s+Fraction overlapping bases.+");
 			Pattern p4 = Pattern.compile("\\s*Mapped genomic insert length.+");
 			Pattern p5 = Pattern.compile("\\s+(\\d+)\\s+Total\\s+# alignments from sam/bam file");
@@ -345,14 +352,15 @@ public class ParseExonMetrics {
 	
 	private void insertSizePlot(StringBuffer sb,String xaxis,String yaxis) {
 		sb.append("p=ggplot(data,aes(x=V1,y=V2)) + geom_bar(stat='identity') + ");
-		sb.append("scale_x_continuous('" + xaxis + "',breaks=round(seq(50,750, by=50),1),limits=c(50,750)) + ");
+		sb.append("scale_x_continuous('" + xaxis + "',breaks=round(seq(50,900, by=50),1),limits=c(50,900)) + ");
 		sb.append("scale_y_continuous('" + yaxis + "') +");
 	}
 	
 	private void depthStandardPlot(StringBuffer sb, String xaxis, String yaxis) {
 		sb.append("p=ggplot(data,aes(x=V1,y=V2)) + geom_bar(stat='identity') + ");
-		sb.append("scale_x_continuous('" + xaxis + "',breaks=round(seq(0, 50, by=1),0),limits=c(0,50)) + ");
+		sb.append("scale_x_continuous('" + xaxis + "',breaks=round(seq(0, 50, by=5),0),limits=c(-1,51)) + ");
 		sb.append("scale_y_continuous('" + yaxis + "',breaks=round(seq(min(data$V1),max(data$V1), by=0.10),2)) +");
+		sb.append("geom_vline(xintercept=20,colour='red') +");
 	}
 	
 	
@@ -390,11 +398,9 @@ public class ParseExonMetrics {
 				System.out.println("Don't recognize graph style, exiting");
 				System.exit(1);
 			}
-			//sb.append("p=ggplot(data,aes(x=V1,y=V2)) + geom_bar(stat='identity') + ");
-			//sb.append("scale_x_discrete('" + xaxis + "',breaks=round(seq(min(data$V1), max(data$V1), by=50),1)) + ");
-			//sb.append("scale_y_continuous('" + yaxis + "') +");
+			
 			sb.append("ggtitle(paste('" + outputFile.getName() + "','" + title + "',sep=': '))\n");
-			sb.append("ggsave(p,file='" + output.getCanonicalPath() + "',width=6,height=3)\n");
+			sb.append("ggsave(p,file='" + output.getPath() + "',width=6,height=4)\n");
 	
 			//write script to file
 			IO.writeString(sb.toString(), scriptFile);
@@ -425,6 +431,111 @@ public class ParseExonMetrics {
 			ioex.printStackTrace();
 			System.exit(1);
 		}
+	}
+	
+	private void generateHtml(File htmlFile) {
+		try {
+			BufferedWriter bw = new BufferedWriter(new FileWriter(htmlFile));
+			
+			String fixedName = outputFile.getName().replace("_", "_");
+			//System.out.println(fixedName + " Why are you not working?");
+			
+			bw.write("<!DOCTYPE html>\n");
+			bw.write("<html>\n");
+			bw.write("<head>\n");
+			bw.write("<title>Sample Metrics: " + fixedName + "</title>\n");
+			bw.write("<meta name='author' content='USeq ParseExonMetrics'>\n");
+			bw.write("</head>\n");
+			bw.write("<body>\n");
+			bw.write("<h1>Sample Metrics: " + fixedName + "</h1>\n");
+			bw.write("<section id='Reference Counts'>\n");
+			bw.write("<h2>Counts</h2>\n");
+			
+			bw.write("<table id='Table1' border='1' cellpadding='5'>\n");
+			bw.write("<tr><th>Metric</th><th>Count</th><th>Percent</th></tr>\n");
+			bw.write("<tr><td>Total Reads</td><td>" + String.format("%,d", this.allCounts) + "</td><td></td></tr>\n");
+			bw.write("<tr><td>Aligned Reads</td><td>" + String.format("%,d", this.alignedCounts) + "</td><td>" + String.format("%,.2f%%",this.perAligned) + "</td></tr>\n");
+			bw.write("<tr><td>Standard hg19 Reads</td><td>" + String.format("%,d", this.normalCounts) + "</td><td>" + String.format("%,.2f%%",this.perNormal) + "</td></tr>\n");
+			bw.write("<tr><td>Non-Standard hg19 Reads</td><td>" + String.format("%,d", this.extraCounts) + "</td><td>" + String.format("%,.2f%%",this.perExtra) + "</td></tr>\n");
+			bw.write("<tr><td>PhiX Reads</td><td>" + String.format("%,d", this.phiXCounts) + "</td><td>" + String.format("%,.2f%%",this.perPhiX) + "</td></tr>\n");
+			bw.write("<tr><td>Adapter Reads</td><td>" + String.format("%,d", this.adapterCounts) + "</td><td>" + String.format("%,.2f%%",this.perAdapter) + "</td></tr>\n");
+			
+			bw.write("<caption>Table 1: Read counts for each reference sequence. " + fixedName + "</caption>\n");
+			bw.write("</table>\n");
+			bw.write("</section>\n");
+			
+			bw.write("<section id='Error Rate'>\n");
+			bw.write("<h2>Error Rate</h2>\n");
+			
+			bw.write("<table class='image' id='Figure1'>\n");
+			bw.write("<caption align='bottom'>Figure 1: Per base error rates for phiX reads. The mean error rate is <code>" + 
+			         String.format("%.5f",this.meanErrorRate) + "</code></caption>\n");
+			bw.write("<tr><td><img src='" + errorGraph.getPath() + "' alt='per base error rate' width='600' height='400'></td></tr>\n");
+			bw.write("</table>\n");
+			bw.write("</section>\n");
+			
+			bw.write("<section id='Duplicates'>\n");
+			bw.write("<h2>Read Duplicates</h2>\n");
+			
+			bw.write("<table id='Table2' border='1' cellpadding='5'>\n");
+			bw.write("<caption>Table 2: Duplicate read statistics: " + fixedName + "</caption>\n");
+			bw.write("<tr><th>Metric</th><th>Count</th><th>Percent</th></tr>\n");
+			bw.write("<tr><th>Duplicate Unpaired Reads</th><td>" + String.format("%,d",this.dupUnpaired) + "</td><td>" + String.format("%,.2f%%",this.percentDupUnpaired) + "</td></tr>\n");
+			bw.write("<tr><th>Duplicate Paired Reads</th><td>" + String.format("%,d",this.dupPaired) + "</td><td>" + String.format("%,.2f%%",this.percentDupPaired) + "</td></tr>\n");
+			bw.write("<tr><th>Percent Duplications</th><th></th><td>" + String.format("%,.2f%%",this.percentDuplication) + "</td></tr>\n");
+			bw.write("</table>\n");
+			bw.write("</section>\n");
+			
+			bw.write("<section id='Alignment'>\n");
+			bw.write("<h2>Alignment</h2>\n");
+			
+			bw.write("<table id='Table3' border='1' cellpadding='5'>\n");
+			bw.write("<caption>Table 3: Alignment Statistics for standard hg19 chromosomes after recalibration, realignment and deduplication." + fixedName + "</caption>\n");
+			bw.write("<tr><th>Metric</th><th>Read1</th><th>Read2</th><th>Combined</th></tr>\n");
+			bw.write("<tr><th>Total Reads</th><td>" + String.format("%,d", this.totalReads[0]) + "</td><td>" + String.format("%,d", this.totalReads[1]) + "</td><td>" + String.format("%,d", this.totalReads[2]) + "</td></tr>\n");
+			bw.write("<tr><th>Aligned Reads</th><td>"+ String.format("%,d", this.alignedReads[0]) + "</td><td>"  + String.format("%,d", this.alignedReads[1]) + "</td><td>"  + String.format("%,d", this.alignedReads[2]) + "</td></tr>\n");
+			bw.write("<tr><th>%Aligned</th><td>" + String.format("%,.2f%%",this.percentAligned[0]) + "</td><td>" + String.format("%,.2f%%",this.percentAligned[1]) + "</td><td>" + String.format("%,.2f%%",this.percentAligned[2]) + "</td></tr>\n");
+			bw.write("<tr><th>Paired</th><td>" + String.format("%,d",this.readsInPairs[0]) + "</td><td>" + String.format("%,d",this.readsInPairs[1]) + "</td><td>" + String.format("%,d",this.readsInPairs[2])  + "</td></tr>\n");
+			bw.write("<tr><th>%Paired</th><td>" + String.format("%,.2f%%",this.percentInPairs[0]) + "</td><td>" + String.format("%,.2f%%",this.percentInPairs[1]) + "</td><td>" + String.format("%,.2f%%",this.percentInPairs[2]) + "</td></tr>\n");
+			bw.write("<tr><th>Strand Balance</th><td>" + String.format("%,.2f%%",this.strandBalance[0]) + "</td><td>" + String.format("%,.2f%%",this.strandBalance[1]) + "</td><td>" + String.format("%,.2f%%",this.strandBalance[2]) + "</td></tr>\n");
+			bw.write("<tr><th>Error Rate</th><td>" + String.format("%,.5f",this.errorRate[0]) + "</td><td>" + String.format("%,.5f",this.errorRate[1]) + "</td><td>" + String.format("%,.5f",this.errorRate[2]) + "</td></tr>\n");
+			bw.write("<tr><th>Non-Proper Pairs</th><td></td><td></td><td>" + String.format("%,d",this.incorrectPairs) + "</td></tr>\n"); 
+			bw.write("<tr><th>%Non-Proper Pairs </th><td></td><td></td><td>" + String.format("%,.2f%%",this.percentIncorrectPairs) + "</td></tr>\n");
+			bw.write("<tr><th>Singletons</td><td></th><td></td><td>" + String.format("%,d",this.singletons) + "</td></tr>\n");
+			bw.write("<tr><th>%Singletons</td><td></th><td></td><td>" + String.format("%,.2f%%",this.percentSingletons) + "</td></tr>\n");
+			bw.write("</table>\n");
+			bw.write("</section>\n");
+			
+			bw.write("<section id='Insert Size'>\n");
+			bw.write("<h2>Overlapping Reads</h2>\n");
+			
+			bw.write("<table class='image' id='Figure2'>\n");
+			bw.write("<caption align='bottom'>Figure 2: Sample insert size distribution.  The fraction of overlapping bases is <code>" + String.format("%.5f",this.fractionOverlap) + "</code></caption>\n");
+			bw.write("<tr><td><img src='" + insertGraph.getPath() + "' alt='insert size distribution' width='600' height='400'></td></tr>\n");
+			bw.write("</table>\n");
+			bw.write("</section>\n");
+			
+			bw.write("<section id='Depth of Coverage'>\n");
+			bw.write("<h2>Coverage</h2>\n");
+			
+			bw.write("<table class='image' id='Figure3'>\n");
+			bw.write("<caption align='bottom'>Figure 3: Depth of coverage across capture region. " + fixedName + "</caption>\n");
+			bw.write("<tr><td><img src='" + coverageGraph2.getPath() + "' alt='per base coverage' width='600' height='400'></td></tr>\n");
+			bw.write("</table>\n");
+			bw.write("</section>\n");
+			
+			
+			bw.write("</body>\n");
+			bw.write("</html>\n");
+
+			bw.flush();
+			bw.close();
+		} catch (IOException ioex) {
+			System.out.println("Error writing to file, exiting: " + ioex.getMessage());
+			ioex.printStackTrace();
+			System.exit(1);
+		} 
+		
 	}
 	
 	private void generateLatex(File latexFile) {
@@ -671,6 +782,8 @@ public class ParseExonMetrics {
 					case 'o': outputFile = new File(args[++i]); break;
 					case 'r': rPath = args[++i]; break;
 					case 'l': lPath = args[++i]; break;
+					case 't': this.html = true; break;
+					case 'n': this.name = args[++i]; break;
 					case 'h': usage(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -710,15 +823,12 @@ public class ParseExonMetrics {
 		} 
 		
 		
-		this.insertGraph = new File(this.outputFile + "_insert.pdf");
-		this.errorGraph = new File(this.outputFile + "_error.pdf");
-		//this.coverageGraph = new File(this.outputFile + "_coverage.pdf");
-		this.coverageGraph2 = new File(this.outputFile + "_coverage2.pdf");
+		File imageDir = new File("images");
+		imageDir.mkdir();
+		this.insertGraph = new File(imageDir,this.outputFile + "_insert.png");
+		this.errorGraph = new File(imageDir,this.outputFile + "_error.png");
+		this.coverageGraph2 = new File(imageDir,this.outputFile + "_coverage2.png");
 		
-		//this.insertGraph.deleteOnExit();
-		//this.errorGraph.deleteOnExit();
-		//this.coverageGraph.deleteOnExit();
-		//this.coverageGraph2.deleteOnExit();
 		
 	}
 	
@@ -734,7 +844,7 @@ public class ParseExonMetrics {
 				"**                         Create Exon Summary Metrics : April 2013                 **\n" +
 				"**************************************************************************************\n" +
 				"This script runs a bunch of summary metric programs and compiles the results.  It uses\n" +
-				"R and LaTex to generate a fancy pdf as an output. \n\n\n" +
+				"R and LaTex to generate a fancy pdf as an output. Can also genrate html \n\n\n" +
 
 				"Required:\n"+
 				"-a Alignment statistics from Picard's CollectAlignmentMetrics\n"+
@@ -747,6 +857,8 @@ public class ParseExonMetrics {
 				"Optional\n" +
 				"-r Path to R\n" +
 				"-l Path to pdflatex\n" +
+				"-t Generate html instead\n" +
+				"-c Coverage file name \n" +
 				"\n\n"+
 
 				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/VCFAnnovar -v 9908R.vcf                 \n" +
