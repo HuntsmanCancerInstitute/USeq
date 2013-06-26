@@ -119,6 +119,10 @@ public class VCFParser {
 	
 	private String[] sampleNames = null;
 	
+	//Chunking arguments
+    int chunkNumber = 0;
+	int chunkSize = Integer.MAX_VALUE; //hopefully a vcf file will never have more than 2.1 Billion lines
+	
 	
 	
 	//Constructors
@@ -131,6 +135,16 @@ public class VCFParser {
 		this.loadInfo = loadInfo;
 		parseVCF();
 	}
+	
+	public VCFParser(File vcfFile, boolean loadRecords, boolean loadSamples, boolean loadInfo, int chunkNumber, int chunkSize) {
+		this. vcfFile = vcfFile;
+		this.loadRecords = loadRecords;
+		this.loadSamples = loadSamples;
+		this.loadInfo = loadInfo;
+		this.chunkNumber = chunkNumber;
+		this.chunkSize = chunkSize;
+		parseVCF();
+	} 
 	
 	//Methods
 	
@@ -171,56 +185,50 @@ public class VCFParser {
 			//load data?
 			if (loadRecords == false) return;
 
-			//parse first data record to load chrom and position
-			String oldChrom = null;
-			int oldPosition = 0;
+			//Initilize variables
+			String oldChrom = "";
+			int oldPosition = -1;
 			HashSet<String> chromNames = new HashSet<String>();
+			
+			//Setup chunking variables
+			int minRecord = this.chunkSize * this.chunkNumber;
+			int maxRecord = this.chunkSize * this.chunkNumber + this.chunkSize;
+			int recordCount = 0;
+			
 			while ((line=in.readLine()) != null){
-				try {
-					VCFRecord vcf = new VCFRecord(line, this, loadSamples, loadInfo);
-					records.add(vcf);
-					oldChrom = vcf.getChromosome();
-					chromNames.add(oldChrom);
-					oldPosition = vcf.getPosition();
+				if (recordCount < minRecord) { //Ignore records less than starting point
+					//pass
+				} else if (recordCount >= maxRecord) { //Quit looking for records beyond ending point
 					break;
-				} catch (Exception e) {
-					System.err.println("Skipping malformed VCF Record-> "+line);
-					System.err.println("Error-> "+e.getMessage());
-					if (badCounter++ > 10) {
-						throw new Exception("\nToo many malformed VCF Records.\n");
+				} else { //Juuust right.
+					try {
+						VCFRecord vcf = new VCFRecord(line, this, loadSamples, loadInfo);
+						//old chrom
+						if (vcf.getChromosome().equals(oldChrom)){
+							//check position
+							if (vcf.getPosition() < oldPosition) throw new Exception("New vcf record position is < prior position!  Is this file sorted?");
+						}
+						//nope new
+						else {
+							//chrom seen before?
+							if (chromNames.contains(vcf.getChromosome())) throw new Exception("New vcf record chromosome has been seen before!  Is this file sorted?");
+							oldChrom = vcf.getChromosome();
+							chromNames.add(oldChrom);
+						}
+						//add record and set position
+						records.add(vcf);
+						oldPosition = vcf.getPosition();
+	
+					} catch (Exception e) {
+						System.err.println("Skipping malformed VCF Record-> "+line);
+						System.err.println("Error-> "+e.getMessage());
+						if (badCounter++ > 10) {
+							throw new Exception("\nToo many malformed VCF Records.\n");
+						}
+						badVcfRecords.add(line);
 					}
-					badVcfRecords.add(line);
 				}
-			}
-
-			//load remaining making sure it is sorted
-			while ((line=in.readLine()) != null){
-				try {
-					VCFRecord vcf = new VCFRecord(line, this, loadSamples, loadInfo);
-					//old chrom
-					if (vcf.getChromosome().equals(oldChrom)){
-						//check position
-						if (vcf.getPosition() < oldPosition) throw new Exception("New vcf record position is < prior position!  Is this file sorted?");
-					}
-					//nope new
-					else {
-						//chrom seen before?
-						if (chromNames.contains(vcf.getChromosome())) throw new Exception("New vcf record chromosome has been seen before!  Is this file sorted?");
-						oldChrom = vcf.getChromosome();
-						chromNames.add(oldChrom);
-					}
-					//add record and set position
-					records.add(vcf);
-					oldPosition = vcf.getPosition();
-
-				} catch (Exception e) {
-					System.err.println("Skipping malformed VCF Record-> "+line);
-					System.err.println("Error-> "+e.getMessage());
-					if (badCounter++ > 10) {
-						throw new Exception("\nToo many malformed VCF Records.\n");
-					}
-					badVcfRecords.add(line);
-				}
+				recordCount++;
 			}
 
 			//save array

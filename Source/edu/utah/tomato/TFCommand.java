@@ -1,5 +1,7 @@
 package edu.utah.tomato;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -7,14 +9,11 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.concurrent.Callable;
-
-import sun.misc.IOUtils;
 
 
 public abstract class TFCommand {
@@ -47,7 +46,7 @@ public abstract class TFCommand {
 
 	
 	public static TFCommand getCommandObject(File templateDir, File rootDirectory, String commandLine, TFLogger logFile, 
-			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress, String study, boolean splitChroms) {
+			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress, String study, boolean splitChroms,  File targetFile) {
 		String[] commandParts = commandLine.split(":");
 		if (commandParts.length < 2) {
 			logFile.writeErrorMessage("Must be at least two parts for every command", true);
@@ -69,12 +68,12 @@ public abstract class TFCommand {
 			if (failmax == null) {
 				failmax = 3;
 			}
-			returnCommand = new TFCommandExomeMetrics(templateFile,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, heartbeat, failmax, jobs, suppress);
+			returnCommand = new TFCommandExomeMetrics(templateFile,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, heartbeat, failmax, jobs, suppress, study, targetFile);
 		} else if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW)) {
 			if (failmax == null) {
 				failmax = 5;
 			}
-			returnCommand = new TFCommandExomeVariantRaw(templateFile,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, heartbeat, failmax, jobs, suppress, study, splitChroms);
+			returnCommand = new TFCommandExomeVariantRaw(templateFile,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, heartbeat, failmax, jobs, suppress, study, splitChroms, targetFile);
 		}
 		
 		else {
@@ -123,6 +122,7 @@ public abstract class TFCommand {
 		try {
 			if (!source.exists()) {
 				logFile.writeErrorMessage("[moveFile] Expected file does not exist: " + source.getAbsolutePath(),true);
+				System.exit(1);
 			}
 			
 			ProcessBuilder pb = new ProcessBuilder("mv",source.getAbsolutePath(),dest.getAbsolutePath());
@@ -131,7 +131,7 @@ public abstract class TFCommand {
 			int val = p.waitFor();
 			
 			if (val != 0) {
-				logFile.writeErrorMessage("[moveFile] System could not move your alignment file " + source.getAbsolutePath(),true);
+				logFile.writeErrorMessage("[moveFile] System could not move your file " + source.getAbsolutePath(),true);
 				BufferedReader br2 = new BufferedReader(new InputStreamReader(p.getErrorStream()));
 				String line2 = null;
 				while((line2 = br2.readLine()) != null) {
@@ -141,10 +141,41 @@ public abstract class TFCommand {
 			}
 			
 		} catch (IOException ioex) {
-			logFile.writeErrorMessage("[moveFile] IO Exception while trying move alignment file: " + source.getAbsolutePath(),true);
+			logFile.writeErrorMessage("[moveFile] IO Exception while trying to move your file: " + source.getAbsolutePath(),true);
 			System.exit(1);
 		} catch (InterruptedException ieex) {
-			logFile.writeErrorMessage("[moveFile] Process was interrupted while trying to create a link to your fastq file: " + source.getAbsolutePath(),true);
+			logFile.writeErrorMessage("[moveFile] Process was interrupted while trying to move your file: " + source.getAbsolutePath(),true);
+			System.exit(1);
+		}
+	}
+    
+    protected void cpFile(File source, File dest) {
+		try {
+			if (!source.exists()) {
+				logFile.writeErrorMessage("[copyFile] Expected file does not exist: " + source.getAbsolutePath(),true);
+				System.exit(1);
+			}
+			
+			ProcessBuilder pb = new ProcessBuilder("cp","-r",source.getAbsolutePath(),dest.getAbsolutePath());
+			Process p = pb.start();
+			
+			int val = p.waitFor();
+			
+			if (val != 0) {
+				logFile.writeErrorMessage("[copyFile] System could not copy your file " + source.getAbsolutePath(),true);
+				BufferedReader br2 = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+				String line2 = null;
+				while((line2 = br2.readLine()) != null) {
+					System.out.println(line2);
+				}
+				System.exit(1);
+			}
+			
+		} catch (IOException ioex) {
+			logFile.writeErrorMessage("[copyFile] IO Exception while trying copy your file: " + source.getAbsolutePath(),true);
+			System.exit(1);
+		} catch (InterruptedException ieex) {
+			logFile.writeErrorMessage("[copyFile] Process was interrupted while trying to copy your file: " + source.getAbsolutePath(),true);
 			System.exit(1);
 		}
 	}
@@ -155,7 +186,7 @@ public abstract class TFCommand {
 				if (linkname.getCanonicalFile().equals(filename.getAbsoluteFile())) {
 					logFile.writeWarningMessage("[createLink] An existing link matches what you requested, using existing link");
 				} else {
-					logFile.writeErrorMessage("[createLink] An existing file exists at link location and it doesn't match request, refused to overwrite existing file"
+					logFile.writeErrorMessage("[createLink] An existing file exists at link location and it doesn't match request, refusing to overwrite existing file"
 							+ "\nExisting: " + linkname.getCanonicalPath()
 							+ "\nNew: " + filename.getAbsolutePath(),false);
 					System.exit(1);
@@ -168,7 +199,7 @@ public abstract class TFCommand {
 				int val = p.waitFor();
 				
 				if (val != 0) {
-					logFile.writeErrorMessage("[createLink]  System could not create a link to your fastq file " + filename.getAbsolutePath(),true);
+					logFile.writeErrorMessage("[createLink]  System could not create a link to you file " + filename.getAbsolutePath(),true);
 					BufferedReader br2 = new BufferedReader(new InputStreamReader(p.getErrorStream()));
 					String line2 = null;
 					while((line2 = br2.readLine()) != null) {
@@ -179,10 +210,10 @@ public abstract class TFCommand {
 				
 			}
 		} catch (IOException ioex) {
-			logFile.writeErrorMessage("[createLink]  IO Exception while trying to create a link to your fastq file: " + filename.getAbsolutePath(),true);
+			logFile.writeErrorMessage("[createLink]  IO Exception while trying to create a link to your file: " + filename.getAbsolutePath(),true);
 			System.exit(1);
 		} catch (InterruptedException ieex) {
-			logFile.writeErrorMessage("[createLink]  Process was interrupted while trying to create a link to your fastq file: " + filename.getAbsolutePath(),true);
+			logFile.writeErrorMessage("[createLink]  Process was interrupted while trying to create a link to your file: " + filename.getAbsolutePath(),true);
 			System.exit(1);
 		}
 		
@@ -190,25 +221,36 @@ public abstract class TFCommand {
 	
 	protected void mergeVcf(ArrayList<File> vcfList, File dest) {
 		try {
-			String bamString = "";
+			ArrayList<String> command  = new ArrayList<String>();
+			command.add("/tomato/app/vcftools/vcf-concat");
+
 			for (File bam: vcfList) {
 				if (!bam.exists()) {
 					logFile.writeErrorMessage("[mergeVcf] Expected file does not exist: " + bam.getAbsolutePath(),true);
+					System.exit(1);
 				}
-				bamString += " " + bam.getAbsolutePath();
+				command.add(bam.getAbsolutePath());
 			}
 			
-			ProcessBuilder pb = new ProcessBuilder("/tomato/app/vcftools/vcf-concat",bamString);
+			
+			ProcessBuilder pb = new ProcessBuilder(command);
 			Process p = pb.start();
 			
-			InputStream inputStream = p.getInputStream();
+			BufferedInputStream bis = new BufferedInputStream(p.getInputStream());
+			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(dest));
 			
-			FileOutputStream bw = new FileOutputStream(dest);
-			bw.write(IOUtils.readFully(inputStream, -1, false));
-            
+			
+			byte[] buffer = new byte[1024*1024*10];
+			int n = -1;
+			
+			while((n = bis.read(buffer))!=-1) {
+			  bos.write(buffer,0,n);
+			}
+		
+
 			int val = p.waitFor();
-			
-			bw.close();
+			bos.close();
+			bis.close();
 
 			
 			if (val != 0) {

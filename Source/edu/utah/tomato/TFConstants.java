@@ -19,6 +19,12 @@ public class TFConstants {
 	public static String FILE_SAM = "sam";
 	public static String FILE_METRICS = "pdf";
 	
+	public static String TARGET_AGILENT = "agilent";
+	public static String TARGET_NIMBLEGEN = "nimblegen";
+	public static String TARGET_TRUSEQ = "truseq";
+	public static String TARGET_CUSTOM = "custom";
+	public static String TARGET_ALL = "all";
+	
 	public static File templateDir = new File("/home/BioApps/tomatoFarmer/");
 	
 	public static HashSet<String> validTypes = new HashSet<String>() {
@@ -32,6 +38,17 @@ public class TFConstants {
 		add(TFConstants.ANALYSIS_EXOME_ALIGN_NOVOALIGN);
 		add(TFConstants.ANALYSIS_EXOME_METRICS);
 		add(TFConstants.ANALYSIS_EXOME_VARIANT_RAW);
+	}};
+	
+	public static HashSet<String> validTargets = new HashSet<String>() {
+		private static final long serialVersionUID = 1L;
+
+	{
+		add(TFConstants.TARGET_AGILENT);
+		add(TFConstants.TARGET_NIMBLEGEN);
+		add(TFConstants.TARGET_TRUSEQ);
+		add(TFConstants.TARGET_CUSTOM);
+		add(TFConstants.TARGET_ALL);
 	}};
 	
 }

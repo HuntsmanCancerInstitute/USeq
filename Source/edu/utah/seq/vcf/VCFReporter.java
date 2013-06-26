@@ -38,9 +38,8 @@ public class VCFReporter {
 		this.processArgs(args);
 		
 
-
-		//Parse the vcf file
-		VCFParser parsedVcf = new VCFParser(this.vcfInFile,true,true, true);
+		//Parse the vcf file for info
+		VCFParser parsedVcf = new VCFParser(this.vcfInFile,false,false, true);
 		
 		//Grab the info part of the header
 		HashMap<String,String> infoLines = parsedVcf.getVcfComments().getInfo();
@@ -85,16 +84,58 @@ public class VCFReporter {
 			this.reportStyle = VCFInfo.UNMODIFIED;
 		}
 		
-		if (reportFormat.equals("TAB")) {
-			writeTabDelimited(parsedVcf);
-		} else if (reportFormat.equals("VCF")) {
-			writeVCF(parsedVcf);
-		} else {
-			System.out.println("Application does not recognize the report format: " + reportFormat + ", please contact the developers");
-			System.exit(1);
+		//Count vcf records
+		ArrayList<File> tempFiles = new ArrayList<File>();
+		int recordCount = VCFUtilities.countReads(vcfInFile);
+		int chunks = recordCount / VCFUtilities.readsToChunk + 1;
+		
+		if (chunks > 1) {
+			System.out.println("File too big to report all in one go, splitting into " + chunks + " chunks");
+		}
+		
+		//make tempDirectory
+		File tempDir = new File("tempVCF");
+		if (tempDir.exists()) {
+			IO.deleteDirectory(tempDir);
+		}
+		tempDir.mkdir();
+		
+		for (int i=0;i<chunks;i++) {
+			System.out.println("Working on file chunk: " + (i + 1));
+			//Create temporary vcf files
+			
+			VCFParser parser =  new VCFParser(vcfInFile, true, true, true, i,VCFUtilities.readsToChunk);
+			
+			if (reportFormat.equals("TAB")) {
+				File tempText = new File(tempDir,"tempTxt_" + i + ".txt");
+				tempFiles.add(tempText);
+				writeTabDelimited(parser,tempText,i);
+				
+			} else if (reportFormat.equals("VCF")) {
+				File tempVcf = new File(tempDir,"tempVcf_" + i + ".vcf");
+				tempFiles.add(tempVcf);
+				writeVCF(parser,tempVcf);
+			} else {
+				System.out.println("Application does not recognize the report format: " + reportFormat + ", please contact the developers");
+				System.exit(1);
+			}
+			
+			parser = null;
 		}
 	
+		if (reportFormat.equals("TAB")) {
+			VCFUtilities.catFiles(tempFiles, this.outFile);
+		}
 		
+		if (reportFormat.equals("VCF")) {
+			VCFUtilities.mergeVcf(tempFiles, this.outFile);
+			if (compressOutput) {
+				VCFUtilities.createTabix(this.outFile, this.pathToTabix);
+			}
+		}
+		
+		IO.deleteDirectory(tempDir);
+			
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
 				
@@ -105,17 +146,15 @@ public class VCFReporter {
 
 	}
 	
-	private void writeVCF(VCFParser vcfFile) {
-		vcfFile.printRecords(this.outFile, true, this.columnsToUse, this.reportStyle);
-		if (compressOutput) {
-			VCFUtilities.createTabix(this.outFile, this.pathToTabix);
-		}
+	private void writeVCF(VCFParser vcfFile, File tempOutFile) {
+		vcfFile.printRecords(tempOutFile, true, this.columnsToUse, this.reportStyle);
+		
 	}
 	
-	private void writeTabDelimited(VCFParser vcfFile) {
+	private void writeTabDelimited(VCFParser vcfFile, File tempOutFile, int fileCount) {
 		
 		try {
-			BufferedWriter bw = new BufferedWriter(new FileWriter(outFile));
+			BufferedWriter bw = new BufferedWriter(new FileWriter(tempOutFile));
 			
 			//Generate the header for the table and write to file
 			StringBuffer header = new StringBuffer("Chrom\tStart\tEnd\tReference\tAlt\tQual");
@@ -127,8 +166,10 @@ public class VCFReporter {
 				header.append("\t" + sample);
 			}
 			
-			bw.write(header.toString() + "\n");
-			
+			//Only write the header for the first file
+			if (fileCount == 0) {
+				bw.write(header.toString() + "\n");
+			}
 			
 			//Write key if exists
 			if (genKey) {
@@ -353,38 +394,46 @@ public class VCFReporter {
 	private void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          VCF Reporter: April 2013                                **\n" +
+				"**                            VCF Reporter: April 2013                              **\n" +
 				"**************************************************************************************\n" +
-				"This application takes a vcf file as input and returns either a modified VCF file or \n" +
-				"a tab-delimited text file containing user-specified and formatted INFO fields.  The \n" +
-				"modified VCF file is useful if you want to view annotations in IGV.  The standard set of \n" +
-				"INFO fields is quite large and can't fit in the IGV window. The tab-delimited text file \n" +
-				"makes the annotations much easier to view sort and filter.  Notice that some options \n" +
-				"are only meaningful for the tab-delimited text file\n\n\n" +
+				"This application takes a VCF file as input and returns either a modified VCF file or a\n" +
+				"tab-delimited text file containing user-specified and optionally formatted INFO \n" +
+				"fields.  The modified VCF file is useful if you want to view annotations in IGV.  The\n" +
+				"standard set of INFO fields is quite large and can't fit in the IGV window. The tab-\n" +
+				"delimited text file allows the annotations to be viewing in Excel for easier sorting \n" +
+				"and filtering. If the number of VCF records is greater than 500,000, the reporting \n" +
+				"will be done in chunks.  The chunks are merged and compressed automatically at the end\n" +
+				"of the application.\n\n" +
 
 				"Required:\n"+
 				"-v VCF file. Full path to a multi sample vcf file (xxx.vcf(.gz/.zip OK)).\n"+
-				"-o Output file.  Full path to the output file. If xxx.txt specified, output will be a tab-delimited\n" +
-				"      spreadsheet.  If xxx.vcf specified, output will be an uncompressed vcf file.  If \n" +
-				"      xxx.vcf.gz specifed, output will be a tabix compressed and indexed vcf file.\n" +
+				"-o Output file.  Full path to the output file. If xxx.txt is specified, output will \n" +
+				"      be a tab-delimited text file.  If xxx.vcf is specified, output will be an \n" +
+				"      uncompressed vcf file.  If xxx.vcf.gz is specifed, output will be a tabix \n" + 
+				"      compressed and indexed vcf file.\n" +
 				"\nOptional:\n"+
-				"-d Desired Columns.  A comma-separated list of Info-field names that will be reported \n" +
+				"-d Desired Columns.  A comma-separated list of INFO-field names that will be reported\n" +
 				"      in the output vcf.\n" +
-				"-u Unwanted Columns. A comma-separated list of Info-field names that will not be reported \n" +
-				"      in the output vcf\n" +
-				"-r Reporting Style. Info field styles.  Only two styles are currently supported, unmodified \n" +
-				"      and short. Unmodified is used by default.  Short truncates some of the longer fields\n" +
-				"-a Annotations only.  Report standard annotations in CLEAN format.  Skip info fields reported \n" + 
-				"      by GATK to reduce clutter in IGV.\n" +
-				"-x Damaging only.  Only report nonsynonymous, frameshift or splicing variants\n" +
-				"-p Path to tabix directory.  Set this variable if the application is not run on moab/alta\n" +
-				"\nTab-delimited only options\n" +
-				"-k Generate key.  Text document that lists descriptions of each column in the output table\n" +
+				"-u Unwanted Columns. A comma-separated list of INFO-field names that will not be \n" +
+				"      reported in the output vcf.\n" +
+				"-r Reporting Style. INFO field styles.  Only two styles are currently supported, \n" + 
+				"      'unmodified' and 'short'. Unmodified is used by default.  Short truncates some\n" +
+				"      of the longer fields, which help visibility in IGV.\n" +
+				"-a Annotations only.  Report standard annotations using the 'short' reporting style.\n" +
+				"      Skip INFO fields reported by GATK to reduce clutter.  The skipped fields are \n" +
+				"      used by GATK to determine variation quality and might not be useful to the \n" +
+				"      general user.\n" +
+				"-x Damaging only.  Only report nonsynonymous, frameshift or splicing variants.\n" +
+				"-p Path to tabix directory.  Set this variable if the application is not run on \n" +
+				"      moab/alta\n" +
+				"\nTab-delimited only options:\n" +
+				"-k Generate key.  Text document that lists descriptions of each column in the output\n" +
+				"      table.\n" +
 				"\n\n"+
 
-				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/VCFReporter -v 9908R.vcf -d SIFT,PP2,LRT,MT \n" +
-				"      -r CLEAN -o 9908.ann.txt \n" +
-		        "**************************************************************************************\n");
+				"Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFReporter -v 9908R.vcf \n" + 
+				"      -d SIFT,LRT,MT,MT_P -r short -o 9908.ann.txt \n\n" +
+				"**************************************************************************************\n");
 
 	}
 

@@ -6,7 +6,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -15,7 +14,7 @@ import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.sun.mail.handlers.message_rfc822;
+
 
 import util.gen.IO;
 import util.gen.Misc;
@@ -37,6 +36,7 @@ public class VCFAnnotator {
 	private String cosmicFile= "cosmic63";
 	private boolean compressOutput = false;
 	
+	
 	//Shared variables
 	private HashMap<String,AnnovarCommand> commandMap = new HashMap<String,AnnovarCommand>() {{
 		put("REFSEQ",new AnnovarCommand("RefSeq Annotations"));
@@ -47,11 +47,8 @@ public class VCFAnnotator {
 		put("PHYLOP",new AnnovarCommand("Phylop Annotations"));
 		put("COSMIC",new AnnovarCommand("COSMIC Annotations"));
 		put("ESP",new AnnovarCommand("ESP Annotations"));
-		put("SIFT",new AnnovarCommand("Sift Annotations"));
-		put("PP2",new AnnovarCommand("Polyphen2 Annotations"));
 		put("ONEK",new AnnovarCommand("1K Genome Annotations"));
-		put("MT",new AnnovarCommand("MutationTaster Annotations"));
-		put("LRT",new AnnovarCommand("LRT Annotations"));
+		put("SCORES", new AnnovarCommand("Variant scoring Annotation"));
 		put("TFBS",new AnnovarCommand("TFBS Annotations"));
 		put("DGV",new AnnovarCommand("DGV Annotations"));
 		put("OMIM",new AnnovarCommand("OMIM Annotations"));
@@ -81,41 +78,82 @@ public class VCFAnnotator {
 		}
 		
 		long startTime = System.currentTimeMillis();
-
+		
 		processArgs(args);
-
-		//for each file
-
-		VCFParser parsedVCF = new VCFParser(vcfFile, true, true, true);
-
+		
+		//Count vcf records
+		ArrayList<File> tempVcfFiles = new ArrayList<File>();
+		int recordCount = VCFUtilities.countReads(vcfFile);
+		int chunks = recordCount / VCFUtilities.readsToChunk + 1;
+		
+		if (chunks > 1) {
+			System.out.println("File too big to annotate all in one go, splitting into " + chunks + " chunks");
+		}
+		
+		//make tempDirectory
+		File tempDir = new File("tempVCF");
+		if (tempDir.exists()) {
+			IO.deleteDirectory(tempDir);
+		}
+		tempDir.mkdir();
+		
+		//Create temporary file names
 		String[] fileParts = vcfFile.getName().split("\\.(?=[^\\.]+$)");
-
 		inputname = fileParts[0] + ".annovar.input.txt";
+		
+		for (int i=0;i<chunks;i++) {
+			System.out.println("Working on file chunk: " + (i + 1));
+			//Create temporary vcf files
+			File tempVcf = new File(tempDir,"tempVcf_" + i + ".vcf");
+			tempVcfFiles.add(tempVcf);
+			
+			
+			//Create a parsed file per-chunk
+			VCFParser parsedVCF = new VCFParser(vcfFile, true, true, true, i,VCFUtilities.readsToChunk);
 
-		//Setup annovar commands
-		this.setupCommands();
+			
+
+			//Setup annovar commands
+			this.setupCommands();
+			
+			//Write annovar input file
+			this.writeAnnovarInput(parsedVCF);
+			
+			//Run annovarDriver
+			for (String command: this.annsToRun) {
+				commandMap.get(command).runCommand(parsedVCF);
+			}
+			
+			//Add VAAST output
+			if (vaastFile != null) {
+				this.addVaastOutput(parsedVCF);
+			}
+			
 		
-		//Write annovar input file
-		this.writeAnnovarInput(parsedVCF);
-		
-		//Run annovarDriver
-		for (String command: this.annsToRun) {
-			commandMap.get(command).runCommand(parsedVCF);
+			//Write VCF file
+			parsedVCF.printRecords(tempVcf,true);
+			
+			parsedVCF = null;
+			
 		}
 		
-		//Add VAAST output
-		if (vaastFile != null) {
-			this.addVaastOutput(parsedVCF);
+		//Merge vcf file
+		VCFUtilities.mergeVcf(tempVcfFiles, this.vcfOutFile);
+		
+		//delete temp files
+		IO.deleteDirectory(tempDir);
+		
+		//DeleteLog 
+		File logFile = new File(inputname + ".log");
+		if (logFile.exists()){ 
+			logFile.delete();
 		}
 		
-	
-		//Write VCF file
-		parsedVCF.printRecords(this.vcfOutFile,true);
+		//Compress if needed
 		if (this.compressOutput) {
 			VCFUtilities.createTabix(this.vcfOutFile, this.pathToTabix);
 		}
 		
-
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");	
@@ -291,61 +329,50 @@ public class VCFAnnotator {
     	commandMap.get(cmdName).addOutputParser(op1Snp);
     	commandMap.get(cmdName).addOutputParser(op2Snp);
     	
-    	//Annovar SIFT
-    	cmdName = "SIFT";
-    	ProcessBuilder pbSift = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype","avsift",this.inputname,this.pathToRespository);
-    	String il1Sift = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Float,Description=\"SIFT score.  Standard SIFT scores below 0.05 are considered damaging. "
+    	
+    	cmdName = "SCORES";
+    	ProcessBuilder pbScore = new ProcessBuilder(this.pathToAnnovar,"--filter","-buildver","hg19","-dbtype","ljb2_all",this.inputname,this.pathToRespository,"-otherinfo");
+    	String il1Sift = new String("##INFO=<ID=SIFT,Number=1,Type=Float,Description=\"SIFT score.  Standard SIFT scores below 0.05 are considered damaging. "
     			+ "If the annovarStyle of the VCF/Report is CLEAN, the SIFT score is reported as 1-SIFT_SCORE, making higher scores more damaging.  This is done "
     			+ "to make the SIFT scores compatible with Polyphen2, MutationTaster and other functional effect predictors.\">");
-    	OutputParser op1Sift = new OutputParser(cmdName,il1Sift,"hg19_avsift_dropped");
-    	OutputParser op2Sift = new OutputParser("hg19_avsift_filtered");
-    	commandMap.get(cmdName).addCommand(pbSift);
-    	commandMap.get(cmdName).addOutputParser(op1Sift);
-    	commandMap.get(cmdName).addOutputParser(op2Sift);
-    	
-    	//Annovar Polyphen
-    	cmdName = "PP2";
-    	ProcessBuilder pbPoly = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype","ljb_pp2",this.inputname,this.pathToRespository);
-    	String il1Poly = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Float,Description=\"Polyphen2 score. Scores range from 0-1.  Scores larger than "
-    			+ "0.85 are considered 'probably damaging', scores between 0.15 and 0.85 are considered 'possibly damaging', scores less than 0.15 are considered "
-    			+ "benign.\">");
-    	OutputParser op1Poly = new OutputParser(cmdName,il1Poly,"hg19_ljb_pp2_dropped");
-    	OutputParser op2Poly = new OutputParser("hg19_ljb_pp2_filtered");
-    	commandMap.get(cmdName).addCommand(pbPoly);
-    	commandMap.get(cmdName).addOutputParser(op1Poly);
-    	commandMap.get(cmdName).addOutputParser(op2Poly);
-    	
-    	//Annovar Mutation Taster
-    	cmdName = "MT";
-    	ProcessBuilder pbMt = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype","ljb_mt",this.inputname,this.pathToRespository);
-    	String il1Mt = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Float,Description=\"MutationTaster score.  Higher scores are more damaging.\">");
-    	OutputParser op1Mt = new OutputParser(cmdName,il1Mt,"hg19_ljb_mt_dropped");
-    	OutputParser op2Mt = new OutputParser("hg19_ljb_mt_filtered");
-    	commandMap.get(cmdName).addCommand(pbMt);
-    	commandMap.get(cmdName).addOutputParser(op1Mt);
-    	commandMap.get(cmdName).addOutputParser(op2Mt);
-    	
-    	//Annovar LRT
-    	cmdName = "LRT";
-    	ProcessBuilder pbLrt = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype","ljb_lrt",this.inputname,this.pathToRespository);
-    	String il1Lrt = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Float,Description=\"LRT score.  LRT scores is a likelihood ratio test of codon "
+    	String il1PolyHvar = new String("##INFO=<ID=PP2_HVAR,Number=1,Type=Float,Description=\"Polyphen2 HVAR score. Scores range from 0-1.  Scores larger than "
+    			+ "0.909 are considered 'probably damaging', scores between 0.447 and 0.908 are considered 'possibly damaging', scores less than 0.446 are considered "
+    			+ "benign.  The PolyPhen HVAR score should be used for diagnositics of Mendelian disease\">");
+    	String il1PolyHvarP = new String("##INFO=<ID=PP2_HVAR_P,Number=1,Type=String,Description=\"Polyphen2 HVAR Prediction. Predictions can be 'D' damaging, "
+    			+ "'P' possibly damaging or 'B' benign.\">");
+    	String il1PolyHidv = new String("##INFO=<ID=PP2_HDIV,Number=1,Type=Float,Description=\"Polyphen2 HDIV score. Scores range from 0-1.  Scores larger than "
+    			+ "0.957 are considered 'probably damaging', scores between 0.453 and 0.956 are considered 'possibly damaging', scores less than 0.452 are considered "
+    			+ "benign.  The PholyPhen HIDV score should be used for evaluating rare alleles at loci potentially involved in complex phenotypes\">");
+    	String il1PolyHidvP = new String("##INFO=<ID=PP2_HDIV_P,Number=1,Type=String,Description=\"Polyphen2 HDIV Prediction.  Predictions can be 'D' damaging, "
+    			+ "'P' possibly damaging or 'B' benign\">");
+    	String il1Lrt = new String("##INFO=<ID=LRT,Number=1,Type=Float,Description=\"LRT score.  LRT scores is a likelihood ratio test of codon "
     			+ "constraint.  The scores range from 0-1 with higher scores signifying more damaging changes.\">");
-    	OutputParser op1Lrt = new OutputParser(cmdName,il1Lrt,"hg19_ljb_lrt_dropped");
-    	OutputParser op2Lrt = new OutputParser("hg19_ljb_lrt_filtered");
-    	commandMap.get(cmdName).addCommand(pbLrt);
-    	commandMap.get(cmdName).addOutputParser(op1Lrt);
-    	commandMap.get(cmdName).addOutputParser(op2Lrt);
+    	String il1LrtP = new String("##INFO=<ID=LRT_P,Number=1,Type=String,Description=\"LRT  prediction.  Predictions can be 'D' damaging, 'N' not damaging"
+    			+ " or 'U' unknown .\">");
+    	String il1Mt = new String("##INFO=<ID=MT,Number=1,Type=Float,Description=\"MutationTaster score.  Higher scores are more damaging.\">");
+    	String il1MtP = new String("##INFO=<ID=MT_P,Number=1,Type=String,Description=\"MutationTaster prediction.  Predictions can be 'A' disease_causing_automatic, "
+    			+ "'D' disease_causing, 'N' polymorphism or 'P' polymorphism_automatic.\">");
+    	String il1Ma = new String("##INFO=<ID=MA,Number=1,Type=Float,Description=\"MutationAssessor score.  Higher scores are more damaging.\">");
+    	String il1MaP = new String("##INFO=<ID=MA_P,Number=1,Type=String,Description=\"MutationAssessor prediction.  There are two possible predictions: "
+    			+ "predicted functional (high, medium), predicted non-functional (low, neutral)\">");
+    	String il1Fathmm = new String("##INFO=<ID=FATHMM,Number=1,Type=Float,Description=\"Fathmm score.  If a score is smaller than -1.5 the corresponding "
+    			+ " NS is predicted as D(AMAGING), otherwise it is predicted as T(OLERATED)\">");
+    	String il1Gerp = new String("##INFO=<ID=GERP,Number=1,Type=Float,Description=\"GERP++ score.  Generally the higher the score, the more conserved the site.\">");
+    	String il1Phylop = new String("##INFO=<ID=PHYLOP,Number=1,Type=Float,Description=\"Phylop score. The PhyloP score is based on multiple alignments of 46 genomes. "
+    			+ "The larger the score, the more conserved the site\">");
+    	String il1Siphy = new String("##INFO=<ID=SIPHY,Number=1,Type=Float,Description=\"Siphy score. The SiPhy score is based on multiple alignments of 29 mammalian genomes. "
+    			+ "The larger the score, the more conserved the site\">");
+    	int[] colLocs = new int[]{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
+    	String[] colNames = new String[]{"SIFT","PP2_HVAR","PP2_HVAR_P","PP2_HDIV","PP2_HDIV_P","LRT","LRT_P","MT","MT_P","MA","MA_P","FATHMM","GERP","PHYLOP","SIPHY"};
+    	String[] colDesc = new String[]{il1Sift,il1PolyHvar,il1PolyHvarP,il1PolyHidv,il1PolyHidvP,il1Lrt,il1LrtP,il1Mt,il1MtP,il1Mt,il1MtP,il1Ma,il1MaP,il1Fathmm,il1Gerp,
+    			il1Phylop,il1Siphy};
     	
-    	//Annovar Phylop
-    	cmdName = "PHYLOP";
-    	ProcessBuilder pbPhylop = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype","ljb_phylop",this.inputname,this.pathToRespository);
-    	String il1Phylop = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Float,Description=\"Phylop score.  This score is a rescaled version of the original "
-    			+ "PhyloP score.  Scores range from 0-1, with higher scores signifying more conservation.  Scores above 0.95 are considered conserved.\">");
-    	OutputParser op1Phylop = new OutputParser(cmdName,il1Phylop,"hg19_ljb_phylop_dropped");
-    	OutputParser op2Phylop = new OutputParser("hg19_ljb_phylop_filtered");
-    	commandMap.get(cmdName).addCommand(pbPhylop);
-    	commandMap.get(cmdName).addOutputParser(op1Phylop);
-    	commandMap.get(cmdName).addOutputParser(op2Phylop);
+    	OutputParser opScore1 = new OutputParser(colLocs,colNames,colDesc,2,"hg19_ljb2_all_dropped",1);
+    	OutputParser opScore2 = new OutputParser("hg19_ljb2_all_filtered");
+    	
+    	commandMap.get(cmdName).addCommand(pbScore);
+    	commandMap.get(cmdName).addOutputParser(opScore1);
+    	commandMap.get(cmdName).addOutputParser(opScore2);
     	
 
     	//Annovar 1K Genomes
@@ -419,7 +446,7 @@ public class VCFAnnotator {
     	//Annovar NIST
     	cmdName = "NIST";
     	ProcessBuilder pbNist = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_nist.gff3",this.inputname,this.pathToRespository);
-    	String il1Nist = new String("##INFO=<ID=" + cmdName + ",Number=0,Type=Flag,Description=\"Regions that can be resolved with high certainty using Illumina sequencing according to NIST.\">");
+    	String il1Nist = new String("##INFO=<ID=" + cmdName + ",Number=0,Type=Flag,Description=\"Regions that can be resolved with high certainty in the female HapMap individual NA12878 according to NIST.\">");
     	OutputParser op1Nist = new OutputParser(cmdName,il1Nist,"hg19_gff3",true);
     	commandMap.get(cmdName).addCommand(pbNist);
     	commandMap.get(cmdName).addOutputParser(op1Nist);
@@ -434,38 +461,46 @@ public class VCFAnnotator {
 	private void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          VCF Annotator : March 2013                              **\n" +
+				"**                              VCF Annotator : March 2013                          **\n" +
 				"**************************************************************************************\n" +
-				"Adds annotations from several different sources to VCF file INFO line.  Only hg19 \n " +
-				"is supported at this time.\n\n\n" +
-
-				"Required:\n"+
+				"VCFAnnotator adds user-specifed annotations to the VCF file INFO field.  Only hg19 is \n" +
+				"supported at this time.  If your VCF file has more than 500,000 records, it will be \n" +
+				"split into smaller VCF files that are annotated separately.  Once annotation is \n" +
+				"complete, the individual annotated files are merged and compressed.  This application \n" +
+				"uses a lot of memory when running large VCF files, so use 20gb of memory when starting\n" +
+				"java.\n\n" +
+		
+				"Required:\n" +
 				"-v VCF file. Path to a multi-sample vcf file, compressed ok (XXX.vcf/XXX.vcf.gz).\n"+
-				"-o Output VCF file.  Path to the annotated vcf file, can be specifed as XXX.vcf or XXX.vcf.gz.\n" +
-				"      If XXX.vcf.gz, the file will be compressed and index using tabix\n\n" +
+				"-o Output VCF file.  Path to the annotated vcf file, can be specifed as XXX.vcf or \n" + 
+				"   XXX.vcf.gz. If XXX.vcf.gz, the file will be compressed and indexed using tabix.\n\n" +
+				
 				"Optional:\n"+
-				"-d dbSNP database.  By default, this applications uses dbSNP 137 for annotation. Use \n" +
-				"      this option along with the database identifier to use a different version, ie snp129 \n" +
-				"      The dbSNP database must be in the annovar data directory\n" +
+				"-d dbSNP database.  By default, this application uses dbSNP 137 for annotation. Use \n" +
+				"      this option along with dbSNP database identifier to use a different version, \n" +
+				"      i.e. snp129. The annovar-formatted dbSNP database must be in the annovar data \n" +
+				"      directory for this option to work.\n" +
 				"-e Ethnicity.  By default, the 1K frequency is calculated across all ethnicities.  \n" +
 				"      If you want to restrict it to one of EUR, AFR, ASN or AMR, use this option \n" +
-				"      followed by the ethnicity identifier. \n" +
+				"      followed by the ethnicity identifier.\n" +
 				"-a Annotations to add.  By default, this application uses all available annovar \n" +
-				"      annotations.  Use a comma-separated list of keys to specify a custom set. Avaiable\n" +
-				"      annotations with (keys): ensembl gene annotations (ENSEMBL), refSeq gene names (REFSEQ)\n" +
-				"      , transcription factor binding sites (TFBS), segmental duplicatons (SEGDUP), database\n" +
-				"      of genomic variants (DGV), sift scores (SIFT), polyphen scores (PP2), mutation taster\n" +
-				"      scores (MT), LRT scores (LRT), Phylop score (PHYLOP), GWAS catalog annotations (GWAS),\n" +
-				"      dbsnp annotations (DBSNP), 1K genomes annotations (ONEK), COSMIC annotations (COSMIC), \n" +
-				"      ESP annotations (ESP), OMIM genes and diseases (OMIM), Flagged VAAST genes (V-FLAG), \n" +
-				"      ACMG genes, and NIST callable ragions (NIST)\n" +
-				"-n VAAST output.  If a VAAST output file is specified, variation score and gene rank \n" +
-				"      is added the VCF file\n" +
+				"      annotations.  Use a comma-separated list of keys to specify a custom set. \n" + 
+				"      Available annotations with (keys): ensembl gene annotations (ENSEMBL), refSeq \n" +
+				"      gene names (REFSEQ), transcription factor binding sites (TFBS), segmental \n" +
+				"      duplicatons (SEGDUP), database of genomic variants (DGV), variant scores \n" + 
+				"      (SCORES), GWAS catalog annotations (GWAS), dbsnp annotations (DBSNP), 1K \n" +
+				"      genomes annotations (ONEK), COSMIC annotations (COSMIC), ESP annotations (ESP),\n" +
+				"      OMIM genes and diseases (OMIM), flagged VAAST genes (V-FLAG), ACMG genes (ACMG),\n" +
+				"      and NIST callable ragions (NIST).  The SCORES option includes SIFT, PolyPhen2, \n" +
+				"      MutationTaster, MutationAssessor, LRT, GERP++, FATHMM, PhyloP and SiPhy.\n"+ 
+				"-n VAAST output.  If a VAAST output file is specified, the VCF file is annotated with\n" +
+				"      the VAAST variation score and gene rank.\n" +
 				"-p Path to annovar directory.\n" +
-				"-t Path to tabix directoy.\n" +
+				"-t Path to tabix directory.\n" +
 				"\n\n"+
 
-				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/VCFAnnotator -v 9908R.vcf -o 9908_ann.vcf.gz \n" +
+				"Example: java -Xmx20G -jar pathTo/USeq/Apps/VCFAnnotator -v 9908R.vcf \n" + 
+				"      -o 9908_ann.vcf.gz \n\n" +
 		        "**************************************************************************************\n");
 
 	}
@@ -547,7 +582,7 @@ public class VCFAnnotator {
 			}
 		} else {
 			//Set up default command, command map keys aren't sorted, so manually set it up
-			String[] ctr = new String[]{"ENSEMBL","REFSEQ","DBSNP","ONEK","COSMIC","ESP","SIFT","PP2","MT","LRT","PHYLOP","SEGDUP","GWAS","OMIM","ACMG","V_FLAG","NIST"};
+			String[] ctr = new String[]{"ENSEMBL","REFSEQ","DBSNP","ONEK","COSMIC","ESP","SCORES","SEGDUP","GWAS","OMIM","ACMG","V_FLAG","NIST"};
 			//String[] ctr = new String[]{"ENSEMBL","REFSEQ"};
 			this.annsToRun.addAll(Arrays.asList(ctr));
 		}
@@ -672,6 +707,7 @@ public class VCFAnnotator {
 		private String method;
 		private String[] infoLine;
 		private VCFParser parsedVCF;
+		private int column;
 		
 		/** The argument-less version of this command simply marks the output file for deletion.
 		 */
@@ -736,6 +772,7 @@ public class VCFAnnotator {
 			this.infoLine = infoLine;
 			this.start = start;
 			this.columns = columns;
+		
 			
 			if (!this.avaiableMethods.contains(method)) {
 				System.out.println("Don't recognize the parsing method, exiting: " + method);
@@ -747,6 +784,31 @@ public class VCFAnnotator {
 			this.ids = ids;
 		}
 		
+		
+		/** Yet another constructor.  This is used if the output column contains comma-delimited data.
+		 
+		 * 
+		 * @param columns    desired column numbers from the output file.  0-based.
+		 * @param ids        column ids.
+		 * @param infoLine   text describing the new info field to put in the VCF file
+		 * @param start      column number of the 'chromosome' column in the annovar output file.  Used in matching
+		 * @param method     match method, options are 'delete', 'unsorted' or 'standard'
+		 * @param extension  extension of the annovar output file
+		 */
+		public OutputParser(int[] columns, String[] ids, String[] infoLine, Integer start, String extension, int column) {
+			//Create input/output files
+			annovarRunOutput = new File(inputname + "." + extension);
+			annovarRunOutput.deleteOnExit();
+			
+			this.infoLine = infoLine;
+			this.start = start;
+			this.columns = columns;
+			this.column = column;
+			this.ids = ids;
+			
+			this.method = "MULTIVALUE";
+		}
+		
 		public void parseOutput(VCFParser parsedVCF) {
 			this.parsedVCF = parsedVCF;
 			if (this.method == "STANDARD") {
@@ -754,10 +816,13 @@ public class VCFAnnotator {
 				this.standardMatch();
 			} else if (this.method == "UNSORTED") {
 				this.insertInfo();
-				this.unsortedMatch(false);
+				this.unsortedMatch(false,false);
 			} else if (this.method == "FLAG") {
 				this.insertInfo();
-				this.unsortedMatch(true);
+				this.unsortedMatch(true,false);
+			} else if (this.method == "MULTIVALUE") {
+				this.insertInfo();
+				this.unsortedMatch(false, true);
 			}
 		}
 
@@ -767,6 +832,7 @@ public class VCFAnnotator {
 				this.parsedVCF.getVcfComments().addInfo(info);
 			}
 		}
+		
 		
 		/** The standard match method is for output files that have one line of data for each line of the 
 		 * input file. This requires no fancy matching.
@@ -785,7 +851,6 @@ public class VCFAnnotator {
 						
 						record.getInfoObject().addInfo(this.ids[i], (roItems[this.columns[i]].replace(' ','_')).replace(';',','));
 					}
-					
 				}
 				
 				roBR.close();
@@ -803,7 +868,7 @@ public class VCFAnnotator {
 		 * issues between VCFs and annovar, I find it easier to just assume the output is unsorted, even though it really is.  As of now, 
 		 * the output files aren't big enough to cause real memory issues, so this method should be fine.
 		 */
-		private void unsortedMatch(boolean flag) {
+		private void unsortedMatch(boolean flag, boolean multicolumn) {
 			HashMap<String,String[]> outputHash = new HashMap<String,String[]>();
 			BufferedReader roBR = null;
 			try {
@@ -824,10 +889,17 @@ public class VCFAnnotator {
 					String endPosition = String.valueOf(getAnnovarEndPosition(vr));
 					String chrom = vr.getChromosome().replace("chr", "");
 					String index = String.format("%s:%s-%s",chrom,vr.getPosition()+1,endPosition);
+					
 					if (outputHash.containsKey(index)) {
 						for (int i=0; i<this.ids.length; i++) {
 							if (flag) {
 								vr.getInfoObject().addInfo(this.ids[i],"true");
+							} else if (multicolumn) {
+								String[] values = outputHash.get(index)[this.column].split(",");
+								String value = values[this.columns[i]];
+								if (!value.equals(".")) {
+									vr.getInfoObject().addInfo(this.ids[i], values[this.columns[i]]);
+								}
 							} else {
 								vr.getInfoObject().addInfo(this.ids[i], (outputHash.get(index)[this.columns[i]].replace(' ','_')).replace(';',','));
 							}

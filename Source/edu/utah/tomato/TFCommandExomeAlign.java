@@ -24,7 +24,7 @@ public class TFCommandExomeAlign extends TFCommand {
 		for (TFSampleInfo si: sampleList) {
 		
 			//Create run directory
-			File runDirectory = new File(this.rootDirectory,si.getSampleName() + "_align");
+			File runDirectory = new File(this.rootDirectory,"JOB_" + si.getSampleName() + "_align");
 			runDirectory.mkdir();
 			
 			//Create command file
@@ -76,7 +76,7 @@ public class TFCommandExomeAlign extends TFCommand {
 		
 		for (TFSampleInfo si: sampleList) {
 			//Make destination directories
-			File runDirectory = new File(this.rootDirectory,si.getSampleName() + "_align");
+			File runDirectory = new File(this.rootDirectory,"JOB_" + si.getSampleName() + "_align");
 			File processedDir = new File(this.rootDirectory,"processed_alignments");
 			File rawDir = new File(this.rootDirectory,"raw_alignments");
 			processedDir.mkdir();

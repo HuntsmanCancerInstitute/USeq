@@ -1,14 +1,12 @@
 package edu.utah.tomato;
 
 import java.io.BufferedInputStream;
-import sun.misc.IOUtils;
+
+import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileOutputStream;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -22,19 +20,20 @@ public class TFCommandExomeVariantRaw extends TFCommand {
 			"chr7","chr8","chr9","chr10","chr11","chr12","chr13","chr14",
 			"chr15","chr16","chr17","chr18","chr19","chr20","chr21","chr22",
 			"chrX","chrY","chrM"};
-	
+	private File targetFile;
+
 	
 	
 	
 	public TFCommandExomeVariantRaw(File templateFile, File rootDirectory,
 			String commandString, String commandType, TFLogger logFile,
 			String email, Integer wallTime, Integer heartbeat, Integer failmax,
-			Integer jobs, boolean suppress, String study, boolean splitChrom) {
+			Integer jobs, boolean suppress, String study, boolean splitChrom, File targetFile) {
 		super(templateFile, rootDirectory, commandString, commandType, logFile, email,
 				wallTime, heartbeat, failmax, jobs, suppress);
 		this.splitChrom = splitChrom;
 		this.study = study;
-		
+		this.targetFile = targetFile;
 	}
 
 	
@@ -67,14 +66,9 @@ public class TFCommandExomeVariantRaw extends TFCommand {
 				File bam = new File(runDirectory,si.getSampleName() + ".bam");
 				File chromBam = new File(chromRunDir,si.getSampleName() + "." + chrom + ".bam");
 				File chromBai = new File(chromRunDir,si.getSampleName() + "." + chrom + ".bam.bai");
-				File fullVcf = new File(chromRunDir,si.getSampleName() + ".vcf");
-				File fullVcfGz = new File(chromRunDir,si.getSampleName() + ".vcf.gz");
-				File filterVcf = new File(chromRunDir,si.getSampleName() + ".filtered.vcf");
-				File filterVcfGz = new File(chromRunDir,si.getSampleName() + ".filtered.vcf.gz");
-				File passVcf = new File(chromRunDir,si.getSampleName() + ".passing.vcf");
-				File passVcfGz = new File(chromRunDir,si.getSampleName() + ".passing.vcf.gz");
 			
 				//Run split
+				this.logFile.writeInfoMessage("Splitting vcf file (" + si.getSampleName() + ") by chromosome (" + chrom + ")");
 				this.splitByChrom(chrom, bam, chromBam);
 				
 				//Add bam/bai to preserve
@@ -84,22 +78,32 @@ public class TFCommandExomeVariantRaw extends TFCommand {
 				//Add files to cleanup list
 				deleteList.add(chromBam);
 				deleteList.add(chromBai);
-				deleteList.add(fullVcf);
-				deleteList.add(fullVcfGz);
-				deleteList.add(filterVcf);
-				deleteList.add(filterVcfGz);
-				deleteList.add(passVcf);
-				deleteList.add(passVcfGz);
-				
-				//Add vcf files to merge lists
-				fullVcfList.add(fullVcf);
-				filteredVcfList.add(filterVcf);
-				passingVcfList.add(passVcf);
 				
 				//Add bam name to list
 				bamList.add(si.getSampleName() + "." + chrom + ".bam");
 
 			}
+			
+			//Create file for original bams/split bams/output files
+			File fullVcf = new File(chromRunDir,this.study + ".vcf");
+			File fullVcfGz = new File(chromRunDir,this.study + ".vcf.gz");
+			File filterVcf = new File(chromRunDir,this.study + ".filtered.vcf");
+			File filterVcfGz = new File(chromRunDir,this.study + ".filtered.vcf.gz");
+			File passVcf = new File(chromRunDir,this.study + ".passing.vcf");
+			File passVcfGz = new File(chromRunDir,this.study + ".passing.vcf.gz");
+		
+			//Add files to cleanup list
+			deleteList.add(fullVcf);
+			deleteList.add(fullVcfGz);
+			deleteList.add(filterVcf);
+			deleteList.add(filterVcfGz);
+			deleteList.add(passVcf);
+			deleteList.add(passVcfGz);
+			
+			//Add vcf files to merge lists
+			fullVcfList.add(fullVcf);
+			filteredVcfList.add(filterVcf);
+			passingVcfList.add(passVcf);
 			
 			//Create bam String
 			String bamString = "";
@@ -112,6 +116,15 @@ public class TFCommandExomeVariantRaw extends TFCommand {
 			HashMap<String,String> replacements = new HashMap<String,String>();
 			replacements.put("STUDY", this.study);
 			replacements.put("BAM_LIST", bamString);
+			if (targetFile == null) {
+				replacements.put("TARGETS","");
+			} else {
+				File localTarget = new File(chromRunDir,targetFile.getName());
+				replacements.put("TARGETS","-L " + targetFile.getName());
+				this.cpFile(targetFile, localTarget);
+				deleteList.add(localTarget);
+				keepers.add(localTarget);
+			}
 			
 			//Create cmd.txt file
 			File cmdFile = new File(chromRunDir,"cmd.txt");
@@ -211,6 +224,15 @@ public class TFCommandExomeVariantRaw extends TFCommand {
 			replacements.put("STUDY", this.study);
 			replacements.put("BAM_LIST", bamString);
 			
+			if (targetFile == null) {
+				replacements.put("TARGETS","");
+			} else {
+				File localTarget = new File(runDirectory,targetFile.getName());
+				replacements.put("TARGETS","-L " + targetFile.getName());
+				this.cpFile(targetFile, localTarget);
+				keepers.add(localTarget);
+			}
+			
 			//Create cmd.txt file
 			File cmdFile = new File(runDirectory,"cmd.txt");
 			keepers.add(cmdFile);
@@ -281,12 +303,15 @@ public class TFCommandExomeVariantRaw extends TFCommand {
 	@Override
 	public void run(ArrayList<TFSampleInfo> sampleList) {
 		//Create outer variant directory
-		File runDirectory = new File(this.rootDirectory,this.study + "_variant");
+		File runDirectory = new File(this.rootDirectory,"JOB_" + this.study + "_variant");
 		runDirectory.mkdir();
 		
-		
-		
-		
+		if (this.targetFile == null) {
+			logFile.writeInfoMessage("Calling variations across all regions");
+		} else {
+			logFile.writeInfoMessage("Calling variations using: " + targetFile.getAbsolutePath());
+		}
+			
 		
 		for (TFSampleInfo si: sampleList) {
 			//Create output files
@@ -314,20 +339,26 @@ public class TFCommandExomeVariantRaw extends TFCommand {
 				logFile.writeErrorMessage("[splitByChrom] Expected file does not exist: " + source.getAbsolutePath(),true);
 			}
 			
-			
 			ProcessBuilder pb = new ProcessBuilder("/tomato/app/samtools/samtools","view","-b","-h",source.getAbsolutePath(),chrom);
 			Process p = pb.start();
 			
 			
 			
-			InputStream inputStream = p.getInputStream();
+			BufferedInputStream bis = new BufferedInputStream(p.getInputStream());
+			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(dest));
 			
-			FileOutputStream bw = new FileOutputStream(dest);
-			bw.write(IOUtils.readFully(inputStream, -1, false));
-            
+			
+			byte[] buffer = new byte[1024*1024*10];
+			int n = -1;
+			
+			while((n = bis.read(buffer))!=-1) {
+			  bos.write(buffer,0,n);
+			}
+		
+
 			int val = p.waitFor();
-			
-			bw.close();
+			bos.close();
+			bis.close();
 			
 			if (val != 0) {
 				logFile.writeErrorMessage("[splitByChrom] Error while splitting the bam file: " + chrom + " "+ source.getAbsolutePath(),true);
