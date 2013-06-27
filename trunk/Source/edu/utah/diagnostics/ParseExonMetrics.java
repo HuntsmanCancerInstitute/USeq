@@ -490,7 +490,7 @@ public class ParseExonMetrics {
 			bw.write("<h2>Alignment</h2>\n");
 			
 			bw.write("<table id='Table3' border='1' cellpadding='5'>\n");
-			bw.write("<caption>Table 3: Alignment Statistics for standard hg19 chromosomes after recalibration, realignment and deduplication." + fixedName + "</caption>\n");
+			bw.write("<caption>Table 3: Alignment Statistics for standard hg19 chromosomes after recalibration, realignment and deduplication: " + fixedName + "</caption>\n");
 			bw.write("<tr><th>Metric</th><th>Read1</th><th>Read2</th><th>Combined</th></tr>\n");
 			bw.write("<tr><th>Total Reads</th><td>" + String.format("%,d", this.totalReads[0]) + "</td><td>" + String.format("%,d", this.totalReads[1]) + "</td><td>" + String.format("%,d", this.totalReads[2]) + "</td></tr>\n");
 			bw.write("<tr><th>Aligned Reads</th><td>"+ String.format("%,d", this.alignedReads[0]) + "</td><td>"  + String.format("%,d", this.alignedReads[1]) + "</td><td>"  + String.format("%,d", this.alignedReads[2]) + "</td></tr>\n");
