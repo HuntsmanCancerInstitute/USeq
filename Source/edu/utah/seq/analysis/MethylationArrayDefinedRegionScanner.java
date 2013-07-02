@@ -61,7 +61,7 @@ public class MethylationArrayDefinedRegionScanner {
 
 	public void run(){
 		//load data hashes
-		System.out.println("Loading paired samples...");
+		System.out.println("Loading samples...");
 		loadSamplePairs();
 
 		//for each chromosome
@@ -123,7 +123,7 @@ public class MethylationArrayDefinedRegionScanner {
 					out.print(sw.getStop()); out.print(tab);
 					//scores = pse, pvalFDR, # obs
 					if (scores == null) {
-						out.println("0\t0\t0\t0\t0");
+						out.print("0\t0\t0\t0\t0");
 					}
 					else {
 						//obs
@@ -261,32 +261,47 @@ public class MethylationArrayDefinedRegionScanner {
 		return (float)Num.pseudoMedian(vals);
 	}
 
-
+	/*Also hacked this to deal with missing pairs. Ugly!*/
 	public void loadSamplePairs(){
 		//parse names
 		String[] treatmentNames = treatmentPairedSamples.split(",");
 		String[] controlNames = controlPairedSamples.split(",");
-		if (treatmentNames.length != controlNames.length) Misc.printErrAndExit("\nError: the number of treatment and control samples differ?");
+		if (performPairedAnalysis && (treatmentNames.length != controlNames.length)) Misc.printErrAndExit("\nError: the number of treatment and control samples differ?");
+		int numSamples = treatmentNames.length;
+		if (controlNames.length > numSamples) numSamples = controlNames.length;
 
-		HashMap<String, ArrayList<MethylationArraySamplePair>> pairs = new HashMap<String, ArrayList<MethylationArraySamplePair>>();
+		HashMap<String, ArrayList<MethylationArraySamplePair>> pairsHM = new HashMap<String, ArrayList<MethylationArraySamplePair>>();
 
-		for (int i=0; i< treatmentNames.length; i++){
-			System.out.println("\t"+ treatmentNames[i] +"\t"+ controlNames[i]);
-			HashMap<String, PointData> pdT = loadPointData(treatmentNames[i]);
-			HashMap<String, PointData> pdC = loadPointData(controlNames[i]);
-			
+		for (int i=0; i< numSamples; i++){
+			System.out.print("\t");
+			HashMap<String, PointData> pdT = null;
+			if (i < treatmentNames.length && treatmentNames[i] !=null) {
+				System.out.print(treatmentNames[i]);
+				pdT = loadPointData(treatmentNames[i]);
+			}
+			System.out.print("\t");
+			HashMap<String, PointData> pdC = null;
+			if (i< controlNames.length && controlNames[i] !=null) {
+				System.out.print(controlNames[i]);
+				pdC = loadPointData(controlNames[i]);
+			}
+			System.out.println();
 			//set version
-			if (genomeVersion == null) genomeVersion = pdT.values().iterator().next().getInfo().getVersionedGenome();
+			if (genomeVersion == null && pdT !=null) genomeVersion = pdT.values().iterator().next().getInfo().getVersionedGenome();
 
 			HashSet<String> allChroms = new HashSet<String>();
-			allChroms.addAll(pdT.keySet());
-			allChroms.addAll(pdC.keySet());
+			if (pdT!=null) allChroms.addAll(pdT.keySet());
+			if (pdC!=null) allChroms.addAll(pdC.keySet());
 			for (String chrom: allChroms){
-				MethylationArraySamplePair sp = new MethylationArraySamplePair(pdT.get(chrom).getScores(), pdC.get(chrom).getScores(), performPairedAnalysis);
-				ArrayList<MethylationArraySamplePair> al = pairs.get(chrom);
+				float[] tScores = null;
+				float[] cScores = null;
+				if (pdT!=null) tScores = pdT.get(chrom).getScores();
+				if (pdC!=null) cScores = pdC.get(chrom).getScores();
+				MethylationArraySamplePair sp = new MethylationArraySamplePair(tScores, cScores, performPairedAnalysis);
+				ArrayList<MethylationArraySamplePair> al = pairsHM.get(chrom);
 				if (al == null){
 					al = new ArrayList<MethylationArraySamplePair>();
-					pairs.put(chrom, al);
+					pairsHM.put(chrom, al);
 				}
 				al.add(sp);
 			}
@@ -294,10 +309,10 @@ public class MethylationArrayDefinedRegionScanner {
 
 		//convert to []s
 		chromSamplePairs = new HashMap<String, MethylationArraySamplePair[]>();
-		for (String chrom: pairs.keySet()){
-			ArrayList<MethylationArraySamplePair> al = pairs.get(chrom);
-			if (al.size() != treatmentNames.length) Misc.printErrAndExit("\nError: One or more samples are missing a chromosome PointData set.");
-			MethylationArraySamplePair[] sp = new MethylationArraySamplePair[treatmentNames.length];
+		for (String chrom: pairsHM.keySet()){
+			ArrayList<MethylationArraySamplePair> al = pairsHM.get(chrom);
+			if (performPairedAnalysis && al.size() != treatmentNames.length) Misc.printErrAndExit("\nError: One or more samples are missing a chromosome PointData set.");
+			MethylationArraySamplePair[] sp = new MethylationArraySamplePair[numSamples];
 			al.toArray(sp);
 			chromSamplePairs.put(chrom, sp);
 		}
@@ -388,7 +403,7 @@ public class MethylationArrayDefinedRegionScanner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                     Methylation Array Defined Region Scanner: May 2013           **\n" +
+				"**                    Methylation Array Defined Region Scanner: July 2013           **\n" +
 				"**************************************************************************************\n" +
 				"MADRS takes paired sample PointData representing beta values (0-1) from arrays and\n" +
 				"a list of regions to score for differential methylation using a B&H corrected Wilcoxon\n" +
@@ -407,11 +422,12 @@ public class MethylationArrayDefinedRegionScanner {
 				"      pair the samples for a paired analysis.\n"+
 				"-o Minimum number paired observations in window, defaults to 3.\n" +
 				"-z Skip printing regions with less than minimum observations.\n"+
-				"-n Run a non-paired analysis where t and c are treated as groups and pooled.\n"+
+				"-n Run a non-paired analysis where t and c are treated as groups and pooled. Uneven\n" +
+				"      numbers of t and c are allowed.\n"+
 
 				"\n"+
 
-				"Example: java -Xmx4G -jar pathTo/USeq/Apps/MethylationArrayDefinedRegionScanner -s\n" +
+				"Example: java -Xmx4G -jar pathTo/USeq/Apps/MethylationArrayDefinedRegionScanner \n" +
 				"     -v H_sapiens_Feb_2009 -d ~/MASS/Bar/ -t Early1,Early2,Early3\n" +
 				"     -c Late1,Late2,Late3 \n\n" +
 

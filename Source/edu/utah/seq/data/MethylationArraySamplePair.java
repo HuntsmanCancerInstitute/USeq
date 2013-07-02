@@ -32,9 +32,15 @@ public class MethylationArraySamplePair{
 			}
 		}
 		else{
-			for (int i=startIndex; i<= stopIndex; i++){
-				if (treatment[i] !=0.0f ) treatmentAL.add(treatment[i]);
-				if (control[i] != 0.0f) controlAL.add(control[i]);
+			if (treatment !=null){
+				for (int i=startIndex; i<= stopIndex; i++){
+					if (treatment[i] !=0.0f ) treatmentAL.add(treatment[i]);
+				}
+			}
+			if (control !=null){
+				for (int i=startIndex; i<= stopIndex; i++){
+					if (control[i] != 0.0f) controlAL.add(control[i]);
+				}
 			}
 		}
 	}

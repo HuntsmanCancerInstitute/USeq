@@ -1,3 +1,10 @@
+----USeq_8.6.3----
+MethylationArrayDefinedRegionScanner
+* Modified app so it works with non even numbers of t and c
+SamParser
+* Modified the way the mid point of an alignment is calculate.  It is now the alignment start + 1/2 the read length. Did this to avoid problems with splice junction reads.
+* Set the bam file reader stringency to silent.
+
 ----USeq_8.6.2----
 RNAEditingScanSeqs
 * Added a minimum base fraction edited option to app to restrict what base observations are allowed into the analysis.

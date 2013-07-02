@@ -11,6 +11,7 @@ import java.util.*;
 import net.sf.samtools.SAMFileReader;
 import net.sf.samtools.SAMRecord;
 import net.sf.samtools.SAMRecordIterator;
+import net.sf.samtools.SAMFileReader.ValidationStringency;
 import net.sf.samtools.SAMRecord.SAMTagAndValue;
 
 
@@ -262,6 +263,7 @@ public class SamParser{
 		SAMFileReader samReader = null;
 		try {
 			samReader = new SAMFileReader(workingFile);
+			samReader.setValidationStringency(ValidationStringency.SILENT);
 			SAMRecordIterator it = samReader.iterator();
 			while (it.hasNext()) {
 				SAMRecord sam = it.next();
@@ -321,8 +323,12 @@ public class SamParser{
 
 				//calc start stop and chrStrand
 				int start = sam.getAlignmentStart();
-				int stop = sam.getAlignmentEnd();
-				double alignmentLength = stop - start;
+				
+				//int stop = sam.getAlignmentEnd();
+				//double alignmentLength = stop - start;
+				//switching to use length of the read, not the Alignment End to avoid huge lengths with splice junction reads.
+				
+				double alignmentLength = sam.getReadLength();
 				int mid = (int)Math.round((alignmentLength/2.0) + start);
 				
 				//reset max seq length?
@@ -556,7 +562,7 @@ public class SamParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam Parser: Oct 2012                              **\n" +
+				"**                                Sam Parser: June 2013                             **\n" +
 				"**************************************************************************************\n" +
 				"Parses SAM and BAM files into alignment center position PointData xxx.bar files.\n" +
 				"For RNASeq data, first run the SamTranscriptomeParser to convert splice junction\n" +

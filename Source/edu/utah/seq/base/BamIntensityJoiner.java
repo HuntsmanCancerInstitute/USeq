@@ -20,7 +20,7 @@ public class BamIntensityJoiner {
 	private File resultsFile;
 	private float minimumMappingQuality = 20;
 	private float maximumAlignmentScore = 240;
-	private String mdField = "101";
+	private String mdField = null;
 	private int subSample = 0;
 	
 	//internal
@@ -258,7 +258,7 @@ public class BamIntensityJoiner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Bam Intensity Joiner : August 2012                      **\n" +
+				"**                          Bam Intensity Joiner : July 2013                        **\n" +
 				"**************************************************************************************\n" +
 				"Extracts base level intensity information from the output of modified Picard\n" +
 				"IlluminaBaseCallsToSam app and inserts this into an alignment file. Be sure to \n" +
