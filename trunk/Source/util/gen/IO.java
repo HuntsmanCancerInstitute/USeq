@@ -1805,6 +1805,38 @@ public class IO {
 		}
 		return columnsRows;
 	}
+	
+	/**Loads a tab delimited file containing double into an double[columns][rows], all lines included, assumes no missing values. No headers please.*/
+	public static double[][] loadTableOfDoubles (File file){
+		double[][] columnsRows = null;
+		try{
+			BufferedReader in = fetchBufferedReader(file);
+			//read first line 
+			String line=in.readLine();
+			if (line == null) return null;
+			String[] tokens = line.split("\\t");
+			//find number columns
+			int numColumns = tokens.length;
+			//find number of rows
+			int numRows = (int)IO.countNumberOfLines(file);
+			columnsRows = new double[numColumns][numRows];
+			//assign first row to table
+			int y=0;
+			for (int x =0; x< numColumns; x++) columnsRows[x][y] = Double.parseDouble(tokens[x]);
+			y++;
+			//load other rows to table
+			for (; y< numRows; y++){
+				line=in.readLine();
+				tokens = line.split("\\t");
+				for (int x =0; x< numColumns; x++) columnsRows[x][y] = Double.parseDouble(tokens[x]);
+			}
+			in.close();
+		} catch (Exception e){
+			System.out.println("Problem loading table");
+			e.printStackTrace();
+		}
+		return columnsRows;
+	}
 
 	/**Attempts to make a file and return it's canonical path text (full path text).*/
 	public static String makeFullPathName(String resultsDirectory, String fileName){
