@@ -34,7 +34,8 @@ public class BisSeq {
 	//internal fields
 	private int maxGap = 0;
 	private File unstrandedPValueDirectory;
-	private File log2RatioDirectory;
+	private File windowLog2RatioDirectory;
+	private File baseLog2RatioDirectory;
 	private File windowsDirectory;
 	private HashMap<String,PointData[]> tConPlusPointData;
 	private HashMap<String,PointData[]> tConMinusPointData;
@@ -536,8 +537,14 @@ public class BisSeq {
 		    }
 		}
 		
-		//fetch the positions
+		//fetch the positions 
 		int[] positions = MethylatedBaseObservation.fetchPositions(mbo);
+		
+		//write out ratio of ratios?
+		if (printGraphs) {
+			float[] diffMeth = MethylatedBaseObservation.fetchLog2DifferentialFractionMethylation(mbo);
+			saveBaseDiffMethPointData(positions, diffMeth);
+		}
 
 		//make windows using all of the positions
 		makeWindows(positions);
@@ -890,7 +897,7 @@ public class BisSeq {
 		info.setStrand(".");	
 
 		//save log2 ratio data
-		saveSmoothedHeatMapData (0, smoothingWindow, info, log2RatioDirectory, "#FF0000", true); //red
+		saveSmoothedHeatMapData (0, smoothingWindow, info, windowLog2RatioDirectory, "#FF0000", true); //red
 
 		//save pvalues
 		notes.put(BarParser.DESCRIPTION_TAG, "Uncorrected p-values of unstranded differential methylation");
@@ -929,35 +936,32 @@ public class BisSeq {
 	}
 
 	/**Saves bar point graph files*/
-	public void saveSmoothedPointData (int scoreIndex, SmoothingWindow[] sm, Info info, File dir, String color){
+	public void saveBaseDiffMethPointData (int[] positions, float[] scores){
+		//build info object
+		Info info;
+		if (tConMergedChromPlus != null) info= tConMergedChromPlus.getInfo();
+		else info = tConMergedChromMinus.getInfo();
+		info.setStrand(".");
+		
 		//add info to hashmap for writing to bar file
 		HashMap<String,String> map = info.getNotes();
 		//what graph type should be used to display it?
 		map.put(BarParser.GRAPH_TYPE_TAG, BarParser.GRAPH_TYPE_BAR);
-		//color
-		map.put(BarParser.GRAPH_TYPE_COLOR_TAG, color);
-		//what's window size
-		map.put(BarParser.WINDOW_SIZE, windowSize+"");
+		map.put(BarParser.GRAPH_TYPE_COLOR_TAG, "#A020F0"); //purple
+		map.put(BarParser.DESCRIPTION_TAG, "Base level log2 ratios (fraction methylated in T/ fraction methylated in C)");
+		map.put(BarParser.UNIT_TAG, "Log2Ratio");
 		//save in info
 		info.setNotes(map);
-		//make centered position and
-		int[] positions = new int[sm.length];
-		float[] scores = new float[sm.length];
-		for (int i=0; i< sm.length; i++){
-			positions[i] = Num.calculateMiddleIntergenicCoordinates(sm[i].getStart(), sm[i].getStop());
-			scores[i] = sm[i].getScores()[scoreIndex];
-		}
 		//write bar
 		PointData pd = new PointData();
 		pd.setInfo(info);
 		pd.setPositions(positions);
 		pd.setScores(scores);
-		pd.writePointData(dir);
+		pd.writePointData(baseLog2RatioDirectory);
 		//clean up
 		pd.nullPositionScoreArrays();
 		positions = null;
 		scores = null;
-		sm = null;
 	}
 
 	public static void main(String[] args) {
@@ -1041,10 +1045,12 @@ public class BisSeq {
 		if (saveDirectory == null) Misc.printExit("\nError: enter a directory text to save results.\n");
 		else if (saveDirectory.exists() == false) saveDirectory.mkdirs();
 		if (printGraphs) {
-			unstrandedPValueDirectory = new File (saveDirectory, "UnCorrPValues");
+			unstrandedPValueDirectory = new File (saveDirectory, "WindowUnCorrPValues");
 			unstrandedPValueDirectory.mkdir();
-			log2RatioDirectory = new File (saveDirectory, "PseLog2Ratio");
-			log2RatioDirectory.mkdir();
+			windowLog2RatioDirectory = new File (saveDirectory, "WindowPseLog2Ratio");
+			windowLog2RatioDirectory.mkdir();
+			baseLog2RatioDirectory = new File (saveDirectory, "BasePseLog2Ratio");
+			baseLog2RatioDirectory.mkdir();
 		}
 		windowsDirectory = new File (saveDirectory, "BinaryWindowData");
 		windowsDirectory.mkdir();
@@ -1065,7 +1071,7 @@ public class BisSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  BisSeq: Feb 2013                                **\n" +
+				"**                                  BisSeq: July 2013                               **\n" +
 				"**************************************************************************************\n" +
 				"Takes two condition (treatment and control) PointData from converted and non-converted\n" +
 				"C bisulfite sequencing data parsed using the NovoalignBisulfiteParser and scores\n" +
@@ -1091,7 +1097,7 @@ public class BisSeq {
 				"-N Control non-coverted PointData directories, ditto. \n"+
 				"-a Scramble control data.\n"+
 
-				"Default Options:\n"+
+				"\nDefault Options:\n"+
 				"-d Minimum per base read coverage, defaults to 5.\n"+
 				"-w Window size, defaults to 250.\n"+
 				"-m Minimum number reads in window, defaults to 5. \n" +

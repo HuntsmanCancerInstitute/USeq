@@ -66,6 +66,12 @@ public class MethylatedBaseObservation {
 			for (int i=0; i< mbo.length; i++) positions[i] = mbo[i].position;
 			return positions;
 		}
+		
+		public static float[] fetchLog2DifferentialFractionMethylation (MethylatedBaseObservation[] mbo){
+			float[] f = new float[mbo.length];
+			for (int i=0; i< mbo.length; i++) f[i] = Num.log2(mbo[i].getDifferentialFractionMethylation());
+			return f;
+		}
 
 		public int getPosition() {
 			return position;

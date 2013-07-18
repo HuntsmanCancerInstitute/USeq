@@ -9,11 +9,13 @@ public class Gzipper {
 	//fields
 	private GZIPOutputStream out;
 	private static final byte[] rtn = "\n".getBytes();
+	private File gzipFile;
 	
 	//constructor
 	public Gzipper (File gzipFile) throws FileNotFoundException, IOException{
 		if (gzipFile.getName().endsWith(".gz") == false) gzipFile = new File (gzipFile+".gz");
 		out = new GZIPOutputStream(new FileOutputStream(gzipFile));
+		this.gzipFile = gzipFile;
 	}
 	
 	public Gzipper(OutputStream gzipFile) throws IOException {
@@ -82,5 +84,9 @@ public class Gzipper {
 		while ((i = in.read(buf)) >= 0) out.write(buf, 0, i);
 		//close in stream
 		in.close();
+	}
+
+	public File getGzipFile() {
+		return gzipFile;
 	}
 }
