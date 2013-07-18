@@ -14,7 +14,7 @@ public class FileFind {
 	private User user;
  
 	public static void main(String[] args) {
-		String path = "/Users/darren/Desktop/testDir/";
+		String path = "/tomato/job/";
 		User user = new User();
 		FileFind ff = new FileFind(new File(path), user);
 		ff.find();
