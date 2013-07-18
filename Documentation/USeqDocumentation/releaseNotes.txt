@@ -1,3 +1,12 @@
+----USeq_8.6.4----
+DefinedRegionDifferentialSeq
+* Added internal check to remove edgeR analysis and proceed if the app throws errors.
+SamSubsampler
+* New app to subsample a sam/bam file after filtering and randomizing.  Needed for comparing read coverage graphs.
+BisStat
+* Added option to export base level log 2 ratio of fraction methylation in T vs C graphs.
+* Renamed graph folders to indicate Base or Window level data  
+
 ----USeq_8.6.3----
 MethylationArrayDefinedRegionScanner
 * Modified app so it works with non even numbers of t and c

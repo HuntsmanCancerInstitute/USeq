@@ -43,7 +43,7 @@ public class DefinedRegionDifferentialSeq {
 	private boolean verbose = true;
 	private int maxAlignmentsDepth = 50000;
 	private boolean secondStrandFlipped = false;
-	
+
 	//internal fields
 	private UCSCGeneLine[] genes;
 	private HashMap<String,UCSCGeneLine[]> chromGenes;
@@ -79,7 +79,7 @@ public class DefinedRegionDifferentialSeq {
 	//from RNASeq app integration
 	private File treatmentBamDirectory;
 	private File controlBamDirectory;
-	
+
 
 	//constructors
 	/**Stand alone.*/
@@ -132,24 +132,26 @@ public class DefinedRegionDifferentialSeq {
 		String thresholdName = Num.formatNumber(minFDR,1)+"FDR"+Num.formatNumber(minLog2Ratio, 1)+"Lg2Rto";
 		File f = new File (saveDirectory, "diffExprGenes_DESeqAllPair_"+thresholdName+".txt");
 		IO.writeHashSet(geneNamesPassingThresholds, f);
-		
-		
+
+
 		//launch all pair ANOVA-like edgeR analysis
 		if (conditions.length > 2){
 			System.out.println("Launching ANOVA-like edgeR any condition analysis...");
-			runEdgeRAllConditionAnalysis();
-			System.out.println("\t"+geneNamesPassingThresholdsEdgeR.size()+"\tGenes/ regions identified as differentially expressed.\n");
-			File e = new File (saveDirectory, "diffExprGenes_EdgeRANOVALike_"+thresholdName+".txt");
-			IO.writeArrayList(geneNamesPassingThresholdsEdgeR, e);
+			if (runEdgeRAllConditionAnalysis()){
+				System.out.println("\t"+geneNamesPassingThresholdsEdgeR.size()+"\tGenes/ regions identified as differentially expressed.\n");
+				File e = new File (saveDirectory, "diffExprGenes_EdgeRANOVALike_"+thresholdName+".txt");
+				IO.writeArrayList(geneNamesPassingThresholdsEdgeR, e);
+			}
+			else System.err.println("Skipped edgeR analysis!\n");
 		}
-		
+
 		//sort by max pvalue
 		Arrays.sort(genes, new UCSCGeneLineComparatorMaxPValue());
 
 		//launch cluster analysis
 		if (verbose) System.out.println("Clustering genes and samples...");
 		clusterDifferentiallyExpressedGenes();
-		
+
 		//print final spreadsheet for all genes
 		printStatSpreadSheet();
 
@@ -157,7 +159,7 @@ public class DefinedRegionDifferentialSeq {
 	}
 
 
-	private void runEdgeRAllConditionAnalysis() {
+	private boolean runEdgeRAllConditionAnalysis() {
 		//find genes with at least 20 reads across all conditions and haven't been flagged
 		ArrayList<String> genesToTest = new ArrayList<String>();
 		Iterator<String> it = geneNamesWithMinimumCounts.iterator();
@@ -169,17 +171,22 @@ public class DefinedRegionDifferentialSeq {
 		//write it out
 		workingCountTable = new File(saveDirectory, "countTable_EdgeRANOVA.txt");
 		writeCountTable(Misc.stringArrayListToStringArray(genesToTest), workingCountTable);
-		
+
 		//create and execute script
 		String[] results = launchEdgeRANOVA(genesToTest.size());
-		
-		//parse results and append FDRs to genes
-		parseEdgeRANOVAResults(results);
-		
-		//append result to gene txt
-		appendGeneTxtWithEdgeRANOVA();
+
+		if (results != null){
+			//parse results and append FDRs to genes
+			parseEdgeRANOVAResults(results);
+
+			//append result to gene txt
+			appendGeneTxtWithEdgeRANOVA();
+		}
+		else return false;
+
+		return true;
 	}
-	
+
 	private void appendGeneTxtWithEdgeRANOVA() {
 		geneNamesPassingThresholdsEdgeR = new ArrayList<String>();
 		//append header
@@ -206,7 +213,7 @@ public class DefinedRegionDifferentialSeq {
 		//find max fdr, not transformed so smallest
 		String[] geneNames = new String[results.length];
 		double[] fdrs = new double[results.length];
-		
+
 		//parse first one skipping header line
 		String[] tokens = tab.split(results[1]);
 		int numCol = tokens.length;
@@ -215,7 +222,7 @@ public class DefinedRegionDifferentialSeq {
 		geneNames[1] = tokens[1];
 		fdrs[1] = Double.parseDouble(tokens[fdrColIndex]);
 		double maxFDR = fdrs[1];
-		
+
 		//parse remainder
 		for (int i=2; i< results.length; i++){
 			tokens = tab.split(results[i]);
@@ -227,7 +234,7 @@ public class DefinedRegionDifferentialSeq {
 		}
 		//transform maxFDR
 		float transMaxFDR = (float)(Num.minus10log10(maxFDR) * 1.01);
-		
+
 		//modify genes edgeR fdr, watch for NaN or infinity?
 		for (int i=1; i< geneNames.length; i++){
 			UCSCGeneLine gene = name2Gene.get(geneNames[i]);
@@ -243,7 +250,7 @@ public class DefinedRegionDifferentialSeq {
 		File edgeRScript = new File(saveDirectory, "script_EdgeRANOVA.txt");
 		IO.writeString(script, edgeRScript);
 		File rOut = new File(saveDirectory, "script_EdgeRANOVA.txt.Rout");
-		
+
 		//make command
 		String[] command = new String[] {
 				fullPathToR.toString(),
@@ -261,7 +268,8 @@ public class DefinedRegionDifferentialSeq {
 		String[] res = IO.loadFile(rOut);
 		for (String s: res) {
 			if (s.contains("Error")){
-				Misc.printErrAndExit("\nError thrown by edgeR application, aborting:\n"+Misc.stringArrayToString(res, "\n")+"\n");
+				System.err.println("\nError thrown by edgeR application:\n"+Misc.stringArrayToString(res, "\n")+"\n");
+				return null;
 			}
 		}
 		for (String s: res) {
@@ -271,11 +279,17 @@ public class DefinedRegionDifferentialSeq {
 		}
 
 		//any results? problems?
-		if (edgeRResults.exists() == false) Misc.printErrAndExit("\nError: no edgeR results file found? Check temp files for problems -> "+rOut.toString()+"\n");
-		
+		if (edgeRResults.exists() == false) {
+			System.err.println("\nError: no edgeR results file found? Check temp files for problems -> "+rOut.toString()+"\n");
+			return null;
+		}
+
 		res = IO.loadFile(edgeRResults);
-		if ((res.length -1) != numGenesToTest) Misc.printErrAndExit("\nError: edgeR results file contains a different number of rows than tested genes?! Aborting, see temp files for issues -> "+rOut.toString()+"\n");
-		
+		if ((res.length -1) != numGenesToTest) {
+			System.err.println("\nError: edgeR results file contains a different number of rows than tested genes?! Aborting, see temp files for issues -> "+rOut.toString()+"\n");
+			return null;
+		}
+
 		//clean up
 		if (deleteTempFiles) {
 			workingCountTable.deleteOnExit();
@@ -283,9 +297,9 @@ public class DefinedRegionDifferentialSeq {
 			edgeRScript.deleteOnExit();
 			rOut.deleteOnExit();
 		}
-		
+
 		return res;
-		
+
 	}
 
 	private String createEdgeRANOVAScript(File results) {
@@ -347,13 +361,13 @@ public class DefinedRegionDifferentialSeq {
 					loadReplica(r);
 				}
 			}
-			
+
 			//any genes with too many reads that were excluded?
 			if (flaggedGeneNames.size() !=0) {
 				System.err.println("\nWARNING: The following genes/ regions were excluded from the analysis due to one or more bps exceeding the maximum read coverage of "+maxAlignmentsDepth+" . If these are genes/ regions you wish to interrogate, increase the maximum read coverage threshold. " +
 						"Realize this will likely require additional memory. Often, these are contaminants (e.g. rRNA) or super abundant transcripts that should be dropped from the analysis.\n"+flaggedGeneNames.toString());
 				String[] badGeneNames = Misc.hashSetToStringArray(flaggedGeneNames);
-				
+
 				//remove flagged genes from all replicas
 				//for each condition
 				for (Condition c: conditions) {
@@ -376,7 +390,7 @@ public class DefinedRegionDifferentialSeq {
 	}
 
 	public void loadBlocks(SAMRecord sam, int chrStartBp, ArrayList<Integer>[] bpNames, boolean[] badBases){
-		
+
 		NameInteger nameIndex = null;
 		boolean addIt;
 		ArrayList<int[]> blocks = fetchAlignmentBlocks(sam.getCigarString(), sam.getUnclippedStart()-1);
@@ -388,7 +402,7 @@ public class DefinedRegionDifferentialSeq {
 				//bad base?
 				if (badBases[i]) continue;
 				addIt = true;
-				
+
 				//never seen before?
 				if (bpNames[i] == null) bpNames[i] = new ArrayList<Integer>();
 				//old so check size
@@ -398,7 +412,7 @@ public class DefinedRegionDifferentialSeq {
 					bpNames[i] = null;	
 					if (nameIndex !=null) workingFragNameIndex.remove(nameIndex.name);
 				}
-				
+
 				// add it?
 				if (addIt) {
 					if (nameIndex == null) nameIndex = fetchFragmentNameIndex(sam);
@@ -432,7 +446,7 @@ public class DefinedRegionDifferentialSeq {
 		Integer index;
 		Matcher mat = BAD_NAME.matcher(samReadName);
 		if (mat.matches()) samReadName = mat.group(1);
-		
+
 		if (workingFragNameIndex.containsKey(samReadName)) {
 			index = workingFragNameIndex.get(samReadName);
 		}
@@ -440,7 +454,7 @@ public class DefinedRegionDifferentialSeq {
 		else {
 			if (!secondStrandFlipped && sam.getReadPairedFlag()) {
 				if ((sam.getFirstOfPairFlag() && sam.getReadNegativeStrandFlag()) || (!sam.getSecondOfPairFlag() && !(sam.getReadNegativeStrandFlag()))) {
-					 index = new Integer(workingFragmentNameIndexMinus--);
+					index = new Integer(workingFragmentNameIndexMinus--);
 				}
 				else {
 					index = new Integer(workingFragmentNameIndexPlus++);
@@ -452,16 +466,16 @@ public class DefinedRegionDifferentialSeq {
 					index = new Integer(workingFragmentNameIndexPlus++);
 				}
 			}
-			
+
 			workingFragNameIndex.put(samReadName, index);
 		}
 		return new NameInteger (samReadName, index);
 	}
-	
+
 	private class NameInteger {
 		String name;
 		Integer index;
-		
+
 		public NameInteger(String name, Integer index){
 			this.name = name;
 			this.index = index;
@@ -476,7 +490,7 @@ public class DefinedRegionDifferentialSeq {
 		//make reader
 		SAMFileReader reader = new SAMFileReader(replica.getBamFile());	
 		reader.setValidationStringency(ValidationStringency.SILENT);
-	
+
 
 		//fetch chromName: length for all chroms
 		HashMap<String, Integer> chromLength = new HashMap<String, Integer>();
@@ -484,7 +498,7 @@ public class DefinedRegionDifferentialSeq {
 		for (SAMSequenceRecord sr: seqs) chromLength.put(sr.getSequenceName(), sr.getSequenceLength());
 
 		SAMRecordIterator iterator = reader.iterator();
-		
+
 		HashSet<String> priorChroms = new HashSet<String>();
 		String chrom = null;
 
@@ -495,7 +509,7 @@ public class DefinedRegionDifferentialSeq {
 		boolean[] badBases = null;
 		while (iterator.hasNext()){
 			sam = iterator.next();
-			
+
 			//unaligned? too many hits?
 			if (alignmentFails(sam)) continue;
 			chrom = sam.getReferenceName();
@@ -512,7 +526,7 @@ public class DefinedRegionDifferentialSeq {
 		}
 		//any data found?
 		if (bpNames == null) {
-				return;
+			return;
 		} 
 
 		//reset working fields
@@ -566,7 +580,7 @@ public class DefinedRegionDifferentialSeq {
 					chrStartBp = sam.getUnclippedStart()-1;
 					badBases = new boolean[chromLength.get(chrom) - chrStartBp];
 					bpNames = new ArrayList[badBases.length];
-					
+
 					//load
 					loadBlocks (sam, chrStartBp, bpNames, badBases);
 				}
@@ -585,7 +599,7 @@ public class DefinedRegionDifferentialSeq {
 		seqs = null;
 		chromLength = null;
 	}
-	
+
 	private boolean alignmentFails(SAMRecord sam){
 		//aligned?
 		if (sam.getReadUnmappedFlag()) return true;
@@ -597,7 +611,7 @@ public class DefinedRegionDifferentialSeq {
 				if (numRepeats > maxRepeats) return true;
 			}
 		}
-		
+
 		return false;
 	}
 
@@ -612,54 +626,54 @@ public class DefinedRegionDifferentialSeq {
 
 		for (int i=0; i< chrGenes.length; i++){
 			//flagged gene
-			
+
 			if (chrGenes[i].isFlagged()) continue;
-			
-			
+
+
 			String geneName = chrGenes[i].getDisplayNameThenName();
 			boolean plusStrand = chrGenes[i].getStrand().equals("+");					
 			allReads.clear();
-			
+
 			//get exons
 			ExonIntron[] exons = chrGenes[i].getExons();
 			int[] exonCounts = new int[exons.length];
 
 			//for each exon
 			exonLoop:
-			for (int x=0; x< exons.length; x++){
-				exonReads.clear();
-				int start = exons[x].getStart() - chrStartBp;
-				if (start < 0) start = 0;
+				for (int x=0; x< exons.length; x++){
+					exonReads.clear();
+					int start = exons[x].getStart() - chrStartBp;
+					if (start < 0) start = 0;
 
-				int end = exons[x].getEnd() - chrStartBp;
-				if (end > lengthBpNames) end = lengthBpNames;
-				//for each base in the exon, see if there is a read
-				for (int y=start; y< end; y++){
-					//bad base? if so then flag entire gene
-					if (badBases[y]) {
-						chrGenes[i].setFlagged(true);
-						flaggedGeneNames.add(geneName);
-						allReads.clear();
-						break exonLoop;
-					}
-					
-					if (bpNames[y] != null) {
-						if (performStrandedAnalysis){
-							for (Integer id : bpNames[y]){
-								if ((id > 0 && plusStrand == true) || (id < 0 && plusStrand == false )) exonReads.add(id);
-							}
-						} else if (performReverseStrandedAnalysis) {
-							for (Integer id: bpNames[y]) {
-								if ((id > 0 && plusStrand == false) || (id < 0 && plusStrand == true)) exonReads.add(id);
-							}
+					int end = exons[x].getEnd() - chrStartBp;
+					if (end > lengthBpNames) end = lengthBpNames;
+					//for each base in the exon, see if there is a read
+					for (int y=start; y< end; y++){
+						//bad base? if so then flag entire gene
+						if (badBases[y]) {
+							chrGenes[i].setFlagged(true);
+							flaggedGeneNames.add(geneName);
+							allReads.clear();
+							break exonLoop;
 						}
-						else exonReads.addAll(bpNames[y]);
+
+						if (bpNames[y] != null) {
+							if (performStrandedAnalysis){
+								for (Integer id : bpNames[y]){
+									if ((id > 0 && plusStrand == true) || (id < 0 && plusStrand == false )) exonReads.add(id);
+								}
+							} else if (performReverseStrandedAnalysis) {
+								for (Integer id: bpNames[y]) {
+									if ((id > 0 && plusStrand == false) || (id < 0 && plusStrand == true)) exonReads.add(id);
+								}
+							}
+							else exonReads.addAll(bpNames[y]);
+						}
 					}
+
+					exonCounts[x] = exonReads.size();
+					allReads.addAll(exonReads);
 				}
-				
-				exonCounts[x] = exonReads.size();
-				allReads.addAll(exonReads);
-			}
 
 			int numCounts = allReads.size();
 
@@ -670,7 +684,7 @@ public class DefinedRegionDifferentialSeq {
 				if (numCounts >= minimumCounts) geneNamesWithMinimumCounts.add(geneName);
 			}
 		}	
-		
+
 		//clean up
 		allReads = null;
 		exonReads = null;
@@ -1236,7 +1250,7 @@ public class DefinedRegionDifferentialSeq {
 				text.append(genes[i].getName());
 				text.append("\"\t");
 			}
-			
+
 			//status? OK or sectioned or read depth
 			if (genes[i].isFlagged()){
 				text.append("Too many reads");
@@ -1676,7 +1690,7 @@ public class DefinedRegionDifferentialSeq {
 			String name = gl.getDisplayNameThenName();
 			if (gl.getExons().length > 1) genesWithExons.put(name, gl);
 			name2Gene.put(name, gl);
-			
+
 		}
 	}
 
@@ -1776,7 +1790,7 @@ public class DefinedRegionDifferentialSeq {
 						"launch an R terminal and type 'library(DESeq)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
 			}
 		}
-		
+
 		//Make sure stranded and reverse aren't both set
 		if (performStrandedAnalysis == true && performReverseStrandedAnalysis == true) {
 			Misc.printErrAndExit("\nError: Stranded and reverse-stranded analyses both set to true, pick one and restart\n\n");
@@ -1807,7 +1821,7 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Defined Region Differential Seq: June 2013                **\n" +
+				"**                        Defined Region Differential Seq: July 2013                **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +
