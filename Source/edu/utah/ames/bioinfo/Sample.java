@@ -85,6 +85,7 @@ public class Sample {
 	private boolean hasGenomeBuild = false;
 	private boolean hasNovoindex = false;
 	private boolean reverseStrand = false;
+	private boolean adaptersIncluded = false;
 	
 	//constructor
 	public Sample(String[] dataValue) {
@@ -498,5 +499,13 @@ public class Sample {
 
 	public void setFastqFile2(String fastqFile2) {
 		this.fastqFile2 = fastqFile2;
+	}
+
+	public boolean isAdaptersIncluded() {
+		return adaptersIncluded;
+	}
+
+	public void setAdaptersIncluded(boolean adaptersIncluded) {
+		this.adaptersIncluded = adaptersIncluded;
 	}
 }
