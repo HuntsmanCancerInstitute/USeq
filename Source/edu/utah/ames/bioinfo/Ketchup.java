@@ -14,13 +14,16 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
 import util.gen.Misc;
+import edu.utah.tomato.TFLogger;
 
 /**
  * This class identifies users in the Tomato jobs directory, creates a User object for
  * each, and then for each user, finds and stores their associated email
- * addresses to be used for notification of impending file deletion. Files are grouped into
+ * addresses to be used for notification of impending file deletion. 
+ * Ketchup descends through each user's Tomato/job/ folder and groups files into
  * either warnFiles or deleteFiles based on size and lastModifiedDate. Soft linked files are
- * skipped. Users with warnFiles and/or deleteFiles are emailed a list of offending files.
+ * skipped. Users with warnFiles and/or deleteFiles are emailed a list of offending files, and 
+ * deleteFiles are deleted from the directory. 
  * 
  * @author darren.ames@hci.utah.edu
  */
@@ -28,8 +31,7 @@ import util.gen.Misc;
 public class Ketchup {
 
 	//fields
-	 private static String path = "/tomato/job/";
-	//local: private static String path = "/Users/darren/Desktop/testDir/";
+	private static String path = "/tomato/job/Ames/test/";
 	//regex to find email addresses
 	static String REGEX = "^#e\\s+(.+@.+)";
 	static HashMap<File, Long> fileDates = null;
@@ -40,11 +42,13 @@ public class Ketchup {
 	private static long deleteDate = System.currentTimeMillis()
 			- (17L * 24 * 60 * 60 * 1000);
 	//filesize cutoff: 10Mb
-	private static long fileSize = 10485760;
+	private static long fileSize = 10485760; 
 	private static SimpleDateFormat sdf = new SimpleDateFormat("yyyy/MM/dd");
 	//date file deletion begins
-	Date startDate = sdf.parse("2013/04/01");
+	Date startDate = sdf.parse("2013/07/27");
 	Date todayDate = new Date();
+	//create logger
+	private TFLogger logFile = new TFLogger(new File("/home/u0785353/UtilLogs/Ketchup/logs/"), "log", "INFO");
 	
 	//constructor
 	public Ketchup (String[] args) throws ParseException {
@@ -63,10 +67,19 @@ public class Ketchup {
 		ArrayList<User> users = fetchUsers(dirs);
 
 		for (User user : users) {
-
+			
+			//write to log 
+			logFile.writeInfoMessage("Running Ketchup");
+			logFile.writeInfoMessage("Working in directory: " + user.getDirectory());
+			
 			//find email addresses for each user
-			fetchEmailAddress(user);
-
+			boolean found = fetchEmailAddress(user);
+			
+			//skip folders missing cmd.txt file
+			if (!found) {
+				continue;
+			}
+			
 			//start walking
 			walk(user);
 
@@ -74,6 +87,10 @@ public class Ketchup {
 			sendMail(user);
 		}
 		Stuff.saveObject(savedFileDates, fileDates);
+		
+		//write info to log and close it
+		logFile.writeInfoMessage("Finished running Ketchup");
+		logFile.closeLogger();
 	}
 
 	/**
@@ -159,19 +176,29 @@ public class Ketchup {
 						fileDates.put(fileObject, fileDate);
 					} else {
 						//warn cutoff? >=10 days ago && < 17 days ago
-						if ((fileDate.longValue() <= warnDate)
-								&& (fileDate.longValue() > deleteDate))
+						if ((fileDate.longValue() <= warnDate) 
+								&& (fileDate.longValue() > deleteDate)) {
+							
 							//add fileObject to warnFiles ArrayList
 							user.getWarnFiles().add(fileObject);
-						else {
-							//delete cutoff >=17 days ago
-							if (fileDate.longValue() <= deleteDate)
-								//add fileObject to deleteFiles ArrayList
-								user.getDeleteFiles().add(fileObject);
-						}
-						if (todayDate.after(startDate)) {
-							//****uncomment this to start deleting offending files****
-							//fileObject.deleteOnExit();
+							
+							//log it
+							logFile.writeInfoMessage("Found these warn files: " + fileObject.getPath());	
+						} 
+						//delete cutoff >=17 days ago
+						else if (fileDate.longValue() <= deleteDate) {
+
+							//add fileObject to deleteFiles ArrayList
+							user.getDeleteFiles().add(fileObject);
+							
+							//log it
+							logFile.writeInfoMessage("Will delete the following files: " + fileObject.getPath());
+
+							//check for first pass
+							if (todayDate.after(startDate)) {
+								//****uncomment this to start deleting offending files****
+								//fileObject.deleteOnExit();	
+							}
 						}
 					}
 				}
@@ -200,7 +227,6 @@ public class Ketchup {
 
 				//add user names to user objects
 				userNames.add(user);
-				//System.out.println(user.getName());
 			}
 		}
 		return userNames;
@@ -211,7 +237,7 @@ public class Ketchup {
 	 * @param user
 	 * @throws IOException
 	 */
-	public void fetchEmailAddress(User user) {
+	public boolean fetchEmailAddress(User user) {
 
 		try {
 			//call pattern to find valid email addresses within a file
@@ -220,9 +246,11 @@ public class Ketchup {
 			//find the cmd.txt file
 			FileFind ff = new FileFind(user.getDirectory(), user);
 			ff.find();
-
-			//read in cmd.txt file
-			user.getCmdFiles().get(0);
+			
+			//check for missing cmd.txt file
+			if (user.getCmdFiles().isEmpty()) {
+				return false;
+			}
 
 			for (File c : user.getCmdFiles()) {
 				BufferedReader br = new BufferedReader(new FileReader(c));
@@ -231,7 +259,6 @@ public class Ketchup {
 				for (String line = br.readLine(); line != null; line = br
 						.readLine()) {
 					Matcher m = pattern.matcher(line);
-					//System.out.println("test");
 					if (m.find()) {
 
 						//set email address in User HashSet
@@ -240,11 +267,16 @@ public class Ketchup {
 				}
 				br.close();
 			}
+			//write to log
+			for (String emailString : user.getEmail() ) {
+				logFile.writeInfoMessage(String.format("Found email %s for user %s", emailString, user.getName()));
+			}
 		}
 		catch (Exception e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
+		return true;
 	}
 	
 	/**
@@ -276,14 +308,14 @@ public class Ketchup {
 		message.append("Hello Tomato user,"
 				+ "\n\n"
 				+ "Our system indicates that you have data files in your Tomato jobs directory that are scheduled for deletion. " 
-				+ "\nWe ask that you move these files to an Analysis Report in GNomEx or delete them or before they are removed."
+				+ "\nWe ask that you move these files to an Analysis Report in GNomEx or delete them before they are removed."
 				+ "\nDetails are below. Please contact a member of the Bioinformatics Core if this message was received in error,"
 				+ "\nor if you need greater space allocation."
 				+ "\n\nThank you," + "\n\nU of U Bioinformatics Core");
 		
 		//first Ketchup run
 		if (todayDate.before(startDate)) {
-			message.append("\n\n\nThe following files will be deleted on Monday April 1, 2013:\n");
+			message.append("\n\n\nThe following files will be deleted on Sunday July 28, 2013:\n");
 			//check if warnFiles are deleteFiles ArrayList are empty
 			if (user.getWarnFiles().isEmpty() == true && user.getDeleteFiles().isEmpty() == true) {
 				message.append("\nNone\n");
@@ -361,7 +393,6 @@ public class Ketchup {
 				}
 			}
 		}
-		//System.out.println(message.toString());
 		return message.toString();
 	}
 
@@ -438,8 +469,11 @@ public class Ketchup {
 				i++;
 			}
 			try {
-				//try sending email to user with list of delete files
+				//try sending email to user with list of warn/delete files
 				this.postMail(this.arrayToString(emails, ","), "Tomato job directory cleanup", this.getMessage(msg, user), "doNotReply@hci.utah.edu");
+				
+				//log it
+				logFile.writeInfoMessage("Sending email notification to: " + this.arrayToString(emails, ","));
 			} catch (MessagingException e1) {
 				e1.printStackTrace();
 			} catch (IOException e1) {
@@ -499,7 +533,7 @@ public class Ketchup {
 	public static void printDocs() {
 		System.out.println("\n" +
 				"**********************************************************************************\n" +
-				"**                                Ketchup: Mar 2013                             **\n" +
+				"**                               Ketchup: July 2013                             **\n" +
 				"**********************************************************************************\n" +
 				"Ketchup identifies users in the Tomato jobs directory, creates a User object for \n" +
 				"each, and then for each user, finds and stores their associated email addresses to \n" +
@@ -520,7 +554,7 @@ public class Ketchup {
 				"	Default: 10485760 bytes (10 MB)\n" +
 
 				"\nExample: java pathToUSeq/Apps/Ketchup -p /tomato/job/\n\n" +
-				"Questions or comments about this app? Contact: darren.ames@hci.utah.edu\n\n" +
+				"Questions or comments? Contact: darren.ames@hci.utah.edu\n\n" +
 				"**************************************************************************************\n");
 	}
 }
