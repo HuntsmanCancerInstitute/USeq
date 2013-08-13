@@ -3,7 +3,6 @@ import java.util.*;
 import java.util.regex.*;
 import java.io.*;
 
-
 import edu.utah.seq.data.*;
 import edu.utah.seq.parsers.*;
 import edu.utah.seq.useq.data.Region;
@@ -1012,7 +1011,7 @@ public class EnrichedRegionMaker {
 	public void processArgs(String[] args){
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		Pattern pat = Pattern.compile("-[a-z]");
-		String swiString = null;
+		File forExtraction = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -1024,7 +1023,7 @@ public class EnrichedRegionMaker {
 					case 'g': maxGap =Integer.parseInt(args[i+1]);i++; break;
 					case 'b': bpBuffer =Integer.parseInt(args[i+1]);i++; break;
 					case 'n': setNumberERs = Num.parseInts(args[++i].split(",")); break;
-					case 'f': swiString = args[++i]; break;
+					case 'f': forExtraction = new File(args[i+1]); i++; break;
 					case 'r': regionsFile = new File(args[i+1]); i++; break;
 					case 's': multiScoreThresholds = Num.stringArrayToFloat(args[++i], ","); break;
 					case 'e': filterWindowsNotERs = false; break;
@@ -1043,19 +1042,21 @@ public class EnrichedRegionMaker {
 			}
 		}
 		System.out.println("\nLaunching...");
-		//look for swi files
-		if (swiString != null) {
-			File dir = new File (swiString);
-			if (dir.isDirectory()){
-				swiFiles = IO.extractFiles(dir, ".swi.gz");
-				if (swiFiles == null || swiFiles.length ==0) swiFiles = IO.extractFiles(dir, ".swi");
-			}
-			else swiFiles = new File[]{dir};
-		}
+		//look for swi files	
+		File[][] tot = new File[3][];
+		tot[0] = IO.extractFiles(forExtraction,".swi");
+		tot[1] = IO.extractFiles(forExtraction,".swi.gz");
+		tot[2] = IO.extractFiles(forExtraction,".swi.zip");
+		swiFiles = IO.collapseFileArray(tot);
 		if (swiFiles == null || swiFiles.length ==0){
-			System.out.println("\nPlease enter a smoothed window xxx.swi results file or directory.\n");
+			System.out.println("\nPlease enter a smoothed window xxx.swi file or directory containing such.\n");
 			System.exit(0);
 		}
+		
+		
+		
+		
+		
 		//look for score indexes?
 		if (setNumberERs == null){
 			if (multiScoreIndexes == null){
@@ -1108,7 +1109,7 @@ public class EnrichedRegionMaker {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Enriched Region Maker: Jan 2010                        **\n" +
+				"**                          Enriched Region Maker: July 2013                        **\n" +
 				"**************************************************************************************\n" +
 				"ERM combines windows from ScanSeqs xxx.swi files into larger enriched or reduced\n" +
 				"regions based on one or more scores. For each score index, you must provide a minimal\n" +

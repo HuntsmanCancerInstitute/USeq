@@ -7,7 +7,9 @@ import java.util.*;
 import util.gen.*;
 import edu.utah.seq.data.*;
 import edu.utah.seq.parsers.*;
+import edu.utah.seq.useq.apps.Bar2USeq;
 import trans.tpmap.*;
+
 import org.apache.commons.math3.stat.inference.*;;
 
 
@@ -134,6 +136,13 @@ public class BisSeq {
 			Arrays.sort(enrichedRegions, new ComparatorEnrichedRegionAbsoluteScore(log2RatioIndex));
 			printEnrichedRegions();
 			System.out.println(enrichedRegions.length+"\tEnriched/Reduced regions passed thresholds.\n");
+		}
+		
+		//convert to USeq?
+		if (printGraphs){
+			new Bar2USeq(unstrandedPValueDirectory,true);
+			new Bar2USeq(windowLog2RatioDirectory,true);
+			new Bar2USeq(baseLog2RatioDirectory,true);
 		}
 
 		//cleanup

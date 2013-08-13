@@ -101,6 +101,10 @@ public class NovoalignBisulfiteParser{
 			for (int i=0; i< dataFiles.length; i++){
 				//set working objects and parse tag file text
 				workingFile = dataFiles[i];
+				
+				//skip bam indexes
+				if (workingFile.getName().endsWith(".bai")) continue;
+				
 				System.out.print("\t"+workingFile);
 				//parse
 				boolean  parsed;
@@ -111,6 +115,7 @@ public class NovoalignBisulfiteParser{
 					parsed = parseWorkingSAMFile();
 				}
 				else {
+					//wonder if this should be deleted?
 					System.out.print(" (NATIVE format) ");
 					parsed = parseWorkingFile();
 					samFormat = false;
