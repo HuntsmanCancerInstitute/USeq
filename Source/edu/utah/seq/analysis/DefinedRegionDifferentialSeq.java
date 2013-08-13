@@ -4,6 +4,10 @@ import java.io.*;
 import java.util.regex.*;
 import java.util.*;
 
+import org.apache.poi.ss.usermodel.*;
+import org.apache.poi.ss.*;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+
 import net.sf.samtools.*;
 import net.sf.samtools.SAMFileReader.ValidationStringency;
 import util.bio.annotation.Bed;
@@ -12,6 +16,7 @@ import util.bio.parsers.*;
 import util.gen.*;
 import edu.utah.seq.analysis.multi.Condition;
 import edu.utah.seq.analysis.multi.GeneCount;
+import edu.utah.seq.analysis.multi.PairedCondition;
 import edu.utah.seq.analysis.multi.Replica;
 import edu.utah.seq.useq.apps.Text2USeq;
 
@@ -32,13 +37,12 @@ public class DefinedRegionDifferentialSeq {
 	private float minLog2Ratio = 1f;
 	private boolean scoreIntrons = false;
 	private boolean removeOverlappingRegions = false;
-	private int minimumCounts = 20;
+	private int minimumCounts = 10;
 	private boolean deleteTempFiles = true;
 	private boolean filterOutliers = false;
 	private float minimumSpliceLog2Ratio = 1f;
 	private boolean performStrandedAnalysis = false;
 	private boolean performReverseStrandedAnalysis = false;
-	private boolean usePermutationSpliceTest = false;
 	private int maxRepeats = 0;
 	private boolean verbose = true;
 	private int maxAlignmentsDepth = 50000;
@@ -47,39 +51,36 @@ public class DefinedRegionDifferentialSeq {
 	//internal fields
 	private UCSCGeneLine[] genes;
 	private HashMap<String,UCSCGeneLine[]> chromGenes;
-	private HashMap<String, UCSCGeneLine> genesWithExons;
 	private HashMap<String, UCSCGeneLine> name2Gene;
 	private Condition[] conditions;
 	private HashSet<String> flaggedGeneNames = new HashSet<String>();
 	private HashSet<String> geneNamesPassingThresholds = new HashSet<String>();
-	private HashSet<String> geneNamesWithMinimumCounts = new HashSet<String>();
-	private ArrayList<String> geneNamesPassingThresholdsEdgeR;
+	private LinkedHashSet<String> geneNamesWithMinimumCounts = new LinkedHashSet<String>();
+	private String[] geneNamesToAnalyze = null;
 	private File serializedConditons = null;
 	private String url;
 	private static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSDHN])");
 	public static final Pattern BAD_NAME = Pattern.compile("(.+)/[12]$");
 	public boolean saveCounts = true;
-
-	//paired diff expression
-	private UCSCGeneLine[] workingGenesToTest = null;
-	private ArrayList<String> workingTNs = null;
-	private ArrayList<String> workingConditionNames = null;
-	private String workingName = "";
-	private File workingCountTable = null;
-	private File[] workingDESeqFiles = null;
-	private ArrayList<UCSCGeneLine> workingGenesPassingFilters = new ArrayList<UCSCGeneLine>();
-	private int numberWorkingGenesPassingFilters =0;
-	private StringBuilder spreadSheetHeader = null;
-	private int workingNumberFirstReplicas;
-	private int workingNumberSecondReplicas;
+	
+	//for loading data
 	private int workingFragmentNameIndexPlus = 1;
 	private int workingFragmentNameIndexMinus = -1;
 	private HashMap<String, Integer> workingFragNameIndex = new HashMap<String, Integer>(10000);
+	
+	//for paired diff expression
+	private File geneCountTable;
+	private String[] conditionNamesPerReplica;
+	private String[] replicaNames;
+	private PairedCondition[] pairedConditions;
+	private File blindedVarCorData;
 
 	//from RNASeq app integration
 	private File treatmentBamDirectory;
 	private File controlBamDirectory;
-
+	
+	//spreadsheet
+	private Workbook workbook = null;
 
 	//constructors
 	/**Stand alone.*/
@@ -101,7 +102,7 @@ public class DefinedRegionDifferentialSeq {
 		this.controlBamDirectory = controlBamDirectory;
 		this.saveDirectory = saveDirectory;
 		this.genomeVersion = genomeVersion;
-		url = "=HYPERLINK(\"http://localhost:7085/UnibrowControl?version="+genomeVersion+"&seqid=";
+		url = "http://localhost:7085/UnibrowControl?version="+genomeVersion+"&seqid=";
 		this.fullPathToR = fullPathToR;
 		this.refSeqFile = processedRefSeqFile;
 		this.scoreIntrons = scoreIntrons;
@@ -120,87 +121,77 @@ public class DefinedRegionDifferentialSeq {
 		if (verbose) System.out.println("Loading regions/ gene models...");
 		loadGeneModels();
 
-		//make TimeCourseConditions and print
+		//load count data by replica 
 		loadConditions();
 
-		//launch pairwise analysis between conditions
+		//write out count table of genes passing minimum counts
+		writeCountTable();
+		
+		//cluster samples based on blinded normalization
+		executeDESeqCluster(false);
+		
+		//launch DESeq for differential expression
+		String thresholdName = "-10Log10(FDR) "+Num.formatNumber(minFDR,1)+", Log2Ratio "+Num.formatNumber(minLog2Ratio, 1);
 		String varianceFiltered = "without";
 		if (filterOutliers) varianceFiltered = "with";
-		System.out.println("Running pairwise DESeq analysis "+varianceFiltered+" variance outlier filtering to identify differentially expressed and spliced genes...");
-		analyzeForDifferentialExpression();
-		System.out.println("\n\t"+geneNamesPassingThresholds.size()+"\tgenes differentially expressed (FDR "+Num.formatNumber(minFDR, 2)+", log2Ratio "+Num.formatNumber(minLog2Ratio, 2)+")\n");
-		String thresholdName = Num.formatNumber(minFDR,1)+"FDR"+Num.formatNumber(minLog2Ratio, 1)+"Lg2Rto";
-		File f = new File (saveDirectory, "diffExprGenes_DESeqAllPair_"+thresholdName+".txt");
-		IO.writeHashSet(geneNamesPassingThresholds, f);
-
-
-		//launch all pair ANOVA-like edgeR analysis
+		if (verbose) System.out.println("Running pairwise DESeq analysis "+varianceFiltered+" variance outlier filtering to identify differentially expressed genes...");
+		analyzeForDifferentialExpression(false);
+		if (verbose) System.out.println("\n\t"+geneNamesPassingThresholds.size()+" / "+geneNamesToAnalyze.length+"\tgenes differentially expressed ("+thresholdName+")\n");
+			
+		//launch all pair ANOVA-like edgeR analysis, appends edgeR FDR onto gene line
 		if (conditions.length > 2){
-			System.out.println("Launching ANOVA-like edgeR any condition analysis...");
-			if (runEdgeRAllConditionAnalysis()){
-				System.out.println("\t"+geneNamesPassingThresholdsEdgeR.size()+"\tGenes/ regions identified as differentially expressed.\n");
-				File e = new File (saveDirectory, "diffExprGenes_EdgeRANOVALike_"+thresholdName+".txt");
-				IO.writeArrayList(geneNamesPassingThresholdsEdgeR, e);
-			}
-			else System.err.println("Skipped edgeR analysis!\n");
+			if (verbose) System.out.println("Running ANOVA-like edgeR all condition analysis...");
+			if (runEdgeRAllConditionAnalysis() == false) System.err.println("Skipped edgeR analysis!\n");
 		}
+		
+		//launch Diff splice
+		if (verbose) System.out.println("Running pairwise chi-square tests for differential splicing...");
+		analyzeForDifferentialSplicing();
+		
+		//set max deseqFDR and varcorLog2Ratio in geneNamesToAnalyze
+		setMaxScores();
 
-		//sort by max pvalue
-		Arrays.sort(genes, new UCSCGeneLineComparatorMaxPValue());
-
-		//launch cluster analysis
-		if (verbose) System.out.println("Clustering genes and samples...");
-		clusterDifferentiallyExpressedGenes();
-
-		//print final spreadsheet for all genes
+		//print spreadsheet 
 		printStatSpreadSheet();
 
 
 	}
 
+	private void setMaxScores() {
+		float[] maxFDRs = new float[geneNamesToAnalyze.length];
+		float[] maxLog2 = new float[geneNamesToAnalyze.length];
+		//for each pair
+		for (int i=0; i< pairedConditions.length; i++){
+			//gene : float[]{FDR, log2VarCorRto}
+			float[][] scores = pairedConditions[i].getParsedDiffExpResults();
+			for (int j=0; j< geneNamesToAnalyze.length; j++){
+				if (scores[j][0] > maxFDRs[j]) maxFDRs[j] = scores[j][0];
+				float abs = Math.abs(scores[j][1]);
+				if (abs > maxLog2[j]) maxLog2[j] = abs;
+			}
+		}
+		//set in genes
+		for (int i=0; i< geneNamesToAnalyze.length; i++){
+			UCSCGeneLine gene = name2Gene.get(geneNamesToAnalyze[i]);
+			gene.setMaxAbsLog2Ratio(maxLog2[i]);
+			gene.setFdr(maxFDRs[i]);  //note misnaming!
+		}
+	}
 
 	private boolean runEdgeRAllConditionAnalysis() {
-		//find genes with at least 20 reads across all conditions and haven't been flagged
-		ArrayList<String> genesToTest = new ArrayList<String>();
-		Iterator<String> it = geneNamesWithMinimumCounts.iterator();
-		while (it.hasNext()){
-			String geneName = it.next();
-			if (flaggedGeneNames.contains(geneName) == false) genesToTest.add(geneName);
-		}
-
-		//write it out
-		workingCountTable = new File(saveDirectory, "countTable_EdgeRANOVA.txt");
-		writeCountTable(Misc.stringArrayListToStringArray(genesToTest), workingCountTable);
 
 		//create and execute script
-		String[] results = launchEdgeRANOVA(genesToTest.size());
+		String[] results = launchEdgeRANOVA();
 
 		if (results != null){
-			//parse results and append FDRs to genes
+			//parse results and append FDRs to UCSCGeneLines
 			parseEdgeRANOVAResults(results);
-
-			//append result to gene txt
-			appendGeneTxtWithEdgeRANOVA();
 		}
 		else return false;
 
 		return true;
 	}
 
-	private void appendGeneTxtWithEdgeRANOVA() {
-		geneNamesPassingThresholdsEdgeR = new ArrayList<String>();
-		//append header
-		spreadSheetHeader.append("\tEdgeR_ANOVALike_FDR\tMaxAbsVarCorLog2Rto");
-		//for each gene
-		for (int i=0; i< genes.length; i++){
-			StringBuilder txt = genes[i].getText();
-			txt.append("\t");
-			txt.append(genes[i].getFdrEdgeR());
-			txt.append("\t");
-			txt.append(genes[i].getMaxAbsLog2Ratio());
-			if (genes[i].getFdrEdgeR() >= minFDR && genes[i].getMaxAbsLog2Ratio() >= minLog2Ratio) geneNamesPassingThresholdsEdgeR.add(genes[i].getDisplayNameThenName());
-		}
-	}
 
 	/*Parses edgeR ANOVA like results table
 	 * genes	logFC.GV	logFC.ICM	logFC.MI	logFC.MII	logFC.MOR	logFC.PN	logFC.TROPH	logCPM	LR	PValue	FDR
@@ -243,13 +234,13 @@ public class DefinedRegionDifferentialSeq {
 		}
 	}
 
-	private String[] launchEdgeRANOVA(int numGenesToTest) {
+	private String[] launchEdgeRANOVA() {
 		//create & write out edgeR script
-		File edgeRResults = new File(saveDirectory, "results_EdgeRANOVA.txt");
+		File edgeRResults = new File(saveDirectory, "edgeRANOVA_Results.txt");
 		String script = createEdgeRANOVAScript(edgeRResults);
-		File edgeRScript = new File(saveDirectory, "script_EdgeRANOVA.txt");
+		File edgeRScript = new File(saveDirectory, "edgeRANOVA_RScript.txt");
 		IO.writeString(script, edgeRScript);
-		File rOut = new File(saveDirectory, "script_EdgeRANOVA.txt.Rout");
+		File rOut = new File(saveDirectory, "edgeRANOVA_RScript.txt.Rout");
 
 		//make command
 		String[] command = new String[] {
@@ -285,14 +276,13 @@ public class DefinedRegionDifferentialSeq {
 		}
 
 		res = IO.loadFile(edgeRResults);
-		if ((res.length -1) != numGenesToTest) {
+		if ((res.length -1) != geneNamesToAnalyze.length) {
 			System.err.println("\nError: edgeR results file contains a different number of rows than tested genes?! Aborting, see temp files for issues -> "+rOut.toString()+"\n");
 			return null;
 		}
 
 		//clean up
 		if (deleteTempFiles) {
-			workingCountTable.deleteOnExit();
 			edgeRResults.deleteOnExit();
 			edgeRScript.deleteOnExit();
 			rOut.deleteOnExit();
@@ -305,16 +295,8 @@ public class DefinedRegionDifferentialSeq {
 	private String createEdgeRANOVAScript(File results) {
 		StringBuilder sb = new StringBuilder();
 		sb.append("library(edgeR)\n");
-		sb.append("rawdata = read.delim('"+workingCountTable.toString()+"', check.names=FALSE, stringsAsFactors=FALSE)\n");
-		//created groups
-		ArrayList<String> conNames = new ArrayList<String>();
-		//for each condition
-		for (Condition c: conditions){
-			String name = c.getName();
-			//for each replica
-			for (Replica r: c.getReplicas()) conNames.add(name);		
-		}
-		sb.append("group = factor(c('"+Misc.stringArrayListToString(conNames, "','")+"'))\n");
+		sb.append("rawdata = read.delim('"+geneCountTable+"', check.names=FALSE, stringsAsFactors=FALSE)\n");
+		sb.append("group = factor(c('"+Misc.stringArrayToString(conditionNamesPerReplica, "','")+"'))\n");
 		sb.append("y = DGEList(counts=rawdata[,2:length(colnames(rawdata))], genes=rawdata[,1], group=group)\n");
 		sb.append("y = calcNormFactors(y)\n");
 		sb.append("design = model.matrix(~group,y$samples)\n");
@@ -328,6 +310,14 @@ public class DefinedRegionDifferentialSeq {
 		return sb.toString();
 	}
 
+	private void analyzeForDifferentialSplicing() {
+		//for each PairedCondition
+		for (PairedCondition pc : pairedConditions){
+			estimateDifferencesInReadDistributions(pc);
+		}
+		
+	}
+
 	private void loadConditions(){
 
 		//Any saved conditions
@@ -335,7 +325,6 @@ public class DefinedRegionDifferentialSeq {
 		if (serializedConditons.exists()){
 			conditions = (Condition[])IO.fetchObject(serializedConditons);
 			if (verbose) System.out.println("\nWARNING: Loading "+conditions.length+" conditions from cached data file, delete "+serializedConditons+" if you'd like to recount gene exon/ regions....\n");
-
 			//load min count hash, this is normally done in the scanGene() method
 			loadMinimumCountsHash();
 		}
@@ -361,11 +350,8 @@ public class DefinedRegionDifferentialSeq {
 					loadReplica(r);
 				}
 			}
-
 			//any genes with too many reads that were excluded?
 			if (flaggedGeneNames.size() !=0) {
-				System.err.println("\nWARNING: The following genes/ regions were excluded from the analysis due to one or more bps exceeding the maximum read coverage of "+maxAlignmentsDepth+" . If these are genes/ regions you wish to interrogate, increase the maximum read coverage threshold. " +
-						"Realize this will likely require additional memory. Often, these are contaminants (e.g. rRNA) or super abundant transcripts that should be dropped from the analysis.\n"+flaggedGeneNames.toString());
 				String[] badGeneNames = Misc.hashSetToStringArray(flaggedGeneNames);
 
 				//remove flagged genes from all replicas
@@ -375,16 +361,19 @@ public class DefinedRegionDifferentialSeq {
 					for (Replica replica: c.getReplicas()) replica.removeFlaggedGenes(badGeneNames);
 				}
 			}
-
-			if (verbose) System.out.println();
+			if (verbose) {
+				System.out.println();
+				System.out.println(geneNamesWithMinimumCounts.size()+" genes with >= "+minimumCounts+" and < "+maxAlignmentsDepth+" counts in one or more replicas will be examined for differential expression.\n ");
+			}
 			//save conditions?
 			if (saveCounts) IO.saveObject(serializedConditons, conditions);
 
 		}
-
+		geneNamesToAnalyze = Misc.hashSetToStringArray(geneNamesWithMinimumCounts);
+		
 		//print conditions
 		if (verbose) {
-			System.out.println("Conditions, replicas, and mapped counts:");
+			System.out.println("Conditions, replicas, and total gene region mapped counts:");
 			for (Condition c: conditions) System.out.println(c);
 		}
 	}
@@ -526,6 +515,7 @@ public class DefinedRegionDifferentialSeq {
 		}
 		//any data found?
 		if (bpNames == null) {
+			reader.close();
 			return;
 		} 
 
@@ -690,141 +680,27 @@ public class DefinedRegionDifferentialSeq {
 		exonReads = null;
 	}
 
-	public void printGeneModelsBed(){
-		try {
-			if (numberWorkingGenesPassingFilters == 0) return;
-
-			File bed = new File(saveDirectory, workingName+"FDR"+(int)minFDR+"Lg2Rto"+ Num.formatNumber(minLog2Ratio, 1)+".bed.gz");
-			Gzipper out = new Gzipper(bed);
-			//genome version
-			out.println("# genome_version = "+genomeVersion);
-			//score names
-			out.println("# score = VarCorrLog2Ratio");
-			//print
-			for (int i=0; i< numberWorkingGenesPassingFilters; i++) {
-				UCSCGeneLine gene = workingGenesPassingFilters.get(i);
-				String name = gene.getDisplayNameThenName()+"_FDR"+(int)gene.getFdr()+"Lg2Rto"+Num.formatNumber(gene.getLog2Ratio(), 2);
-				out.println(gene.toStringBed12Float(gene.getLog2Ratio(), name));
-			}
-			out.close();
-
-			//convert to useq
-			new Text2USeq(bed, genomeVersion, "#FF0000");
 
 
-		} catch (Exception e){
-			e.printStackTrace();
-		}
-	}
-
-	private void clusterDifferentiallyExpressedGenes(){
-		//write counts for all genes to file
-		File countTable = new File (saveDirectory, "geneCountTable.txt");
-		String[] allGenes = new String[genes.length];
-		for (int i=0; i< genes.length; i++){
-			allGenes[i] = genes[i].getDisplayNameThenName();
-		}
-		ArrayList<String> conditionNames = writeCountTable(allGenes, countTable);
-
-		//execute clustering
-		File varCorrData = executeDESeqCluster(countTable, conditionNames, false);
-
-		//append count and varCorr data onto genes
-		appendCountVarCorrData(countTable, varCorrData, conditionNames);
-
-		//this doesn't appear to work that well?  need test data!
-		//write counts for genes with > 20 reads
-		//File selectCountTable = new File (saveDirectory, "gene20CountTable.txt");
-		//String[] selectGenes = new String[geneNamesWithMinimumCounts.size()];
-		//int index = 0;
-		//for (String geneName: geneNamesWithMinimumCounts) selectGenes[index++] = geneName;
-
-		//id diff express genes when using whole table
-		//executeDESeqDiffExpAll(selectCountTable, writeCountTable(selectGenes, selectCountTable));
-
-	}
-
-	public void appendCountVarCorrData(File countTable, File varCorrData, ArrayList<String> conditionNames){
-		//add onto header
-		//spacer
-		spreadSheetHeader.append("\t");
-		//counts
-		spreadSheetHeader.append("Counts_"+Misc.stringArrayListToString(conditionNames, "\tCounts_"));
-		//spacer
-		spreadSheetHeader.append("\t");
-		//varCoor
-		spreadSheetHeader.append("VarCorCounts_"+Misc.stringArrayListToString(conditionNames, "\tVarCorCounts_"));
-		//spacer
-		spreadSheetHeader.append("\t");
-		//FPKM
-		spreadSheetHeader.append("FPKM_"+Misc.stringArrayListToString(conditionNames, "\tFPKM_"));
-
-		//append onto genes
-		try {
-			BufferedReader counts = new BufferedReader( new FileReader (countTable));
-			//skip header
-			counts.readLine();
-			BufferedReader varCounts = new BufferedReader (new FileReader (varCorrData));
-			//append, these are tab delimited
-			for (int i=0; i< genes.length; i++){
-				StringBuilder sb = genes[i].getText();
-				//sb.append("\t");
-				String line = counts.readLine();
-				int index = line.indexOf("\t");
-				sb.append(line.substring(index));
-				sb.append("\t");
-				sb.append(varCounts.readLine());
-				sb.append("\t");
-				//calculate FPKM values
-				for (Condition c: conditions){
-					//for each replica
-					for (Replica r: c.getReplicas()){
-						double num = 0;
-						if (r.getGeneCounts().get(genes[i].getDisplayNameThenName()) != null) num = r.getGeneCounts().get(genes[i].getDisplayNameThenName()).calculateFPKM(r.getTotalCounts(), genes[i].getTotalExonicBasePairs());
-						sb.append(num);
-						sb.append("\t");
-					}
-				}
-			}
-
-			//close readers
-			counts.close();
-			varCounts.close();
-
-		} catch (IOException e){
-			e.printStackTrace();
-			Misc.printErrAndExit("\nError parsing counts and varCorr counts.\n");
-		}
-	}
-
-	public File executeDESeqCluster(File countTable, ArrayList<String> conditionNames, boolean useLocalFitType){
-		int numDiffExp = geneNamesPassingThresholds.size();
-		File varCorrData = new File (saveDirectory, "allGene_DESeqVarCorrData.txt");
-		File clusteredDiffExpressGenes = new File (saveDirectory, "clusterPlot"+numDiffExp+"DiffExpGenes.pdf");
-		File sampleClustering = new File (saveDirectory, "clusterPlotSamples.pdf");
+	public void executeDESeqCluster(boolean useLocalFitType){
+		File sampleClustering = new File (saveDirectory, "sampleClusterPlot.pdf");
+		blindedVarCorData = new File (saveDirectory, "blindedDESeqVarCorData.txt");
+		if (deleteTempFiles) blindedVarCorData.deleteOnExit();
 		try {
 			//make R script
 			StringBuilder sb = new StringBuilder();
-			sb.append("numDiffExpGenes = "+numDiffExp+"\n");
 			sb.append("library(DESeq)\n");
-			sb.append("countsTable = read.delim('"+countTable.getCanonicalPath()+"', header=TRUE)\n");
+			sb.append("countsTable = read.delim('"+geneCountTable.getCanonicalPath()+"', header=TRUE)\n");
 			sb.append("rownames(countsTable) = countsTable[,1]\n");
 			sb.append("countsTable = countsTable[,-1]\n");
-			sb.append("conds = c('"+ Misc.stringArrayListToString(conditionNames, "','") + "')\n");
+			sb.append("conds = c('"+ Misc.stringArrayToString(replicaNames, "','") + "')\n");
 			sb.append("cds = newCountDataSet( countsTable, conds)\n");
 			sb.append("cds = estimateSizeFactors( cds )\n");
 			if (useLocalFitType) sb.append("cds = estimateDispersions( cds, method='blind', sharingMode='fit-only', fitType='local' )\n");
 			else sb.append("cds = estimateDispersions( cds, method='blind', sharingMode='fit-only' )\n");
 			sb.append("vsd = getVarianceStabilizedData( cds )\n");
 			//write out the vsd data
-			sb.append("write.table(vsd, file = '"+varCorrData.getCanonicalPath()+"', quote=FALSE, sep ='\t', row.names = FALSE, col.names = FALSE)\n");
-			//cluster diff expressed genes?
-			if (numDiffExp >= 10){
-				sb.append("colors = colorRampPalette(c('white','darkblue'))(100)\n");
-				sb.append("pdf('"+clusteredDiffExpressGenes.getCanonicalPath()+"', height=10, width=10)\n");
-				sb.append("heatmap( vsd[1:numDiffExpGenes,], col=colors, scale='none')\n");
-				sb.append("dev.off()\n");
-			}
+			sb.append("write.table(vsd, file = '"+blindedVarCorData.getCanonicalPath()+"', quote=FALSE, sep ='\t', row.names = FALSE, col.names = FALSE)\n");
 			//cluster by sample
 			sb.append("dists = dist( t( vsd ) )\n");
 			sb.append("pdf('"+ sampleClustering.getCanonicalPath() +"', height=10, width=10)\n");
@@ -832,8 +708,8 @@ public class DefinedRegionDifferentialSeq {
 			sb.append("dev.off()\n");
 
 			//write script to file
-			File scriptFile = new File (saveDirectory, "allGene_RScript.txt");
-			File rOut = new File(saveDirectory, "allGene_RScript.txt.Rout");
+			File scriptFile = new File (saveDirectory, "cluster_RScript.txt");
+			File rOut = new File(saveDirectory, "cluster_RScript.txt.Rout");
 			IO.writeString(sb.toString(), scriptFile);
 
 			//make command
@@ -859,26 +735,22 @@ public class DefinedRegionDifferentialSeq {
 						rOut.delete();
 						scriptFile.delete();
 					}
-					if (useLocalFitType == false) executeDESeqCluster(countTable, conditionNames, true);
+					if (useLocalFitType == false) executeDESeqCluster(true);
 					else throw new IOException();
 				}
 			}
-
 			//any problems?
-			if (varCorrData.exists() == false) throw new IOException();
+			if (sampleClustering.exists() == false || blindedVarCorData.exists() == false) throw new IOException();
 
 			//cleanup
 			if (deleteTempFiles) {
 				rOut.deleteOnExit();
-				countTable.deleteOnExit();
 				scriptFile.deleteOnExit();
-				varCorrData.deleteOnExit();
 			}
 
 		} catch (IOException e) {
 			Misc.printErrAndExit("\nError failed to cluster data. Check temp files in save directory for error.\n"+ e.getMessage());
 		}
-		return varCorrData;
 	}
 
 	public void loadGeneLineWithExonCounts(UCSCGeneLine gl, Condition treatment, Condition control){
@@ -922,44 +794,18 @@ public class DefinedRegionDifferentialSeq {
 		gl.setScores(new float[]{totalTCounts, totalCCounts});
 	}
 
-	public void estimateDifferencesInReadDistributionsWithPermutationTest(Condition one, Condition two){
-		ArrayList<UCSCGeneLine> al = new ArrayList<UCSCGeneLine>();
-
-		//for each gene with min counts
-		//note all of the scores have been zeroed or nulled
-		for (UCSCGeneLine gene: workingGenesToTest){
-
-			//does it have 2 or more exons?
-			UCSCGeneLine gl = genesWithExons.get(gene.getDisplayNameThenName());
-			if (gl == null) continue;
-
-			//load it with counts
-			loadGeneLineWithExonCounts(gl, one, two);
-
-			//calc permutated pvalue
-			double pval = Num.calculatePermutedChiSquarePValue (Num.floatArraysToInt(gl.getTreatmentExonCounts()), Num.floatArraysToInt(gl.getControlExonCounts()));
-			gl.setSplicingPValue((float)pval);
-
-			//set ratio
-			setMaxLog2RatioSplice(gl);
-
-		}
-	}
-
-	public void estimateDifferencesInReadDistributions(Condition one, Condition two){
+	public void estimateDifferencesInReadDistributions(PairedCondition pair){
 		int maxNumberExons = -1;
 		ArrayList<UCSCGeneLine> al = new ArrayList<UCSCGeneLine>();
 
 		//for each gene with min counts
-		//note all of the scores have been zeroed or nulled
-		for (UCSCGeneLine gene: workingGenesToTest){
-
-			//does it have 2 or more exons?
-			UCSCGeneLine gl = genesWithExons.get(gene.getDisplayNameThenName());
-			if (gl == null) continue;
-
+		for (String geneName: geneNamesToAnalyze){
+			UCSCGeneLine gl = name2Gene.get(geneName);
+			//any exons?
+			if (gl.getExons().length < 1) continue;
+			
 			//load it with counts
-			loadGeneLineWithExonCounts(gl, one, two);
+			loadGeneLineWithExonCounts(gl, pair.getFirstCondition(), pair.getSecondCondition());
 
 			//check exon counts and modify if too few 
 			if (checkForMinimums(gl)){
@@ -1000,6 +846,15 @@ public class DefinedRegionDifferentialSeq {
 			float pAdj = (float) pVals[i] + bc;
 			if (pAdj > 0) genesWithExonsAndReads[i].setSplicingPValue(pAdj);
 		}
+		
+		//extract info and put back in PairedCondition
+		HashMap<String, float[]> geneNameSpliceStats = new HashMap<String, float[]>();
+		for (UCSCGeneLine gene: genesWithExonsAndReads){
+			float[] scores = new float[]{gene.getSplicingPValue(), gene.getSplicingLog2Ratio(), gene.getSplicingExon()};
+			geneNameSpliceStats.put(gene.getDisplayNameThenName(), scores);
+		}
+		pair.setGeneNameSpliceStats(geneNameSpliceStats);
+		
 	}
 
 	/**Looks for minimum number of reads and minimum log2Ratio difference between exon counts.*/
@@ -1076,64 +931,113 @@ public class DefinedRegionDifferentialSeq {
 
 	}
 
-	/**Sets max log2Ratio difference between exon counts.*/
-	private void setMaxLog2RatioSplice(UCSCGeneLine gene){
-		//get total treatment and total control
-		float[][] tExonCounts = gene.getTreatmentExonCounts();
-		float[][] cExonCounts = gene.getControlExonCounts();
-		int numExons = tExonCounts[0].length;
 
-		//collapse
-		float[] tCounts = new float[numExons];
-		float[] cCounts = new float[numExons];
+	public void analyzeForDifferentialExpression(boolean useLocalFitType){
+		ArrayList<PairedCondition> pairedConditionsAL = new ArrayList<PairedCondition>();
+		try {
+			//make R script
+			StringBuilder sb = new StringBuilder();
+			sb.append("library(DESeq)\n");
+			sb.append("countsTable = read.delim('"+geneCountTable.getCanonicalPath()+"', header=TRUE)\n");
+			sb.append("rownames(countsTable) = countsTable[,1]\n");
+			sb.append("countsTable = countsTable[,-1]\n");
+			sb.append("conds = c('"+ Misc.stringArrayToString(conditionNamesPerReplica, "','") + "')\n");
+			sb.append("cds = newCountDataSet( countsTable, conds)\n");
+			sb.append("cds = estimateSizeFactors( cds )\n");
+			//estimate dispersions
+			//no replicas?
+			if (replicaNames.length == 2) {
+				if (useLocalFitType) sb.append("cds = estimateDispersions( cds, method='blind', sharingMode='fit-only', fitType='local' )\n");
+				else sb.append("cds = estimateDispersions( cds, method='blind', sharingMode='fit-only' )\n");
+			}
+			else {
+				String outlier = "";
+				String local = "";
+				if (filterOutliers == false) outlier= ", sharingMode='fit-only'";
+				if (useLocalFitType) local = ", fitType='local'";
+				sb.append("cds = estimateDispersions( cds" +outlier + local +")\n");
+			}
+			sb.append("vsd = getVarianceStabilizedData( cds )\n");
+			
+			//write out variance stabilized data, actually we don't want this, need it to be blinded!
+			//deseqVarCorData = new File(saveDirectory,"deseqVarCorData.txt");
+			//if (deleteTempFiles) deseqVarCorData.deleteOnExit();
+			//sb.append("write.table(vsd, file = '"+deseqVarCorData.getCanonicalPath()+"', quote=FALSE, sep ='\t', row.names = FALSE, col.names = FALSE)\n");
+			
+			//diff express
+			pairedConditionsAL = new ArrayList<PairedCondition>();
+			for (int i=0; i< conditions.length; i++){
+				for (int j=i+1; j< conditions.length; j++){
+					//make condition
+					PairedCondition pc = new PairedCondition(conditions[i], conditions[j]);
+					pairedConditionsAL.add(pc);
+					File results = new File (saveDirectory, pc.getName()+"DESeq.txt");
+					if (deleteTempFiles) results.deleteOnExit();
+					pc.setDiffExpResults(results);
+					
+					sb.append("res = nbinomTest( cds, '"+conditions[i].getName()+"', '"+conditions[j].getName()+"', pvals_only = FALSE)\n");
+					sb.append("res[,6] = (rowMeans( vsd[, conditions(cds)=='"+conditions[i].getName()+"', drop=FALSE] ) - rowMeans( vsd[, conditions(cds)=='"+conditions[j].getName()+"', drop=FALSE] ))\n");
+					//Fred adjP
+					sb.append("res[,8] = -10 * log10(res[,8])\n");
+					//Parse padj, log2ratio; note flip of A and B back to T and C
+					sb.append("res = res[,c(8,6)]\n");
+					//note, the order of the rows is the same as the input
+					sb.append("write.table(res, file = '"+results.getCanonicalPath()+"', quote=FALSE, sep ='\t', row.names = FALSE, col.names = FALSE)\n");
+				}
+			}
+			
+			//write script to file
+			File scriptFile = new File (saveDirectory,"deseq_RScript.txt");
+			File rOut = new File(saveDirectory, "deseq_RScript.txt.Rout");
+			IO.writeString(sb.toString(), scriptFile);
 
-		//for each exon
-		for (int i=0; i< numExons; i++){
-			//for each replica
-			for (int j=0; j< tExonCounts.length; j++){
-				tCounts[i] += tExonCounts[j][i];
+			//make command
+			String[] command = new String[] {
+					fullPathToR.getCanonicalPath(),
+					"CMD",
+					"BATCH",
+					"--no-save",
+					"--no-restore",
+					scriptFile.getCanonicalPath(),
+					rOut.getCanonicalPath()};
+			
+			//execute command
+			IO.executeCommandLine(command);
+
+			//check for warnings
+			String[] res = IO.loadFile(rOut);
+
+			for (String s: res) {
+				if (s.contains("Dispersion fit did not converge") || s.contains("Parametric dispersion fit failed")) {
+					System.err.println("\n\t\tWarning, DESeq's GLM dispersion fit failed. Relaunching using fitType='local'");
+					analyzeForDifferentialExpression(true);
+					return;
+				}
 			}
-			//sum from c
-			for (int j=0; j< cExonCounts.length; j++){
-				cCounts[i] += cExonCounts[j][i];
+
+			//Make conditions
+			pairedConditions = new PairedCondition[pairedConditionsAL.size()];
+			pairedConditionsAL.toArray(pairedConditions);
+			
+			//look for results files and parse results
+			for (PairedCondition pc: pairedConditions){
+				if (pc.getDiffExpResults().exists() == false ) throw new IOException("\n\nR results file doesn't exist. Check temp files in save directory for error.\n");
+				pc.parseDESeqStatResults(geneNamesToAnalyze, minFDR, this.minLog2Ratio);
+				if (verbose) System.out.println("\t"+pc.getVsName()+"\t"+pc.getDiffExpGeneNames().size());
+				geneNamesPassingThresholds.addAll(pc.getDiffExpGeneNames());
 			}
+			
+			//cleanup
+			if (deleteTempFiles) {
+				rOut.deleteOnExit();
+				scriptFile.deleteOnExit();
+			}
+
+		} catch (IOException e) {
+			e.printStackTrace();
+			Misc.printErrAndExit("Error: failed to execute DESeq.\n");
 		}
 
-		//need to estimate scalars
-		float[] totalTC = gene.getScores();
-		double scalarTC = totalTC[0]/ totalTC[1];
-		double scalarCT = totalTC[1]/totalTC[0];
-
-
-		//for each exon
-		float maxLogRatio = 0;
-		int maxLogRatioIndex = 0;
-		float[] log2Ratios = new float[numExons];
-		for (int i=0; i< numExons; i++){
-			//enough reads?
-			if ((tCounts[i] + cCounts[i]) < 10) continue;
-			//check ratio
-			log2Ratios[i] = calculateLog2Ratio(tCounts[i], cCounts[i], scalarTC, scalarCT);
-			float logRatio = Math.abs(log2Ratios[i]);
-			if (logRatio > maxLogRatio) {
-				maxLogRatio = logRatio;
-				maxLogRatioIndex = i;
-			}
-		}
-		//set log2Ratio 
-		gene.setSplicingLog2Ratio(log2Ratios[maxLogRatioIndex]);
-		gene.setSplicingExon(maxLogRatioIndex);
-
-	}
-
-	public void analyzeForDifferentialExpression(){
-		for (int i=0; i< conditions.length; i++){
-			Condition first = conditions[i];
-			for (int j=i+1; j< conditions.length; j++){
-				Condition second = conditions[j];
-				differentialExpress(first, second);
-			}
-		}
 	}
 
 	/**Calculates a log2( (tSum+1)/(cSum+1) ) on linearly scaled tSum and cSum based on the total observations.*/
@@ -1152,253 +1056,410 @@ public class DefinedRegionDifferentialSeq {
 		return (float)Num.log2(ratio);
 	}
 
-	public void differentialExpress(Condition first, Condition second){
-		if (verbose) System.out.print("\tComparing "+first.getName()+" vs "+ second.getName());
-
-		workingName = first.getName() +"_"+ second.getName();
-		workingNumberFirstReplicas = first.getReplicas().length;
-		workingNumberSecondReplicas = second.getReplicas().length;
-
-		//write count table
-		if (writePairedCountTable(first, second) == false) return;
-
-		//execute DESeq
-		executeDESeqDiffExp(false);
-		if (workingDESeqFiles == null) return;
-
-		//parse results and populate gene scores
-		if (parseDESeqStatResults() == false) return;
-		if (verbose) System.out.println(" : "+numberWorkingGenesPassingFilters);
-
-		//differential splice
-		if (usePermutationSpliceTest) estimateDifferencesInReadDistributionsWithPermutationTest(first, second);
-		else estimateDifferencesInReadDistributions(first, second);
-
-		//print results spread sheet
-		if (spreadSheetHeader == null) saveFirstWorkingGeneModels();
-		else saveWorkingGeneModels();
-
-		//print bed file
-		printGeneModelsBed();
-
-	}
-
-	/**Prints a spread sheet of counts from all of the genes*/
-	public void printCountSpreadSheet(){
-		File f = new File (saveDirectory, "geneCounts.xls");
-		String[] allGenes = new String[genes.length];
-		for (int i=0; i< genes.length; i++){
-			allGenes[i] = genes[i].getDisplayNameThenName();
-		}
-		writeCountTable(allGenes, f);
-	}
-
-	/**Prints a spread sheet from all of the genes sorted by max log2 ratio for those found differentially expressed.*/
+	/**Prints a variety of spreadsheets.*/
 	public void printStatSpreadSheet(){
 		try {
-			File f = new File (saveDirectory, "geneStats.xls.gz");
-			Gzipper spreadSheetOut = new Gzipper (f);
-			spreadSheetOut.println(spreadSheetHeader.toString() +"\tGenomeVersion=" +genomeVersion);
-			for (UCSCGeneLine gene : genes) spreadSheetOut.println(gene.getText().toString());
-			spreadSheetOut.close();
+			//create a workbook
+			workbook = new XSSFWorkbook();
+		    FileOutputStream fileOut = new FileOutputStream(new File(saveDirectory, "geneStats.xlsx"));
+		    
+		    //create a worksheet
+		    Sheet sheet1 = workbook.createSheet("Analyzed Genes");
+		    sheet1.createFreezePane( 0, 1, 0, 1 );
+		    
+		    //create rows, one for each gene with counts plus header
+		    Row[] rows = new Row[geneNamesToAnalyze.length+1];
+		    for (int i=0; i< rows.length; i++) rows[i] = sheet1.createRow(i);
+		    
+		    //make header line
+		    makeHeaderLine(rows[0]);
+		    
+		    
+		    //add gene info
+		    int cellIndex = addGeneInfo(rows);
+		    
+		    //add PairedCondition info
+		    cellIndex = addPairedConditionInfo(rows, cellIndex);
+		    
+		    //add count values
+		    cellIndex = addCountInfo(rows, cellIndex);
+		    
+		    //add varcor values
+		    cellIndex = addVarCorInfo(rows, cellIndex);
+		    
+		    //add FPKM
+		    cellIndex = addFPKMInfo(rows, cellIndex);
+		    
+		    //new sheet for flagged genes
+		    Sheet sheet2 = workbook.createSheet("Flagged Genes");
+		    addFlaggedGenes(sheet2);
+		    
+		    //new sheet for descriptions of headings
+		    Sheet sheet3= workbook.createSheet("Column Descriptions");
+		    addColumnDescriptors(sheet3);
+		    
+		    //write out and close
+		    workbook.write(fileOut);
+		    fileOut.close();
+
+			
 		} catch (Exception e){
-			System.err.println("\nProblem printing gene models.");
+			System.err.println("\nProblem printing spreadsheet!");
 			e.printStackTrace();
 			System.exit(1);
 		}
 	}
 
-	public void saveFirstWorkingGeneModels(){
-		//build header line
-		spreadSheetHeader = new StringBuilder();
-		boolean secondNamePresent = false;
-		if (workingGenesToTest[0].getDisplayName() != null && workingGenesToTest[0].getName() != null) {
-			spreadSheetHeader.append("#DisplayName\tName\t");
-			secondNamePresent = true;
+	private void addColumnDescriptors(Sheet sheet) {
+		//make some styles
+	    CellStyle bold = workbook.createCellStyle();
+	    Font font = workbook.createFont();
+	    font.setBoldweight(Font.BOLDWEIGHT_BOLD);
+	    bold.setFont(font);
+	    
+		int rowIndex = 0;
+		for (int i=0; i< descriptors.length; i++){
+			Row row = sheet.createRow(rowIndex++);
+			Cell cell = row.createCell(0);
+			cell.setCellStyle(bold);
+			cell.setCellValue(descriptors[i][0]);
+			if (descriptors[i][1] != null) row.createCell(1).setCellValue(descriptors[i][1]);
 		}
-		else spreadSheetHeader.append("#Name\t");
-		String splicePVal = "\tSpliceChiPVal_";
-		if (usePermutationSpliceTest) splicePVal = "\tSplicePermChiPVal_";
-		spreadSheetHeader.append("Chr\tStrand\tStart\tStop\tTotalBPs\tPVal_"+workingName+"\tFDR_"+workingName+"\tVarCorLg2Rto_"+workingName+ splicePVal +workingName+"\tSpliceMaxLg2Rto_"+workingName+"\tSpliceMaxExon_"+workingName);
+		
+		sheet.autoSizeColumn((short)0);
+	}
+	
+	private String[][] descriptors = {
+			{"Gene/Region info:", null},
+			{"IGB HyperLink", "Click each to reposition a running instance of IGB, http://bioviz.org/igb/"},
+			{"Alt Name", "Alternative name for this gene/region"},
+			{"Coordinates", "Chromosome : Start of the gene/region - end of the gene/region"},
+			{"Strand", "Strand of the gene/region"},
+			{"Total BPs", "Total base pairs of gene/region after masking for overlapping annotations if so indicated"},
+			{"Max Abs Lg2Rto", "Maximum absolute log2 ratio observed using DESeq's varCor values"},
+			{"Max DESeq FDR", "Maximum observed -10Log10( FDR ) between any pairwise DESeq comparisons.  Note the MaxAbsLg2Rto and MaxDESeqFDR may be from different comparisons.  "
+					+ "Moreover, all p-values and FDRs in USeq output, both printed and in graph form have been phred transformed where the value is actually -10*Log10(FDR or pval). Thus -10*Log10(0.001) = 30, -10*Log10(0.01) = 20, -10*Log10(0.05) = 13, and -10*Log10(0.1) = 10. "},
+			{"EdgeR FDR", "Maximum -10Log10( FDR ) from running edgeR's ANOVA-like analysis designed to score genes for differential expression under any conditions."},
+			{"", ""},
+			{"For each Paired Comparison:", null},
+			{"Lg2Rto", "DESeq's log2 ratio for differential expression, log2(mean(varCorT1,varCorT2, ...)/mean(varCorC1,varCorC2,...)). Note these varCor values will differ somewhat from the blinded varCor values exported to the spreadsheet since they use a different variance estimation."},
+			{"FDR", "DESeq's negative binomial p-value following the Benjamini and Hochberg multiple testing correction."},
+			{"Spli Lg2Rto", "The maximum log2 ratio difference between two conditions and a gene's exon after correcting for differences in counts.  Use this to gauge the degree of potential differential splicing."},
+			{"Spli AdjPVal", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction is applied to the p-values."},
+			{"Spli Index", "The zero based index relative to the plus genomic strand for the exon displaying the SpliLg2Rto."},
+			{"", ""},
+			{"For each Replica:", null},
+			{"Counts", "Number of alignments that overlap a given gene/region by at least one base pair. Paired alignments are only counted once.  Alignments that span a gene/region but don't actually touch down are ignored. "},
+			{"VarCor", "Per gene/region variance corrected counts in log space from DESeq estimated using its blind method.  Use these for subsequent clustering.  These values are a bit different from the varCor values used in scoring paired differential expression. "},
+			{"FPKM", "Transformed count data normalized to library size and gene/region length (counts/ exonicBasesPerKB/ millionTotalMappedReadsToGeneTable)"}
+					
+	};
 
-		//for each gene
-		for (int i=0; i< genes.length; i++){
-			//instantiate new SB
-			StringBuilder text = new StringBuilder();
-
-			//name
-			String name = genes[i].getDisplayNameThenName();
-
-			//url
-			int start = genes[i].getTxStart() - 10000;
-			if (start < 0) start = 0;
-			int end = genes[i].getTxEnd() + 10000;
-
-			text.append(url);
-			text.append(genes[i].getChrom());
-			text.append("&start=");
-			text.append(start);
-			text.append("&end=");
-			text.append(end);
-			text.append("\",\"");
-			text.append(name);
-			text.append("\")\t");
-
-			//print second name?
-			if (secondNamePresent) {
-				text.append("\"");
-				text.append(genes[i].getName());
-				text.append("\"\t");
-			}
-
-			//status? OK or sectioned or read depth
-			if (genes[i].isFlagged()){
-				text.append("Too many reads");
-			}
-
-			//coordinates
-			text.append(genes[i].coordinates());
-			text.append("\t");
-
-			//total bases
-			text.append(genes[i].getTotalExonicBasePairs());
-			text.append("\t");
-
-			//scores pval, fdr, log2rto, splicePVal, spliceLog2
-			text.append(genes[i].getpValue()); 
-			text.append("\t");
-			text.append(genes[i].getFdr()); 
-			text.append("\t");
-			text.append(genes[i].getLog2Ratio()); 
-			text.append("\t");
-			text.append(genes[i].getSplicingPValue()); 
-			text.append("\t");
-			text.append(genes[i].getSplicingLog2Ratio()); 
-			text.append("\t");
-			text.append(genes[i].getSplicingExon());
-
-			//set text
-			genes[i].setText(text);
+	private void addFlaggedGenes(Sheet sheet) {
+		//generate gene lists
+		String[] tooMany = Misc.hashSetToStringArray(flaggedGeneNames);
+		
+//System.out.println("FlaggedGenes "+flaggedGeneNames.size());
+		
+		Arrays.sort(tooMany);
+		ArrayList<String> tooFewAL = new ArrayList<String>();
+		for (UCSCGeneLine gene: genes){
+			String name = gene.getDisplayNameThenName();
+			if (flaggedGeneNames.contains(name) || geneNamesWithMinimumCounts.contains(name)) continue;
+			else tooFewAL.add(name);
 		}
-
+		String[] tooFew = Misc.stringArrayListToStringArray(tooFewAL);
+		Arrays.sort(tooFew);
+		int maxNum = tooFew.length;
+		if (tooMany.length > maxNum) maxNum = tooMany.length;
+	
+//System.out.println("TooFewGenes "+tooFewAL.size());	
+		
+		//bold styles
+	    CellStyle bold = workbook.createCellStyle();
+	    Font font = workbook.createFont();
+	    font.setBoldweight(Font.BOLDWEIGHT_BOLD);
+	    bold.setFont(font);
+		
+		int rowIndex = 0;
+		Row header = sheet.createRow(rowIndex++);
+		header.createCell(0).setCellValue("< "+minimumCounts+ " counts");
+		header.createCell(1).setCellValue("> "+maxAlignmentsDepth+ " counts");
+		header.getCell(0).setCellStyle(bold);
+		header.getCell(1).setCellStyle(bold);
+		
+		for (int i=0; i< maxNum; i++){
+			String tooManyCell = "";
+			String tooFewCell = "";
+			if (tooMany.length > i) tooManyCell = tooMany[i];
+			if (tooFew.length > i) tooFewCell = tooFew[i];
+			
+			Row r = sheet.createRow(rowIndex++);
+			r.createCell(0).setCellValue(tooFewCell);
+			r.createCell(1).setCellValue(tooManyCell);
+		}
+		//autosize
+		sheet.autoSizeColumn(0);
+		sheet.autoSizeColumn(1);
 	}
 
-	public void saveWorkingGeneModels(){
-		//add to header line
-		spreadSheetHeader.append("\tPVal_"+workingName+"\tFDR_"+workingName+"\tVarCorLg2Rto_"+workingName+"\tSplicePVal_"+workingName+"\tSpliceMaxLg2Rto_"+workingName+"\tSpliceMaxExon_"+workingName);
-
-		//for each gene
-		for (int i=0; i< genes.length; i++){
-			StringBuilder text = genes[i].getText();
-			text.append("\t");
-
-			//scores pval, fdr, log2rto, splicePVal, spliceLog2
-			text.append(genes[i].getpValue()); 
-			text.append("\t");
-			text.append(genes[i].getFdr()); 
-			text.append("\t");
-			text.append(genes[i].getLog2Ratio()); 
-			text.append("\t");
-			text.append(genes[i].getSplicingPValue()); 
-			text.append("\t");
-			text.append(genes[i].getSplicingLog2Ratio()); 
-			text.append("\t");
-			text.append(genes[i].getSplicingExon());
+	private int addCountInfo(Row[] rows, int cellIndex) {
+		int ci = cellIndex;
+		
+		//for each gene / row
+		for (int j=0; j< geneNamesToAnalyze.length; j++){
+			int rowIndex = j+1;
+			ci = cellIndex;
+			for (Condition c: conditions){
+				//for each replica
+				for (Replica r: c.getReplicas()){
+					int num = 0;
+					if (r.getGeneCounts().containsKey(geneNamesToAnalyze[j])){
+						num = r.getGeneCounts().get(geneNamesToAnalyze[j]).getCount();
+					}
+					rows[rowIndex].createCell(ci++).setCellValue(num);
+				}
+			}
+			
 		}
-
+		return ci;
 	}
 
-	private boolean parseDESeqStatResults(){
+	private int addVarCorInfo(Row[] rows, int cellIndex) {
+		//First parse the table of numbers
+		float[][] geneVarCor = parseVarCorData(blindedVarCorData);
+				
+		//write them to the excel sheet
+		int ci = cellIndex;
+		for (int j=0; j< geneNamesToAnalyze.length; j++){
+			int rowIndex = j+1;
+			ci = cellIndex;
+			for (float c: geneVarCor[j]){
+				rows[rowIndex].createCell(ci++).setCellValue(c);
+			}
+		}
+		
+		return ci;
+	}
+	
+	private int addFPKMInfo(Row[] rows, int cellIndex) {
+		int ci = cellIndex;
+		//for each gene
+		for (int j=0; j< geneNamesToAnalyze.length; j++){
+			int rowIndex = j+1;
+			ci = cellIndex;
+			double totalBps = name2Gene.get(geneNamesToAnalyze[j]).getTotalExonicBasePairs();
+			//calculate FPKM values for each condition			
+			for (Condition c: conditions){
+				//for each replica
+				for (Replica r: c.getReplicas()){
+					double num = 0;
+					if (r.getGeneCounts().containsKey(geneNamesToAnalyze[j])){
+						num = r.getGeneCounts().get(geneNamesToAnalyze[j]).calculateFPKM(r.getTotalCounts(), totalBps);
+					}
+					rows[rowIndex].createCell(ci++).setCellValue(num);
+				}
+			}
+		}
+		return ci;
+	}
+
+	/*Rips the deseqVarCorData file checking and fixing negative values.*/
+	private float[][] parseVarCorData(File deseqVarCorData) {
+		Pattern tab = Pattern.compile("\\t");
+		float[][] geneVarCor = new float[geneNamesToAnalyze.length][replicaNames.length];
+		float minimum = 0;
 		try {
-			BufferedReader inStats = new BufferedReader (new FileReader (workingDESeqFiles[0]));
-			BufferedReader inVarCorr = new BufferedReader (new FileReader (workingDESeqFiles[1]));
-			numberWorkingGenesPassingFilters = 0;
-			workingGenesPassingFilters.clear();
-			String line;
-			String[] stats;
-			String[] varCorr;
-			Pattern tab = Pattern.compile("\t");
-			float maxPVal = 0;
-			float maxAdjPVal = 0;
-			int totalReps = workingNumberFirstReplicas + workingNumberSecondReplicas;
-
-			for (int x=0; x< workingGenesToTest.length; x++){
-
-				//parse stats line: pval, padj, (meanVarCorT- meanVarCorC)
-				line= inStats.readLine();
-				stats = tab.split(line);
-				if (stats.length!=3) Misc.printErrAndExit("One of the DESeq stats R results rows is malformed -> "+line);
-				float[] scores = new float[stats.length];
-				for (int i=0; i< stats.length; i++) {
-					if (stats[i].equals("Inf") || stats[i].equals("NA") || stats[i].equals("-Inf")) scores[i] = Float.MIN_VALUE;
-					else scores[i] = Float.parseFloat(stats[i]);
-				}
-				//pval
-				if (scores[0]> maxPVal) maxPVal = scores[0];
-				//adjPval
-				if (scores[1]> maxAdjPVal) maxAdjPVal = scores[1];
-
-				//parse variance corrected counts line and recalculate varCorr diff using pseudo median, otherwise use meanT - meanC from R
-				if (workingNumberFirstReplicas > 2 || workingNumberSecondReplicas > 2){
-					line= inVarCorr.readLine();
-					varCorr = tab.split(line);
-					if (varCorr.length!=totalReps) Misc.printErrAndExit("One of the DESeq varCorr R results rows is malformed -> "+line);
-					scores[2] = calculateDifference(varCorr);
-				}
-				//add
-				workingGenesToTest[x].setpValue(scores[0]);
-				workingGenesToTest[x].setFdr(scores[1]);
-				workingGenesToTest[x].setLog2Ratio(scores[2]);
-				workingGenesToTest[x].setScores(null);
+			BufferedReader in = IO.fetchBufferedReader(deseqVarCorData);
+			for (int i=0; i< geneNamesToAnalyze.length; i++){
+				String[] scoresString = tab.split(in.readLine());
+				if (scoresString.length != replicaNames.length) Misc.printErrAndExit("\nError: one of the varCor data rows doesn't contain the appropriate number of values! See row "+i+" "+deseqVarCorData);
+				float[] scores = Num.parseFloats(scoresString);
+				if (scores == null) Misc.printErrAndExit("\nError: couldn't parse floats from one of the varCor data rows! See row "+i+" "+deseqVarCorData);
+				//look for negative values
+				for (float f : scores) if (f< minimum) minimum = f;
+				geneVarCor[i] = scores;
 			}
-			inStats.close();
-			inVarCorr.close();
-
-			//convert Inf to max values * 1%
-			maxPVal = maxPVal *1.01f;
-			maxAdjPVal = maxAdjPVal * 1.01f;
-			for (int i=0; i< workingGenesToTest.length; i++){
-				//check pval
-				if (workingGenesToTest[i].getpValue() == Float.MIN_VALUE) workingGenesToTest[i].setpValue(maxPVal);
-				if (workingGenesToTest[i].getpValue() > workingGenesToTest[i].getMaxPValue()) workingGenesToTest[i].setMaxPValue(workingGenesToTest[i].getpValue());
-				//check adjPVal
-				if (workingGenesToTest[i].getFdr() == Float.MIN_VALUE) workingGenesToTest[i].setFdr(maxAdjPVal);
-				//does it log2ratio difference  thresholds?
-				float absLog2Ratio = Math.abs(workingGenesToTest[i].getLog2Ratio());
-				if (workingGenesToTest[i].getFdr() >= minFDR && absLog2Ratio >= minLog2Ratio){
-					geneNamesPassingThresholds.add(workingGenesToTest[i].getDisplayNameThenName());
-					numberWorkingGenesPassingFilters++;
-					workingGenesPassingFilters.add(workingGenesToTest[i]);
-				}
-				//set max log2ratio?
-				if (workingGenesToTest[i].getMaxAbsLog2Ratio() < absLog2Ratio) workingGenesToTest[i].setMaxAbsLog2Ratio(absLog2Ratio);
-			}
-			//clean up
-			if (deleteTempFiles) {
-				workingDESeqFiles[0].delete();
-				workingDESeqFiles[1].delete();
-			}
-			return true;
-		} catch (Exception e){
-			System.err.println("\nProblem parsing DESeq stats results from R.");
-			e.printStackTrace();
-			System.exit(1);
+			in.close();
+		} catch (Exception e) {
+			Misc.printErrAndExit("\nError: problem parsing varCor data, see "+deseqVarCorData+"\n"+e.getMessage());
 		}
-		return false;
+		
+		//fix negatives? remember these are in log space so it is OK to add a constant
+		if (minimum < 0){
+			minimum = -1 * minimum;
+			for (int i=0; i< geneVarCor.length; i++){
+				for (int j=0; j< geneVarCor[i].length; j++) geneVarCor[i][j] += minimum;
+			}
+		}
+		return geneVarCor;
 	}
 
-	public float calculateDifference (String[] varCorr){
-		//parse values
-		float[] t = new float[workingNumberFirstReplicas];
-		float[] c = new float[workingNumberSecondReplicas];
-		for (int i=0; i< workingNumberFirstReplicas; i++){
-			t[i] = Float.parseFloat(varCorr[i]);
+	/*Adds DiffExpLg2Rto DiffExpFDR DiffSpliceLg2Rto DiffSpliceFDR DiffSpliceIndex*/
+	private int addPairedConditionInfo(Row[] rows, int cellIndex) {
+		float[] noScores = {0f,0f,0f};
+		int ci = 0;
+		
+		//for each paired condition
+		for (int i=0; i< pairedConditions.length; i++){
+			PairedCondition pc = pairedConditions[i];
+			float[][] geneScores = pc.getParsedDiffExpResults();
+			HashMap<String, float[]> spliceScores = pc.getGeneNameSpliceStats();
+			
+			//for each gene / row
+			for (int j=0; j< geneNamesToAnalyze.length; j++){
+				int rowIndex = j+1;
+				ci = cellIndex;
+				//fdr and log2 diff exp
+				float[] fdrLog2 = geneScores[j];
+				//fdr, lg2, index
+				float[] splice = noScores;
+				if (spliceScores.containsKey(geneNamesToAnalyze[j]))  splice = spliceScores.get(geneNamesToAnalyze[j]); 
+				//lg2Rto deseq
+				rows[rowIndex].createCell(ci++).setCellValue(fdrLog2[1]);
+				//fdr deseq
+				rows[rowIndex].createCell(ci++).setCellValue(fdrLog2[0]);
+				//lg2 splice
+				rows[rowIndex].createCell(ci++).setCellValue(splice[1]);
+				//fdr splice
+				rows[rowIndex].createCell(ci++).setCellValue(splice[0]);
+				//index splice
+				rows[rowIndex].createCell(ci++).setCellValue(splice[2]);
+			}
+			cellIndex = ci;
 		}
-		int index =0;
-		for (int i=workingNumberFirstReplicas; i < varCorr.length; i++){
-			c[index++] = Float.parseFloat(varCorr[i]);
+		return ci;
+	}
+
+	/*Adds DisplayName Name Chr Strand Start Stop TotalBPs MaxAbsLg2Rto MaxDESeqFDR MaxEdgeRFDR*/
+	private int addGeneInfo(Row[] rows) {
+		CreationHelper createHelper = workbook.getCreationHelper();
+		
+		//make style for hyperlinks
+		CellStyle hlStyle = workbook.createCellStyle();
+		Font hlFont = workbook.createFont();
+		hlFont.setUnderline(Font.U_SINGLE);
+		hlFont.setColor(IndexedColors.BLUE.getIndex());
+		hlStyle.setFont(hlFont);
+		
+		int cellIndex = 0;
+		for (int i=0; i < geneNamesToAnalyze.length; i++){
+			cellIndex = 0;
+			int rowIndex = i+1;
+			UCSCGeneLine gene = name2Gene.get(geneNamesToAnalyze[i]);
+			
+			//hyperlink with displayName
+			Hyperlink link = createHelper.createHyperlink(Hyperlink.LINK_URL);
+			link.setAddress(fetchIGBHyperLink(gene));
+			link.setLabel(gene.getDisplayNameThenName());
+			
+			Cell hlCell = rows[rowIndex].createCell(cellIndex++);
+			hlCell.setCellStyle(hlStyle);
+			hlCell.setHyperlink(link);
+			hlCell.setCellValue(gene.getDisplayNameThenName());
+			
+			//alt name
+			if (gene.getName() != null) rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getName());
+			else rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getDisplayName());
+			//chr:start-stop
+			rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getChrStartStop());
+			//Strand
+			rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getStrand());
+			//TotalBPs
+			rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getTotalExonicBasePairs());
+			//MaxAbsLg2Rto
+			rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getMaxAbsLog2Ratio());
+			//MaxDESeqFDR
+			rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getFdr());
+			//MaxEdgeRFDR
+			rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getFdrEdgeR());
 		}
-		return (float)(Num.pseudoMedian(t) - Num.pseudoMedian(c));
+		return cellIndex;
+	}
+	
+	private String fetchIGBHyperLink(UCSCGeneLine gene){
+		StringBuilder text = new StringBuilder();
+		//url
+		int start = gene.getTxStart() - 50000;
+		if (start < 0) start = 0;
+		int end = gene.getTxEnd() + 50000;
+
+		text.append(url);
+		text.append(gene.getChrom());
+		text.append("&start=");
+		text.append(start);
+		text.append("&end=");
+		text.append(end);
+		return text.toString();
+	}
+	
+	private int createCell (Row row, String value, int index, CellStyle style){
+		Cell cell = row.createCell(index);
+		cell.setCellType(Cell.CELL_TYPE_STRING);
+		if (style != null) cell.setCellStyle(style);
+		cell.setCellValue(value);
+		return index +1;
+	}
+	
+	private CellStyle createHeaderStyle(short colorIndex){
+	    CellStyle style = workbook.createCellStyle();
+	    style.setWrapText(true);
+	    style.setAlignment(CellStyle.ALIGN_CENTER);
+	    Font font = workbook.createFont();
+	    font.setBoldweight(Font.BOLDWEIGHT_BOLD);
+	    style.setFont(font);
+	    if (colorIndex != -1){
+	    	style.setFillForegroundColor(colorIndex);
+	    	style.setFillPattern(CellStyle.SOLID_FOREGROUND);
+	    }
+	    return style;
+	}
+	private void makeHeaderLine(Row row) {
+		//create header
+	    CellStyle headerCellStyle = createHeaderStyle((short)-1);
+	    
+	    int index = 0;
+	    index = createCell(row, "IGB HyperLink", index, headerCellStyle);
+	    index = createCell(row, "Alt Name", index, headerCellStyle);
+	    index = createCell(row, "Coor "+genomeVersion, index, headerCellStyle);
+	    index = createCell(row, "Strand", index, headerCellStyle);
+	    index = createCell(row, "Total BPs", index, headerCellStyle);
+	    index = createCell(row, "Max Abs Lg2Rto", index, headerCellStyle);
+	    index = createCell(row, "Max DESeq FDR", index, headerCellStyle);
+	    index = createCell(row, "EdgeR FDR", index, headerCellStyle);
+	     
+	    //for each PairedCondition
+	    int colorIndex = 0;
+	    short[] colorIndexes = new short[]{IndexedColors.LIGHT_BLUE.getIndex(), IndexedColors.LIGHT_GREEN.getIndex(), IndexedColors.LIGHT_ORANGE.getIndex(), IndexedColors.LIGHT_TURQUOISE.getIndex(), IndexedColors.LIGHT_YELLOW.getIndex()};
+	    for (PairedCondition pc : pairedConditions){
+	    	CellStyle pcCellStyle = createHeaderStyle(colorIndexes[colorIndex++]);
+	    	if (colorIndex == colorIndexes.length) colorIndex = 0;
+	    	String name = pc.getName();
+	    	index = createCell(row, "Lg2Rto "+name, index, pcCellStyle);
+	    	index = createCell(row, "FDR "+name, index, pcCellStyle);
+	    	index = createCell(row, "Spli Lg2Rto "+name, index, pcCellStyle);
+	    	index = createCell(row, "Spli AdjPVal "+name, index, pcCellStyle);
+	    	index = createCell(row, "Spli Index "+name, index, pcCellStyle);
+	    }
+	    
+	    //count values for each replica
+	    CellStyle countCellStyle = createHeaderStyle(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+	    for (String repName: replicaNames){
+	    	index = createCell(row, "Counts "+repName, index, countCellStyle);
+	    }
+	    
+	    //VarCor values for each replica
+	    CellStyle varCorCellStyle = createHeaderStyle(IndexedColors.WHITE.getIndex());
+	    for (String repName: replicaNames){
+	    	index = createCell(row, "VarCor "+repName, index, varCorCellStyle);
+	    }
+	    
+	    //FPKM values for each replica	    
+	    CellStyle fpkmCellStyle = createHeaderStyle(IndexedColors.SKY_BLUE.getIndex());
+	    for (String repName: replicaNames){
+	    	index = createCell(row, "FPKM "+repName, index, fpkmCellStyle);
+	    }
+		
 	}
 
 	public float parseFloat(String f){
@@ -1406,222 +1467,40 @@ public class DefinedRegionDifferentialSeq {
 		else return Float.parseFloat(f);
 	}
 
-	public void executeDESeqDiffExp(boolean useLocalFitType){
-
-		File rResultsStats = new File (saveDirectory, workingName+"_DESeqResults.txt");
-		File rResultsData = new File (saveDirectory, workingName+"_DESeqResultsData.txt");
-		workingDESeqFiles = null;
+	public void writeCountTable(){
+		ArrayList<String> conditionNamesPerReplicaAL = new ArrayList<String>();
+		ArrayList<String> replicaNamesAL = new ArrayList<String>();
+		geneCountTable = new File(saveDirectory, "geneCountTableMin"+minimumCounts+".txt");
+		if (deleteTempFiles) geneCountTable.deleteOnExit();
+		
 		try {
-			//make R script
-			StringBuilder sb = new StringBuilder();
-			sb.append("library(DESeq)\n");
-			sb.append("countsTable = read.delim('"+workingCountTable.getCanonicalPath()+"', header=TRUE)\n");
-			sb.append("rownames(countsTable) = countsTable[,1]\n");
-			sb.append("countsTable = countsTable[,-1]\n");
-			sb.append("conds = c('"+ Misc.stringArrayListToString(workingTNs, "','") + "')\n");
-			sb.append("cds = newCountDataSet( countsTable, conds)\n");
-			sb.append("cds = estimateSizeFactors( cds )\n");
-			if (workingTNs.size() == 2) {
-				if (useLocalFitType) sb.append("cds = estimateDispersions( cds, method='blind', sharingMode='fit-only', fitType='local' )\n");
-				else sb.append("cds = estimateDispersions( cds, method='blind', sharingMode='fit-only' )\n");
-			}
-
-			else {
-				String outlier = "";
-				String local = "";
-				if (filterOutliers == false) outlier= ", sharingMode='fit-only'";
-				if (useLocalFitType) local = ", fitType='local'";
-				sb.append("cds = estimateDispersions( cds" +outlier + local +")\n");
-			}
-			sb.append("res = nbinomTest( cds, 'N', 'T', pvals_only = FALSE)\n");
-			//Recalculate log2 ratio using moderated values
-			sb.append("vsd = getVarianceStabilizedData( cds )\n");
-			sb.append("res[,6] = (rowMeans( vsd[, conditions(cds)=='T', drop=FALSE] ) - rowMeans( vsd[, conditions(cds)=='N', drop=FALSE] ))\n");
-			//Fred  pvalues
-			sb.append("res[,7] = -10 * log10(res[,7])\n");
-			sb.append("res[,8] = -10 * log10(res[,8])\n");
-			//Parse pval, padj, log2ratio; note flip of A and B back to T and C
-			sb.append("res = res[,c(7,8,6)]\n");
-			//note, the order of the rows is the same as the input
-			sb.append("write.table(res, file = '"+rResultsStats.getCanonicalPath()+"', quote=FALSE, sep ='\t', row.names = FALSE, col.names = FALSE)\n");
-			sb.append("write.table(vsd, file = '"+rResultsData.getCanonicalPath()+"', quote=FALSE, sep ='\t', row.names = FALSE, col.names = FALSE)\n");
-
-			//write script to file
-			File scriptFile = new File (saveDirectory, workingName +"_RScript.txt");
-			File rOut = new File(saveDirectory, workingName +"_RScript.txt.Rout");
-			IO.writeString(sb.toString(), scriptFile);
-
-			//make command
-			String[] command = new String[] {
-					fullPathToR.getCanonicalPath(),
-					"CMD",
-					"BATCH",
-					"--no-save",
-					"--no-restore",
-					scriptFile.getCanonicalPath(),
-					rOut.getCanonicalPath()};
-
-			//execute command
-			IO.executeCommandLine(command);
-
-
-			//check for warnings
-			String[] res = IO.loadFile(rOut);
-
-			for (String s: res) {
-				if (s.contains("Dispersion fit did not converge") || s.contains("Parametric dispersion fit failed")) {
-					System.err.println("\n\t\tWarning, DESeq's GLM dispersion fit failed. Relaunching using fitType='local'");
-					if (deleteTempFiles == false){
-						rOut.delete();
-						scriptFile.delete();
-					}
-					executeDESeqDiffExp(true);
-					return;
-				}
-			}
-
-			//look for results file
-			if (rResultsStats.exists() == false ) throw new IOException("\n\nR results file doesn't exist. Check temp files in save directory for error.\n");
-
-
-			//cleanup
-			if (deleteTempFiles) {
-				rOut.deleteOnExit();
-				scriptFile.deleteOnExit();
-			}
-
-		} catch (IOException e) {
-			e.printStackTrace();
-			Misc.printErrAndExit("Error: failed to execute DESeq.\n");
-		}
-		workingDESeqFiles = new File[]{rResultsStats,rResultsData};
-	}
-
-	public void setTNs(Condition first, Condition second){
-		workingTNs = new ArrayList<String>();
-		workingConditionNames = new ArrayList<String>();
-		for (Replica r: first.getReplicas()) {
-			workingTNs.add("T");
-			workingConditionNames.add(r.getNameNumber());
-		}
-		for (Replica r: second.getReplicas()) {
-			workingTNs.add("N");
-			workingConditionNames.add(r.getNameNumber());
-		}
-	}
-
-	public boolean writePairedCountTable(Condition first, Condition second){
-		try {
-
-			HashSet<String> genesToTest = new HashSet<String>();
-			Condition[] twoConditions = new Condition[]{first, second};
-
-			//write matrix of name, t1,t2,t3...c1,c2,c3 to file for genes with observations
-			workingCountTable = new File(saveDirectory, "countTable_"+workingName+".txt");
-			if (deleteTempFiles) workingCountTable.deleteOnExit();
-			PrintWriter out = new PrintWriter( new FileWriter(workingCountTable));
-
-			//print header also look for genes with sufficient reads
-			out.print("GeneName");
-			for (Condition c: twoConditions){
-				for (Replica r: c.getReplicas()){
-					out.print("\t");
-					out.print(r.getNameNumber());
-
-					//scan for genes that pass minimum read coverage
-					HashMap<String, GeneCount> geneCounts = r.getGeneCounts();
-					Iterator<String> it = geneCounts.keySet().iterator();
-					while (it.hasNext()){
-						String geneName = it.next();
-						//has this been flagged? Hmmm. I thought these were already removed from all of the conditions?
-						if (flaggedGeneNames.contains(geneName)) {
-							Misc.printErrAndExit("\nFlagged gene found! Exiting\n");
-							continue;
-						}
-						GeneCount gc = geneCounts.get(geneName);
-						if (gc != null && gc.getCount()> minimumCounts) {
-							genesToTest.add(geneName);
-						}
-					}
-				}
-
-			}
-			out.println();
-
-			//any genes to test?
-			if (genesToTest.size() ==0) {
-				out.close();
-				System.err.println("\nWARNING: no genes were found with minimum counts.  Skipping "+workingName);
-				return false;
-			}
-
-			setTNs(first, second);
-
-			//fetch ucsc gene lines
-			workingGenesToTest = new UCSCGeneLine[genesToTest.size()];
-			int index = 0;
-			for (UCSCGeneLine gene: genes){
-				//zero scores
-				gene.zeroNullScores();
-				if (genesToTest.contains(gene.getDisplayNameThenName())) {
-					workingGenesToTest[index] = gene;
-					index++;
-				}
-			}
-
-			//fetch counts, print and set in UCSCGeneLine
-			for (UCSCGeneLine gene: workingGenesToTest){
-				String geneName = gene.getDisplayNameThenName();
-				out.print(geneName);
-				for (Condition c: twoConditions){
-					//for each replica
-					for (Replica r: c.getReplicas()){
-						out.print("\t");
-						int count = 0;
-						if (r.getGeneCounts().get(geneName) != null) count = r.getGeneCounts().get(geneName).getCount();
-						out.print(count);
-					}
-				}
-				out.println();
-			}
-			out.close();
-
-			return true;
-		}
-		catch (Exception e){
-			System.err.println("Problem writing out count table.");
-			e.printStackTrace();
-		}
-		return false;
-	}
-
-	public ArrayList<String> writeCountTable(String[] genesNamesToWrite, File countTable){
-		ArrayList<String> conditionNames = new ArrayList<String>();
-		try {
-			//write matrix of name, t1,t2,t3...c1,c2,c3 to file for genes with observations
-			PrintWriter out = new PrintWriter( new FileWriter(countTable));
+			//write matrix of name, t,t,t...c,c,c,c...d,d,d, to file for genes with observations
+			PrintWriter out = new PrintWriter( new FileWriter(geneCountTable));
 
 			//print header
 			out.print("GeneName");
 			//for each condition
 			for (Condition c: conditions){
 				//for each replica
+				String conditionName = c.getName();
 				for (Replica r: c.getReplicas()){
 					out.print("\t");
-					out.print(r.getNameNumber());
-					conditionNames.add(r.getNameNumber());
+					out.print(conditionName);
+					conditionNamesPerReplicaAL.add(conditionName);
+					replicaNamesAL.add(r.getNameNumber());
 				}
 			}
 			out.println();
 
-			//print counts
-			for (String geneName: genesNamesToWrite){
+			//print counts for genes with minimal counts in any replica
+			for (String geneName: geneNamesToAnalyze){
 				out.print(geneName);
 				for (Condition c: conditions){
 					//for each replica
 					for (Replica r: c.getReplicas()){
 						out.print("\t");
 						int num = 0;
+						//remember that genes with zero counts are not stored in a replica
 						if (r.getGeneCounts().get(geneName) != null) num = r.getGeneCounts().get(geneName).getCount();
 						out.print(num);
 					}
@@ -1634,7 +1513,9 @@ public class DefinedRegionDifferentialSeq {
 			System.err.println("Problem writing out count table.");
 			e.printStackTrace();
 		}
-		return conditionNames;
+		
+		conditionNamesPerReplica = Misc.stringArrayListToStringArray(conditionNamesPerReplicaAL);
+		replicaNames = Misc.stringArrayListToStringArray(replicaNamesAL);
 	}
 
 	public void loadGeneModels(){
@@ -1684,13 +1565,11 @@ public class DefinedRegionDifferentialSeq {
 
 		chromGenes = reader.getChromSpecificGeneLines();
 
-		genesWithExons = new HashMap<String, UCSCGeneLine>();
+		
 		name2Gene = new HashMap<String, UCSCGeneLine>();
 		for (UCSCGeneLine gl: genes) {
 			String name = gl.getDisplayNameThenName();
-			if (gl.getExons().length > 1) genesWithExons.put(name, gl);
 			name2Gene.put(name, gl);
-
 		}
 	}
 
@@ -1747,7 +1626,6 @@ public class DefinedRegionDifferentialSeq {
 					case 't': deleteTempFiles = false; break;
 					case 'v': filterOutliers = true; break;
 					case 'g': genomeVersion = args[++i]; break;
-					case 'a': usePermutationSpliceTest = true; break;
 					case 'j': performReverseStrandedAnalysis = true; break;
 					case 'k': secondStrandFlipped = true; break;
 					case 'h': printDocs(); System.exit(0);
@@ -1764,7 +1642,7 @@ public class DefinedRegionDifferentialSeq {
 
 		//fetch genome version and make url
 		if (genomeVersion == null) Misc.printErrAndExit("\nPlease provide a versioned genome (e.g. H_sapiens_Mar_2006).\n");
-		url = "=HYPERLINK(\"http://localhost:7085/UnibrowControl?version="+genomeVersion+"&seqid=";
+		url = "http://localhost:7085/UnibrowControl?version="+genomeVersion+"&seqid=";
 
 		//look for bam files
 		if (conditionDirectories == null || conditionDirectories.length == 0) Misc.printErrAndExit("\nError: cannot find any condition directories?\n");
@@ -1821,19 +1699,16 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Defined Region Differential Seq: July 2013                **\n" +
+				"**                        Defined Region Differential Seq: Aug 2013                 **\n" +
 				"**************************************************************************************\n" +
-				"DRDS takes bam files, one per replica, minimum one per condition, minimum two\n" +
+				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +
-				"identifies differentially expressed genes under any pairwise comparison using DESeq.\n" +
-				"DESeq's variance corrected count data is used to heirachically cluster the \n" +
-				"differentially expressed genes as well as the samples. See the DESeq manual for\n" +
-				"details. An ANOVA-like any condition differential expression analysis is also run using\n" +
-				"edgeR. Alternative splicing is estimated using a chi-square test of independence.\n" +
-				"In addition to the cluster plots, a spread sheet is created with the pValue,\n" +
-				"FDR, and variance corrected log2Ratios for each of the pairwise comparisons as well as\n" +
-				"the raw, FPKM, and log2 variance corrected alignment counts.  Use the later for\n" +
-				"subsequent clustering and distance estimations.\n"+
+				"identifies differentially expressed genes under any condition using edgeR's ANOVA-like\n"+
+				"analysis and an all pairwise comparison with DESeq. DESeq's blinded variance corrected\n"+
+				"count data is used to heirachically cluster the samples. Alternative splicing\n"+
+				"is estimated using a chi-square test of independence. Note, when interested in only a\n"+
+				"few genes or regions, append these onto a full gene table so that DESeq can\n"+
+				"appropriately estimate the library size and replica variance.\n"+
 
 				"\nOptions:\n"+
 				"-s Save directory.\n"+
@@ -1862,12 +1737,10 @@ public class DefinedRegionDifferentialSeq {
 				"-v Filter for variance outliers in DESeq, defaults to not filtering.\n"+
 				"-m Mask overlapping gene annotations, recommended for well annotated genomes.\n"+
 				"-x Max per base alignment depth, defaults to 50000. Genes containing such high\n"+
-				"       density coverage are ignored. Warnings are thrown.\n"+
+				"       density coverage are ignored.\n"+
 				"-n Max number repeat alignments. Defaults to all.  Assumes 'IH' tags have been set by\n" +
 				"       processing raw alignments with the SamTranscriptomeProcessor.\n"+
-				"-f Minimum FDR threshold for sorting, defaults to 13 (-10Log10(FDR=0.05)).\n"+
-				"-l Minimum absolute varCorLog2Rto threshold for sorting, defaults to 1 (2x).\n"+
-				"-e Minimum number alignments per gene/ region, defaults to 20.\n"+
+				"-e Minimum number alignments per gene-region per replica, defaults to 10.\n"+
 				"-i Score introns instead of exons.\n"+
 				"-p Perform a stranded analysis. Only collect reads from the same strand as the\n" +
 				"      annotation.\n" +
@@ -1876,8 +1749,6 @@ public class DefinedRegionDifferentialSeq {
 				"      dUTP protocol.\n" +
 				"-k Second read's strand is flipped. Otherwise, assumes this was not done in the \n" +
 				"      SamTranscriptomeParser.\n" +
-				"-a Perform a permutation based chi-square test for differential exon usage.\n"+
-				"      Needs 4 or more replicas per condition.\n"+
 				"-t Don't delete temp files (R script, R results, Rout, etc..).\n"+
 				"\n"+
 

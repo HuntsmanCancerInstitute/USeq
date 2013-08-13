@@ -1389,6 +1389,20 @@ public class Num {
 		}
 		return d;
 	}
+	/**Parses float from a String[] of floats. Returns null if a parsing error is encountered.*/
+	public static float[] parseFloats(String[] floats){
+		int num = floats.length;
+		float[] d = new float[num];
+		try {
+			for (int i=0; i<num; i++){
+				d[i] = Float.parseFloat(floats[i]);
+			}
+		} catch (Exception e){
+			e.printStackTrace();
+			return null;
+		}
+		return d;
+	}
 
 	/**Converts an array of values to z scores given their mean and standard deviation.*/
 	public static double[] convertToZScores(double[] values, double mean, double stndDev){

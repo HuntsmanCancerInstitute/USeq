@@ -222,6 +222,10 @@ public class UCSCGeneLine {
 		return sb.toString();
 	}
 	
+	public String getChrStartStop(){
+		return chrom+":"+txStart+"-"+txEnd;
+	}
+	
 	/*Assumes interbase coordinates**/
 	public boolean intersects(int start, int stop){
 		if (stop < this.txStart || start >= this.txEnd) return false;

@@ -4,12 +4,12 @@ import java.io.*;
 import java.util.regex.*;
 import java.util.*;
 
-import util.bio.cluster.HierarchicalClustering;
 import util.bio.parsers.MultiFastaParser;
 import util.bio.seq.Seq;
 import util.gen.*;
 import edu.utah.seq.data.*;
 import edu.utah.seq.parsers.*;
+import edu.utah.seq.useq.apps.Bar2USeq;
 import trans.tpmap.*;
 
 /**For processing bisulfite sequencing data
@@ -101,6 +101,9 @@ public class BisStat {
 		//print contexts
 		printBaseContexts();
 		printGenomicContextStats();
+		
+		//convert to useq archives
+		if (printGraphs) new Bar2USeq(saveDirectory, true);
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
@@ -1462,7 +1465,7 @@ public class BisStat {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  BisStat: August 2012                            **\n" +
+				"**                                  BisStat: July 2013                              **\n" +
 				"**************************************************************************************\n" +
 				"Takes PointData from converted and non-converted C bisulfite sequencing data parsed\n" +
 				"using the NovoalignBisulfiteParser and generates several xxCxx context statistics and\n" +
