@@ -34,29 +34,29 @@ import util.gen.Misc;
 public class Autoaligner {
 
 	//fields
-	private static String analysisNumber;
-	private static String myEmail = "darren.ames@hci.utah.edu"; //TODO change this when I know it works correctly
-	private static String autoalignReport = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoalign_*.txt";
-	private static String novoindexNames = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData/novoindexNameTable.txt";
-	private static String parsedFreshDataReports = "/home/sbsuser/Pipeline/AutoAlignReport/reports/processedReports/";
-	private static String tomatoJobDir = "/tomato/job/autoaligner/alignments/";
+	private String analysisNumber;
+	private String myEmail = "darren.ames@hci.utah.edu"; //TODO change this when I know it works correctly
+	private String autoalignReport = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoalign_*.txt";
+	private final String novoindexNames = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData/novoindexNameTable.txt";
+	private final String parsedFreshDataReports = "/home/sbsuser/Pipeline/AutoAlignReport/reports/processedReports/";
+	private final String tomatoJobDir = "/tomato/job/autoaligner/alignments/";
 	private String smtpHostName = "mail.inscc.utah.edu"; //default
 	static String EMAILREGEX = "^#e\\s+(.+@.+)"; //email address pattern
 	static String LABNAMEREGEX = "\\w+\\s\\w+(?=\\WLab)"; //matches first and last name of lab using positive look
-	private static String reportsDir = "/home/sbsuser/Pipeline/AutoAlignReport/reports/";
+	private String reportsDir = "/home/sbsuser/Pipeline/AutoAlignReport/reports/";
 	private HashMap<String, String> genomeIndex;
-	private static boolean doNotAlign = false;
-	private static boolean isSmallRNA = false;
+	boolean doNotAlign = false;
+	boolean isSmallRNA = false;
 	//create logger
-	private TFLogger logFile = new TFLogger(new File("/home/u0785353/UtilLogs/Autoaligner/logs/"), "log", "INFO");
+	//private TFLogger logFile = new TFLogger(new File("/home/u0785353/UtilLogs/Autoaligner/logs/"), "log", "INFO");
 	
 	//constructor
 	public Autoaligner(String[] args) {	
 		processArgs(args);
 		
 		//write info to log file and close it
-		logFile.writeInfoMessage("Running Autoaligner");
-		logFile.closeLogger();
+	//	logFile.writeInfoMessage("Running Autoaligner");
+	//	logFile.closeLogger();
 	}
 
 	public static void main(String[] args) throws Exception {
@@ -120,7 +120,7 @@ public class Autoaligner {
 		while ((line = br.readLine()) != null) {
 			
 			//log sample input
-			logFile.writeInfoMessage("Sample input: " + line);
+		//	logFile.writeInfoMessage("Sample input: " + line);
 			
 			//split contents of tab-delimited file 
 			String dataValue[] = line.split("\t");
@@ -332,6 +332,9 @@ public class Autoaligner {
 		if (s.getSequencingApplicationCode().toString().equals("SMRNASEQ")) {
 			isSmallRNA = true;
 		}
+		else {
+			isSmallRNA = false;
+		}
 		
 		//set condensed sequencing application codes if other (kinda) redundant names are used
 		if (s.getSequencingApplicationCode().toString().equals("APP2") || 
@@ -522,7 +525,7 @@ public class Autoaligner {
 				+ "\n\nfastqc " + s.getSampleID() + "_*.gz" + " --noextract" 
 				+ "\n\n@align -novoalign ";
 		//set string for first non-variable part of cmd.txt params
-		String msg2 = " -g " + s.getNovoindex() + " -i " + s.getSampleID() + "_*.gz" + " -gzip\n";
+		String msg2 = " -g " + s.getNovoindex() + " -i " + s.getSampleID() + "_*.gz" + " -gzip\n\n";
 		
 		//command string for splitting bisulfite files and preparing dirs for alignment
 		//splits into files with 2 million reads, which with our current hardware at CHPC, takes ~1 hr to align/file
@@ -588,7 +591,7 @@ public class Autoaligner {
 	public String getCmdFileMessageGenomic(Sample s) {
 		//no adapter sequences available?
 		if (s.isAdaptersIncluded() == false) {
-			s.setParams("[-o SAM -r None -a -H -k]");
+			s.setParams("[-o SAM -r None -H -k]");
 		}
 		//adapter sequences available
 		else {
@@ -632,7 +635,7 @@ public class Autoaligner {
 		//stranded and paired-end
 		//adapters sequences NOT available?
 		if (s.isAdaptersIncluded() == false) {
-			s.setParams("[-o SAM -r All 50 -a]");
+			s.setParams("[-o SAM -r All 50]");
 		}
 		//adapters sequences ARE available
 		else {
@@ -664,6 +667,7 @@ public class Autoaligner {
 			System.out.println("Error while creating the new b file: " + s.getSampleID() + "\t" + ioe); 
 		}
 		
+		/**
 		//log job info
 		logFile.writeInfoMessage("Starting alignment with the following params: ");
 		logFile.writeInfoMessage("Lab: " + s.getLab());
@@ -685,7 +689,7 @@ public class Autoaligner {
 		logFile.writeInfoMessage("Sequencing application: " + s.getSequencingApplicationCode());
 		logFile.writeInfoMessage("Single or paired end: " + s.getSingleOrPairedEnd());
 		logFile.writeInfoMessage("Read adapter 1: " + s.getRead1Adapter());
-		logFile.writeInfoMessage("Read adapter 2: " + s.getRead2Adapter());
+		logFile.writeInfoMessage("Read adapter 2: " + s.getRead2Adapter()); */
 	}
 
 	/**
