@@ -6,9 +6,8 @@ import java.util.regex.*;
 
 import edu.utah.seq.useq.data.Region;
 import edu.utah.seq.useq.data.RegionScoreText;
-
-
 import util.gen.IO;
+import util.gen.Num;
 
 public class Bed extends Coordinate implements Serializable{
 
@@ -24,7 +23,7 @@ public class Bed extends Coordinate implements Serializable{
 		this.score = score;
 		this.strand = strand;
 	}
-	
+
 	public Bed (String chromosome, char strand, RegionScoreText nsss){
 		super(chromosome, nsss.getStart(), nsss.getStop());
 		this.name = nsss.getText();
@@ -85,7 +84,7 @@ public class Bed extends Coordinate implements Serializable{
 		HashMap<String,File> splitData = new HashMap<String,File>();
 		Pattern tab = Pattern.compile("\\t");
 		String line = null;
-		
+
 		try{
 			HashMap<String,DataOutputStream> chromOut = new HashMap<String,DataOutputStream>();
 			BufferedReader in = IO.fetchBufferedReader(bedFile);
@@ -106,7 +105,7 @@ public class Bed extends Coordinate implements Serializable{
 				}
 				//make chromosome strand text
 				String chrStrand = tokens[0]+tokens[5];
-				
+
 				//get PrintWriter
 				if (chrStrand.equals(currentChromStrand) == false){
 					currentChromStrand = chrStrand;
@@ -119,7 +118,7 @@ public class Bed extends Coordinate implements Serializable{
 						chromOut.put(chrStrand, dos);
 					}
 				}
-				
+
 				//write entry, start, stop, text, score
 				int start = Integer.parseInt(tokens[1]);
 				int stop = Integer.parseInt(tokens[2]);
@@ -130,20 +129,20 @@ public class Bed extends Coordinate implements Serializable{
 				dos.writeInt(tokens[3].length());
 				dos.writeBytes(tokens[3]);
 			}
-			
+
 			//close writers
 			Iterator<DataOutputStream> it = chromOut.values().iterator();
 			while (it.hasNext()) it.next().close();
-			
+
 		} catch (Exception e){
 			e.printStackTrace();
 			return null;
 		}
-		
+
 		return splitData;
 
 	}
-	
+
 	/**Split a bed file by chromosome and strand into a HashMap of chromosomeStrand 
 	 * (e.g. chr3+, chr3-, or chr3.; can force chr3. if ignoreStrand==true.)
 	 * Will automatically add chr3. if missing strand info.*/
@@ -274,7 +273,7 @@ public class Bed extends Coordinate implements Serializable{
 		}
 		return chrSpec;
 	}
-	
+
 	public String toStringNoStrand(){
 		return chromosome+"\t"+start+"\t"+stop+"\t"+name+"\t"+score;
 	}
@@ -302,5 +301,28 @@ public class Bed extends Coordinate implements Serializable{
 
 	public void setStrand(char strand) {
 		this.strand = strand;
+	}
+	/*Quickie method to stat a bed file.*/
+	public static void main (String[] args){
+		File[] files = IO.extractFiles(new File(args[0]));
+		for (File f : files){
+			HashMap<String,Region[]> chromRegions = Bed.parseRegions(f, true);
+			long totalBases = 0;
+			long numberRegions = 0;
+			ArrayList<Float> lengthsAL = new ArrayList<Float>();
+			for (String chrom: chromRegions.keySet()){
+				Region[] regions = chromRegions.get(chrom);
+				numberRegions += regions.length;
+				for (Region r : regions){
+					int len = r.getLength();
+					totalBases += len;
+					lengthsAL.add(new Float(len));
+				}
+			}
+			float[] lengths = Num.arrayListOfFloatToArray(lengthsAL);
+			System.out.println("\n"+f.getName()+"\t"+numberRegions+"\t"+totalBases);
+			Num.statFloatArray(lengths, false);
+			
+		}
 	}
 }

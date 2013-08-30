@@ -16,6 +16,7 @@ import util.bio.parsers.*;
 import util.gen.*;
 import edu.utah.seq.analysis.multi.Condition;
 import edu.utah.seq.analysis.multi.GeneCount;
+import edu.utah.seq.analysis.multi.GeneResult;
 import edu.utah.seq.analysis.multi.PairedCondition;
 import edu.utah.seq.analysis.multi.Replica;
 import edu.utah.seq.useq.apps.Text2USeq;
@@ -1064,16 +1065,15 @@ public class DefinedRegionDifferentialSeq {
 		    FileOutputStream fileOut = new FileOutputStream(new File(saveDirectory, "geneStats.xlsx"));
 		    
 		    //create a worksheet
-		    Sheet sheet1 = workbook.createSheet("Analyzed Genes");
-		    sheet1.createFreezePane( 0, 1, 0, 1 );
+		    Sheet sheet0 = workbook.createSheet("Analyzed Genes");
+		    sheet0.createFreezePane( 0, 1, 0, 1 );
 		    
 		    //create rows, one for each gene with counts plus header
 		    Row[] rows = new Row[geneNamesToAnalyze.length+1];
-		    for (int i=0; i< rows.length; i++) rows[i] = sheet1.createRow(i);
+		    for (int i=0; i< rows.length; i++) rows[i] = sheet0.createRow(i);
 		    
 		    //make header line
-		    makeHeaderLine(rows[0]);
-		    
+		    makeHeaderLine(rows[0], true);
 		    
 		    //add gene info
 		    int cellIndex = addGeneInfo(rows);
@@ -1090,13 +1090,28 @@ public class DefinedRegionDifferentialSeq {
 		    //add FPKM
 		    cellIndex = addFPKMInfo(rows, cellIndex);
 		    
+		    //new sheet for diff expressed genes at relaxed thresholds
+		    Sheet sheet1 = workbook.createSheet("FDR 10 Lg2Rt 0.585");
+		    sheet1.createFreezePane( 0, 1, 0, 1 );
+		    addDiffExpressedGenes(sheet1, 10f, 0.5849625f);
+		    
+		    //new sheet for diff expressed genes at standard thresholds
+		    Sheet sheet2 = workbook.createSheet("FDR 13 Lg2Rt 1");
+		    sheet2.createFreezePane( 0, 1, 0, 1 );
+		    addDiffExpressedGenes(sheet2, 13f, 1f);
+		    
+		    //new sheet for diff expressed genes at standard thresholds
+		    Sheet sheet3 = workbook.createSheet("FDR 30 Lg2Rt 1.585");
+		    sheet3.createFreezePane( 0, 1, 0, 1 );
+		    addDiffExpressedGenes(sheet3, 30f, 1.584963f);
+		    
 		    //new sheet for flagged genes
-		    Sheet sheet2 = workbook.createSheet("Flagged Genes");
-		    addFlaggedGenes(sheet2);
+		    Sheet sheet4 = workbook.createSheet("Flagged Genes");
+		    addFlaggedGenes(sheet4);
 		    
 		    //new sheet for descriptions of headings
-		    Sheet sheet3= workbook.createSheet("Column Descriptions");
-		    addColumnDescriptors(sheet3);
+		    Sheet sheet5= workbook.createSheet("Column Descriptions");
+		    addColumnDescriptors(sheet5);
 		    
 		    //write out and close
 		    workbook.write(fileOut);
@@ -1108,6 +1123,48 @@ public class DefinedRegionDifferentialSeq {
 			e.printStackTrace();
 			System.exit(1);
 		}
+	}
+
+	private void addDiffExpressedGenes(Sheet sheet, float minFDR, float minLog2Ratio) {
+		//add header row
+		makeHeaderLine(sheet.createRow(0), false);
+
+		//for each paired condition
+		int columnIndex = 0;
+		for (int i=0; i< pairedConditions.length; i++){
+			PairedCondition pc = pairedConditions[i];
+			float[][] geneScores = pc.getParsedDiffExpResults();
+
+			//for each gene find those that pass
+			ArrayList<GeneResult> passing = new ArrayList<GeneResult>();
+			for (int j=0; j< geneNamesToAnalyze.length; j++){
+				//fdr and log2 diff exp
+				float[] fdrLog2 = geneScores[j];
+				//pass?
+				if (Math.abs(fdrLog2[1]) >= minLog2Ratio && fdrLog2[0] >= minFDR){
+					passing.add(new GeneResult(geneNamesToAnalyze[j], fdrLog2[0], fdrLog2[1]));
+				}
+			}
+			
+			//convert to array and sort by abs of log2
+			GeneResult[] gr = new GeneResult[passing.size()];
+			passing.toArray(gr);
+			Arrays.sort(gr);
+			
+			//for each gene result
+			int rowIndex = 1;
+			for (int j=0; j< gr.length; j++){
+				Row r = sheet.getRow(rowIndex);
+				if (r == null) r = sheet.createRow(rowIndex);
+				gr[j].addInfo(r, columnIndex);
+				//advance row
+				rowIndex++;
+			}
+
+			//advance column index
+			columnIndex+=3;
+		}
+
 	}
 
 	private void addColumnDescriptors(Sheet sheet) {
@@ -1158,9 +1215,6 @@ public class DefinedRegionDifferentialSeq {
 	private void addFlaggedGenes(Sheet sheet) {
 		//generate gene lists
 		String[] tooMany = Misc.hashSetToStringArray(flaggedGeneNames);
-		
-//System.out.println("FlaggedGenes "+flaggedGeneNames.size());
-		
 		Arrays.sort(tooMany);
 		ArrayList<String> tooFewAL = new ArrayList<String>();
 		for (UCSCGeneLine gene: genes){
@@ -1171,9 +1225,7 @@ public class DefinedRegionDifferentialSeq {
 		String[] tooFew = Misc.stringArrayListToStringArray(tooFewAL);
 		Arrays.sort(tooFew);
 		int maxNum = tooFew.length;
-		if (tooMany.length > maxNum) maxNum = tooMany.length;
-	
-//System.out.println("TooFewGenes "+tooFewAL.size());	
+		if (tooMany.length > maxNum) maxNum = tooMany.length;	
 		
 		//bold styles
 	    CellStyle bold = workbook.createCellStyle();
@@ -1414,19 +1466,21 @@ public class DefinedRegionDifferentialSeq {
 	    }
 	    return style;
 	}
-	private void makeHeaderLine(Row row) {
+	private void makeHeaderLine(Row row, boolean all) {
 		//create header
 	    CellStyle headerCellStyle = createHeaderStyle((short)-1);
 	    
 	    int index = 0;
-	    index = createCell(row, "IGB HyperLink", index, headerCellStyle);
-	    index = createCell(row, "Alt Name", index, headerCellStyle);
-	    index = createCell(row, "Coor "+genomeVersion, index, headerCellStyle);
-	    index = createCell(row, "Strand", index, headerCellStyle);
-	    index = createCell(row, "Total BPs", index, headerCellStyle);
-	    index = createCell(row, "Max Abs Lg2Rto", index, headerCellStyle);
-	    index = createCell(row, "Max DESeq FDR", index, headerCellStyle);
-	    index = createCell(row, "EdgeR FDR", index, headerCellStyle);
+	    if (all){
+	    	index = createCell(row, "IGB HyperLink", index, headerCellStyle);
+	    	index = createCell(row, "Alt Name", index, headerCellStyle);
+	    	index = createCell(row, "Coor "+genomeVersion, index, headerCellStyle);
+	    	index = createCell(row, "Strand", index, headerCellStyle);
+	    	index = createCell(row, "Total BPs", index, headerCellStyle);
+	    	index = createCell(row, "Max Abs Lg2Rto", index, headerCellStyle);
+	    	index = createCell(row, "Max DESeq FDR", index, headerCellStyle);
+	    	index = createCell(row, "EdgeR FDR", index, headerCellStyle);
+	    }
 	     
 	    //for each PairedCondition
 	    int colorIndex = 0;
@@ -1435,31 +1489,35 @@ public class DefinedRegionDifferentialSeq {
 	    	CellStyle pcCellStyle = createHeaderStyle(colorIndexes[colorIndex++]);
 	    	if (colorIndex == colorIndexes.length) colorIndex = 0;
 	    	String name = pc.getName();
+	    	if (all == false) index = createCell(row, name, index, pcCellStyle);
 	    	index = createCell(row, "Lg2Rto "+name, index, pcCellStyle);
 	    	index = createCell(row, "FDR "+name, index, pcCellStyle);
-	    	index = createCell(row, "Spli Lg2Rto "+name, index, pcCellStyle);
-	    	index = createCell(row, "Spli AdjPVal "+name, index, pcCellStyle);
-	    	index = createCell(row, "Spli Index "+name, index, pcCellStyle);
+	    	if (all){
+	    		index = createCell(row, "Spli Lg2Rto "+name, index, pcCellStyle);
+	    		index = createCell(row, "Spli AdjPVal "+name, index, pcCellStyle);
+	    		index = createCell(row, "Spli Index "+name, index, pcCellStyle);
+	    	}
 	    }
 	    
-	    //count values for each replica
-	    CellStyle countCellStyle = createHeaderStyle(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
-	    for (String repName: replicaNames){
-	    	index = createCell(row, "Counts "+repName, index, countCellStyle);
+	    if (all){
+	    	//count values for each replica
+	    	CellStyle countCellStyle = createHeaderStyle(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+	    	for (String repName: replicaNames){
+	    		index = createCell(row, "Counts "+repName, index, countCellStyle);
+	    	}
+
+	    	//VarCor values for each replica
+	    	CellStyle varCorCellStyle = createHeaderStyle(IndexedColors.WHITE.getIndex());
+	    	for (String repName: replicaNames){
+	    		index = createCell(row, "VarCor "+repName, index, varCorCellStyle);
+	    	}
+
+	    	//FPKM values for each replica	    
+	    	CellStyle fpkmCellStyle = createHeaderStyle(IndexedColors.SKY_BLUE.getIndex());
+	    	for (String repName: replicaNames){
+	    		index = createCell(row, "FPKM "+repName, index, fpkmCellStyle);
+	    	}
 	    }
-	    
-	    //VarCor values for each replica
-	    CellStyle varCorCellStyle = createHeaderStyle(IndexedColors.WHITE.getIndex());
-	    for (String repName: replicaNames){
-	    	index = createCell(row, "VarCor "+repName, index, varCorCellStyle);
-	    }
-	    
-	    //FPKM values for each replica	    
-	    CellStyle fpkmCellStyle = createHeaderStyle(IndexedColors.SKY_BLUE.getIndex());
-	    for (String repName: replicaNames){
-	    	index = createCell(row, "FPKM "+repName, index, fpkmCellStyle);
-	    }
-		
 	}
 
 	public float parseFloat(String f){
