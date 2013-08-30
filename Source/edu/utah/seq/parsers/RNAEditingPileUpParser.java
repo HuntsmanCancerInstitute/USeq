@@ -86,11 +86,12 @@ public class RNAEditingPileUpParser {
 			
 			//for each line in the file
 			String line;
+			int badLines = 0;
 			while ((line = in.readLine()) != null){
 				if (line.length() == 0 || line.startsWith("#")) continue;
 				String[] tokens = space.split(line);
 				if (tokens.length < 5){
-					System.err.println("\nMalformed pileup line, skipping -> "+line+"\n\t"+tokens.length+" Tokens");
+					if (badLines++ < 20) System.err.println("\nMalformed pileup line, skipping -> "+line+"\n\t"+tokens.length+" Tokens");
 					continue;
 				}
 				//set first chrom?
