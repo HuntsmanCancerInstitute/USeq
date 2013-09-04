@@ -1,3 +1,9 @@
+----Useq_8.6.5----
+DefinedRegionDifferentialSeq
+* Fixed an error where improperly paired reads weren't counted towards a gene's coverage. This only affected stranded analysis.
+Now, the -j and -p options work properly on stranded analysis.
+
+
 ----USeq_8.6.4----
 DefinedRegionDifferentialSeq
 * Added internal check to remove edgeR analysis and proceed if the app throws errors.
