@@ -443,7 +443,7 @@ public class DefinedRegionDifferentialSeq {
 
 		else {
 			if (!secondStrandFlipped && sam.getReadPairedFlag()) {
-				if ((sam.getFirstOfPairFlag() && sam.getReadNegativeStrandFlag()) || (!sam.getSecondOfPairFlag() && !(sam.getReadNegativeStrandFlag()))) {
+				if ((sam.getFirstOfPairFlag() && sam.getReadNegativeStrandFlag()) || (sam.getSecondOfPairFlag() && !(sam.getReadNegativeStrandFlag()))) {
 					index = new Integer(workingFragmentNameIndexMinus--);
 				}
 				else {
