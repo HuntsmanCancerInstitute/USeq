@@ -25,7 +25,7 @@ public class USeq2UCSCBig extends Thread{
 	private File convertedFile;
 	private File tempFile;
 	private File tempFileSorted;
-	private boolean deleteTempFiles = false;
+	private boolean deleteTempFiles = true;
 	private boolean forceConversion = false;
 
 	//constructors
