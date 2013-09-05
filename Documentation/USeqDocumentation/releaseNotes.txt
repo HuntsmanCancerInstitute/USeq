@@ -1,7 +1,8 @@
-----Useq_8.6.6----
+----USeq_8.6.6----
 DefinedRegionDifferentialSeq
 * Fixed an error where improperly paired reads weren't counted towards a gene's coverage. This only affected stranded analysis.
 Now, the -j and -p options work properly on stranded analysis.
+* Fixed issue with running a no replica multiple condition analysis where DESeq was exiting with an error.
 ScoreSequences
 * Modified output to table format, including score summary and each hit
 
