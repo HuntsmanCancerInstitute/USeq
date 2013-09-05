@@ -947,7 +947,14 @@ public class DefinedRegionDifferentialSeq {
 			sb.append("cds = estimateSizeFactors( cds )\n");
 			//estimate dispersions
 			//no replicas?
-			if (replicaNames.length == 2) {
+			boolean noReplicas = true;
+			for (int i=0; i< conditions.length; i++){
+				if (conditions[i].getReplicas().length > 1){
+					noReplicas = false;
+					break;
+				}
+			}
+			if (noReplicas) {
 				if (useLocalFitType) sb.append("cds = estimateDispersions( cds, method='blind', sharingMode='fit-only', fitType='local' )\n");
 				else sb.append("cds = estimateDispersions( cds, method='blind', sharingMode='fit-only' )\n");
 			}
@@ -1757,7 +1764,7 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Defined Region Differential Seq: Aug 2013                 **\n" +
+				"**                       Defined Region Differential Seq: Sept 2013                 **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +
