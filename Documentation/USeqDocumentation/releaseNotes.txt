@@ -1,8 +1,18 @@
-----Useq_8.6.5----
+----Useq_8.6.6----
 DefinedRegionDifferentialSeq
 * Fixed an error where improperly paired reads weren't counted towards a gene's coverage. This only affected stranded analysis.
 Now, the -j and -p options work properly on stranded analysis.
+ScoreSequences
+* Modified output to table format, including score summary and each hit
 
+----USeq_8.6.5----
+EnrichedRegionMaker
+* Enabled the app to work with .swi, .swi.gz, and .swi.zip files
+BisStat & BisSeq
+* Autoconverting bar directories to useq archives
+DefinedRegionDifferentialSeq
+* Major rewrite to incorporate all sample normalization into DESeq
+* Added direct formated output to actual Excel xlsx document
 
 ----USeq_8.6.4----
 DefinedRegionDifferentialSeq
