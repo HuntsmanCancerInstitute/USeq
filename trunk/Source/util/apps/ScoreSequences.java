@@ -104,6 +104,7 @@ public class ScoreSequences {
 		MultiFastaParser toScanFasta = new MultiFastaParser(seqFile);
 		//motifScanner.scanPrintAllSequences(fastaParser.getSeqs(), fastaParser.getNames());
 		System.out.println();
+		System.out.println("Cuttoff\t"+cutOff);
 		
 		motifScanner.scanPrintNumberHits(cutOff, toScanFasta.getSeqs(), toScanFasta.getNames());
 		
