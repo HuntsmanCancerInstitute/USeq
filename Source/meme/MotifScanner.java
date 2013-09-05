@@ -2,6 +2,7 @@ package meme;
 import java.util.*;
 
 import util.bio.seq.*;
+import util.gen.Num;
 
 /**MotifScanner objects are used to scan sequences with a particular weight matrix and generate 
  an array of MotifHit objects.*/
@@ -128,17 +129,24 @@ public class MotifScanner {
 		int numWithHits = 0;
 		long totalNumberHits = 0;
 		long totalLength = 0;
+		System.out.println("Name\tLength\t#Hits\tSumHitScores\tHitScores");
 		for (int i=0; i<seqs.length; i++){
 			MotifHit[] hits = scoreSequence(scoreCutOff, seqs[i].toUpperCase());
-			System.out.println("Seq: "+names[i]);
-			System.out.println("\tLength: "+seqs[i].length());
-			System.out.println("\t# Hits: "+hits.length);
 			totalLength+= seqs[i].length();
+			double sumHits = 0;
+			String hitScores = "";
 			if (hits.length !=0) {
 				//System.out.println(names[i]+"\t"+len+"\t");
 				numWithHits++;
 				totalNumberHits += hits.length;
+				double[] scores = new double[hits.length];
+				for (int x=0; x< scores.length; x++){
+					scores[x] = hits[x].getScore();
+				}
+				hitScores = Num.doubleArrayToString(scores, 1, " ");
+				sumHits = Num.sumArray(scores);
 			}
+			System.out.println(names[i]+"\t"+seqs[i].length()+"\t"+hits.length+"\t"+sumHits+"\t"+hitScores);
 		}
 		System.out.println("\nNumber sequences with hits: "+numWithHits);
 		System.out.println("Total number hits: "+totalNumberHits);
