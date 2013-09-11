@@ -27,6 +27,10 @@ public class USeq2UCSCBig extends Thread{
 	private File tempFileSorted;
 	private boolean deleteTempFiles = true;
 	private boolean forceConversion = false;
+	//optional timeout params
+	private File timeoutApp;
+	private String timeoutSeconds = "3600"; //1hr
+	private String timeoutMKB = "40000000"; //4G
 
 	//constructors
 	//stand alone
@@ -160,13 +164,24 @@ public class USeq2UCSCBig extends Thread{
 		
 		//convert to binary
 		convertedFile = new File (workingUSeqArchiveFile.getParentFile(), name + ".bb");
-		String[] command = new String[]{
-				ucscBed2BigBed.getCanonicalPath(),
-				tempFileSorted.getCanonicalPath(),
-				chromLengths.getCanonicalPath(),
-				convertedFile.getCanonicalPath()
-		};
+		
+		ArrayList<String> cmdAL = new ArrayList<String>();
+		if (timeoutApp != null){
+			cmdAL.add(timeoutApp.getCanonicalPath());
+			cmdAL.add("-t");
+			cmdAL.add(timeoutSeconds);
+			cmdAL.add("-m");
+			cmdAL.add(timeoutMKB);
+			cmdAL.add("--no-info-on-success");
+		}
+		cmdAL.add(ucscBed2BigBed.getCanonicalPath());
+		cmdAL.add(tempFileSorted.getCanonicalPath());
+		cmdAL.add(chromLengths.getCanonicalPath());
+		cmdAL.add(convertedFile.getCanonicalPath());
+		String[] command = Misc.stringArrayListToStringArray(cmdAL);
+		
 		executeUCSCCommand(command);
+		
 		deleteTempFiles();
 		//return
 		ArrayList<File> al = new ArrayList<File>();
@@ -192,6 +207,22 @@ public class USeq2UCSCBig extends Thread{
 		return convertedFiles;
 	}
 
+	private String[] buildGraphCommand() throws IOException{
+		ArrayList<String> cmdAL = new ArrayList<String>();
+		if (timeoutApp != null){
+			cmdAL.add(timeoutApp.getCanonicalPath());
+			cmdAL.add("-t");
+			cmdAL.add(timeoutSeconds);
+			cmdAL.add("-m");
+			cmdAL.add(timeoutMKB);
+			cmdAL.add("--no-info-on-success");
+		}
+		cmdAL.add(ucscWig2BigWig.getCanonicalPath());
+		cmdAL.add(tempFile.getCanonicalPath());
+		cmdAL.add(chromLengths.getCanonicalPath());
+		cmdAL.add(convertedFile.getCanonicalPath());
+		return Misc.stringArrayListToStringArray(cmdAL);
+	}
 
 	private ArrayList<File> convertGraphData() throws Exception{	
 		
@@ -200,30 +231,22 @@ public class USeq2UCSCBig extends Thread{
 		String name = workingUSeqArchiveFile.getName().replace(USeqUtilities.USEQ_EXTENSION_WITH_PERIOD, "");
 		ArrayList<File> convertedFiles = new ArrayList<File>();
 		tempFile = new File (workingUSeqArchiveFile.getCanonicalPath() + ".wig");		
-
+		
 		//is it stranded
 		boolean stranded = workingUSeqArchive.isStranded();
 		if (stranded){
-
 			//convert for plus?
 			if (workingUSeqArchive.isPlusStrandedPresent()){				
 				useq2Text.print2WigFile(workingUSeqArchiveFile, tempFile, "+");
 
 				//convert text to binary, wigToBigWig in.wig chrom.sizes out.bw
 				convertedFile = new File (workingUSeqArchiveFile.getParentFile(), name + "_Plus.bw");
-				String[] command = new String[]{
-						ucscWig2BigWig.getCanonicalPath(),
-						tempFile.getCanonicalPath(),
-						chromLengths.getCanonicalPath(),
-						convertedFile.getCanonicalPath()
-				};
-
+				//create cmd
+				String[] command = buildGraphCommand();				
 				//execute it
-				executeUCSCCommand(command);
-				convertedFiles.add(convertedFile);
-
+				if (executeUCSCCommand(command)) convertedFiles.add(convertedFile);
+				else return null;
 			}
-
 
 			//convert minus?
 			if (workingUSeqArchive.isMinusStrandedPresent()){
@@ -231,34 +254,24 @@ public class USeq2UCSCBig extends Thread{
 
 				//convert text to binary, wigToBigWig in.wig chrom.sizes out.bw
 				convertedFile = new File (workingUSeqArchiveFile.getParentFile(), name + "_Minus.bw");
-				String[] command = new String[]{
-						ucscWig2BigWig.getCanonicalPath(),
-						tempFile.getCanonicalPath(),
-						chromLengths.getCanonicalPath(),
-						convertedFile.getCanonicalPath()
-				};
-				//execute and save it
-				executeUCSCCommand(command);
-				convertedFiles.add(convertedFile);
+				//create cmd
+				String[] command = buildGraphCommand();				
+				//execute it
+				if (executeUCSCCommand(command)) convertedFiles.add(convertedFile);
+				else return null;
 			}
 
 		}
 		else {
 			//convert all		
-			
 			useq2Text.print2WigFile(workingUSeqArchiveFile, tempFile, null);
 			//convert text to binary, wigToBigWig in.wig chrom.sizes out.bw
 			convertedFile = new File (workingUSeqArchiveFile.getParentFile(), name + ".bw");
-			String[] command = new String[]{
-					ucscWig2BigWig.getCanonicalPath(),
-					tempFile.getCanonicalPath(),
-					chromLengths.getCanonicalPath(),
-					convertedFile.getCanonicalPath()
-			};
+			//create cmd
+			String[] command = buildGraphCommand();				
 			//execute it
-			executeUCSCCommand(command);
-
-			convertedFiles.add(convertedFile);
+			if (executeUCSCCommand(command)) convertedFiles.add(convertedFile);
+			else return null;
 		}
 		//cleanup
 		deleteTempFiles();
@@ -266,24 +279,30 @@ public class USeq2UCSCBig extends Thread{
 		return convertedFiles;
 	}
 
-	private void executeUCSCCommand(String[] command) throws Exception{
-		
+	private boolean executeUCSCCommand(String[] command) throws Exception{
 		//execute ucsc converter, nothing should come back for wigToBigWig and sort
 		String[] results = USeqUtilities.executeCommandLineReturnAll(command);
 		if (results.length !=0){
-			//scan to see if just bedToBigBed normal output
+			//scan to see if just bedToBigBed normal output, also watch for potential timeout.pl errors
 			boolean ok = true;
 			StringBuilder sb = new StringBuilder("Error message:");
 			for (String c : results) {
 				sb.append("\n");
 				sb.append(c);
 				if (c.contains("millis") == false) ok = false;
+				//any timeout errors?
+				if (c.startsWith("TIMEOUT CPU") || c.contains("MEM CPU")) {
+					System.err.println("\nWARNING: conversion failed timeout.pl, skipping -> "+workingUSeqArchiveFile);
+					deleteAllFiles();
+					return false;
+				}
 			}
 			if (ok != true) {
 				deleteAllFiles();
 				throw new Exception (sb.toString());
 			}
 		}
+		return true;
 	}
 
 	private void writeChromLengths() throws IOException{
@@ -335,6 +354,7 @@ public class USeq2UCSCBig extends Thread{
 					case 'd': ucscDir = new File (args[++i]); break;
 					case 'f': forceConversion = true; break;
 					case 'e': verbose = false; break;
+					case 't': timeoutApp = new File (args[++i]); break;
 					case 'h': printDocs(); System.exit(0); break;
 					default: USeqUtilities.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -355,6 +375,7 @@ public class USeq2UCSCBig extends Thread{
 		if (useqArchives == null || useqArchives.length == 0) USeqUtilities.printExit("\nCannot find any xxx."+USeqUtilities.USEQ_EXTENSION_NO_PERIOD+" USeq archives?\n");
 		if (ucscWig2BigWig.canExecute() == false) USeqUtilities.printExit("\nCannot find or execute -> "+ucscWig2BigWig+"\n");
 		if (ucscBed2BigBed.canExecute() == false) USeqUtilities.printExit("\nCannot find or execute -> "+ucscBed2BigBed+"\n");
+		if (timeoutApp != null && timeoutApp.canExecute() == false) USeqUtilities.printExit("\nCannot execute -> "+timeoutApp+"\n");
 		
 
 	}	
@@ -385,7 +406,7 @@ public class USeq2UCSCBig extends Thread{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              USeq 2 UCSC Big: Jan 2013                           **\n" +
+				"**                              USeq 2 UCSC Big: Sept 2013                          **\n" +
 				"**************************************************************************************\n" +
 				"Converts USeq archives to UCSC bigWig (xxx.bw) or bigBed (xxx.bb) archives based on\n" +
 				"the data type. WARNING: bigBed format conversion will clip any associated scores to\n" +
@@ -399,6 +420,8 @@ public class USeq2UCSCBig extends Thread{
 				"-f Force conversion of xxx.useq to xxx.bw or xxx.bb overwriting any UCSC big files.\n"+
 				"       Defaults to skipping those already converted.\n"+
 				"-e Only print error messages.\n"+
+				"-t Sandbox the UCSC apps by providing a full path file name to the timeout.pl app.\n"+
+				"       Download from https://github.com/pshved/timeout . Max time 1hr, max mem 4G.\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/USeq2UCSCBig -u\n" +
 				"      /AnalysisResults/USeqDataArchives/ -d /Apps/UCSC/\n\n" +

@@ -1,3 +1,11 @@
+----USeq_8.6.7----
+ExportExons
+* Added name score and strand to the output
+DefinedRegionDifferentialSeq
+* Fixed a bug where genes with excessive counts were still being included in the DESeq analysis
+USeq2UCSCBig
+* Added a sandbox to the UCSC executables to limit memory and time on linux systems
+
 ----USeq_8.6.6----
 DefinedRegionDifferentialSeq
 * Fixed an error where improperly paired reads weren't counted towards a gene's coverage. This only affected stranded analysis.

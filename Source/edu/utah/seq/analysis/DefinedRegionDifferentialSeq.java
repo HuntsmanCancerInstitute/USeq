@@ -62,7 +62,7 @@ public class DefinedRegionDifferentialSeq {
 	private String url;
 	private static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSDHN])");
 	public static final Pattern BAD_NAME = Pattern.compile("(.+)/[12]$");
-	public boolean saveCounts = true;
+	public boolean saveCounts = false;
 	
 	//for loading data
 	private int workingFragmentNameIndexPlus = 1;
@@ -353,7 +353,7 @@ public class DefinedRegionDifferentialSeq {
 			}
 			//any genes with too many reads that were excluded?
 			if (flaggedGeneNames.size() !=0) {
-				String[] badGeneNames = Misc.hashSetToStringArray(flaggedGeneNames);
+				String[] badGeneNames = Misc.hashSetToStringArray(flaggedGeneNames);			
 
 				//remove flagged genes from all replicas
 				//for each condition
@@ -361,10 +361,14 @@ public class DefinedRegionDifferentialSeq {
 					//for each replica
 					for (Replica replica: c.getReplicas()) replica.removeFlaggedGenes(badGeneNames);
 				}
+				//remove them from geneNamesWithMinimumCounts
+				for (String baddie: badGeneNames){
+					geneNamesWithMinimumCounts.remove(baddie);
+				}
 			}
 			if (verbose) {
 				System.out.println();
-				System.out.println(geneNamesWithMinimumCounts.size()+" genes with >= "+minimumCounts+" and < "+maxAlignmentsDepth+" counts in one or more replicas will be examined for differential expression.\n ");
+				System.out.println(geneNamesWithMinimumCounts.size()+" genes, with >= "+minimumCounts+" and < "+maxAlignmentsDepth+" counts, will be examined for differential expression.\n ");
 			}
 			//save conditions?
 			if (saveCounts) IO.saveObject(serializedConditons, conditions);
