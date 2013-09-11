@@ -335,6 +335,8 @@ public class SamTranscriptomeParser{
 	 * Saves them if they pass a whole set of filters.*/
 	public void filterPrintAlignments(ArrayList<SamAlignment> al){
 		try {
+			
+			
 			//collapse alignments with same coordinates, CIGAR, and from same read pair 
 			uniques.clear();
 			for (SamAlignment sam : al) uniques.add(sam); 
@@ -363,6 +365,8 @@ public class SamTranscriptomeParser{
 			int numberFirstPair = firstPair.size();
 			int numberSecondPair = secondPair.size();
 
+			System.out.println("\nNumF "+numberFirstPair+"\nNumS "+numberSecondPair);
+			
 			//fix mate info in pairs? Can only do this if one first and one second.  Don't know how to join up repeat matches?
 			//merge ?
 			if (secondPairPresent && numberFirstPair == 1 && numberSecondPair == 1){

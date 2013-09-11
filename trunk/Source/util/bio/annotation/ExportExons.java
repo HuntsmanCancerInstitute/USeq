@@ -27,6 +27,7 @@ public class ExportExons {
 					String chr = lines[i].getChrom();
 					int startCoding = lines[i].getCdsStart();
 					int endCoding = lines[i].getCdsEnd();
+					String nameScoreStrand = "\t"+lines[i].getDisplayNameThenName() +"\t0\t"+lines[i].getStrand();
 					for (int j=0; j< exons.length; j++){
 						int start = exons[j].getStart();
 						int end = exons[j].getEnd();
@@ -38,7 +39,8 @@ public class ExportExons {
 						start = start - adder;
 						if (start < 0) start =0;
 						end = end + adder;
-						out.println(chr+"\t"+start+"\t"+end);
+						//chr start stop name score strand
+						out.println(chr+"\t"+start+"\t"+end + nameScoreStrand);
 					}
 				}
 			}
@@ -46,10 +48,11 @@ public class ExportExons {
 				for (int i=0; i< lines.length; i++){
 					ExonIntron[] exons = lines[i].getExons();
 					String chr = lines[i].getChrom();
+					String nameScoreStrand = "\t"+lines[i].getDisplayNameThenName() +"\t0\t"+lines[i].getStrand();
 					for (int j=0; j< exons.length; j++){
 						int start = exons[j].getStart()-adder;
 						if (start < 0) start =0;
-						out.println(chr+"\t"+start+"\t"+(exons[j].getEnd()+adder));
+						out.println(chr+"\t"+start+"\t"+(exons[j].getEnd()+adder) + nameScoreStrand);
 					}
 				}
 			}
@@ -98,7 +101,7 @@ public class ExportExons {
 	public static void printDocs(){ 
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              Export Exons    Jan 2013                            **\n" +
+				"**                              Export Exons   Sept 2013                            **\n" +
 				"**************************************************************************************\n" +
 				"EE takes a UCSC Gene table and prints the exons to a bed file.\n\n"+
 
