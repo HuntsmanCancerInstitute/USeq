@@ -43,6 +43,7 @@ public class RegionScoreTextData extends USeqData{
 	}
 	/**Returns the bp of the last end position in the array.*/
 	public int fetchLastBase(){
+		
 		int lastBase = -1;
 		for (RegionScoreText r : sortedRegionScoreTexts){
 			int end = r.getStop();
