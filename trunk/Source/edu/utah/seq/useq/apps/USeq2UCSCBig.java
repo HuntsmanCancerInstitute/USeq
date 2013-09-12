@@ -354,6 +354,7 @@ public class USeq2UCSCBig extends Thread{
 					case 'd': ucscDir = new File (args[++i]); break;
 					case 'f': forceConversion = true; break;
 					case 'e': verbose = false; break;
+					case 'm': deleteTempFiles = false; break;
 					case 't': timeoutApp = new File (args[++i]); break;
 					case 'h': printDocs(); System.exit(0); break;
 					default: USeqUtilities.printExit("\nProblem, unknown option! " + mat.group());
@@ -421,7 +422,9 @@ public class USeq2UCSCBig extends Thread{
 				"       Defaults to skipping those already converted.\n"+
 				"-e Only print error messages.\n"+
 				"-t Sandbox the UCSC apps by providing a full path file name to the timeout.pl app.\n"+
-				"       Download from https://github.com/pshved/timeout . Max time 1hr, max mem 4G.\n"+
+				"       Download from https://github.com/pshved/timeout . Max time and mem per file \n"+
+				"       conversion 1hr and 4G.\n"+
+				"-m Don't delete temp files.\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/USeq2UCSCBig -u\n" +
 				"      /AnalysisResults/USeqDataArchives/ -d /Apps/UCSC/\n\n" +

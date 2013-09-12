@@ -473,9 +473,11 @@ public class USeqArchive {
 	/**Returns a HashMap containing chromosomes and the last base covered.*/
 	public HashMap<String,Integer> fetchChromosomesAndLastBase() throws IOException{
 		//find last DR
-		HashMap <String,DataRange> map = new HashMap<String,DataRange>();
-		for (String chrom : chromStrandRegions.keySet()){
+		HashMap <String,DataRange[]> map = new HashMap<String,DataRange[]>();
+		for (String chrom : chromStrandRegions.keySet()){			
 			//these are sorted by first base so it's best to look at all of them.
+			//problem here with stranded data, since the actual last base is not considered in a DR can pick the wrong strand to examine.
+			//thus need to look at last two
 			DataRange[] dr = chromStrandRegions.get(chrom);
 			int lastFirstBase = 0;
 			DataRange lastDataRange = null;
@@ -485,44 +487,64 @@ public class USeqArchive {
 					lastDataRange = d;
 				}
 			}
-			map.put(chrom, lastDataRange);
+			
+			//do it again but fetch second last
+			int secondLastFirstBase = 0;
+			DataRange secondLastDataRange = null;
+			for (DataRange d : dr){
+				if (d.endingBP != lastFirstBase && d.endingBP > secondLastFirstBase) {
+					secondLastFirstBase = d.endingBP;
+					secondLastDataRange = d;
+				}
+			}
+			map.put(chrom, new DataRange[]{lastDataRange, secondLastDataRange});
+			
 		}
-
-		//now scan each for actual last base
+		
+		
+		//now scan each pair for actual last base
 		ZipFile zf = new ZipFile(zipFile);
 		HashMap<String,Integer> chromBase = new HashMap<String,Integer>();
 		for (String chrom: map.keySet()){
-			DataRange dr = map.get(chrom);
-			ZipEntry ze = dr.zipEntry;
-			
-			//make a SliceInfo object
-			SliceInfo si = new SliceInfo(ze.getName());
-			DataInputStream dis = new DataInputStream( new BufferedInputStream(zf.getInputStream(ze)));
-			String extension = si.getBinaryType();
-
-			int lastBase = -1;
-
-			//Position
-			if (USeqUtilities.POSITION.matcher(extension).matches()) lastBase = new PositionData (dis, si).fetchLastBase();
-			//PositionScore
-			else if (USeqUtilities.POSITION_SCORE.matcher(extension).matches()) lastBase = new PositionScoreData (dis, si).fetchLastBase();
-			//PositionText
-			else if (USeqUtilities.POSITION_TEXT.matcher(extension).matches()) lastBase = new PositionTextData (dis, si).fetchLastBase();
-			//PositionScoreText
-			else if (USeqUtilities.POSITION_SCORE_TEXT.matcher(extension).matches()) lastBase = new PositionScoreTextData (dis, si).fetchLastBase();
-			//Region
-			else if (USeqUtilities.REGION.matcher(extension).matches()) lastBase = new RegionData (dis, si).fetchLastBase();
-			//RegionScore
-			else if (USeqUtilities.REGION_SCORE.matcher(extension).matches()) lastBase = new RegionScoreData (dis, si).fetchLastBase();
-			//RegionText
-			else if (USeqUtilities.REGION_TEXT.matcher(extension).matches()) lastBase =  new RegionTextData (dis, si).fetchLastBase();
-			//RegionScoreText
-			else if (USeqUtilities.REGION_SCORE_TEXT.matcher(extension).matches()) lastBase = new RegionScoreTextData (dis, si).fetchLastBase();
-			else  throw new IOException("\nFailed to recognize the binary file extension! "+ze.getName());
-
-			chromBase.put(chrom, new Integer(lastBase));
+			DataRange[] dr = map.get(chrom);
+			int lastBase0 = fetchLastBase(dr[0], zf);
+			int lastBase1 = 0;
+			if (dr[1] !=null) lastBase1 = fetchLastBase(dr[1], zf);
+			if (lastBase1 > lastBase0) lastBase0 = lastBase1;
+			chromBase.put(chrom, new Integer(lastBase0));
 		}
 		return chromBase;
+	}
+	
+	private int fetchLastBase(DataRange dr, ZipFile zf) throws IOException{
+		ZipEntry ze = dr.zipEntry;
+
+		//make a SliceInfo object
+		SliceInfo si = new SliceInfo(ze.getName());
+		DataInputStream dis = new DataInputStream( new BufferedInputStream(zf.getInputStream(ze)));
+		String extension = si.getBinaryType();
+
+		int lastBase = -1;
+
+		//Position
+		if (USeqUtilities.POSITION.matcher(extension).matches()) lastBase = new PositionData (dis, si).fetchLastBase();
+		//PositionScore
+		else if (USeqUtilities.POSITION_SCORE.matcher(extension).matches()) lastBase = new PositionScoreData (dis, si).fetchLastBase();
+		//PositionText
+		else if (USeqUtilities.POSITION_TEXT.matcher(extension).matches()) lastBase = new PositionTextData (dis, si).fetchLastBase();
+		//PositionScoreText
+		else if (USeqUtilities.POSITION_SCORE_TEXT.matcher(extension).matches()) lastBase = new PositionScoreTextData (dis, si).fetchLastBase();
+		//Region
+		else if (USeqUtilities.REGION.matcher(extension).matches()) lastBase = new RegionData (dis, si).fetchLastBase();
+		//RegionScore
+		else if (USeqUtilities.REGION_SCORE.matcher(extension).matches()) lastBase = new RegionScoreData (dis, si).fetchLastBase();
+		//RegionText
+		else if (USeqUtilities.REGION_TEXT.matcher(extension).matches()) lastBase =  new RegionTextData (dis, si).fetchLastBase();
+		//RegionScoreText
+		else if (USeqUtilities.REGION_SCORE_TEXT.matcher(extension).matches()) lastBase = new RegionScoreTextData (dis, si).fetchLastBase();
+		else  throw new IOException("\nFailed to recognize the binary file extension! "+ze.getName());
+		
+		return lastBase;
 	}
 
 	public File getZipFile() {

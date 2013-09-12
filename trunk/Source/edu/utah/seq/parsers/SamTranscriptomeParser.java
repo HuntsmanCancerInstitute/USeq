@@ -364,8 +364,6 @@ public class SamTranscriptomeParser{
 
 			int numberFirstPair = firstPair.size();
 			int numberSecondPair = secondPair.size();
-
-			System.out.println("\nNumF "+numberFirstPair+"\nNumS "+numberSecondPair);
 			
 			//fix mate info in pairs? Can only do this if one first and one second.  Don't know how to join up repeat matches?
 			//merge ?
