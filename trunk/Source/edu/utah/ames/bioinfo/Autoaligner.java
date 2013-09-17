@@ -622,7 +622,7 @@ public class Autoaligner {
 	public String getCmdFileMessageSmallRNA(Sample s) {
 		//includes 3' adapter stripping prior to alignment
 		//***this is NOT the standard Illumina Gex Adapter 2 used as default by novoalign
-		s.setParams("[-o SAM -r All 50 -m -a ATCTCGTATGCCGTCTTCTGCTTG -l 15 -t 30]");
+		s.setParams("[-o SAM -r All 50 -m -a " + s.getRead1Adapter() + " -l 18 -h 60]");
 		return s.getParams();
 	}
 
