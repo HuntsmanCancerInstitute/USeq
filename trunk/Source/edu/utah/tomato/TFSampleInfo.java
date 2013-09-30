@@ -12,6 +12,9 @@ public class TFSampleInfo {
 	private boolean qual64 = false;
 	private HashMap<String,File> fileList = null;
 	private TFLogger logFile = null;
+	private int recordCount = 0;
+	private int recordTargetCount = 0;
+	private int readLength = 0;
 	
 	public TFSampleInfo(String sampleName, TFLogger logFile) {
 		this.sampleName = sampleName;
@@ -168,6 +171,29 @@ public class TFSampleInfo {
 		}
 	}
 	
+	public void setRecordCount(int count) {
+		this.recordCount = count;
+	}
+	
+	public int getRecordCount() {
+		return this.recordCount;
+	}
+	
+	public void setRecordTargetCount(int count) {
+		this.recordTargetCount = count;
+	}
+	
+	public int getRecordTargetCount() {
+		return this.recordTargetCount;
+	}
+	
+	public int getReadLength() {
+		return this.readLength;
+	}
+	
+	public void setReadLength(int readLength) {
+		this.readLength = readLength;
+	}
 	
 	
 

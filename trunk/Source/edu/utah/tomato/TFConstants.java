@@ -19,9 +19,12 @@ public class TFConstants {
 	public static String FILE_SAM = "sam";
 	public static String FILE_METRICS = "pdf";
 	
-	public static String TARGET_AGILENT = "agilent";
-	public static String TARGET_NIMBLEGEN = "nimblegen";
-	public static String TARGET_TRUSEQ = "truseq";
+	public static String TARGET_AGILENTV5 = "AgilentAllExonV5";
+	public static String TARGET_AGILENTV4 = "AgilentAllExonV4";
+	public static String TARGET_AGILENT50MB = "AgilentAllExon50MB";
+	public static String TARGET_NIMBLEGENV2 = "NimbleGenEZCapV2";
+	public static String TARGET_NIMBLEGENV3 = "NimbleGenEZCapV3";
+	public static String TARGET_TRUSEQ = "TruSeq";
 	public static String TARGET_CUSTOM = "custom";
 	public static String TARGET_ALL = "all";
 	
@@ -44,8 +47,11 @@ public class TFConstants {
 		private static final long serialVersionUID = 1L;
 
 	{
-		add(TFConstants.TARGET_AGILENT);
-		add(TFConstants.TARGET_NIMBLEGEN);
+		add(TFConstants.TARGET_AGILENTV5);
+		add(TFConstants.TARGET_AGILENTV4);
+		add(TFConstants.TARGET_AGILENT50MB);
+		add(TFConstants.TARGET_NIMBLEGENV2);
+		add(TFConstants.TARGET_NIMBLEGENV3);
 		add(TFConstants.TARGET_TRUSEQ);
 		add(TFConstants.TARGET_CUSTOM);
 		add(TFConstants.TARGET_ALL);

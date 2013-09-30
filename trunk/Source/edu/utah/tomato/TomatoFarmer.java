@@ -33,6 +33,7 @@ public class TomatoFarmer {
 	private String username;
 	private File rootDirectory = null;
 	private String email = null;
+	private boolean deleteSam = false;
 	
 	private boolean tomatoFarmerFailed = true;
 	
@@ -76,6 +77,17 @@ public class TomatoFarmer {
 			System.exit(1);
 		}
 		
+		//Clean up sam files if specified
+		this.logFile.writeInfoMessage("Deleting raw alignments");
+		if (this.deleteSam) {
+			File alignDir = new File(this.rootDirectory,"Alignments");
+			File samDir = new File(alignDir,"RawAlignments");
+			for (File sf: samDir.listFiles()) {
+				sf.delete();
+			}
+			samDir.delete();
+			
+		}
 		
 		try {
 			this.postMail(this.email, "TomatoFarmer finished successfully", "", "Farmer@tomatosareawesome.org");
@@ -83,6 +95,7 @@ public class TomatoFarmer {
 			logFile.writeErrorMessage("Failed to send ending email", true);
 			e.printStackTrace();
 		}
+		
 		this.tomatoFarmerFailed = false;
 		logFile.writeInfoMessage("TomatoFarmer finished successfully!");
 	}
@@ -109,6 +122,7 @@ public class TomatoFarmer {
 			logFile.writeErrorMessage("Paired-end fastq files have unequal numbers of lines: " + lines1 + " " + lines2,false);
 			System.exit(1);
 		}
+		fi.setRecordCount(lines1);
 	}
 	
 	private int validateFastq(TFSampleInfo fi, String type) {
@@ -122,6 +136,8 @@ public class TomatoFarmer {
 			String line = null;
 			int min = 100000000;
 			int max = 0;
+			int rl = 0;
+			
 		
 			while((line = br.readLine()) != null) {
 				if (counter % 4 == 0) {
@@ -132,6 +148,9 @@ public class TomatoFarmer {
 				} else if (counter % 4 == 1) {
 					Matcher m = p.matcher(line);
 					readLength = line.length();
+					if (readLength > rl) {
+						rl = readLength;
+					}
 					if (!m.matches()) {
 						logFile.writeErrorMessage("Fastq line 2 has characters other than A,C,G,T or N.  Error at line#: " + (counter + 1) + ". Contents: " + line,false);
 						System.exit(1);
@@ -181,6 +200,8 @@ public class TomatoFarmer {
 			
 			br.close();
 			retval = counter / 4;
+			
+			fi.setReadLength(rl);
 		} catch (Exception ioex) {
 			logFile.writeErrorMessage("Error reading fastq file, exiting: " + ioex.getMessage(),true) ;
 			ioex.printStackTrace();
@@ -232,7 +253,9 @@ public class TomatoFarmer {
 		int jobNumber = 5;
 		boolean manualFail = false;
 		boolean splitChroms = false;
+		boolean noSplit = false;
 		boolean suppressEmail = true;
+		boolean deleteSam = true;
 		
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -245,6 +268,7 @@ public class TomatoFarmer {
 					case 'e': email = args[++i]; break;
 					case 'w': wallTime = Integer.parseInt(args[++i]); break;
 					case 'c': splitChroms = true; break;
+					case 'n': noSplit = true; break;
 					case 'y': analysisType = args[++i].toLowerCase(); break;
 					case 't': targetType = args[++i]; break;
 					case 'f': manualFail = true; break;
@@ -253,6 +277,7 @@ public class TomatoFarmer {
 					case 'j': jobNumber = Integer.parseInt(args[++i]); break;
 					case 's': studyName = args[++i]; break;
 					case 'x': suppressEmail = false; break; 
+					case 'r': deleteSam = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -271,7 +296,7 @@ public class TomatoFarmer {
 		this.username = System.getProperty("user.name");
 				
 		//Initialize log files
-		logFile = new TFLogger(TFConstants.templateDir,this.username,logLevel);
+		logFile = new TFLogger(TFConstants.templateDir,this.rootDirectory,this.username,logLevel);
 		
 		//Write Username to file
 		logFile.writeSystemMessage("Username: " + this.username);
@@ -280,6 +305,20 @@ public class TomatoFarmer {
 		//************************************************
 		// Parse command line arguments
 		//************************************************
+		
+		String splitType = "chunk";
+		
+		//Determine run type
+		if (splitChroms == true) {
+			if (noSplit == true) {
+				logFile.writeErrorMessage("Argument '-c' and '-n' can't be used together.", true);
+				System.exit(1);
+			} else {
+				splitType = "chrom";
+			}
+		} else if (noSplit == true) {
+			splitType = "none";
+		}
 		
 		//Write out system arguments
 		logFile.writeInfoMessage(IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " "));
@@ -337,6 +376,10 @@ public class TomatoFarmer {
 			if (!configFile.exists()) {
 				logFile.writeErrorMessage("Default configuration file for runtype " + analysisType + " does not exist", true);
 				System.exit(1);
+			}
+			
+			if (analysisType.equals("exome_bw") || analysisType.equals("exome_novoalign") && deleteSam) {
+				this.deleteSam = true;
 			}
 		} else {
 			configFile = new File(analysisType);
@@ -399,7 +442,7 @@ public class TomatoFarmer {
 					}
 					scanner.close();
 				} 
-				TFCommand cmd = TFCommand.getCommandObject(TFConstants.templateDir, directory, commandString, logFile, email, wallTime, heartbeat, failmax, jobNumber, suppressEmail, studyName, splitChroms, targetFile);
+				TFCommand cmd = TFCommand.getCommandObject(TFConstants.templateDir, directory, commandString, logFile, email, wallTime, heartbeat, failmax, jobNumber, suppressEmail, studyName, splitType, targetFile);
 				commandList.add(cmd);
 			}
 			br.close();
@@ -467,8 +510,10 @@ public class TomatoFarmer {
 				"          2) exome_novoalign - Full exome analysis (novoalign). \n" +
 				"          3) exome_align_bwa - Alignment/recalibration only (bwa).\n" +
 				"          4) exome_align_novoalign - Align/recalibration only (novoalign).\n" +
-				"          5) exome_metrics - Sample QC metrics only.\n" +
-				"          6) exome_variant_raw - Variant detection and filtering (raw settings).\n " + 
+				"          5) exome_metrics - Sample QC metrics only. Requires sam.gz, bam/bai from 1,2,\n" +
+				"             3 or 4 in the launch directory.\n" +
+				"          6) exome_variant_raw - Variant detection and filtering (raw settings). \n" + 
+				"             Requires bam/bai from 1,2,3 or 4 in the launch directory.\n" + 
 				"          7) path to configuration file.  This allows you to use older versions of \n" +
 				"             the pipeline.\n" +		
 				"      If you want run older versions of the pipeline, you must provide a configuration\n" +
@@ -479,10 +524,13 @@ public class TomatoFarmer {
 				"-t Target regions. Setting this argument will restrict coverage metrics and variant \n" +
 				"      detection to targeted regions.  This speeds up the variation detection process\n" +
 				"      and reduces noise. Options are:\n" +
-				"          1) agilent\n" +
-				"          2) nimblegen\n" +
-				"          3) truseq\n" +
-				"          4) path to custom targed bed file.\n" +
+				"          1) AgilentAllExonV4\n" +
+				"          2) AgilentAllExonV5\n" +
+				"          3) AgilentAllExon50MB\n" +
+				"          4) NimbleGenEZCapV2\n" +
+				"          5) NimbleGenEZCapV3\n" +
+				"          6) TruSeq\n" +
+				"          7) path to custom targed bed file.\n" +
 				"      If nothing is specifed for this argument, the full genome will be queried for \n" +
 				"      variants and ccds exomes will be used for capture metrics. Example: '-t truseq'.\n" +
 				"-w Wall time.  Use this option followed by a new wall time, in hours, if you want less\n" +
@@ -491,10 +539,17 @@ public class TomatoFarmer {
 				"-s Study name.  Set this if you want your VCF files to have a prefix other than \n" +
 				"      'STUDY'. Example: '-s DEMO'.\n" +
 				"-c Split chromsomes.  Set this option if you want to run variant calling on each \n" +
-				"      chromosome separately.  This is good for large projects (>15 exomes). They  \n" +
-				"      will be merged once they are all finished. Example: '-c'.\n" +
+				"      chromosome separately. By default, the genome is split by callable region. \n" +
+				"      Example: '-c'.\n" +
+				"-n No splitting.  Set this option if you want to run variant calling on the entire\n" +
+				"      genome at one time.  This is only suggested when you have a very small capture\n" +
+				"      region.  By default, the genome is split by callable region,  Example '-n'. \n" +
 				"-x Unsuppress tomato emails.  Receive both tomato and TomatoFarmer emails. \n" +
 				"      Example: '-x'.\n" +
+				"-r Keep raw sam alignments. This option is specific to the full pipelines. Once the\n " +
+				"      full pipeline is finished, the sam.gz files are deleted. Use this option if you\n" +
+				"      want to keep them.  They take up a lot of space and are only useful if you want\n" +
+				"      to go back before indel realignment ond base recalibration\n"+
 				
 				
 				"\nAdmin Arguments:\n\n" +
@@ -508,13 +563,13 @@ public class TomatoFarmer {
 				"-l Logging level.  Level of logging you want to see.  Options INFO, WARNING, ERROR.\n" +
 				"      ERROR just displays error messages, WARNING displays warning and error messages.\n" +
 				"      INFO shows all three levels. Default: INFO.\n" +
-				"-b Heatbeat frequency.  How often you want a thread heartbeat message in minutes. \n" + 
+				"-b Heartbeat frequency.  How often you want a thread heartbeat message in minutes. \n" + 
 				"      Default: 30 mins.\n" +
 				"-j Number of jobs at a time. Don't abuse this, big brother is watching you. Default:\n" +
 				"      5 jobs.\n" +
 			
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/TomatoFarmer -d /tomato/version/job/demo/\n" +
-				"      -e herschel.krustofsky@hci.utah.edu -y exome_bwa -s DEMO -c -t agilent\n\n" +
+				"      -e herschel.krustofsky@hci.utah.edu -y exome_bwa -s DEMO -c -t AgilentAllExon50MB\n\n" +
 
 				"**************************************************************************************\n");
 

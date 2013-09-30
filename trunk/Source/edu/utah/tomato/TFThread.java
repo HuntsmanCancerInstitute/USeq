@@ -48,6 +48,10 @@ public class TFThread implements Callable<Boolean> {
 			tfLogger.writeInfoMessage("[T" + this.threadnumber + "] " + message);
 		}
 		
+		private void writeWarningMessage(String message) {
+			tfLogger.writeWarningMessage("[T" + this.threadnumber + "] " + message);
+		}
+		
 		private void transferExisting() {
 			this.writeInfoMessage("Cleaning directory.");
 			
@@ -174,7 +178,7 @@ public class TFThread implements Callable<Boolean> {
 									this.writeInfoMessage("Tomato job finished correctly");
 									analysisFinished = true;
 								} else {
-									this.writeErrorMessage("Don't recognize the final line of the log file, assuming failed",true);
+									this.writeWarningMessage("Don't recognize the final line of the log file, assuming failed and resubmitting");
 									tomatoFailed = true;
 								}
 							}

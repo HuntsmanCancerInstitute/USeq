@@ -27,29 +27,30 @@ public class TFCommandExomeMetrics extends TFCommand {
 
 	@Override
 	public void run(ArrayList<TFSampleInfo> sampleList) {
+		//Initialize daemon-specific variables
 		int counter = 1;
 		this.daemon = new TFThreadDaemon(this.logFile,this.commandString,sampleList.size(),this.jobs);
 		this.daemon.start();
+		
+		//Create project-specific storage
+		ArrayList<File> runDirectoryList = new ArrayList<File>();
+		ArrayList<File> deleteList = new ArrayList<File>();
+		
+		
 		for (TFSampleInfo si: sampleList) {
+			//Create sample-specific storage
+			ArrayList<File> protectList = new ArrayList<File>();
 
 			//Create run directory
 			File runDirectory = new File(this.rootDirectory,"JOB_" + si.getSampleName() + "_metrics");
+			runDirectoryList.add(runDirectory);
 			runDirectory.mkdir();
 			
-			
-			//Create command file
-			File cmdFile = new File(runDirectory,"cmd.txt");
-			
-			//Create keepers files
+			//Create  files
 			File bam = new File(runDirectory,si.getSampleName() + ".bam");
 			File bai = new File(runDirectory,si.getSampleName() + ".bai");
 			File sam = new File(runDirectory,si.getSampleName() + ".sam.gz");
-			
-			ArrayList<File> keepers = new ArrayList<File>();
-			keepers.add(bam);
-			keepers.add(sam);
-			keepers.add(bai);
-			keepers.add(cmdFile);
+			File cmdFile = new File(runDirectory,"cmd.txt");
 			
 			//Link necessary files
 			this.createLink(si.getFile(TFConstants.FILE_BAM),bam);
@@ -65,7 +66,7 @@ public class TFCommandExomeMetrics extends TFCommand {
 			}
 			File destFile = new File(runDirectory,targetFile.getName());
 			this.cpFile(targetFile, destFile);
-			keepers.add(destFile);
+			
 			
 			replacements.put("NAME", si.getSampleName());
 			replacements.put("TARGETS", destFile.getName());
@@ -75,7 +76,18 @@ public class TFCommandExomeMetrics extends TFCommand {
 			//Create cmd.txt file
 			this.createCmd(replacements, cmdFile);
 			
-			TFThread thread = new TFThread(runDirectory,this.failmax, counter, this.heartbeat, keepers, this.logFile);
+		
+			//Mark files for deletion of cleanup protection
+			protectList.add(bam);
+			protectList.add(sam);
+			protectList.add(bai);
+			protectList.add(cmdFile);
+			protectList.add(destFile);
+			deleteList.add(bam);
+			deleteList.add(bai);
+			deleteList.add(sam);
+						
+			TFThread thread = new TFThread(runDirectory,this.failmax, counter, this.heartbeat, protectList, this.logFile);
 			
 			//this.taskList.add(thread);
 			this.daemon.addJob(thread);
@@ -95,26 +107,30 @@ public class TFCommandExomeMetrics extends TFCommand {
 			System.exit(1);
 		}
 		
-		File metricsDir = new File(this.rootDirectory,"metrics");
+		//Create output files
+		File metricsDir = new File(this.rootDirectory,"Metrics");
+		File jobDir = new File(metricsDir,"Jobs");
 		if (metricsDir.exists()) {
 			IO.deleteDirectory(metricsDir);
 		}
 		File imageDir = new File(metricsDir,"images");
 		metricsDir.mkdir();
 		imageDir.mkdir();
+		jobDir.mkdir();
 		
-		for (TFSampleInfo si: sampleList) {
-			//Make destination directories
-			File runDirectory = new File(this.rootDirectory,"JOB_" + si.getSampleName() + "_metrics");
-			
+		for (int i=0; i<sampleList.size();i++) {
+			//get sample-specific info
+			File runDirectory = runDirectoryList.get(i);
 			File runImageDirectory = new File(runDirectory,"images");
+			TFSampleInfo si = sampleList.get(i);
 			
+
 			//Make destination files
-			File metricsFile = new File(metricsDir,si.getSampleName() + ".html");
+			File metricsFile = new File(metricsDir,si.getSampleName() + ".dict.txt");
 			
 			
 			//Move results
-			this.moveFile(new File(runDirectory,si.getSampleName() + ".html"), metricsFile);
+			this.moveFile(new File(runDirectory,si.getSampleName() + ".dict.txt"), metricsFile);
 			this.cpFile(runImageDirectory, metricsDir);
 
 			
@@ -122,7 +138,21 @@ public class TFCommandExomeMetrics extends TFCommand {
 			si.setFile(TFConstants.FILE_METRICS, metricsFile);
 		}
 		
+		//Merge metrics data
 		mergeMetrics(metricsDir);
+		
+		this.moveFile(new File(studyName + ".xlsx"), metricsDir);
+		
+		//clean up unwanted files
+		for (File df: deleteList) {
+			this.deleteFile(df);
+		}
+		
+		//Move JOB directories
+		for (File rd: runDirectoryList) {
+			this.moveFile(rd, jobDir);
+		}
+		
 
 	}
 	

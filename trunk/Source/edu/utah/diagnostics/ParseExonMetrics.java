@@ -26,6 +26,7 @@ public class ParseExonMetrics {
 	private File errorFile = null;
 	private File mergedFile = null;
 	private boolean html = false;
+	private boolean dictionary = false;
 	private String name = "Full Genome";
 	
 	//Alignments
@@ -102,7 +103,10 @@ public class ParseExonMetrics {
 		this.parseCoverage();
 		
 		//Generate Latexfile
-		if (this.html) {
+		if (this.dictionary) {
+			File dictionaryFile = new File(outputFile + ".dict.txt");
+			this.generateDictionaryFile(dictionaryFile);
+		} else if (this.html) {
 			File htmlFile = new File(outputFile + ".html");
 			this.generateHtml(htmlFile);
 		} else {
@@ -433,6 +437,60 @@ public class ParseExonMetrics {
 		}
 	}
 	
+	private void generateDictionaryFile(File dictionaryFile) {
+		try {
+			BufferedWriter bw = new BufferedWriter(new FileWriter(dictionaryFile));
+			bw.write(String.format("sampleName\t%s\n",this.outputFile.getName()));
+			bw.write(String.format("totalReads\t%d\n",this.allCounts));
+			bw.write(String.format("alignReads\t%d\n",this.alignedCounts));
+			bw.write(String.format("alignReadsP\t%f\n",this.perAligned));
+			bw.write(String.format("standardReads\t%d\n",this.normalCounts));
+			bw.write(String.format("standardReadsP\t%f\n",this.perNormal));
+			bw.write(String.format("nonStandardReads\t%d\n",this.extraCounts));
+			bw.write(String.format("nonStandardReadsP\t%f\n",this.perExtra));
+			bw.write(String.format("phiXReads\t%d\n",this.phiXCounts));
+			bw.write(String.format("phiXReadsP\t%f\n",this.perPhiX));
+			bw.write(String.format("adapterReads\t%d\n",this.adapterCounts));
+			bw.write(String.format("adapterReadsP\t%f\n",this.perAdapter));
+			bw.write(String.format("dupUnpaired\t%d\n",this.dupUnpaired));
+			bw.write(String.format("dupUnpairedP\t%f\n",this.percentDupUnpaired));
+			bw.write(String.format("dupPaired\t%d\n",this.dupPaired));
+			bw.write(String.format("dupPairedP\t%f\n",this.percentDupPaired));
+			bw.write(String.format("percentDup\t%f\n",this.percentDuplication));
+			bw.write(String.format("aTotalReads1\t%d\n",this.totalReads[0]));
+			bw.write(String.format("aTotalReads2\t%d\n",this.totalReads[1]));
+			bw.write(String.format("aTotalReadsC\t%d\n",this.totalReads[2]));
+			bw.write(String.format("aAlignedReads1\t%d\n",this.alignedReads[0]));
+			bw.write(String.format("aAlignedReads2\t%d\n",this.alignedReads[1]));
+			bw.write(String.format("aAlignedReadsC\t%d\n",this.alignedReads[2]));
+			bw.write(String.format("aAlignedReadsP1\t%f\n",this.percentAligned[0]));
+			bw.write(String.format("aAlignedReadsP2\t%f\n",this.percentAligned[1]));
+			bw.write(String.format("aAlignedReadsPC\t%f\n", this.percentAligned[2]));
+			bw.write(String.format("aPairedReads1\t%d\n",this.readsInPairs[0]));
+			bw.write(String.format("aPairedReads2\t%d\n",this.readsInPairs[1]));
+			bw.write(String.format("aPairedReadsC\t%d\n",this.readsInPairs[2]));
+			bw.write(String.format("aPairedReadsP1\t%f\n",this.percentInPairs[0]));
+			bw.write(String.format("aPairedReadsP2\t%f\n",this.percentInPairs[1]));
+			bw.write(String.format("aPairedReadsPC\t%f\n",this.percentInPairs[2]));
+			bw.write(String.format("aStrand1\t%f\n",this.strandBalance[0]));
+			bw.write(String.format("aStrand2\t%f\n",this.strandBalance[1]));
+			bw.write(String.format("aError1\t%f\n",this.errorRate[0]));
+			bw.write(String.format("aError2\t%f\n",this.errorRate[1]));
+			bw.write(String.format("aErrorC\t%f\n",this.errorRate[2]));
+			bw.write(String.format("aNonProper\t%d\n",this.incorrectPairs));
+			bw.write(String.format("aNonProperP\t%f\n",this.percentIncorrectPairs));
+			bw.write(String.format("aSingleton\t%d\n",this.singletons));
+			bw.write(String.format("aSingleTonP\t%f\n",this.percentSingletons));
+			bw.write(String.format("aErrorRate\t%f\n",this.meanErrorRate));
+			bw.close();
+			
+		} catch (IOException ioex) {
+			System.out.println("Error writing to file, exiting: " + ioex.getMessage());
+			ioex.printStackTrace();
+			System.exit(1);
+		} 
+	}
+	
 	private void generateHtml(File htmlFile) {
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(htmlFile));
@@ -501,8 +559,8 @@ public class ParseExonMetrics {
 			bw.write("<tr><th>Error Rate</th><td>" + String.format("%,.5f",this.errorRate[0]) + "</td><td>" + String.format("%,.5f",this.errorRate[1]) + "</td><td>" + String.format("%,.5f",this.errorRate[2]) + "</td></tr>\n");
 			bw.write("<tr><th>Non-Proper Pairs</th><td></td><td></td><td>" + String.format("%,d",this.incorrectPairs) + "</td></tr>\n"); 
 			bw.write("<tr><th>%Non-Proper Pairs </th><td></td><td></td><td>" + String.format("%,.2f%%",this.percentIncorrectPairs) + "</td></tr>\n");
-			bw.write("<tr><th>Singletons</td><td></th><td></td><td>" + String.format("%,d",this.singletons) + "</td></tr>\n");
-			bw.write("<tr><th>%Singletons</td><td></th><td></td><td>" + String.format("%,.2f%%",this.percentSingletons) + "</td></tr>\n");
+			bw.write("<tr><th>Singletons</th><td></td><td></td><td>" + String.format("%,d",this.singletons) + "</td></tr>\n");
+			bw.write("<tr><th>%Singletons</th><td></td><td></td><td>" + String.format("%,.2f%%",this.percentSingletons) + "</td></tr>\n");
 			bw.write("</table>\n");
 			bw.write("</section>\n");
 			
@@ -779,6 +837,7 @@ public class ParseExonMetrics {
 					case 'd': duplicateFile = new File(args[++i]); break;
 					case 'e': errorFile = new File(args[++i]); break;
 					case 'f': mergedFile = new File(args[++i]); break;
+					case 'i': this.dictionary = true; break;
 					case 'o': outputFile = new File(args[++i]); break;
 					case 'r': rPath = args[++i]; break;
 					case 'l': lPath = args[++i]; break;
@@ -858,6 +917,7 @@ public class ParseExonMetrics {
 				"-r Path to R\n" +
 				"-l Path to pdflatex\n" +
 				"-t Generate html instead\n" +
+				"-i Generate dictionary (for pipeline)\n" +
 				"-c Coverage file name \n" +
 				"\n\n"+
 
