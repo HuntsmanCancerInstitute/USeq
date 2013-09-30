@@ -101,6 +101,9 @@ public class VCFAnnotator {
 		String[] fileParts = vcfFile.getName().split("\\.(?=[^\\.]+$)");
 		inputname = fileParts[0] + ".annovar.input.txt";
 		
+		//Setup annovar commands
+		this.setupCommands();
+		
 		for (int i=0;i<chunks;i++) {
 			System.out.println("Working on file chunk: " + (i + 1));
 			//Create temporary vcf files
@@ -110,11 +113,9 @@ public class VCFAnnotator {
 			
 			//Create a parsed file per-chunk
 			VCFParser parsedVCF = new VCFParser(vcfFile, true, true, true, i,VCFUtilities.readsToChunk);
-
 			
-
-			//Setup annovar commands
-			this.setupCommands();
+			
+			
 			
 			//Write annovar input file
 			this.writeAnnovarInput(parsedVCF);
@@ -129,7 +130,8 @@ public class VCFAnnotator {
 				this.addVaastOutput(parsedVCF);
 			}
 			
-		
+			
+			
 			//Write VCF file
 			parsedVCF.printRecords(tempVcf,true);
 			
@@ -831,6 +833,10 @@ public class VCFAnnotator {
 			for (String info: this.infoLine) {
 				this.parsedVCF.getVcfComments().addInfo(info);
 			}
+			
+			System.out.println("YO");
+			
+		
 		}
 		
 		

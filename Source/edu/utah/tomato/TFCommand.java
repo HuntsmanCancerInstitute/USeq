@@ -46,7 +46,7 @@ public abstract class TFCommand {
 
 	
 	public static TFCommand getCommandObject(File templateDir, File rootDirectory, String commandLine, TFLogger logFile, 
-			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress, String study, boolean splitChroms,  File targetFile) {
+			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress, String study, String splitType,  File targetFile) {
 		String[] commandParts = commandLine.split(":");
 		if (commandParts.length < 2) {
 			logFile.writeErrorMessage("Must be at least two parts for every command", true);
@@ -73,7 +73,7 @@ public abstract class TFCommand {
 			if (failmax == null) {
 				failmax = 5;
 			}
-			returnCommand = new TFCommandExomeVariantRaw(templateFile,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, heartbeat, failmax, jobs, suppress, study, splitChroms, targetFile);
+			returnCommand = new TFCommandExomeVariantRaw(templateFile,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, heartbeat, failmax, jobs, suppress, study, splitType, targetFile);
 		}
 		
 		else {
@@ -116,6 +116,79 @@ public abstract class TFCommand {
     		this.daemon.interrupt();
     		while(this.daemon.isAlive()){}
     	}
+    }
+    
+    protected void sortVCF(File source, File dest) {
+		try {
+			if (!source.exists()) {
+				logFile.writeErrorMessage("[sortVCF] Expected file does not exist: " + source.getAbsolutePath(),true);
+				System.exit(1);
+			}
+			
+			ProcessBuilder pb = new ProcessBuilder("/tomato/app/vcftools/vcf-sort",source.getAbsolutePath());
+			
+			Process p = pb.start();
+			
+			BufferedInputStream bis = new BufferedInputStream(p.getInputStream());
+			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(dest));
+			
+			
+			byte[] buffer = new byte[1024*1024*10];
+			int n = -1;
+			
+			while((n = bis.read(buffer))!=-1) {
+			  bos.write(buffer,0,n);
+			}
+		
+
+			int val = p.waitFor();
+			bos.close();
+			bis.close();
+
+			
+			if (val != 0) {
+				logFile.writeErrorMessage("[sortVcf] Error while sorting the VCF file: " + dest.getAbsolutePath(),true);
+				BufferedReader br2 = new BufferedReader(new InputStreamReader(p.getErrorStream()));
+				String line2 = null;
+				while((line2 = br2.readLine()) != null) {
+					System.out.println(line2);
+				}
+				System.exit(1);
+			}
+			
+		} catch (IOException ioex) {
+			logFile.writeErrorMessage("[sortVcf] IO Exception while trying to move your file: " + source.getAbsolutePath(),true);
+			System.exit(1);
+		} catch (InterruptedException ieex) {
+			logFile.writeErrorMessage("[sortVcf] Process was interrupted while trying to move your file: " + source.getAbsolutePath(),true);
+			System.exit(1);
+		}
+	}
+    
+    protected void deleteFile(File source) {
+    	try {
+			if (!source.exists()) {
+				logFile.writeErrorMessage("[deleteFile] Expected file does not exist: " + source.getAbsolutePath(),true);
+				System.exit(1);
+			}
+			
+			ProcessBuilder pb = new ProcessBuilder("rm",source.getAbsolutePath());
+			Process p = pb.start();
+			
+			int val = p.waitFor();
+			
+			if (val != 0) {
+				logFile.writeErrorMessage("[deleteFile] System could not delete your file " + source.getAbsolutePath(),true);
+				System.exit(1);
+			}
+			
+		} catch (IOException ioex) {
+			logFile.writeErrorMessage("[deleteFile] IO Exception while trying to delete your file: " + source.getAbsolutePath(),true);
+			System.exit(1);
+		} catch (InterruptedException ieex) {
+			logFile.writeErrorMessage("[deleteFile] Process was interrupted while trying to delete your file: " + source.getAbsolutePath(),true);
+			System.exit(1);
+		}
     }
     
     protected void moveFile(File source, File dest) {
