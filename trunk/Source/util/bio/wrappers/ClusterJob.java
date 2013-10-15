@@ -37,21 +37,16 @@ public class ClusterJob {
 		//make tmp dir
 		script.add("mkdir /scratch/local/"+rndName+"/");
 		//copy over genome index
-		script.add("cp -f "+chpcAligner.getGenomeIndex() +" /scratch/local/"+rndName+"/");
-		//uncompress it?
-		//if (chpcAligner.getGenomeIndex().getName().endsWith(".gz")){
-			//script.add("gunzip -f "+chpcAligner.getGenomeIndex() +" /scratch/local/"+rndName+"/");
-		//}
+		script.add("rsync "+chpcAligner.getGenomeIndex() +" /scratch/local/"+rndName+"/");
+		
 		//copy over the data
 		script.add("mkdir /scratch/local/"+rndName+"/Data1/ /scratch/local/"+rndName+"/Data2/");
-		script.add("cp -f "+data1 +" /scratch/local/"+rndName+"/Data1/");
-		if (data2 != null) script.add("cp -f "+data2 +" /scratch/local/"+rndName+"/Data2/");
+		script.add("rsync "+data1 +" /scratch/local/"+rndName+"/Data1/");
+		if (data2 != null) script.add("rsync "+data2 +" /scratch/local/"+rndName+"/Data2/");
 		//add alignment command
 		script.add(fetchNovoAlignmentCommand(rndName));
-		//force compress results, deletes any that already exist
-		script.add("gzip -f /scratch/local/"+rndName+"/"+results.getName());
 		//move results off node 
-		script.add("mv -f /scratch/local/"+rndName+"/"+results.getName()+".gz "+gzippedResults);
+		script.add("rsync /scratch/local/"+rndName+"/"+results.getName()+".gz "+gzippedResults);
 		//do a clean up 
 		script.add("rm -rf /scratch/local/"+rndName+"/");
 		//end time
@@ -125,7 +120,7 @@ public class ClusterJob {
 			String stripNonChr = "";
 			if (filterForChrLines) stripNonChr =" | grep chr ";
 		
-			cmd = cmd + stripHeaders + stripNonChr +" > /scratch/local/"+dirName+"/"+ results.getName()+" \n";
+			cmd = cmd + stripHeaders + stripNonChr +" | gzip > /scratch/local/"+dirName+"/"+ results.getName()+".gz \n";
 		}
 		else {
 			chpcAligner.printError("Unsupported aligner "+chpcAligner.getAlignerName());
@@ -139,7 +134,7 @@ public class ClusterJob {
 		if (chpcAligner.getChpcAccount() != null) account = "#PBS -A "+chpcAligner.getChpcAccount()+"\n";
 
 		String h = 
-			"#PBS -l nodes=1:ppn="+chpcAligner.getNumberCPUs()+",walltime="+chpcAligner.getHrsWallTime()+":00:00 \n"+
+			"#PBS -l nodes=2:ppn="+chpcAligner.getNumberCPUs()+",walltime="+chpcAligner.getHrsWallTime()+":00:00 \n"+
 			"#PBS -m a \n"+ 
 			"#PBS -M "+chpcAligner.getEmail()+"\n"+ 
 			"#PBS -N "+name+"\n"+  

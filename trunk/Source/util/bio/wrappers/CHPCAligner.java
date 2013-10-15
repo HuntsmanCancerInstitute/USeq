@@ -26,12 +26,12 @@ public class CHPCAligner {
 	private String smtpHostName = "smtp.utah.edu";
 	private boolean filterForChrLines = false;
 	private boolean relaunchBadJobs = true;
-	private String chpcAccount = null;
+	private String chpcAccount = "kaplan";
 	private double numberOfJobs = 0;
 	private boolean stripSAMSQHeaders = false;
 
 	//aligner
-	private File alignerApp = new File("/uufs/chpc.utah.edu/common/home/u0028003/BioApps/Novocraft/novocraft/novoalign");
+	private File alignerApp = new File("/uufs/chpc.utah.edu/common/home/hcibcore/tomato/app/novoalign/novoalign");
 	private String alignerName;
 
 	//fastq file(s)
@@ -39,19 +39,19 @@ public class CHPCAligner {
 	private File actualFastqFile1;
 	private String fastqFile2;
 	private File actualFastqFile2;
-	private String fastqFileUserNameAndServer = "hci_u0028003@hci-bio3.hci.utah.edu";
+	private String fastqFileUserNameAndServer = "u0028003@hci-moab.hci.utah.edu";
 	private String splitDataFileExtension = ".gz";
 
 	//Final results archive, should contain the actual directory in which to place the compressed alignments
 	private String archiveDirectory;
-	private String archiveDirectoryUserNameAndServer = "hci_u0028003@hci-bio3.hci.utah.edu";
+	private String archiveDirectoryUserNameAndServer = "u0028003@hci-moab.hci.utah.edu";
 
 	//misc
 	private String alignerParams = " ";
-	private int numberReadsPerSlice = 500000;
+	private int numberReadsPerSlice = 1000000;
 	private String adminEmail = "david.nix@hci.utah.edu";
 	private int hrsWallTime = 24;
-	private int numberCPUs = 12;
+	private int numberCPUs = 16;
 	private ClusterJob job;
 	private ClusterJob[] jobs;
 	private ArrayList<String> log = new ArrayList<String>();
@@ -286,6 +286,7 @@ public class CHPCAligner {
 					System.out.println("\t\tSplitting reads into "+numberReadsPerSlice + " read chunks to launch "+numberOfJobs+" jobs. Total read count = "+(int)(numLines/4));
 				}
 				numLinesInFirst = splitFastqDataGZipOutput(fq, true);
+				numFilesInFirst = IO.numberFilesExist(splitFastqDataDirectory1, splitDataFileExtension);
 			}
 			//delete original file?
 			if (actualFastqFile1 != null && numberOfJobs !=1) actualFastqFile1.delete();
@@ -708,35 +709,36 @@ public class CHPCAligner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                CHPC Aligner: Sept 2011                           **\n" +
+				"**                                CHPC Aligner: Sept 2013                           **\n" +
 				"**************************************************************************************\n" +
 				"Wrapper for running novoalign on the CHPC clusters. You will need to configure ssh\n" +
-				"keys from CHPC to your other servers. See http://linuxproblem.org/art_9.html . Run\n" +
+				"keys from CHPC to your data server. See http://linuxproblem.org/art_9.html (might\n"+
+				"need to reset your home dir on alta/moab 'chmod go-w ~/'). Run\n" +
 				"this app at the CHPC.\n\n" +
 
 				"Required Options:\n"+
 				"-i Genome index file on CHPC\n"+
-				"-r Results directory on CHPC, this also defines the name of the final data archive\n" +
-				"-f First fastq file on the raw data server\n"+
-				"-s (Optional) Second paired end read fastq file on the raw data server\n"+
-				"-a Archive directory on the analysis server for saving the final alignments\n"+
+				"-r Working directory on CHPC, this also defines the name of the final data archive\n" +
+				"-f First fastq file on the data server\n"+
+				"-s (Optional) Second paired end read fastq file on the data server\n"+
+				"-a Archive directory on the data server for saving the final alignments\n"+
 
 				"\nDefault Options:\n"+
 				"-l Launch jobs, defaults to not launching jobs, inspect and test the shell scripts\n"+
 				"     before committing.\n"+
-				"-w Wall time in hours, defaults to 24. (Max on ember general is 24.)\n"+
-				"-x Number CPUs, defaults to 12 for ember, set to 4 for sanddune.\n"+
+				"-w Wall time in hours, defaults to 24.\n"+
+				"-x Number CPUs, defaults to 16.\n"+
 				"-e Administrator email address, defaults to david.nix@hci.utah.edu\n"+
 				"-c (Optional) Client email addresses, comma delimited, no spaces.\n"+
 				"-b Don't relaunch bad jobs, defaults to making 3 attempts before aborting.\n"+
-				"-o CHPC account to draw hours from (e.g. kaplan, kaplan-em, cairns, etc)\n"+
-				"-d Raw data user name and server, defaults to hci_u0028003@hci-bio3.hci.utah.edu\n"+
+				"-o CHPC account to draw hours from (e.g. kaplan-em), defaults to kaplan.\n"+
+				"-d Raw data user name and server, defaults to u0028003@hci-moab.hci.utah.edu\n"+
 				"-g Final alignment data user name and server, defaults to\n" +
-				"     hci_u0028003@hci-bio3.hci.utah.edu\n"+
+				"     u0028003@hci-moab.hci.utah.edu\n"+
 				"-j Aligner application, defaults to \n" +
-				"     '/uufs/chpc.utah.edu/common/home/u0028003/BioApps/Novocraft/novocraft/novoalign'\n" +
+				"     '/uufs/chpc.utah.edu/common/home/hcibcore/tomato/app/novoalign/novoalign'\n" +
 				"-p Aligner cmd line options\n"+
-				"-n Number of reads to process per job, defaults to 500000\n"+
+				"-n Number of reads to process per job, defaults to 1000000\n"+
 				"-k Number of jobs to run, defaults to number of reads per job setting\n"+
 				"-t Filter results for lines containing a 'chr' string, defaults to all.\n"+
 				"-q Strip @SQ: lines from SAM alignment results, recommended for transcriptomes.\n"+
