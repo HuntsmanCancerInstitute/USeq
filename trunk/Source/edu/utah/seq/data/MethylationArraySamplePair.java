@@ -18,7 +18,7 @@ public class MethylationArraySamplePair{
 	}
 
 	public void randomize() {
-		Num.randomizePairedValues(treatment, control, System.currentTimeMillis());
+		if (treatment != null && control != null) Num.randomizePairedValues(treatment, control, System.currentTimeMillis());
 	}
 
 	/**StopIndex is included!*/
