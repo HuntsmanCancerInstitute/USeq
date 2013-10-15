@@ -43,6 +43,7 @@ public class USeq2UCSCBig extends Thread{
 		//remove those that already exist?
 		if (forceConversion == false) {
 			useqArchives = USeq2UCSCBig.removeExistingConvertedUSeqArchives (useqArchives);
+			useqArchives = USeq2UCSCBig.removeBrokenUSeqArchives(useqArchives);
 			if (useqArchives.length == 0) {
 				if (verbose) System.out.println("\tNo unconverted xxx.useq archives were found.  Use the -f option to overwrite.\n");
 				System.exit(0);
@@ -398,6 +399,18 @@ public class USeq2UCSCBig extends Thread{
 			f = new File (useq.getParentFile(), name +"_Plus.bb");
 			if (f.exists()) continue;
 			toReturn.add(useq);
+		}
+		File[] f = new File[toReturn.size()];
+		toReturn.toArray(f);
+		return f;
+	}
+	
+	public static File[] removeBrokenUSeqArchives (File[] useqFiles){
+		ArrayList<File> toReturn = new ArrayList<File>();
+		for (File useq: useqFiles){
+			String name = useq.getName();
+			File f = new File (useq.getParentFile(), name +".broken");
+			if (f.exists() == false) toReturn.add(useq);
 		}
 		File[] f = new File[toReturn.size()];
 		toReturn.toArray(f);
