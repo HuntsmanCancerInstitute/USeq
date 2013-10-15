@@ -431,6 +431,9 @@ public class USeqArchive {
 			if (beginningBP > other.beginningBP) return 1;
 			return 0;
 		}
+		public String toString(){
+			return beginningBP+"\t"+endingBP;
+		}
 	}
 
 	//alphabet minus 28 abiguous characters
@@ -479,7 +482,7 @@ public class USeqArchive {
 			//problem here with stranded data, since the actual last base is not considered in a DR can pick the wrong strand to examine.
 			//thus need to look at last two
 			DataRange[] dr = chromStrandRegions.get(chrom);
-			int lastFirstBase = 0;
+			int lastFirstBase = -1;
 			DataRange lastDataRange = null;
 			for (DataRange d : dr){
 				if (d.endingBP > lastFirstBase) {
@@ -489,7 +492,7 @@ public class USeqArchive {
 			}
 			
 			//do it again but fetch second last
-			int secondLastFirstBase = 0;
+			int secondLastFirstBase = -1;
 			DataRange secondLastDataRange = null;
 			for (DataRange d : dr){
 				if (d.endingBP != lastFirstBase && d.endingBP > secondLastFirstBase) {
@@ -507,6 +510,7 @@ public class USeqArchive {
 		HashMap<String,Integer> chromBase = new HashMap<String,Integer>();
 		for (String chrom: map.keySet()){
 			DataRange[] dr = map.get(chrom);
+			
 			int lastBase0 = fetchLastBase(dr[0], zf);
 			int lastBase1 = 0;
 			if (dr[1] !=null) lastBase1 = fetchLastBase(dr[1], zf);
