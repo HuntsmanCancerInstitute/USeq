@@ -157,9 +157,9 @@ public class SamTranscriptomeParser{
 	public boolean parseFile(File samFile){
 		BufferedReader in = null;
 		int numBadLines = 0;
+		String line = null;
 		try {
 			in = IO.fetchBufferedReader(samFile);
-			String line;
 			String priorReadName = "";
 			boolean priorSet = false;
 			ArrayList<SamAlignment> alignmentsToSave = new ArrayList<SamAlignment>();
@@ -192,8 +192,8 @@ public class SamTranscriptomeParser{
 				SamAlignment sa;
 				try {
 					sa = new SamAlignment(line, true);
-				} catch (MalformedSamAlignmentException e) {
-					if (verbose) System.out.println("\nSkipping malformed sam alignment -> "+e.getMessage());
+				} catch (Exception e) {
+					if (verbose) System.out.println("\nSkipping malformed sam alignment -> "+e.getMessage()+"\n"+line);
 					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
 					continue;
 				}
@@ -321,7 +321,9 @@ public class SamTranscriptomeParser{
 			filterPrintAlignments(alignmentsToSave);
 
 		} catch (Exception e) {
+			System.err.println("Problem parsing -> "+line);
 			e.printStackTrace();
+			
 			return false;
 		} finally {
 			try {
