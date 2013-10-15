@@ -1,10 +1,23 @@
+----USeq_8.6.8----
+MethylationArrayScanner
+* Removed a requirement that non paired analysis contain matching t vc samples
+CHPCAligner
+* Modified to work with the kingspeak cluster
+MiRNACorrelator
+* New application for associating changes in miRNA and gene expression values
+USeq2UCSCBig
+* Added catch to rename broken useq archives so these are skipped in subsequent autoconversion
+
 ----USeq_8.6.7----
 ExportExons
 * Added name score and strand to the output
 DefinedRegionDifferentialSeq
 * Fixed a bug where genes with excessive counts were still being included in the DESeq analysis
+* Added a check for splice analysis with one gene
 USeq2UCSCBig
 * Added a sandbox to the UCSC executables to limit memory and time on linux systems
+SamTranscriptomeParser
+* Added another check for malformed sam records
 
 ----USeq_8.6.6----
 DefinedRegionDifferentialSeq
