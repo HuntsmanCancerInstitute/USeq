@@ -1377,7 +1377,7 @@ public class DefinedRegionDifferentialSeq {
 				float[] fdrLog2 = geneScores[j];
 				//fdr, lg2, index
 				float[] splice = noScores;
-				if (spliceScores.containsKey(geneNamesToAnalyze[j]))  splice = spliceScores.get(geneNamesToAnalyze[j]); 
+				if (spliceScores != null && spliceScores.containsKey(geneNamesToAnalyze[j]))  splice = spliceScores.get(geneNamesToAnalyze[j]); 
 				//lg2Rto deseq
 				rows[rowIndex].createCell(ci++).setCellValue(fdrLog2[1]);
 				//fdr deseq
