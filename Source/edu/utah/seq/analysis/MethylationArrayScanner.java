@@ -140,7 +140,7 @@ public class MethylationArrayScanner {
 		//convert graph data to useq
 		new Bar2USeq(pseDir, true);
 		new Bar2USeq(fdrDir, true);
-		new Bar2USeq(baseRatioDir, true);
+		if (performPairedAnalysis) new Bar2USeq(baseRatioDir, true);
 
 		//save window data 
 		System.out.println("Writing window objects for the EnrichedRegionMaker...");
@@ -376,24 +376,33 @@ public class MethylationArrayScanner {
 		//parse names
 		String[] treatmentNames = treatmentPairedSamples.split(",");
 		String[] controlNames = controlPairedSamples.split(",");
-		if (treatmentNames.length != controlNames.length) Misc.printErrAndExit("\nError: the number of treatment and control samples differ?");
+		if (performPairedAnalysis && treatmentNames.length != controlNames.length) Misc.printErrAndExit("\nError: the number of treatment and control samples differ?");
 		numberMethylationArraySamplePairs = treatmentNames.length;
+		if (numberMethylationArraySamplePairs < controlNames.length) numberMethylationArraySamplePairs = controlNames.length;
 
 		HashMap<String, ArrayList<MethylationArraySamplePair>> pairs = new HashMap<String, ArrayList<MethylationArraySamplePair>>();
 
-		for (int i=0; i< treatmentNames.length; i++){
-			System.out.println("\t"+ treatmentNames[i] +"\t"+ controlNames[i]);
-			HashMap<String, PointData> pdT = loadPointData(treatmentNames[i]);
-			HashMap<String, PointData> pdC = loadPointData(controlNames[i]);
+		for (int i=0; i< numberMethylationArraySamplePairs; i++){
+			if (performPairedAnalysis) System.out.println("\t"+ treatmentNames[i] +"\t"+ controlNames[i]);
+			boolean tPresent = i < treatmentNames.length;
+			boolean cPresent = i < controlNames.length;
+			HashMap<String, PointData> pdT = null;
+			HashMap<String, PointData> pdC = null;
+			if (tPresent) pdT = loadPointData(treatmentNames[i]);
+			if (cPresent) pdC = loadPointData(controlNames[i]);
 
 			//write log2(t/2) graphs
-			writeProbeRatioGraph(pdT, pdC, treatmentNames[i]+"_"+controlNames[i]);
+			if (performPairedAnalysis) writeProbeRatioGraph(pdT, pdC, treatmentNames[i]+"_"+controlNames[i]);
 
 			HashSet<String> allChroms = new HashSet<String>();
-			allChroms.addAll(pdT.keySet());
-			allChroms.addAll(pdC.keySet());
+			if (tPresent) allChroms.addAll(pdT.keySet());
+			if (cPresent) allChroms.addAll(pdC.keySet());
 			for (String chrom: allChroms){
-				MethylationArraySamplePair sp = new MethylationArraySamplePair(pdT.get(chrom).getScores(), pdC.get(chrom).getScores(), performPairedAnalysis);
+				float[] tScores = null;
+				float[] cScores = null;
+				if (tPresent) tScores = pdT.get(chrom).getScores();
+				if (cPresent) cScores = pdC.get(chrom).getScores();
+				MethylationArraySamplePair sp = new MethylationArraySamplePair(tScores, cScores, performPairedAnalysis);
 				ArrayList<MethylationArraySamplePair> al = pairs.get(chrom);
 				if (al == null){
 					al = new ArrayList<MethylationArraySamplePair>();
@@ -407,8 +416,8 @@ public class MethylationArrayScanner {
 		chromMethylationArraySamplePairs = new HashMap<String, MethylationArraySamplePair[]>();
 		for (String chrom: pairs.keySet()){
 			ArrayList<MethylationArraySamplePair> al = pairs.get(chrom);
-			if (al.size() != treatmentNames.length) Misc.printErrAndExit("\nError: One or more samples are missing a chromosome PointData set.");
-			MethylationArraySamplePair[] sp = new MethylationArraySamplePair[treatmentNames.length];
+			if (al.size() != numberMethylationArraySamplePairs) Misc.printErrAndExit("\nError: One or more samples are missing a chromosome PointData set.");
+			MethylationArraySamplePair[] sp = new MethylationArraySamplePair[numberMethylationArraySamplePairs];
 			al.toArray(sp);
 			chromMethylationArraySamplePairs.put(chrom, sp);
 		}
@@ -528,8 +537,10 @@ public class MethylationArrayScanner {
 		pseDir.mkdirs();
 		fdrDir = new File(saveDirectory, "WindowWilcoxFDR");
 		fdrDir.mkdirs();
-		baseRatioDir = new File(saveDirectory, "BPLog2Ratio");
-		baseRatioDir.mkdirs();
+		if (performPairedAnalysis){
+			baseRatioDir = new File(saveDirectory, "BPLog2Ratio");
+			baseRatioDir.mkdirs();
+		}
 
 		scoreNames = new String[]{
 				"Log2Rto",
@@ -561,7 +572,7 @@ public class MethylationArrayScanner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Methylation Array Scanner: May 2013                      **\n" +
+				"**                        Methylation Array Scanner: Oct 2013                       **\n" +
 				"**************************************************************************************\n" +
 				"MAS takes paired or non-paired sample PointData representing beta values (0-1) from\n" +
 				"arrays and scores regions with enriched/ reduced signal using a sliding window\n" +
