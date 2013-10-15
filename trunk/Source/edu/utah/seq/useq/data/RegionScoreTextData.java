@@ -53,17 +53,23 @@ public class RegionScoreTextData extends USeqData{
 	}
 	/**Writes six or 12 column xxx.bed formatted lines to the PrintWriter*/
 	public void writeBed (PrintWriter out, boolean fixScore){
+		
+		
 		String chrom = sliceInfo.getChromosome();
 		String strand = sliceInfo.getStrand();
 		for (int i=0; i< sortedRegionScoreTexts.length; i++){
 			String[] tokens = Text2USeq.PATTERN_TAB.split(sortedRegionScoreTexts[i].text);
 			if (fixScore){
+				
 				int score = USeqUtilities.fixBedScore(sortedRegionScoreTexts[i].score);
 				if (tokens.length == 7) {
 					//check end
 					int checkStop = checkBed12Stop(sortedRegionScoreTexts[i].start, sortedRegionScoreTexts[i].stop, tokens[5], tokens[6]);
 					int thickEnd = Integer.parseInt(tokens[2]);
 					if (thickEnd > checkStop) thickEnd = checkStop;
+					//watch out for thickEnd > thickStart
+					int thickStart = Integer.parseInt(tokens[1]);
+					if (thickStart > thickEnd) continue;
 					//check zero start
 					if (tokens[6].startsWith("0,")) out.println(chrom+"\t"+sortedRegionScoreTexts[i].start+"\t"+checkStop+"\t"+tokens[0] +"\t"+ score +"\t"+strand+"\t"+tokens[1]+"\t"+thickEnd+"\t"+tokens[3]+"\t"+tokens[4]+"\t"+tokens[5]+"\t"+tokens[6]);
 				
@@ -76,6 +82,9 @@ public class RegionScoreTextData extends USeqData{
 					int checkStop = checkBed12Stop(sortedRegionScoreTexts[i].start, sortedRegionScoreTexts[i].stop, tokens[5], tokens[6]);
 					int thickEnd = Integer.parseInt(tokens[2]);
 					if (thickEnd > checkStop) thickEnd = checkStop;
+					//watch out for thickEnd > thickStart
+					int thickStart = Integer.parseInt(tokens[1]);
+					if (thickStart > thickEnd) continue;
 					//check zero start
 					if (tokens[6].startsWith("0,")) out.println(chrom+"\t"+sortedRegionScoreTexts[i].start+"\t"+checkStop+"\t"+tokens[0] +"\t"+ sortedRegionScoreTexts[i].score +"\t"+strand+"\t"+tokens[1]+"\t"+thickEnd+"\t"+tokens[3]+"\t"+tokens[4]+"\t"+tokens[5]+"\t"+tokens[6]);
 				}
