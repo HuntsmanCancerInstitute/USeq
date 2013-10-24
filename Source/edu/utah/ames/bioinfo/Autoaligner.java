@@ -23,9 +23,7 @@ import util.gen.Misc;
  * files are split into smaller chunks using the FileSplitter app and aligned individually. Results from all steps
  * in the bisulfite alignment process are appended to the same GNomEx analysis report. Tomato will only email the user 
  * if there are exceptions and/or job failures (-ef option, i.e. #e email@nobody.com -ef). All input fastq files are
- * first run through fastqc app. Genomic/RNA-Seq alignments are run through the SamTranscriptomeParser and relative
- * read coverage tracks are generated using Sam2USeq. Genomic alignments are also pushed through the 
- * CalculatePerCycleErrorRate app prior to making read coverage .useq files. 
+ * first run through fastqc app.  
  * 
  * @author darren.ames@hci.utah.edu
  *
@@ -38,8 +36,9 @@ public class Autoaligner {
 	private String myEmail = "darren.ames@hci.utah.edu"; //TODO change this when I know it works correctly
 	private String autoalignReport = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoalign_*.txt";
 	private final String novoindexNames = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData/novoindexNameTable.txt";
+	//TODO set parsedFreshDataReports to output to dir for the appropriate year
 	private final String parsedFreshDataReports = "/home/sbsuser/Pipeline/AutoAlignReport/reports/processedReports/";
-	private final String tomatoJobDir = "/tomato/job/autoaligner/alignments/";
+	private final String tomatoJobDir = "/tomato/dev/job/autoaligner/alignments/";
 	private String smtpHostName = "mail.inscc.utah.edu"; //default
 	static String EMAILREGEX = "^#e\\s+(.+@.+)"; //email address pattern
 	static String LABNAMEREGEX = "\\w+\\s\\w+(?=\\WLab)"; //matches first and last name of lab using positive look
@@ -291,15 +290,16 @@ public class Autoaligner {
 		
 		//set path
 		String path = s.getAnalysisNumberPath();
+		
 		//make other dirs in the new analysis report dir
 		File alignDir = new File(path + "rawAlignments");
-		File bamDir = new File(path + "processedAlignments");
-		File coverageDir = new File(path + "coverageTracks");
-		File qcDir = new File(path + "QC");
+		//File bamDir = new File(path + "processedAlignments");
+		//File coverageDir = new File(path + "coverageTracks");
+		//File qcDir = new File(path + "QC");
 		alignDir.mkdir();
-		coverageDir.mkdir();
-		bamDir.mkdir();
-		qcDir.mkdir();
+		//coverageDir.mkdir();
+		//bamDir.mkdir();
+		//qcDir.mkdir();
 		
 		brCleanup.close();
 		//call method that creates the cmd.txt file
@@ -341,17 +341,30 @@ public class Autoaligner {
 				s.getSequencingApplicationCode().toString().equals("APP3") || 
 				s.getSequencingApplicationCode().toString().equals("MRNASEQ") || 
 				s.getSequencingApplicationCode().toString().equals("SMRNASEQ") || 
+				s.getSequencingApplicationCode().toString().equals("APP27") ||
+				s.getSequencingApplicationCode().toString().equals("APP9") || 
 				s.getSequencingApplicationCode().toString().equals("DMRNASEQ")) {
 			s.setSequencingApplicationCode("_MRNASEQ_");
 		}
-		else if (s.getSequencingApplicationCode().toString().equals("APP1") || 
-				s.getSequencingApplicationCode().toString().equals("TDNASEQ") || 
-				s.getSequencingApplicationCode().toString().equals("EXCAPNIM") || 
+		else if (s.getSequencingApplicationCode().toString().equals("APP1") ||  
 				s.getSequencingApplicationCode().toString().equals("APP4") || 
-				s.getSequencingApplicationCode().toString().equals("DNASEQ") || 
-				s.getSequencingApplicationCode().toString().equals("APP5") || 
+				s.getSequencingApplicationCode().toString().equals("APP8") || 
+				s.getSequencingApplicationCode().toString().equals("APP11") || 
+				s.getSequencingApplicationCode().toString().equals("APP12") ||
+				s.getSequencingApplicationCode().toString().equals("APP13") || 
+				s.getSequencingApplicationCode().toString().equals("APP20") || 
+				s.getSequencingApplicationCode().toString().equals("APP21") || 
+				s.getSequencingApplicationCode().toString().equals("APP22") || 
+				s.getSequencingApplicationCode().toString().equals("APP23") || 
+				s.getSequencingApplicationCode().toString().equals("APP24") || 
+				s.getSequencingApplicationCode().toString().equals("APP25") || 
+				s.getSequencingApplicationCode().toString().equals("APP26") || 
+				s.getSequencingApplicationCode().toString().equals("APP29") || 
+				s.getSequencingApplicationCode().toString().equals("APP30") ||
+				s.getSequencingApplicationCode().toString().equals("APP33") || 
 				s.getSequencingApplicationCode().toString().equals("CHIPSEQ") ||
-				s.getSequencingApplicationCode().toString().equals("MONNUCSEQ")) {
+				s.getSequencingApplicationCode().toString().equals("EXCAPSSC") ||
+				s.getSequencingApplicationCode().toString().equals("TDNASEQ")) {
 			s.setSequencingApplicationCode("_DNASEQ");
 		}
 		else if (s.getSequencingApplicationCode().toString().equals("APP6")) {
@@ -519,13 +532,13 @@ public class Autoaligner {
 	public String getCmdFileMsgGen(Sample s) throws IOException, InterruptedException {
 
 		//set string for first non-variable part of cmd.txt params
-		String msg = "#e " + myEmail + " -ef" + "\n#a " + s.getAnalysisNumber() + "\n## Novoalignments of " 
+		String msg = "#e " + myEmail + "\n#a " + s.getAnalysisNumber() + "\n## Novoalignments of " 
 				+ s.getRequestNumber() + " " + s.getProjectName() + "\n## Aligning to " 
 				+ s.getBuildCode() + " for " + s.getRequester() + " in the " + s.getLab() + "Lab "
-				+ "\n\nfastqc " + s.getSampleID() + "_*.gz" + " --noextract" 
+				+ "\n\nfastqc *.gz --noextract" 
 				+ "\n\n@align -novoalign ";
 		//set string for first non-variable part of cmd.txt params
-		String msg2 = " -g " + s.getNovoindex() + " -i " + s.getSampleID() + "_*.gz" + " -gzip\n\n";
+		String msg2 = " -g " + s.getNovoindex() + " -i *.gz" + " -gzip\n\n";
 		
 		//command string for splitting bisulfite files and preparing dirs for alignment
 		//splits into files with 2 million reads, which with our current hardware at CHPC, takes ~1 hr to align/file
@@ -632,14 +645,27 @@ public class Autoaligner {
 	 * @return
 	 */
 	public String getCmdFileMessageStdParams(Sample s) {
-		//stranded and paired-end
-		//adapters sequences NOT available?
-		if (s.isAdaptersIncluded() == false) {
-			s.setParams("[-o SAM -r All 50]");
+		//paired-end data
+		if (s.isPairedEnd() == true) {
+			//adapters included
+			if (s.isAdaptersIncluded() == true) {
+				s.setParams("[-o SAM -r All 50 -a " + s.getRead1Adapter() + " " + s.getRead2Adapter() + "]");
+			}
+			//adapters NOT included
+			else {
+				s.setParams("[-o SAM -r All 50]");
+			}
 		}
-		//adapters sequences ARE available
-		else {
-			s.setParams("[-o SAM -r All 50 -a " + s.getRead1Adapter() + " " + s.getRead2Adapter() + "]");
+		//single-end data
+		else if (s.isPairedEnd() == false) {
+			//adapter included
+			if (s.isAdaptersIncluded() == true) {
+				s.setParams("[-o SAM -r All 50 -a " + s.getRead1Adapter() + "]");
+			}
+			//adapter NOT included
+			else {
+				s.setParams("[-o SAM -r All 50]");
+			}
 		}
 		return s.getParams(); 
 	}
@@ -769,7 +795,7 @@ public class Autoaligner {
 	public static void printDocs() {
 		System.out.println("\n" +
 				"**********************************************************************************\n" +
-				"**                            Autoaligner: June 2013                            **\n" +
+				"**                           Autoaligner: October 2013                          **\n" +
 				"**********************************************************************************\n" + 
 				"This class contains methods to automatically align fastq sequences using novoalign via\n" +
 				"Tomato after they come out of the HiSeq Pipeline. All the necessary input data is contained\n" +
@@ -777,10 +803,9 @@ public class Autoaligner {
 				"A new analysis report is created in GNomEx (linked to experiment numbers) for all\n" +
 				"samples of the same request number. The requester is notified via email when jobs start\n" +
 				"and finish (except bisulfite at the moment). Bisulphite files are split into smaller chunks\n" +
-				"and aligned individually. Results from all steps in the bisulfite alignment process are\n" +
-				"appended to the same GNomEx analysis report. In the case of bisulfite alignments, Tomato\n" +
-				"will only email the user if there are exceptions and/or job failures (i.e. \n " +
-				"#e email@nobody.com -ef). All input fastq files are first run through fastqc app.\n" +
+				"and aligned individually. All input fastq files are first run through fastqc app.\n" +
+				"New novoindices must be added to the list of acceptable indices in novoindexNamesTable.txt,\n" + 
+				"along with its associated short index name.\n" + 
 				"\nParameters: \n\n" +
 				"-d full path to reports directory containing autoalign reports\n" +
 				"-f filename for autoalign report to process\n\n" +
