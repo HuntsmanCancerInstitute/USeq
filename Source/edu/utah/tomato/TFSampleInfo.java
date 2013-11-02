@@ -9,6 +9,8 @@ import java.util.regex.Pattern;
 public class TFSampleInfo {
 
 	private String sampleName = null;
+	private String sampleID = null;
+	private String puID = null;
 	private boolean qual64 = false;
 	private HashMap<String,File> fileList = null;
 	private TFLogger logFile = null;
@@ -16,8 +18,8 @@ public class TFSampleInfo {
 	private int recordTargetCount = 0;
 	private int readLength = 0;
 	
-	public TFSampleInfo(String sampleName, TFLogger logFile) {
-		this.sampleName = sampleName;
+	public TFSampleInfo(String sampleID, TFLogger logFile) {
+		this.sampleID = sampleID;
 		this.logFile = logFile;
 		this.fileList = new HashMap<String,File>();
 		this.fileList.put(TFConstants.FILE_FASTQ1, null);
@@ -26,6 +28,17 @@ public class TFSampleInfo {
 		this.fileList.put(TFConstants.FILE_BAM, null);
 		this.fileList.put(TFConstants.FILE_SAM, null);
 		this.fileList.put(TFConstants.FILE_METRICS, null);
+		this.fileList.put(TFConstants.FILE_LANE_BAM,null);
+		this.fileList.put(TFConstants.FILE_LANE_BAI,null);
+		this.fileList.put(TFConstants.FILE_SAMPLE_BAM, null);
+		this.fileList.put(TFConstants.FILE_SAMPLE_BAI, null);
+		this.fileList.put(TFConstants.FILE_SPLIT_LANE_BAM,null);
+		this.fileList.put(TFConstants.FILE_SPLIT_LANE_BAI, null);
+		this.fileList.put(TFConstants.FILE_REALIGN_SAMPLE_BAM,null);
+		this.fileList.put(TFConstants.FILE_REALIGN_SAMPLE_BAI, null);
+		this.fileList.put(TFConstants.FILE_REDUCE_BAM,null);
+		this.fileList.put(TFConstants.FILE_REDUCE_BAI, null);
+	
 	}
 	
 	public static ArrayList<TFSampleInfo> identifyAndValidateSamples(File directory, String commandType, TFLogger logFile) {
@@ -60,9 +73,9 @@ public class TFSampleInfo {
 		}
 		
 		//Write out ignored files
-		for (File ignore: ignored) {
-			logFile.writeInfoMessage("Ignored file: " + ignore.getAbsolutePath());
-		}
+		//for (File ignore: ignored) {
+			//logFile.writeInfoMessage("Ignored file: " + ignore.getAbsolutePath());
+		//}
 		
 		//Make sure each sample has the appropriate files
 		for (TFSampleInfo sample: sampleList) {
@@ -72,6 +85,7 @@ public class TFSampleInfo {
 		return sampleList;
 	
 	}
+	
 	
 	private static void matchFiles(File f, ArrayList<TFSampleInfo> sampleList, Matcher m, StringPattern p, TFLogger logFile) {
 		TFSampleInfo used = null;
@@ -85,25 +99,24 @@ public class TFSampleInfo {
 			sampleList.add(used);
 		}
 		
-		logFile.writeInfoMessage("Used file: " + used.getSampleName() + " " +  f.getAbsolutePath());
+		logFile.writeInfoMessage("Used file: " + used.getSampleID() + " " +  f.getAbsolutePath());
 		used.setFile(p.getName(), f);
 	}
 	
 	private static ArrayList<StringPattern> createPatterns(String commandType, TFLogger logFile) {
 		ArrayList<StringPattern> patterns = new ArrayList<StringPattern>();
 			
-		if (commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) || commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVOALIGN)) {
+		if (commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) || commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO)) {
 			patterns.add(new StringPattern(TFConstants.FILE_FASTQ1,Pattern.compile("(.+?)_1\\..+\\.gz$")));
 			patterns.add(new StringPattern(TFConstants.FILE_FASTQ2,Pattern.compile("(.+?)_2\\..+\\.gz$")));
 		} else if (commandType.equals(TFConstants.ANALYSIS_EXOME_METRICS)) {
-			patterns.add(new StringPattern(TFConstants.FILE_SAM,Pattern.compile("(.+?)\\.sam\\.gz$")));
-			patterns.add(new StringPattern(TFConstants.FILE_BAM,Pattern.compile("(.+?)\\.bam$")));
-			patterns.add(new StringPattern(TFConstants.FILE_BAI,Pattern.compile("(.+?)\\.bam\\.bai$")));
-			patterns.add(new StringPattern(TFConstants.FILE_BAI,Pattern.compile("(.+?)\\.bai$")));
-		} else if (commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW)) {
-			patterns.add(new StringPattern(TFConstants.FILE_BAM,Pattern.compile("(.+?)\\.bam$")));
-			patterns.add(new StringPattern(TFConstants.FILE_BAI,Pattern.compile("(.+?)\\.bam\\.bai$")));
-			patterns.add(new StringPattern(TFConstants.FILE_BAI,Pattern.compile("(.+?)\\.bai$")));
+			patterns.add(new StringPattern(TFConstants.FILE_SPLIT_LANE_BAM,Pattern.compile("(.+?)\\.split.bam$")));
+			patterns.add(new StringPattern(TFConstants.FILE_SPLIT_LANE_BAI,Pattern.compile("(.+?)\\.split.bai$")));
+			patterns.add(new StringPattern(TFConstants.FILE_BAM,Pattern.compile("(.+?)\\.raw\\.bam$")));
+			patterns.add(new StringPattern(TFConstants.FILE_BAI,Pattern.compile("(.+?)\\.raw\\.bai$")));
+		} else if (commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW) || commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR)) {
+			patterns.add(new StringPattern(TFConstants.FILE_REDUCE_BAM,Pattern.compile("(.+?)\\.reduce\\.bam$")));
+			patterns.add(new StringPattern(TFConstants.FILE_REDUCE_BAI,Pattern.compile("(.+?)\\.reduce\\.bai$")));
 		} else {
 			logFile.writeErrorMessage("<TFSampleInfo> Command type is not recognized by sample info parser: " + commandType, true);
 			System.exit(1);
@@ -113,18 +126,28 @@ public class TFSampleInfo {
 	
 	
 	private static void validateSample(TFSampleInfo si, String commandType, TFLogger logFile) {
-		if (commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) || commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVOALIGN)) {
+		if (commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) || commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO)) {
 		    if (si.fileList.get(TFConstants.FILE_FASTQ1) == null || si.fileList.get(TFConstants.FILE_FASTQ2) == null) {
 		    	logFile.writeErrorMessage("<TFSampleInfo> Found only one paired-end file, please make sure both are in the directory.  Offending sample name: " + si.getSampleName(),false);
 				System.exit(1);
 		    }
+		    String[] parts = si.getSampleID().split("_",2);
+		    if (parts.length != 2) {
+		    	logFile.writeErrorMessage("<TFSampleInfo> The Fastq file name is not properly formed. Should have an underscore separating the sample name and the flowcell name: SAMPLE_FLOWCELL_1.fastq and SAMPLE_FLOWCELL_2.fastq",false);
+		    	System.exit(1);
+		    }
+		    si.setPuID(parts[1]);
+		    si.setSampleName(parts[0]);
+		    
+		     
 		} else if (commandType.equals(TFConstants.ANALYSIS_EXOME_METRICS)) {
-			if (si.fileList.get(TFConstants.FILE_BAM) == null || si.fileList.get(TFConstants.FILE_BAI) == null || si.fileList.get(TFConstants.FILE_SAM) == null) {
+			if (si.fileList.get(TFConstants.FILE_BAM) == null || si.fileList.get(TFConstants.FILE_BAI) == null || si.fileList.get(TFConstants.FILE_SPLIT_LANE_BAM) == null || 
+					si.fileList.get(TFConstants.FILE_SPLIT_LANE_BAI) == null) {
 				logFile.writeErrorMessage("<TFSampleInfo> Could not find bam/bai/sam set.  Please make sure that the bam/bai/sam combination is present for each prefix. Offending sample name: " + si.getSampleName(),false);
 				System.exit(1);
 			}
-		} else if (commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW)) {
-			if (si.fileList.get(TFConstants.FILE_BAM) == null || si.fileList.get(TFConstants.FILE_BAI) == null) {
+		} else if (commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW) || commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR)) {
+			if (si.fileList.get(TFConstants.FILE_REDUCE_BAM) == null || si.fileList.get(TFConstants.FILE_REDUCE_BAI) == null) {
 				logFile.writeErrorMessage("<TFSampleInfo> Could not find bam/bai set.  Please make sure that the bam/bai combination is present for each prefix. Offending sample name: " + si.getSampleName(),false);
 				System.exit(1);
 			}
@@ -164,7 +187,7 @@ public class TFSampleInfo {
 	}
 		
 	private boolean comparePrefix(String prefix) {
-		if (this.sampleName.equals(prefix)) {
+		if (this.sampleID.equals(prefix)) {
 			return true;
 		} else {
 			return false;
@@ -194,6 +217,23 @@ public class TFSampleInfo {
 	public void setReadLength(int readLength) {
 		this.readLength = readLength;
 	}
+	
+	public String getSampleID() {
+		return sampleID;
+	}
+
+	public String getPuID() {
+		return puID;
+	}
+	
+	public void setPuID(String id) {
+		this.puID = id;
+	}
+	
+	public void setSampleName(String name) {
+		this.sampleName = name;
+	}
+
 	
 	
 

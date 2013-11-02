@@ -13,15 +13,18 @@ import util.gen.IO;
 public class TFCommandExomeMetrics extends TFCommand {
 	private File targetFile;
 	private String studyName;
+	private boolean deleteMetricsBam;
 	
-	public TFCommandExomeMetrics(File templateFile, File rootDirectory,
+	
+	public TFCommandExomeMetrics(ArrayList<File> templateFile, File rootDirectory,
 			String commandString, String commandType, TFLogger logFile,
 			String email, Integer wallTime, Integer heartbeat, Integer failmax,
-			Integer jobs, boolean suppress, String studyName, File targetFile) {
+			Integer jobs, boolean suppress, boolean deleteMetricsBam, boolean isFull, String studyName, File targetFile, HashMap<String,String> properties) {
 		super(templateFile, rootDirectory, commandString, commandType, logFile, email,
-				wallTime, heartbeat, failmax, jobs, suppress);
+				wallTime, heartbeat, failmax, jobs, suppress, isFull, properties);
 		this.targetFile = targetFile;
 		this.studyName = studyName;
+		this.deleteMetricsBam = deleteMetricsBam;
 		// TODO Auto-generated constructor stub
 	}
 
@@ -42,50 +45,57 @@ public class TFCommandExomeMetrics extends TFCommand {
 			ArrayList<File> protectList = new ArrayList<File>();
 
 			//Create run directory
-			File runDirectory = new File(this.rootDirectory,"JOB_" + si.getSampleName() + "_metrics");
+			File runDirectory = new File(this.rootDirectory,"JOB_" + si.getSampleID() + "_metrics");
 			runDirectoryList.add(runDirectory);
 			runDirectory.mkdir();
 			
 			//Create  files
-			File bam = new File(runDirectory,si.getSampleName() + ".bam");
-			File bai = new File(runDirectory,si.getSampleName() + ".bai");
-			File sam = new File(runDirectory,si.getSampleName() + ".sam.gz");
+			File mbam = new File(runDirectory,si.getSampleID() + ".mate.bam");
+			File mbai = new File(runDirectory,si.getSampleID() + ".mate.bai");
+			File rbam = new File(runDirectory,si.getSampleID() + ".split.lane.bam");
+			File rbai = new File(runDirectory,si.getSampleID() + ".split.lane.bai");
+			
 			File cmdFile = new File(runDirectory,"cmd.txt");
 			
 			//Link necessary files
-			this.createLink(si.getFile(TFConstants.FILE_BAM),bam);
-			this.createLink(si.getFile(TFConstants.FILE_BAI),bai);
-			this.createLink(si.getFile(TFConstants.FILE_SAM),sam);
+			this.createLink(si.getFile(TFConstants.FILE_BAM),mbam);
+			this.createLink(si.getFile(TFConstants.FILE_BAI),mbai);
+			this.createLink(si.getFile(TFConstants.FILE_SPLIT_LANE_BAM),rbam);
+			this.createLink(si.getFile(TFConstants.FILE_SPLIT_LANE_BAI),rbai);
 			
 			//Create replacement hash
 			HashMap<String,String> replacements = new HashMap<String,String>();
 			
 			//Copy target region to directory
 			if (this.targetFile == null) {
-				this.targetFile = new File("/home/u0855942/tim_genomes/hg19.ccds.20130301.bed");
+				this.targetFile = new File("/home/u0855942/tim_genomes/hg19.ccds.20131019.bed");
 			}
+			
 			File destFile = new File(runDirectory,targetFile.getName());
 			this.cpFile(targetFile, destFile);
+	
 			
-			
-			replacements.put("NAME", si.getSampleName());
+			replacements.put("NAME", si.getSampleID());
 			replacements.put("TARGETS", destFile.getName());
 			replacements.put("FILE",targetFile.getName());
+			replacements.putAll(this.properties);
 			
 			
 			//Create cmd.txt file
-			this.createCmd(replacements, cmdFile);
+			this.createCmd(replacements, cmdFile,0);
 			
 		
 			//Mark files for deletion of cleanup protection
-			protectList.add(bam);
-			protectList.add(sam);
-			protectList.add(bai);
+			protectList.add(rbam);
+			protectList.add(rbai);
+			protectList.add(mbam);
+			protectList.add(mbai);
 			protectList.add(cmdFile);
 			protectList.add(destFile);
-			deleteList.add(bam);
-			deleteList.add(bai);
-			deleteList.add(sam);
+			deleteList.add(mbam);
+			deleteList.add(mbai);
+			deleteList.add(rbam);
+			deleteList.add(rbai);
 						
 			TFThread thread = new TFThread(runDirectory,this.failmax, counter, this.heartbeat, protectList, this.logFile);
 			
@@ -126,11 +136,11 @@ public class TFCommandExomeMetrics extends TFCommand {
 			
 
 			//Make destination files
-			File metricsFile = new File(metricsDir,si.getSampleName() + ".dict.txt");
+			File metricsFile = new File(metricsDir,si.getSampleID() + ".dict.txt");
 			
 			
 			//Move results
-			this.moveFile(new File(runDirectory,si.getSampleName() + ".dict.txt"), metricsFile);
+			this.moveFile(new File(runDirectory,si.getSampleID() + ".dict.txt"), metricsFile);
 			this.cpFile(runImageDirectory, metricsDir);
 
 			
@@ -150,10 +160,33 @@ public class TFCommandExomeMetrics extends TFCommand {
 		
 		//Move JOB directories
 		for (File rd: runDirectoryList) {
+			File existDir = new File(jobDir,rd.getName());
+			if (existDir.exists()) {
+				deleteFolder(existDir);
+			}
 			this.moveFile(rd, jobDir);
 		}
 		
-
+		//Clean up metrics files if specified
+		this.logFile.writeInfoMessage("Deleting raw alignments");
+		if (this.deleteMetricsBam && this.isFull) {
+			for (TFSampleInfo si: sampleList) {
+				if (si.getFile(TFConstants.FILE_BAM).exists()) {
+					si.getFile(TFConstants.FILE_BAM).delete();
+				}
+				if (si.getFile(TFConstants.FILE_BAI).exists()) {
+					si.getFile(TFConstants.FILE_BAI).delete();
+				}
+				if (si.getFile(TFConstants.FILE_SPLIT_LANE_BAM).exists()) {
+					si.getFile(TFConstants.FILE_SPLIT_LANE_BAM).delete();
+				}
+				if (si.getFile(TFConstants.FILE_SPLIT_LANE_BAI).exists()) {
+					si.getFile(TFConstants.FILE_SPLIT_LANE_BAI).delete();
+				}
+			}
+		}
+		
+        //FIN
 	}
 	
 	
