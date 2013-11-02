@@ -5,6 +5,7 @@ import java.io.BufferedOutputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -22,7 +23,7 @@ public abstract class TFCommand {
 	protected String commandType = null;
 	
 	//Directory locations
-	protected File templateFile = null;
+	protected ArrayList<File> templateFiles = null;
 	protected File rootDirectory = null;
 	
 	//Log file
@@ -35,6 +36,7 @@ public abstract class TFCommand {
 	protected Integer wallTime = 0;
 	protected String email = null;
 	protected boolean suppress = false;
+	protected boolean isFull = false;
 	protected Integer jobs= null;
 	
 	//Tomato thread options
@@ -44,36 +46,68 @@ public abstract class TFCommand {
 	//Thread daemon
 	protected TFThreadDaemon daemon = null;
 
+	//Variables
+	protected HashMap<String,String> properties = null;
 	
-	public static TFCommand getCommandObject(File templateDir, File rootDirectory, String commandLine, TFLogger logFile, 
-			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress, String study, String splitType,  File targetFile) {
+	public static TFCommand getCommandObject(File rootDirectory, String commandLine, TFLogger logFile, 
+			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress,
+			boolean deleteMetricsBams, boolean deleteReducedBams, boolean isFull, boolean use1KGenomes, String study, String splitType,  
+			File targetFile, HashMap<String,String> properties) {
+		File templateDir = new File(properties.get("TEMPLATE_PATH"));
 		String[] commandParts = commandLine.split(":");
 		if (commandParts.length < 2) {
 			logFile.writeErrorMessage("Must be at least two parts for every command", true);
 			System.exit(1);
 		}
+		ArrayList<File> templateFiles = new ArrayList<File>();
 		File templateFile = new File(templateDir,"templates/" + commandParts[0] + "/" + commandParts[0] + "." + commandParts[1] + ".txt");
 		if (!templateFile.exists()) {
 			logFile.writeErrorMessage("Configuration file invalid, specified template file doesn not exist: " + commandLine,false);
 			System.exit(1);
 		}
+		templateFiles.add(templateFile);
+		File depFile = new File(templateDir,"templates/" + commandParts[0] + "/deps." + commandParts[1] + ".txt");
+		if (depFile.exists()) {
+			logFile.writeInfoMessage("Found dependencies: ");
+			try {
+				BufferedReader br = new BufferedReader(new FileReader(depFile));
+				String line = "";
+				while ((line = br.readLine()) != null) {
+					File extraFile = new File(templateDir,"templates/" + commandParts[0] + "/" + line);
+					if (!extraFile.exists()) {
+						logFile.writeErrorMessage("Configuration file invalid, specified template file doesn not exist: " + extraFile.toString(),false);
+						System.exit(1);
+					}
+					logFile.writeInfoMessage("\t" + extraFile.getName());
+					templateFiles.add(extraFile);
+				}
+				br.close();
+			} catch (FileNotFoundException fnfe) {
+				logFile.writeErrorMessage("[getCommandObject] Count not find deps file", true);
+			} catch (IOException ioex) {
+				logFile.writeErrorMessage("[getCommandObject] Error reading deps file",true);
+			}
+		}
 		
 		TFCommand returnCommand = null;
-		if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVOALIGN) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA)) {
+		if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA)) {
 			if (failmax == null) {
 				failmax = 3;
 			}
-			returnCommand = new TFCommandExomeAlign(templateFile,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, heartbeat, failmax, jobs, suppress);
+			returnCommand = new TFCommandExomeAlign(templateFiles,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, 
+					heartbeat, failmax, jobs, suppress, isFull, properties);
 		} else if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_METRICS)) {
 			if (failmax == null) {
 				failmax = 3;
 			}
-			returnCommand = new TFCommandExomeMetrics(templateFile,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, heartbeat, failmax, jobs, suppress, study, targetFile);
-		} else if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW)) {
+			returnCommand = new TFCommandExomeMetrics(templateFiles,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, 
+					heartbeat, failmax, jobs, suppress, deleteMetricsBams, isFull, study, targetFile, properties);
+		} else if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR)) {
 			if (failmax == null) {
 				failmax = 5;
 			}
-			returnCommand = new TFCommandExomeVariantRaw(templateFile,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, heartbeat, failmax, jobs, suppress, study, splitType, targetFile);
+			returnCommand = new TFCommandExomeVariant(templateFiles,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, 
+					heartbeat, failmax, jobs, suppress, deleteReducedBams, isFull, use1KGenomes, study, splitType, targetFile, properties);
 		}
 		
 		else {
@@ -87,9 +121,9 @@ public abstract class TFCommand {
 	}
 	
 
-	public TFCommand(File templateFile, File rootDirectory, String commandString, String commandType, TFLogger logFile, 
-			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress) {
-		this.templateFile = templateFile;
+	public TFCommand(ArrayList<File> templateFile, File rootDirectory, String commandString, String commandType, TFLogger logFile, 
+			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress, boolean isFull, HashMap<String,String> properties) {
+		this.templateFiles = templateFile;
 		this.rootDirectory  = rootDirectory;
 		this.commandString = commandString;
 		this.commandType = commandType;
@@ -100,6 +134,8 @@ public abstract class TFCommand {
 		this.failmax = failmax;
 		this.jobs = jobs;
 		this.suppress  = suppress;
+		this.properties = properties;
+		this.isFull = isFull;
 	}
 	
 	
@@ -408,12 +444,27 @@ public abstract class TFCommand {
 			System.exit(1);
 		}
 	}
+	
+	
+	protected void deleteFolder(File folder) {
+	    File[] files = folder.listFiles();
+	    if(files!=null) { //some JVMs return null for empty dirs
+	        for(File f: files) {
+	            if(f.isDirectory()) {
+	                deleteFolder(f);
+	            } else {
+	                f.delete();
+	            }
+	        }
+	    }
+	    folder.delete();
+	}
    
 	
-    protected void createCmd(HashMap<String,String> replacements, File cmdFile) {
+    protected void createCmd(HashMap<String,String> replacements, File cmdFile, int index) {
 		//Write command file
 		try {
-			BufferedReader br = new BufferedReader(new FileReader(this.templateFile));
+			BufferedReader br = new BufferedReader(new FileReader(this.templateFiles.get(index)));
 			BufferedWriter bw = new BufferedWriter(new FileWriter(cmdFile));
 			
 			
@@ -437,6 +488,7 @@ public abstract class TFCommand {
 			while((line = br.readLine()) != null) {
 				String edited = line;
 				for (String key: replacements.keySet()) {
+				
 					edited = edited.replaceAll(key, replacements.get(key));
 				}
 				bw.write(edited + "\n");

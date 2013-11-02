@@ -8,6 +8,7 @@ import java.util.concurrent.ExecutorCompletionService;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.ThreadPoolExecutor;
 
 public class TFThreadDaemon extends Thread {
 	
@@ -18,6 +19,8 @@ public class TFThreadDaemon extends Thread {
 	private String commandString = null;
 	private Integer totalJobs = null;
 	private boolean failed = false;
+	private boolean maxed = false;
+	private int concurrentJobs = 0;
 
 	/** TFThread Daemon creates a Thread derived class that manages individual tomato job threads.  Once the daemon is
 	 * created and started, you can give the daemon new jobs to manage.  Note that the daemon is started with a set 
@@ -36,9 +39,12 @@ public class TFThreadDaemon extends Thread {
 		this.taskList = new ArrayList<Callable<Boolean>>();
 		this.pool = Executors.newFixedThreadPool(concurrentJobs);
 		this.service = new ExecutorCompletionService<Boolean>(pool);
+		this.concurrentJobs = concurrentJobs;
 		
 		
 	}
+	
+	
 	
 	private void writeErrorMessage(String message, boolean internal) {
 		logFile.writeErrorMessage("[DAEMON] " + message,internal);
@@ -55,6 +61,22 @@ public class TFThreadDaemon extends Thread {
 	public boolean getFailed() {
 		return this.failed;
 	}
+	
+	public boolean isMaxed() {
+		return this.maxed;
+	}
+	
+	public void decrementFinishedJobs() {
+		this.totalJobs -= 1;
+	}
+	
+	public int getActive() {
+		ThreadPoolExecutor tpe = ((ThreadPoolExecutor)this.pool);
+		int queued = tpe.getQueue().size();
+		int active = tpe.getActiveCount();
+		int notCompleted = queued + active;
+		return notCompleted;
+	}
 
 	
 	@Override
@@ -67,6 +89,12 @@ public class TFThreadDaemon extends Thread {
 				if (taskList.size() > 0) {
 					Callable<Boolean> job = taskList.remove(0);
 					service.submit(job);
+				}
+				
+				if (this.getActive() >= (this.concurrentJobs * 2)) {
+					this.maxed = true;
+				} else {
+					this.maxed = false;
 				}
 				
 				Future<Boolean> result = service.poll();
@@ -85,6 +113,8 @@ public class TFThreadDaemon extends Thread {
 					} 
 				}
 				
+				
+				
 				if (finishedJobs == this.totalJobs) {
 					Thread.currentThread().interrupt();
 				}
@@ -93,7 +123,7 @@ public class TFThreadDaemon extends Thread {
 				    throw new InterruptedException();
 				}
 				
-				Thread.sleep(5000);
+				Thread.sleep(1000);
 			}
 					
 		} catch (InterruptedException irrex) {

@@ -48,6 +48,8 @@ public class TFLogger {
 		try {
 			this.logWriter.write(message + "\n");
 			this.localLogWriter.write(message + "\n");
+			this.logWriter.flush();
+			this.localLogWriter.flush();
 		} catch (IOException ioex) {
 			writeErrorMessage("Error writing to TomatoFarmer log file.  Exiting run, please contact core with the run log: bioinformaticscore@utah.edu\n",true);
 			System.exit(1);

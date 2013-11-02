@@ -19,12 +19,20 @@ public class TFThread implements Callable<Boolean> {
 		private File stdoutFile = null;
 		private File endFile = null;
 		private File tmpFailFile = null;
+		private File running = null;
 		private static volatile Integer failCount = 0;
 		private int failMax = 0;
 		private int threadnumber = 0;
 		private int heartbeat = 0;
 		private File directory = null;
 		private ArrayList<File> keepers = null;
+		private ArrayList<File> deleteEarly = null;
+		private boolean deleted = false;
+		
+		public TFThread(File directory, int failMax, int threadnumber, int heartbeat, ArrayList<File> keepers, ArrayList<File> deleteEarly, TFLogger tfLogger) {
+			this(directory,failMax,threadnumber,heartbeat,keepers,tfLogger);
+			this.deleteEarly = deleteEarly;
+		}
 		
 		public TFThread(File directory, int failMax, int threadnumber, int heartbeat, ArrayList<File> keepers, TFLogger tfLogger) {
 			this.logFile = new File(directory,"log.txt");
@@ -33,6 +41,7 @@ public class TFThread implements Callable<Boolean> {
 			this.stdoutFile = new File(directory,"stdout.txt");
 			this.startFile = new File(directory,"b");
 			this.endFile = new File(directory,"a");
+			this.running = new File(directory,"r");
 			this.heartbeat = heartbeat;
 			this.failMax = failMax;
 			this.threadnumber = threadnumber;
@@ -157,7 +166,7 @@ public class TFThread implements Callable<Boolean> {
 							foundStderr = true;
 							
 							this.writeInfoMessage("Found log file!");
-							Thread.sleep(5000);
+							Thread.sleep(1000);
 							
 							if (!this.logFile.exists()) {
 								this.writeInfoMessage("T" + this.threadnumber + " Could not find log file, assuming error");
@@ -185,7 +194,44 @@ public class TFThread implements Callable<Boolean> {
 						} else if (this.tmpFailFile.exists()) {
 							foundStderr = true;
 							this.writeInfoMessage("Found tmp.fail, resubmitting");
+						} else if (this.logFile.exists() && !startFile.exists() && !running.exists() && !errorFile.exists()) {
+							BufferedReader br = new BufferedReader(new FileReader(logFile));
+							String line = "";
+							String lastLine = "";
+							while ((line=br.readLine()) != null) {
+								lastLine = line;
+							}
+							br.close();
+							
+							if (Pattern.matches(".+?Job failed.*", lastLine)) {
+								this.writeInfoMessage("Apparent tomato failure, resubmitting, resubmitting");
+								foundStderr = true;
+							}
 						}
+//						} else if (deleteEarly != null && logFile.exists() && !errorFile.exists() && !tmpFailFile.exists()) {
+//							BufferedReader br = new BufferedReader(new FileReader(logFile));
+//							String line = "";
+//							String lastLine = "";
+//							int counter = 0;
+//							while ((line=br.readLine()) != null) {
+//								counter += 1;
+//								lastLine = line;
+//							}
+//							br.close();
+//							
+//							if (counter > 4 && !Pattern.matches(".+?Job failed.*", lastLine)) {
+//								this.writeInfoMessage("T" + this.threadnumber + " Upload appears to be finished, deleting temp files");
+//								File[] fileList = this.directory.listFiles();
+//								for (File file: fileList) {
+//									if (!file.isDirectory() && !this.deleteEarly.contains(file)) {
+//										file.delete();
+//									}
+//								}
+//							}
+//							
+//							this.deleted = true;
+//							
+//						}
 							
 							
 						if (tomatoFailed) {
@@ -193,6 +239,10 @@ public class TFThread implements Callable<Boolean> {
 							if (failCount > this.failMax) {
 								this.writeInfoMessage("Too many tomato run failures, killing all jobs and exiting");
 								analysisFinished = true;
+								analysisFailed = true;
+							} else if (this.deleted) {
+								this.writeErrorMessage("Some necessary files were deleted to save space, and the job can't be resubmitted. "
+										+ "(I know this is a dumb-sounding error, but it was done to save space, sorry.",true);
 								analysisFailed = true;
 							} else {
 								this.writeInfoMessage("Resubmitting tomato job.  Resubmission " + failCount + " of " + this.failMax);
@@ -216,6 +266,15 @@ public class TFThread implements Callable<Boolean> {
 				this.writeErrorMessage("Could not read the log file, please contact core",true);
 				analysisFailed = true;
 			}
+			if (deleteEarly != null && !analysisFailed) {
+				for (File f: deleteEarly) {
+					if (f.exists()) {
+						f.delete();
+					}
+				}
+			}
+			
+			
 			return analysisFailed;
 		}
 

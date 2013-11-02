@@ -25,7 +25,7 @@ public class VCFSample {
 		this.originalRecord = sample;
 		this.originalFormat = sampleFormat;
 		//is it a no call?
-		if (sample.equals("./.")){
+		if (sample.substring(0,3).equals("./.")){
 			noCall = true;
 		}
 		else {

@@ -226,9 +226,30 @@ public class VCFAnnotator {
 			
 			for(VCFRecord vr: parser.getVcfRecords()) {
 				String chrom = vr.getChromosome().replace("chr", "");
+				//String chrom = vr.getChromosome();
+				String ref = vr.getReference();
+				String alt = vr.getAlternate()[0];
+				int position = vr.getPosition() + 1;
+				if (ref.length() == 1 && alt.length() > 1) {
+					if (!ref.equals(alt.substring(0, 1))) {
+						System.out.println("First base of InDel doesn't match, skipping");
+					} else {
+						ref = "-";
+						alt = alt.substring(1);
+					}
+				} else if (ref.length() > 1 && alt.length() == 1) {
+					if (!alt.equals(ref.substring(0,1))) {
+						System.out.println("First base of InDel doesn't match, skipping");
+					} else {
+						ref = ref.substring(1);
+						alt = "-";
+						position += 1;
+					}
+					
+				}
 				String endPosition = String.valueOf(this.getAnnovarEndPosition(vr));
 				String altAllele = vr.getAlternate()[0];
-				bw.write(chrom + "\t" + String.valueOf(vr.getPosition() + 1) + "\t" + endPosition + "\t" + vr.getReference() + "\t" + altAllele + "\n");
+				bw.write(chrom + "\t" + String.valueOf(position) + "\t" + endPosition + "\t" + ref + "\t" + alt + "\n");
 			}
 			
 			bw.flush();
@@ -834,7 +855,7 @@ public class VCFAnnotator {
 				this.parsedVCF.getVcfComments().addInfo(info);
 			}
 			
-			System.out.println("YO");
+			
 			
 		
 		}

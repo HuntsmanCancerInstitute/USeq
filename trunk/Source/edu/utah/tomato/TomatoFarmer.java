@@ -9,6 +9,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.regex.Matcher;
@@ -22,6 +23,8 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import javax.mail.Session;
 
+import edu.utah.tomato.TFConstants;
+
 
 import util.gen.IO;
 import util.gen.Misc;
@@ -33,7 +36,10 @@ public class TomatoFarmer {
 	private String username;
 	private File rootDirectory = null;
 	private String email = null;
-	private boolean deleteSam = false;
+	
+	private boolean isFull = false;
+	private HashMap<String,String> properties = new HashMap<String,String>();
+	
 	
 	private boolean tomatoFarmerFailed = true;
 	
@@ -42,6 +48,8 @@ public class TomatoFarmer {
 	
 	//Analysis step management
 	private ArrayList<TFCommand> commandList = null;
+	
+	 
 	
 	
 	
@@ -69,6 +77,7 @@ public class TomatoFarmer {
 			for (TFCommand command: this.commandList) {
 				br.write(command.commandString);
 				command.run(sampleList);
+				
 			}
 			
 			br.close();
@@ -77,29 +86,75 @@ public class TomatoFarmer {
 			System.exit(1);
 		}
 		
-		//Clean up sam files if specified
-		this.logFile.writeInfoMessage("Deleting raw alignments");
-		if (this.deleteSam) {
-			File alignDir = new File(this.rootDirectory,"Alignments");
-			File samDir = new File(alignDir,"RawAlignments");
-			for (File sf: samDir.listFiles()) {
-				sf.delete();
-			}
-			samDir.delete();
-			
-		}
+		
+		
+		
 		
 		try {
 			this.postMail(this.email, "TomatoFarmer finished successfully", "", "Farmer@tomatosareawesome.org");
 		} catch (MessagingException e) {
 			logFile.writeErrorMessage("Failed to send ending email", true);
 			e.printStackTrace();
-		}
+		} catch (NoClassDefFoundError ncdfe) {
+ 			logFile.writeErrorMessage("Failed to send ending email", true);
+ 		}
 		
 		this.tomatoFarmerFailed = false;
 		logFile.writeInfoMessage("TomatoFarmer finished successfully!");
 	}
 
+	
+	private void validatePropertiesFile(File propertiesFile) {
+		ArrayList<String> properties = new ArrayList<String>();
+		properties.add("DATA_PATH");
+		properties.add("DATA2_PATH");
+		properties.add("BWA_PATH");
+		properties.add("PICARD_PATH");
+		properties.add("GATK_PATH");
+		properties.add("SAM_PATH");
+		properties.add("R_PATH");
+		properties.add("USEQ_PATH");
+		properties.add("TEMPLATE_PATH");
+		properties.add("SCRATCH_PATH");
+		properties.add("JAVA_MEM");
+		properties.add("JAVA_PATH");
+		properties.add("NOVOALIGN_PATH");
+
+		
+		try {
+			BufferedReader br = new BufferedReader(new FileReader(propertiesFile));
+			String line = null;
+			
+			Pattern p = Pattern.compile("(.+?)=(.+)");
+			
+			while ((line = br.readLine()) != null) {
+				Matcher m = p.matcher(line);
+				if (m.matches()) {
+					this.properties.put(m.group(1), m.group(2));
+				}
+			}
+			
+			br.close();
+				
+		} catch (IOException ioex) {
+			System.out.println("Error reading properties file: " + ioex.getMessage());
+			System.exit(1);
+		}
+		
+		boolean passed = true;
+		for (String p: properties) {
+			if (!this.properties.containsKey(p)) {
+				System.out.println("Properties file does not contain required key: " + p);
+				passed = false;
+			}
+		}
+		
+		if (!passed) {
+			System.exit(1);
+		}
+		
+		
+	}
 
 
 	private void validateFileSet(TFSampleInfo fi) {
@@ -241,13 +296,14 @@ public class TomatoFarmer {
 		Pattern pat = Pattern.compile("-[a-z]");
 		
 		String targetType = null;
-		String analysisType = null;
 		File directory = null;
 		File configFile = null;
+		File propertiesFile = null;
 		String email = null;
 		Integer wallTime = null;
 		String logLevel = "INFO";
 		String studyName  = "STUDY";
+		String analysisType = null;
 		
 		int heartbeat = 30;
 		int jobNumber = 5;
@@ -255,7 +311,11 @@ public class TomatoFarmer {
 		boolean splitChroms = false;
 		boolean noSplit = false;
 		boolean suppressEmail = true;
-		boolean deleteSam = true;
+		boolean use1KGenomes = false;
+		boolean deleteMetricsBam = true;
+		boolean deleteReducedBam = true;
+		
+		
 		
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -269,7 +329,7 @@ public class TomatoFarmer {
 					case 'w': wallTime = Integer.parseInt(args[++i]); break;
 					case 'c': splitChroms = true; break;
 					case 'n': noSplit = true; break;
-					case 'y': analysisType = args[++i].toLowerCase(); break;
+					case 'y': analysisType = args[++i]; break;
 					case 't': targetType = args[++i]; break;
 					case 'f': manualFail = true; break;
 					case 'l': logLevel = args[++i]; break;
@@ -277,8 +337,11 @@ public class TomatoFarmer {
 					case 'j': jobNumber = Integer.parseInt(args[++i]); break;
 					case 's': studyName = args[++i]; break;
 					case 'x': suppressEmail = false; break; 
-					case 'r': deleteSam = false; break;
+					case 'p': propertiesFile = new File(args[++i]); break; 
 					case 'h': printDocs(); System.exit(0);
+					case 'u': deleteMetricsBam = false; break;
+					case 'v': deleteReducedBam = false; break;
+					case 'g': use1KGenomes = true; break;
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -288,6 +351,17 @@ public class TomatoFarmer {
 			}
 		}
 		
+		//read in properties file
+		if (propertiesFile == null) {
+			System.out.println("The properties ( -p ) file was not specified, exiting");
+			System.exit(1);
+		}
+		if (!propertiesFile.exists()) {
+			System.out.println("Specified properties file does not exist, exiting");
+			System.exit(1);
+		}
+		validatePropertiesFile(propertiesFile);
+		
 		//***********************************************
 		// Set up logging file
 		//***********************************************
@@ -296,7 +370,7 @@ public class TomatoFarmer {
 		this.username = System.getProperty("user.name");
 				
 		//Initialize log files
-		logFile = new TFLogger(TFConstants.templateDir,this.rootDirectory,this.username,logLevel);
+		logFile = new TFLogger(new File(this.properties.get("TEMPLATE_PATH")),this.rootDirectory,this.username,logLevel);
 		
 		//Write Username to file
 		logFile.writeSystemMessage("Username: " + this.username);
@@ -320,6 +394,8 @@ public class TomatoFarmer {
 			splitType = "none";
 		}
 		
+		
+		
 		//Write out system arguments
 		logFile.writeInfoMessage(IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " "));
 		
@@ -338,10 +414,10 @@ public class TomatoFarmer {
 		this.email = email;
 		
 
-		if (!directory.getAbsolutePath().startsWith("/tomato/version/job")) {
-			logFile.writeErrorMessage("Your job directory must be contained within /tomato/version/job.  Offending directory: " + directory.getAbsolutePath(),false);
-			System.exit(1);
-		}
+//		if (!directory.getAbsolutePath().startsWith("/tomato/version/job")) {
+//			logFile.writeErrorMessage("Your job directory must be contained within /tomato/version/job.  Offending directory: " + directory.getAbsolutePath(),false);
+//			System.exit(1);
+//		}
 		
 		if (!directory.canWrite() || !directory.canRead() || !directory.canExecute()) {
 			logFile.writeErrorMessage("Your directory is not accessable to tomatoFarmer, please edit permissions",false);
@@ -363,7 +439,7 @@ public class TomatoFarmer {
 			logFile.writeErrorMessage("Email does not pass our format check, please check if it was entered properly.  Offending email: " + email,false);
 			System.exit(1);
 		}
-		
+	
 		//Check to make sure the run type is valid
 		if (analysisType == null) {
 			logFile.writeErrorMessage("You must set runtype",false);
@@ -372,14 +448,15 @@ public class TomatoFarmer {
 	
 		//Specify the configuration file
 		if (TFConstants.validTypes.contains(analysisType)) {
-			configFile = new File(TFConstants.templateDir,"defaults/" + analysisType + ".default.txt");
+			configFile = new File(this.properties.get("TEMPLATE_PATH"),"defaults/" + analysisType + ".default.txt");
 			if (!configFile.exists()) {
 				logFile.writeErrorMessage("Default configuration file for runtype " + analysisType + " does not exist", true);
 				System.exit(1);
 			}
 			
-			if (analysisType.equals("exome_bw") || analysisType.equals("exome_novoalign") && deleteSam) {
-				this.deleteSam = true;
+			if (analysisType.equals("exome_bw_raw") || analysisType.equals("exome_novo_raw") || analysisType.equals("exome_novo_vqsr") ||
+					analysisType.equals("exome_bw_vqsr")) {
+				this.isFull = true;
 			}
 		} else {
 			configFile = new File(analysisType);
@@ -390,11 +467,13 @@ public class TomatoFarmer {
 			}
 		}
 		
+		
+		
 		//Make sure the target capture is valid
 		File targetFile = null;
 		
 		if (targetType != null) {
-			File targetDirectory = new File(TFConstants.templateDir,"captureRegions");
+			File targetDirectory = new File(new File(this.properties.get("TEMPLATE_PATH")),"captureRegions");
 			if (TFConstants.validTargets.contains(targetType)) {
 				targetFile = new File(targetDirectory,targetType + ".bed");
 				if (!targetFile.exists()) {
@@ -409,6 +488,8 @@ public class TomatoFarmer {
 					System.exit(1);
 				}
 			}
+		} else {
+			targetFile = new File(this.properties.get("TARGET_DEFAULT"));
 		}
 		
 
@@ -442,12 +523,14 @@ public class TomatoFarmer {
 					}
 					scanner.close();
 				} 
-				TFCommand cmd = TFCommand.getCommandObject(TFConstants.templateDir, directory, commandString, logFile, email, wallTime, heartbeat, failmax, jobNumber, suppressEmail, studyName, splitType, targetFile);
+				TFCommand cmd = TFCommand.getCommandObject(directory, commandString, logFile, email, wallTime, heartbeat, 
+						failmax, jobNumber, suppressEmail, deleteMetricsBam, deleteReducedBam, isFull, use1KGenomes, studyName, 
+						splitType, targetFile, this.properties);
 				commandList.add(cmd);
 			}
 			br.close();
 		} catch (IOException ioex) {
-			logFile.writeErrorMessage("Could not read configuation file",true);
+			logFile.writeErrorMessage("Could not read configuration file",true);
 			System.exit(1);
 		}
 		
@@ -473,7 +556,7 @@ public class TomatoFarmer {
 		
 		
 		if (commandList.get(0).getCommandType().equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) || 
-				commandList.get(0).getCommandType().equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVOALIGN)) {
+				commandList.get(0).getCommandType().equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO)) {
 			for (TFSampleInfo fi: sampleList) {
 				validateFileSet(fi);
 			}
@@ -506,20 +589,27 @@ public class TomatoFarmer {
 				"       opt to get all tomato emails as individual jobs start/end (see option -x).\n" +
 				"       Example: '-e hershel.krustofsky@hci.utah.edu'.\n" +
 				"-y Analysis pipeline. The analysis pipeline or step to run.  Current options are: \n" +
-				"          1) exome_bwa - Full exome analysis (bwa).\n" +
-				"          2) exome_novoalign - Full exome analysis (novoalign). \n" +
-				"          3) exome_align_bwa - Alignment/recalibration only (bwa).\n" +
-				"          4) exome_align_novoalign - Align/recalibration only (novoalign).\n" +
-				"          5) exome_metrics - Sample QC metrics only. Requires sam.gz, bam/bai from 1,2,\n" +
-				"             3 or 4 in the launch directory.\n" +
-				"          6) exome_variant_raw - Variant detection and filtering (raw settings). \n" + 
-				"             Requires bam/bai from 1,2,3 or 4 in the launch directory.\n" + 
-				"          7) path to configuration file.  This allows you to use older versions of \n" +
+				"          Full Pipeline \n" +
+				"          1) exome_bwa_raw - Full exome analysis, using bwa and raw filtering.\n" +
+				"          2) exome_bwa_vqsr - Full exome analysis, using bwa and vqsr filtering\n" +
+				"          3) exome_novo_raw - Full exome analysis, using novoalign and raw filtering\n" +
+				"          4) exome_novo_vqsr - Full exome analysis, using novoalign and vqsr filtering\n\n"+
+				"          A la carte\n"+
+				"          5) exome_align_bwa - Alignment/recalibration only (bwa).\n" +
+				"          6) exome_align_novo - Align/recalibration only (novoalign).\n" +
+				"          7) exome_metrics - Sample QC metrics only. Requires *mate.bam and \n" +
+				"             *split.lane.bam from 1, 2, 3, 4, 5 or 6 in the launch directory.\n" +
+				"          8) exome_variant_raw - Variant detection and filtering (raw settings). \n" + 
+				"             Requires *reduced.bam from 1, 2, 3, 4, 5 or 6 in the launch directory.\n" + 
+				"          9) exome_variant_vqsr - Variant detection and filtering (vqsr) \n" +
+				"             Requires *reduced.bam from 1, 2, 3, 4, 5 or 6 in the launch directory.\n" + 
+				"          10) path to configuration file.  This allows you to use older versions of \n" +
 				"             the pipeline.\n" +		
 				"      If you want run older versions of the pipeline, you must provide a configuration\n" +
 				"      file, otherwise the most recent versions of each command are used. \n" +
-				"      Example: '-y exome_bwa'.\n" + 
-
+				"      Example: '-y exome_bwa'.\n" +  
+				"-p Properties file.  This file contains a list of cluster-specific paths and options \n" +
+				"      this file doesn't need to be changed by the user. Example: '-p properties.txt' \n" +
 				"\nOptional Arguments:\n\n"+
 				"-t Target regions. Setting this argument will restrict coverage metrics and variant \n" +
 				"      detection to targeted regions.  This speeds up the variation detection process\n" +
@@ -533,6 +623,10 @@ public class TomatoFarmer {
 				"          7) path to custom targed bed file.\n" +
 				"      If nothing is specifed for this argument, the full genome will be queried for \n" +
 				"      variants and ccds exomes will be used for capture metrics. Example: '-t truseq'.\n" +
+				"-g 1K Genome samples.  Use this option if you want to spike in 200 1K genome samples \n" +
+				"      as the background sample set.  This should improve VQSR variant calling and \n" +
+				"      VAAST, but it will take a lot more time to process. BETA, ONLY WORKS FOR CORE \n" +
+				"      USERS!!!\n" +
 				"-w Wall time.  Use this option followed by a new wall time, in hours, if you want less\n" +
 				"      wall time than the default 240 hours. Useful when there is upcoming CHPC \n" +
 				"      downtime. Example: '-w 40'. \n" +
@@ -546,11 +640,15 @@ public class TomatoFarmer {
 				"      region.  By default, the genome is split by callable region,  Example '-n'. \n" +
 				"-x Unsuppress tomato emails.  Receive both tomato and TomatoFarmer emails. \n" +
 				"      Example: '-x'.\n" +
-				"-r Keep raw sam alignments. This option is specific to the full pipelines. Once the\n " +
-				"      full pipeline is finished, the sam.gz files are deleted. Use this option if you\n" +
-				"      want to keep them.  They take up a lot of space and are only useful if you want\n" +
-				"      to go back before indel realignment ond base recalibration\n"+
-				
+				"-u Don't delete metrics bams (full pipeline specific).  Use this option if you want \n "+
+				"      to keep the bams used to generate the metrics output.  The two bam files are \n" +
+				"      the unprocessed lane-level sample bam and the processed lane-level sample bam \n" +
+				"      files.  Example '-u' \n" +
+				"-v Don't delete reduced bams (full pipeline specific.) Use this option if you want \n " +
+				"      to keep the reduced bams used to generate variant calls.  Reduced bams are \n" +
+				"      efficient in GATK pipelines but don't necessarily work in non-GATK software. \n" +
+				"      We recommend using the files labeled SAMPLE_NAME.bam for downstream apps\n. " +
+				"      Example '-v'\n" +
 				
 				"\nAdmin Arguments:\n\n" +
 				"-f Manually set failure level.  If this variable is set, the user will be prompted to \n" + 
@@ -584,8 +682,9 @@ public class TomatoFarmer {
 		     }
 		      
 		     if (tomatoFarmerFailed) {
-		    	 try {
-		 			postMail(email, "TomatoFarmer failed, check logs", "", "Farmer@tomatosareawesome.org");
+		    	try {
+		    		
+		 			postMail(email, "TomatoFarmer failed, check logs ","", "Farmer@tomatosareawesome.org");
 		 		} catch (MessagingException e) {
 		 			logFile.writeErrorMessage("Failed to send ending email", true);
 		 		} catch (NoClassDefFoundError ncdfe) {
