@@ -230,6 +230,7 @@ public class VCFAnnotator {
 				String ref = vr.getReference();
 				String alt = vr.getAlternate()[0];
 				int position = vr.getPosition() + 1;
+				String endPosition = String.valueOf(this.getAnnovarEndPosition(vr));
 				if (ref.length() == 1 && alt.length() > 1) {
 					if (!ref.equals(alt.substring(0, 1))) {
 						System.out.println("First base of InDel doesn't match, skipping");
@@ -244,10 +245,11 @@ public class VCFAnnotator {
 						ref = ref.substring(1);
 						alt = "-";
 						position += 1;
+						
 					}
 					
 				}
-				String endPosition = String.valueOf(this.getAnnovarEndPosition(vr));
+				
 				String altAllele = vr.getAlternate()[0];
 				bw.write(chrom + "\t" + String.valueOf(position) + "\t" + endPosition + "\t" + ref + "\t" + alt + "\n");
 			}
@@ -515,7 +517,9 @@ public class VCFAnnotator {
 				"      genomes annotations (ONEK), COSMIC annotations (COSMIC), ESP annotations (ESP),\n" +
 				"      OMIM genes and diseases (OMIM), flagged VAAST genes (V-FLAG), ACMG genes (ACMG),\n" +
 				"      and NIST callable ragions (NIST).  The SCORES option includes SIFT, PolyPhen2, \n" +
-				"      MutationTaster, MutationAssessor, LRT, GERP++, FATHMM, PhyloP and SiPhy.\n"+ 
+				"      MutationTaster, MutationAssessor, LRT, GERP++, FATHMM, PhyloP and SiPhy.\n" +
+				"      The ENSEMBL option includes the columns EnsemblRegion, EnsemblName, VarType and \n" +
+				"      VarDesc. \n" +
 				"-n VAAST output.  If a VAAST output file is specified, the VCF file is annotated with\n" +
 				"      the VAAST variation score and gene rank.\n" +
 				"-p Path to annovar directory.\n" +
@@ -913,9 +917,32 @@ public class VCFAnnotator {
 				
 				//Add the results to the VCF file
 				for (VCFRecord vr: this.parsedVCF.getVcfRecords()) {
-					String endPosition = String.valueOf(getAnnovarEndPosition(vr));
 					String chrom = vr.getChromosome().replace("chr", "");
-					String index = String.format("%s:%s-%s",chrom,vr.getPosition()+1,endPosition);
+					//String chrom = vr.getChromosome();
+					String ref = vr.getReference();
+					String alt = vr.getAlternate()[0];
+					int position = vr.getPosition() + 1;
+					String endPosition = String.valueOf(getAnnovarEndPosition(vr));
+					if (ref.length() == 1 && alt.length() > 1) {
+						if (!ref.equals(alt.substring(0, 1))) {
+							System.out.println("First base of InDel doesn't match, skipping");
+						} else {
+							ref = "-";
+							alt = alt.substring(1);
+						}
+					} else if (ref.length() > 1 && alt.length() == 1) {
+						if (!alt.equals(ref.substring(0,1))) {
+							System.out.println("First base of InDel doesn't match, skipping");
+						} else {
+							ref = ref.substring(1);
+							alt = "-";
+							position += 1;
+							
+						}
+						
+					}
+					
+					String index = String.format("%s:%s-%s",chrom,position,endPosition);
 					
 					if (outputHash.containsKey(index)) {
 						for (int i=0; i<this.ids.length; i++) {
