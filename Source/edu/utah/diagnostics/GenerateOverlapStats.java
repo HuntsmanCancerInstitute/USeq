@@ -192,14 +192,8 @@ public class GenerateOverlapStats {
 					SAMRecord sam = it.next();
 					line = sam.getSAMString().trim();
 					
-					if (++timCounter > 100000) {
-						System.out.println(matched + "  " + unmatched + " " + storedReads.size() + " " + skipped.size());
-//						for (SamAlignment s: storedReads.values()) {
-//							if (sam.getAlignmentStart() - s.getPosition() > 1000) {
-//								System.out.println(s.toString());
-//							}
-//						}
-						timCounter = 0;
+					if (sam.getNotPrimaryAlignmentFlag()) {
+						continue;
 					}
 
 					if (++dotCounter > 1000000){
@@ -474,6 +468,7 @@ public class GenerateOverlapStats {
 
 		private void processPair(SamAlignment first, SamAlignment second) throws IOException {
 			//check if the pair is from the same chromosome, acceptable distance, and proper strand
+			
 			if (testChrDistStrnd(first, second)){
 				//cross validate mate information? this is often messed up especially if from the STP app.
 				if (crossCheckMateCoordinates){
@@ -494,6 +489,7 @@ public class GenerateOverlapStats {
 				}
 			}
 			else {
+				
 				samOut.println(first);
 				samOut.println(second);
 				numberPrintedAlignments+=2;

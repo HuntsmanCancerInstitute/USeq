@@ -107,7 +107,6 @@ public class TomatoFarmer {
 	private void validatePropertiesFile(File propertiesFile) {
 		ArrayList<String> properties = new ArrayList<String>();
 		properties.add("DATA_PATH");
-		properties.add("DATA2_PATH");
 		properties.add("BWA_PATH");
 		properties.add("PICARD_PATH");
 		properties.add("GATK_PATH");
@@ -119,6 +118,15 @@ public class TomatoFarmer {
 		properties.add("JAVA_MEM");
 		properties.add("JAVA_PATH");
 		properties.add("NOVOALIGN_PATH");
+		properties.add("BACKGROUND_PATH");
+		properties.add("SAM_PATH_LOCAL");
+		properties.add("VCF_PATH_LOCAL");
+		properties.add("TABIX_PATH_LOCAL");
+		properties.add("USEQ_PATH_LOCAL");
+		properties.add("TARGET_DEFAULT");
+		properties.add("NCTHREAD");
+		properties.add("NTHREAD");
+	
 
 		
 		try {
@@ -616,11 +624,12 @@ public class TomatoFarmer {
 				"      and reduces noise. Options are:\n" +
 				"          1) AgilentAllExonV4\n" +
 				"          2) AgilentAllExonV5\n" +
-				"          3) AgilentAllExon50MB\n" +
-				"          4) NimbleGenEZCapV2\n" +
-				"          5) NimbleGenEZCapV3\n" +
-				"          6) TruSeq\n" +
-				"          7) path to custom targed bed file.\n" +
+				"          3) AgilentAllExonV5UTR\n" +
+				"          4) AgilentAllExon50MB\n" +
+				"          5) NimbleGenEZCapV2\n" +
+				"          6) NimbleGenEZCapV3\n" +
+				"          7) TruSeq\n" +
+				"          8) path to custom targed bed file.\n" +
 				"      If nothing is specifed for this argument, the full genome will be queried for \n" +
 				"      variants and ccds exomes will be used for capture metrics. Example: '-t truseq'.\n" +
 				"-g 1K Genome samples.  Use this option if you want to spike in 200 1K genome samples \n" +

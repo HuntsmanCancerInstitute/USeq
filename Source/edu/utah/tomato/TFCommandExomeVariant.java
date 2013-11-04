@@ -440,7 +440,7 @@ public class TFCommandExomeVariant extends TFCommand {
 					intervalBed.add(workingEntry);
 					bedFileIndex+=1;
 					basesInChunk += entrySize;
-					if (bedFileIndex == (bedFile.size()-1)) {
+					if (bedFileIndex == (bedFile.size())) {
 						samtoolsRegion = this.writeTargetRegions(intervalBed,chunkIntervals);
 						break;
 					}
@@ -622,13 +622,13 @@ public class TFCommandExomeVariant extends TFCommand {
 		File jobDir = new File(varDir,"Jobs");
 		
 		//Make destination files
-		File fullVcfDest = new File(varDir,this.study + ".vcf");
-		File filterVcfDest = new File(varDir,this.study + ".filtered.vcf");
-		File passingVcfDest = new File(varDir,this.study + ".passing.vcf");
+		File fullVcfDest = new File(varDir,this.study + ".raw.vcf");
+		File filterVcfDest = new File(varDir,this.study + ".filterFieldSetAll.vcf");
+		File passingVcfDest = new File(varDir,this.study + ".filterFieldSetPassing.vcf");
 		
-		File fullVcfDestGz = new File(varDir,this.study + ".vcf.gz");
-		File filterVcfDestGz = new File(varDir,this.study + ".filtered.vcf.gz");
-		File passingVcfDestGz = new File(varDir,this.study + ".passing.vcf.gz");
+		File fullVcfDestGz = new File(varDir,this.study + ".raw.vcf.gz");
+		File filterVcfDestGz = new File(varDir,this.study + ".filterFieldSetAll.vcf.gz");
+		File passingVcfDestGz = new File(varDir,this.study + ".filterFieldSetPassing.vcf.gz");
 		
 		//Merge output files
 		logFile.writeInfoMessage("Moving vcf files");
@@ -728,7 +728,6 @@ public class TFCommandExomeVariant extends TFCommand {
 			}
 			
 			bw.close();
-			
 			
 			for (String c: order) {
 				regions.add(" " + c + ":" + Integer.valueOf(startPos.get(c)) + "-" + Integer.valueOf(endPos.get(c)));
@@ -837,7 +836,7 @@ public class TFCommandExomeVariant extends TFCommand {
 //			System.exit(1);
 //		}
 		
-		return 50000000;
+		return 20000000;
 	}
 	
 	private void splitByChrom(String chrom, File source, File dest) {
@@ -846,7 +845,7 @@ public class TFCommandExomeVariant extends TFCommand {
 				logFile.writeErrorMessage("[splitByChrom] Expected file does not exist: " + source.getAbsolutePath(),true);
 			}
 			
-			ProcessBuilder pb = new ProcessBuilder("/home/u0855942/applications/samtools/samtools","view","-b","-h","-@","10",source.getAbsolutePath(),chrom);
+			ProcessBuilder pb = new ProcessBuilder(properties.get("SAM_PATH_LOCAL") + "/samtools","view","-b","-h","-@","10",source.getAbsolutePath(),chrom);
 			Process p = pb.start();
 			
 			
@@ -908,7 +907,7 @@ public class TFCommandExomeVariant extends TFCommand {
 				logFile.writeErrorMessage("[splitByChrom] Expected file does not exist: " + source.getAbsolutePath(),true);
 			}
 			
-			String[] commandArray = {"/home/u0855942/applications/samtools/samtools","view","-b","-h","-@","10",source.getAbsolutePath()};
+			String[] commandArray = {properties.get("SAM_PATH_LOCAL") + "/samtools","view","-b","-h","-@","10",source.getAbsolutePath()};
 			ArrayList<String> commandList = new ArrayList<String>(Arrays.asList(commandArray));
 			commandList.addAll(samRegion);
 			
@@ -944,7 +943,7 @@ public class TFCommandExomeVariant extends TFCommand {
 				System.exit(1);
 			}
 			
-			pb = new ProcessBuilder("/tomato/app/samtools/samtools","index",dest.getAbsolutePath());
+			pb = new ProcessBuilder(properties.get("SAM_PATH_LOCAL") + "/samtools","index",dest.getAbsolutePath());
 			p = pb.start();
 			
 			val = p.waitFor();

@@ -11,6 +11,7 @@ import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import net.sf.samtools.*;
+import net.sf.samtools.SAMFileReader.ValidationStringency;
 
 import util.gen.Misc;
 
@@ -29,35 +30,37 @@ public class CountChromosomes {
 		this.parseArgs(args);
 		
 		SAMFileReader sr = new SAMFileReader(inputFile);
+		sr.setValidationStringency(ValidationStringency.SILENT);
+		
 		header = sr.getFileHeader();
 		
 		referenceChroms.put("hg19", new ArrayList<ArrayList<String>>());
 		ArrayList<String> stdChroms = new ArrayList<String>(){{
-			add("chr1");
-			add("chr2");
-			add("chr3");
-			add("chr4");
-			add("chr5");
-			add("chr6");
-			add("chr7");
-			add("chr8");
-			add("chr9");
-			add("chr10");
-			add("chr11");
-			add("chr12");
-			add("chr13");
-			add("chr14");
-			add("chr15");
-			add("chr16");
-			add("chr17");
-			add("chr18");
-			add("chr19");
-			add("chr20");
-			add("chr21");
-			add("chr22");
-			add("chrX");
-			add("chrY");
-			add("chrM");
+			add("1");
+			add("2");
+			add("3");
+			add("4");
+			add("5");
+			add("6");
+			add("7");
+			add("8");
+			add("9");
+			add("10");
+			add("11");
+			add("12");
+			add("13");
+			add("14");
+			add("15");
+			add("16");
+			add("17");
+			add("18");
+			add("19");
+			add("20");
+			add("21");
+			add("22");
+			add("X");
+			add("Y");
+			add("MT");
 		}};
 		
 		ArrayList<String> phiX = new ArrayList<String>() {{
@@ -71,6 +74,8 @@ public class CountChromosomes {
 		referenceChroms.get("hg19").add(stdChroms);
 		referenceChroms.get("hg19").add(phiX);
 		referenceChroms.get("hg19").add(adapter);
+		
+		sr.close();
 		
 		
 	}
@@ -90,7 +95,7 @@ public class CountChromosomes {
 		ProcessBuilder pb = null;
 		
 		//Grab the total number of reads
-		pb = new ProcessBuilder(path.toString(),"view","-c",inputFile.toString());
+		pb = new ProcessBuilder(path.toString(),"view","-c","-F","256",inputFile.toString());
 		allReads = this.runSystemCommand(pb, "Count all Reads");
 		
 		//Create standard command
@@ -98,7 +103,7 @@ public class CountChromosomes {
 		stdCommand.add(path.toString());
 		stdCommand.add("view");
 		stdCommand.add("-F");
-		stdCommand.add("0x4");
+		stdCommand.add("260");
 		stdCommand.add("-c");
 		stdCommand.add(inputFile.toString());
 		
