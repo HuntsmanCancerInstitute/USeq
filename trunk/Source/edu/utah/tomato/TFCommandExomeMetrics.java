@@ -68,7 +68,7 @@ public class TFCommandExomeMetrics extends TFCommand {
 			
 			//Copy target region to directory
 			if (this.targetFile == null) {
-				this.targetFile = new File("/home/u0855942/tim_genomes/hg19.ccds.20131019.bed");
+				this.targetFile = new File(properties.get("TARGET_DEFAULT"));
 			}
 			
 			File destFile = new File(runDirectory,targetFile.getName());
@@ -193,7 +193,7 @@ public class TFCommandExomeMetrics extends TFCommand {
 	protected void mergeMetrics(File metricsDir) {
 		try {
 			
-			ProcessBuilder pb = new ProcessBuilder("java","-Xmx2g","-jar","/home/u0855942/tim_scripts/USeq_vcf/Apps/MergeExonMetrics","-f",metricsDir.getAbsolutePath(),"-o",studyName);
+			ProcessBuilder pb = new ProcessBuilder("java","-Xmx10g","-jar",properties.get("USEQ_PATH_LOCAL") + "/Apps/MergeExonMetrics","-f",metricsDir.getAbsolutePath(),"-o",studyName);
 			Process p = pb.start();
 			
 			int val = p.waitFor();

@@ -33,6 +33,7 @@ public class TFConstants {
 	public static String FILE_SAM = "sam";
 	public static String FILE_METRICS = "pdf";
 	
+	public static String TARGET_AGILENTV5UTR = "AgilentAllExonV5UTR";
 	public static String TARGET_AGILENTV5 = "AgilentAllExonV5";
 	public static String TARGET_AGILENTV4 = "AgilentAllExonV4";
 	public static String TARGET_AGILENT50MB = "AgilentAllExon50MB";
@@ -64,6 +65,7 @@ public class TFConstants {
 		private static final long serialVersionUID = 1L;
 
 	{
+		add(TFConstants.TARGET_AGILENTV5UTR);
 		add(TFConstants.TARGET_AGILENTV5);
 		add(TFConstants.TARGET_AGILENTV4);
 		add(TFConstants.TARGET_AGILENT50MB);

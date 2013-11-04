@@ -161,7 +161,7 @@ public abstract class TFCommand {
 				System.exit(1);
 			}
 			
-			ProcessBuilder pb = new ProcessBuilder("/tomato/app/vcftools/vcf-sort",source.getAbsolutePath());
+			ProcessBuilder pb = new ProcessBuilder(properties.get("VCF_PATH_LOCAL") + "/vcf-sort",source.getAbsolutePath());
 			
 			Process p = pb.start();
 			
@@ -331,7 +331,7 @@ public abstract class TFCommand {
 	protected void mergeVcf(ArrayList<File> vcfList, File dest) {
 		try {
 			ArrayList<String> command  = new ArrayList<String>();
-			command.add("/tomato/app/vcftools/vcf-concat");
+			command.add(properties.get("VCF_PATH_LOCAL") + "/vcf-concat");
 
 			for (File bam: vcfList) {
 				if (!bam.exists()) {
@@ -390,7 +390,7 @@ public abstract class TFCommand {
 				logFile.writeErrorMessage("[bgzip] Expected file does not exist: " + source.getAbsolutePath(),true);
 			}
 			
-			ProcessBuilder pb = new ProcessBuilder("/tomato/app/tabix/bgzip",source.getAbsolutePath());
+			ProcessBuilder pb = new ProcessBuilder(properties.get("TABIX_PATH_LOCAL") + "/bgzip",source.getAbsolutePath());
 			Process p = pb.start();
 			
 			int val = p.waitFor();
@@ -421,7 +421,7 @@ public abstract class TFCommand {
 				logFile.writeErrorMessage("[tabix] Expected file does not exist: " + source.getAbsolutePath(),true);
 			}
 			
-			ProcessBuilder pb = new ProcessBuilder("/tomato/app/tabix/tabix","-p","vcf",source.getAbsolutePath());
+			ProcessBuilder pb = new ProcessBuilder(properties.get("TABIX_PATH_LOCAL") + "tabix","-p","vcf",source.getAbsolutePath());
 			Process p = pb.start();
 			
 			int val = p.waitFor();
