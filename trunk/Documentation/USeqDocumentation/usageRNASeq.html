@@ -79,27 +79,6 @@ Custom Analysis:
 <p>
 <br>
 
-<h2><a href="cmdLnMenus.html#DefinedRegionDifferentialSeq">DefinedRegionDifferentialSeq</a> spreadsheet column descriptions:</h2>
-	<ol>
-		<li> #DisplayName - if the Integrated Genome Browser is open, clicking these hyper links will take you to that defined region/ gene in the genome browser.
-		<li> Name - present if found in the gene table.
-		<li> Chr  - chromosome 
-		<li> Strand - strand of the defined region
-		<li> Start  - start bp coordinate (0 based) for the defined region
-		<li> Stop - stop bp coordinate (end excluded) for the defined region
-		<li> TotalBPs - total base pairs of the defined region/ gene's exons. 
-		<li> PVal_ConditionA_ConditionB - uncorrected negative binomial -10*log10(pval) from DESeq for the paired ConditionA vs ConditionB comparison
-		<li> FDR_ConditionA_ConditionB - Benjamini-Hochberg -10*log10(FDR) estimation derived from the DESeq p-values
-		<li> VarCorLg2Rto_ConditionA_ConditionB - Log2 ratio estimation (pseudo median of ConditionA varCors - pseudo median of ConditionB varCors) for the degree of differential expression based on DESeq's variance corrected counts for each sample. 
-		<li> SpliceChiPVal_ConditionA_ConditionB - Bonferroni corrected chi-square test of independence -10*log10(pval) looking for differences in the distribution of reads between the exons for a particular gene.  Replica counts are merged for this analysis.
-		<li> SpliceMaxLg2Rto_ConditionA_ConditionB - The maximum observed log2Ratio for differential exonic splicing normalized for total gene counts.
-		<li> SpliceMaxExon_Treatment_Control - The zero based index for which exon displayed the maximum log2Ratio splicing difference.
-		<li> Counts_ConditionReplica - number of fragments from each replica that aligned to the defined region or gene exons.
-		<li> VarCorCounts_ConditionReplica   - DESeq's variance corrected fragment counts for each replica that aligned to the defined region or gene exons.
-		<li> FPKM_ConditionReplica - FPKM corrected fragment counts for each replica that aligned to the defined region or gene exons. FPKM = #fragments/TotalBPs/1000/#fragmentsInDataSet/1M
-	</ol>
-
-
 
 </body>
 </html>
