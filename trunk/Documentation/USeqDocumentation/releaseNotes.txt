@@ -1,3 +1,11 @@
+----USeq_8.6.9----
+VCFSample
+* Changed how it recognizes a no call to anything that starts with ./. so these are skipped
+DefinedRegionDifferentialSeq
+* Added a System.setProperty("java.awt.headless", "true") to allow running app in non x11 mode.
+FilterIntersectingRegions
+* Added option to split gtf/ gff files
+
 ----USeq_8.6.8----
 MethylationArrayScanner
 * Removed a requirement that non paired analysis contain matching t vc samples

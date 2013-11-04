@@ -4,6 +4,7 @@ import java.io.*;
 import util.bio.annotation.Bed;
 import util.gen.*;
 import edu.utah.seq.useq.data.*;
+
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -19,7 +20,8 @@ public class FilterIntersectingRegions {
 	private File toFlatten;
 	private HashMap<String,Region[]> regionsForFlattening;
 	private File[] toSplit;
-	private HashMap<String,RegionScoreText[]> regionsForSplitting;
+	private boolean bedFormat;
+	private HashMap<String,RegionText[]> regionsForSplitting;
 	private double minimumFractionIntersection = Double.MIN_VALUE;
 	private PrintWriter outIntersected;
 	private PrintWriter outNonIntersected;
@@ -38,12 +40,12 @@ public class FilterIntersectingRegions {
 		for (File splitMe: toSplit){
 			System.out.print("Intersecting "+splitMe.getName());
 			
-			regionsForSplitting = Bed.parseBedFile(splitMe, true);
+			regionsForSplitting = parseFile(splitMe, bedFormat);
 
 			//for each chromosome to split
 			Iterator<String> it = regionsForSplitting.keySet().iterator();
-			File intersected = new File (splitMe.getParentFile(), Misc.removeExtension(splitMe.getName())+"_Int.bed");
-			File nonIntersected = new File (splitMe.getParentFile(), Misc.removeExtension(splitMe.getName())+"_NonInt.bed");
+			File intersected = new File (splitMe.getParentFile(), Misc.removeExtension(splitMe.getName())+"_Int.txt");
+			File nonIntersected = new File (splitMe.getParentFile(), Misc.removeExtension(splitMe.getName())+"_NonInt.txt");
 			try {
 				outIntersected = new PrintWriter( new FileWriter( intersected));
 				outNonIntersected = new PrintWriter( new FileWriter( nonIntersected));
@@ -51,13 +53,13 @@ public class FilterIntersectingRegions {
 					//get text of chromosome and maxBase
 					String chrom = (String)it.next();
 					//get SS to split
-					RegionScoreText[] ssToSplit = regionsForSplitting.get(chrom);
+					RegionText[] ssToSplit = regionsForSplitting.get(chrom);
 					//make mask
 					boolean[] mask = makeMask(chrom);
 					//anything to mask?
 					if (mask == null) printNonIntersected(ssToSplit, chrom);
 					else {
-						RegionScoreText[][] split = intersect(ssToSplit, mask);
+						RegionText[][] split = intersect(ssToSplit, mask);
 						printIntersected(split[0], chrom);
 						printNonIntersected(split[1], chrom);
 					}
@@ -79,11 +81,90 @@ public class FilterIntersectingRegions {
 		}
 		System.out.println("\nDone!\n");
 	}
+	
+	/**Splits a gff or bed file by chromosome into a HashMap of chromosome : sorted RegionText[].
+	 * The Text contains the complete unmodified annotation line.*/
+	public static HashMap<String,RegionText[]> parseFile(File file, boolean bedFormat){
+		HashMap<String,ArrayList<RegionText>> chrAls = new HashMap<String,ArrayList<RegionText>>();
+		Pattern tab = Pattern.compile("\\t");
+		String line = null;
+		//gff or gtf
+		//chrom, programName, featureName, 1baseStart, endIncluded, score0-1000, strand, frame, text
+		//chr22  TeleGene      enhancer     100000        100010         500        +      .    touch1
+		//0           1           2            3             4            5         6      7      8
+		
+		//bed
+		//chrom, start, stop, name, score strand
+		// 0       1      2     3     4      5
+		int minColumns = 3;
+		int startIndex = 1;
+		int stopIndex = 2;
+		boolean subtractOne = false;
+		if (bedFormat == false){
+			minColumns = 9;
+			startIndex = 3;
+			stopIndex = 4;
+			subtractOne = true;
+		}
+		
+		try{
+			BufferedReader in = IO.fetchBufferedReader(file);
+			String[] tokens;
+
+			ArrayList<RegionText> al = new ArrayList<RegionText>(); 
+			String currentChrom = "";
+			while ((line = in.readLine()) !=null) {
+				line = line.trim();
+				if (line.length() ==0 || line.startsWith("#")) continue;
+				tokens = tab.split(line);
+				if (tokens.length < minColumns) {
+					System.err.println("Error: skipping the following annotation line, it does not contain requisit number of tab delimited columns\n\t-> "+line);
+					continue;
+				}
+				//make chromosome strand text
+				String chrom = tokens[0];
+				
+				//fetch ArrayList
+				if (currentChrom != chrom){
+					currentChrom = chrom;
+					if (chrAls.containsKey(currentChrom)) al = chrAls.get(currentChrom);
+					else {
+						al = new ArrayList<RegionText>(); 
+						chrAls.put(currentChrom, al);
+					}
+				}
+				//add entry
+				int start = Integer.parseInt(tokens[startIndex]);
+				if (subtractOne) start = start -1;
+				int stop = Integer.parseInt(tokens[stopIndex]);
+
+				RegionText n = new RegionText(start, stop, line);
+				al.add(n);
+			}
+		}catch (Exception e){
+			e.printStackTrace();
+			System.out.println("Malformed annotation line? -> "+line);
+		}
+		//sort and load hash
+		HashMap<String,RegionText[]> chrSpec = new HashMap<String,RegionText[]>();
+		Iterator<String> it = chrAls.keySet().iterator();
+		ArrayList<RegionText> al = null;
+		while (it.hasNext()){
+			String cs = it.next();
+			al = chrAls.get(cs);
+			RegionText[] nsss = new RegionText[al.size()];
+			al.toArray(nsss);
+			Arrays.sort(nsss);
+			chrSpec.put(cs, nsss);
+		}
+		return chrSpec;
+	}
+
 
 	/**Returns intersecting and non intersecting*/
-	public RegionScoreText[][] intersect(RegionScoreText[] ss, boolean[] bps){
-		ArrayList<Region> intAL = new ArrayList<Region>();
-		ArrayList<Region> nonIntAL = new ArrayList<Region>();
+	public RegionText[][] intersect(RegionText[] ss, boolean[] bps){
+		ArrayList<RegionText> intAL = new ArrayList<RegionText>();
+		ArrayList<RegionText> nonIntAL = new ArrayList<RegionText>();
 
 		//for each region count number to trues/ masked bases
 		int maxBase = bps.length;
@@ -102,29 +183,28 @@ public class FilterIntersectingRegions {
 				else nonIntAL.add(ss[i]);
 			}
 		}
-		RegionScoreText[] intersecting = new RegionScoreText[intAL.size()];
+		RegionText[] intersecting = new RegionText[intAL.size()];
 		intAL.toArray(intersecting);
-		RegionScoreText[] nonIntersecting = new RegionScoreText[nonIntAL.size()];
+		RegionText[] nonIntersecting = new RegionText[nonIntAL.size()];
 		nonIntAL.toArray(nonIntersecting);
-		return new RegionScoreText[][]{intersecting, nonIntersecting};
+		return new RegionText[][]{intersecting, nonIntersecting};
 	}
 
-	public void printNonIntersected(RegionScoreText[] ss, String chromosome) throws IOException{
+	public void printNonIntersected(RegionText[] ss, String chromosome) throws IOException{
 		if (ss == null) return;
 		numberNonIntersecting += ss.length;
 		String c = chromosome +"\t";
 		for (int i=0; i< ss.length; i++){
-			outNonIntersected.println(c + ss[i].getStart()+"\t"+ss[i].getStop()+"\t"+ss[i].getText()+"\t"+ss[i].getScore()+"\t.");
+			outNonIntersected.println(ss[i].getText());
 		}
 	}
 
-	public void printIntersected(RegionScoreText[] ss, String chromosome) throws IOException{
+	public void printIntersected(RegionText[] ss, String chromosome) throws IOException{
 		if (ss == null) return;
 		numberIntersecting += ss.length;
 		String c = chromosome +"\t";
 		for (int i=0; i< ss.length; i++){
-			//chr,start,stop,name,score,strand
-			outIntersected.println(c + ss[i].getStart()+"\t"+ss[i].getStop()+"\t"+ss[i].getText()+"\t"+ss[i].getScore()+"\t.");
+			outIntersected.println(ss[i].getText());
 		}
 	}
 
@@ -166,6 +246,8 @@ public class FilterIntersectingRegions {
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
+		File[] bedToSplit = null;
+		File[] gffToSplit = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -174,7 +256,8 @@ public class FilterIntersectingRegions {
 				try{
 					switch (test){
 					case 'm': toFlatten = new File (args[++i]); break;
-					case 's': toSplit = IO.extractFiles(new File(args[++i])); break;
+					case 'b': bedToSplit = IO.extractFiles(new File(args[++i])); break;
+					case 'g': gffToSplit = IO.extractFiles(new File(args[++i])); break;
 					case 'i': minimumFractionIntersection = Double.parseDouble(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
@@ -186,7 +269,17 @@ public class FilterIntersectingRegions {
 			}
 		}
 		if (toFlatten == null || toFlatten.canRead() == false) Misc.printErrAndExit("\nCannot find your mask file! "+toFlatten+"\n");
-		if (toSplit == null || toSplit[0].canRead() == false) Misc.printErrAndExit("\nCannot find your file(s) to split! "+toSplit+"\n");
+		if (bedToSplit == null && gffToSplit == null) Misc.printErrAndExit("\nCannot find your file(s) to split!\n");
+		if (bedToSplit != null) {
+			bedFormat = true;
+			toSplit = bedToSplit;
+		}
+		else {
+			bedFormat = false;
+			toSplit = gffToSplit;
+		}
+		
+		
 	}	
 
 
@@ -194,21 +287,22 @@ public class FilterIntersectingRegions {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Filter Intersecting Regions: Feb 2011                     **\n" +
+				"**                        Filter Intersecting Regions: Oct 2013                     **\n" +
 				"**************************************************************************************\n" +
-				"Flattens the mask regions file and uses it to split the split file into intersecting\n" +
-				"and non intersecting regions based on the minimum fraction intersection. Assumes\n" +
-				"interbase coordinates.\n" +
+				"Flattens the mask regions and uses it to split the split file(s) into intersecting\n" +
+				"and non intersecting regions based on the minimum fraction intersection.\n" +
 
 				"\nOptions:\n"+
 				"-m Full path file text for the masking bed file (tab delim: chr start stop ...).\n"+
-				"-s Full path file text for the bed file to split into intersecting and non\n" +
+				"-b Full path file text for the bed file to split into intersecting and non\n" +
+				"        intersecting regions. Can also point to a directory of files to split.\n"+
+				"-g (Or) Full path file text for the gff/ gtf file to split into intersecting and non\n" +
 				"        intersecting regions. Can also point to a directory of files to split.\n"+
 				"-i Minimum fraction of each split region required to score as an intersection with\n"+
 				"        the flattened mask, defaults to 1x10-1074\n"+
 
 				"\nExample: java -Xmx4000M -jar pathTo/Apps/FilterIntersectingRegions -i 0.5\n" +
-				"        -m /ArrayDesigns/repMskedDesign.bed -s /ArrayDesigns/novoMskedDesign.bed\n\n" +
+				"        -m /ArrayDesigns/repMskedDesign.bed -b /ArrayDesigns/novoMskedDesign.bed\n\n" +
 
 		"************************************************************************************\n");
 	}

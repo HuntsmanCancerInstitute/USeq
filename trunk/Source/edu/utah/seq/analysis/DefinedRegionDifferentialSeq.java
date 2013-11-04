@@ -118,6 +118,9 @@ public class DefinedRegionDifferentialSeq {
 	}
 
 	public void run(){
+		//run in non X11 mode
+		System.setProperty("java.awt.headless", "true");
+		
 		//load gene models
 		if (verbose) System.out.println("Loading regions/ gene models...");
 		loadGeneModels();
@@ -1768,7 +1771,7 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                       Defined Region Differential Seq: Sept 2013                 **\n" +
+				"**                       Defined Region Differential Seq: Oct 2013                 **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +
