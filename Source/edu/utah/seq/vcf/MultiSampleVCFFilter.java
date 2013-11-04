@@ -24,6 +24,7 @@ public class MultiSampleVCFFilter {
 	private float recordMinimumQUAL = 0;
 	private boolean printSampleNames = false;
 	private boolean filterByGenotype = false;
+	private boolean failNoCall = false;
 
 	
 	private String[][] samplesByGroup = null;
@@ -140,31 +141,31 @@ public class MultiSampleVCFFilter {
 			if (test.getFilter().equals(VCFRecord.FAIL)) continue;
 			
 			boolean passFlag;
-			boolean foundFlag;
 			boolean globalPass = true;
 			
 			for (int i=0; i<flagsByGroup.length; i++) {
 				passFlag = true;
-				foundFlag = false;
 				
 				int[] groupSamples = this.fetchGroupIndexes(parser, i);
 				VCFSample[] samples = test.getSample();
 				
 				for (int j=0; j<groupSamples.length; j++) {
 					VCFSample s = samples[groupSamples[j]];
+					
 					if (s.isNoCall()== true || s.getReadDepthDP() < sampleMinimumReadDepthDP || 
 							s.getGenotypeQualityGQ() < sampleMinimumGenotypeQualityGQ) {
+						if (failNoCall) {
+							passFlag = false;
+						} 
 						continue;
 					} 
 					
 					if (!checkFlag(s.getGenotypeGT(),this.flagsByGroup[i])) {
 						passFlag = false;
-					} else {
-						foundFlag = true;
-					}
+					} 
 				}
 				
-				if (passFlag != true || foundFlag != true) {
+				if (passFlag != true) {
 					globalPass = false;
 				}
 			}
@@ -324,7 +325,7 @@ public class MultiSampleVCFFilter {
 					case 'n': sampleNames = args[++i].split(","); break;
 					case 'u': groups = args[++i].split(","); break;
 					case 'l': flagsByGroup = args[++i].split(","); break;
-					
+					case 'e': failNoCall = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -482,13 +483,18 @@ public class MultiSampleVCFFilter {
 				"-u Number of samples in each category.  \n" +
 				"-l Requirement flags for each category. All samples that pass the specfied filters \n" + 
 				"       must meet the flag requirements, or the variant isn't reported.  At least one \n" +
-				"       sample in each group must pass the specified filters, or the variant isn't reported.\n" +
+				"       sample in each group must pass the specified filters, or the variant isn't \n" +
+				"       reported.\n" +
 				"		   a) 'W' : homozygous common \n" +
 				"		   b) 'H' : heterozygous \n" +
 				"		   c) 'M' : homozygous rare \n" +
 				"		   d) '-W' : not homozygous common \n" +
 				"	 	   e) '-H' : not heterozygous \n" +
-				"		   f) '-M' : not homozygous rare\n" +		
+				"		   f) '-M' : not homozygous rare\n" +
+				"-e Strict genotype matching. If this is selected, records with no-call samples \n" +
+				"       or samples falling below either minimum sample genotype quality (-g) or \n" +
+				"       minimum sample read depth (-r) won't be reported. Only samples listed in (-n)" +
+				"       will be checked \n"+
 				"-d Minimum record QUAL score, defaults to 0, recommend >=20 .\n"+
 				"-g Minimum sample genotype quality GQ, defaults to 0, recommend >= 20 .\n"+
 				"-r Minimum sample read depth DP, defaults to 0, recommend >=10 .\n"+
