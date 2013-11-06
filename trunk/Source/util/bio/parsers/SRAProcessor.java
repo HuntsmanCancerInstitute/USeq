@@ -10,7 +10,7 @@ import java.util.regex.*;
 /**Downloads and converts xxx.sra files from the SRA to fastq.gz, then launches tomato.  So SRAToDamnSAM!
  * @author davidnix*/
 public class SRAProcessor {
-	
+
 	/* ftp://ftp-trace.ncbi.nlm.nih.gov
 
 	## by run SRR016669
@@ -21,7 +21,7 @@ public class SRAProcessor {
 	/sra/sra-instant/reads/ByStudy/sra/SRP/SRP000/SRP000401 many others possible
 	/sra/sra-instant/reads/ByStudy/sra/SRP/SRP000/SRP000401/SRR016669/SRR016669.sra
 	 */
-	
+
 	//fields
 	private String ipAddress = "ftp-trace.ncbi.nlm.nih.gov";
 	private String srrPath = "/sra/sra-instant/reads/ByRun/sra/SRR/";
@@ -36,6 +36,7 @@ public class SRAProcessor {
 	private ArrayList<String> srrFailedToProcess = new ArrayList<String>();
 	private ArrayList<String> srrProcessed = new ArrayList<String>();
 	private static final Pattern JUST_SRR = Pattern.compile("(SRR\\d+).*");
+	private boolean setScoreOffset64 = false;
 
 	//constructors
 	public SRAProcessor(String[] args) {
@@ -44,36 +45,36 @@ public class SRAProcessor {
 
 		//connect
 		connect();
-		
+
 		//any projects?
 		if (srpToProcess.size() != 0){
 			System.out.println("Fetching SRR names from project(s)...");
 			for (String project: srpToProcess) fetchProjectSRRNames(project);
 		}
-		
+
 		//look for any already converted
 		System.out.println("\nLooking for existing converted SRR's, the following will be skipped, delete to reprocess...");
 		removeAlreadyPresent();
-		
+
 		//process the runs
 		String[] srrNamesToProcess = Misc.stringArrayListToStringArray(srrToProcess);
 		System.out.println("\nProcessing "+srrNamesToProcess.length+" SRRs...");
 		for (int i=0; i< srrNamesToProcess.length; i++){
 			fetchConvertDeleteSRR(srrNamesToProcess[i]);
 		}
-		
+
 		//disconnect
 		disconnect();
-		
-		
-		
+
+
+
 		//stats
 		printProcessed();
-		
+
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/(60000.0 * 60.0);
 		System.out.println("\nRun complete "+Num.formatNumber(diffTime, 3)+"hrs");
 	}
-	
+
 	public void removeAlreadyPresent(){
 		//fetch all the files in the save directory
 		File[] files = saveDirectory.listFiles();
@@ -92,7 +93,7 @@ public class SRAProcessor {
 				al.add(f);
 			}
 		}
-		
+
 		//for each srr look to see if it is already present
 		System.out.print("\t");
 		for (int i=0; i< srrToProcess.size(); i++){
@@ -118,19 +119,23 @@ public class SRAProcessor {
 
 	//methods
 	public boolean convertSRA(File sra){
+		ArrayList<String> al = new ArrayList();
 		try {
-			String[] cmd = {
-					fastqDump.getCanonicalPath(),
-					"--split-3",
-					"--gzip",
-					"--origfmt",
-					"--outdir",
-					sra.getParentFile().getCanonicalPath(),
-					sra.getCanonicalPath(),
-			};
+			al.add(fastqDump.getCanonicalPath());
+			if (setScoreOffset64){
+				al.add("--offset");
+				al.add("64");
+			}
+			al.add("--split-files");
+			al.add("--gzip");
+			al.add("--origfmt");
+			al.add("--outdir");
+			al.add(sra.getParentFile().getCanonicalPath());
+			al.add(sra.getCanonicalPath());
+			String[] cmd = Misc.stringArrayListToStringArray(al);
 
 			System.out.println("\tconverting "+sra);
-
+			
 			String[] output = IO.executeCommandLineReturnAll(cmd);
 			//look for error
 			for (String line: output){
@@ -144,6 +149,7 @@ public class SRAProcessor {
 			return true;
 		} catch (IOException e) {
 			System.err.println("\nProblem converting to fastq for -> "+sra);
+			System.err.println(Misc.stringArrayListToString(al, " "));
 			e.printStackTrace();
 			return false;
 		}
@@ -279,7 +285,7 @@ public class SRAProcessor {
 			//set binary
 			if (ftp.setFileType(FTPClient.BINARY_FILE_TYPE) == false) throw new Exception("Failed to set binary file type, aborting");
 			ftp.setControlKeepAliveTimeout(15);
-			
+
 		} catch (Exception ex) {
 			System.out.println("\nFailed to connect! Aborting.");
 			printProcessed();
@@ -306,7 +312,7 @@ public class SRAProcessor {
 
 			//fetch files
 			FTPFile[] files = ftp.listFiles(path);
-			
+
 			if (files != null) {
 				for (FTPFile f: files){
 					String name = f.getName();
@@ -325,7 +331,7 @@ public class SRAProcessor {
 						ArrayList<String> newNames = fetchSRRNames(newPath);
 						names.addAll(newNames);
 						//System.out.println("yyyyyyy adding "+newNames);
-						
+
 					}
 					//System.out.println("CurrListOfNames "+names);
 				}
@@ -370,6 +376,7 @@ public class SRAProcessor {
 					case 'n': names =  args[++i].split(","); break;
 					case 'f': fastqDump = new File (args[++i]); break;
 					case 's': saveDirectory = new File (args[++i]); break;
+					case 'q': setScoreOffset64 = true; break;
 					case 'c': cmdFile = new File (args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: USeqUtilities.printExit("\nProblem, unknown option! " + mat.group());
@@ -402,7 +409,7 @@ public class SRAProcessor {
 
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               SRA Processor: August 2012                         **\n" +
+				"**                               SRA Processor: Nov 2013                            **\n" +
 				"**************************************************************************************\n" +
 				"Fetchs SRA files from the Sequence Read Archive and converts them to gzipped fastq.\n" +
 				"Use in conjunction with Tomato to align these on the ember cluster. Be sure the SRA\n" +
@@ -419,6 +426,7 @@ public class SRAProcessor {
 				"-c Full path to a cmd.txt file to copy into converted SRA folders. If the save\n" +
 				"       directory is scanned by tomato, a tomato job is then launched,\n" +
 				"       see http://bioserver.hci.utah.edu/BioInfo/index.php/Software:Tomato\n" +
+				"-q Set quality score offset to 64, defaults to 33. Needed for some Illumina datasets.\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/SRAProcessor -n SRP000401 /\n" +
 				"      -s /tomato/job/Nix/SRP000401/ -f ~/sratoolkit.2.1.8-centos_linux64/fastq-dump\n" +
@@ -426,7 +434,7 @@ public class SRAProcessor {
 
 				"\n"+
 
-		"**************************************************************************************\n");
+				"**************************************************************************************\n");
 
 	}
 

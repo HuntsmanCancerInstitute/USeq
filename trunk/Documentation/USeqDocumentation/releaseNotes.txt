@@ -1,3 +1,9 @@
+----USeq_8.7.0----
+SRAProcessor
+* Added option to set quality score offset to 64, needed for some Illumina datasets
+MiRNACorrelator
+* Added ggplot2 box whisker plot functionality
+
 ----USeq_8.6.9----
 VCFSample
 * Changed how it recognizes a no call to anything that starts with ./. so these are skipped
