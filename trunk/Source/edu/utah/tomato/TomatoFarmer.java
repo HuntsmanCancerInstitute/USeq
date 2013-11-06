@@ -462,8 +462,8 @@ public class TomatoFarmer {
 				System.exit(1);
 			}
 			
-			if (analysisType.equals("exome_bw_raw") || analysisType.equals("exome_novo_raw") || analysisType.equals("exome_novo_vqsr") ||
-					analysisType.equals("exome_bw_vqsr")) {
+			if (analysisType.equals("exome_bwa_raw") || analysisType.equals("exome_novo_raw") || analysisType.equals("exome_novo_vqsr") ||
+					analysisType.equals("exome_bwa_vqsr")) {
 				this.isFull = true;
 			}
 		} else {

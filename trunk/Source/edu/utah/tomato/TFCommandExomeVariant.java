@@ -436,7 +436,7 @@ public class TFCommandExomeVariant extends TFCommand {
 				BedEntry workingEntry = bedFile.get(bedFileIndex);
 				int entrySize = workingEntry.getEnd() - workingEntry.getStart();
 				
-				if (entrySize + basesInChunk <= basesPerChunk) {
+				if (entrySize + basesInChunk < basesPerChunk) {
 					intervalBed.add(workingEntry);
 					bedFileIndex+=1;
 					basesInChunk += entrySize;
@@ -444,6 +444,12 @@ public class TFCommandExomeVariant extends TFCommand {
 						samtoolsRegion = this.writeTargetRegions(intervalBed,chunkIntervals);
 						break;
 					}
+				} else if (entrySize + basesInChunk == basesPerChunk) {
+					intervalBed.add(workingEntry);
+					bedFileIndex += 1;
+					basesInChunk += entrySize;
+					samtoolsRegion = this.writeTargetRegions(intervalBed, chunkIntervals);
+					break;
 				} else {
 					int overhang = basesPerChunk - basesInChunk;
 					int newBoundary = workingEntry.getStart() + overhang;
