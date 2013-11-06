@@ -173,23 +173,36 @@ public class VCFAnnotator {
 			BufferedReader br = new BufferedReader(new FileReader(vaastFile));
 			
 			ArrayList<String> batch = new ArrayList<String>();
-			Pattern p = Pattern.compile("T[UR]:\\s+(.+?)\\s+(\\d+?)@(\\d+?)\\s+.+");
-			Pattern p1 = Pattern.compile("RANK:(\\d+).*");
+			Pattern snpPat = Pattern.compile("T[UR]:\\s+(.+?)\\s+(\\d+?)@(.+?)\\s+.+");
+			Pattern rankPat = Pattern.compile("RANK:(\\d+).*");
+			Pattern indelPat = Pattern.compile("T:\\s+(.+?)\\s+(ins|del)-(.+?)-(\\d+?)-\\d+\\s+.+");
+			
 			
 			String temp = null;
 			while ((temp = br.readLine()) != null) {
-				Matcher m = p.matcher(temp);
-				Matcher m1 = p1.matcher(temp);
+				Matcher snpMatch = snpPat.matcher(temp);
+				Matcher rankMatch = rankPat.matcher(temp);
+				Matcher indelMatch = indelPat.matcher(temp);
 				
-				if (m.matches()) {
-					String key = "chr" + m.group(3) + ":" + m.group(2);
+				if (snpMatch.matches()) {
+					String key = snpMatch.group(3) + ":" + snpMatch.group(2);
+					key = key.replace("chr", "");
+					
 					if (!vaastHash.containsKey(key)) {
-						vaastHash.put(key, new String[]{m.group(1),""});
+						vaastHash.put(key, new String[]{snpMatch.group(1),""});
 						batch.add(key);
 					}
-				} else if (m1.matches()) {
+				} else if (indelMatch.matches()) {
+					String key = indelMatch.group(3) + ":" + indelMatch.group(4);
+					key = key.replace("chr","");
+					
+					if (!vaastHash.containsKey(key)) {
+						vaastHash.put(key, new String[]{indelMatch.group(1),""});
+						batch.add(key);
+					}
+				} else if (rankMatch.matches()) {
 					for (String key: batch) {
-						vaastHash.get(key)[1] = m1.group(1);
+						vaastHash.get(key)[1] = rankMatch.group(1);
 					}
 					batch.clear();
 				} 
@@ -202,7 +215,8 @@ public class VCFAnnotator {
 		
 		//Add VAAST results to VCF
 		for (VCFRecord record: parser.getVcfRecords()) {
-			String key = record.getChromosome() + ":" + String.valueOf(record.getPosition()+1);
+			String key = record.getChromosome() + ":" + String.valueOf(record.getPosition() + 1 + this.maxInt(record.getReference().length()-1,0));
+			key = key.replace("chr","");
 			if (vaastHash.containsKey(key)) {
 				String[] vaastResult = vaastHash.get(key);
 				record.getInfoObject().addInfo("V_LRS", vaastResult[0]);
