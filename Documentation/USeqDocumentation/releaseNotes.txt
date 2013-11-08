@@ -3,6 +3,8 @@ SRAProcessor
 * Added option to set quality score offset to 64, needed for some Illumina datasets
 MiRNACorrelator
 * Added ggplot2 box whisker plot functionality
+MaxEntScan Score3 and Score5
+* Java implementation of Yeo and Burge's Max Ent Scan algorithms for human splice site detection
 
 ----USeq_8.6.9----
 VCFSample
