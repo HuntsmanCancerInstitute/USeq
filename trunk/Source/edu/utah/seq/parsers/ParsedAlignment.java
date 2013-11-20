@@ -68,7 +68,6 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 
 			String baseCalls = makeBaseCalls (sequence, refSeq.toUpperCase(), cigar, isGA);
 			containsIndels = INDEL.matcher(baseCalls).find();
-
 			baseObservations = SPACE.split(baseCalls);
 
 			scan();
@@ -109,11 +108,13 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 		
 		//any indels
 		containsIndels = INDEL.matcher(baseCalls).find();
-
 		baseObservations = SPACE.split(baseCalls);
 
-		if (samFormat) scanSAM();
-		else scan();
+		//Hmm why the scan SAM()?  and not just use scan();
+//if (samFormat) scanSAM();
+//else scan();
+		
+		scan();
 	}
 	
 	private void scanSAM(){

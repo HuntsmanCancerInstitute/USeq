@@ -399,14 +399,6 @@ public class NovoalignBisulfiteParser{
 			
 	}
 
-
-	
-	
-	
-	
-	
-
-
 	/**Closes writers.*/
 	public void closeWriters(){
 		try{
@@ -547,165 +539,6 @@ public class NovoalignBisulfiteParser{
 		return true;
 	}
 
-	/*public boolean parseWorkingSAMFile(){
-		if (picard) return parseWorkingSAMFilePicard();
-		
-		try{
-			//get reader
-			BufferedReader in = IO.fetchBufferedReader(workingFile);
-			String line;
-			int counter =0;
-			String currentChromStrand = "";
-			DataOutputStream dos = null;
-			int numBadLines = 0;
-			while ((line = in.readLine()) !=null){
-				line = line.trim();
-				//skip header and blank lines
-				if (line.length() == 0 || line.startsWith("@")) continue;
-				
-				//print status blip
-				if (++counter == 2500000){
-					System.out.print(".");
-					counter = 0;
-				}
-
-				SamAlignment sa;
-				try {
-					sa = new SamAlignment(line, false);
-					//if (counter < 50) System.out.println(picard+"\t"+sa.getName()+"\t"+sa.getMappingQuality() +"\t"+sa.getAlignmentScore()+"\t"+line);
-				} catch (Exception e) {
-					System.out.println("\nSkipping malformed sam alignment ->\n"+line+"\n"+e.getMessage());
-					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
-					continue;
-				}
-				
-				//is it aligned?
-				if (sa.isUnmapped()) {
-					numberAlignmentsUnmapped++;
-					continue;
-				}
-				
-				//does it pass the vendor qc?
-				if (sa.failedQC()) {
-					numberAlignmentsFailingQC++;
-					continue;
-				}
-				
-				//skip phiX and adapter
-				if (sa.getReferenceSequence().startsWith(phiX) || sa.getReferenceSequence().startsWith(adapter)) {
-					numberControlAlignments++;
-					continue;
-				}
-
-				//does it pass the scores threshold?
-				if (sa.getAlignmentScore() > maximumAlignmentScore) {
-					numberAlignmentsFailingAlignmentScore++;
-					continue;
-				}
-				if (sa.getMappingQuality() < minimumPosteriorProbability) {
-					numberAlignmentsFailingQualityScore++;
-					continue;
-				}
-
-				//check for unique alignments? Not sure this works unless dups have been marked
-				if (uniquesOnly && sa.isADuplicate()) {
-					numberAlignmentsFailingDuplicateCheck++;
-					continue;
-				}
-
-				//increment counter
-				numberPassingAlignments++;
-				
-				//make readID
-				String firstSecond = "";
-				if (sa.isFirstPair()) firstSecond = "/1";
-				if (sa.isSecondPair()) firstSecond = "/2";
-				String readID = sa.getName()+ firstSecond;
-				
-				//make chromosome strand, note stranded second pair reads should use opp strand
-				String chromosomeStrand = null;
-				if (reverseSecondPairsStrand && sa.isSecondPair()){
-					if (sa.isReverseStrand()) chromosomeStrand = sa.getReferenceSequence() + "+";
-					else chromosomeStrand = sa.getReferenceSequence() + "-";
-				}
-				else {
-					if (sa.isReverseStrand()) chromosomeStrand = sa.getReferenceSequence() + "-";
-					else chromosomeStrand = sa.getReferenceSequence() + "+";
-				}
-				
-				//set position
-				int position = sa.getPosition();
-				
-				//clear masking references
-				sa.trimMaskingOfReadToFitAlignment();
-
-				//set isGA based on strand
-				String isGA; 
-				//is it part of a paired alignment? the need to set it to the ori of the 1st read
-				if (sa.isPartOfAPairedAlignment()){
-					if (sa.isFirstPair() && sa.isReverseStrand() == false) isGA = "f";
-					else if (sa.isSecondPair() && sa.isReverseStrand()) isGA = "f";
-					else isGA = "t";
-				}
-				else if (sa.isReverseStrand()) isGA = "t";
-				else isGA = "f";
-
-				//get PrintWriter
-				if (currentChromStrand.equals(chromosomeStrand) == false){
-					currentChromStrand = chromosomeStrand;
-					if (chromOut.containsKey(currentChromStrand)) dos = chromOut.get(currentChromStrand);
-					else {
-						//make and set file
-						File f = new File(saveDirectory, currentChromStrand);
-						parsedBinaryDataFiles.add(f);
-						dos = new DataOutputStream(new BufferedOutputStream (new FileOutputStream(f)));
-						chromOut.put(currentChromStrand, dos);
-					}
-				}
-				
-				//save data: readID, position, sequence, baseScores, t or f + cigar
-				dos.writeUTF(readID);
-				dos.writeInt(position);
-				dos.writeUTF(sa.getSequence());
-				dos.writeUTF(sa.getQualities());
-				dos.writeUTF(isGA + sa.getCigar());
-
-				//calculate fraction overlap for paired reads
-				//is it a L read?
-				if (sa.isFirstPair() && sa.isPartOfAPairedAlignment()){
-					//check that chrom is same
-					if (sa.getMateReferenceSequence().equals("=") || sa.getMateReferenceSequence().equals(sa.getReferenceSequence())) {
-						//calc diff
-						int leftPos = position;
-						int rightPos = sa.getMatePosition();
-						int l;
-						int r;
-						if (leftPos > rightPos) {
-							l = rightPos;
-							r = leftPos;
-						}
-						else {
-							l = leftPos;
-							r = rightPos;
-						} 
-						int sequenceLength = sa.getSequence().length();
-						int stopL = l+ sequenceLength;
-						long diff = stopL - r;
-						if (diff >= 0) bpPairedOverlappingSequence += diff;
-						bpPairedSequence += (2 * sequenceLength);
-					}
-				}
-			}
-			System.out.println();
-		} catch (Exception e){
-			System.err.println("\nError parsing Novoalign file or writing split binary chromosome files.\nToo many open files? Too many chromosomes? " +
-			"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
-			e.printStackTrace();
-			return false;
-		}
-		return true;
-	}*/
-
 	public boolean parseWorkingSAMFile(){
 		try{
 			//make reader
@@ -730,7 +563,7 @@ public class NovoalignBisulfiteParser{
 				//this is a bit inefficient but gives absolute control on the sam data
 				SamAlignment sa;
 				try {
-					sa = new SamAlignment(samRecord.getSAMString().trim(), false);
+					sa = new SamAlignment(samRecord.getSAMString().trim(), false);				
 				} catch (Exception e) {
 					System.out.println("\nSkipping malformed sam alignment ->\n"+samRecord.getSAMString()+"\n"+e.getMessage());
 					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
@@ -768,11 +601,12 @@ public class NovoalignBisulfiteParser{
 				//increment counter
 				numberPassingAlignments++;
 				
-				//make readID
-				String firstSecond = "";
-				if (sa.isFirstPair()) firstSecond = "/1";
-				if (sa.isSecondPair()) firstSecond = "/2";
-				String readID = sa.getName()+ firstSecond;
+				//make readID, why?  this is killing the sorting and finding of paired alignments, masking for now
+				//String firstSecond = "";
+				//if (sa.isFirstPair()) firstSecond = "/1";
+				//if (sa.isSecondPair()) firstSecond = "/2";
+				//String readID = sa.getName()+ firstSecond;
+				String readID = sa.getName();
 				
 				//make chromosome strand, note stranded second pair reads should use opp strand
 				String chromosomeStrand = null;
@@ -791,16 +625,21 @@ public class NovoalignBisulfiteParser{
 				//clear masking references
 				sa.trimMaskingOfReadToFitAlignment();
 
-				//set isGA based on strand
+				//set isGA based on strand,  hmm, why not read this in from the ZB:Z:CT or GA flag?
 				String isGA; 
 				//is it part of a paired alignment? the need to set it to the ori of the 1st read
-				if (sa.isPartOfAPairedAlignment()){
-					if (sa.isFirstPair() && sa.isReverseStrand() == false) isGA = "f";
-					else if (sa.isSecondPair() && sa.isReverseStrand()) isGA = "f";
-					else isGA = "t";
-				}
-				else if (sa.isReverseStrand()) isGA = "t";
-				else isGA = "f";
+				//if (sa.isPartOfAPairedAlignment()){
+					//if (sa.isFirstPair() && sa.isReverseStrand() == false) isGA = "f";
+					//else if (sa.isSecondPair() && sa.isReverseStrand()) isGA = "f";
+					//else isGA = "t";
+				//}
+				//else if (sa.isReverseStrand()) isGA = "t";
+				//else isGA = "f";
+
+				int za = sa.getCtGaTag();
+				if (za == 1) isGA = "t";
+				else if (za == 2) isGA = "f";
+				else throw new Exception("\nError: Failed to find a ZB:Z:GA or ZB:Z:CT tag? Is this an old novoalignment? Update and realign?\n");
 
 				//get PrintWriter
 				if (currentChromStrand.equals(chromosomeStrand) == false){
@@ -851,8 +690,7 @@ public class NovoalignBisulfiteParser{
 			reader.close();
 			System.out.println();
 		} catch (Exception e){
-			System.err.println("\nError parsing Novoalign file or writing split binary chromosome files.\nToo many open files? Too many chromosomes? " +
-			"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
+			System.err.println("\nError parsing Novoalign file or writing split binary chromosome files.\n");
 			e.printStackTrace();
 			return false;
 		}
@@ -1002,7 +840,7 @@ public class NovoalignBisulfiteParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Novoalign Bisulfite Parser: May 2013                      **\n" +
+				"**                        Novoalign Bisulfite Parser: Nov 2013                      **\n" +
 				"**************************************************************************************\n" +
 				"Parses Novoalign single and paired bisulfite sequence alignment files into xxx.bed\n" +
 				"and PointData file formats. Generates several summary statistics on converted and non-\n" +

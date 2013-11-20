@@ -268,6 +268,9 @@ public class ExonIntron implements Comparable, Serializable {
 	public String toString(){
 		return "ExonIntron: "+start+"-"+end;
 	}
+	public String getStartStopString(){
+		return start+"-"+end;
+	}
 	public int compareTo(Object other){
 		ExonIntron otherExon = (ExonIntron)other;
 		//sort by start position
