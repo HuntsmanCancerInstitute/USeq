@@ -46,8 +46,9 @@ see <a href="https://bioserver.hci.utah.edu:443/gnomex/gnomexGuestFlex.jsp?topic
 <h2>To align and process your Illumina fastq RNA-Seq data:</h2>
 <ol>
 <li> Align your fastq data using novoalign and the read length matched extended splice junction novoindex.  Output the reads in SAM format and allow for 50 
-       repeat matches for each read. Use grep to toss @SQ lines and those reads that don't align.
-       (e.g.  ~/novocraft/novoalign -o SAM -r All 50  
+       repeat matches for each read. Limit the maximum alignment quality to 120 ~ 4 mismatches per alignment. Use grep to toss @SQ lines and those reads that don't align.
+       Also, be sure to test your gzip compressed fastq files.  Novoalign doesn't throw an error when encountering a broken gzip file.
+       (e.g.  gunzip -t *gz && ~/novocraft/novoalign -o SAM -r All 50 -t 120  
        -d /scratch/local/mm9EnsTransRad46Num100kMin10SplicesChrPhiXAdaptr.novoindex -f /scratch/local/7410X6_s_5_1_sequence.txt.gz 
        /scratch/local/7410X6_s_5_2_sequence.txt.gz | grep -v ^@SQ  | grep chr | gzip > 7410X6_s_5_raw.sam.gz )
 

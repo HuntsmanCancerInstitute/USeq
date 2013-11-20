@@ -5,6 +5,9 @@ MiRNACorrelator
 * Added ggplot2 box whisker plot functionality
 MaxEntScan Score3 and Score5
 * Java implementation of Yeo and Burge's Max Ent Scan algorithms for human splice site detection
+NovoalignBisulfiteParser
+* Added functionality for processing -b4 novoalignments
+* Enabled merging of paired overlapping reads for sam formatted alignments
 
 ----USeq_8.6.9----
 VCFSample
