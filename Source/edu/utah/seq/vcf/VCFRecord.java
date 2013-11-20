@@ -211,9 +211,23 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	public void setQuality(float quality) {
 		this.quality = quality;
 	}
-
+	
+	/**Checks that there is only one alternate. Otherwise false.*/
 	public boolean isSNP() {
+		if (alternate.length != 1) return false;
 		if (alternate[0].length() == 1 && reference.length() == 1 && alternate.equals(".") == false) return true;
+		return false;
+	}
+	/**Checks that there is only one alternate. Otherwise false.*/
+	public boolean isInsertion(){
+		if (alternate.length != 1) return false;
+		if (alternate[0].length() > reference.length()) return true;
+		return false;
+	}
+	/**Checks that there is only one alternate. Otherwise false.*/
+	public boolean isDeletion(){
+		if (alternate.length != 1) return false;
+		if (alternate[0].length() < reference.length()) return true;
 		return false;
 	}
 	
@@ -277,6 +291,12 @@ public class VCFRecord implements Comparable<VCFRecord> {
 			}
 		}
 		return false;
+	}
+
+	/**Adds a chr onto the chromosome field if it doesn't start with such.*/
+	public void appendChr() {
+		if (chromosome.startsWith("chr") == false) chromosome = "chr"+chromosome;
+		
 	}	
 
 

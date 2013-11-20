@@ -10,6 +10,7 @@ import util.gen.Num;
 
 /**Java implementation of the Max Ent Scan score5 algorithm. 
  * See Yeo and Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897
+ * Scores 5' splice site 2bpExon:7bpIntron
  * @author David.Nix@hci.utah.edu.*/
 public class MaxEntScanScore5 {
 	//user defined fields
@@ -31,9 +32,9 @@ public class MaxEntScanScore5 {
 		scoreSequences();
 	}
 	
-	/**For incorp into other apps.
-	 * Call scoreSequence(String upperCase9MerGATC) after instantiating.*/
-	public MaxEntScanScore5(File seqScoreFile) {
+	/**For incorp into other apps.*/
+	public MaxEntScanScore5(File spliceModelDirectory) {
+		this.spliceModelDirectory = spliceModelDirectory;
 		loadBaseScores();
 		loadSeqScores();
 	}
@@ -82,6 +83,36 @@ public class MaxEntScanScore5 {
 		//calc final 
 		double score = consensus + preComputedScore;
 		return score;
+	}
+	
+	/**Scores each 9mer in the sequence moving 5' to 3', only GATC, upper case sensitive. Does not check.
+	 * Assumes you've upper cased and removed non GATC bases.*/
+	public double[] scanSequenceNoChecks(String seq){
+		int num = seq.length() - 8;
+		double[] scores = new double[num];
+		for (int i=0; i< num; i++){
+			String subSeq = seq.substring(i, i+9);
+			scores[i] = scoreSequence(subSeq);
+		}
+		return scores;
+	}
+	
+	/**Scores each 9mer in the sequence moving 5' to 3' skipping 9mers with non GATCgatc bases.
+	 * Case insensitive.*/
+	public double[] scanSequence(String seq){
+		int num = seq.length() - 8;
+		Matcher mat;
+		ArrayList<Double> al = new ArrayList<Double>();
+		String ucSeq = seq.toUpperCase();
+		for (int i=0; i< num; i++){
+			String subSeq = ucSeq.substring(i, i+9);
+			mat = NonGATC.matcher(subSeq);
+			if (mat.find() == false) {
+				double score = scoreSequence(subSeq);
+				al.add(score);
+			}
+		}
+		return Num.arrayListOfDoubleToArray(al);
 	}
 
 	private double scoreConsensus(String seq) {

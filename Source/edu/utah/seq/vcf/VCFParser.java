@@ -144,10 +144,12 @@ public class VCFParser {
 		this.chunkNumber = chunkNumber;
 		this.chunkSize = chunkSize;
 		parseVCF();
-	} 
+	}
+	
+	public VCFParser() {}
 	
 	//Methods
-	
+
 	/**Adds a chr onto chromosome names that lack it.*/
 	public void appendChr(){
 		for (VCFRecord r : vcfRecords){
