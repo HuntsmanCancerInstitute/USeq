@@ -47,7 +47,8 @@ public class PairedCondition {
 				if (stats.length!=2) Misc.printErrAndExit("One of the DESeq stats R results rows is malformed -> "+line);
 				parsedDiffExpResults[x] = new float[2];
 				//adjPval
-				if (stats[0].equals("Inf") || stats[0].equals("NA") || stats[0].equals("-Inf")) {
+				if (stats[0].equals("NA")) parsedDiffExpResults[x][0] = 0;
+				else if (stats[0].equals("Inf") || stats[0].equals("-Inf")) {
 					parsedDiffExpResults[x][0] = Float.MIN_VALUE;
 				}
 				else parsedDiffExpResults[x][0] = Float.parseFloat(stats[0]);

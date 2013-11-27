@@ -1037,7 +1037,7 @@ public class DefinedRegionDifferentialSeq {
 			//look for results files and parse results
 			for (PairedCondition pc: pairedConditions){
 				if (pc.getDiffExpResults().exists() == false ) throw new IOException("\n\nR results file doesn't exist. Check temp files in save directory for error.\n");
-				pc.parseDESeqStatResults(geneNamesToAnalyze, minFDR, this.minLog2Ratio);
+				pc.parseDESeqStatResults(geneNamesToAnalyze, minFDR, minLog2Ratio);
 				if (verbose) System.out.println("\t"+pc.getVsName()+"\t"+pc.getDiffExpGeneNames().size());
 				geneNamesPassingThresholds.addAll(pc.getDiffExpGeneNames());
 			}
@@ -1771,7 +1771,7 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                       Defined Region Differential Seq: Oct 2013                 **\n" +
+				"**                       Defined Region Differential Seq: Nov 2013                  **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +
