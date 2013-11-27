@@ -2,9 +2,11 @@ package edu.utah.seq.parsers;
 
 import java.io.*;
 import java.util.regex.*;
+
 import util.bio.parsers.MultiFastaParser;
 import util.bio.seq.Seq;
 import util.gen.*;
+
 import java.util.*;
 
 import net.sf.samtools.SAMFileReader;
@@ -14,12 +16,12 @@ import net.sf.samtools.SAMFileReader.ValidationStringency;
 import edu.utah.seq.data.*;
 import edu.utah.seq.data.sam.SamAlignment;
 
-/**Parses a Novoalign bisulfite alignment txt file. PointData scores are set to 1.
+/**Parses a Novoalign bisulfite alignment sam/bam files. PointData scores are set to 1.
  * @author david.nix@hci.utah.edu 
  **/
 public class NovoalignBisulfiteParser{
 	//fields
-	private File[] dataFiles;
+	private File[] samFiles;
 	private String versionedGenome;
 	private HashMap<String, File> chromosomeFastaFiles = new HashMap<String, File>();
 	private File workingFile;
@@ -31,8 +33,6 @@ public class NovoalignBisulfiteParser{
 	private int minimumBaseScore = 13;
 	private int minimumStandAloneBaseScore = 13;
 	private boolean printBed = false;
-	private boolean reverseSecondPairsStrand = true;
-	private static Pattern TAB = Pattern.compile("\\t");
 	public static final Pattern COMMENT = Pattern.compile("^#.*");
 	public static final Pattern CTStart = Pattern.compile("CT.*");
 	public static final Pattern MD_BIS_SUB_MATCHER= Pattern.compile("(\\d+)([^0-9])");
@@ -61,22 +61,6 @@ public class NovoalignBisulfiteParser{
 	private double bpFailQual = 0;
 	private ArrayList<BaseObservation> boAL = new ArrayList<BaseObservation>();
 	private HashMap<Integer, BaseObservation> firstHM = new HashMap<Integer, BaseObservation>();
-
-	//indexes for columns
-	private int readIDIndex = 0;
-	private int readTypeIndex = 1;
-	private int sequenceIndex = 2;
-	private int qualityIndex = 3;
-	private int alignmentStatusIndex = 4;
-	private int alignmentScoreIndex = 5;
-	private int posteriorProbabilityIndex = 6;
-	private int chromosomeIndex = 7;
-	private int positionIndex = 8;
-	private int strandIndex = 9;
-	private int chromosomeIndexMate = 10;
-	private int positionIndexMate = 11;
-	private int strandIndexMate = 12;
-	private int baseCallCommentIndex = 13;
 	
 	//alignment counts for sam files
 	private long numberAlignmentsFailingQualityScore = 0;
@@ -90,7 +74,7 @@ public class NovoalignBisulfiteParser{
 	public NovoalignBisulfiteParser(String[] args){
 		long startTime = System.currentTimeMillis();
 		processArgs(args);
-		System.out.println("\nSplitting text alignment data by chromosome and filtering...");
+		System.out.println("Splitting text alignment data by chromosome and filtering...");
 
 		//look for parsed files 1st
 		if (useParsedFiles && fetchParsedFiles()){
@@ -98,29 +82,12 @@ public class NovoalignBisulfiteParser{
 		}
 		else {
 			//for each file, parse, filter, split by chrom and strand and save to disk	
-			for (int i=0; i< dataFiles.length; i++){
+			for (int i=0; i< samFiles.length; i++){
 				//set working objects and parse tag file text
-				workingFile = dataFiles[i];
-				
-				//skip bam indexes
-				if (workingFile.getName().endsWith(".bai")) continue;
-				
+				workingFile = samFiles[i];
 				System.out.print("\t"+workingFile);
 				//parse
-				boolean  parsed;
-				String name = workingFile.getName();
-				if (name.endsWith(".sam.gz") || name.endsWith(".sam") || name.endsWith(".bam")) {
-					samFormat = true;
-					System.out.print(" (SAM format) ");
-					parsed = parseWorkingSAMFile();
-				}
-				else {
-					//wonder if this should be deleted?
-					System.out.print(" (NATIVE format) ");
-					parsed = parseWorkingFile();
-					samFormat = false;
-				}
-				if (parsed == false) Misc.printExit("\n\tError: failed to parse, aborting.\n");
+				if (parseWorkingSAMFile() == false) Misc.printErrAndExit("\nERROR: failed to parse, aborting!");
 			}
 			closeWriters();
 			
@@ -292,7 +259,7 @@ public class NovoalignBisulfiteParser{
 					p= Point.sumIdenticalPositionScores(p);
 					pd = Point.extractPositionScores(p);
 					//make an Info object public Info (String name, String versionedGenome, String chromosome, String strand, int readLength, HashMap<String,String> notes){
-					info = new Info("MergedHitCountNonConvertedC", versionedGenome, chromosome, strand, readLength, null);
+					info = new Info("NonConvertedC", versionedGenome, chromosome, strand, readLength, null);
 					pd.setInfo(info);
 					//save
 					pd.writePointData(nonConvertedCPointDataDirectory);
@@ -305,7 +272,7 @@ public class NovoalignBisulfiteParser{
 					Arrays.sort(p, new ComparatorPointPosition());
 					p= Point.sumIdenticalPositionScores(p);
 					pd = Point.extractPositionScores(p);
-					info = new Info("MergedHitCountConvertedC", versionedGenome, chromosome, strand, readLength, null);
+					info = new Info("ConvertedC", versionedGenome, chromosome, strand, readLength, null);
 					pd.setInfo(info);
 					//save
 					pd.writePointData(convertedCPointDataDirectory);
@@ -409,136 +376,6 @@ public class NovoalignBisulfiteParser{
 		}
 	}
 
-	public boolean parseWorkingFile(){
-		try{
-			int badLines = 0;
-			//get reader
-			BufferedReader in = IO.fetchBufferedReader(workingFile);
-			String line;
-			String[] tokens = null;
-			int counter =0;
-			String currentChromStrand = "";
-			DataOutputStream dos = null;
-			while ((line = in.readLine()) !=null){
-				//print status blip
-				if (++counter == 2500000){
-					System.out.print(".");
-					counter = 0;
-				}
-				//comment line
-				if (COMMENT.matcher(line).matches()) continue;
-				//check number of rows
-				tokens = TAB.split(line);
-				if (tokens.length < 14) continue;
-				//qc failed?
-				if (tokens[baseCallCommentIndex].equals("QC")) {
-					numberAlignmentsFailingQC++;
-					continue;
-				}
-				//adapter chrom?
-				if (tokens[chromosomeIndex].contains(adapter) || tokens[chromosomeIndex].contains(phiX)) {
-					numberControlAlignments++;
-					continue;
-				}
-
-				//check size of read against size of quality score
-				int sequenceLength = tokens[sequenceIndex].length();
-				if (sequenceLength != tokens[qualityIndex].length()) {
-					System.err.println("\nSeq length != Qual length, skipping -> "+line);
-					if (badLines++ > 1000) Misc.printErrAndExit("\nToo many malformed lines. Aborting \n");
-					continue;
-				}
-
-				//check scores
-				//check probability threshold
-				float probScore = Float.parseFloat(tokens[posteriorProbabilityIndex]);
-				if (probScore < minimumPosteriorProbability) {
-					numberAlignmentsFailingQualityScore++;
-					continue;
-				}
-
-				//check alignment threshold
-				float alignmentScore = Float.parseFloat(tokens[alignmentScoreIndex]);
-				if (alignmentScore > maximumAlignmentScore) {
-					numberAlignmentsFailingAlignmentScore++;
-					continue;
-				}
-
-				//increment counter
-				numberPassingAlignments++;
-
-				//parse chromosome removing leading '>' and strand
-				String chromosome = tokens[chromosomeIndex].substring(1);
-				String strand = "-";
-				Matcher mat = CTStart.matcher(tokens[baseCallCommentIndex]);
-				if (mat.matches()) strand = "+";
-				String chromosomeStrand = chromosome+ strand;
-
-				//minus strand read? reverse base qualities and reverse complement sequence
-				if (tokens[strandIndex].equals("R")){
-					tokens[sequenceIndex] = Seq.reverseComplementDNA(tokens[sequenceIndex]);
-					tokens[qualityIndex] = Misc.reverse(tokens[qualityIndex]);
-				}
-
-				//get PrintWriter
-				if (currentChromStrand.equals(chromosomeStrand) == false){
-					currentChromStrand = chromosomeStrand;
-					if (chromOut.containsKey(currentChromStrand)) dos = chromOut.get(currentChromStrand);
-					else {
-						//make and set file
-						File f = new File(saveDirectory, currentChromStrand);
-						parsedBinaryDataFiles.add(f);
-						dos = new DataOutputStream(new BufferedOutputStream (new FileOutputStream(f)));
-						chromOut.put(currentChromStrand, dos);
-					}
-				}
-				//save data: readID, position, sequence, baseScores, comments
-				dos.writeUTF(tokens[readIDIndex]);
-				int position = Integer.parseInt(tokens[positionIndex])-1;
-				dos.writeInt(position);
-				dos.writeUTF(tokens[sequenceIndex]);
-				dos.writeUTF(tokens[qualityIndex]);
-				dos.writeUTF(tokens[baseCallCommentIndex]);
-
-				//calculate fraction overlap for paired reads
-				//is it a L read?
-				if (tokens[readTypeIndex].equals("L")){
-					//does it have a pair, check ori columns
-					if (tokens[strandIndexMate].equals(".")) continue;
-					//check that chrom is same, thus .
-					if (tokens[chromosomeIndexMate].equals(".") == false) continue;
-					//calc diff
-					int leftPos = position;
-					int rightPos = Integer.parseInt(tokens[positionIndexMate]) -1;
-					int l;
-					int r;
-					if (leftPos > rightPos) {
-						l = rightPos;
-						r = leftPos;
-					}
-					else {
-						l = leftPos;
-						r = rightPos;
-					} 
-					int stopL = l+ sequenceLength;
-					long diff = stopL - r;
-					if (diff >= 0) bpPairedOverlappingSequence += diff;
-					bpPairedSequence += (2 * sequenceLength);
-				}
-				
-				//System.out.println("NAT\t"+chromosomeStrand+"\t"+tokens[readIDIndex]+"\t"+position+"\t"+tokens[sequenceIndex]+"\t"+tokens[qualityIndex]+"\t"+tokens[baseCallCommentIndex]+"\t"+bpPairedSequence);
-				
-			}
-			System.out.println();
-		} catch (Exception e){
-			System.err.println("\nError parsing Novoalign file or writing split binary chromosome files.\nToo many open files? Too many chromosomes? " +
-			"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
-			e.printStackTrace();
-			return false;
-		}
-		return true;
-	}
-
 	public boolean parseWorkingSAMFile(){
 		try{
 			//make reader
@@ -601,23 +438,8 @@ public class NovoalignBisulfiteParser{
 				//increment counter
 				numberPassingAlignments++;
 				
-				//make readID, why?  this is killing the sorting and finding of paired alignments, masking for now
-				//String firstSecond = "";
-				//if (sa.isFirstPair()) firstSecond = "/1";
-				//if (sa.isSecondPair()) firstSecond = "/2";
-				//String readID = sa.getName()+ firstSecond;
+				//make readID
 				String readID = sa.getName();
-				
-				//make chromosome strand, note stranded second pair reads should use opp strand
-				String chromosomeStrand = null;
-				if (reverseSecondPairsStrand && sa.isSecondPair()){
-					if (sa.isReverseStrand()) chromosomeStrand = sa.getReferenceSequence() + "+";
-					else chromosomeStrand = sa.getReferenceSequence() + "-";
-				}
-				else {
-					if (sa.isReverseStrand()) chromosomeStrand = sa.getReferenceSequence() + "-";
-					else chromosomeStrand = sa.getReferenceSequence() + "+";
-				}
 				
 				//set position
 				int position = sa.getPosition();
@@ -625,22 +447,20 @@ public class NovoalignBisulfiteParser{
 				//clear masking references
 				sa.trimMaskingOfReadToFitAlignment();
 
-				//set isGA based on strand,  hmm, why not read this in from the ZB:Z:CT or GA flag?
+				//set isGA and strand based the ZB:Z:CT or GA flag
 				String isGA; 
-				//is it part of a paired alignment? the need to set it to the ori of the 1st read
-				//if (sa.isPartOfAPairedAlignment()){
-					//if (sa.isFirstPair() && sa.isReverseStrand() == false) isGA = "f";
-					//else if (sa.isSecondPair() && sa.isReverseStrand()) isGA = "f";
-					//else isGA = "t";
-				//}
-				//else if (sa.isReverseStrand()) isGA = "t";
-				//else isGA = "f";
-
+				String chromosomeStrand = null;
 				int za = sa.getCtGaTag();
-				if (za == 1) isGA = "t";
-				else if (za == 2) isGA = "f";
+				if (za == 1) {
+					isGA = "t";
+					chromosomeStrand = sa.getReferenceSequence() + "-";
+				}
+				else if (za == 2) {
+					isGA = "f";
+					chromosomeStrand = sa.getReferenceSequence() + "+";
+				}
 				else throw new Exception("\nError: Failed to find a ZB:Z:GA or ZB:Z:CT tag? Is this an old novoalignment? Update and realign?\n");
-
+				
 				//get PrintWriter
 				if (currentChromStrand.equals(chromosomeStrand) == false){
 					currentChromStrand = chromosomeStrand;
@@ -790,6 +610,7 @@ public class NovoalignBisulfiteParser{
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		File[] fastas = null;
+		File forExtraction = null;
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -798,7 +619,7 @@ public class NovoalignBisulfiteParser{
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'a': dataFiles = IO.extractFiles(new File(args[++i])); break;
+					case 'a': forExtraction = new File(args[i+1]); i++; break;
 					case 'f': fastas = IO.extractFiles(new File(args[++i])); break;
 					case 's': saveDirectory = new File(args[++i]); saveDirectory.mkdir(); break;
 					case 'v': versionedGenome = args[i+1]; i++; break;
@@ -817,15 +638,23 @@ public class NovoalignBisulfiteParser{
 				}
 			}
 		}
+		//fetch sam files
+		File[][] tot = new File[4][];
+		tot[0] = IO.extractFiles(forExtraction,".sam");
+		tot[1] = IO.extractFiles(forExtraction,".sam.gz");
+		tot[2] = IO.extractFiles(forExtraction,".sam.zip");
+		tot[3] = IO.extractFiles(forExtraction,".bam");
+		samFiles = IO.collapseFileArray(tot);
+		if (samFiles == null || samFiles.length ==0 || samFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.sam(.zip/.gz) file(s)!\n");
+
 		if (versionedGenome == null) Misc.printErrAndExit("\nPlease provide a versioned genome (e.g. H_sapiens_Mar_2006).\n");
 		if (fastas == null || fastas.length ==0) Misc.printErrAndExit("\nError: cannot find any fasta sequence files?\n");
-		if (dataFiles == null || dataFiles.length ==0 || dataFiles[0].canRead() == false) Misc.printErrAndExit("\nError: cannot find your alignment file(s)!\n");
-		if (saveDirectory == null || saveDirectory.isDirectory() == false) Misc.printErrAndExit("\nPlease enter a directory to use in saving your results.\n");
-		File pointDataDirectory = new File (saveDirectory, "MergedHitCountPointData");
-		pointDataDirectory.mkdirs();
-		nonConvertedCPointDataDirectory = new File (pointDataDirectory, "NonConvertedC");
+		if (samFiles == null || samFiles.length ==0 || samFiles[0].canRead() == false) Misc.printErrAndExit("\nError: cannot find your alignment file(s)!\n");
+		if (saveDirectory == null) Misc.printErrAndExit("\nPlease enter a directory to use in saving your results.\n");
+		saveDirectory.mkdirs();
+		nonConvertedCPointDataDirectory = new File (saveDirectory, "NonConvertedC");
 		nonConvertedCPointDataDirectory.mkdir();
-		convertedCPointDataDirectory = new File (pointDataDirectory, "ConvertedC");
+		convertedCPointDataDirectory = new File (saveDirectory, "ConvertedC");
 		convertedCPointDataDirectory.mkdir();
 
 		//load fastaFiles into hash
@@ -842,14 +671,14 @@ public class NovoalignBisulfiteParser{
 				"**************************************************************************************\n" +
 				"**                        Novoalign Bisulfite Parser: Nov 2013                      **\n" +
 				"**************************************************************************************\n" +
-				"Parses Novoalign single and paired bisulfite sequence alignment files into xxx.bed\n" +
-				"and PointData file formats. Generates several summary statistics on converted and non-\n" +
+				"Parses Novoalign -b2 and -b4 single and paired bisulfite sequence alignment files into\n" +
+				"PointData file formats. Generates several summary statistics on converted and non-\n" +
 				"converted C contexts. Flattens overlapping reads in a pair to call consensus bps.\n" +
-				"Note: for paired read RNA-Seq data run through the SamTranscriptomeParser.\n" +
+				"Note: for paired read RNA-Seq data run through the SamTranscriptomeParser first.\n" +
 
 				"\nOptions:\n"+
-				"-a Alignment file or directory containing novoalignments in native xxx.txt(.zip/.gz)\n" +
-				"      or SAM/BAM (xxx.sam(.zip/.gz OK) or xxx.bam) format. Multiple files are merged.\n" +
+				"-a Alignment file or directory containing novoalignments in SAM/BAM\n"+
+				"      (xxx.sam(.zip/.gz OK) or xxx.bam) format. Multiple files are merged.\n" +
 				"-f Fasta file directory, chromosome specific xxx.fa/.fasta(.zip/.gz OK) files.\n" +
 				"-s Save directory.\n"+
 				"-v Versioned Genome (ie H_sapiens_Mar_2006), see UCSC Browser,\n"+

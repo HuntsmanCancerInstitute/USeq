@@ -140,6 +140,30 @@ public class ParsePointDataContexts {
 		for (int i=0; i< positions.length; i++){
 			//watch out for out of bounds sequence due to partial matches to sequence termini
 			if (positions[i] < 2 || positions[i] > genomicSequenceLengthMinus3) continue;
+			
+			
+			if (positions[i] == 7206193) {
+				
+				//fetch genomic sequence
+				String genSeq = genomicSequence.substring(positions[i]-2,positions[i]+3);
+				if (negativeStrand) genSeq = Seq.reverseComplementDNA(genSeq);
+				System.out.println("NegStrand? "+negativeStrand+" "+genSeq);
+				//does it match?
+				if (contextPattern.matcher(genSeq).matches()){
+					System.out.println("Match");
+					indexesToSave.add(new Integer(i));
+					matches++;
+					matchingContexts.add(genSeq);
+				}
+				else {
+					System.out.println("NoMatch");
+					nonMatches++;
+					nonMatchingContexts.add(genSeq);
+				}
+				System.exit(0);
+			}
+			
+			
 			//fetch genomic sequence
 			String genSeq = genomicSequence.substring(positions[i]-2,positions[i]+3);
 			if (negativeStrand) genSeq = Seq.reverseComplementDNA(genSeq);

@@ -1,3 +1,11 @@
+----USeq_8.7.1----
+DefinedRegionDifferentialSeq
+* Fixed bug when DESeq was outputting FDRs with "NA", these were being assigned the max FDR, switched it to 0.  
+Note, this won't effect most analysis since these genes also have a log2 of 0 and wouldn't survive standard log2Ratio thresholding.
+NovoalignBisulfiteParser
+* Fixed a bug in the -b4 novoalignment parsing
+* Remove support for native novoalign format, just sam/ bam now.
+
 ----USeq_8.7.0----
 SRAProcessor
 * Added option to set quality score offset to 64, needed for some Illumina datasets
