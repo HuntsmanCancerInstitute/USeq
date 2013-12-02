@@ -106,7 +106,7 @@ public class TFSampleInfo {
 	private static ArrayList<StringPattern> createPatterns(String commandType, TFLogger logFile) {
 		ArrayList<StringPattern> patterns = new ArrayList<StringPattern>();
 			
-		if (commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) || commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO)) {
+		if (commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) || commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO) || commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_BEST)) {
 			patterns.add(new StringPattern(TFConstants.FILE_FASTQ1,Pattern.compile("(.+?)_1\\..+\\.gz$")));
 			patterns.add(new StringPattern(TFConstants.FILE_FASTQ2,Pattern.compile("(.+?)_2\\..+\\.gz$")));
 		} else if (commandType.equals(TFConstants.ANALYSIS_EXOME_METRICS)) {
@@ -114,7 +114,7 @@ public class TFSampleInfo {
 			patterns.add(new StringPattern(TFConstants.FILE_SPLIT_LANE_BAI,Pattern.compile("(.+?)\\.split.bai$")));
 			patterns.add(new StringPattern(TFConstants.FILE_BAM,Pattern.compile("(.+?)\\.raw\\.bam$")));
 			patterns.add(new StringPattern(TFConstants.FILE_BAI,Pattern.compile("(.+?)\\.raw\\.bai$")));
-		} else if (commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW) || commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR)) {
+		} else if (commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW) || commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR) || commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_BEST)) {
 			patterns.add(new StringPattern(TFConstants.FILE_REDUCE_BAM,Pattern.compile("(.+?)\\.reduce\\.bam$")));
 			patterns.add(new StringPattern(TFConstants.FILE_REDUCE_BAI,Pattern.compile("(.+?)\\.reduce\\.bai$")));
 		} else {
@@ -126,7 +126,7 @@ public class TFSampleInfo {
 	
 	
 	private static void validateSample(TFSampleInfo si, String commandType, TFLogger logFile) {
-		if (commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) || commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO)) {
+		if (commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) || commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO) || commandType.equals(TFConstants.ANALYSIS_EXOME_ALIGN_BEST)) {
 		    if (si.fileList.get(TFConstants.FILE_FASTQ1) == null || si.fileList.get(TFConstants.FILE_FASTQ2) == null) {
 		    	logFile.writeErrorMessage("<TFSampleInfo> Found only one paired-end file, please make sure both are in the directory.  Offending sample name: " + si.getSampleName(),false);
 				System.exit(1);
@@ -146,7 +146,7 @@ public class TFSampleInfo {
 				logFile.writeErrorMessage("<TFSampleInfo> Could not find bam/bai/sam set.  Please make sure that the bam/bai/sam combination is present for each prefix. Offending sample name: " + si.getSampleName(),false);
 				System.exit(1);
 			}
-		} else if (commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW) || commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR)) {
+		} else if (commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW) || commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR) || commandType.equals(TFConstants.ANALYSIS_EXOME_VARIANT_BEST)) {
 			if (si.fileList.get(TFConstants.FILE_REDUCE_BAM) == null || si.fileList.get(TFConstants.FILE_REDUCE_BAI) == null) {
 				logFile.writeErrorMessage("<TFSampleInfo> Could not find bam/bai set.  Please make sure that the bam/bai combination is present for each prefix. Offending sample name: " + si.getSampleName(),false);
 				System.exit(1);
@@ -163,6 +163,14 @@ public class TFSampleInfo {
 			System.exit(1);
 		}	
 		this.fileList.put(name, file);
+	}
+	
+	public boolean fileExists(String name) {
+		if (this.fileList.get(name) != null) {
+			return true;
+		} else {
+			return false;
+		}
 	}
 	
 	public File getFile(String name) {

@@ -90,7 +90,7 @@ public abstract class TFCommand {
 		}
 		
 		TFCommand returnCommand = null;
-		if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA)) {
+		if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_BEST)) {
 			if (failmax == null) {
 				failmax = 3;
 			}
@@ -102,7 +102,7 @@ public abstract class TFCommand {
 			}
 			returnCommand = new TFCommandExomeMetrics(templateFiles,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, 
 					heartbeat, failmax, jobs, suppress, deleteMetricsBams, isFull, study, targetFile, properties);
-		} else if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR)) {
+		} else if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_BEST)) {
 			if (failmax == null) {
 				failmax = 5;
 			}

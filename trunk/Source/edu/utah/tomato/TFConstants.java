@@ -8,11 +8,14 @@ public class TFConstants {
 	public static String ANALYSIS_EXOME_NOVO_VQSR = "exome_novo_vqsr";
 	public static String ANALYSIS_EXOME_BWA_RAW = "exome_bwa_raw";
 	public static String ANALYSIS_EXOME_BWA_VQSR = "exome_bwa_vqsr";
-	public static String ANALYSIS_EXOME_ALIGN_NOVO = "exome_align_novoalign";
+	public static String ANALYSIS_EXOME_ALIGN_NOVO = "exome_align_novo";
 	public static String ANALYSIS_EXOME_ALIGN_BWA = "exome_align_bwa";
+	public static String ANALYSIS_EXOME_ALIGN_BEST = "exome_align_best";
 	public static String ANALYSIS_EXOME_METRICS = "exome_metrics";
 	public static String ANALYSIS_EXOME_VARIANT_RAW = "exome_variant_raw";
 	public static String ANALYSIS_EXOME_VARIANT_VQSR = "exome_variant_vqsr";
+	public static String ANALYSIS_EXOME_VARIANT_BEST = "exome_variant_best";
+	public static String ANALYSIS_EXOME_BEST = "exome_best";
 	public static String ANALYSIS_CUSTOM = "custom";
 	
 	public static String FILE_FASTQ1 = "fastq1";
@@ -56,9 +59,12 @@ public class TFConstants {
 		add(TFConstants.ANALYSIS_EXOME_NOVO_VQSR);
 		add(TFConstants.ANALYSIS_EXOME_ALIGN_BWA);
 		add(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO);
+		add(TFConstants.ANALYSIS_EXOME_ALIGN_BEST);
 		add(TFConstants.ANALYSIS_EXOME_METRICS);
 		add(TFConstants.ANALYSIS_EXOME_VARIANT_RAW);
 		add(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR);
+		add(TFConstants.ANALYSIS_EXOME_VARIANT_BEST);
+		add(TFConstants.ANALYSIS_EXOME_BEST);
 	}};
 	
 	public static HashSet<String> validTargets = new HashSet<String>() {

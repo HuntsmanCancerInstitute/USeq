@@ -463,7 +463,7 @@ public class TomatoFarmer {
 			}
 			
 			if (analysisType.equals("exome_bwa_raw") || analysisType.equals("exome_novo_raw") || analysisType.equals("exome_novo_vqsr") ||
-					analysisType.equals("exome_bwa_vqsr")) {
+					analysisType.equals("exome_bwa_vqsr") || analysisType.equals("exome_best")) {
 				this.isFull = true;
 			}
 		} else {
@@ -598,23 +598,21 @@ public class TomatoFarmer {
 				"       Example: '-e hershel.krustofsky@hci.utah.edu'.\n" +
 				"-y Analysis pipeline. The analysis pipeline or step to run.  Current options are: \n" +
 				"          Full Pipeline \n" +
-				"          1) exome_bwa_raw - Full exome analysis, using bwa and raw filtering.\n" +
-				"          2) exome_bwa_vqsr - Full exome analysis, using bwa and vqsr filtering\n" +
-				"          3) exome_novo_raw - Full exome analysis, using novoalign and raw filtering\n" +
-				"          4) exome_novo_vqsr - Full exome analysis, using novoalign and vqsr filtering\n\n"+
+				"          1) exome_best - Full exome analysis, current core best practices.\n" +
+				"          2) exome_bwa_raw - Full exome analysis, using bwa and raw filtering. GATK\n" +
+				"             best practices\n" +
+				"          3) exome_bwa_vqsr - Full exome analysis, using bwa and vqsr filtering. GATK\n" +
+				"             best practices\n" +
 				"          A la carte\n"+
-				"          5) exome_align_bwa - Alignment/recalibration only (bwa).\n" +
-				"          6) exome_align_novo - Align/recalibration only (novoalign).\n" +
-				"          7) exome_metrics - Sample QC metrics only. Requires *mate.bam and \n" +
-				"             *split.lane.bam from 1, 2, 3, 4, 5 or 6 in the launch directory.\n" +
-				"          8) exome_variant_raw - Variant detection and filtering (raw settings). \n" + 
-				"             Requires *reduced.bam from 1, 2, 3, 4, 5 or 6 in the launch directory.\n" + 
-				"          9) exome_variant_vqsr - Variant detection and filtering (vqsr) \n" +
-				"             Requires *reduced.bam from 1, 2, 3, 4, 5 or 6 in the launch directory.\n" + 
-				"          10) path to configuration file.  This allows you to use older versions of \n" +
-				"             the pipeline.\n" +		
-				"      If you want run older versions of the pipeline, you must provide a configuration\n" +
-				"      file, otherwise the most recent versions of each command are used. \n" +
+				"          4) exome_align_bwa - Alignment/recalibration only (bwa).\n" +
+				"          5) exome_align_best - Align - core best practices.\n" +
+				"          6) exome_metrics - Sample QC metrics only. Requires *mate.bam and \n" +
+				"             *split.lane.bam from one of 1-5 in the launch directory.\n" +
+				"          7) exome_variant_raw - Variant detection and filtering (raw settings). \n" + 
+				"             Requires *reduced.bam from one of 1-5 in the launch directory.\n" + 
+				"          8) exome_variant_vqsr - Variant detection and filtering (vqsr) \n" +
+				"             Requires *reduced.bam from one of 1-5 in the launch directory.\n" + 
+				"          9) exome_variant_best - Variant detection using core best practices.\n" +
 				"      Example: '-y exome_bwa'.\n" +  
 				"-p Properties file.  This file contains a list of cluster-specific paths and options \n" +
 				"      this file doesn't need to be changed by the user. Example: '-p properties.txt' \n" +
@@ -634,47 +632,19 @@ public class TomatoFarmer {
 				"      variants and ccds exomes will be used for capture metrics. Example: '-t truseq'.\n" +
 				"-g 1K Genome samples.  Use this option if you want to spike in 200 1K genome samples \n" +
 				"      as the background sample set.  This should improve VQSR variant calling and \n" +
-				"      VAAST, but it will take a lot more time to process. BETA, ONLY WORKS FOR CORE \n" +
-				"      USERS!!!\n" +
+				"      VAAST, but it will take a lot more time to process. BETA, only works for core \n" +
+				"      users!\n" +
 				"-w Wall time.  Use this option followed by a new wall time, in hours, if you want less\n" +
 				"      wall time than the default 240 hours. Useful when there is upcoming CHPC \n" +
 				"      downtime. Example: '-w 40'. \n" +
 				"-s Study name.  Set this if you want your VCF files to have a prefix other than \n" +
 				"      'STUDY'. Example: '-s DEMO'.\n" +
-				"-c Split chromsomes.  Set this option if you want to run variant calling on each \n" +
-				"      chromosome separately. By default, the genome is split by callable region. \n" +
-				"      Example: '-c'.\n" +
 				"-n No splitting.  Set this option if you want to run variant calling on the entire\n" +
 				"      genome at one time.  This is only suggested when you have a very small capture\n" +
 				"      region.  By default, the genome is split by callable region,  Example '-n'. \n" +
 				"-x Unsuppress tomato emails.  Receive both tomato and TomatoFarmer emails. \n" +
 				"      Example: '-x'.\n" +
-				"-u Don't delete metrics bams (full pipeline specific).  Use this option if you want \n "+
-				"      to keep the bams used to generate the metrics output.  The two bam files are \n" +
-				"      the unprocessed lane-level sample bam and the processed lane-level sample bam \n" +
-				"      files.  Example '-u' \n" +
-				"-v Don't delete reduced bams (full pipeline specific.) Use this option if you want \n " +
-				"      to keep the reduced bams used to generate variant calls.  Reduced bams are \n" +
-				"      efficient in GATK pipelines but don't necessarily work in non-GATK software. \n" +
-				"      We recommend using the files labeled SAMPLE_NAME.bam for downstream apps\n. " +
-				"      Example '-v'\n" +
 				
-				"\nAdmin Arguments:\n\n" +
-				"-f Manually set failure level.  If this variable is set, the user will be prompted to \n" + 
-				"      override default allowed failures for each analysis step before the analysis \n" + 
-				"      begins.  If exome_align is set to 3, once four failures are reached across all \n" +
-				"      spawned threads, everything will be shut down.  You might think about changing \n" +
-				"      the default settings if you're running lots of samples. Note that outright \n" + 
-				"      tomato failures (job never actually starts) don't count against the cap.  Must \n" +
-				"      be between 1 and 20. \n" + 	
-				"-l Logging level.  Level of logging you want to see.  Options INFO, WARNING, ERROR.\n" +
-				"      ERROR just displays error messages, WARNING displays warning and error messages.\n" +
-				"      INFO shows all three levels. Default: INFO.\n" +
-				"-b Heartbeat frequency.  How often you want a thread heartbeat message in minutes. \n" + 
-				"      Default: 30 mins.\n" +
-				"-j Number of jobs at a time. Don't abuse this, big brother is watching you. Default:\n" +
-				"      5 jobs.\n" +
-			
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/TomatoFarmer -d /tomato/version/job/demo/\n" +
 				"      -e herschel.krustofsky@hci.utah.edu -y exome_bwa -s DEMO -c -t AgilentAllExon50MB\n\n" +
 

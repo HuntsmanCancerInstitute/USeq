@@ -212,6 +212,8 @@ public class CalculatePerCycleErrorRate {
 
 				//is it aligned?
 				if (sam.getReadUnmappedFlag()) continue;
+				
+				if (sam.getNotPrimaryAlignmentFlag()) continue;
 
 				//does it pass the vendor qc?
 				if (sam.getReadFailsVendorQualityCheckFlag()) continue;

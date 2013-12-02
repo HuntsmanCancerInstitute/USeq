@@ -592,67 +592,97 @@ public class TFCommandExomeVariant extends TFCommand {
 		ArrayList<File> keepers = new ArrayList<File>(); //files to preserve on cleanup
 		keepers.add(fullVcfSource);
 		
-		//Initialize daemon
-		this.daemon = new TFThreadDaemon(this.logFile, this.templateFiles.get(1).getName(), 1, this.jobs);
-		this.daemon.start();
-		
-		//Create replacement tokens
-		HashMap<String,String> replacements = new HashMap<String,String>();
-		replacements.put("STUDY", this.study);
-		replacements.putAll(this.properties);
-		
-		//Create cmd.txt file
-		File cmdFile = new File(mergeDirectory,"cmd.txt");
-		keepers.add(cmdFile);
-		
-		//Create cmd.txt file
-		this.createCmd(replacements, cmdFile, 1);
-		
-		//Run this shit!
-		TFThread thread = new TFThread(mergeDirectory,this.failmax, counter, this.heartbeat, keepers, this.logFile);
-		this.daemon.addJob(thread);
-		
-		//Wait for command to finish
-		try {
-			this.daemon.join();
-			Thread.sleep(5000);
-		} catch (InterruptedException ie) {
-			logFile.writeErrorMessage("Daemon interrupted",true);
-			System.exit(1);
-		}
-		
 		//Make destination directory
 		File varDir = new File(this.rootDirectory,"Variants");
 		varDir.mkdir();
-		for(File file: varDir.listFiles()) file.delete();
 		File jobDir = new File(varDir,"Jobs");
 		
-		//Make destination files
-		File fullVcfDest = new File(varDir,this.study + ".raw.vcf");
-		File filterVcfDest = new File(varDir,this.study + ".filterFieldSetAll.vcf");
-		File passingVcfDest = new File(varDir,this.study + ".filterFieldSetPassing.vcf");
 		
-		File fullVcfDestGz = new File(varDir,this.study + ".raw.vcf.gz");
-		File filterVcfDestGz = new File(varDir,this.study + ".filterFieldSetAll.vcf.gz");
-		File passingVcfDestGz = new File(varDir,this.study + ".filterFieldSetPassing.vcf.gz");
+		if (this.templateFiles.size() > 1) {
+			//Initialize daemon
+			this.daemon = new TFThreadDaemon(this.logFile, this.templateFiles.get(1).getName(), 1, this.jobs);
+			this.daemon.start();
+			
+			//Create replacement tokens
+			HashMap<String,String> replacements = new HashMap<String,String>();
+			replacements.put("STUDY", this.study);
+			replacements.putAll(this.properties);
+			
+			//Create cmd.txt file
+			File cmdFile = new File(mergeDirectory,"cmd.txt");
+			keepers.add(cmdFile);
+			
+			//Create cmd.txt file
+			this.createCmd(replacements, cmdFile, 1);
+			
+			//Run this shit!
+			TFThread thread = new TFThread(mergeDirectory,this.failmax, counter, this.heartbeat, keepers, this.logFile);
+			this.daemon.addJob(thread);
+			
+			//Wait for command to finish
+			try {
+				this.daemon.join();
+				Thread.sleep(5000);
+			} catch (InterruptedException ie) {
+				logFile.writeErrorMessage("Daemon interrupted",true);
+				System.exit(1);
+			}
+			
+			
+			for(File file: varDir.listFiles()) file.delete();
+			
+			
+			//Make destination files
+			File fullVcfDest = new File(varDir,this.study + ".raw.vcf");
+			File filterVcfDest = new File(varDir,this.study + ".filterFieldSetAll.vcf");
+			File passingVcfDest = new File(varDir,this.study + ".filterFieldSetPassing.vcf");
+			
+			File fullVcfDestGz = new File(varDir,this.study + ".raw.vcf.gz");
+			File filterVcfDestGz = new File(varDir,this.study + ".filterFieldSetAll.vcf.gz");
+			File passingVcfDestGz = new File(varDir,this.study + ".filterFieldSetPassing.vcf.gz");
+			
+			//Merge output files
+			logFile.writeInfoMessage("Moving vcf files");
+			this.moveFile(fullVcfSource, fullVcfDest);
+			this.moveFile(filterVcfSource,filterVcfDest);
+			this.moveFile(passingVcfSource, passingVcfDest);
+			
+			//Compress
+			logFile.writeInfoMessage("Compressing vcf files");
+			this.bgzip(fullVcfDest);
+			this.bgzip(filterVcfDest);
+			this.bgzip(passingVcfDest);
+			
+			//Index
+			logFile.writeInfoMessage("Indexing vcf files");
+			this.tabix(fullVcfDestGz);
+			this.tabix(filterVcfDestGz);
+			this.tabix(passingVcfDestGz);
+		} else {
+			//Clean Destination Directory
+			for(File file: varDir.listFiles()) file.delete();
+
+			
+			//Make destination files
+			File fullVcfDest = new File(varDir,this.study + ".raw.vcf");
+			
+			File fullVcfDestGz = new File(varDir,this.study + ".raw.vcf.gz");
+			
+			
+			//Merge output files
+			logFile.writeInfoMessage("Moving vcf files");
+			this.moveFile(fullVcfSource, fullVcfDest);
+			
+			//Compress
+			logFile.writeInfoMessage("Compressing vcf files");
+			this.bgzip(fullVcfDest);
+			
+			//Index
+			logFile.writeInfoMessage("Indexing vcf files");
+			this.tabix(fullVcfDestGz);
+		}
 		
-		//Merge output files
-		logFile.writeInfoMessage("Moving vcf files");
-		this.moveFile(fullVcfSource, fullVcfDest);
-		this.moveFile(filterVcfSource,filterVcfDest);
-		this.moveFile(passingVcfSource, passingVcfDest);
 		
-		//Compress
-		logFile.writeInfoMessage("Compressing vcf files");
-		this.bgzip(fullVcfDest);
-		this.bgzip(filterVcfDest);
-		this.bgzip(passingVcfDest);
-		
-		//Index
-		logFile.writeInfoMessage("Indexing vcf files");
-		this.tabix(fullVcfDestGz);
-		this.tabix(filterVcfDestGz);
-		this.tabix(passingVcfDestGz);
 		
 		
 		File existDir = new File(jobDir,mergeDirectory.getName());
