@@ -5,6 +5,7 @@ import java.util.regex.*;
 import java.util.*;
 
 import org.apache.commons.math3.stat.inference.ChiSquareTest;
+
 import util.gen.*;
 import edu.utah.seq.data.*;
 import edu.utah.seq.parsers.*;
@@ -513,6 +514,7 @@ public class DefinedRegionRNAEditing {
 					case 'e': nonConvertedPointDirs = IO.extractFiles(args[++i]); break;
 					case 'b': regionsFile = new File(args[++i]); break;
 					case 't': runStrandedAnalysis = true; break;
+					case 'a': minimumBaseCoverage = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -562,7 +564,7 @@ public class DefinedRegionRNAEditing {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Defined Region RNA Editing: April 2013                 **\n" +
+				"**                           Defined Region RNA Editing: Dec 2013                   **\n" +
 				"**************************************************************************************\n" +
 				"DRRE scores regions for the pseudomedian of the base fraction edits as well as the\n" +
 				"probability that the observations occured by chance using a permutation test based on\n" +
@@ -575,6 +577,7 @@ public class DefinedRegionRNAEditing {
 				"       can also provide a single directory that contains multiple PointData\n" +
 				"       directories. These will be merged when scanning.\n" +
 				"-r Reference PointData directory from the RNAEditingPileUpParser. Ditto.\n" +
+				"-a Minimum base read coverage, defaults to 5.\n"+
 				"-t Run a stranded analysis, defaults to non-stranded.\n"+
 
 				"\n"+

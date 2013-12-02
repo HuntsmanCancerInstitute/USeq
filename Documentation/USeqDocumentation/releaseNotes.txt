@@ -1,3 +1,7 @@
+----USeq_8.7.2----
+RNAEditingScanSeqs & DefinedRegionRNAEditing
+* Added ability to set the minimum base read coverage threshold, defaults to 5 alignments
+
 ----USeq_8.7.1----
 DefinedRegionDifferentialSeq
 * Fixed bug when DESeq was outputting FDRs with "NA", these were being assigned the max FDR, switched it to 0.  
