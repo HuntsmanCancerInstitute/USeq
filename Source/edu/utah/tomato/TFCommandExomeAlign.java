@@ -932,24 +932,156 @@ public class TFCommandExomeAlign extends TFCommand {
 		}
 	}
 	
+	public void simpleAlign(ArrayList<TFSampleInfo> sampleList) {
+		/******************************************************************************************
+		 *  Standard Alignment
+		 *****************************************************************************************/
+		logFile.writeInfoMessage("Starting sample alignment");
+		
+		int counter = 1;
+		this.daemon = new TFThreadDaemon(this.logFile,this.commandString,sampleList.size(),this.jobs);
+		this.daemon.start();
+		
+		//Create project-specific storage
+		ArrayList<File> runDirectoryList = new ArrayList<File>(); //List of the run directories
+		ArrayList<File> deleteList = new ArrayList<File>(); //list of files to delete at the end of the run
+		
+		for (TFSampleInfo si: sampleList) {
+			//Create sample-specific storage
+			ArrayList<File> protectList = new ArrayList<File>(); //don't remove these files on job re-submission cleanup
+		
+			//Create run directory
+			File runDirectory = new File(this.rootDirectory,"JOB_" + si.getSampleID() + "_align"); //tomato job directory
+			runDirectoryList.add(runDirectory); //store directory information
+			runDirectory.mkdir();
+			
+			//Create files
+			File cmdFile = new File(runDirectory,"cmd.txt");
+			File fastq1 = new File(runDirectory,si.getSampleID() + "_1.txt.gz");
+			File fastq2 = new File(runDirectory,si.getSampleID() + "_2.txt.gz");
+			
+			//Link necessary files
+			this.createLink(si.getFile(TFConstants.FILE_FASTQ1),fastq1);
+			this.createLink(si.getFile(TFConstants.FILE_FASTQ2),fastq2);
+			
+			//Create replacement hash
+			HashMap<String,String> replacements = new HashMap<String,String>();
+			replacements.put("NAME", si.getSampleID());
+			replacements.put("LIBRARY",si.getSampleName());
+			replacements.put("SAMPLE",si.getSampleName());
+			replacements.put("FLOWCELL",si.getPuID());
+			if (si.isQual64()) {
+				replacements.put("QUAL_FLAG", "-I");
+			} else {
+				replacements.put("QUAL_FLAG","");
+			}
+			
+			//Add properties to replacement hash
+			replacements.putAll(this.properties);
+			
+			//Create cmd.txt file
+			this.createCmd(replacements,cmdFile,0);
+			
+			//Mark files for deletion or cleanup protection
+			protectList.add(fastq1);
+			protectList.add(fastq2);
+			protectList.add(cmdFile);
+			deleteList.add(fastq1);
+			deleteList.add(fastq2);
+			
+			TFThread thread = new TFThread(runDirectory,this.failmax, counter, this.heartbeat, protectList, this.logFile);
+			
+			//this.taskList.add(thread);
+			this.daemon.addJob(thread);
+			
+			counter ++;
+		}
+			
+		//Wait for command to finish
+		try {
+			this.daemon.join();
+			Thread.sleep(5000);
+			if (this.daemon.getFailed()) {
+				System.exit(1);
+			}
+		} catch (InterruptedException ie) {
+			logFile.writeErrorMessage("Daemon interrupted",true);
+			System.exit(1);
+		}
+		
+		//Create final directories
+		File alignDir = new File(this.rootDirectory,"Alignments");
+		File processedDir = new File(alignDir,"ProcessedAlignments");
+		File jobDir = new File(alignDir,"Jobs");
+		alignDir.mkdir();
+		processedDir.mkdir();
+		jobDir.mkdir();
+		
+		
+		for (int i=0;i<sampleList.size();i++) {
+			//Get sample-specific info
+			File runDirectory = runDirectoryList.get(i);
+			TFSampleInfo si = sampleList.get(i);
+			
+			//Make destination files
+			File rawBamFile = new File(processedDir,si.getSampleID() + ".raw.bam");
+			File rawBaiFile = new File(processedDir,si.getSampleID() + ".raw.bai");
+			File finalBamFile = new File(processedDir,si.getSampleID() + ".final.bam");
+			File finalBaiFile = new File(processedDir,si.getSampleID() + ".final.bai");
+			File reduceBamFile = new File(processedDir,si.getSampleID() + ".reduce.bam");
+			File reduceBaiFile = new File(processedDir,si.getSampleID() + ".reduce.bai");
+			
+			//Move results
+			this.moveFile(new File(runDirectory,si.getSampleID() + ".raw.bam"), rawBamFile);
+			this.moveFile(new File(runDirectory,si.getSampleID() + ".raw.bai"), rawBaiFile);
+			this.moveFile(new File(runDirectory,si.getSampleID() + ".final.bam"), finalBamFile);
+			this.moveFile(new File(runDirectory,si.getSampleID() + ".final.bai"), finalBaiFile);
+			this.moveFile(new File(runDirectory,si.getSampleID() + ".reduce.bam"), reduceBamFile);
+			this.moveFile(new File(runDirectory,si.getSampleID() + ".reduce.bai"), reduceBaiFile);
+			
+			
+			//Add files to si object
+			si.setFile(TFConstants.FILE_BAM, rawBamFile);
+			si.setFile(TFConstants.FILE_BAI, rawBaiFile);
+			si.setFile(TFConstants.FILE_SPLIT_LANE_BAM, finalBamFile);
+			si.setFile(TFConstants.FILE_SPLIT_LANE_BAI, finalBaiFile);
+			si.setFile(TFConstants.FILE_REDUCE_BAM, reduceBamFile);
+			si.setFile(TFConstants.FILE_REDUCE_BAI, reduceBaiFile);
+		}
+		
+		//clean up unwanted files
+		for (File df: deleteList) {
+			this.deleteFile(df);
+		}
+		
+		//Move JOB directories
+		for (File rd: runDirectoryList) {
+			File existDir = new File(jobDir,rd.getName());
+			if (existDir.exists()) {
+				deleteFolder(existDir);
+			}
+			this.moveFile(rd, jobDir);
+		}
+	}
+	
 	
 	
 	
 
 	@Override
 	public void run(ArrayList<TFSampleInfo> sampleList) {
+		String commandName = (this.commandString.split(":"))[0];
+		if (commandName.equals("exome_align_best")) {
+			this.simpleAlign(sampleList);
+		} else {
 		
-		this.alignment(sampleList);
-		
-		this.realignLane(sampleList);
-		
-		this.splitLaneBams(sampleList);
-		
-		this.mergeSampleLanes(sampleList);
-		
-		this.realignSample(sampleList);
-		
-		this.reduceSample(sampleList);
+			this.alignment(sampleList);
+			this.realignLane(sampleList);
+			this.splitLaneBams(sampleList);
+			this.mergeSampleLanes(sampleList);
+			this.realignSample(sampleList);
+			this.reduceSample(sampleList);
+		}
 		
 		
 		
