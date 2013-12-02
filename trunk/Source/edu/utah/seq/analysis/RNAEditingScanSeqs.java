@@ -3,7 +3,9 @@ package edu.utah.seq.analysis;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
+
 import org.apache.commons.math3.stat.inference.ChiSquareTest;
+
 import util.gen.*;
 import edu.utah.seq.data.*;
 import edu.utah.seq.parsers.*;
@@ -623,6 +625,7 @@ public class RNAEditingScanSeqs {
 					case 'm': minimumNumberObservationsInWindow = Integer.parseInt(args[++i]); break;
 					case 'p': minimumPseMedian = Float.parseFloat(args[++i]); break;
 					case 'b': minimumBaseFractionEdited = Float.parseFloat(args[++i]); break;
+					case 'a': minimumBaseCoverage = Integer.parseInt(args[++i]); break;
 					case 't': runStrandedAnalysis = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
@@ -666,7 +669,7 @@ public class RNAEditingScanSeqs {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           RNA Editing Scan Seqs: June 2013                       **\n" +
+				"**                           RNA Editing Scan Seqs: Dec 2013                        **\n" +
 				"**************************************************************************************\n" +
 				"RESS attempts to identify clustered editing sites across a genome using a sliding\n" +
 				"window approach.  Each window is scored for the pseudomedian of the base fraction\n" +
@@ -682,9 +685,10 @@ public class RNAEditingScanSeqs {
 				"-r Reference PointData directory from the RNAEditingPileUpParser. Ditto.\n" +
 				
 				"\nAdvanced Options:\n"+
-				"-p Minimum pseudomedian, defaults to 0.005.\n"+
+				"-a Minimum base read coverage, defaults to 5.\n"+
 				"-b Minimum base fraction edited to use in analysis, defaults to 0.01\n"+
 				"-w Window size, defaults to 50.\n"+
+				"-p Minimum window pseudomedian, defaults to 0.005.\n"+
 				"-m Minimum number observations in window, defaults to 3. \n" +
 				"-t Run a stranded analysis, defaults to non-stranded.\n"+
 				"\n"+
