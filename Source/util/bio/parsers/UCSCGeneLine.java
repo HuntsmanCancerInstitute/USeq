@@ -228,7 +228,7 @@ public class UCSCGeneLine {
 	
 	/*Assumes interbase coordinates**/
 	public boolean intersects(int start, int stop){
-		if (stop < this.txStart || start >= this.txEnd) return false;
+		if (stop <= txStart || start >= txEnd) return false;
 		return true;
 	}
 	/**Returns null if no overlap, otherwise the start and stop coordinates of the overlap.
