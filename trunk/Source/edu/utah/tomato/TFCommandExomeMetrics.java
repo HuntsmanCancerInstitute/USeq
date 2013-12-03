@@ -177,14 +177,7 @@ public class TFCommandExomeMetrics extends TFCommand {
 				if (si.getFile(TFConstants.FILE_BAI).exists()) {
 					si.getFile(TFConstants.FILE_BAI).delete();
 				}
-				if (si.fileExists(TFConstants.FILE_REALIGN_SAMPLE_BAM)) {
-					if (si.getFile(TFConstants.FILE_SPLIT_LANE_BAM).exists()) {
-						si.getFile(TFConstants.FILE_SPLIT_LANE_BAM).delete();
-					}
-					if (si.getFile(TFConstants.FILE_SPLIT_LANE_BAI).exists()) {
-						si.getFile(TFConstants.FILE_SPLIT_LANE_BAI).delete();
-					}
-				}
+
 			}
 		}
 		
