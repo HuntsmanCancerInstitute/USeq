@@ -38,6 +38,16 @@ public class PointData {
 		barParser.readBarFile(barFile,loadPositionScores);
 		info = new Info (barParser);
 	}
+	
+	/**Creates a no observation PointData object with a copied Info*/
+	public PointData(Info info, String strand){
+		this.info = info.copy();
+		positions = new int[]{};
+		scores = new float[]{};
+		info.setNumberObservations(0);
+		info.setScoreTotal(0);
+		info.setStrand(strand);
+	}
 
 	//methods
 	/**Writes a zip compressed 'chromosome_strand_.bar.zip' file into the saveDirectory.
@@ -485,6 +495,7 @@ public class PointData {
 	/**Given a start bp (included) and stop bp (not included), returns start (included) and stop (not included) indexes.
 	 * May return startIndex = endIndex, therefore nothing found.*/
 	public int[] findIndexes(int startBp, int stopBp){
+		if (positions.length ==0) return new int[]{0,0};
 		//find start index, included
 		int startIndex = Arrays.binarySearch(positions, startBp);
 		if (startIndex < 0) {
