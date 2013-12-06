@@ -60,10 +60,12 @@ public class Positive {
 		sb.append(start);
 		sb.append("\t");
 		sb.append(stop);
-		float[] f = (float[])scores.get(0);
-		for (int i=0; i<f.length; i++){
-			sb.append("\t");
-			sb.append(f[i]);
+		if (scores.size()!=0){
+			float[] f = (float[])scores.get(0);
+			for (int i=0; i<f.length; i++){
+				sb.append("\t");
+				sb.append(f[i]);
+			}
 		}
 		return sb.toString();
 	}

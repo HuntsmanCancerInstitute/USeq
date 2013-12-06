@@ -1023,7 +1023,7 @@ public class DefinedRegionDifferentialSeq {
 			String[] res = IO.loadFile(rOut);
 
 			for (String s: res) {
-				if (s.contains("Dispersion fit did not converge") || s.contains("Parametric dispersion fit failed")) {
+				if (s.contains("did not converge") || s.contains("fit failed")) {
 					System.err.println("\n\t\tWarning, DESeq's GLM dispersion fit failed. Relaunching using fitType='local'");
 					analyzeForDifferentialExpression(true);
 					return;

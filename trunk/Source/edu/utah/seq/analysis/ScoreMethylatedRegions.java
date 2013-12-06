@@ -3,21 +3,14 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import edu.utah.seq.data.Point;
+import edu.utah.seq.data.Info;
 import edu.utah.seq.data.PointData;
-import edu.utah.seq.data.SmoothingWindow;
 import edu.utah.seq.useq.data.Region;
-
-import trans.anno.*;
-import trans.misc.*;
 import trans.roc.ParseSgrsForParticularRegions;
 import trans.roc.Positive;
 import trans.roc.PositiveComparator;
-import util.bio.parsers.*;
 import util.bio.seq.Seq;
 import util.gen.*;
-import util.bio.annotation.*;
 
 /**
  * Returns values that overlap particular regions, can generate p-values associated with random back ground model 
@@ -60,6 +53,8 @@ public class ScoreMethylatedRegions {
 	private PointData nonConvertedMergedChromMinus = null;
 	private MethylatedBaseObservationOneSample[] methylatedBases;
 	private int[] methylatedBasePositions;
+	private boolean plusStrandPresent;
+	private boolean minusStrandPresent;
 
 
 	public void printDefaultValues(){
@@ -95,42 +90,47 @@ public class ScoreMethylatedRegions {
 			//new chromosome? load data!
 			if (regions[x].getChromosome().equals(currentChrom) == false) {
 				currentChrom = regions[x].getChromosome();
-				System.out.print("\n"+currentChrom+" ");
+				System.out.print(currentChrom+" ");
 
-				//load PointData
-				fetchDataAndRemove();
-				//check they all exist
-				if (convertedMergedChromPlus == null || convertedMergedChromMinus == null || nonConvertedMergedChromPlus == null || nonConvertedMergedChromMinus == null) {
-					Misc.printErrAndExit("\nError: missing all four PointDatasets for -> "+currentChrom +"\n");
+				//load PointData, might not be any!
+				if (fetchDataAndRemove() == false) methylatedBases = null;
+				
+				else {
+					//making random?
+					if (makeRandom) loadRandomData();
+					//merge strands?
+					ArrayList<PointData> al = new ArrayList<PointData>();
+					if (minusStrandPresent) al.add(convertedMergedChromMinus);
+					if (plusStrandPresent) al.add(convertedMergedChromPlus);
+					PointData mergedCon = PointData.mergePointData(al, false, false);
+					al.clear();
+					if (minusStrandPresent) al.add(nonConvertedMergedChromMinus);
+					if (plusStrandPresent) al.add(nonConvertedMergedChromPlus);    
+					PointData mergedNonCon = PointData.mergePointData(al, false, false);
+					//might be null!
+					methylatedBases = MethylatedBaseObservationOneSample.fetchCommonBasesWithMinimumObservations(mergedNonCon, mergedCon, minimumReadCoverage);
+					methylatedBasePositions = null;
+					if (methylatedBases != null) methylatedBasePositions = MethylatedBaseObservationOneSample.fetchPositions(methylatedBases);
 				}
-				//making random?
-				if (makeRandom) loadRandomData();
-				
-				//merge strands
-				ArrayList<PointData> al = new ArrayList<PointData>();
-				al.add(convertedMergedChromMinus);
-				al.add(convertedMergedChromPlus);
-				
-				PointData mergedCon = PointData.mergePointData(al, false, false);
-				al.clear();
-				al.add(nonConvertedMergedChromMinus);
-				al.add(nonConvertedMergedChromPlus);
-				PointData mergedNonCon = PointData.mergePointData(al, false, false);
-				methylatedBases = MethylatedBaseObservationOneSample.fetchCommonBasesWithMinimumObservations(mergedNonCon, mergedCon, minimumReadCoverage);
-				methylatedBasePositions = MethylatedBaseObservationOneSample.fetchPositions(methylatedBases);
 			}
-
+			regionResults[x] = new RegionResult(regions[x].getIndex());
+			
+			//any data from chromosome?
+			if (methylatedBases == null){
+				regionResults[x].results = regions[x].toStringSimpleFloat()+"\tNo chromosome data, skipping.";
+				continue;
+			}
+			
 			//load select region with PointData
 			loadRegion(regions[x]);
-			regionResults[x] = new RegionResult(regions[x].getIndex());
-
+			
 			//fetch scores numberBaseFractions, mean, median, fractionNonConverted, numberNonCon, numberNonCon+numberCon
 			float[] scores = (float[])(regions[x].getScores().get(0));
 			int numberObservations = (int)scores[5];
 
 			//enough observations?
 			if (numberObservations < minimumNumberObservations || scores[0] < minimumNumberBaseFractions){
-				regionResults[x].results = regions[x].toStringSimpleFloat()+"\tToo few observations";
+				regionResults[x].results = regions[x].toStringSimpleFloat()+"\tToo few observations, skipping.";
 				continue;
 			}
 			
@@ -153,16 +153,14 @@ public class ScoreMethylatedRegions {
 		
 		System.out.println();
 		
-		
-		
 		//sort and print results
 		Arrays.sort(regionResults);
 		for (RegionResult rr : regionResults) {
-			if (printAll || rr.results.contains("Too few") == false) out.println(rr.results);
+			if (printAll || rr.results.contains("skipping") == false) out.println(rr.results);
 		}
 		out.close();
 		
-		this.printAggregateData(randomResultsAgg, regionResultsAgg, regions.length);
+		printAggregateData(randomResultsAgg, regionResultsAgg, regions.length);
 
 		System.out.println("\nDone!\n");
 	}
@@ -210,7 +208,7 @@ public class ScoreMethylatedRegions {
 	}
 	
 	private void printAggregateData(ArrayList<ArrayList<Float>> randomData, ArrayList<Float> regionData,int length) {
-		System.out.println(String.format("Aggregating data for %d of %d regions\n",regionData.size(),length));
+		System.out.println(String.format("\nAggregating data for %d of %d regions\n",regionData.size(),length));
 		
 		double realMed = getMedian(regionData);
 		ArrayList<ArrayList<Float>> realData = new ArrayList<ArrayList<Float>>();
@@ -265,7 +263,7 @@ public class ScoreMethylatedRegions {
 			if (numLessThanP > 1) numLessThanP = 1;
 			double foldEnrich = Math.log(realMed/average)/Math.log(2);
 			System.out.println(String.format("Median methylation in the targed regions is: %.3f",realMed));
-			System.out.println(String.format("Median methylation in randomly generated regions: %.3f.\n" +
+			if (makeRandom) System.out.println(String.format("Median methylation in randomly generated regions: %.3f.\n" +
 											 "P-value: Targeted region more enriched than random regions: %.3f (%d/%d).\n" + 
 											 "P-value: Targeted region less enriched than random regions: %.3f (%d/%d).\n" +
 											 "Fold-Enrichment target regions / random regions: %.3f.",
@@ -400,8 +398,8 @@ public class ScoreMethylatedRegions {
 
 
 
-	/**Fetchs the data for a particular chromosome.*/
-	public void fetchDataAndRemove(){
+	/**Fetchs the data for a particular chromosome. Returns true of chrom data was loaded.*/
+	public boolean fetchDataAndRemove(){
 		ArrayList<PointData> al = null;
 		PointData[] pd;
 		//merge converted
@@ -432,6 +430,29 @@ public class ScoreMethylatedRegions {
 		}
 		pd = null;
 		al = null;
+		plusStrandPresent = (convertedMergedChromPlus != null && nonConvertedMergedChromPlus != null);
+		minusStrandPresent = (convertedMergedChromMinus != null && nonConvertedMergedChromMinus != null);
+		//add blank holders?
+		return addMissingStrands();
+	}
+	
+	private boolean addMissingStrands(){
+		if (convertedMergedChromPlus == null || convertedMergedChromMinus == null || nonConvertedMergedChromPlus == null || nonConvertedMergedChromMinus == null) {
+			//fetch an info object
+			Info info = null;
+			if (convertedMergedChromPlus != null) info = convertedMergedChromPlus.getInfo();
+			else if (convertedMergedChromMinus != null) info = convertedMergedChromMinus.getInfo();
+			else if (nonConvertedMergedChromPlus != null) info = nonConvertedMergedChromPlus.getInfo();
+			else if (nonConvertedMergedChromMinus != null) info = nonConvertedMergedChromMinus.getInfo();
+			if (info == null) return false;
+
+			if (convertedMergedChromPlus == null) convertedMergedChromPlus = new PointData(info, "+");
+			if (convertedMergedChromMinus == null) convertedMergedChromMinus = new PointData(info, "-");
+			if (nonConvertedMergedChromPlus == null) nonConvertedMergedChromPlus = new PointData(info, "+");
+			if (nonConvertedMergedChromMinus == null) nonConvertedMergedChromMinus = new PointData(info, "-");
+			return true;
+		}
+		return true;
 	}
 
 	/**Loads a Positive with fractionNonConverted.*/
@@ -458,9 +479,10 @@ public class ScoreMethylatedRegions {
 		region.setScores(al);
 	}
 
-	/**Returns number of fractions in region and the median*/
+	/**Returns number of fractions in region and the median, or all zeros if no data*/
 	private float[] scoreBaseFractionMethylation(int start, int stop) {
 		int[] indexes = Num.findIndexes(start, stop, methylatedBasePositions);
+		if (indexes[0] == indexes[1]) return new float[]{0,0,0};
 
 		//for each index, calculate fraction methylated
 		float[] fractions = new float[indexes[1]- indexes[0]];
@@ -593,7 +615,7 @@ public class ScoreMethylatedRegions {
 	public static void printDocs(){ 
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Score Methylated Regions: March 2012                      **\n" +
+				"**                        Score Methylated Regions: Dec 2013                        **\n" +
 				"**************************************************************************************\n" +
 				"For each region finds the underlying methylation data. A p-value (Bon Corr) for each\n" +
 				"region's fraction methylated (# nonConObs/ # totalObs) as well as a fold enrichment\n" +

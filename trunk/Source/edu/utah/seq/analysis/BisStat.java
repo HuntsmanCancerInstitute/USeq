@@ -84,6 +84,8 @@ public class BisStat {
 	private PointData nonConvertedMergedChromMinus = null;	
 	private PointData convertedChrom = null;
 	private PointData nonConvertedChrom = null;
+	private boolean plusStrandPresent;
+	private boolean minusStrandPresent;
 
 
 	//constructors
@@ -138,7 +140,7 @@ public class BisStat {
 	public void scan(){
 		//fetch counts
 		System.out.println("\nCalculating read count stats...");
-		calculateReadCountStatistics();
+		mergeData();
 
 		//this also removes the phiX and lambda data from that to be scanned if resent
 		fetchAllChromosomes();
@@ -170,15 +172,18 @@ public class BisStat {
 
 			System.out.print(chromosome+" ");
 			//fetch data
-			if (fetchDataAndRemove() == false) continue;
+			if (fetchDataAndRemove() == false) {
+				System.out.print("missing data skipping, ");
+				continue;
+			}
+
 			//calculate base level pvalues
 			if (performStrandedAnalysis){
-				baseScanChromosomeContextsForPValues(nonConvertedMergedChromPlus, convertedMergedChromPlus);
-				baseScanChromosomeContextsForPValues(nonConvertedMergedChromMinus, convertedMergedChromMinus);
+				if (plusStrandPresent) baseScanChromosomeContextsForPValues(nonConvertedMergedChromPlus, convertedMergedChromPlus);
+				if (minusStrandPresent) baseScanChromosomeContextsForPValues(nonConvertedMergedChromMinus, convertedMergedChromMinus);
 			}
 			else {
-				convertedChrom = PointData.mergePairedPointDataNoSumming(convertedMergedChromPlus, convertedMergedChromMinus);
-				nonConvertedChrom = PointData.mergePairedPointDataNoSumming(nonConvertedMergedChromPlus, nonConvertedMergedChromMinus);
+				mergeStrandedPointData();
 				baseScanChromosomeContextsMergingStrandsForPValues();
 			}
 		}
@@ -189,7 +194,7 @@ public class BisStat {
 		correctPValues();
 
 		//refetch data pointers, reset index
-		calculateReadCountStatistics();
+		mergeData();
 		fetchAllChromosomes();
 		fdrIndex = 0;
 
@@ -214,10 +219,7 @@ public class BisStat {
 			}
 
 			//merge strands?
-			if (printGraphs || performStrandedAnalysis == false){
-				convertedChrom = PointData.mergePairedPointDataNoSumming(convertedMergedChromPlus, convertedMergedChromMinus);
-				nonConvertedChrom = PointData.mergePairedPointDataNoSumming(nonConvertedMergedChromPlus, nonConvertedMergedChromMinus);
-			}
+			if (printGraphs || performStrandedAnalysis == false) mergeStrandedPointData();
 
 			//non stranded
 			if (performStrandedAnalysis == false){
@@ -247,17 +249,20 @@ public class BisStat {
 				}
 			}
 
-			//stranded
+			//stranded analysis
 			else{
-				//calculate base level stats			
-				PointData[] plusPD = baseScanChromosomeContexts(nonConvertedMergedChromPlus, convertedMergedChromPlus, false);		
-				PointData[] minusPD = baseScanChromosomeContexts(nonConvertedMergedChromMinus, convertedMergedChromMinus, true);
+				//calculate base level stats
+				PointData[] plusPD = null;	
+				PointData[] minusPD = null;
+				if (plusStrandPresent) plusPD = baseScanChromosomeContexts(nonConvertedMergedChromPlus, convertedMergedChromPlus, false);		
+				if (minusStrandPresent) minusPD = baseScanChromosomeContexts(nonConvertedMergedChromMinus, convertedMergedChromMinus, true);
 
-				if (plusPD == null || minusPD == null){
+				//both null
+				if (plusPD == null && minusPD == null){
 					System.err.println("\n"+chromosome+"\tNo base contexts. Skipping.");
 				}
-
-				else {
+				//both present
+				else if (plusPD != null && minusPD != null) {
 					//save fractions
 					baseFractionMethylation.add(plusPD[0].getScores());
 					baseFractionMethylation.add(minusPD[0].getScores());
@@ -304,10 +309,63 @@ public class BisStat {
 						histogram.printScaledHistogram();
 					}
 				}
+				else if (plusStrandPresent) processStrand(plusPD, nonConvertedMergedChromPlus, convertedMergedChromPlus, "+");
+				else processStrand(minusPD, nonConvertedMergedChromMinus, convertedMergedChromMinus, "-");
 			}
 		}
 		System.out.println();
 
+	}
+	
+	/**Only call when one of the two stranded datasets is missing.*/
+	private void processStrand(PointData[] pd, PointData nonCon, PointData con, String strand){	
+			//save fractions
+			baseFractionMethylation.add(pd[0].getScores());
+			
+			//print graphs?
+			if (printGraphs){
+				//write stranded fractions
+				if (strand.equals("+")) pd[0].writePointData(fractionNonConvertedDirectoryPlus);
+				else pd[0].writePointData(fractionNonConvertedDirectoryMinus);
+				//window scanning
+				windowScanChromosome(pd[0]);
+				//write fdrs
+				pd[1].writePointData(fdrNonConvertedDirectory);
+			}
+
+			//print chromosome stats
+			double numNon = nonCon.getInfo().getScoreTotal();
+			double numCon = con.getInfo().getScoreTotal();
+
+			//calc 
+			System.out.println();
+			float[] fracs = pd[0].getScores();
+			//enought to stat?
+			if (fracs.length<10) System.out.println(chromosome+"+\tskipping, too few observations");
+			else {
+				Arrays.sort(fracs);
+				System.out.println(chromosome +strand+ "\t"+ (int)numNon +"\t"+(int)numCon +"\t"+Num.statFloatArray(fracs) );
+				Histogram histogram = new Histogram(0, 1.1, 11);
+				histogram.countAll(fracs);
+				histogram.printScaledHistogram();
+			}
+	}
+
+	private void mergeStrandedPointData() {
+		if (plusStrandPresent && minusStrandPresent){
+			convertedChrom = PointData.mergePairedPointDataNoSumming(convertedMergedChromPlus, convertedMergedChromMinus);
+			nonConvertedChrom = PointData.mergePairedPointDataNoSumming(nonConvertedMergedChromPlus, nonConvertedMergedChromMinus);
+		}
+		else {
+			if (plusStrandPresent) {
+				convertedChrom = convertedMergedChromPlus;
+				nonConvertedChrom = nonConvertedMergedChromPlus;
+			}
+			else{
+				convertedChrom = convertedMergedChromMinus;
+				nonConvertedChrom = nonConvertedMergedChromMinus;
+			}
+		}
 	}
 
 	public void correctPValues(){
@@ -407,7 +465,10 @@ public class BisStat {
 		}
 		pd = null;
 		al = null;
-		if ( convertedMergedChromPlus == null || nonConvertedMergedChromPlus == null || convertedMergedChromMinus == null || nonConvertedMergedChromMinus == null) return false;
+		plusStrandPresent = (convertedMergedChromPlus != null && nonConvertedMergedChromPlus != null);
+		minusStrandPresent = (convertedMergedChromMinus != null && nonConvertedMergedChromMinus != null);
+
+		if ( plusStrandPresent == false && minusStrandPresent == false) return false;
 		return true;
 	}
 
@@ -485,7 +546,6 @@ public class BisStat {
 
 		//collect all positions
 		int[] allPositions = Num.returnUniques(new int[][]{positionsNonCon, positionsCon});
-
 		//for each position 
 		int indexNonCon =0;
 		int indexCon =0;
@@ -519,7 +579,6 @@ public class BisStat {
 				//greater than so keep advancing
 				indexCon = j;
 			}
-
 
 			float totalObservations = numCon+numNonCon;
 
@@ -588,7 +647,6 @@ public class BisStat {
 			int[] positions = Num.arrayListOfIntegerToInts(positionsAL);
 			if (positions == null || positions.length ==0) return null;
 
-
 			//make PointData for fraction
 			HashMap<String,String> map = new HashMap<String,String>();
 			map.put(BarParser.GRAPH_TYPE_TAG, BarParser.GRAPH_TYPE_BAR);
@@ -637,7 +695,7 @@ public class BisStat {
 
 		//collect all positions
 		int[] allPositions = Num.returnUniques(new int[][]{positionsNonCon, positionsCon});
-
+		
 		//for each position 
 		int indexNonCon =0;
 		int indexCon =0;
@@ -800,6 +858,7 @@ public class BisStat {
 
 
 	private void baseScanChromosomeContextsMergingStrandsForPValues(){
+
 		//fetch arrays
 		int[] positionsNonCon = nonConvertedChrom.getPositions();
 		float[] readsNonCon = nonConvertedChrom.getScores();
@@ -895,6 +954,7 @@ public class BisStat {
 
 	/**Scores a chromosome for non-converted to total at base level.*/
 	private void baseScanChromosomeContextsForPValues(PointData nonCon, PointData con){
+
 		//fetch arrays
 		int[] positionsNonCon = nonCon.getPositions();
 		float[] readsNonCon = nonCon.getScores();
@@ -957,8 +1017,6 @@ public class BisStat {
 			if (pValue > minimumPValueToCorrect) pointAL.add(new Point(fdrIndex++, pValue));
 			else pValueOffset++;
 		}
-
-
 	}
 
 
@@ -1013,8 +1071,6 @@ public class BisStat {
 
 	}
 
-
-
 	public void setBaseContexts(){
 		baseContexts = new HashMap <String,BaseContext>();
 		String[] bases = {"G","A","T","C"};
@@ -1030,9 +1086,8 @@ public class BisStat {
 		}
 	}
 
-
-	/**Collects and calculates a bunch of stats re the PointData.*/
-	private void calculateReadCountStatistics(){
+	/**Merges PointData from multiple directories.*/
+	private void mergeData(){
 		//fetch converted PointData and calculate total observations
 		HashMap<String, ArrayList<PointData>>[] combo = PointData.fetchStrandedPointDataNoMerge (convertedPointDirs);
 		convertedPlusPointData = PointData.convertArrayList2Array(combo[0]);
@@ -1040,22 +1095,6 @@ public class BisStat {
 		combo = PointData.fetchStrandedPointDataNoMerge (nonConvertedPointDirs);
 		nonConvertedPlusPointData = PointData.convertArrayList2Array(combo[0]);
 		nonConvertedMinusPointData = PointData.convertArrayList2Array(combo[1]);
-
-		//calc totals
-		double totalConvertedGenomicContexts = PointData.totalObservationsMultiPointData(convertedPlusPointData);
-		totalConvertedGenomicContexts += PointData.totalObservationsMultiPointData(convertedMinusPointData);
-		double totalNonConvertedGenomicContexts = PointData.totalObservationsMultiPointData(nonConvertedPlusPointData);
-		totalNonConvertedGenomicContexts += PointData.totalObservationsMultiPointData(nonConvertedMinusPointData);
-	}
-
-	private int[] fetchMergePositions(){
-		ArrayList<int[]> posAL = new ArrayList<int[]>();
-		posAL.add(nonConvertedChrom.getPositions());
-		posAL.add(convertedChrom.getPositions());
-		//merge
-		int[][] toMerge = new int[posAL.size()][];
-		for (int i=0; i< posAL.size(); i++) toMerge[i] = posAL.get(i);
-		return Num.returnUniques(toMerge);
 	}
 
 	/**Makes a common set of windows using merged positions.*/
@@ -1465,7 +1504,7 @@ public class BisStat {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  BisStat: July 2013                              **\n" +
+				"**                                  BisStat: Dec 2013                               **\n" +
 				"**************************************************************************************\n" +
 				"Takes PointData from converted and non-converted C bisulfite sequencing data parsed\n" +
 				"using the NovoalignBisulfiteParser and generates several xxCxx context statistics and\n" +
