@@ -88,7 +88,7 @@ public class BisSeq {
 		fetchAllChromosomes();
 
 		//for each chromosome
-		System.out.println("\nWindow scanning chromosomes for differential methylation... ");
+		System.out.println("\nWindow scanning chromosomes for differential methylation...\n");
 		for (int i=0; i< chromosomes.length; i++){
 			chromosome = chromosomes[i];
 			System.out.print(chromosome + " ");
@@ -96,12 +96,6 @@ public class BisSeq {
 			//fetch data
 			fetchData();
 
-			//check
-			if (tConMergedChromPlus == null || tConMergedChromMinus == null || tNonConMergedChromPlus == null || tNonConMergedChromMinus == null || 
-					cConMergedChromPlus == null || cConMergedChromMinus == null || cNonConMergedChromPlus == null || cNonConMergedChromMinus == null) {
-				System.out.print(" - Couldn't find all 8 datasets, skipping! ");
-				continue;
-			}
 			//scan chromosome
 			windowScanChromosomeBPs();
 
@@ -502,32 +496,27 @@ public class BisSeq {
 
 
 	public void windowScanChromosomeBPs(){
-//System.out.println("Here");
 		smoothingWindow = null;
 
 		//merge strands
-		ArrayList<PointData> al = new ArrayList<PointData>();
-		al.add(tConMergedChromMinus);
-		al.add(tConMergedChromPlus);
-		PointData mergedTreatmentCon = PointData.mergePointData(al, false, true);
-		al.clear();
-		al.add(tNonConMergedChromMinus);
-		al.add(tNonConMergedChromPlus);
-		PointData mergedTreatmentNonCon = PointData.mergePointData(al, false, true);
-
-		al.clear();
-		al.add(cConMergedChromMinus);
-		al.add(cConMergedChromPlus);
-		PointData mergedControlCon = PointData.mergePointData(al, false, true);
-		al.clear();
-		al.add(cNonConMergedChromMinus);
-		al.add(cNonConMergedChromPlus);
-		PointData mergedControlNonCon = PointData.mergePointData(al, false, true);
-
+		PointData mergedTreatmentCon = DefinedRegionBisSeq.mergePointData(tConMergedChromMinus, tConMergedChromPlus);
+		PointData mergedTreatmentNonCon = DefinedRegionBisSeq.mergePointData(tNonConMergedChromMinus, tNonConMergedChromPlus);
+		PointData mergedControlCon = DefinedRegionBisSeq.mergePointData(cConMergedChromMinus, cConMergedChromPlus);
+		PointData mergedControlNonCon = DefinedRegionBisSeq.mergePointData(cNonConMergedChromMinus, cNonConMergedChromPlus);
+			
+		if (mergedTreatmentCon == null || mergedTreatmentNonCon == null || mergedControlCon == null || mergedControlNonCon == null) {
+			System.err.println(" Warning: missing chrom datasets, skipping!");
+			return;
+		}
+		
 		//fetch paired base observations meeting minimum read coverage in both T and C
 		MethylatedBaseObservation[] mbo = fetchCommonBasesWithMinimumObservations (mergedTreatmentNonCon, mergedTreatmentCon, mergedControlNonCon, mergedControlCon, minimumReadCoverage);
-		if (mbo == null) return;
-		
+			
+		if (mbo == null) {
+			System.err.println(" Warning: no matching base contexts found, skipping!");
+			return;
+		}
+
 		if (scrambleControlData){
 			//swap control observations, not positions
 			Random rng = new Random();       

@@ -9,6 +9,8 @@ ScoreMethylatedRegions
 * Modifications to support datasets lacking whole strands, needed for amplicon data.
 DefinedRegionBisSeq
 * Modifications to support datasets lacking whole strands, needed for amplicon data.
+BisSeq
+* Modifications to support datasets lacking whole strands, needed for amplicon data.
 
 ----USeq_8.7.1----
 DefinedRegionDifferentialSeq
