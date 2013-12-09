@@ -213,7 +213,7 @@ public class DefinedRegionBisSeq {
 		al = null;
 	}
 
-	private PointData mergePointData(PointData a, PointData b){
+	public static PointData mergePointData(PointData a, PointData b){
 		ArrayList<PointData> al = new ArrayList<PointData>();
 		if (a !=null) al.add(a);
 		if (b !=null) al.add(b);
