@@ -67,6 +67,7 @@ public class Point implements Serializable{
 	 * @param offset Number of pvalues with poor significance not included in the array
 	 * @return nada, modifies the original array*/
 	public static void benjaminiHochbergCorrect(Point[] sortedMin10Log10PVals, long offset){
+		if (sortedMin10Log10PVals.length <=1) return;
 		double num = sortedMin10Log10PVals.length + offset;
 		double offsetDouble = (double)offset;
 		double prior = 1;

@@ -71,7 +71,7 @@ public class DefinedRegionBisSeq {
 		loadDataHashes();
 
 		//for each chromosome of regions
-		System.out.println("\nScanning regions by chromosome for differential methylation... ");
+		System.out.println("\nScanning regions by chromosome for differential methylation...\n");
 
 		for (String chr : chromosomeRegion.keySet()){
 			chromosome = chr;
@@ -80,17 +80,11 @@ public class DefinedRegionBisSeq {
 			//fetch data
 			fetchData();
 
-			//check
-			if (tConMergedChromPlus == null || tConMergedChromMinus == null || tNonConMergedChromPlus == null || tNonConMergedChromMinus == null || 
-					cConMergedChromPlus == null || cConMergedChromMinus == null || cNonConMergedChromPlus == null || cNonConMergedChromMinus == null) {
-				System.out.print(" - Couldn't find all 8 datasets, skipping! ");
-				continue;
-			}
 			//scan chromosome
 			scanChromosome();
 		}
 
-		System.out.println();System.out.println();
+		System.out.println("\n");
 
 		//B & H correct pvalues and make EnrichedRegions
 		System.out.println("Applying a Benjamini and Hochberg FDR correction to the p-values...\n");
@@ -154,16 +148,6 @@ public class DefinedRegionBisSeq {
 			e.printStackTrace();
 		}
 	}
-
-
-
-
-
-
-
-
-
-
 
 	/**Fetchs the data for a particular chromosome.*/
 	public void fetchData(){
@@ -229,31 +213,34 @@ public class DefinedRegionBisSeq {
 		al = null;
 	}
 
+	private PointData mergePointData(PointData a, PointData b){
+		ArrayList<PointData> al = new ArrayList<PointData>();
+		if (a !=null) al.add(a);
+		if (b !=null) al.add(b);
+		PointData m = null;
+		if (al.size()!=0) m = PointData.mergePointData(al, false, true);
+		return m;
+	}
 
 	public void scanChromosome(){
 		//merge strands
-		ArrayList<PointData> al = new ArrayList<PointData>();
-		al.add(tConMergedChromMinus);
-		al.add(tConMergedChromPlus);
-		PointData mergedTreatmentCon = PointData.mergePointData(al, false, true);
-		al.clear();
-		al.add(tNonConMergedChromMinus);
-		al.add(tNonConMergedChromPlus);
-		PointData mergedTreatmentNonCon = PointData.mergePointData(al, false, true);
-
-		al.clear();
-		al.add(cConMergedChromMinus);
-		al.add(cConMergedChromPlus);
-		PointData mergedControlCon = PointData.mergePointData(al, false, true);
-		al.clear();
-		al.add(cNonConMergedChromMinus);
-		al.add(cNonConMergedChromPlus);
-		PointData mergedControlNonCon = PointData.mergePointData(al, false, true);
-
+		PointData mergedTreatmentCon = mergePointData(tConMergedChromMinus, tConMergedChromPlus);
+		PointData mergedTreatmentNonCon = mergePointData(tNonConMergedChromMinus, tNonConMergedChromPlus);
+		PointData mergedControlCon = mergePointData(cConMergedChromMinus, cConMergedChromPlus);
+		PointData mergedControlNonCon = mergePointData(cNonConMergedChromMinus, cNonConMergedChromPlus);
+		
+		if (mergedTreatmentCon == null || mergedTreatmentNonCon == null || mergedControlCon == null || mergedControlNonCon == null) {
+			System.err.println(" Warning: missing chrom datasets, skipping!");
+			return;
+		}
+		
 		//fetch paired base observations meeting minimum read coverage in both T and C
 		MethylatedBaseObservation[] mbo = fetchCommonBasesWithMinimumObservations (mergedTreatmentNonCon, mergedTreatmentCon, mergedControlNonCon, mergedControlCon, minimumReadCoverage);
 		
-		if (mbo == null) return;
+		if (mbo == null) {
+			System.err.println(" Warning: no matching base contexts found, skipping!");
+			return;
+		}
 
 		//scan
 		scoreRegionsForDifferentialMethylation(mbo);
@@ -265,7 +252,6 @@ public class DefinedRegionBisSeq {
 
 		SmoothingWindow[] regions = chromosomeRegion.get(chromosome);
 		ArrayList<SmoothingWindow> forR = new ArrayList<SmoothingWindow>();
-		numberRegions+= regions.length;
 
 		int[] positions = MethylatedBaseObservation.fetchPositions(mbo);
 
@@ -564,7 +550,7 @@ public class DefinedRegionBisSeq {
 
 	/**Collects and calculates a bunch of stats re the PointData.*/
 	private void loadDataHashes(){	
-		//null values, weird zip error.
+		//null values
 		tConPlusPointData = null;
 		tConMinusPointData = null;
 		tNonConPlusPointData = null;
@@ -593,8 +579,6 @@ public class DefinedRegionBisSeq {
 		cNonConPlusPointData = PointData.convertArrayList2Array(combo[0]);
 		cNonConMinusPointData = PointData.convertArrayList2Array(combo[1]);
 	}
-
-
 
 	public static void main(String[] args) {
 		if (args.length ==0){
@@ -633,7 +617,7 @@ public class DefinedRegionBisSeq {
 				}
 			}
 		}
-
+		
 		//look for point directories
 		if (tConPointDirs == null || tConPointDirs[0].isDirectory() == false) Misc.printExit("\nError: cannot find your treatment converted PointData directories(s)!\n");
 		if (cConPointDirs == null || cConPointDirs[0].isDirectory() == false) Misc.printExit("\nError: cannot find your control converted PointData directories(s)!\n");
@@ -670,14 +654,15 @@ public class DefinedRegionBisSeq {
 		else if (saveDirectory.exists() == false) saveDirectory.mkdirs();
 
 		//load regions
-		if (bedFile == null) Misc.printExit("\nError: please provide a text bed file (tab delimited: chr start stop) of regions to score for differential methylation.\n");
+		if (bedFile == null || bedFile.canRead() == false) Misc.printExit("\nError: please provide a text bed file (tab delimited: chr start stop) of regions to score for differential methylation.\n");
 		HashMap<String, Region[]>cr = Region.parseStartStops(bedFile, 0, 0, 0);
 		chromosomeRegion = new LinkedHashMap<String, SmoothingWindow[]>();
 		for (String chr: cr.keySet()){
 			Region[] regions = cr.get(chr);
 			SmoothingWindow[] sw = new SmoothingWindow[regions.length];
+			numberRegions+= regions.length;
 			for (int i=0; i< regions.length; i++){
-				sw[i] = new SmoothingWindow (regions[i].getStart(), regions[i].getStop(), new float[]{0,0,0,0,0,0});
+				sw[i] = new SmoothingWindow (regions[i].getStart(), regions[i].getStop(), new float[]{0,0,0,0,0,0,0,0,0});
 			}
 			chromosomeRegion.put(chr, sw);
 		}
@@ -685,12 +670,10 @@ public class DefinedRegionBisSeq {
 
 	}	
 
-
-
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                DefinedRegionBisSeq: May 2012                     **\n" +
+				"**                             Defined Region Bis Seq: Dec 2013                     **\n" +
 				"**************************************************************************************\n" +
 				"Takes two condition (treatment and control) PointData from converted and non-converted\n" +
 				"C bisulfite sequencing data parsed using the NovoalignBisulfiteParser and scores user\n" +

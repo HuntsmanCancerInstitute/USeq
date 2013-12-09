@@ -1,11 +1,19 @@
 ----USeq_8.7.2----
 RNAEditingScanSeqs & DefinedRegionRNAEditing
 * Added ability to set the minimum base read coverage threshold, defaults to 5 alignments
+DefinedRegionDifferentialSeq
+* Fixed an issue with recognizing a failed glm fit error message that was being inappropriately ignored leading to reduced FDRs in some cases.
+BisStat
+* Extensive modifications to support data from only one stand, prior to these chromosomes were skipped,  needed for amplicon datasets.
+ScoreMethylatedRegions
+* Modifications to support datasets lacking whole strands, needed for amplicon data.
+DefinedRegionBisSeq
+* Modifications to support datasets lacking whole strands, needed for amplicon data.
 
 ----USeq_8.7.1----
 DefinedRegionDifferentialSeq
 * Fixed bug when DESeq was outputting FDRs with "NA", these were being assigned the max FDR, switched it to 0.  
-Note, this won't effect most analysis since these genes also have a log2 of 0 and wouldn't survive standard log2Ratio thresholding.
+Note, this won't effect standard analysis since these genes also have a log2 of 0 and wouldn't survive standard log2Ratio thresholding.
 NovoalignBisulfiteParser
 * Fixed a bug in the -b4 novoalignment parsing
 * Remove support for native novoalign format, just sam/ bam now.
