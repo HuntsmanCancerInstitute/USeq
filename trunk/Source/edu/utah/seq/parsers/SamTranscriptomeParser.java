@@ -518,7 +518,7 @@ public class SamTranscriptomeParser{
 			left = second;
 		}
 
-		//System.out.println("Name "+left.getName());
+//System.out.println("Name "+left.getName());
 
 		//fetch genomic space coordinates
 		int startLeft = left.getPosition();
@@ -528,7 +528,7 @@ public class SamTranscriptomeParser{
 		int stop = stopRight;
 		if (stopLeft > stop) stop = stopLeft;
 
-		//any Is in left that preceed the start of right?
+		//any Is in left that precede the start of right?
 		int numAdders = MergePairedSamAlignments.countIs(left.getCigar(), startRight-startLeft);
 
 		//make arrays to hold sequence and qualities in cigar space
@@ -541,18 +541,18 @@ public class SamTranscriptomeParser{
 		leftLayout.layoutCigar(startLeft, left);
 		rightLayout.layoutCigar(startLeft-numAdders, right);
 
-		//System.out.println("\nNumAdders "+numAdders);
-		//System.out.println("PreFirstLayout");
-		//leftLayout.print();
-		//System.out.println("PreSecondLayout");
-		//rightLayout.print();
+//System.out.println("\nNumAdders "+numAdders);
+//System.out.println("PreFirstLayout");
+//leftLayout.print();
+//System.out.println("PreSecondLayout");
+//rightLayout.print();
 
 
 		//merge layouts, modifies original layouts so print first if you want to see em before mods.
 		SamLayout mergedSamLayout = SamLayout.mergeLayouts(leftLayout, rightLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);
 
-		//System.out.println("MergedLayout");
-		//mergedSamLayout.print();
+//System.out.println("MergedLayout");
+//mergedSamLayout.print();
 
 		if (mergedSamLayout == null) {
 			//add failed merge tag
@@ -811,7 +811,7 @@ public class SamTranscriptomeParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Sam Transcriptome Parser: June 2013                     **\n" +
+				"**                          Sam Transcriptome Parser: Dec 2013                      **\n" +
 				"**************************************************************************************\n" +
 				"STP takes SAM alignment files that were aligned against chromosomes and extended\n" +
 				"splice junctions (see MakeTranscriptome app), converts the coordinates to genomic\n" +

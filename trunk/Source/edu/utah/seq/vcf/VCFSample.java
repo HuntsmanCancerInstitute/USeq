@@ -1,5 +1,7 @@
 package edu.utah.seq.vcf;
 
+import java.util.regex.Pattern;
+
 
 /* GT:AD:DP:GQ:PL
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype"> 0/0, 0/1, 1/1
@@ -18,6 +20,7 @@ public class VCFSample {
 	private String originalRecord = null;
 	private String originalFormat = null;
 	private String alleleCounts = null;
+	private static final Pattern PIPE = Pattern.compile("\\|");
 
 	/**Finding vcf files with mixed sample formats so must determine each record by record :( 
 	 * Add rippers as needed.*/
@@ -34,7 +37,13 @@ public class VCFSample {
 			if (data.length != format.length) throw new Exception("Incorrect number of fields in sample -> "+sample+" for indicated format -> "+sampleFormat);
 			//attempt to parse GT, DP, GQ
 			for (int i=0; i< format.length; i++){
-				if (format[i].equals("GT")) genotypeGT = data[i];
+				if (format[i].equals("GT")) {
+					genotypeGT = data[i];
+					//replace any | with /
+					genotypeGT = PIPE.matcher(genotypeGT).replaceAll("/");
+					//replace 1/0 with 0/1
+					if (genotypeGT.equals("1/0")) genotypeGT = "0/1";
+				}
 				else if (format[i].equals("DP")) readDepthDP = Integer.parseInt(data[i]);
 				else if (format[i].equals("GQ")) genotypeQualityGQ = Integer.parseInt(data[i]);
 				else if (format[i].equals("AD")) {

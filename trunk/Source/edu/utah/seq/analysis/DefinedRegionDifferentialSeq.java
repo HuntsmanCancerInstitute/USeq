@@ -38,7 +38,7 @@ public class DefinedRegionDifferentialSeq {
 	private float minLog2Ratio = 1f;
 	private boolean scoreIntrons = false;
 	private boolean removeOverlappingRegions = false;
-	private int minimumCounts = 10;
+	private int minimumCounts = 20;
 	private boolean deleteTempFiles = true;
 	private boolean filterOutliers = false;
 	private float minimumSpliceLog2Ratio = 1f;
@@ -737,8 +737,8 @@ public class DefinedRegionDifferentialSeq {
 			String[] res = IO.loadFile(rOut);
 
 			for (String s: res) {
-				if (s.contains("Dispersion fit did not converge") || s.contains("Parametric dispersion fit failed")) {
-					System.err.println("\tWarning, DESeq's GLM dispersion fit failed. Relaunching using fitType='local'");
+				if (s.contains("did not converge") || s.contains("fit failed")) {
+					System.err.println("\nWarning, DESeq's GLM dispersion fit failed. Relaunching using fitType='local'");
 					if (deleteTempFiles == false){
 						rOut.delete();
 						scriptFile.delete();
@@ -1771,7 +1771,7 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                       Defined Region Differential Seq: Nov 2013                  **\n" +
+				"**                       Defined Region Differential Seq: Dec 2013                  **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +
@@ -1812,7 +1812,7 @@ public class DefinedRegionDifferentialSeq {
 				"       density coverage are ignored.\n"+
 				"-n Max number repeat alignments. Defaults to all.  Assumes 'IH' tags have been set by\n" +
 				"       processing raw alignments with the SamTranscriptomeProcessor.\n"+
-				"-e Minimum number alignments per gene-region per replica, defaults to 10.\n"+
+				"-e Minimum number alignments per gene-region per replica, defaults to 20.\n"+
 				"-i Score introns instead of exons.\n"+
 				"-p Perform a stranded analysis. Only collect reads from the same strand as the\n" +
 				"      annotation.\n" +

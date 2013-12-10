@@ -101,11 +101,15 @@ public class VCFRecord implements Comparable<VCFRecord> {
 				}
 			}
 		}
-		if (match == false) return false;
+		if (match == false) {
+			return false;
+		}
 		
 		//check genotype of first sample
 		if (requireGenotypeMatch){
-			if (vcfRecord.getSample()[0].getGenotypeGT().equals(sample[0].getGenotypeGT()) == false) return false;
+			if (vcfRecord.getSample()[0].getGenotypeGT().equals(sample[0].getGenotypeGT()) == false) {
+				return false;
+			}
 		}
 		return true;
 	}

@@ -1,3 +1,11 @@
+----USeq_8.7.3----
+DefinedRegionDifferentialSeq
+* Changed the default minimum read count threshold to 20 from 10.  This lower number was causing too many low hit genes into the multiple testing correct and causing the FDRs to be significantly lower than necessary.
+VCFComparator
+* Added checks to convert 0|1 genotypes to 0/1, and 1/0 calls to 0/1; these are needed to standardize the calls and enable genotype matching with the NIST key
+SamTranscriptomeParser
+* Bug fix for merging paired alignments where an insertion occurred immediately before the start of the second read
+
 ----USeq_8.7.2----
 RNAEditingScanSeqs & DefinedRegionRNAEditing
 * Added ability to set the minimum base read coverage threshold, defaults to 5 alignments
