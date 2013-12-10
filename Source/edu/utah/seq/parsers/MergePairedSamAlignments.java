@@ -749,11 +749,12 @@ public class MergePairedSamAlignments{
 			//pass
 			int num = Integer.parseInt(mat.group(1));
 			//is call I 
-			if (mat.group(2).equals("I")){
+			if (mat.group(2).equals("I")){			
 				for (int i=0; i< num; i++){
-					length++;
-					if (length >= stop) break;
+					length++;	
 					numIs++;
+					if (length >= stop) break;
+					//numIs++;
 				}
 			}
 			//nope just addit

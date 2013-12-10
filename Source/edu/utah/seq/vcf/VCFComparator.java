@@ -71,7 +71,7 @@ public class VCFComparator {
 			//if useVQSLOD
 			if (useVQSLOD){
 				try {
-					testParser.setRecordVQSLODAsScore();
+					testParser.setRecordScore("VQSLOD");
 				} catch (Exception e) {
 					System.err.println("\nProblem parsing VQSLOD from INFO? Was the GATK ApplyRecalibration run on your vcf file?\n");
 					e.printStackTrace();
@@ -315,10 +315,11 @@ public class VCFComparator {
 				nonMatches.add(vcfTest[i]);
 			}
 			else {
-//System.out.println(vcfTest[i]);				
+//System.out.println("VCFTEST "+vcfTest[i]);				
 				//for each match
 				boolean matchFound = false;
 				for (int x=0; x< matchingKey.length; x++){
+//System.out.println("VCFKey "+matchingKey[x]);					
 					//check to see if it matches
 					if (vcfTest[i].matchesAlternateAlleleGenotype(matchingKey[x], requireGenotypeMatch)) {
 //System.out.println("MatchFound");
@@ -604,7 +605,7 @@ public class VCFComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             VCF Comparator : April 2013                          **\n" +
+				"**                             VCF Comparator : Dec 2013                            **\n" +
 				"**************************************************************************************\n" +
 				"Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls\n" +
 				"that fall in the common interrogated regions are compared. WARNING tabix gzipped files\n" +

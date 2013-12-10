@@ -412,14 +412,15 @@ public class VCFParser {
 		return new float[]{minScore, maxScore};
 	}
 	
-	/**Sets the VQSLOD score as the thresholding score in each VCFRecord.
+	/**Sets the infoNamed score as the thresholding score in each VCFRecord.
 	 * Returns the min and max scores found.
-	 * Throw an exception in the VQSLOD can't be found or parsed as a double.*/
-	public float[] setRecordVQSLODAsScore() throws Exception{
-		float minScore = vcfRecords[0].getInfoObject().getInfoFloat("VQSLOD");
+	 * Throw an exception if it can't be found or parsed as a double.
+	 * e.g. VQSLOD or AVR*/
+	public float[] setRecordScore(String infoName) throws Exception{
+		float minScore = vcfRecords[0].getInfoObject().getInfoFloat(infoName);
 		float maxScore = minScore;
 		for (VCFRecord r : vcfRecords) {
-			float score = r.getInfoObject().getInfoFloat("VQSLOD");
+			float score = r.getInfoObject().getInfoFloat(infoName);
 			if (score < minScore) minScore = score;
 			if (score > maxScore) maxScore = score;
 			r.setScore((float)score);
