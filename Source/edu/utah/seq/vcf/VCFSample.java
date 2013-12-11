@@ -28,6 +28,7 @@ public class VCFSample {
 		this.originalRecord = sample;
 		this.originalFormat = sampleFormat;
 		//is it a no call?
+		
 		if (sample.substring(0,3).startsWith("./.")){
 			noCall = true;
 		}
@@ -44,7 +45,14 @@ public class VCFSample {
 					//replace 1/0 with 0/1
 					if (genotypeGT.equals("1/0")) genotypeGT = "0/1";
 				}
-				else if (format[i].equals("DP")) readDepthDP = Integer.parseInt(data[i]);
+				else if (format[i].equals("DP")) {
+					if (data[i].equals(".")) {
+						noCall = true;
+						break;
+					} else {
+						readDepthDP = Integer.parseInt(data[i]);
+					}
+				}
 				else if (format[i].equals("GQ")) genotypeQualityGQ = Integer.parseInt(data[i]);
 				else if (format[i].equals("AD")) {
 					alleleCounts = data[i];
