@@ -13,7 +13,9 @@ import net.sf.samtools.SAMFileReader;
 import net.sf.samtools.SAMRecord;
 import net.sf.samtools.SAMRecordIterator;
 import net.sf.samtools.SAMFileReader.ValidationStringency;
+import edu.utah.ames.bioinfo.PicardMarkDuplicates;
 import edu.utah.seq.data.*;
+import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.data.sam.SamAlignment;
 
 /**Parses a Novoalign bisulfite alignment sam/bam files. PointData scores are set to 1.
@@ -74,6 +76,26 @@ public class NovoalignBisulfiteParser{
 	public NovoalignBisulfiteParser(String[] args){
 		long startTime = System.currentTimeMillis();
 		processArgs(args);
+		
+		//for each input alignment file, sort sams and remove duplicate reads
+		System.out.println("\nSorting alignment data and removing duplicate reads...\n");
+		for (int i=0; i < samFiles.length; i++) {
+			File sortFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_sort.bam"));
+
+			//call Picard's SortSam to coordinate-sort input sam files
+			new PicardSortSam(samFiles[i], sortFile);
+			File dupeFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_dup.bam"));
+			File metricsFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_metrics.txt"));
+
+			//call Picard's MarkDuplicates to remove duplicate reads
+			new PicardMarkDuplicates(sortFile, dupeFile, metricsFile);
+			File sortFileIndex = new File (sortFile.toString().replaceAll("_sort.bam", "_sort.bai")); 
+
+			//delete intermediate bam/bai files
+			sortFile.delete();
+			sortFileIndex.delete();
+		}
+				
 		System.out.println("Splitting text alignment data by chromosome and filtering...");
 
 		//look for parsed files 1st
@@ -84,7 +106,8 @@ public class NovoalignBisulfiteParser{
 			//for each file, parse, filter, split by chrom and strand and save to disk	
 			for (int i=0; i< samFiles.length; i++){
 				//set working objects and parse tag file text
-				workingFile = samFiles[i];
+				workingFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_dup.bam"));
+				
 				System.out.print("\t"+workingFile);
 				//parse
 				if (parseWorkingSAMFile() == false) Misc.printErrAndExit("\nERROR: failed to parse, aborting!");
