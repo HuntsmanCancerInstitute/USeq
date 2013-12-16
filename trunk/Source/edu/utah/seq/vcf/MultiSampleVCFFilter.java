@@ -192,7 +192,7 @@ public class MultiSampleVCFFilter {
 			retVal = true;
 		} else if (flag.equals("-H") && !genotype.equals("0/1")) {
 			retVal = true;
-		} else if (flag.equals("-M") && !genotype.equals("0/1")) {
+		} else if (flag.equals("-M") && !genotype.equals("1/1")) {
 			retVal = true;
 		}
 		
