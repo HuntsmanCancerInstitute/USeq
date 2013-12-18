@@ -5,6 +5,11 @@ VCFComparator
 * Added checks to convert 0|1 genotypes to 0/1, and 1/0 calls to 0/1; these are needed to standardize the calls and enable genotype matching with the NIST key
 SamTranscriptomeParser
 * Bug fix for merging paired alignments where an insertion occurred immediately before the start of the second read
+MultiSampleVCFFilter
+* Fixed the behavior of the -M flag, wasn't intersecting the proper samples
+VCFSample
+* The GATK HaplotypeCaller reports InDels with no coverage depth, which would break USeq VCF applications.  If the sample has no coverage depth '.', the
+  sample is no marked as a 'no call'
 
 ----USeq_8.7.2----
 RNAEditingScanSeqs & DefinedRegionRNAEditing
