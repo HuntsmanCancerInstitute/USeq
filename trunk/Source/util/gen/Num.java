@@ -21,7 +21,7 @@ public class Num {
 		float diff = diffY * ratio;
 		return diff + y1;
 	}
-	
+
 	/**Does a linear regression type interpolation, assumes 2's are > 1's.*/
 	public static double interpolateY(double x1, double y1, double x2, double y2, double fixedX){
 		double diffX = x2-x1;
@@ -31,7 +31,7 @@ public class Num {
 		double diff = diffY * ratio;
 		return diff + y1;
 	}
-	
+
 	/**Using interbase coordinates so length = stop - start.*/
 	public static int calculateMiddleIntergenicCoordinates(int start, int end){
 		if (start == end) return start;
@@ -47,7 +47,7 @@ public class Num {
 		for (int i=0; i< b.length; i++) if (b[i]) num++;
 		return num;
 	}
-	
+
 	/**Takes t[reps][exonCounts] c[reps][exonCounts] and returns int[t/c][permutation][sumExonCounts] for permutated chi-square calculations*/
 	public static int[][][] permutateReplicas(int[][] tReps, int[][] cReps){
 		int numberTReplicas = tReps.length;
@@ -57,7 +57,7 @@ public class Num {
 		int[][] tSum = new int[numPermutations][numberExons];
 		int[][] cSum = new int[numPermutations][numberExons];
 		int permutationIndex = 0;
-		
+
 		//for each t replica
 		for (int t =0; t< numberTReplicas; t++){
 			int[] tRepToSwap = tReps[t];
@@ -79,7 +79,7 @@ public class Num {
 		}
 		return new int[][][]{tSum, cSum};
 	}
-	
+
 	/**Takes int[replicas][exonCounts] and returns a sum of the replica counts at each exon*/
 	public static int[] sumReplicaCounts (int[][] repsCounts){
 		int[] summedCounts = new int[repsCounts[0].length];
@@ -130,7 +130,7 @@ public class Num {
 		}
 		return new int[]{startIndex, endIndex};
 	}
-	
+
 	/**Scales the array to 1:1000, converts all negative values to positive.*/
 	public static void scale1To1000(float[] f){
 		for (int i=0; i< f.length; i++) if (f[i]<0) f[i] = Math.abs(f[i]);
@@ -140,7 +140,7 @@ public class Num {
 		float multi = 999.0f/range;
 		for (int i=0; i< f.length; i++) f[i] = Math.round((f[i]) * multi)+1;
 	}
-	
+
 	/**Scales the array to 100:1000*/
 	public static int[] scale100To1000(double[] f){
 		double[] minMax = Num.findMinMaxDoubleValues(f);
@@ -150,12 +150,12 @@ public class Num {
 		for (int i=0; i< f.length; i++) scaled[i] = (int)Math.round((f[i]-minMax[0]) * multi)+101;
 		return scaled;
 	}
-	
+
 	/**Provided a count matrix where the columns represent the counts from each gene in a given sample, countMatrix[gene][obs].
 	 * Returns a scalar that a given genes counts should be multiplied by to normalize for differences in the total number of
 	 * counts in a given sample.  normCount = scalar * observedCounts */
 	public static double[] estimateSizeFactors(int[][] countMatrix){
-		
+
 		//get total obs on each column
 		int numColumns = countMatrix[0].length;
 		double[] columnTotals = new double[numColumns];
@@ -166,24 +166,24 @@ public class Num {
 				columnTotals[j] += countMatrix[i][j];
 			}
 		}
-		
+
 		//find smallest
 		double smallest = columnTotals[0];
 		for (int i=1; i< numColumns; i++) if (columnTotals[i] < smallest) smallest = columnTotals[i];
-		
+
 		//make ratios
 		for (int i=0; i< numColumns; i++) columnTotals[i] = smallest/columnTotals[i];
-	
+
 		return columnTotals;
 	}
-	
+
 	public static double[][] normalizeCountMatrix (int[][] countMatrix){
 		//fetch scalars
 		double[] scalars = estimateSizeFactors(countMatrix);
-		
+
 		int numColumns = countMatrix[0].length;
 		double[][] normalizedData = new double[countMatrix.length][numColumns];
-		
+
 		//for each row
 		for (int i=0; i<countMatrix.length; i++){
 			//for each column
@@ -193,7 +193,7 @@ public class Num {
 		}
 		return normalizedData;
 	}
-	
+
 	/**Given two matrices of genes (rows) and their number of observations for each sample (column), normalizes based on total counts for each sample, and returns the log2(pseT+1/ pseC+1).
 	 * Be sure to have at minimum 3 reps for each t and c. Assumes same number rows.
 	 * Returns double[0][gene] = pseLog2Ratios, double[1][gene] = smallestPairwiseLog2Ratio*/
@@ -203,7 +203,7 @@ public class Num {
 		int numberTreatmentSamples = treatmentCountMatrix[0].length;
 		int numberControlSamples = controlCountMatrix[0].length;
 		int totalNumberSamples = numberTreatmentSamples + numberControlSamples;
-		
+
 		//merge samples	
 		int[][] merged = new int[numberGeneRows][totalNumberSamples];
 		for (int r=0; r<numberGeneRows; r++){
@@ -213,7 +213,7 @@ public class Num {
 			int index = 0;
 			for (int m=numberTreatmentSamples; m< totalNumberSamples; m++) merged[r][m] = controlCountMatrix[r][index++];
 		}
-		
+
 		//fetch normalized counts
 		double[][] normMerged = normalizeCountMatrix(merged);
 		//for each gene/ row, calculate the pseudoMedian for the t and c, then the ratio, then the log2Ratio
@@ -237,7 +237,7 @@ public class Num {
 
 		return new double[][]{ratios, smallestAbsRatio};
 	}
-	
+
 	/**Returns smallest abs all pair log2 ratio.*/
 	public static double findSmallestLog2RatioWithPseudoCounts (double[] t, double[] c){
 		double smallest = Double.MAX_VALUE;
@@ -254,7 +254,7 @@ public class Num {
 		}
 		return smallest;
 	}
-	
+
 	/**Calculates the permuted pval for all paired replica swaps with the chi-square test.
 	 * @return -10Log10(numPerm>=RealChi / totalPerm) if numPerm == 0, numPerm set to 0.1
 	 */
@@ -264,14 +264,14 @@ public class Num {
 		int[] oriC = Num.sumReplicaCounts(cReps);
 		int[][] combo = new int[][]{oriT,oriC};
 		double oriChi = Num.chiSquareTestStatistic(Num.intArraysToLong(combo));
-		
+
 		int[][][] tc = Num.permutateReplicas(tReps, cReps);
-		
+
 		int[][] tSum = tc[0];
 		int[][] cSum = tc[1];
 
 		double numFail = 0;
-		
+
 		for (int i=0; i<tSum.length; i++){
 			int[][] merge = new int[][]{tSum[i], cSum[i]};
 			double permChi = Num.chiSquareTestStatistic(Num.intArraysToLong(merge));
@@ -281,103 +281,103 @@ public class Num {
 		if (numFail == 0.0) numFail = 0.1;
 		return Num.minus10log10(numFail/totalPerm);
 	}
-	
-	 /**
-     * @param counts array representation of 2-way table
-     * @return chi-square test statistic
-     * From apache Math package.
-     */
-    public static double chiSquareTestStatistic(long[][] counts) {
 
-        int nRows = counts.length;
-        int nCols = counts[0].length;
+	/**
+	 * @param counts array representation of 2-way table
+	 * @return chi-square test statistic
+	 * From apache Math package.
+	 */
+	public static double chiSquareTestStatistic(long[][] counts) {
 
-        // compute row, column and total sums
-        double[] rowSum = new double[nRows];
-        double[] colSum = new double[nCols];
-        double total = 0.0d;
-        for (int row = 0; row < nRows; row++) {
-            for (int col = 0; col < nCols; col++) {
-                rowSum[row] += counts[row][col];
-                colSum[col] += counts[row][col];
-                total += counts[row][col];
-            }
-        }
+		int nRows = counts.length;
+		int nCols = counts[0].length;
 
-        // compute expected counts and chi-square
-        double sumSq = 0.0d;
-        double expected = 0.0d;
-        for (int row = 0; row < nRows; row++) {
-            for (int col = 0; col < nCols; col++) {
-                expected = (rowSum[row] * colSum[col]) / total;
-                //watch out for cases where expect is zero due to double zeros present in matrix (bad!) so just skip the addition to sumSq, a conservative approach
-                if (expected == 0) continue;
-                sumSq += ((counts[row][col] - expected) *
-                        (counts[row][col] - expected)) / expected;
-            }
-        }
-        return sumSq;
-    }
-    
-    /**Casts ints to longs*/
-    public static long[][] intArraysToLong (int[][] ints){
-    	long[][] longs = new long[ints.length][];
-    	for (int i=0; i< ints.length; i++){
-    		longs[i] = new long[ints[i].length];
-    		for (int j=0; j< ints[i].length; j++){
-    			longs[i][j] = (long)ints[i][j];
-    		}
-    	}
-    	return longs;
-    }
-    
-    /**Rounds floats to ints*/
-    public static int[][] floatArraysToInt (float[][] flt){
-    	int[][] ints = new int[flt.length][];
-    	for (int i=0; i< flt.length; i++){
-    		ints[i] = new int[flt[i].length];
-    		for (int j=0; j< flt[i].length; j++){
-    			ints[i][j] = Math.round(flt[i][j]);
-    		}
-    	}
-    	return ints;
-    }
-	
+		// compute row, column and total sums
+		double[] rowSum = new double[nRows];
+		double[] colSum = new double[nCols];
+		double total = 0.0d;
+		for (int row = 0; row < nRows; row++) {
+			for (int col = 0; col < nCols; col++) {
+				rowSum[row] += counts[row][col];
+				colSum[col] += counts[row][col];
+				total += counts[row][col];
+			}
+		}
+
+		// compute expected counts and chi-square
+		double sumSq = 0.0d;
+		double expected = 0.0d;
+		for (int row = 0; row < nRows; row++) {
+			for (int col = 0; col < nCols; col++) {
+				expected = (rowSum[row] * colSum[col]) / total;
+				//watch out for cases where expect is zero due to double zeros present in matrix (bad!) so just skip the addition to sumSq, a conservative approach
+				if (expected == 0) continue;
+				sumSq += ((counts[row][col] - expected) *
+						(counts[row][col] - expected)) / expected;
+			}
+		}
+		return sumSq;
+	}
+
+	/**Casts ints to longs*/
+	public static long[][] intArraysToLong (int[][] ints){
+		long[][] longs = new long[ints.length][];
+		for (int i=0; i< ints.length; i++){
+			longs[i] = new long[ints[i].length];
+			for (int j=0; j< ints[i].length; j++){
+				longs[i][j] = (long)ints[i][j];
+			}
+		}
+		return longs;
+	}
+
+	/**Rounds floats to ints*/
+	public static int[][] floatArraysToInt (float[][] flt){
+		int[][] ints = new int[flt.length][];
+		for (int i=0; i< flt.length; i++){
+			ints[i] = new int[flt[i].length];
+			for (int j=0; j< flt[i].length; j++){
+				ints[i][j] = Math.round(flt[i][j]);
+			}
+		}
+		return ints;
+	}
+
 	/**@param treatmentsControls - int[window index][counts T1,T2,T..., counts C1,C2,C...]
 	 * @param totalNumberObservationsInEachReplica - total number of observations in each treatment and control replica*/
 	public static double[] quasipoisson (int[][] treatmentsControls, int numberTreatmentSamples, int[] totalNumberObservationsInEachReplica, File tempDirectory, File fullPathToR) throws Exception{
 		//check number
 		if (totalNumberObservationsInEachReplica.length != treatmentsControls[0].length) throw new Exception ("Number of totalNumberObservationsInEachReplica does not match number of treatment and control samples.");
-		
+
 		int[][] ids = new int[1][totalNumberObservationsInEachReplica.length];
 		for (int i=0; i< numberTreatmentSamples; i++) ids[0][i] =1;
-		
+
 		//write arrays to file
 		File tcFile = writeArrayToSingleLineFile(treatmentsControls, tempDirectory);
 		int[][] obs = new int[1][];
 		obs[0] = totalNumberObservationsInEachReplica;
 		File observationsFile = writeArrayToSingleLineFile(obs, tempDirectory);
 		File idsFile = writeArrayToSingleLineFile(ids, tempDirectory);
-		
+
 		File results = new File (tempDirectory, "tempFile_Results_"+Passwords.createRandowWord(6));
-		
+
 		//write script
 		String script =
-			"libraryPresent = library(aod, logical.return = T)\n"+
-			"numRows = "+treatmentsControls.length+ "\n"+
-			"numColumns = "+treatmentsControls[0].length+ "\n"+
-			"y = matrix(scan('"+ tcFile+ "'), numRows, numColumns, byrow=T)\n"+
-			"n = scan('"+observationsFile +"')\n"+
-			"x = scan('"+idsFile +"')\n"+
-			"res = 1:numRows\n"+
-			"for (i in 1:numRows) {\n"+
-			"	z = quasipois(y[i,] ~ x + offset(log(n)),data = data.frame(y[i,], x),tol=0.1)\n"+
-			"	res[i] =  z@fm$null.deviance - z@fm$deviance \n"+
-			"}\n"+
-			"write.table(res, file='"+results+"',row.names = FALSE, col.names = FALSE, sep = \"\t\")\n";
+				"libraryPresent = library(aod, logical.return = T)\n"+
+						"numRows = "+treatmentsControls.length+ "\n"+
+						"numColumns = "+treatmentsControls[0].length+ "\n"+
+						"y = matrix(scan('"+ tcFile+ "'), numRows, numColumns, byrow=T)\n"+
+						"n = scan('"+observationsFile +"')\n"+
+						"x = scan('"+idsFile +"')\n"+
+						"res = 1:numRows\n"+
+						"for (i in 1:numRows) {\n"+
+						"	z = quasipois(y[i,] ~ x + offset(log(n)),data = data.frame(y[i,], x),tol=0.1)\n"+
+						"	res[i] =  z@fm$null.deviance - z@fm$deviance \n"+
+						"}\n"+
+						"write.table(res, file='"+results+"',row.names = FALSE, col.names = FALSE, sep = \"\t\")\n";
 		File rScriptFile = new File(tempDirectory, "tempFile_RScript_"+Passwords.createRandowWord(6));
 		IO.writeString(script, rScriptFile);
-		
+
 		//make command
 		File rOutFile = new File (tempDirectory, "tempFile_ROut_"+Passwords.createRandowWord(6));
 		String[] command = new String[] {
@@ -403,7 +403,7 @@ public class Num {
 		rOutFile.deleteOnExit();
 		return values;
 	}
-	
+
 	/**Runs a modified chi square test in R looking for differences between two distributions of categories using a test for independence.
 	 * Assumes that for any given rowNumber, the number of categories in each sample are the same. 
 	 * R, given the screwed up "language" it is, cannot import ragged arrays, thus must add '-1' trailing place holders so the number of columns is the same, what the @#%$%@#$!!!!!
@@ -431,19 +431,19 @@ public class Num {
 			String yates = "	res[i] = chisq.test(m,correct=FALSE)$p.value\n";
 			if (useYatesCorrection) yates = "	res[i] = chisq.test(m,correct=TRUE)$p.value\n";
 			String script = 
-				"numberRows = "+numberRows+ "\n"+
-				"bigM = read.table('"+matrixFile+"')\n"+
-				"res = 1:numberRows\n"+
-				"for (i in 1:numberRows){\n"+
-				"	y = bigM[i,]\n"+
-				"	y = y[y!=-1]\n"+
-				"	m = matrix(y, nrow = 2, byrow = TRUE)\n"+
-				yates+
-				"	if (is.na(res[i])) res[i] = 1\n"+
-				"}\n"+
-				"res = -10 * log10(res)\n"+
-				"write.table(res, file='"+results+"',row.names = FALSE, col.names = FALSE, sep = \"\t\")\n";
-			
+					"numberRows = "+numberRows+ "\n"+
+							"bigM = read.table('"+matrixFile+"')\n"+
+							"res = 1:numberRows\n"+
+							"for (i in 1:numberRows){\n"+
+							"	y = bigM[i,]\n"+
+							"	y = y[y!=-1]\n"+
+							"	m = matrix(y, nrow = 2, byrow = TRUE)\n"+
+							yates+
+							"	if (is.na(res[i])) res[i] = 1\n"+
+							"}\n"+
+							"res = -10 * log10(res)\n"+
+							"write.table(res, file='"+results+"',row.names = FALSE, col.names = FALSE, sep = \"\t\")\n";
+
 
 			File rScriptFile = new File(tempDirectory, "tempFile_RScript_"+Passwords.createRandowWord(6));
 			IO.writeString(script, rScriptFile);
@@ -471,7 +471,7 @@ public class Num {
 			results.deleteOnExit();
 			rScriptFile.deleteOnExit();
 			rOutFile.deleteOnExit();
-			
+
 			return values;
 
 		} catch (Exception e){
@@ -480,77 +480,77 @@ public class Num {
 		return null;
 	}
 
-	
+
 	/**Runs a modified fisher exact test in R looking for differences between two distributions of GATC using a test for independence. 
 	 * @param gatcSample int[rowNumber][4; counts of observations for each base: GATC]*/
 	public static double[] fisherTest (int[][] gatcSampleA, int[][] gatcSampleB, File tempDirectory, File fullPathToR) {
 		try {
-		
-		//make warped matrix
-		int[][] data = new int[gatcSampleA.length][8];
-		for (int i=0; i< data.length; i++){
-			data[i] = new int[8];
-			int counter = 0;
-			for (int x=0; x< 4; x++){
-				data[i][counter++] = gatcSampleA[i][x];
-				data[i][counter++] = gatcSampleB[i][x];
+
+			//make warped matrix
+			int[][] data = new int[gatcSampleA.length][8];
+			for (int i=0; i< data.length; i++){
+				data[i] = new int[8];
+				int counter = 0;
+				for (int x=0; x< 4; x++){
+					data[i][counter++] = gatcSampleA[i][x];
+					data[i][counter++] = gatcSampleB[i][x];
+				}
 			}
-		}
-		
-		//write matrix to file
-		File matrixFile = writeArrayToSingleLineFile(data, tempDirectory);
-		
-		//make holder for data
-		File results = new File (tempDirectory, "tempFile_Results_"+Passwords.createRandowWord(6));
-		
-		//write script
-		String script =
-			"numberRows = "+data.length+ "\n"+
-			"bigM = matrix ( scan (\""+ matrixFile +"\"),numberRows,8, byrow=T)\n"+
-			"res = 1:numberRows\n"+
-			"for (i in 1:numberRows){\n"+
-			"	m = matrix (bigM[i,], nrow=2)\n"+
-			"   if (max(m) ==0) res[i] = -1\n"+
-			"	else res[i] = fisher.test(m)$p.value\n"+
-			"}\n"+
-			"write.table(res, file='"+results+"',row.names = FALSE, col.names = FALSE, sep = \"\t\")\n";
-			
-		File rScriptFile = new File(tempDirectory, "tempFile_RScript_"+Passwords.createRandowWord(6));
-		IO.writeString(script, rScriptFile);
-		
-		//make command
-		File rOutFile = new File (tempDirectory, "tempFile_ROut_"+Passwords.createRandowWord(6));
-		String[] command = new String[] {
-				fullPathToR.getCanonicalPath(),
-				"CMD",
-				"BATCH",
-				"--no-save",
-				"--no-restore",
-				rScriptFile.getCanonicalPath(),
-				rOutFile.getCanonicalPath()};			
-		//execute
-		IO.executeCommandLine(command);
-		//load results
-		double[] values = Num.loadDoubles(results);
-		//check
-		if (values == null || values.length != data.length) throw new Exception ("Number of results from R does not match the number of trials.");
-		//clean up
-		matrixFile.deleteOnExit();
-		results.deleteOnExit();
-		rOutFile.deleteOnExit();
-		results.deleteOnExit();
-		rScriptFile.deleteOnExit();
-		rOutFile.deleteOnExit();
-		return values;
-		
+
+			//write matrix to file
+			File matrixFile = writeArrayToSingleLineFile(data, tempDirectory);
+
+			//make holder for data
+			File results = new File (tempDirectory, "tempFile_Results_"+Passwords.createRandowWord(6));
+
+			//write script
+			String script =
+					"numberRows = "+data.length+ "\n"+
+							"bigM = matrix ( scan (\""+ matrixFile +"\"),numberRows,8, byrow=T)\n"+
+							"res = 1:numberRows\n"+
+							"for (i in 1:numberRows){\n"+
+							"	m = matrix (bigM[i,], nrow=2)\n"+
+							"   if (max(m) ==0) res[i] = -1\n"+
+							"	else res[i] = fisher.test(m)$p.value\n"+
+							"}\n"+
+							"write.table(res, file='"+results+"',row.names = FALSE, col.names = FALSE, sep = \"\t\")\n";
+
+			File rScriptFile = new File(tempDirectory, "tempFile_RScript_"+Passwords.createRandowWord(6));
+			IO.writeString(script, rScriptFile);
+
+			//make command
+			File rOutFile = new File (tempDirectory, "tempFile_ROut_"+Passwords.createRandowWord(6));
+			String[] command = new String[] {
+					fullPathToR.getCanonicalPath(),
+					"CMD",
+					"BATCH",
+					"--no-save",
+					"--no-restore",
+					rScriptFile.getCanonicalPath(),
+					rOutFile.getCanonicalPath()};			
+			//execute
+			IO.executeCommandLine(command);
+			//load results
+			double[] values = Num.loadDoubles(results);
+			//check
+			if (values == null || values.length != data.length) throw new Exception ("Number of results from R does not match the number of trials.");
+			//clean up
+			matrixFile.deleteOnExit();
+			results.deleteOnExit();
+			rOutFile.deleteOnExit();
+			results.deleteOnExit();
+			rScriptFile.deleteOnExit();
+			rOutFile.deleteOnExit();
+			return values;
+
 		} catch (Exception e){
 			e.printStackTrace();
 		}
 		return null;
 	}
 
-	
-	
+
+
 	public static File writeArrayToSingleLineFile (int[][] array, File tempDirectory) throws IOException {
 		//make random word
 		String rndWrd = "tempFile_Array_"+Passwords.createRandowWord(6);
@@ -566,7 +566,7 @@ public class Num {
 		out.close();
 		return file;
 	}
-	
+
 	public static File writeArrayToFile (int[][] array, File tempDirectory) throws IOException {
 		//make random word
 		String rndWrd = "tempFile_Array_"+Passwords.createRandowWord(6);
@@ -724,7 +724,7 @@ public class Num {
 		}
 		return f;
 	}
-	
+
 	/**Converts a double[][] to Float[][] */
 	public static Float[][] convertToFloatObjectArray(double[][] d){
 		int sizeMain = d.length;
@@ -787,9 +787,9 @@ public class Num {
 			File resultsFile = new File (tempDir, rndWrd+"_TempFileRResults");
 			//make script
 			String script = "l="+rate+
-			";x=0:"+maxHit+
-			";y = ppois(x,l,lower.tail=FALSE) * "+bonCorr+";write.table(y,\""+resultsFile+
-			"\",row.names=FALSE,col.names=FALSE)\n";
+					";x=0:"+maxHit+
+					";y = ppois(x,l,lower.tail=FALSE) * "+bonCorr+";write.table(y,\""+resultsFile+
+					"\",row.names=FALSE,col.names=FALSE)\n";
 			//write script
 			IO.writeString(script, scriptFile);
 			//make command
@@ -850,7 +850,7 @@ public class Num {
 			script.append("   start = stop + 1 \n");
 			script.append("   if (start > len) break \n");
 			script.append("}");
-			
+
 			//write script
 			IO.writeString(script.toString(), scriptFile);
 			//make command
@@ -882,7 +882,7 @@ public class Num {
 		} 
 		return pvalues;
 	}
-	
+
 	/**Run's Storey's qvalue FDR conversion of well behaved pvalues (uniformally distributed). 
 	 * Set min10Log10Transformed to true if the pvalues are so transformed. Will return a file containing transformed qValueFDRs.
 	 */
@@ -908,7 +908,7 @@ public class Num {
 			script.append("   start = stop + 1 \n");
 			script.append("   if (start > len) break \n");
 			script.append("}");
-			
+
 			//write script
 			IO.writeString(script.toString(), scriptFile);
 			//make command
@@ -934,7 +934,7 @@ public class Num {
 		} 
 		return rResults;
 	}
-	
+
 	/**Assumes sorted pvalues, descending. Alters the input array.*/
 	public static void benjaminiHochbergCorrect(double[] sortedPValDecending){
 		double num = sortedPValDecending.length;
@@ -945,7 +945,7 @@ public class Num {
 			else sortedPValDecending[i] = prior;
 		}
 	}
-	
+
 	/**Assumes pvalues are -10Log10(pval) transformed and sorted in ascending order. Alters the input array.*/
 	public static void benjaminiHochbergCorrect(float[] sortedMin10Log10PVals){
 		double num = sortedMin10Log10PVals.length;
@@ -958,7 +958,7 @@ public class Num {
 			sortedMin10Log10PVals[i] = Num.minus10log10Float(val);
 		}
 	}
-	
+
 	/**Applies the Benjamini & Hochberg FDR correction to the incoming array. Use this method to correct threholded pvalues by setting the offset.
 	 * @param sortedMin10Log10PVals -10Log10(pval) transformed and sorted in ascending order
 	 * @param offset Number of pvalues with poor significance not included in the array
@@ -1064,7 +1064,7 @@ public class Num {
 		} 
 		return pvalues;
 	}
-	
+
 	/**Calculates p-values using a binomial probability from built in R function. Returns up and down pvals as -10log10(pval) for each.*/
 	public static double[][] binomialPValues(float[][] treatmentControlExpect, File tempDirectory, File fullPathToR){
 		//make random word
@@ -1688,49 +1688,49 @@ public class Num {
 		}
 		return z;
 	}
-	
+
 	public static void randomize (float[] array, long seed){
-	    Random rng = new Random(seed);       
-	    // n is the number of items left to shuffle
-	    for (int n = array.length; n > 1; n--) {
-	        // Pick a random element to move to the end
-	        int k = rng.nextInt(n);  // 0 <= k <= n - 1.
-	        // Simple swap of variables
-	        float tmp = array[k];
-	        array[k] = array[n - 1];
-	        array[n - 1] = tmp;
-	    }
+		Random rng = new Random(seed);       
+		// n is the number of items left to shuffle
+		for (int n = array.length; n > 1; n--) {
+			// Pick a random element to move to the end
+			int k = rng.nextInt(n);  // 0 <= k <= n - 1.
+			// Simple swap of variables
+			float tmp = array[k];
+			array[k] = array[n - 1];
+			array[n - 1] = tmp;
+		}
 	}
-	
+
 	/**Randomized the paired arrays, keeping the indexed scores matched.*/
 	public static void randomizePairedValues (float[] array, float[] array2, long seed){
-	    Random rng = new Random(seed);       
-	    // n is the number of items left to shuffle
-	    for (int n = array.length; n > 1; n--) {
-	        // Pick a random element to move to the end
-	        int k = rng.nextInt(n);  // 0 <= k <= n - 1.
-	        // Simple swap of variables, keeping array and array2 together
-	        int nMinOne = n-1;
-	        float tmp = array[k];
-	        array[k] = array[nMinOne];
-	        array[nMinOne] = tmp;
-	        float tmp2 = array2[k];
-	        array2[k] = array2[nMinOne];
-	        array2[nMinOne] = tmp2;
-	    }
+		Random rng = new Random(seed);       
+		// n is the number of items left to shuffle
+		for (int n = array.length; n > 1; n--) {
+			// Pick a random element to move to the end
+			int k = rng.nextInt(n);  // 0 <= k <= n - 1.
+			// Simple swap of variables, keeping array and array2 together
+			int nMinOne = n-1;
+			float tmp = array[k];
+			array[k] = array[nMinOne];
+			array[nMinOne] = tmp;
+			float tmp2 = array2[k];
+			array2[k] = array2[nMinOne];
+			array2[nMinOne] = tmp2;
+		}
 	}
-	
+
 	public static void randomize (int[] array, long seed){
-	    Random rng = new Random(seed);       
-	    // n is the number of items left to shuffle
-	    for (int n = array.length; n > 1; n--) {
-	        // Pick a random element to move to the end
-	        int k = rng.nextInt(n);  // 0 <= k <= n - 1.
-	        // Simple swap of variables
-	        int tmp = array[k];
-	        array[k] = array[n - 1];
-	        array[n - 1] = tmp;
-	    }
+		Random rng = new Random(seed);       
+		// n is the number of items left to shuffle
+		for (int n = array.length; n > 1; n--) {
+			// Pick a random element to move to the end
+			int k = rng.nextInt(n);  // 0 <= k <= n - 1.
+			// Simple swap of variables
+			int tmp = array[k];
+			array[k] = array[n - 1];
+			array[n - 1] = tmp;
+		}
 	}
 
 
@@ -2477,7 +2477,7 @@ public class Num {
 	public static double minus10log10(double pvalue){
 		return -10 * (Math.log10(pvalue));
 	}
-	
+
 	/**Returns the -10 * LOG base 10 of the number.*/
 	public static float minus10log10Float(double pvalue){
 		return new Double(-10 * (Math.log10(pvalue))).floatValue();
@@ -2511,7 +2511,7 @@ public class Num {
 		}
 		return matrix;
 	}
-	
+
 	/**Loads columns of double from a file into an array.
 	 * Will substitute defaultValue if value = "Inf"*/
 	public static double[][] loadDoubleMatrix(File f, Double defaultValue, int numberOfColumns){
@@ -2540,7 +2540,7 @@ public class Num {
 		}
 		return values;
 	}
-	
+
 	/**Loads columns of double from a file into an array.
 	 * Will substitute max value for Infs */
 	public static double[][] loadDoubleMatrix(File f, int numberOfColumns){
@@ -2579,7 +2579,7 @@ public class Num {
 		}
 		return values;
 	}
-	
+
 	/**Converts and negative doubles to zero.*/
 	public static void zeroNegativeValues( double[][] d){
 		for (int i=0; i< d.length; i++){
@@ -2648,7 +2648,7 @@ public class Num {
 		}
 		return values;
 	}
-	
+
 	/**Loads a column of double from a file into an array.
 	 * Returns null if nothing found.
 	 * Will set 'Inf' values to max found.
@@ -2745,7 +2745,7 @@ public class Num {
 		}
 		return values;
 	}
-	
+
 	/**Loads a column of float from a file into an array.
 	 * Returns null if nothing found.
 	 * Will set 'INF' values to max found.
@@ -2837,7 +2837,7 @@ public class Num {
 		}//leave empty
 		return failNumber;
 	}
-	
+
 	/**Returns a tab delimited string of Mean Median StdDev Min Max 10th 90th for the Float[]*/
 	public static String statFloatArray(float[] sortedFloat){
 		//calc mean
@@ -2854,7 +2854,7 @@ public class Num {
 		float stndDev = (float)Num.standardDeviation(sortedFloat,mean);
 		return mean+"\t"+median+"\t"+stndDev+"\t"+minMax[0]+"\t"+minMax[1]+"\t"+perc10th+"\t"+perc90th;
 
-		
+
 	}
 
 	/**Calculates Min, Max, Mean, Median, Mode, and Histogram/10 for a Float[]*/
@@ -2933,14 +2933,14 @@ public class Num {
 		}
 		return combine;
 	}
-	
+
 	/**Takes an ArrayList of int[]s and returns a sorted int[] of unique values.*/
 	public static int[] returnUniques (ArrayList<int[]> ints){
 		int[][] x = new int[ints.size()][];
 		for (int i=0; i< x.length; i++) x[i] = ints.get(i);
 		return returnUniques(x);
 	}
-	
+
 	/**Takes arrays of int[] and returns a sorted int[] of unique values.*/
 	public static int[] returnUniques (int[][] ints){
 		int[] merged = ints[0];
@@ -2954,7 +2954,7 @@ public class Num {
 		}
 		return merged;
 	}
-	
+
 	/**Takes a sorted array of int[] and returns unique values.*/
 	public static int[] returnUniques (int[] sortedArray){
 		ArrayList<Integer> al = new ArrayList<Integer>();
@@ -2999,14 +2999,14 @@ public class Num {
 		}
 		return combine;
 	}
-	
+
 	public static float[] collapseFloatArray (ArrayList<float[]> al){
 		//count total num
 		int len = 0;
 		for (float[] f: al) len += f.length;
 		float[] combine = new float[len];
 		int index = 0;
-		
+
 		//for each array
 		for (float[] f: al){
 			System.arraycopy(f, 0, combine, index, f.length);
@@ -3700,7 +3700,7 @@ public class Num {
 		}
 		return means;
 	}
-	
+
 	/** Slides a window along an array, one index at a time, calculating a trimmed mean on the contents. 
 	 * Scans all windows including start and ends. Note, if windowSize is odd then the scan size is actually windowSize-1.
 	 * Zero values are ignored in mean calculation.*/
@@ -3717,7 +3717,7 @@ public class Num {
 			int stop = i+halfWindow;
 			if (stop > scores.length) stop = scores.length;
 			//collect scores
-			 subScoresAL.clear();
+			subScoresAL.clear();
 			for (int j=start; j< stop; j++){
 				if (scores[j] !=0){
 					subScoresAL.add(new Double(scores[j]));
@@ -3740,7 +3740,7 @@ public class Num {
 		}
 		return means;
 	}
-	
+
 	/** Slides a window along an array, one index at a time, calculating a median on the contents. 
 	 * Scans all windows including start and ends. Note, if windowSize is odd then the scan size is actually windowSize-1.
 	 * Zero values are ignored in median calculation.*/
@@ -3757,7 +3757,7 @@ public class Num {
 			int stop = i+halfWindow;
 			if (stop > scores.length) stop = scores.length;
 			//collect scores
-			 subScoresAL.clear();
+			subScoresAL.clear();
 			for (int j=start; j< stop; j++){
 				if (scores[j] !=0){
 					subScoresAL.add(new Double(scores[j]));
@@ -3821,10 +3821,10 @@ public class Num {
 	}
 
 	/**ArrayList of Double to double[]*/
-	public static double[] arrayListOfDoubleToArray(ArrayList dbl){
+	public static double[] arrayListOfDoubleToArray(ArrayList<Double> dbl){
 		int num = dbl.size();
 		double[] d = new double[num];
-		for (int i=0; i<num; i++)d[i]= ((Double)dbl.get(i)).doubleValue();
+		for (int i=0; i<num; i++)d[i]= dbl.get(i).doubleValue();
 		return d;
 	}
 	/**ArrayList of Float to float[]*/
@@ -4267,7 +4267,7 @@ public class Num {
 		}
 		return top/bot;
 	}
-	
+
 	/**Calculates Pearson correlation coefficient, r, from two int[]s. 
 	 * Cannot have one double[] be uniform values, returns -2 if error.*/
 	public static double correlationCoefficient (double[] x, double[] y){
@@ -4338,21 +4338,21 @@ public class Num {
 		f.setMinimumFractionDigits(numberOfDecimalPlaces);
 		return f.format(num);
 	}
-	
+
 	/**Converts a double[] to int[] using Math.round()*/
 	public static int[] doubleArrayToIntArray(double[] d){
 		int[] ints = new int[d.length];
 		for (int i=0; i< d.length; i++) ints[i] = (int)Math.round(d[i]);
 		return ints;
 	}
-	
+
 	/**Converts a double[] to float[] */
 	public static float[] doubleArrayToFloatArray(double[] d){
 		float[] floats = new float[d.length];
 		for (int i=0; i< d.length; i++) floats[i] = (float)d[i];
 		return floats;
 	}
-	
+
 	/**Converts a double[] to int[] using Math.round()*/
 	public static float[] intArrayToFloat(int[] ints){
 		float[] floats = new float[ints.length];
@@ -4400,7 +4400,7 @@ public class Num {
 		}
 		return sb.toString();
 	}
-	
+
 	/**Converts to String using delimiter.*/
 	public static String doubleArrayToString(double[] f, String delimiter){
 		StringBuilder sb = new StringBuilder();
@@ -4607,7 +4607,7 @@ public class Num {
 		for (int i=0; i< sum.length; i++) sum[i] = one[i]+two[i];
 		return sum;
 	}
-	
+
 	/**Sums an int array*/
 	public static int sumIntArray(int[] ints){
 		int num = 0;
@@ -4664,7 +4664,7 @@ public class Num {
 			rev[last--] = array[i];
 			//System.out.println("i "+i+"  last "+last);
 			//System.out.println("\t"+array[i]+" "+array[last]);
-			
+
 		}
 		return rev;
 	}
@@ -4680,5 +4680,72 @@ public class Num {
 		double total = 0;
 		for (short s: c) total += s;
 		return total/((double)c.length);
+	}
+
+	public static ArrayList<Double> convertDoubleToArrayList(double[] d){
+		ArrayList<Double> a = new ArrayList<Double>(d.length);
+		for (Double n : d) a.add(n);
+		return a;
+	}
+	
+	public static ArrayList<Integer> convertDoubleToArrayListInt(double[] d){
+		ArrayList<Integer> a = new ArrayList<Integer>(d.length);
+		for (double n : d) a.add((int)(Math.round(n)));
+		return a;
+	}
+
+	/**Trims identical scores after rounding to integers from the left and right ends, returning the centers. int[a,b][].
+	 * Bit slow but it works.  This is devilishly complex if you don't use ArrayLists.*/
+	public static int[][] trimIdenticalEnds(double[] a, double[] b) {
+		ArrayList<Integer> aAL = convertDoubleToArrayListInt(a);
+		ArrayList<Integer> bAL = convertDoubleToArrayListInt(b);
+		int[] tA = null;
+		int[] tB = null;
+
+		//trim from left
+		while (true){
+			if (aAL.size() == 0 || bAL.size() == 0) break;
+			int testA = aAL.get(0);
+			int testB = bAL.get(0);
+			if (testA != testB) break;
+			aAL.remove(0);
+			bAL.remove(0);
+		}
+
+		//trim from right?
+		if (aAL.size() != 0 || bAL.size() != 0){
+			while (true){
+				int aSize = aAL.size();
+				int bSize = bAL.size();
+				if (aSize == 0 || bSize == 0) break;
+				aSize--;
+				bSize--;
+				int testA = aAL.get(aSize);
+				int testB = bAL.get(bSize);
+				if (testA != testB) break;
+				aAL.remove(aSize);
+				bAL.remove(bSize);
+			}
+		}
+		
+		tA = Num.arrayListOfIntegerToInts(aAL);
+		tB = Num.arrayListOfIntegerToInts(bAL);
+
+		return new int[][]{tA, tB};
+	}
+
+	public static double maxValue(double[] ds) {
+		double max = ds[0];
+		for (int i=1; i< ds.length; i++){
+			if (max < ds[i]) max = ds[i];
+		}
+		return max;
+	}
+	public static int maxValue(int[] ds) {
+		int max = ds[0];
+		for (int i=1; i< ds.length; i++){
+			if (max < ds[i]) max = ds[i];
+		}
+		return max;
 	}
 }
