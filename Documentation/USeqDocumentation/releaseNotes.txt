@@ -1,6 +1,6 @@
 ----USeq_8.7.3----
 DefinedRegionDifferentialSeq
-* Changed the default minimum read count threshold to 20 from 10.  This lower number was causing too many low hit genes into the multiple testing correct and causing the FDRs to be significantly lower than necessary.
+* Changed the default minimum read count threshold to 20 from 10.  This lower number was allowing too many low hit genes into the multiple testing correct and causing the FDRs to be significantly lower than necessary.
 VCFComparator
 * Added checks to convert 0|1 genotypes to 0/1, and 1/0 calls to 0/1; these are needed to standardize the calls and enable genotype matching with the NIST key
 SamTranscriptomeParser
@@ -10,6 +10,8 @@ MultiSampleVCFFilter
 VCFSample
 * The GATK HaplotypeCaller reports InDels with no coverage depth, which would break USeq VCF applications.  If the sample has no coverage depth '.', the
   sample is no marked as a 'no call'
+SamSVFilter
+* New application to filter name sorted, novo raw output, for alignments indicative of structural variation
 
 ----USeq_8.7.2----
 RNAEditingScanSeqs & DefinedRegionRNAEditing

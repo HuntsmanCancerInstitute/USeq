@@ -114,6 +114,28 @@ public class MaxEntScanScore3 {
 		return Num.arrayListOfDoubleToArray(al);
 	}
 	
+	/**Scores each 23mer in the sequence moving 5' to 3' skipping seqs with non GATCgatc bases.
+	 * Prints results to screen. Case insensitive.*/
+	public void scanPrintSequence(String seq){
+		int num = seq.length() - 22;
+		Matcher mat;
+		ArrayList<Double> al = new ArrayList<Double>();
+		String ucSeq = seq.toUpperCase();
+		System.out.println(seq);
+		StringBuilder spaces = new StringBuilder();
+		for (int i=0; i< num; i++){
+			String subSeq = ucSeq.substring(i, i+23);
+			mat = MaxEntScanScore5.NonGATC.matcher(subSeq);
+			if (mat.find() == false) {
+				double score = scoreSequence(subSeq);
+				al.add(score);
+				System.out.println(spaces+subSeq+"\t"+score);
+			}
+			else System.out.println(spaces+subSeq+"\tNonGATCgatc base, skipping");
+			spaces.append(" ");
+		}
+	}
+	
 	
 	
 

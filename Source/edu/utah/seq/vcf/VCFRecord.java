@@ -61,6 +61,8 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		}
 	}
 	
+	public VCFRecord() {}
+
 	/**Return modified record line.*/
 	public String getModifiedRecord(ArrayList<String> infoToUse, String style) {
 		String infoLine;

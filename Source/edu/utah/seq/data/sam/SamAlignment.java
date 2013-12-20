@@ -26,6 +26,7 @@ public class SamAlignment {
 	private String qualities;
 	private String[] tags = null;
 	private String md = null;
+	private String unmodifiedSamRecord;
 	private boolean spliceJunction = false;
 	private boolean convertedJunctionCoordinates = false;
 
@@ -42,6 +43,7 @@ public class SamAlignment {
 	private static final Pattern MINUS = Pattern.compile("-");
 	private static final Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSNIDH])");
 	private static final Pattern CIGAR_COUNTS = Pattern.compile("(\\d+)[MDN]");
+	private static final Pattern CIGAR_SOFT = Pattern.compile("(\\d+)S");
 	private static final Pattern CIGAR_COUNTS_MIN = Pattern.compile("(\\d+)[MIN]");
 	private static final Pattern CIGAR_BAD_CHARACTERS = Pattern.compile(".*[^\\dMNIDSH].*");
 	public static final Pattern CIGAR_STARTING_MASK = Pattern.compile("^(\\d+)[SH].+");
@@ -58,6 +60,7 @@ public class SamAlignment {
 	public SamAlignment(){}
 
 	public SamAlignment (String line, boolean fixNonChrChroms) throws MalformedSamAlignmentException, NumberFormatException{
+		unmodifiedSamRecord = line;
 		String[] tokens = TAB.split(line);
 		//check length
 		if (tokens.length < 11 ) throw new MalformedSamAlignmentException("Cannot parse SamAlignment, too few columns, requires a minimum of 11 -> <QNAME> <FLAG> <RNAME> <POS> <MAPQ> <CIGAR> <MRNM> <MPOS> <ISIZE> <SEQ> <QUAL>  [<TAG>:<VTYPE>:<VALUE> [...]]");
@@ -69,7 +72,6 @@ public class SamAlignment {
 		if (mat.matches()) {
 			name = mat.group(1);
 		}
-		
 		referenceSequence = tokens[2];
 		if (fixNonChrChroms) referenceSequence = fixChromosomeName(referenceSequence);
 		//note subtracting 1 to put into interbase coordinates
@@ -671,6 +673,17 @@ public class SamAlignment {
 		return length;
 	}
 	
+	/**Counts the number of soft masked bases in CIGAR.*/
+	public int countLengthOfSoftMaskedBases (){
+		int length = 0;
+		//for each S block
+		Matcher mat = CIGAR_SOFT.matcher(cigar);
+		while (mat.find()){
+			length += Integer.parseInt(mat.group(1));
+		}
+		return length;
+	}
+	
 	/**Assumes interbase coordinates for start and returned blocks.*/
 	public static ArrayList<int[]> fetchAlignmentBlocks(String cigar, int start){
 		//for each cigar block
@@ -875,6 +888,10 @@ public class SamAlignment {
 
 	public boolean isConvertedJunctionCoordinates() {
 		return convertedJunctionCoordinates;
+	}
+
+	public String getUnmodifiedSamRecord() {
+		return unmodifiedSamRecord;
 	}
 
 
