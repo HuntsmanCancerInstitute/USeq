@@ -89,7 +89,7 @@ public class MiRNACorrelator {
 			out.println(targetLog2Rtos.substring(0, targetLog2Rtos.length() -2)+")");
 			out.println(targetBinNames.substring(0, targetBinNames.length() -1)+")");
 			out.println("df = data.frame(Log2Rto, Bin)");
-			out.println("\n# Reorder bins");
+			out.println("\n# Rename bins");
 			out.println("levels(df$Bin) = c("+binOrder.substring(0, binOrder.length() -1)+")");
 			out.println("\n#make plot and save as pdf");
 			out.println("p <- ggplot(df, aes(x=Bin,y=Log2Rto)) + geom_boxplot( )");
@@ -130,26 +130,26 @@ public class MiRNACorrelator {
 
 		//stat each bin
 		System.out.println("Bin one: > 4");
-		printStats(one,"One");
+		printStats(one,"B1", "> 4");
 		System.out.println("\nBin two: 4 <-> 2 ");
-		printStats(two,"Two");
+		printStats(two,"B2","4 to 2");
 		System.out.println("\nBin three: 2 <-> -2");
-		printStats(three,"Three");
+		printStats(three,"B3", "2 to -2");
 		System.out.println("\nBin four: -2 <-> -4");
-		printStats(four,"Four");
+		printStats(four,"B4", "-2 to -4");
 		System.out.println("\nBin five: < -4");
-		printStats(five,"Five");
+		printStats(five,"B5", "< -4");
 
 	}
 
 
 
-	private void printStats(ArrayList<MiRNA> one, String binName) {
+	private void printStats(ArrayList<MiRNA> one, String binName, String binLabel) {
 		if (one.size() ==0 ) {
 			System.out.println("No miRNAs");
 			return;
 		}
-		binOrder.append("'"+binName+"',");
+		binOrder.append("'"+binLabel+"',");
 		String[] names = new String[one.size()];
 		double[] miRNALog2Ratios = new double[one.size()];
 		ArrayList<Double> targetLog2Ratios = new ArrayList<Double>();
@@ -171,10 +171,12 @@ public class MiRNACorrelator {
 		System.out.println("MiRNA Log2Rtos:\t"+Num.doubleArrayToString(miRNALog2Ratios, 2, ", "));
 		double[] targetVals = Num.arrayListOfDoubleToArray(targetLog2Ratios);
 		System.out.println("Target Log2Rtos:\t"+ Num.doubleArrayToString(targetVals, 3, ", ")  );
-		float[] tvs = Num.doubleArrayToFloatArray(targetVals);
-		Arrays.sort(tvs);
-		System.out.println("Mean\tMedian\tStdDev\tMin\tMax\t10th\t90th");
-		System.out.println(Num.statFloatArray(tvs));
+		if (targetVals.length > 1){
+			float[] tvs = Num.doubleArrayToFloatArray(targetVals);
+			Arrays.sort(tvs);
+			System.out.println("Target_Mean\tMedian\tStdDev\tMin\tMax\t10th\t90th");
+			System.out.println(Num.statFloatArray(tvs));
+		}
 
 		//add info to string builder
 		for (int i=0; i< targetVals.length; i++){
@@ -396,7 +398,7 @@ public class MiRNACorrelator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             MiRNA Correlator: Nov 2013                           **\n" +
+				"**                             MiRNA Correlator: Dec 2013                           **\n" +
 				"**************************************************************************************\n" +
 				"Generates a spreadsheet to use in comparing changing miRNA levels to changes in gene\n"+
 				"expression.\n"+

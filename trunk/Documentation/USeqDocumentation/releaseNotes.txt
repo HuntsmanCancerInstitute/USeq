@@ -1,3 +1,8 @@
+----USeq_8.7.4----
+MiRNACorrelator
+* Added a catch to skip calculating stats on bins with only one value
+* Fixed bug with the ordering of the bins in the ggplot
+
 ----USeq_8.7.3----
 DefinedRegionDifferentialSeq
 * Changed the default minimum read count threshold to 20 from 10.  This lower number was allowing too many low hit genes into the multiple testing correct and causing the FDRs to be significantly lower than necessary.
