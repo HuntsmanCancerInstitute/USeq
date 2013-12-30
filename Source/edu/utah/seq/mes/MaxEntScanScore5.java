@@ -60,7 +60,7 @@ public class MaxEntScanScore5 {
 						System.out.println("skipping, non GATCgatc base ");
 						continue;
 					}
-					double score = scoreSequence(ucSeq);
+					double score = scoreSequenceNoChecks(ucSeq);
 					System.out.println(score);
 				}
 			}
@@ -75,7 +75,7 @@ public class MaxEntScanScore5 {
 
 	/**Scores an upper case 9Mer for 5' splicing potential using MaxEntScan algorithm. 
 	 * Only upper case GATC bases, nothing else. Does not check.*/
-	public double scoreSequence(String upperCase9Mer) {
+	public double scoreSequenceNoChecks(String upperCase9Mer) {
 		double consensus = scoreConsensus(upperCase9Mer);
 		//reduce to 7mer
 		String sub = upperCase9Mer.substring(0,3) + upperCase9Mer.substring(5);
@@ -85,6 +85,14 @@ public class MaxEntScanScore5 {
 		return score;
 	}
 	
+	/**Looks to see if 9mer and no nonGATC bases before scoring, if fail, returns Double.MIN_VALUE*/
+	public double scoreSequenceWithChecks(String seq){
+		if (seq.length() != 9) return Double.MIN_VALUE;
+		Matcher mat = NonGATC.matcher(seq);
+		if (mat.find()) return Double.MAX_VALUE;
+		return scoreSequenceNoChecks(seq);
+	}
+	
 	/**Scores each 9mer in the sequence moving 5' to 3', only GATC, upper case sensitive. Does not check.
 	 * Assumes you've upper cased and removed non GATC bases.*/
 	public double[] scanSequenceNoChecks(String seq){
@@ -92,7 +100,7 @@ public class MaxEntScanScore5 {
 		double[] scores = new double[num];
 		for (int i=0; i< num; i++){
 			String subSeq = seq.substring(i, i+9);
-			scores[i] = scoreSequence(subSeq);
+			scores[i] = scoreSequenceNoChecks(subSeq);
 		}
 		return scores;
 	}
@@ -108,7 +116,7 @@ public class MaxEntScanScore5 {
 			String subSeq = ucSeq.substring(i, i+9);
 			mat = NonGATC.matcher(subSeq);
 			if (mat.find() == false) {
-				double score = scoreSequence(subSeq);
+				double score = scoreSequenceNoChecks(subSeq);
 				al.add(score);
 			}
 		}

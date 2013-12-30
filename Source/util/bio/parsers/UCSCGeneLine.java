@@ -63,6 +63,13 @@ public class UCSCGeneLine {
 		scores = new float[]{(float)bed.getScore()};
 	}
 	
+	public static void main(String[] args){
+		String line = "ENSG00000230759_RP11-153F1.2	lincRNA	chr1	+	103957500	103968087	103968087	103968087	2	103957500,103967726	103957557,103968087";
+		String[] tokens = line.split("\t");
+		UCSCGeneLine gene = new UCSCGeneLine(tokens, 0, true);
+		System.out.println(gene.toStringAll());
+	}
+	
 	public UCSCGeneLine (String[] tokens, int numToSubtractFromEnd, boolean displayNamePresent){
 		try {
 			int i = 0;
@@ -111,7 +118,7 @@ public class UCSCGeneLine {
 				int smallest = exons[0].getStart();
 				int size = exons[exons.length-1].getEnd() - smallest;
 				//make boolean array to mask
-				boolean[] masked = new boolean[size+1];
+				boolean[] masked = new boolean[size];
 				//for each exon mask boolean
 				for (int k=0; k< exons.length; k++){
 					int end = exons[k].getEnd() - smallest;

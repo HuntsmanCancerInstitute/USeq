@@ -59,7 +59,7 @@ public class MaxEntScanScore3 {
 						System.out.println("skipping, non GATCgatc base ");
 						continue;
 					}
-					double score = scoreSequence(ucSeq);
+					double score = scoreSequenceNoChecks(ucSeq);
 					System.out.println(score);
 				}
 			}
@@ -74,13 +74,21 @@ public class MaxEntScanScore3 {
 
 	/**Scores an upper case 23Mer for 5' splicing potential using MaxEntScan algorithm. 
 	 * Only upper case GATC bases, nothing else. Does not check.*/
-	public double scoreSequence(String upperCase23Mer) {
+	public double scoreSequenceNoChecks(String upperCase23Mer) {
 		double consensus = scoreConsensus(upperCase23Mer);
 		//reduce to 21mer
 		String sub = upperCase23Mer.substring(0,18) + upperCase23Mer.substring(20,23);
 		double mes = maxEntScore(sub);
 		//calc final 
 		return consensus + mes;
+	}
+	
+	/**Looks to see if 23mer and no nonGATC bases before scoring, if fail, returns Double.MIN_VALUE*/
+	public double scoreSequenceWithChecks(String seq){
+		if (seq.length() != 23) return Double.MIN_VALUE;
+		Matcher mat = MaxEntScanScore5.NonGATC.matcher(seq);
+		if (mat.find()) return Double.MAX_VALUE;
+		return scoreSequenceNoChecks(seq);
 	}
 	
 	
@@ -91,12 +99,12 @@ public class MaxEntScanScore3 {
 		double[] scores = new double[num];
 		for (int i=0; i< num; i++){
 			String subSeq = seq.substring(i, i+23);
-			scores[i] = scoreSequence(subSeq);
+			scores[i] = scoreSequenceNoChecks(subSeq);
 		}
 		return scores;
 	}
 	
-	/**Scores each 23mer in the sequence moving 5' to 3' skipping 9mers with non GATCgatc bases.
+	/**Scores each 23mer in the sequence moving 5' to 3' skipping 23mers with non GATCgatc bases.
 	 * Case insensitive.*/
 	public double[] scanSequence(String seq){
 		int num = seq.length() - 22;
@@ -107,7 +115,7 @@ public class MaxEntScanScore3 {
 			String subSeq = ucSeq.substring(i, i+23);
 			mat = MaxEntScanScore5.NonGATC.matcher(subSeq);
 			if (mat.find() == false) {
-				double score = scoreSequence(subSeq);
+				double score = scoreSequenceNoChecks(subSeq);
 				al.add(score);
 			}
 		}
@@ -127,7 +135,7 @@ public class MaxEntScanScore3 {
 			String subSeq = ucSeq.substring(i, i+23);
 			mat = MaxEntScanScore5.NonGATC.matcher(subSeq);
 			if (mat.find() == false) {
-				double score = scoreSequence(subSeq);
+				double score = scoreSequenceNoChecks(subSeq);
 				al.add(score);
 				System.out.println(spaces+subSeq+"\t"+score);
 			}
