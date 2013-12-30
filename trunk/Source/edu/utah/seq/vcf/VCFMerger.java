@@ -29,7 +29,7 @@ public class VCFMerger {
 			for (int i=0; i< vcfFiles.length; i++){
 				System.out.println(i+ "\t"+ vcfFiles[i].getName());
 				vcfParsers[i] = new VCFParser(vcfFiles[i], true, true, true);
-				vcfParsers[i].appendChr();
+				vcfParsers[i].appendChrFixMT();
 				vcfParsers[i].setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
 				vcfParsers[i].filterVCFRecords(VCFRecord.PASS);
 				num += vcfParsers[i].getVcfRecords().length;

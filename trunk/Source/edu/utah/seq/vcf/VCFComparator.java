@@ -425,7 +425,7 @@ public class VCFComparator {
 				keyParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
 				keyParser.filterVCFRecords(VCFRecord.PASS);
 			}			
-			keyParser.appendChr();			
+			keyParser.appendChrFixMT();			
 			if (removeSNPs) keyParser.removeSNPs();
 			if (removeNonSNPs) keyParser.removeNonSNPs();
 			numberUnfilteredKeyVariants = keyParser.getVcfRecords().length;		
@@ -450,7 +450,7 @@ public class VCFComparator {
 			testParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
 			testParser.filterVCFRecords(VCFRecord.PASS);
 		}
-		testParser.appendChr();
+		testParser.appendChrFixMT();
 		if (removeSNPs) testParser.removeSNPs();
 		if (removeNonSNPs) testParser.removeNonSNPs();
 		res = testParser.getVcfRecords().length +"\tTest variants\n";

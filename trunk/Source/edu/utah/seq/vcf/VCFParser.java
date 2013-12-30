@@ -150,10 +150,11 @@ public class VCFParser {
 	
 	//Methods
 
-	/**Adds a chr onto chromosome names that lack it.*/
-	public void appendChr(){
+	/**Adds a chr onto chromosome names that lack it. Converts chrMT to chrM.*/
+	public void appendChrFixMT(){
 		for (VCFRecord r : vcfRecords){
-			if (r.getChromosome().startsWith("chr") == false) r.setChromosome("chr"+r.getChromosome());
+			r.appendChr();
+			r.correctChrMTs();
 		}
 	}
 

@@ -303,7 +303,11 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	public void appendChr() {
 		if (chromosome.startsWith("chr") == false) chromosome = "chr"+chromosome;
 		
-	}	
+	}
+	public void correctChrMTs(){
+		if (chromosome.equals("chrMT")) chromosome = "chrM";
+		else if (chromosome.equals("MT")) chromosome = "M";
+	}
 
 
 }
