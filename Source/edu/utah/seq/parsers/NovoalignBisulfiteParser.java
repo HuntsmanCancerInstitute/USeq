@@ -13,7 +13,9 @@ import net.sf.samtools.SAMFileReader;
 import net.sf.samtools.SAMRecord;
 import net.sf.samtools.SAMRecordIterator;
 import net.sf.samtools.SAMFileReader.ValidationStringency;
+import edu.utah.ames.bioinfo.PicardMarkDuplicates;
 import edu.utah.seq.data.*;
+import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.data.sam.SamAlignment;
 
 /**Parses a Novoalign bisulfite alignment sam/bam files. PointData scores are set to 1.
@@ -33,6 +35,7 @@ public class NovoalignBisulfiteParser{
 	private int minimumBaseScore = 13;
 	private int minimumStandAloneBaseScore = 13;
 	private boolean printBed = false;
+	private boolean removeDuplicateReads = false;
 	public static final Pattern COMMENT = Pattern.compile("^#.*");
 	public static final Pattern CTStart = Pattern.compile("CT.*");
 	public static final Pattern MD_BIS_SUB_MATCHER= Pattern.compile("(\\d+)([^0-9])");
@@ -74,6 +77,33 @@ public class NovoalignBisulfiteParser{
 	public NovoalignBisulfiteParser(String[] args){
 		long startTime = System.currentTimeMillis();
 		processArgs(args);
+		
+		try {
+			if (removeDuplicateReads) {
+				//for each input alignment file, sort sams and remove duplicate reads
+				System.out.println("\nSorting alignment data and removing duplicate reads...\n");
+				for (int i=0; i < samFiles.length; i++) {
+					File sortFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_sort.bam"));
+
+					//call Picard's SortSam to coordinate-sort input sam files
+					new PicardSortSam(samFiles[i], sortFile);
+					File dupeFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_dup.bam"));
+					File metricsFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_metrics.txt"));
+
+					//call Picard's MarkDuplicates to remove duplicate reads
+					new PicardMarkDuplicates(sortFile, dupeFile, metricsFile);
+					File sortFileIndex = new File (sortFile.toString().replaceAll("_sort.bam", "_sort.bai")); 
+
+					//delete intermediate bam/bai files
+					sortFile.delete();
+					sortFileIndex.delete();
+				}
+			}
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+				
 		System.out.println("Splitting text alignment data by chromosome and filtering...");
 
 		//look for parsed files 1st
@@ -82,9 +112,14 @@ public class NovoalignBisulfiteParser{
 		}
 		else {
 			//for each file, parse, filter, split by chrom and strand and save to disk	
-			for (int i=0; i< samFiles.length; i++){
-				//set working objects and parse tag file text
-				workingFile = samFiles[i];
+			for (int i=0; i< samFiles.length; i++) {
+				if (removeDuplicateReads) {
+					//set working objects and parse tag file text
+					workingFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_dup.bam"));
+				}
+				else {
+					workingFile = samFiles[i];
+				}
 				System.out.print("\t"+workingFile);
 				//parse
 				if (parseWorkingSAMFile() == false) Misc.printErrAndExit("\nERROR: failed to parse, aborting!");
@@ -625,6 +660,7 @@ public class NovoalignBisulfiteParser{
 					case 'v': versionedGenome = args[i+1]; i++; break;
 					case 'p': printBed = true; break;
 					case 'z': useParsedFiles = true; break;
+					case 'd': removeDuplicateReads = true; break;
 					case 'b': minimumBaseScore = Integer.parseInt(args[++i]);break;
 					case 'c': minimumStandAloneBaseScore = Integer.parseInt(args[++i]);break;
 					case 'x': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
@@ -669,7 +705,7 @@ public class NovoalignBisulfiteParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Novoalign Bisulfite Parser: Nov 2013                      **\n" +
+				"**                        Novoalign Bisulfite Parser: Dec 2013                      **\n" +
 				"**************************************************************************************\n" +
 				"Parses Novoalign -b2 and -b4 single and paired bisulfite sequence alignment files into\n" +
 				"PointData file formats. Generates several summary statistics on converted and non-\n" +
@@ -693,6 +729,8 @@ public class NovoalignBisulfiteParser{
 				"-b Minimum base quality score for reporting a non/converted C, defaults to 13.\n"+
 				"-c Minimum base quality score for reporting a overlapping non/converted C not found\n" +
 				"      in the other pair, defaults to 13.\n"+
+				"-d Remove duplicate reads prior to generating PointData. Defaults to not removing\n" +
+				"      duplicates.\n" +
 
 				"\nExample: java -Xmx25G -jar pathToUSeq/Apps/NovoalignBisulfiteParser -x 240 -a\n" +
 				"      /Novo/Run7/ -f /Genomes/Hg19/Fastas/ -v H_sapiens_Feb_2009 -s /Novo/Run7/NBP \n\n" +
