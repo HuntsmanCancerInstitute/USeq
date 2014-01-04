@@ -92,7 +92,7 @@ public class MiRNACorrelator {
 			out.println("\n# Rename bins");
 			out.println("levels(df$Bin) = c("+binOrder.substring(0, binOrder.length() -1)+")");
 			out.println("\n#make plot and save as pdf");
-			out.println("p <- ggplot(df, aes(x=Bin,y=Log2Rto)) + geom_boxplot( )");
+			out.println("p <- ggplot(df, aes(x=Bin,y=Log2Rto)) + geom_boxplot( ) + ylab('Target Gene Log2Rto') + xlab('miRNA Log2Rto Bin') + ggtitle('Association of changes in miRNA with changes in target gene expression')");
 			out.println("ggsave(filename='~/ggBoxPlot.pdf', plot=p)");
 			out.println("p");
 			out.close();
@@ -171,7 +171,7 @@ public class MiRNACorrelator {
 		System.out.println("MiRNA Log2Rtos:\t"+Num.doubleArrayToString(miRNALog2Ratios, 2, ", "));
 		double[] targetVals = Num.arrayListOfDoubleToArray(targetLog2Ratios);
 		System.out.println("Target Log2Rtos:\t"+ Num.doubleArrayToString(targetVals, 3, ", ")  );
-		if (targetVals.length > 1){
+		if (targetVals.length > 3){
 			float[] tvs = Num.doubleArrayToFloatArray(targetVals);
 			Arrays.sort(tvs);
 			System.out.println("Target_Mean\tMedian\tStdDev\tMin\tMax\t10th\t90th");

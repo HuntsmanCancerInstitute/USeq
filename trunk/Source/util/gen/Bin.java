@@ -1,9 +1,11 @@
 package util.gen;
+import java.io.Serializable;
 import java.util.*;
 
 /**Info and methods about a particular bin, used by the Histogram class.*/
-public class Bin {
+public class Bin implements Serializable{
 	
+	private static final long serialVersionUID = 1L;
 	private double start;
 	private double stop;
 	private double middle;
