@@ -381,6 +381,14 @@ public class SamAlignment {
 		}
 		return 0;
 	}
+	
+	/**Looks for the splice junction alignment tag SJ:Z:xxxxxx returns null if not found or the associated splice junction info, e.g. chr20:744550-744647_745851-745948 */
+	public String getSJTagValue (){
+		for (String tag : tags){
+			if (tag.startsWith("SJ:Z:")) return tag.substring(5);
+		}
+		return null;
+	}
 
 	private boolean convertTranscriptomePosition(String coordinatesString, boolean convertMatePosition){
 		//split coordinates on underscore to get chunks

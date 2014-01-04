@@ -1,10 +1,17 @@
-package edu.utah.seq.vcf;
+package edu.utah.seq.vcf.splice;
 
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
+import net.sf.samtools.AlignmentBlock;
+import net.sf.samtools.SAMFileReader;
+import net.sf.samtools.SAMRecord;
+import net.sf.samtools.SAMRecordIterator;
+import net.sf.samtools.SAMFileReader.ValidationStringency;
 import edu.utah.seq.mes.*;
+import edu.utah.seq.vcf.VCFParser;
+import edu.utah.seq.vcf.VCFRecord;
 import util.bio.annotation.ExonIntron;
 import util.bio.annotation.ExportIntergenicRegions;
 import util.bio.parsers.MultiFastaParser;
@@ -22,7 +29,12 @@ public class VCFSpliceAnnotator {
 	private File[] vcfFiles;
 	private File chromDirectory;
 	private File spliceModelDirectory;
-	private File refSeqFile;
+	private File histogramFile;
+	private File transcriptSeqFile;
+	private File ccdsTranscriptFile;
+	private File samSpliceFile;
+	private int minimumSpliceJunctionCoverage = 10;
+	private double minimumFractionCorrectlySpliced = 1.0;
 	private double min5Threshold = 5;
 	private double min5DeltaThreshold = 5;
 	private double min3Threshold = 5;
@@ -36,6 +48,7 @@ public class VCFSpliceAnnotator {
 	private MaxEntScanScore5 score5;
 	private MaxEntScanScore3 score3;
 	private HashMap<String,UCSCGeneLine[]> chromGenes;
+	private HashMap<String,UCSCGeneLine[]> ccdsChromGenes;
 	private String workingChromosomeName = "";
 	private String workingSequence = null;
 	private UCSCGeneLine[] workingTranscripts;
@@ -46,6 +59,7 @@ public class VCFSpliceAnnotator {
 	private Histogram spliceHistogram5;
 	private Histogram spliceHistogram3;
 	private boolean printHistograms = true;
+	private SAMFileReader samSpliceReader;
 	
 	private int numTranscripts = 0; //
 	private HashSet<String> intersectingTranscriptNames = new HashSet<String>();
@@ -79,7 +93,7 @@ public class VCFSpliceAnnotator {
 		loadTranscripts();
 		
 		//histograms of novel exonic splices
-		System.out.println("Loading null score histograms...");
+		System.out.println("Loading splice score histograms...");
 		loadNullScoreHistograms();
 
 		//for each vcf file
@@ -93,9 +107,7 @@ public class VCFSpliceAnnotator {
 		System.out.println();
 		printThresholds();
 		printSummary();
-		
-		
-		
+
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		System.out.println("\nDone "+Math.round(diffTime)+" seconds!\n");
@@ -110,6 +122,7 @@ public class VCFSpliceAnnotator {
 		sb.append(min3Threshold +"\tMinimum 3' splice junction threshold for scoring the presence of a junction\n");
 		sb.append(min5DeltaThreshold +"\tMinimum score difference for loss or gain of a 5' splice junction\n");
 		sb.append(min3DeltaThreshold +"\tMinimum score difference for loss or gain of a 3' splice junction\n");
+		
 		System.out.println(sb);
 	}
 	
@@ -125,17 +138,25 @@ public class VCFSpliceAnnotator {
 		sb.append(numVariantsIntersectingSJs+"\tVariants intersecting splice junctions\n"); 
 		sb.append(numExonSJsGained+"\tExonic splice junctions gained\n"); 
 		sb.append(numIntronSJsGained+"\tIntronic splice junctions gained\n"); 
-		sb.append(numSpliceJunctionSJsGained+"\tSplice junctions with novel splice junction gained\n"); 
-		sb.append(numSJsLost+"\tSplice junctions damaged\n");
+		sb.append(numSpliceJunctionSJsGained+"\tKnown splice junctions with novel splice junction gained\n"); 
+		sb.append(numSJsLost+"\tKnown splice junctions damaged\n");
 		System.out.println(sb);
 	}
 
 	public void loadTranscripts(){
-		UCSCGeneModelTableReader reader = new UCSCGeneModelTableReader(refSeqFile, 0);
+		//main transcripts
+		UCSCGeneModelTableReader reader = new UCSCGeneModelTableReader(transcriptSeqFile, 0);
 		//check ordering
 		if (reader.checkStartStopOrder() == false) Misc.printExit("\nOne of your transcript's coordinates are reversed. Check that each start is less than the stop.\n");
 		chromGenes = reader.getChromSpecificGeneLines();
 		numTranscripts = reader.getGeneLines().length;
+		//load ccsg
+		if (ccdsTranscriptFile != null){
+			UCSCGeneModelTableReader ccsg = new UCSCGeneModelTableReader(ccdsTranscriptFile, 0);
+			//check ordering
+			if (ccsg.checkStartStopOrder() == false) Misc.printExit("\nOne of your ccds transcript's coordinates are reversed. Check that each start is less than the stop.\n");
+			ccdsChromGenes = ccsg.getChromSpecificGeneLines();
+		}
 	}
 
 	/**Adds splice junction information to each record. */
@@ -160,7 +181,7 @@ public class VCFSpliceAnnotator {
 					System.out.println(line);
 					continue;
 				}
-
+//need to load results into object framework to export to spreadsheet
 				//parse record adding chr to chrom name if not present
 				VCFRecord vcf = new VCFRecord(line, parser, true, true);
 				vcf.appendChr();
@@ -256,12 +277,6 @@ public class VCFSpliceAnnotator {
 		}
 	}
 
-
-	
-
-	/**Deletion 20     2 .         TC      T      .   PASS  DP=100"
-	 * Insertion 20     2 .         TC      TCA    .   PASS  DP=100  
-	 */
 	private String scanIntronsForNovelSpliceJunctions (VCFRecord vcf, UCSCGeneLine transcript, boolean isPlusStrand){
 		ExonIntron[] introns = transcript.getIntrons();
 		String results = "noIntersection";
@@ -311,8 +326,6 @@ public class VCFSpliceAnnotator {
 		}
 		return results;
 	}
-
-
 
 	private String scanExonsForNovelSpliceJunctions (VCFRecord vcf, UCSCGeneLine transcript, boolean isPlusStrand){
 		ExonIntron[] exons = transcript.getExons();
@@ -473,7 +486,6 @@ public class VCFSpliceAnnotator {
 
 	}
 
-
 	/**Returns null if no actionable info.  Otherwise with message.*/
 	private String scoreVariantTranscript(VCFRecord vcf, UCSCGeneLine transcript) {
 		boolean isPlusStrand = transcript.getStrand().equals("+");
@@ -593,6 +605,7 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 		double altScoreShift = 0;
 		double altScoreMax = 0;
 		double d;
+		double pval = 0;
 		String name;
 		if (score5Junction){
 			refScore = score5.scoreSequenceNoChecks(rfs[0]);
@@ -610,7 +623,10 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 			
 			//calc delta
 			d= refScore- altScoreMax;
-			if (d >= min5DeltaThreshold) lostKnown = true;
+			if (d >= min5DeltaThreshold) {
+				lostKnown = true;
+				pval = Num.minus10log10(spliceHistogram5.pValue(altScoreMax, false));
+			}
 			
 		}
 		else {
@@ -628,7 +644,10 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 			else altScoreShift = altScoreFixed;
 			//calc delta
 			d= refScore- altScoreMax;
-			if (d >= min3DeltaThreshold) lostKnown = true;
+			if (d >= min3DeltaThreshold) {
+				lostKnown = true;
+				pval = Num.minus10log10(spliceHistogram3.pValue(altScoreMax, false));
+			}
 			
 		}
 
@@ -643,7 +662,8 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 				sb.append ("AltF\t"+rfs[1]+"\t"+altScoreFixed+"\n");
 				sb.append ("AltS\t"+rfs[2]+"\t"+altScoreShift+"\n");
 			}
-			sb.append ("Delta\t"+d+"\n");
+			sb.append ("Delta: "+d+"  -10Log10(PVal): "+pval+"\n");
+System.out.println("\nSplice!\n"+sb);			
 			return sb.toString();
 		}
 
@@ -704,8 +724,8 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 				double delta = a[i] - testR;
 				if (delta >= minDelta) {
 					//calc pval
-					double pval = Num.minus10log10(histogram.pValue(a[i]));
-					sb.append(name+" "+Num.formatNumber(r[i],1)+" -> "+Num.formatNumber(a[i],1)+" index: "+i+" delta: "+Num.formatNumber(delta, 1)+" pval: "+pval+"\n");
+					double pval = Num.minus10log10(histogram.pValue(a[i], true));
+					sb.append(name+" "+Num.formatNumber(r[i],1)+" -> "+Num.formatNumber(a[i],1)+" index: "+i+" delta: "+Num.formatNumber(delta, 1)+" -10Log10(pval): "+pval+"\n");
 //System.out.println(name+" "+Num.formatNumber(r[i],1)+" -> "+Num.formatNumber(a[i],1)+" index: "+i+" delta: "+Num.formatNumber(delta, 1)+" pval: "+pval);					
 				}
 			}
@@ -727,8 +747,8 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 				int delta = maxAlt - maxRef;
 				if (delta >= minDelta) {
 					//calc pval
-					double pval = Num.minus10log10(histogram.pValue(maxAlt));
-					sb.append(name+" "+maxRef+" -> "+maxAlt+" delta: "+delta +" pval: "+pval+"\n");
+					double pval = Num.minus10log10(histogram.pValue(maxAlt, true));
+					sb.append(name+" "+maxRef+" -> "+maxAlt+" delta: "+delta +" -10Log10(pval): "+pval+"\n");
 //System.out.println(name+" "+maxRef+" -> "+maxAlt+" delta: "+delta +" pval: "+pval);
 				}
 			}
@@ -741,8 +761,7 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 		}
 		return null;
 	}
-	
-	
+		
 	/*This is going to be really slow....hmm.*/
 	private UCSCGeneLine[] fetchIntersectingTranscripts(VCFRecord vcf){
 		ArrayList<UCSCGeneLine> al = new ArrayList<UCSCGeneLine>();
@@ -774,17 +793,28 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 	}
 	
 	private void loadNullScoreHistograms(){
-		spliceHistogram5 = new Histogram(-12, 12, 1000);
-		spliceHistogram3 = new Histogram(-16, 16, 1000);
+		if (histogramFile != null && histogramFile.exists()){
+			System.out.println("\tLoading histograms from serialized object file");
+			//Histogram[]{exonicHistogram5, exonicHistogram3, intronicHistogram5, intronicHistogram3, spliceHistogram5, spliceHistogram3};
+			Histogram[] hist = (Histogram[]) IO.fetchObject(histogramFile);
+			exonicHistogram5 = hist[0];
+			exonicHistogram3 = hist[1];
+			intronicHistogram5 = hist[2];
+			intronicHistogram3 = hist[3];
+			spliceHistogram5 = hist[4];
+			spliceHistogram3 = hist[5];
+			return;
+		}
+		//for known splice
+		spliceHistogram5 = new Histogram(-13, 13, 5000);
+		spliceHistogram3 = new Histogram(-14, 16, 5000);
+		samSpliceReader = new SAMFileReader(samSpliceFile);	
+		samSpliceReader.setValidationStringency(ValidationStringency.SILENT);
+		exonicHistogram5 = new Histogram(5, 13, 5000);
+		exonicHistogram3 = new Histogram(5, 17, 5000);
+		intronicHistogram5 = new Histogram(5, 13, 5000);
+		intronicHistogram3 = new Histogram(5, 17, 5000);
 		
-		if (scoreNovelExonJunctions){
-			exonicHistogram5 = new Histogram(min5Threshold, 12, 1000);
-			exonicHistogram3 = new Histogram(min3Threshold, 16, 1000);
-		}
-		if (scoreNovelIntronJunctions || scoreNovelSpliceJunctionsInSplice){
-			intronicHistogram5 = new Histogram(min5Threshold, 12, 1000);
-			intronicHistogram3 = new Histogram(min3Threshold, 16, 1000);
-		}
 		
 		//for each chrom of transcripts
 		System.out.println("\tChr\tSeqLength\tTranscripts");
@@ -800,54 +830,215 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 			workingSequence = new MultiFastaParser(seqFile).getSeqs()[0];
 			workingSequence = workingSequence.toUpperCase();
 			System.out.println("\t"+workingChromosomeName+"\t"+workingSequence.length()+"\t"+workingTranscripts.length);
+			
+			//score known sj for background histogram
+			if (ccdsChromGenes.containsKey(workingChromosomeName)) scoreKnownSplices();
+			
 			//mask known splices
 			maskKnownSplices();
-			//score plus and minus strands exons
-			if (scoreNovelExonJunctions){
-				scoreAllExonsOrIntronsForSplices(true, true);
-				scoreAllExonsOrIntronsForSplices(false, true);
-			}
-			if (scoreNovelIntronJunctions || scoreNovelSpliceJunctionsInSplice){
-				scoreAllExonsOrIntronsForSplices(true, false);
-				scoreAllExonsOrIntronsForSplices(false, false);
-			}
+			
+			//score plus and minus strands for novel splices in exons
+			scoreAllExonsOrIntronsForSplices(true, true);
+			scoreAllExonsOrIntronsForSplices(false, true);
+			scoreAllExonsOrIntronsForSplices(true, false);
+			scoreAllExonsOrIntronsForSplices(false, false);
+		
 		}
+		samSpliceReader.close();
+		
 		//reset so these load
 		workingSequence = "";
 		workingChromosomeName = "";
 		
 		//print histograms
 		if (printHistograms){
-			System.out.println("\nHistograms of novel splices");
-			if (scoreNovelExonJunctions){
-				System.out.println("5' Exon Splice:");
-				exonicHistogram5.printScaledHistogram();
-				System.out.println("\n3' Exon Splice:");
-				exonicHistogram3.printScaledHistogram();
-			}
-			if (scoreNovelIntronJunctions || scoreNovelSpliceJunctionsInSplice){
-				System.out.println("5' Intron Splice:");
-				intronicHistogram5.printScaledHistogram();
-				System.out.println("\n3' Intron Splice:");
-				intronicHistogram3.printScaledHistogram();
-			}
-			System.out.println("\nHistograms of known splices");
+			System.out.println("\nHistograms of novel splice scores");
+			System.out.println("5' Exon Splice:");
+			exonicHistogram5.printScaledHistogram();
+			System.out.println("\n3' Exon Splice:");
+			exonicHistogram3.printScaledHistogram();
+			System.out.println("5' Intron Splice:");
+			intronicHistogram5.printScaledHistogram();
+			System.out.println("\n3' Intron Splice:");
+			intronicHistogram3.printScaledHistogram();
+			System.out.println("\nHistograms of known splice scores");
 			System.out.println("5' Splice Junctions:");
 			spliceHistogram5.printScaledHistogram();
-			System.out.println("3' Splice Junctions:");
+			System.out.println("\n3' Splice Junctions:");
 			spliceHistogram3.printScaledHistogram();
 		}
+		//save them
+		Histogram[] hist = new Histogram[]{exonicHistogram5, exonicHistogram3, intronicHistogram5, intronicHistogram3, spliceHistogram5, spliceHistogram3};
+		System.out.println("Saving histogram serialized object file. Use this to speed up subsequent matched species analysis: "+ histogramFile);
 		System.out.println();
+		IO.saveObject(histogramFile, hist);
+	}
+	
+	private boolean checkCoverage(int position, String toLookFor, boolean leftRight){
+		SAMRecordIterator i = samSpliceReader.queryOverlapping(workingChromosomeName, position, position);
+		HashSet<String> names = new HashSet<String>();
+		double numberOverlaps = 0;
+		double numberCorrect = 0;
+		int numRecords = 0;
+
+		ArrayList<String> allNames = new ArrayList<String>();
+		while (i.hasNext()) {
+			SAMRecord sam = i.next();
+			allNames.add(sam.getReadName());
+			numRecords++;
+			//look for match to splice junction
+			String sj = (String)sam.getAttribute("SJ");
+			if (sj.contains(toLookFor)) {
+				//does it end/ start at the junction
+				if (leftRight){
+					int alignEnd = sam.getAlignmentEnd()-1;
+					if (position == alignEnd) continue;
+				}
+				else {
+					// hmmm doesn't appear to be hit?
+					int alignStart = sam.getAlignmentStart()-1;
+					if (alignStart == position){
+						Misc.printErrAndExit("SJ startIssue "+position+" "+toLookFor+"  as "+alignStart);
+						continue;
+					}
+				}
+				//check for ending read block (1based, end excluded; so add 2 to position)
+				List<AlignmentBlock> blocks = sam.getAlignmentBlocks();
+				//System.out.println(sam.getReadName());
+				int numBlocks = blocks.size();
+				if (numBlocks == 1) continue;
+				numberOverlaps++;
+				boolean add = false;
+				for (int x=0; x< numBlocks; x++){
+					AlignmentBlock ab = blocks.get(x);
+					int pos;
+					if (leftRight) pos = ab.getReferenceStart()+ab.getLength()-2;
+					else pos = ab.getReferenceStart() -1;
+					//correct position?
+					if (pos == position){
+						//is there another block downstream?
+						if (leftRight){
+							if (++x < numBlocks) add = true;
+						}
+						//is there a block upstream?
+						else if (x != 0) add = true;
+						break;
+					}
+				}
+				if (add){
+					numberCorrect++;
+					names.add(sam.getReadName());
+				}
+			}
+		}
+		i.close();
+
+		double fractionCorrect = numberCorrect/ numberOverlaps;
+		if (names.size() < minimumSpliceJunctionCoverage || fractionCorrect < minimumFractionCorrectlySpliced) {
+			//if (leftRight == false && names.size() < 10 && fractionCorrect < minimumFractionCorrectlySpliced) {
+				//System.out.println("SJ "+position+" "+toLookFor+" "+fractionCorrect+" "+numRecords+" "+names);
+			//}
+			return false;
+		}
+		return true;
+	}
+	
+	private void scoreKnownSplices() {
+		//make array to hold info about presence of a splice base pair, default is false
+		int lenMinOne = workingSequence.length() - 1;
+		HashSet<String> scored5Plus = new HashSet<String>();
+		HashSet<String> scored3Plus = new HashSet<String>();
+		HashSet<String> scored5Minus = new HashSet<String>();
+		HashSet<String> scored3Minus = new HashSet<String>();
+		//for each transcript
+		for (UCSCGeneLine g: ccdsChromGenes.get(workingChromosomeName)){
+			ExonIntron[] introns = g.getIntrons();
+			if (introns == null) continue;
+			boolean isPlusStrand = g.getStrand().equals("+");
+			//mask both 5' and 3' junctions
+			int startJunc = 0;
+			int endJunc = 0;
+			for (int i=0; i< introns.length; i++){
+				//plus strand 
+				if (isPlusStrand){
+					//5'
+					startJunc = introns[i].getStart()-3;     
+					endJunc = introns[i].getStart()+6;
+					if (startJunc < 0) startJunc = 0;
+					if (endJunc > lenMinOne) endJunc = lenMinOne;
+					String coor = startJunc+"-"+endJunc;
+					//add to histogram of known splice scores?
+					if (scored5Plus.contains(coor) == false){
+						scored5Plus.add(coor);
+						if (checkCoverage(introns[i].getStart()-1, "-"+introns[i].getStart()+"_", true)){
+							String seq = workingSequence.substring(startJunc, endJunc);
+							double score = score5.scoreSequenceWithChecks(seq);
+							if (score != Double.MIN_VALUE) spliceHistogram5.count(score);
+							//System.out.println("+ 5\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);
+						}
+					}
+					//3'
+					startJunc = introns[i].getEnd()-20;
+					endJunc = introns[i].getEnd()+3;
+					if (startJunc < 0) startJunc = 0;
+					if (endJunc > lenMinOne) endJunc = lenMinOne;
+					coor = startJunc+"-"+endJunc;
+					if (scored3Plus.contains(coor) == false){
+						scored3Plus.add(coor);
+						if (checkCoverage(introns[i].getEnd(), "_"+introns[i].getEnd(), false)){
+							String seq = workingSequence.substring(startJunc, endJunc);
+							double score = score3.scoreSequenceWithChecks(seq);
+							if (score != Double.MIN_VALUE) spliceHistogram3.count(score);
+							//System.out.println("+ 3\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);	
+						}
+					}
+				}
+				//minus strand
+				else {
+					//3'
+					startJunc = introns[i].getStart()-3;
+					endJunc = introns[i].getStart()+20;
+					if (startJunc < 0) startJunc = 0;
+					if (endJunc > lenMinOne) endJunc = lenMinOne;
+					String coor = startJunc+"-"+endJunc;
+					//add to histogram of known splice scores?
+					if (scored3Minus.contains(coor) == false){
+						scored3Minus.add(coor);
+						if (checkCoverage(introns[i].getStart()-1, "-"+introns[i].getStart()+"_", true)){
+							String seq = workingSequence.substring(startJunc, endJunc);
+							seq = Seq.reverseComplementDNA(seq);
+							double score = score3.scoreSequenceWithChecks(seq);
+							if (score != Double.MIN_VALUE) spliceHistogram5.count(score);
+							//System.out.println("- 3\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);
+						}
+					}
+					
+					//5'
+					startJunc = introns[i].getEnd()-6;
+					endJunc = introns[i].getEnd()+3;
+					if (startJunc < 0) startJunc = 0;
+					if (endJunc > lenMinOne) endJunc = lenMinOne;
+					coor = startJunc+"-"+endJunc;
+					//add to histogram of known splice scores?
+					if (scored5Minus.contains(coor) == false){
+						scored5Minus.add(coor);
+						if (checkCoverage(introns[i].getEnd(), "_"+introns[i].getEnd(), false)){
+							String seq = workingSequence.substring(startJunc, endJunc);
+							seq = Seq.reverseComplementDNA(seq);
+							double score = score5.scoreSequenceWithChecks(seq);
+							if (score != Double.MIN_VALUE) spliceHistogram5.count(score);
+							//System.out.println("- 5\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);	
+						}
+					}
+				}
+			}
+		}
 	}
 
 	private void maskKnownSplices() {
 		//make array to hold info about presence of a splice base pair, default is false
 		boolean[] spliceBase = new boolean[workingSequence.length()];
 		int lenMinOne = spliceBase.length-1;
-		HashSet<String> scored5Plus = new HashSet<String>();
-		HashSet<String> scored3Plus = new HashSet<String>();
-		HashSet<String> scored5Minus = new HashSet<String>();
-		HashSet<String> scored3Minus = new HashSet<String>();
 		//for each transcript
 		for (UCSCGeneLine g: workingTranscripts){
 			ExonIntron[] introns = g.getIntrons();
@@ -865,29 +1056,12 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 					if (startJunc < 0) startJunc = 0;
 					if (endJunc > lenMinOne) endJunc = lenMinOne;
 					for (int j=startJunc; j< endJunc; j++) spliceBase[j] = true;
-					String coor = startJunc+"-"+endJunc;
-					//add to histogram of known splice scores?
-					if (scored5Plus.contains(coor) == false){
-						scored5Plus.add(coor);
-						String seq = workingSequence.substring(startJunc, endJunc);
-						double score = score5.scoreSequenceWithChecks(seq);
-						if (score != Double.MIN_VALUE) spliceHistogram5.count(score);
-						//System.out.println("+ 5\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);					
-					}
 					//3'
 					startJunc = introns[i].getEnd()-20;
 					endJunc = introns[i].getEnd()+3;
 					if (startJunc < 0) startJunc = 0;
 					if (endJunc > lenMinOne) endJunc = lenMinOne;
 					for (int j=startJunc; j< endJunc; j++) spliceBase[j] = true;
-					coor = startJunc+"-"+endJunc;
-					if (scored3Plus.contains(coor) == false){
-						scored3Plus.add(coor);
-						String seq = workingSequence.substring(startJunc, endJunc);
-						double score = score3.scoreSequenceWithChecks(seq);
-						if (score != Double.MIN_VALUE) spliceHistogram3.count(score);
-						//System.out.println("+ 3\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);	
-					}
 				}
 				//minus strand
 				else {
@@ -897,35 +1071,12 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 					if (startJunc < 0) startJunc = 0;
 					if (endJunc > lenMinOne) endJunc = lenMinOne;
 					for (int j=startJunc; j< endJunc; j++) spliceBase[j] = true;
-					
-					String coor = startJunc+"-"+endJunc;
-					//add to histogram of known splice scores?
-					if (scored3Minus.contains(coor) == false){
-						scored3Minus.add(coor);
-						String seq = workingSequence.substring(startJunc, endJunc);
-						seq = Seq.reverseComplementDNA(seq);
-						double score = score3.scoreSequenceWithChecks(seq);
-						if (score != Double.MIN_VALUE) spliceHistogram5.count(score);
-						//System.out.println("- 3\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);	
-					}
-					
 					//5'
 					startJunc = introns[i].getEnd()-6;
 					endJunc = introns[i].getEnd()+3;
 					if (startJunc < 0) startJunc = 0;
 					if (endJunc > lenMinOne) endJunc = lenMinOne;
 					for (int j=startJunc; j< endJunc; j++) spliceBase[j] = true;
-					
-					coor = startJunc+"-"+endJunc;
-					//add to histogram of known splice scores?
-					if (scored5Minus.contains(coor) == false){
-						scored5Minus.add(coor);
-						String seq = workingSequence.substring(startJunc, endJunc);
-						seq = Seq.reverseComplementDNA(seq);
-						double score = score5.scoreSequenceWithChecks(seq);
-						if (score != Double.MIN_VALUE) spliceHistogram5.count(score);
-						//System.out.println("- 5\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);	
-					}
 				}
 			}
 		}
@@ -1008,7 +1159,10 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 					case 'v': forExtraction = new File(args[++i]); break;
 					case 'f': chromDirectory = new File(args[++i]); break;
 					case 'm': spliceModelDirectory = new File(args[++i]); break;
-					case 'u': refSeqFile = new File(args[++i]); break;
+					case 'u': transcriptSeqFile = new File(args[++i]); break;
+					case 't': ccdsTranscriptFile = new File(args[++i]); break;
+					case 'j': samSpliceFile = new File(args[++i]); break;
+					case 'k': minimumSpliceJunctionCoverage = Integer.parseInt(args[++i]); break;
 					case 'e': scoreNovelExonJunctions = false; break;
 					case 'i': scoreNovelIntronJunctions = false; break;
 					case 's': scoreNovelSpliceJunctionsInSplice = false; break;
@@ -1016,8 +1170,7 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 					case 'b': min3Threshold = Double.parseDouble(args[++i]); break;
 					case 'c': min5DeltaThreshold = Double.parseDouble(args[++i]); break;
 					case 'd': min3DeltaThreshold = Double.parseDouble(args[++i]); break;
-					
-					case 'h': printDocs(); System.exit(0);
+					case 'h': histogramFile = new File(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -1034,8 +1187,14 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 		if (spliceModelDirectory == null || spliceModelDirectory.isDirectory() == false ) {
 			Misc.printErrAndExit("\nError: please provide a path to a directory containing the splice models.\n");
 		}
-		if (refSeqFile == null || refSeqFile.canRead()== false){
+		if (transcriptSeqFile == null || transcriptSeqFile.canRead()== false){
 			Misc.printErrAndExit("\nPlease enter a transcript table file in ucsc refflat format.\n");
+		}
+		//histogram
+		if (histogramFile == null) Misc.printErrAndExit("\nPlease enter a histogram object file, either to load or to use in saving the serialized object.\n");
+		if (histogramFile.exists() == false ){
+			//look for bam and ccds
+			if (ccdsTranscriptFile == null || samSpliceFile == null) Misc.printErrAndExit("\nPlease enter an indexed bam file containing splice junction reads and or a CCDS transcript table.  These will be used to generate background score histograms.\n");
 		}
 		
 		//pull files
@@ -1053,7 +1212,7 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Splice Annotator : Dec 2013                       **\n" +
+				"**                            VCF Splice Annotator : Jan 2014                       **\n" +
 				"**************************************************************************************\n" +
 				"WARNING: beta!\n"+
 				"\n"+
@@ -1061,7 +1220,10 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 				"Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice\n"+
 				"acceptors and donors are scored for loss of a junction.  Exonic, intronic, and splice\n"+
 				"bases are scanned for novel junctions.  Note, indels in exons causing\n"+
-				"frameshifts are not annotated. This app only looks for changes in splicing.\n\n" +
+				"frameshifts are not annotated. This app only looks for changes in splicing. Pvalues\n"+
+				"for gained exonic or intronic splices are estimated by generating null distibutions\n"+
+				"of masked sequence scores. Likewise, damaged splice pvalues are calculated using a\n"+
+				"score distribution from the trusted splice junction file.\n\n" +
 
 				"Required Options:\n"+
 				"-v VCF file or directory containing such (xxx.vcf(.gz/.zip OK)).\n"+
@@ -1074,8 +1236,9 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 				"-m Full path directory name containing the me2x3acc1-9, splice5sequences and me2x5\n"+
 				"       splice model files. See USeq/Documentation/ or \n"+
 				"       http://genes.mit.edu/burgelab/maxent/download/ \n"+
-				
+				"-h Histogram object file for estimating pvalues.\n"+
 				"\n"+
+				
 				"Optional options:\n"+
 				"-e Don't scan exonic bases for novel splice junctions.\n"+
 				"-i Don't scan intronic bases for novel splice junctions.\n"+
@@ -1085,9 +1248,19 @@ System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
 				"-c Minimum difference for loss or gain of a 5' splice junction, defaults to 5.\n"+
 				"-d Minimum difference for loss or gain of a 3' splice junction, defaults to 5.\n"+
 				"\n"+
-
+				
+				"Options for generating a histogram object file:\n"+
+				"-j Bam alignment splice file from running the SamTranscriptomeParser with -j to use\n"+
+				"       in checking for actual use of the known splice junction prior to scoring it for\n"+
+				"       inclusion in the known junction histograms. Besure to remove duplicates with the\n"+
+				"       Picard MarkDuplicates app too.\n"+
+				"-t CCDS transcript file, see -u above.\n"+
+				"-k Minimum read coverage for known splice junction scoring, defaults to 10\n"+
+				
+				"\n"+
 				"Example: java -Xmx10G -jar ~/USeq/Apps/VCFSpliceAnnotator -f ~/Hg19/Fa/ -v ~/exm2.vcf\n"+
-				"       -m ~/USeq/Documentation/splicemodels -i -u ~/Hg19/hg19EnsTran.ucsc.zip \n\n"+
+				"       -m ~/USeq/Documentation/splicemodels -i -u ~/Hg19/hg19EnsTrans.ucsc.zip -t\n"+
+				"       ~/Hg19/hg19CCDSTrans.ucsc.zip -j ~/Hg19/allReadsSTP.bam\n\n"+
 
 				"**************************************************************************************\n");
 

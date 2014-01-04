@@ -47,6 +47,7 @@ public class SamTranscriptomeParser{
 	private ArrayList<SamAlignment> secondPair = new ArrayList<SamAlignment>();
 	private Random random = new Random();
 	private boolean verbose = true;
+	private boolean exportJustSpliceJunctionAlignments = false;
 	//for trimming/ merging paired data
 	private boolean mergePairedAlignments = false;
 	private int minimumDiffQualScore = 3;
@@ -441,65 +442,6 @@ public class SamTranscriptomeParser{
 			Misc.printErrAndExit("\nProblem printing alignment block!?\n");
 		}
 	}
-	/*Attempts to merge alignments. Doesn't check if proper pairs!  Returns null if it cannot. This modifies the input SamAlignments so print first before calling
-	private SamAlignment mergePairedAlignments(SamAlignment first, SamAlignment second) {
-		//trim them of soft clipped info
-		first.trimMaskingOfReadToFitAlignment();
-		second.trimMaskingOfReadToFitAlignment();
-
-		//look for bad CIGARs
-		if (CIGAR_BAD.matcher(first.getCigar()).matches()) Misc.printErrAndExit("\nError: unsupported cigar string! See -> "+first.toString()+"\n");
-		if (CIGAR_BAD.matcher(second.getCigar()).matches()) Misc.printErrAndExit("\nError: unsupported cigar string! See -> "+second.toString()+"\n");
-
-		//fetch coordinates
-		int startBaseFirst = first.getPosition();
-		int stopBaseFirst = startBaseFirst + countLengthOfCigar(first.getCigar());
-		int startBaseSecond = second.getPosition();
-		int stopBaseSecond = startBaseSecond + countLengthOfCigar(second.getCigar());
-
-		//make arrays to hold sequence and qualities
-		int start = startBaseFirst;
-		if (startBaseSecond < start) start = startBaseSecond;
-		int stop = stopBaseFirst;
-		if (stopBaseSecond > stop) stop = stopBaseSecond;
-		int size = stop-start;
-
-		SamLayout firstLayout = new SamLayout(size);
-		SamLayout secondLayout = new SamLayout(size);
-
-		//layout data
-		firstLayout.layoutCigar(start, first);
-		secondLayout.layoutCigar(start, second);
-
-
-
-		//merge layouts, modifies original layouts so print first if you want to see em before mods.
-		SamLayout mergedSamLayout = SamLayout.mergeLayouts(firstLayout, secondLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);
-
-		if (mergedSamLayout == null) {
-			//if (true){
-
-
-				//add failed merge tag
-				first.addMergeTag(false);
-				second.addMergeTag(false);
-
-			return null;
-		}
-
-		else {
-			//calculate overlap
-			int[] overNonOver = SamLayout.countOverlappingBases(firstLayout, secondLayout);
-			numberOverlappingBases+= overNonOver[0];
-			numberNonOverlappingBases+= overNonOver[1];
-
-			//make merged
-			SamAlignment mergedSam = makeSamAlignment(first, second, mergedSamLayout, start);
-			return mergedSam;
-		}
-
-	}*/
-
 	/**Attempts to merge alignments. Doesn't check if proper pairs!  Returns null if it cannot. This modifies the input SamAlignments so print first before calling*/
 	private SamAlignment mergePairedAlignments(SamAlignment first, SamAlignment second) {
 		//trim them of soft clipped info
@@ -576,6 +518,11 @@ public class SamTranscriptomeParser{
 	}
 
 	public void printSam(SamAlignment sam, int numberRepeats) throws IOException{
+		//just print splice junction alignments?
+		if (exportJustSpliceJunctionAlignments){
+			if (sam.getSJTagValue() == null) return;
+		}
+		
 		numberPrintedAlignments++;
 		//add/ replace IH tag for number of "Number of stored alignments in SAM that contains the query in the current record"
 		sam.addRepeatTag(numberRepeats);
@@ -722,6 +669,7 @@ public class SamTranscriptomeParser{
 					case 'f': forExtraction = new File(args[++i]); break;
 					case 'n': maxMatches = Integer.parseInt(args[++i]); break;
 					case 'r': reverseStrand = true; break;
+					case 'j': exportJustSpliceJunctionAlignments = true; break;
 					case 'u': saveUnmappedAndFailedScore = true; break;
 					case 's': saveFile = new File(args[++i]); break;
 					case 'h': replacementHeaderFile = new File(args[++i]); break;
@@ -843,6 +791,7 @@ public class SamTranscriptomeParser{
 				"      UTP sequencing.\n" +
 				"-u Save unmapped reads and those that fail the alignment score.\n"+
 				"-c Don't remove chrAdapt and chrPhiX alignments.\n"+
+				"-j Only print splice junction alignments, defaults to all.\n"+
 				"-p Merge proper paired unique alignments. Those that cannot be unambiguously merged\n" +
 				"      are left as pairs. Recommended to avoid double counting errors and increase\n" +
 				"      base calling accuracy. For paired Illumina UTP data, use -p -r -b .\n"+

@@ -6,7 +6,7 @@ import java.util.*;
 /**
  * Generates histograms.
  */
-public class Histogram {
+public class Histogram implements Serializable {
 	//fields
 	private double minimum;
 	private double maximum;
@@ -23,7 +23,7 @@ public class Histogram {
 	private boolean meanScoresPresent = false;
 	private boolean trimLabelsToSingleInteger = false;
 	private boolean skipZeroBins = true;
-
+	private static final long serialVersionUID = 1L;
 
 	public Histogram( double minimum, double maximum, int numberOfBins){
 		this.minimum = minimum;
@@ -96,6 +96,19 @@ public class Histogram {
 		if (total == 0) return 1.0/totalBinHits;
 		return total/totalBinHits;
 	}
+	
+	/**Returns a two tailed, p value given a threshold.
+	 * Use boolean to force right side or left side
+	 * Returns 1/total bin hits if value exceeds last bin. Thus will not return zero.*/
+	public double pValue(double value, boolean rightSide){
+		//has the histogram been totaled?
+		if (totalBinHits == -1) getTotalBinCounts();
+		double total;
+		if (rightSide) total= numberBinHitsToRightAndIncludingValue(value);
+		else total = numberBinHitsToLeftAndIncludingValue(value);
+		if (total == 0) return 1.0/totalBinHits;
+		return total/totalBinHits;
+	}
 
 	/**Returns number of bin hits in the bins to the right of the value's bin
 	 * including the numMoreThanMax.*/
@@ -128,7 +141,7 @@ public class Histogram {
 		return totalRightSide;
 	}
 
-	/**Returns number of bin hits in the bins to the right of the value's bin
+	/**Returns number of bin hits in the bins to the left of the value's bin
 	 * including the numMoreThanMax.*/
 	public double numberBinHitsToLeftAndIncludingValue(double value){
 		//find total right of value
