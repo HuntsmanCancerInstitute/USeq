@@ -2,6 +2,8 @@
 MiRNACorrelator
 * Added a catch to skip calculating stats on bins with only one value
 * Fixed bug with the ordering of the bins in the ggplot
+NovoalignBisulfiteParser
+* Added an option to first call Picard's SortSam and MarkDuplicates
 
 ----USeq_8.7.3----
 DefinedRegionDifferentialSeq
