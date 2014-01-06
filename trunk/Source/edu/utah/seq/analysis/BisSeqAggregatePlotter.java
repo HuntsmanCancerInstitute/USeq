@@ -324,10 +324,10 @@ public class BisSeqAggregatePlotter {
 			String chromStrand = it.next();
 
 			ArrayListStartStop[] alss = chromRegions.get(chromStrand);
-			
+					
 			//fetch first region with data?
 			int i=0;
-			if (mergedBisSeqPoints == null){
+			if (mergedBisSeqPoints == null || !mergedBisSeqPoints.dataPresent){
 				for (;i<alss.length; i++){
 					mergedBisSeqPoints = (BisSeqRegion)alss[i].getArrayList().get(0);
 					if (mergedBisSeqPoints.dataPresent) {

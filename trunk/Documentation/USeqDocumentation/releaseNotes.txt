@@ -4,6 +4,14 @@ MiRNACorrelator
 * Fixed bug with the ordering of the bins in the ggplot
 NovoalignBisulfiteParser
 * Added an option to first call Picard's SortSam and MarkDuplicates
+BisSeqAggregatePlotter
+* Fixed a bug that would result in no output data. This bug only occurs when the first encountered chromosome has no 
+data in any of it's regions
+Gr2Bar
+* Users can now specify orientation when running this app.
+MicrosatelliteCounter
+* Initial check-in of Microsatellite counter application.
+
 
 ----USeq_8.7.3----
 DefinedRegionDifferentialSeq
