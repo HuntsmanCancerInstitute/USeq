@@ -13,6 +13,7 @@ public class Gr2Bar {
 	
 	private File[] files;
 	private String genomeVersion;
+	private String orient;
 	
 	public Gr2Bar(String[] args) {
 		//check for args 
@@ -61,7 +62,7 @@ public class Gr2Bar {
 				//write xxx.bar file?
 				if (intPositions != null && intPositions.length != 0){
 					System.out.println("\tWriting...");
-					Util.writeSimpleBarFile(chrom, genomeVersion, ".", intPositions, floatValues, bar);
+					Util.writeSimpleBarFile(chrom, genomeVersion, this.orient, intPositions, floatValues, bar);
 				}
 				else System.out.println("\tProblem making bar file for "+files[x]);
 			}
@@ -89,6 +90,7 @@ public class Gr2Bar {
 					switch (test){
 					case 'f': filesString = args[i+1]; i++; break;
 					case 'v': genomeVersion = args[i+1]; i++; break;
+					case 'o': orient = args[i+1]; i++; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nError: unknown option! " + mat.group());
 					}
@@ -99,6 +101,9 @@ public class Gr2Bar {
 			}
 		}
 		
+		if (orient == null) {
+			orient = ".";
+		}
 		//parse files and genome version
 		if (filesString == null ) Misc.printExit("\nError: cannot find your xxx.sgr.zip file(s)?");
 		files = IO.fetchFilesRecursively(new File(filesString), ".gr.zip");
@@ -116,6 +121,7 @@ public class Gr2Bar {
 				"-f The full path directory/file text for your xxx.gr.zip file(s).\n" +
 				"-v Genome version (ie H_sapiens_Mar_2006), get from UCSC Browser,\n" +
 				"      http://genome.ucsc.edu/FAQ/FAQreleases\n" +
+				"-o Orientation of GR file.  If not specified, orientation is left as '.'\n" + 
 				
 				"\nExample: java -Xmx1500M -jar pathTo/T2/Apps/Gr2Bar -f /affy/GrFiles/ -v hg17 \n\n" +
 				
