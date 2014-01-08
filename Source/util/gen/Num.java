@@ -4696,17 +4696,17 @@ public class Num {
 
 	/**Trims identical scores after rounding to integers from the left and right ends, returning the centers. int[a,b][].
 	 * Bit slow but it works.  This is devilishly complex if you don't use ArrayLists.*/
-	public static int[][] trimIdenticalEnds(double[] a, double[] b) {
-		ArrayList<Integer> aAL = convertDoubleToArrayListInt(a);
-		ArrayList<Integer> bAL = convertDoubleToArrayListInt(b);
-		int[] tA = null;
-		int[] tB = null;
+	public static double[][] trimIdenticalEnds(double[] a, double[] b) {
+		ArrayList<Double> aAL = convertDoubleToArrayList(a);
+		ArrayList<Double> bAL = convertDoubleToArrayList(b);
+		double[] tA = null;
+		double[] tB = null;
 
 		//trim from left
 		while (true){
 			if (aAL.size() == 0 || bAL.size() == 0) break;
-			int testA = aAL.get(0);
-			int testB = bAL.get(0);
+			int testA = (int)Math.round(aAL.get(0));
+			int testB = (int)Math.round(bAL.get(0));
 			if (testA != testB) break;
 			aAL.remove(0);
 			bAL.remove(0);
@@ -4720,18 +4720,18 @@ public class Num {
 				if (aSize == 0 || bSize == 0) break;
 				aSize--;
 				bSize--;
-				int testA = aAL.get(aSize);
-				int testB = bAL.get(bSize);
+				int testA = (int)Math.round(aAL.get(aSize));
+				int testB = (int)Math.round(bAL.get(bSize));
 				if (testA != testB) break;
 				aAL.remove(aSize);
 				bAL.remove(bSize);
 			}
 		}
 		
-		tA = Num.arrayListOfIntegerToInts(aAL);
-		tB = Num.arrayListOfIntegerToInts(bAL);
+		tA = Num.arrayListOfDoubleToArray(aAL);
+		tB = Num.arrayListOfDoubleToArray(bAL);
 
-		return new int[][]{tA, tB};
+		return new double[][]{tA, tB};
 	}
 
 	public static double maxValue(double[] ds) {

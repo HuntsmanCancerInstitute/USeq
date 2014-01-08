@@ -21,6 +21,8 @@ public class MaxEntScanScore3 {
 	private double[][] seqScores;
 	private HashMap<String, double[]> baseScores;
 	private static final double[] hashValues = {1,4,16,64,256,1024,4096,16384};
+	private double[] scoredScores = null;
+	private String[] scoredSubSequences = null;
 
 	//constructor
 	/**Stand alone*/
@@ -120,6 +122,28 @@ public class MaxEntScanScore3 {
 			}
 		}
 		return Num.arrayListOfDoubleToArray(al);
+	}
+	
+	/**Scores each 23mer in the sequence moving 5' to 3' 23mers with a non GATCgatc base are not scored and are assigned the defaultScore.
+	 * Use the getScoredSubSequences, and getScoredScores methods to fetch.
+	 * Case insensitive.*/
+	public double[] scanSequence(String seq, double defaultScore){
+		int num = seq.length() - 22;
+		Matcher mat;
+		scoredScores = new double[num];
+		scoredSubSequences = new String[num];
+		String ucSeq = seq.toUpperCase();
+		for (int i=0; i< num; i++){
+			String subSeq = ucSeq.substring(i, i+23);
+			scoredSubSequences[i] = subSeq;
+			mat = MaxEntScanScore5.NonGATC.matcher(subSeq);
+			if (mat.find() == false) {
+				double score = scoreSequenceNoChecks(subSeq);
+				scoredScores[i] = score;
+			}
+			else scoredScores[i] = defaultScore;
+		}
+		return scoredScores;
 	}
 	
 	/**Scores each 23mer in the sequence moving 5' to 3' skipping seqs with non GATCgatc bases.
@@ -271,6 +295,13 @@ public class MaxEntScanScore3 {
 
 				"**************************************************************************************\n");
 
+	}
+	public double[] getScoredScores() {
+		return scoredScores;
+	}
+
+	public String[] getScoredSubSequences() {
+		return scoredSubSequences;
 	}
 
 }
