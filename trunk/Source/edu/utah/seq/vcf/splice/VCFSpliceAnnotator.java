@@ -33,12 +33,14 @@ public class VCFSpliceAnnotator {
 	private File transcriptSeqFile;
 	private File ccdsTranscriptFile;
 	private File samSpliceFile;
+	private File saveDirectory;
 	private int minimumSpliceJunctionCoverage = 10;
 	private double minimumFractionCorrectlySpliced = 1.0;
 	private double min5Threshold = 5;
 	private double min5DeltaThreshold = 5;
 	private double min3Threshold = 5;
 	private double min3DeltaThreshold = 5;
+	private double minPValue = 13;
 	private boolean scoreNovelIntronJunctions = true;
 	private boolean scoreNovelExonJunctions = true;
 	private boolean scoreNovelSpliceJunctionsInSplice = true;
@@ -47,10 +49,12 @@ public class VCFSpliceAnnotator {
 	private HashMap<String, File> chromFile;
 	private MaxEntScanScore5 score5;
 	private MaxEntScanScore3 score3;
+	private LinkedHashMap<String, ArrayList<SpliceHit>> geneNameSpliceHits = null;
 	private HashMap<String,UCSCGeneLine[]> chromGenes;
 	private HashMap<String,UCSCGeneLine[]> ccdsChromGenes;
 	private String workingChromosomeName = "";
 	private String workingSequence = null;
+	private boolean workingTranscriptIsPlusStrand;
 	private UCSCGeneLine[] workingTranscripts;
 	private Histogram exonicHistogram5;
 	private Histogram exonicHistogram3;
@@ -60,6 +64,7 @@ public class VCFSpliceAnnotator {
 	private Histogram spliceHistogram3;
 	private boolean printHistograms = true;
 	private SAMFileReader samSpliceReader;
+	private ArrayList<SpliceHit> spliceHitsAL = new ArrayList<SpliceHit>();
 	
 	private int numTranscripts = 0; //
 	private HashSet<String> intersectingTranscriptNames = new HashSet<String>();
@@ -100,7 +105,9 @@ public class VCFSpliceAnnotator {
 		System.out.println("Processing...");
 		for (int i=0; i< vcfFiles.length; i++){
 			System.out.println("\t"+vcfFiles[i]);
+			geneNameSpliceHits = new LinkedHashMap<String, ArrayList<SpliceHit>>();
 			annotateVCFWithSplices(vcfFiles[i]);
+			printSpreadSheetResults(vcfFiles[i]);
 		}
 		
 		//summaries
@@ -114,7 +121,72 @@ public class VCFSpliceAnnotator {
 	}
 	
 	//methods
-	
+	private void printSpreadSheetResults(File vcfFile) {
+		File modFile = new File (saveDirectory, Misc.removeExtension(vcfFile.getName())+".xls");
+		PrintWriter out;
+		try {
+			out = new PrintWriter( new FileWriter (modFile));
+			//save header
+			out.println("GeneName\tTranscriptNames\tVCF RefSeq\tVCF AltSeq\tVCF Pos\tSJ Type\tSJ -10Log10(pval)\tSJ Pos\tSJ RefSeq\tSJ AltSeq\tSJ RefScore\tSJ AltScore\tVCF Record Fields...");
+			//walk through hash printing all should collapse transcripts with same hit
+			for (String geneName : geneNameSpliceHits.keySet()) {
+				//for each hit
+				ArrayList<SpliceHit> spliceHits = geneNameSpliceHits.get(geneName);
+				//for each splice hit				
+				for (SpliceHit sh: spliceHits){
+					//build header
+					StringBuilder sb = new StringBuilder();
+					//geneName
+					sb.append(sh.getTranscript().getDisplayName()); sb.append("\t");
+					//transName
+					sb.append(sh.getTranscript().getName()); sb.append("\t");
+					//vcf refseq
+					sb.append(sh.getVcf().getReference()); sb.append("\t");
+					//vcf altseq
+					sb.append(sh.getVcf().getAlternate()[sh.getVcfAltIndex()]); sb.append("\t");
+					//vcf pos
+					sb.append(sh.getVcf().getPosition()); sb.append("\t");
+					String head = sb.toString();
+					
+					//for each splice junction affect, typically only one
+					ArrayList<SpliceJunction> sjAL = sh.getAffectedSpliceJunctions();					
+					for (SpliceJunction sj: sjAL){
+						sb = new StringBuilder();
+						sb.append(head); 
+						//sj type
+						sb.append(sj.getType()); sb.append("\t");
+						//sj pval
+						sb.append(sj.getTransPValue()); sb.append("\t");
+						//sj pos
+						sb.append(sj.getPosition()); sb.append("\t");
+						//sj ref seq
+						sb.append(sj.getReferenceSequence()); sb.append("\t");
+						//sj alt seq
+						sb.append(sj.getAlternateSequence()); sb.append("\t");
+						//sj ref score
+						sb.append(sj.getReferenceScore()); sb.append("\t");
+						//sj alt seq
+						sb.append(sj.getAlternateScore()); sb.append("\t");
+						//vcf record
+						sb.append(sh.getVcf().toString());
+						out.println(sb.toString());
+					}
+				}
+				
+						
+			}
+
+			out.close();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		
+		
+		
+	}
+
 	private void printThresholds(){
 		StringBuilder sb = new StringBuilder();
 		sb.append("Threholds:\n");
@@ -122,6 +194,7 @@ public class VCFSpliceAnnotator {
 		sb.append(min3Threshold +"\tMinimum 3' splice junction threshold for scoring the presence of a junction\n");
 		sb.append(min5DeltaThreshold +"\tMinimum score difference for loss or gain of a 5' splice junction\n");
 		sb.append(min3DeltaThreshold +"\tMinimum score difference for loss or gain of a 3' splice junction\n");
+		sb.append(minPValue +"\tMinimum -10Log10(pval) for reporting a loss or gain of a splice junction\n");
 		
 		System.out.println(sb);
 	}
@@ -161,16 +234,13 @@ public class VCFSpliceAnnotator {
 
 	/**Adds splice junction information to each record. */
 	public void annotateVCFWithSplices(File vcfFile) {
-		File modFile = new File (vcfFile.getParentFile(), Misc.removeExtension(vcfFile.getName())+".splice.txt");
 		BufferedReader in = null;
-		PrintWriter out = null;
 		VCFParser parser = new VCFParser();
 		try {
 			in  = IO.fetchBufferedReader(vcfFile);
-			out = new PrintWriter ( new FileWriter (modFile));
 
 			//add ##INFO line and find "#CHROM" line 
-			loadAndModifyHeader(in, out);
+			loadAndModifyHeader(in);
 
 			//For each record
 			String line;
@@ -181,7 +251,6 @@ public class VCFSpliceAnnotator {
 					System.out.println(line);
 					continue;
 				}
-//need to load results into object framework to export to spreadsheet
 				//parse record adding chr to chrom name if not present
 				VCFRecord vcf = new VCFRecord(line, parser, true, true);
 				vcf.appendChr();
@@ -210,19 +279,29 @@ public class VCFSpliceAnnotator {
 					
 					//for each transcript score effect
 					for (UCSCGeneLine l: trans){
-						String effect = scoreVariantTranscript(vcf, l);
-						if (effect != null) {
-							out.println("Hit to gene -> "+l.toString());
-							out.println("By variant  -> "+vcf.toString());
-							out.println(effect);
+						SpliceHit sh = new SpliceHit (vcf, i, l);
+						scoreVariantTranscript(sh);
+						
+						//any changes? add to hash
+						if (sh.getAffectedSpliceJunctions() != null) {
+							String geneName = sh.getTranscript().getDisplayName();
+							ArrayList<SpliceHit> al = geneNameSpliceHits.get(geneName);
+							if (al == null) {
+								al = new ArrayList<SpliceHit>();
+								geneNameSpliceHits.put(geneName, al);
+							}
+							al.add(sh);
+							spliceHitsAL.add(sh);
 						}
 					}
 				}
 				vcf.setAlternate(alts);
+//if (spliceHitsAL.size() !=0) {
+//break;
+//}
 			}
 			//last
 			System.out.println();
-			out.close();
 			in.close();
 		}catch (Exception e) {
 			System.err.println("Error -> "+e.getMessage());
@@ -277,14 +356,13 @@ public class VCFSpliceAnnotator {
 		}
 	}
 
-	private String scanIntronsForNovelSpliceJunctions (VCFRecord vcf, UCSCGeneLine transcript, boolean isPlusStrand){
-		ExonIntron[] introns = transcript.getIntrons();
-		String results = "noIntersection";
-		StringBuilder sb = new StringBuilder();
+	private void scanIntronsForNovelSpliceJunctions (SpliceHit hit){
+		VCFRecord vcf = hit.getVcf();
+		ExonIntron[] introns = hit.getTranscript().getIntrons();		
 		if (introns != null) {
 			int leftAdd = 6;
 			int rightSub = 20;
-			if (isPlusStrand == false){
+			if (workingTranscriptIsPlusStrand == false){
 				leftAdd = 20;
 				rightSub = 6;
 			}
@@ -299,38 +377,20 @@ public class VCFSpliceAnnotator {
 				if (intersects(varStart, varEnd, intronStart, intronEnd) == false) continue;
 				//ok its a hit, set to noChange
 				numVariantsIntersectingIntrons++;
-				if (results.equals("noIntersection")) results = "noChange";
-				//scan for novel, reference and alternate			
-				String[] fiveSeqs = fetchNMerSeqs(vcf, 9, isPlusStrand == false);
-				String fiveRes = scoreNewJunction(fiveSeqs, true, false);
-				String[] threeSeqs = fetchNMerSeqs(vcf, 23, isPlusStrand == false);
-				String threeRes = scoreNewJunction(threeSeqs, false, false);
-				if (fiveRes != null || threeRes != null){
-					StringBuilder alerts = new StringBuilder();
-					alerts.append ("Novel junction in intron "+introns[i].getStartStopString()+"\n");
-					if (fiveRes != null) {
-						alerts.append (fiveRes+"\n");
-						numIntronSJsGained++;
-					}
-					if (threeRes != null) {
-						alerts.append (threeRes+"\n");
-						numIntronSJsGained++;
-					}
-					//save results 
-					sb.append(alerts.toString()+"\n");
-				}
-				//can only have one intersection if snp
-				if (vcf.isSNP()) break;
+				//scan for novel, reference and alternate
+				String[] fiveSeqs = fetchNMerSeqs(vcf, 9);
+				scoreNewJunction(fiveSeqs, true, false, false, hit);
+				String[] threeSeqs = fetchNMerSeqs(vcf, 23);
+				scoreNewJunction(threeSeqs, false, false, false, hit);
+				//can only have one intersection if snp or insertion
+				if (vcf.isSNP() || vcf.isInsertion()) break;
 			}
-			if (sb.length() != 0) results = sb.toString();
 		}
-		return results;
 	}
 
-	private String scanExonsForNovelSpliceJunctions (VCFRecord vcf, UCSCGeneLine transcript, boolean isPlusStrand){
-		ExonIntron[] exons = transcript.getExons();
-		String results = "noIntersection";
-		StringBuilder sb = new StringBuilder();
+	private void scanExonsForNovelSpliceJunctions (SpliceHit hit){
+		VCFRecord vcf = hit.getVcf();
+		ExonIntron[] exons = hit.getTranscript().getExons();
 		if (exons.length != 0) {
 			int varStart = vcf.getPosition();
 			int varEnd = varStart+ vcf.getReference().length();
@@ -347,33 +407,15 @@ public class VCFSpliceAnnotator {
 				//if a hit then score 
 				if (intersects(varStart, varEnd, start, end) == false) continue;
 				numVariantsIntersectingExons++;
-				if (results.equals("noIntersection")) results = "noChange";
 				//scan for novel, reference and alternate			
-				String[] fiveSeqs = fetchNMerSeqs(vcf, 9, isPlusStrand == false);
-				String fiveRes = scoreNewJunction(fiveSeqs, true, true);
-				String[] threeSeqs = fetchNMerSeqs(vcf, 23, isPlusStrand == false);
-				String threeRes = scoreNewJunction(threeSeqs, false, true);
-				if (fiveRes != null || threeRes != null){
-					StringBuilder alerts = new StringBuilder();
-					alerts.append ("Novel junction in exon "+exons[i].getStartStopString()+"\n");
-					if (fiveRes != null) {
-						alerts.append (fiveRes+"\n");
-						numExonSJsGained++;
-					}
-					if (threeRes != null) {
-						alerts.append (threeRes+"\n");
-						numExonSJsGained++;
-					}
-					//save results 
-					sb.append(alerts.toString()+"\n");
-				}
-				//can only have one intersection if snp
-				if (vcf.isSNP()) break;
+				String[] fiveSeqs = fetchNMerSeqs(vcf, 9);
+				scoreNewJunction(fiveSeqs, true, true, false, hit);
+				String[] threeSeqs = fetchNMerSeqs(vcf, 23);
+				scoreNewJunction(threeSeqs, false, true, false, hit);
+				//can only have one intersection if snp or insertion
+				if (vcf.isSNP() || vcf.isInsertion()) break;
 			}
-			if (sb.length() != 0) results = sb.toString();
-			
 		}
-		return results;
 	}
 	
 	private boolean intersects(int varStart, int varEnd, int annoStart, int annoEnd){
@@ -382,45 +424,38 @@ public class VCFSpliceAnnotator {
 		return true;
 	}
 	
-	private String scanKnownSplices (VCFRecord vcf, UCSCGeneLine transcript, boolean isPlusStrand){
-		ExonIntron[] introns = transcript.getIntrons();
+	private void scanKnownSplices (SpliceHit hit){
+		VCFRecord vcf = hit.getVcf();
+		ExonIntron[] introns = hit.getTranscript().getIntrons();
+		
 		int varStart = vcf.getPosition();
 		int varEnd = varStart+ vcf.getReference().length();
+		boolean intersectsSplice = false;
 		if (introns!= null) {
 			//find junction
 			int junc = 0;
 			int startJunc = 0;
 			int endJunc = 0;
-			boolean found = false;
-			StringBuilder sb = new StringBuilder();
 			for (int i=0; i< introns.length; i++){
+				SpliceJunction sj3 = null;
+				SpliceJunction sj5 = null;
 				//plus strand 
-				if (isPlusStrand){
+				if (workingTranscriptIsPlusStrand){
 					//5'?
 					startJunc = introns[i].getStart()-3;     
 					endJunc = introns[i].getStart()+6;
 					if (intersects(varStart, varEnd, startJunc, endJunc)) {
 						junc = introns[i].getStart();
-						String spliceResult = scoreLossOfKnownJunction(junc, vcf, true, isPlusStrand);
-						if (spliceResult != null) {
-							sb.append(spliceResult);
-							numSJsLost++;
-						}
-						found = true;
+						sj5 = scoreLossOfKnownJunction(junc, vcf, true);
+						intersectsSplice = true;
 					}
 					//3'?
-					else {
-						startJunc = introns[i].getEnd()-20;
-						endJunc = introns[i].getEnd()+3;
-						if (intersects(varStart, varEnd, startJunc, endJunc)) {
-							junc = introns[i].getEnd();
-							String spliceResult = scoreLossOfKnownJunction(junc, vcf, false, isPlusStrand);
-							if (spliceResult != null) {
-								sb.append(spliceResult);
-								numSJsLost++;
-							}
-							found = true;
-						}
+					startJunc = introns[i].getEnd()-20;
+					endJunc = introns[i].getEnd()+3;
+					if (intersects(varStart, varEnd, startJunc, endJunc)) {
+						junc = introns[i].getEnd();
+						sj3 = scoreLossOfKnownJunction(junc, vcf, false);
+						intersectsSplice = true;
 					}
 				}
 				//minus strand
@@ -430,111 +465,60 @@ public class VCFSpliceAnnotator {
 					endJunc = introns[i].getStart()+20;
 					if (intersects(varStart, varEnd, startJunc, endJunc)) {
 						junc = introns[i].getStart();
-						String spliceResult = scoreLossOfKnownJunction(junc, vcf, false, isPlusStrand);
-						if (spliceResult != null) {
-							sb.append(spliceResult);
-							numSJsLost++;
-						}
-						found = true;
+						sj3 = scoreLossOfKnownJunction(junc, vcf, false);
+						intersectsSplice = true;
 					}
 					//5'?
-					else {
-						startJunc = introns[i].getEnd()-6;
-						endJunc = introns[i].getEnd()+3;
-						if (intersects(varStart, varEnd, startJunc, endJunc)) {
-							junc = introns[i].getEnd();
-							String spliceResult = scoreLossOfKnownJunction(junc, vcf, true, isPlusStrand);
-							if (spliceResult != null) {
-								sb.append(spliceResult);
-								numSJsLost++;
-							}
-							found = true;
-						}
+					startJunc = introns[i].getEnd()-6;
+					endJunc = introns[i].getEnd()+3;
+					if (intersects(varStart, varEnd, startJunc, endJunc)) {
+						junc = introns[i].getEnd();
+						sj5 = scoreLossOfKnownJunction(junc, vcf, true);
+						intersectsSplice = true;
 					}
 				}
+				//damage?
+				if (sj3 != null) hit.saveSpliceJunction(sj3);
+				if (sj5 != null) hit.saveSpliceJunction(sj5);
 			}
-
-			//did it hit a splice junction?
-			if (found) numVariantsIntersectingSJs++;
-			else  return "noIntersection";
-
-			//now scan for novel new splice in splice site
-			if (scoreNovelSpliceJunctionsInSplice){
-				String[] fiveSeqs = fetchNMerSeqs(vcf, 9, isPlusStrand == false);
-				String fiveRes = scoreNewJunction(fiveSeqs, true, false);
-				String[] threeSeqs = fetchNMerSeqs(vcf, 23, isPlusStrand == false);
-				String threeRes = scoreNewJunction(threeSeqs, false, false);
-				if (fiveRes != null || threeRes != null){
-					sb.append ("Novel junction found near splice junction ("+junc+")\n");
-					if (fiveRes != null) {
-						sb.append (fiveRes+"\n");
-						numSpliceJunctionSJsGained++;
-					}
-					if (threeRes != null) {
-						sb.append (threeRes+"\n");
-						numSpliceJunctionSJsGained++;
-					}
+			if (intersectsSplice){
+				numVariantsIntersectingSJs++;
+				//now scan for novel new splice in splice site
+				if (scoreNovelSpliceJunctionsInSplice){
+					String[] fiveSeqs = fetchNMerSeqs(vcf, 9);
+					scoreNewJunction(fiveSeqs, true, false, true, hit);
+					String[] threeSeqs = fetchNMerSeqs(vcf, 23);
+					scoreNewJunction(threeSeqs, false, false, true, hit);
 				}
 			}
-
-			//any results?
-			if (sb.length() == 0) return "noChange";
-			return sb.toString();
+			
 		}
-
-		return "noIntersection";
-
 	}
 
 	/**Returns null if no actionable info.  Otherwise with message.*/
-	private String scoreVariantTranscript(VCFRecord vcf, UCSCGeneLine transcript) {
-		boolean isPlusStrand = transcript.getStrand().equals("+");
-		boolean isSNP = vcf.isSNP();
-
-		//can hit multiple annotation classes so must scan all
-		StringBuilder sb = new StringBuilder();
+	private void scoreVariantTranscript(SpliceHit hit) {
+		//set working vals
+		workingTranscriptIsPlusStrand = hit.getTranscript().getStrand().equals("+");
+		//check to see if variant is a snp or insertion, if so then a hit is mutually exclusive to that annotation class so can skip. For deletions, must scan all.
+		boolean isSNPInsertion = true;
+		if (hit.getVcf().isDeletion()) isSNPInsertion = false;
 		//intronic and away from splice junctions
-		if (scoreNovelIntronJunctions){
-//System.out.println("Scanning Introns!");
-			String intronResults = scanIntronsForNovelSpliceJunctions(vcf, transcript, isPlusStrand);
-//System.out.println(intronResults);
-			if (isSNP){
-				if (intronResults.equals("noChange")) return null;
-				if (intronResults.equals("noIntersection") == false) return intronResults;
-			}
-			//if (intronResults.length()>20 && vcf.isDeletion()) System.out.println("intronINDELhit \n"+vcf.getOriginalRecord()+"\n"+intronResults);
-			if (intronResults.equals("noChange") == false && intronResults.equals("noIntersection") == false) sb.append(intronResults);
-		}
+		if (scoreNovelIntronJunctions) scanIntronsForNovelSpliceJunctions(hit);
+		if (isSNPInsertion && hit.getAffectedSpliceJunctions() != null) return;
 		//exonic and away from splice junction
-		if (scoreNovelExonJunctions){
-//System.out.println("Scanning Exons!");			
-			String exonResults = scanExonsForNovelSpliceJunctions(vcf, transcript, isPlusStrand);
-//System.out.println(exonResults);
-			if (isSNP){
-				if (exonResults.equals("noChange")) return null;
-				if (exonResults.equals("noIntersection") == false) return exonResults;
-			}
-			//if (exonResults.length()>20 && vcf.isDeletion()) System.out.println("exonINDELhit \n"+vcf.getOriginalRecord()+"\n"+exonResults);
-			if (exonResults.equals("noChange") == false && exonResults.equals("noIntersection") == false) sb.append(exonResults);
-		}
+		if (scoreNovelExonJunctions) scanExonsForNovelSpliceJunctions(hit);
+		if (isSNPInsertion && hit.getAffectedSpliceJunctions() != null) return;
 		//scan hits to splices, gain and loss
-//System.out.println("Scanning Splices!");		
-		String spliceResults = scanKnownSplices(vcf, transcript, isPlusStrand);
-//System.out.println(spliceResults);
-		//if (sb.length() == 0 && spliceResults.equals("noIntersection")) Misc.printErrAndExit("Hmm variant didn't land on an annotation, something is wrong!\n"+transcript.toStringAll()+"\n"+ vcf.toString());
-		if (spliceResults.equals("noChange") == false && spliceResults.equals("noIntersection") == false) sb.append(spliceResults);		
-		
-		if (sb.length() == 0) return null;
-		return sb.toString();
+		scanKnownSplices(hit);
 	}
 	
 	/**Returns three sequences, the reference splice junction, the modified splice junction where the position has been fixed or follows the original.
 	 * {refSeq, fixedSeq, shiftedSeq} */
-	private String[] fetchModifiedSpliceSequences(VCFRecord vcf, int junctionPosition, boolean isPlusStrand, boolean fetch5Prime){
+	private String[] fetchModifiedSpliceSequences(VCFRecord vcf, int junctionPosition, boolean fetch5Prime){
 		//set cut points
 		int leftSub;
 		int rightAdd;
-		if (isPlusStrand){
+		if (workingTranscriptIsPlusStrand){
 			if (fetch5Prime){
 				leftSub = 3;
 				rightAdd = 6;
@@ -574,99 +558,86 @@ public class VCFSpliceAnnotator {
 		String fixedSeq = modChromSeq.substring(junctionPosition - leftSub, junctionPosition + rightAdd);
 		String shiftedSeq = modChromSeq.substring(modJunction - leftSub, modJunction+ rightAdd);
 		
-		if (isPlusStrand == false){
-//System.out.println("NoRCRS  \t"+refSeq);
+		if (workingTranscriptIsPlusStrand == false){
 			refSeq = Seq.reverseComplementDNA(refSeq);
 			fixedSeq = Seq.reverseComplementDNA(fixedSeq);
 			shiftedSeq = Seq.reverseComplementDNA(shiftedSeq);
 		}
-		
-		/*
-System.out.println("RefJun  \t"+refSeq );
-System.out.println("FixedJun\t"+fixedSeq+" "+junctionPosition);
-System.out.println("ShiftedJun\t"+shiftedSeq+" "+modJunction);
-*/
-		
 		return new String[]{refSeq, fixedSeq, shiftedSeq};
 	}
 
-	private String scoreLossOfKnownJunction(int junctionPosition, VCFRecord vcf, boolean score5Junction, boolean isPlusStrand){
+	/**Returns null if no damage passing thresholds or SpliceJunction.*/
+	private SpliceJunction scoreLossOfKnownJunction(int junctionPosition, VCFRecord vcf, boolean score5Junction){
 		//fetch sequences and check for non GATC
-		String[] rfs = fetchModifiedSpliceSequences(vcf, junctionPosition, isPlusStrand, score5Junction);
+		String[] rfs = fetchModifiedSpliceSequences(vcf, junctionPosition, score5Junction);
 		//watch out for non GATC bases
 		Matcher mat;
 		for (String t: rfs){
 			mat = MaxEntScanScore5.NonGATC.matcher(t);
 			if (mat.find() ) return null;
 		}
-		boolean lostKnown = false;
+		SpliceJunction sj = null;
 		double refScore = 0;
-		double altScoreFixed = 0;
-		double altScoreShift = 0;
 		double altScoreMax = 0;
-		double d;
+		String altScoreMaxSeq = null;
 		double pval = 0;
-		String name;
 		if (score5Junction){
 			refScore = score5.scoreSequenceNoChecks(rfs[0]);
 			//does ref meet threshold?
 			if (refScore < min5Threshold) return null;
-			name = "5'";
 			//calc alts
-			altScoreFixed = score5.scoreSequenceNoChecks(rfs[1]);
+			double altScoreFixed = score5.scoreSequenceNoChecks(rfs[1]);
 			altScoreMax = altScoreFixed;
+			altScoreMaxSeq = rfs[1];
 			if (rfs[1].equals(rfs[2]) == false) {
-				altScoreShift = score5.scoreSequenceNoChecks(rfs[2]);
-				if (altScoreShift > altScoreMax) altScoreMax = altScoreShift;
+				double altScoreShift = score5.scoreSequenceNoChecks(rfs[2]);
+				if (altScoreShift > altScoreMax) {
+					altScoreMax = altScoreShift;
+					altScoreMaxSeq = rfs[2];
+				}
 			}
-			else altScoreShift = altScoreFixed;
-			
 			//calc delta
-			d= refScore- altScoreMax;
+			double d= refScore- altScoreMax;
 			if (d >= min5DeltaThreshold) {
-				lostKnown = true;
+				sj =  new SpliceJunction('D', '5', 'S');
 				pval = Num.minus10log10(spliceHistogram5.pValue(altScoreMax, false));
 			}
-			
 		}
 		else {
 			refScore = score3.scoreSequenceNoChecks(rfs[0]);
 			//does ref meet threshold?
 			if (refScore < min3Threshold) return null;
-			name = "3'";
 			//calc alts
-			altScoreFixed = score3.scoreSequenceNoChecks(rfs[1]);
+			double altScoreFixed = score3.scoreSequenceNoChecks(rfs[1]);
 			altScoreMax = altScoreFixed;
+			altScoreMaxSeq = rfs[1];
 			if (rfs[1].equals(rfs[2]) == false) {
-				altScoreShift = score3.scoreSequenceNoChecks(rfs[2]);
-				if (altScoreShift > altScoreMax) altScoreMax = altScoreShift;
+				double altScoreShift = score3.scoreSequenceNoChecks(rfs[2]);
+				if (altScoreShift > altScoreMax) {
+					altScoreMax = altScoreShift;
+					altScoreMaxSeq = rfs[2];
+				}
 			}
-			else altScoreShift = altScoreFixed;
 			//calc delta
-			d= refScore- altScoreMax;
+			double d= refScore- altScoreMax;
 			if (d >= min3DeltaThreshold) {
-				lostKnown = true;
+				sj =  new SpliceJunction('D', '3', 'S');
 				pval = Num.minus10log10(spliceHistogram3.pValue(altScoreMax, false));
 			}
-			
 		}
-
-		if (lostKnown){
-			//insert spaces into seqs to represent junctions
-			insertJunctionSpace(rfs, score5Junction);
-			StringBuilder sb = new StringBuilder();
-			sb.append (name+" splice junction ("+junctionPosition+") possibly damaged\n");
-			sb.append ("Ref\t"+rfs[0]+"\t"+refScore+"\n");
-			if (vcf.isSNP()) sb.append ("Alt\t"+rfs[1]+"\t"+altScoreFixed+"\n");
-			else {
-				sb.append ("AltF\t"+rfs[1]+"\t"+altScoreFixed+"\n");
-				sb.append ("AltS\t"+rfs[2]+"\t"+altScoreShift+"\n");
-			}
-			sb.append ("Delta: "+d+"  -10Log10(PVal): "+pval+"\n");
-System.out.println("\nSplice!\n"+sb);			
-			return sb.toString();
+		//damaged?
+		if (pval >= minPValue){
+			numSJsLost++;
+			//add info to sj
+			sj.setPosition(junctionPosition);
+			sj.setReferenceSequence(rfs[0]);
+			sj.setReferenceScore(refScore);
+			sj.setAlternateSequence(altScoreMaxSeq);
+			sj.setAlternateScore(altScoreMax);
+			sj.setTransPValue(pval);
+			return sj;
 		}
-
+		//nope
 		return null;
 	}
 	
@@ -686,80 +657,138 @@ System.out.println("\nSplice!\n"+sb);
 		}
 	}
 	
-	private String scoreNewJunction(String[] refAltSeqsToScan, boolean score5Junction, boolean exonic) {
+	private void scoreNewJunction(String[] refAltSeqsToScan, boolean score5Junction, boolean exonic, boolean splice, SpliceHit spliceHit) {
 		double[] r;
 		double[] a;
 		double minThres;
 		double minDelta;
-		String name;
 		Histogram histogram;
+		SpliceJunction spliceJunction;
 		if (score5Junction){
-			r = score5.scanSequence(refAltSeqsToScan[0]);
-			a = score5.scanSequence(refAltSeqsToScan[1]);
+			r = score5.scanSequence(refAltSeqsToScan[0], -1000);
+			a = score5.scanSequence(refAltSeqsToScan[1], -1000);
 			minThres = min5Threshold;
 			minDelta = min5DeltaThreshold;
-			name = "5'";
-			if (exonic) histogram = exonicHistogram5;
-			else histogram = intronicHistogram5;
+			if (exonic) {
+				histogram = exonicHistogram5;
+				spliceJunction = new SpliceJunction('G', '5', 'E');
+			}
+			else {
+				histogram = intronicHistogram5;
+				spliceJunction = new SpliceJunction('G', '5', 'I');
+			}
 		}
 		else {
-			r = score3.scanSequence(refAltSeqsToScan[0]);
-			a = score3.scanSequence(refAltSeqsToScan[1]);
+			r = score3.scanSequence(refAltSeqsToScan[0], -1000);
+			a = score3.scanSequence(refAltSeqsToScan[1], -1000);
 			minThres = min3Threshold;
 			minDelta = min3DeltaThreshold;
-			name = "3'";
-			if (exonic) histogram = exonicHistogram3;
-			else histogram = intronicHistogram3;
+			if (exonic) {
+				histogram = exonicHistogram3;
+				spliceJunction = new SpliceJunction('G', '3', 'E');
+			}
+			else {
+				histogram = intronicHistogram3;
+				spliceJunction = new SpliceJunction('G', '3', 'I');
+			}
 		}
 		
 		//compare scores
-		StringBuilder sb = new StringBuilder();
 		//snp, direct 1:1 comparison
 		if (r.length == a.length) {
+			double maxPval = 0;
+			//scan all for maxPval, must first meet minimum delta
 			for (int i=0; i< r.length; i++){
-				//does alt exceed min threshold
+				//does alt exceed min threshold, if it's -1000 it'll be skipped
 				if (a[i] < minThres) continue;
+				//skip due to bad base in reference?
+				if (r[i] == -1000) continue;
 				double testR = r[i];
 				if (testR < 0) testR = 0;
 				double delta = a[i] - testR;
 				if (delta >= minDelta) {
 					//calc pval
 					double pval = Num.minus10log10(histogram.pValue(a[i], true));
-					sb.append(name+" "+Num.formatNumber(r[i],1)+" -> "+Num.formatNumber(a[i],1)+" index: "+i+" delta: "+Num.formatNumber(delta, 1)+" -10Log10(pval): "+pval+"\n");
-//System.out.println(name+" "+Num.formatNumber(r[i],1)+" -> "+Num.formatNumber(a[i],1)+" index: "+i+" delta: "+Num.formatNumber(delta, 1)+" pval: "+pval);					
+					if (pval < maxPval) continue;
+					maxPval = pval;
+					//good so save info in spliceJunction
+					spliceJunction.setTransPValue(pval);
+					spliceJunction.setReferenceScore(r[i]);
+					spliceJunction.setAlternateScore(a[i]);
+					int posOfZeroSeq;
+					int relPosSpliceInSeq;
+					if (spliceJunction.getFiveOrThreePrime() == '5') {
+						spliceJunction.setReferenceSequence(refAltSeqsToScan[0].substring(i, i+9));
+						spliceJunction.setAlternateSequence(refAltSeqsToScan[1].substring(i,i+9));
+						posOfZeroSeq = spliceHit.getVcf().getPosition() - 9 +1;
+						relPosSpliceInSeq = i+3;
+					}
+					else {
+						spliceJunction.setReferenceSequence(refAltSeqsToScan[0].substring(i, i+23));
+						spliceJunction.setAlternateSequence(refAltSeqsToScan[1].substring(i,i+23));
+						posOfZeroSeq = spliceHit.getVcf().getPosition() -23 +1;
+						relPosSpliceInSeq = i+20;
+					}
+					//if neg strand then flip
+					if (workingTranscriptIsPlusStrand == false){
+						relPosSpliceInSeq = refAltSeqsToScan[0].length() - relPosSpliceInSeq;
+					}
+					spliceJunction.setPosition(posOfZeroSeq + relPosSpliceInSeq);
+					
+					//System.out.println("\nHereeeeSNP "+workingTranscriptIsPlusStrand+"\n"+spliceJunction);
+					//System.out.println(Num.formatNumber(r[i],1)+" -> "+Num.formatNumber(a[i],1)+" index: "+i+" delta: "+Num.formatNumber(delta, 1)+" pval: "+pval);					
+					
+ 
 				}
 			}
 		}
+		
 		//indel, round scores and trim ends of identical scores then look at remainder for novel
 		else{
-			//trim 5' and 3' ends of identical scores
-			int[][] ra = Num.trimIdenticalEnds(r, a);
+			//trim 5' and 3' ends of identical scores after rounding to ints
+			double[][] ra = Num.trimIdenticalEnds(r, a);
 			//find max remaining ref score or 0
-			int maxRef = 0;
-			if (ra[0].length !=0) maxRef = Num.maxValue(ra[0]);
+			double maxRef = 0;
+			double actualMaxRef = 0;
+			if (ra[0].length !=0) {
+				maxRef = Num.maxValue(ra[0]);
+				actualMaxRef = maxRef;
+			}
 			if (maxRef < 0) maxRef = 0;
 			//find max remaining alt score or 0
-			int maxAlt = 0;
+			double maxAlt = 0;
 			if (ra[1].length !=0) maxAlt = Num.maxValue(ra[1]);
 			if (maxAlt < 0) maxAlt = 0;
 			//if alt meets minThres and delta meets minDelta
 			if (maxAlt >= minThres){
-				int delta = maxAlt - maxRef;
+				double delta = maxAlt - maxRef;
 				if (delta >= minDelta) {
 					//calc pval
 					double pval = Num.minus10log10(histogram.pValue(maxAlt, true));
-					sb.append(name+" "+maxRef+" -> "+maxAlt+" delta: "+delta +" -10Log10(pval): "+pval+"\n");
-//System.out.println(name+" "+maxRef+" -> "+maxAlt+" delta: "+delta +" pval: "+pval);
+					spliceJunction.setTransPValue(pval);
+					spliceJunction.setReferenceScore(actualMaxRef);
+					spliceJunction.setReferenceSequence(refAltSeqsToScan[0]);
+					spliceJunction.setAlternateScore(maxAlt);
+					spliceJunction.setAlternateSequence(refAltSeqsToScan[1]);
+					spliceJunction.setPosition(spliceHit.getVcf().getPosition());
+//System.out.println("\nHereeeeINDEL"+workingTranscriptIsPlusStrand+"\n"+spliceJunction);
+//System.out.println(maxRef+" -> "+maxAlt+" delta: "+delta +" pval: "+pval);
 				}
 			}
 		}
-		//add on score arrays if hits were found
-		if (sb.length() !=0){
-			sb.append("Ref "+refAltSeqsToScan[0]+"\t"+Num.doubleArrayToString(r, 1, "\t")+"\n");
-			sb.append("Alt "+refAltSeqsToScan[1]+"\t"+Num.doubleArrayToString(a, 1, "\t")+"\n");
-			return sb.toString();
+		//pass pval threshold? save splice junction in splice hit
+		if (spliceJunction.getTransPValue() >= minPValue){
+			spliceHit.saveSpliceJunction(spliceJunction);
+			//increment counters
+			if (exonic) numExonSJsGained++;
+			else if (splice) numSpliceJunctionSJsGained++;
+			else numIntronSJsGained++;
+//System.out.println("Ref "+refAltSeqsToScan[0]+"\t"+Num.doubleArrayToString(r, 1, "\t")+"\n");
+//System.out.println("Alt "+refAltSeqsToScan[1]+"\t"+Num.doubleArrayToString(a, 1, "\t")+"\n");
 		}
-		return null;
+		
+		
+
 	}
 		
 	/*This is going to be really slow....hmm.*/
@@ -879,13 +908,11 @@ System.out.println("\nSplice!\n"+sb);
 		HashSet<String> names = new HashSet<String>();
 		double numberOverlaps = 0;
 		double numberCorrect = 0;
-		int numRecords = 0;
 
 		ArrayList<String> allNames = new ArrayList<String>();
 		while (i.hasNext()) {
 			SAMRecord sam = i.next();
 			allNames.add(sam.getReadName());
-			numRecords++;
 			//look for match to splice junction
 			String sj = (String)sam.getAttribute("SJ");
 			if (sj.contains(toLookFor)) {
@@ -954,13 +981,13 @@ System.out.println("\nSplice!\n"+sb);
 		for (UCSCGeneLine g: ccdsChromGenes.get(workingChromosomeName)){
 			ExonIntron[] introns = g.getIntrons();
 			if (introns == null) continue;
-			boolean isPlusStrand = g.getStrand().equals("+");
+			boolean plusStrand = g.getStrand().equals("+");
 			//mask both 5' and 3' junctions
 			int startJunc = 0;
 			int endJunc = 0;
 			for (int i=0; i< introns.length; i++){
 				//plus strand 
-				if (isPlusStrand){
+				if (plusStrand){
 					//5'
 					startJunc = introns[i].getStart()-3;     
 					endJunc = introns[i].getStart()+6;
@@ -1043,13 +1070,13 @@ System.out.println("\nSplice!\n"+sb);
 		for (UCSCGeneLine g: workingTranscripts){
 			ExonIntron[] introns = g.getIntrons();
 			if (introns == null) continue;
-			boolean isPlusStrand = g.getStrand().equals("+");
+			boolean plusStrand = g.getStrand().equals("+");
 			//mask both 5' and 3' junctions
 			int startJunc = 0;
 			int endJunc = 0;
 			for (int i=0; i< introns.length; i++){
 				//plus strand 
-				if (isPlusStrand){
+				if (plusStrand){
 					//5'
 					startJunc = introns[i].getStart()-3;     
 					endJunc = introns[i].getStart()+6;
@@ -1088,7 +1115,8 @@ System.out.println("\nSplice!\n"+sb);
 		bases = null;
 	}
 
-	private String[] fetchNMerSeqs(VCFRecord vcf, int nMer, boolean reverseComplement) {
+	private String[] fetchNMerSeqs(VCFRecord vcf, int nMer) {
+		boolean reverseComplement = (workingTranscriptIsPlusStrand == false);
 		String refSeq = null;
 		String altSeq = null;
 		//set coordinates
@@ -1110,7 +1138,7 @@ System.out.println("\nSplice!\n"+sb);
 		return new String[]{refSeq, altSeq};
 	}
 
-	public void loadAndModifyHeader(BufferedReader in, PrintWriter out) throws IOException{
+	public void loadAndModifyHeader(BufferedReader in) throws IOException{
 		boolean addedInfo = false;
 		boolean foundChrom = false;
 		String line;
@@ -1161,6 +1189,7 @@ System.out.println("\nSplice!\n"+sb);
 					case 'm': spliceModelDirectory = new File(args[++i]); break;
 					case 'u': transcriptSeqFile = new File(args[++i]); break;
 					case 't': ccdsTranscriptFile = new File(args[++i]); break;
+					case 'r': saveDirectory = new File(args[++i]); break;
 					case 'j': samSpliceFile = new File(args[++i]); break;
 					case 'k': minimumSpliceJunctionCoverage = Integer.parseInt(args[++i]); break;
 					case 'e': scoreNovelExonJunctions = false; break;
@@ -1196,6 +1225,9 @@ System.out.println("\nSplice!\n"+sb);
 			//look for bam and ccds
 			if (ccdsTranscriptFile == null || samSpliceFile == null) Misc.printErrAndExit("\nPlease enter an indexed bam file containing splice junction reads and or a CCDS transcript table.  These will be used to generate background score histograms.\n");
 		}
+		//save directory
+		if (saveDirectory == null) Misc.printErrAndExit("\nPlease enter a directory to save the results.\n");
+		saveDirectory.mkdirs();
 		
 		//pull files
 		if (forExtraction == null || forExtraction.canRead() == false) Misc.printExit("\nError: please provide a vcf file or directory containing such to annotate splice junctions.\n");
@@ -1226,6 +1258,7 @@ System.out.println("\nSplice!\n"+sb);
 				"score distribution from the trusted splice junction file.\n\n" +
 
 				"Required Options:\n"+
+				"-r Save directory for writing results files.\n"+
 				"-v VCF file or directory containing such (xxx.vcf(.gz/.zip OK)).\n"+
 				"-f Fasta file directory, chromosome specific xxx.fa/.fasta(.zip/.gz OK) files.\n" +
 				"-u UCSC RefFlat or RefSeq transcript (not merged genes) file, full path. See RefSeq \n"+
@@ -1236,7 +1269,7 @@ System.out.println("\nSplice!\n"+sb);
 				"-m Full path directory name containing the me2x3acc1-9, splice5sequences and me2x5\n"+
 				"       splice model files. See USeq/Documentation/ or \n"+
 				"       http://genes.mit.edu/burgelab/maxent/download/ \n"+
-				"-h Histogram object file for estimating pvalues.\n"+
+				"-h Histogram object file for estimating pvalues or complete -j -t below.\n"+
 				"\n"+
 				
 				"Optional options:\n"+
@@ -1260,7 +1293,7 @@ System.out.println("\nSplice!\n"+sb);
 				"\n"+
 				"Example: java -Xmx10G -jar ~/USeq/Apps/VCFSpliceAnnotator -f ~/Hg19/Fa/ -v ~/exm2.vcf\n"+
 				"       -m ~/USeq/Documentation/splicemodels -i -u ~/Hg19/hg19EnsTrans.ucsc.zip -t\n"+
-				"       ~/Hg19/hg19CCDSTrans.ucsc.zip -j ~/Hg19/allReadsSTP.bam\n\n"+
+				"       ~/Hg19/hg19CCDSTrans.ucsc.zip -j ~/Hg19/allReadsSTP.bam -r ~/ExmSJAnno/\n\n"+
 
 				"**************************************************************************************\n");
 

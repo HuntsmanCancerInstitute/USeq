@@ -5,12 +5,13 @@ MiRNACorrelator
 NovoalignBisulfiteParser
 * Added an option to first call Picard's SortSam and MarkDuplicates
 BisSeqAggregatePlotter
-* Fixed a bug that would result in no output data. This bug only occurs when the first encountered chromosome has no 
-data in any of it's regions
+* Fixed a bug that would result in no output data. This bug only occurs when the first encountered chromosome has no data in any of it's regions
 Gr2Bar
 * Users can now specify orientation when running this app.
 MicrosatelliteCounter
 * Initial check-in of Microsatellite counter application.
+VCFSpliceAnnotator
+* New app for scoring vcf files for gain or loss of splice junctions using the MaxEntScan algorithms.
 
 
 ----USeq_8.7.3----

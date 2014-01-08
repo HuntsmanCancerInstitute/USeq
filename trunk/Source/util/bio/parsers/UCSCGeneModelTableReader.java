@@ -1,7 +1,9 @@
 package util.bio.parsers;
 import java.io.*;
+
 import util.bio.annotation.*;
 import util.gen.*;
+
 import java.util.*;
 
 
@@ -394,6 +396,29 @@ public class UCSCGeneModelTableReader {
 			}
 		}
 		return true;
+	}
+
+	/**Returns geneName: transcripts[].  Assumes first name is gene, second transcript.*/
+	public HashMap<String, UCSCGeneLine[]> getGeneNameTranscripts() {
+		HashMap<String, ArrayList<UCSCGeneLine>> genes = new HashMap<String, ArrayList<UCSCGeneLine>>();
+		for (int i=0; i< geneLines.length; i++){
+			String geneName = geneLines[i].getDisplayName();
+			ArrayList<UCSCGeneLine> al = genes.get(geneName);
+			if (al == null) {
+				al = new ArrayList<UCSCGeneLine>();
+				genes.put(geneName, al);
+			}
+			al.add(geneLines[i]);
+		}
+		//convert to arrays
+		HashMap<String, UCSCGeneLine[]> toReturn = new HashMap<String, UCSCGeneLine[]>();
+		for (String geneName: genes.keySet()){
+			ArrayList<UCSCGeneLine> al = genes.get(geneName);
+			UCSCGeneLine[] g = new UCSCGeneLine[al.size()];
+			al.toArray(g);
+			toReturn.put(geneName, g);
+		}
+		return toReturn;
 	}
 	
 }
