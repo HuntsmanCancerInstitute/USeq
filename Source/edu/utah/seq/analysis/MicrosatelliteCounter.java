@@ -25,6 +25,7 @@ public class MicrosatelliteCounter {
 	private ArrayList<Pattern> pattern1 = new ArrayList<Pattern>();
 	private ArrayList<Pattern> pattern2 = new ArrayList<Pattern>();
 	private ArrayList<RepeatContainer> repContainers = new ArrayList<RepeatContainer>();
+	private boolean bothPrimers = false;
 	
 
 	public MicrosatelliteCounter(String[] args) {
@@ -115,34 +116,33 @@ public class MicrosatelliteCounter {
 				    //Check for inconsistencies and determine sequence origination.
 				    if (index1 == -1) {
 				    	if (index2 == -1) {
-				    		//System.out.println("None");
 				    		noneCount += 1;
 				    	} else {
-				    		//System.out.println("primer2");
 				    		primerCount2[index2] += 1;
 				    		usedIndex = index2;
 				    		usedSequence = usedSequence.substring(0,usedSequence.length()-primers.get(usedIndex).getPrimer2().length());
 				    	}
 				    } else if (index2 == -1) {
-				    	//System.out.println("primer1");
 				    	primerCount1[index1] += 1;
 				    	usedIndex = index1;
 				    	usedSequence = usedSequence.substring(primers.get(usedIndex).getPrimer1().length());
 				    	
 				    } else {
 				    	if (index1 == index2) {
-				    		//System.out.println("BOth");
 				    		primerCountBoth[index1] += 1;
 				    		usedIndex = index1;
 				    		usedSequence = usedSequence.substring(primers.get(usedIndex).getPrimer1().length(),usedSequence.length()-primers.get(usedIndex).getPrimer2().length());
 				    	} else {
-				    		//System.out.println("Diff");
 				    		diffCount += 1;
 				    	}
 				    }
 				    
-				    //Bail if sequence is unusable
-				    if (usedIndex == -1) {
+				    //If both primers are required, bail if either have -1 index
+				    if (this.bothPrimers) {
+				    	if (index1 == -1 || index2 == -1 || usedIndex == -1) {
+				    		continue;
+				    	}
+				    } else if (usedIndex == -1) { //If only one primer is required, only bail if usedIndex is -1
 				    	continue;
 				    }
 				    
@@ -150,7 +150,6 @@ public class MicrosatelliteCounter {
 				    int maxPos = -1;
 				    int maxCount = 0;
 				    
-				
 				    String repeatToCheck = primers.get(usedIndex).getRepeat();
 				    
 				    for (int i=0; i<usedSequence.length()-repeatToCheck.length();i++) {
@@ -197,15 +196,23 @@ public class MicrosatelliteCounter {
 				    	//Set the sequence position to end of repeat
 				    	i = tempPos + (maxCount * repeatLength);
 				    }
-				    
-//				    if (usedIndex == 2 && maxCount == 10) {
-//		    			System.out.println(usedSequence + " " + index1 + " " + index2);
-//		    		}
-				    
-				    if (maxCount == 0) {
+				    	
+				    //If primer1 is missing and the repeat starts at 0, don't record
+				    if (maxPos == 0 && index1 == -1) {
+				    	repContainers.get(usedIndex).foundAmbiguous();
+				    }
+				    //If primer2 is missing and the reapeat ends at the last position, don't record
+				    else if (maxCount*repeatToCheck.length()+repeatToCheck.length()-1+maxPos == usedSequence.length() && index2 == -1) {
+				    	repContainers.get(usedIndex).foundAmbiguous();
+				    	
+				    } 
+				    //If the repeat couldn't be found, skip
+				    else if (maxCount == 0) {
 				    	repContainers.get(usedIndex).foundNothing();
-				    	//System.out.println(this.primers.get(usedIndex).getName() + " " + index1 + " " + index2 + " " + usedSequence);
-				    } else {
+		
+				    } 
+				    //Write the repeat
+				    else {
 				    	repContainers.get(usedIndex).addSeq(maxPos, maxCount);
 				    }
 				}
@@ -375,9 +382,10 @@ public class MicrosatelliteCounter {
 				try{
 					switch (test){
 					case 'f': mergedFastq = new File(args[++i]); break;
-					case 'r': primerFile = new File(args[++i]); break;
+					case 'p': primerFile = new File(args[++i]); break;
 					case 'n': sampleName = args[++i]; break;
-					case 'p': outputDirectory = new File(args[++i]); break;
+					case 'd': outputDirectory = new File(args[++i]); break;
+					case 'b': bothPrimers = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -416,6 +424,7 @@ public class MicrosatelliteCounter {
 		private ArrayList<Integer> repeatCountList = null; //List of observed repeat counts
 		private int sequenceCount = 0;
 		private int nothing = 0;
+		private int ambiguous = 0;
 		private String primer = null;
 		private String sampleName = null;
 		private String directoryName = null;
@@ -435,6 +444,10 @@ public class MicrosatelliteCounter {
 			this.nothing++;
 		}
 		
+		public void foundAmbiguous() {
+			this.ambiguous++;
+		}
+		
 		/* This method adds repeat information for a given sequence */
 		public void addSeq(int position, int count) {
 			this.repeatPositionList.add(position);
@@ -451,8 +464,8 @@ public class MicrosatelliteCounter {
 				String posData = this.createHistogram(this.repeatPositionList, "PositionInSequence", "Observations","position");
 				
 				
-				return String.format("%s\t%s\t%s\n\n%s\n\n%s\n", this.repeat,
-						Integer.toString(this.sequenceCount), Integer.toString(this.nothing), repeatData,
+				return String.format("%s\t%s\t%s\t%s\n\n%s\n\n%s\n", this.repeat,
+						Integer.toString(this.sequenceCount), Integer.toString(this.nothing), Integer.toString(this.ambiguous),repeatData,
 						posData);
 			}
 		}
@@ -624,10 +637,12 @@ public class MicrosatelliteCounter {
 				"\nRequired Arguments:\n\n"+
 				"-f Merged fastq file. Path to merged fastq file. We currently suggest using PEAR to \n" +
 				"       merge fastq sequences.\n" +
-				"-r Primer file.  Path to primer reference file.  This file lists each primer used in \n" +
+				"-p Primer file.  Path to primer reference file.  This file lists each primer used in \n" +
 				"       in the sequencing project in the format NAME<tab>PRIMER1<tab>PRIMER2.\n" +
 				"-n Sample name.  Sample name.  This string will be appended to the output files names.\n" +
-				"-p Directory. Output directory. Output files will be written to this directory\n" +
+				"-d Directory. Output directory. Output files will be written to this directory\n" +
+				"-b Require both primers.  Both primers must be identified in order to more forward \n" +
+				"       with the analysis.\n" +
 				
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/MicrosatelliteCounter -f Merged.fastq \n" +
 				"      -r PrimerReference.txt -p 10511X1.primer.txt -o 10511X1.repeat.txt\n\n" +
