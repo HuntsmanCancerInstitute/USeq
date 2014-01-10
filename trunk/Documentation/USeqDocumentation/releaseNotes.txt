@@ -1,3 +1,7 @@
+----USeq_8.7.5----
+DRDSAnnotator
+* Initial Check-in of DRDSAnnotator application
+
 ----USeq_8.7.4----
 MiRNACorrelator
 * Added a catch to skip calculating stats on bins with only one value
