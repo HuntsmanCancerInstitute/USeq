@@ -71,21 +71,24 @@ public class Sample {
 	private String cmdFilePath;
 	private String novoindex;
 	private String params;
+	private String bisParams;
 	private String indexCode;
 	private File[] paramsFile;
 	private File[] fastqFiles;
 	private HashSet<String> emails = new HashSet<String>();
 	private boolean isPairedEnd = false;
-	private boolean isBisSeq = false;
-	private boolean isRNASeq = false;
-	private boolean isChIPSeq = false;
-	private boolean isSmallRNA = false;
-	private boolean isNewGenome = false;
-	private boolean sequenceFilesAreNew = false;
-	private boolean hasGenomeBuild = false;
-	private boolean hasNovoindex = false;
-	private boolean reverseStrand = false;
+	private boolean isBisSeq;
+	private boolean isRNASeq;
+	private boolean isChIPSeq;
+	private boolean isSmallRNA;
+	private boolean isNewGenome;
+	private boolean sequenceFilesAreNew;
+	private boolean hasGenomeBuild;
+	private boolean hasNovoindex;
+	private boolean reverseStrand;
 	private boolean adaptersIncluded = false;
+	private boolean knownSeqAppCode = false;
+	private boolean align = true;
 	
 	//constructor
 	public Sample(String[] dataValue) {
@@ -181,7 +184,7 @@ public class Sample {
 		this.hasGenomeBuild = hasGenomeBuild;
 	}
 
-	public boolean isHasNovoindex() {
+	public boolean hasNovoindex() {
 		return hasNovoindex;
 	}
 
@@ -501,11 +504,35 @@ public class Sample {
 		this.fastqFile2 = fastqFile2;
 	}
 
-	public boolean isAdaptersIncluded() {
+	public boolean adaptersIncluded() {
 		return adaptersIncluded;
 	}
 
 	public void setAdaptersIncluded(boolean adaptersIncluded) {
 		this.adaptersIncluded = adaptersIncluded;
+	}
+
+	public boolean knownSeqAppCode() {
+		return knownSeqAppCode;
+	}
+
+	public void setKnownSeqAppCode(boolean knownSeqAppCode) {
+		this.knownSeqAppCode = knownSeqAppCode;
+	}
+
+	public boolean toAlign() {
+		return align;
+	}
+
+	public void setAlign(boolean align) {
+		this.align = align;
+	}
+
+	public String getBisParams() {
+		return bisParams;
+	}
+
+	public void setBisParams(String bisParams) {
+		this.bisParams = bisParams;
 	}
 }
