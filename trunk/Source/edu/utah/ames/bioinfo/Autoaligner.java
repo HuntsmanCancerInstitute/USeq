@@ -208,11 +208,18 @@ public class Autoaligner {
 
 			//check for correct number of columns in fresh data report
 			if (dataValue.length < 18) {
-				continue;
+				//continue;
 			}
 			else {
 				Sample s = new Sample(dataValue);
 
+				//catch B37 genome if specified
+				//TODO catch B37 only with RNA-Seq, not exome stuff
+				//TODO make sure we have B37 index in data dir
+				if (s.getGenome().toString().equals("H_sapiens_Jun_2003")) {
+					s.setGenome("hg19; H_sapiens_Feb_2009; GRCh37");
+				}
+				
 				//if paired-end
 				if (s.getSingleOrPairedEnd().toString().equals("Paired-end")) {
 
@@ -399,6 +406,7 @@ public class Autoaligner {
 	 * @throws Exception 
 	 */
 	public void setCondSeqAppCode(Sample s) throws Exception {
+		
 		//set isPaired flag
 		if (s.getSingleOrPairedEnd().toString().equals("Paired-end")) {
 			s.setPairedEnd(true);
@@ -518,14 +526,13 @@ public class Autoaligner {
 		String BUILDCODE = "([A-Za-z]+[0-9]+)(?=[;,:])"; 
 		//match versioned genome (D_rerio_Jul_2010, etc)
 		String VERSIONEDGENOME = "\\w_\\w+_\\w{3}_[0-9]{4}";
-
+		
 		if (s.getGenome() != null) {
 			Pattern p = Pattern.compile(BUILDCODE);
 			Matcher m = p.matcher(s.getGenome());
 			if (m.find()) {
 				s.setBuildCode(m.group().toLowerCase());
 			}
-			//missing build?
 			else {
 				s.setAlign(false);
 			}
@@ -539,7 +546,7 @@ public class Autoaligner {
 			else {
 				s.setAlign(false);
 			}
-		} 
+		}
 		buildShortIndexName(s);
 	}
 
@@ -895,7 +902,8 @@ public class Autoaligner {
 					case 'f': autoalignReport = new String(args[++i]); break; 
 					case 'c': configFile = new File(args[++i]); break;
 					default: Misc.printErrAndExit("Problem--unknown option used: " + mat.group() 
-							+ "\nUsage: java -jar Autoaligner.jar -f autoalign_2013-01-01.txt ");
+							+ "\nUsage: java -jar Autoaligner.jar -f autoalign_2013-01-01.txt "
+							+ "-c configFile.txt");
 					}
 				}
 				catch (Exception e) {
@@ -978,7 +986,7 @@ public class Autoaligner {
 				"-f filename for autoalign report to process\n" +
 				"-c config file with run parameters\n" +
 				"\nUsage:\n" +
-				"java -jar pathTo/Autoaligner.jar -f autoalign_2014-01-01.txt\n" +
+				"java -jar pathTo/Autoaligner.jar -f autoalign_2014-01-01.txt -c configFile.txt\n" +
 				"**************************************************************************************\n");
 	}
 }
