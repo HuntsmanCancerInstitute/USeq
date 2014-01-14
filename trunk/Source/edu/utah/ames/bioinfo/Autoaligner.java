@@ -19,7 +19,7 @@ import util.gen.Misc;
  * samples of the same request number. Bisulphite files are first split into smaller chunks and aligned separately. 
  * Tomato will email the user only if there are exceptions and/or job failures (-ef option, i.e. #e email@nobody.com -ef). 
  * All input fastq files are first run through fastqc app. A log is created for each run, with data reported on how 
- * each sample is handled.  
+ * each sample is handled. Run parameters supplied through the autoalign_run_configs.txt file.
  * 
  * @author darren.ames@hci.utah.edu
  *
@@ -30,14 +30,17 @@ public class Autoaligner {
 	//fields
 	private String analysisNumber;
 	private String myEmail = "darren.ames@hci.utah.edu"; 
-	private String autoalignReport = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoalign_*.txt";
-	private final String novoindexNames = "/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData/novoindexNameTable.txt";
-	private final String parsedReports = "/home/sbsuser/Pipeline/AutoAlignReport/reports/processedReports/";
-	private final String tomatoJobDir = "/tomato/dev/job/autoaligner/alignments/";
-	//private String smtpHostName = "mail.inscc.utah.edu"; //default
+	private String autoalignReport = null;
+	private String novoindexNames = null;
+	private String parsedReports = null;
+	private String tomatoJobDir = null;
+	private File configFile = null;
+	private String logDir = null;
+	private String createAnalysisMain = null;
 	static String EMAILREGEX = "^#e\\s+(.+@.+)"; //email address pattern
 	static String LABNAMEREGEX = "\\w+\\s\\w+(?=\\WLab)"; //matches first and last name of lab using positive look
-	private String reportsDir = "/home/sbsuser/Pipeline/AutoAlignReport/reports/";
+	
+
 	private HashMap<String, String> genomeIndex;
 	boolean isSmallRNA = false;
 	private Logger logFile;
@@ -45,10 +48,10 @@ public class Autoaligner {
 	//constructor
 	public Autoaligner(String[] args) {	
 		processArgs(args);
+		this.parseConfig();
 
 		//write info to log file
 		Date date = new Date();
-		File logDir = new File("/home/sbsuser/Pipeline/AutoAlignReport/reports/logs/");
 		logFile = new Logger(logDir,"autoalign","INFO");
 		logFile.writeInfoMessage("Running Autoaligner: " + date);
 	}
@@ -328,12 +331,13 @@ public class Autoaligner {
 
 		//feed input params into string array
 		String cmd[] = {"./httpclient_create_analysis.sh", "-properties", "gnomex_httpclient.properties", 
-				"-serverURL", "https://hci-bio-app.hci.utah.edu", "-name", s.getProjectName(), 
+				"-serverURL", "https://bioserver.hci.utah.edu", "-name", s.getProjectName(), 
 				"-folderName", "novoalignments", "-lab", s.getLab(), "-organism", s.getOrganism(), 
 				"-genomeBuild", s.getBuildCode(), "-analysisType", "Alignment", "-seqLane", s.getSequenceLaneNumber()};
 
 		//launch the script and grab stdin/stdout and stderr
-		Process process = Runtime.getRuntime().exec(cmd, null, new File("/home/sbsuser/Pipeline/AutoAlignReport/reports/autoAlignerData/"));
+		Process process = Runtime.getRuntime().exec(cmd, null, new File(createAnalysisMain));
+
 		stderr = process.getErrorStream();
 		stdout = process.getInputStream();
 
@@ -342,6 +346,7 @@ public class Autoaligner {
 
 		//fetch output analysis number
 		while (((line = brCleanup.readLine()) != null)) {
+
 			System.out.println("[stdout] " + line);
 			if (line.indexOf("idAnalysis=") > 0) {
 				//grab the new analysis number in output
@@ -369,7 +374,7 @@ public class Autoaligner {
 
 				//write to log file
 				logFile.writeInfoMessage("Path for " + s.getAnalysisNumber() + ": "
-				+ s.getAnalysisNumberPath());
+						+ s.getAnalysisNumberPath());
 			}
 		}
 
@@ -377,7 +382,7 @@ public class Autoaligner {
 		String path = s.getAnalysisNumberPath();
 
 		//check for new Analysis Report directory
-		if (path.isEmpty()) {
+		if (path.isEmpty() || s.getAnalysisNumber() == null) {
 			System.out.println("Problem creating new Analysis Report " + s.getAnalysisNumber());
 
 			s.setAlign(false);
@@ -469,7 +474,7 @@ public class Autoaligner {
 			parseGenomeIndex(s);
 		}
 	}
-	
+
 	/**
 	 * Sends me emails for the two most common errors
 	 * @param s
@@ -500,7 +505,7 @@ public class Autoaligner {
 			}
 		}
 	}
-	
+
 	/**
 	 * Parses abbreviated genome name (hg19, mm10...) from larger build string
 	 * @param sample
@@ -744,7 +749,7 @@ public class Autoaligner {
 		this.startTomatoJob(s);
 		return sb.toString();
 	}
-	
+
 	/**
 	 * Exome, genomic DNA, mononucleosome, ChIP alignment params
 	 * @param s
@@ -888,6 +893,7 @@ public class Autoaligner {
 				try {
 					switch (test) {
 					case 'f': autoalignReport = new String(args[++i]); break; 
+					case 'c': configFile = new File(args[++i]); break;
 					default: Misc.printErrAndExit("Problem--unknown option used: " + mat.group() 
 							+ "\nUsage: java -jar Autoaligner.jar -f autoalign_2013-01-01.txt ");
 					}
@@ -896,6 +902,60 @@ public class Autoaligner {
 					Misc.printErrAndExit("\nSorry, something doesn't look right with this parameter: -" + test + "\n");
 				}
 			}
+		}
+		if (configFile == null) {
+			System.out.println("Please set config file path");
+			System.exit(1);
+		}
+		if (!configFile.exists()) {
+			System.out.println("config file is missing!!!");
+			System.exit(1);
+		}
+	}
+
+	/**
+	 * Checks for necessary variables in the config file
+	 * @param name
+	 * @param hm
+	 * @return
+	 */
+	private String checkExistance(String name, HashMap<String,String> hm) {
+		String var = "";
+		if (hm.containsKey(name)) {
+			var = hm.get(name);
+		} else {
+			System.out.println("Config file doesn't contain variable " + name);
+			System.exit(1);
+		}
+		return var;
+	}
+	
+	/**
+	 * Parses the config run file to populate necessary parameters
+	 */
+	private void parseConfig() {
+		HashMap<String,String> hm = new HashMap<String,String>();
+
+		try {
+			BufferedReader br = new BufferedReader(new FileReader(this.configFile));
+			String tmp = null;
+
+			while ((tmp = br.readLine()) != null) {
+				String[] items = tmp.split("=");
+				hm.put(items[0], items[1]);
+			}
+			this.novoindexNames = this.checkExistance("novoindexNames", hm);
+			this.parsedReports = this.checkExistance("parsedReports", hm);
+			this.tomatoJobDir = this.checkExistance("tomatoJobDir", hm);
+			this.logDir = this.checkExistance("logDir", hm);
+			this.createAnalysisMain = this.checkExistance("createAnalysisMain", hm);
+
+		} catch (FileNotFoundException e) {
+			System.out.println("Please set config file path");
+			System.exit(1);
+		} catch (IOException e) {
+			System.out.println("Error reading file: " + this.configFile.getAbsolutePath());
+			System.exit(1);
 		}
 	}
 
@@ -916,6 +976,7 @@ public class Autoaligner {
 				"short index name. Each run logs what happens to each sample in the report.\n" + 
 				"\nParameters:\n\n" +
 				"-f filename for autoalign report to process\n" +
+				"-c config file with run parameters\n" +
 				"\nUsage:\n" +
 				"java -jar pathTo/Autoaligner.jar -f autoalign_2014-01-01.txt\n" +
 				"**************************************************************************************\n");
