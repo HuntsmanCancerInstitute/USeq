@@ -125,10 +125,13 @@ public class DRDSAnnotator {
 						} else {
 							//Subsequent rows need to be matched
 							
+							//create matching key
+							String key = (oldCell.getStringCellValue().split("_"))[0];
+							
 							//Grab annotations if there is match
 							String[] annList = null;
-							if (this.annotations.containsKey(oldCell.getStringCellValue())) {
-						    	annList = this.annotations.get(oldCell.getStringCellValue());
+							if (this.annotations.containsKey(key)) {
+						    	annList = this.annotations.get(key);
 						    }
 							
 							for (int i=0;i<entries;i++) {
