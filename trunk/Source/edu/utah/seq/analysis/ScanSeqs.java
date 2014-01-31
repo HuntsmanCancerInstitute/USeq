@@ -502,8 +502,9 @@ public class ScanSeqs {
 			}
 			else {
 				scores[1] = upQVals[i];
-				scores[2] = 0;
+				
 			} 
+			scores[2] = 0;
 			//multiple test correct skew binomial pvalue
 			scores[3] = scores[3] + transTotal;
 			if (scores[3] < 0) scores[3] = 0;
