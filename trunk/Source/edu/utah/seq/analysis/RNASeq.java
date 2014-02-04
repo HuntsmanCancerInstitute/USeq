@@ -42,6 +42,7 @@ public class RNASeq {
 	private boolean useDESeq = true;
 	private boolean verbose = false;
 	private int maxAlignmentsDepth = 50000;
+	private boolean useSamSeq = false;
 
 	//internal fields
 	private File filteredGeneTableFile;
@@ -227,10 +228,14 @@ public class RNASeq {
 		
 		if (useDESeq) {
 			//score exons
-			DefinedRegionDifferentialSeq o = new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, genomeVersion, exons, rApplication, filteredGeneTableFile, false, stranded, verbose, this.performReverseStrandedAnalysis, this.secondStrandFlipped, this.maxAlignmentsDepth);
+			DefinedRegionDifferentialSeq o = new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, 
+					genomeVersion, exons, rApplication, filteredGeneTableFile, false, stranded, verbose, 
+					this.performReverseStrandedAnalysis, this.secondStrandFlipped, this.maxAlignmentsDepth,this.useSamSeq);
 			System.out.println("Introns....");
 			//score introns
-			o= new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, genomeVersion, introns, rApplication, filteredGeneTableFile, true, stranded, verbose, this.performReverseStrandedAnalysis, this.secondStrandFlipped, this.maxAlignmentsDepth);
+			o= new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, genomeVersion, 
+					introns, rApplication, filteredGeneTableFile, true, stranded, verbose, 
+					this.performReverseStrandedAnalysis, this.secondStrandFlipped, this.maxAlignmentsDepth,this.useSamSeq);
 	
 		}
 		else {
@@ -699,6 +704,7 @@ public class RNASeq {
 					case 'k': secondStrandFlipped = true; break;
 					case 'b': bothFlipped = true; break;
 					case 'x': maxAlignmentsDepth = Integer.parseInt(args[++i]); break;
+					case 'q': this.useSamSeq = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -769,7 +775,10 @@ public class RNASeq {
 				"-a Maximum alignment score. Defaults to 120, smaller numbers are more stringent.\n"+
 				"-d Minimum FDR threshold for filtering windows, defaults to 0.5\n"+
 				"-o Don't delete overlapping exons from the gene table.\n"+
-				"-e Print verbose output from each application.\n"+				
+				"-e Print verbose output from each application.\n"+
+				"-p Run SAMseq in place of DESeq.  This is suggested when you have five or more\n" +
+				"      replicates in each condition, and not suggested if you have fewer.  Note \n" +
+				"      that it can't be run if you don't have at least two replicates per condition\n" +
 
 				"\n"+
 				"Example: java -Xmx2G -jar pathTo/USeq/Apps/RNASeq -v D_rerio_Dec_2008 -t \n" +

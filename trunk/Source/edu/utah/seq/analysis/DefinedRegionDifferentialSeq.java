@@ -48,6 +48,7 @@ public class DefinedRegionDifferentialSeq {
 	private boolean verbose = true;
 	private int maxAlignmentsDepth = 50000;
 	private boolean secondStrandFlipped = false;
+	private boolean useSamSeq = false;
 
 	//internal fields
 	private UCSCGeneLine[] genes;
@@ -98,7 +99,7 @@ public class DefinedRegionDifferentialSeq {
 
 	/**For integration with RNASeq app.*/
 	public DefinedRegionDifferentialSeq(File treatmentBamDirectory, File controlBamDirectory, String genomeVersion, File saveDirectory,  File fullPathToR, File processedRefSeqFile, boolean scoreIntrons, boolean performStrandedAnalysis, 
-			boolean verbose, boolean reverse, boolean flipped, int maxAlignDepth){
+			boolean verbose, boolean reverse, boolean flipped, int maxAlignDepth, boolean useSamSeq){
 		this.treatmentBamDirectory = treatmentBamDirectory;
 		this.controlBamDirectory = controlBamDirectory;
 		this.saveDirectory = saveDirectory;
@@ -114,6 +115,7 @@ public class DefinedRegionDifferentialSeq {
 		this.secondStrandFlipped = flipped;
 		this.performReverseStrandedAnalysis = reverse;
 		this.maxAlignmentsDepth = maxAlignDepth;
+		this.useSamSeq = useSamSeq;
 		run();
 	}
 
@@ -134,12 +136,22 @@ public class DefinedRegionDifferentialSeq {
 		//cluster samples based on blinded normalization
 		executeDESeqCluster(false);
 		
-		//launch DESeq for differential expression
+		//launch DESeq/SAMSeq for differential expression
 		String thresholdName = "-10Log10(FDR) "+Num.formatNumber(minFDR,1)+", Log2Ratio "+Num.formatNumber(minLog2Ratio, 1);
-		String varianceFiltered = "without";
-		if (filterOutliers) varianceFiltered = "with";
-		if (verbose) System.out.println("Running pairwise DESeq analysis "+varianceFiltered+" variance outlier filtering to identify differentially expressed genes...");
-		analyzeForDifferentialExpression(false);
+	
+		if (this.useSamSeq) {
+			if (verbose) {
+				System.out.println("Running pairwise SAMseq analysis to identify differentially expressed genes...");
+			}
+			this.analyzeUsingSamSeq();
+		} else {
+			String varianceFiltered = "without";
+			if (filterOutliers) varianceFiltered = "with";
+			if (verbose) System.out.println("Running pairwise DESeq analysis "+varianceFiltered+" variance outlier filtering to identify differentially expressed genes...");
+			analyzeForDifferentialExpression(false);
+		}
+		
+		
 		if (verbose) System.out.println("\n\t"+geneNamesPassingThresholds.size()+" / "+geneNamesToAnalyze.length+"\tgenes differentially expressed ("+thresholdName+")\n");
 			
 		//launch all pair ANOVA-like edgeR analysis, appends edgeR FDR onto gene line
@@ -347,6 +359,17 @@ public class DefinedRegionDifferentialSeq {
 				conditions = new Condition[conditionDirectories.length];				
 				for (int i=0; i< conditionDirectories.length; i++) conditions[i] = new Condition(conditionDirectories[i]);
 			}
+			
+			//If SAMseq, make sure there are least two replicas
+			if (this.useSamSeq) {
+				for (Condition c: this.conditions) {
+					if (c.getReplicas().length < 2) {
+						System.out.println("You must have at least two replicates per condition in order to run SAMseq");
+						System.exit(1);
+					}
+				}
+			}
+			
 			//load em with data
 			for (int i=0; i< conditions.length; i++) {				
 				for (Replica r: conditions[i].getReplicas()){			
@@ -938,6 +961,101 @@ public class DefinedRegionDifferentialSeq {
 		return true;
 
 	}
+	
+	private void analyzeUsingSamSeq(){
+		ArrayList<PairedCondition> pairedConditionsAL = new ArrayList<PairedCondition>();
+		try {
+			StringBuilder sb = new StringBuilder();
+			sb.append("library(samr)\n");
+			
+			//diff express
+			pairedConditionsAL = new ArrayList<PairedCondition>();
+			for (int i=0; i< conditions.length; i++){
+				for (int j=i+1; j< conditions.length; j++){
+					//make condition
+					PairedCondition pc = new PairedCondition(conditions[i], conditions[j]);
+					pairedConditionsAL.add(pc);
+					File results = new File (saveDirectory, pc.getName()+"DESeq.txt");
+					if (deleteTempFiles) results.deleteOnExit();
+					pc.setDiffExpResults(results);
+					
+					//make R script
+					
+					
+					//Load up data
+					sb.append("dataTable <- read.table('" + geneCountTable.getCanonicalPath()+"', header=TRUE,row.names=1)\n");
+					sb.append("geneNames <- rownames(dataTable)\n");
+					sb.append("conds <- as.factor(c('"+ Misc.stringArrayToString(conditionNamesPerReplica, "','") + "'))\n");
+					
+					//Create data model
+					sb.append("dataModel <- list(x=dataTable,y=conds,geneid=geneNames)\n");
+					
+					//Run SAMSeq
+					sb.append("results <- SAMseq(dataTable,conds,resp.type='Two class unpaired',geneid=geneNames,fdr.output=1)\n");
+					
+					//Create output table
+				    sb.append("outputTables <- samr.compute.siggenes.table(results$samr.obj,results$del,dataModel,results$delta.table,all.genes=TRUE)\n");
+				    
+				    //Merge output tables
+				    sb.append("mergeTable <- rbind(outputTables$genes.up,outputTables$genes.lo)\n");
+				    
+				    //Clean up tables
+				    sb.append("finalTable <- mergeTable[,c(3,4,7,8)]\n");
+				    sb.append("finalTable[,4] <- as.numeric(finalTable[,4]) / 100\n");
+				    sb.append("finalTable[,3] <- log(as.numeric(finalTable[,3]),2)\n");
+				    sb.append("finalTable <- finalTable[match(geneNames,finalTable[,1]),]\n");
+				    
+				    //Write Table
+				    sb.append("write.table(finalTable,file='"+results.getCanonicalPath()+"',sep='\t',quote=FALSE,row.names=FALSE)");
+					
+				}
+			}
+			
+			//write script to file
+			File scriptFile = new File (saveDirectory,"samseq_RScript.txt");
+			File rOut = new File(saveDirectory, "samseq_RScript.txt.Rout");
+			IO.writeString(sb.toString(), scriptFile);
+
+			//make command
+			String[] command = new String[] {
+					fullPathToR.getCanonicalPath(),
+					"CMD",
+					"BATCH",
+					"--no-save",
+					"--no-restore",
+					scriptFile.getCanonicalPath(),
+					rOut.getCanonicalPath()};
+			
+			//execute command
+			IO.executeCommandLine(command);
+
+			//check for warnings (Not sure what to check at this point)
+			//String[] res = IO.loadFile(rOut);
+
+			//Make conditions
+			pairedConditions = new PairedCondition[pairedConditionsAL.size()];
+			pairedConditionsAL.toArray(pairedConditions);
+			
+			//look for results files and parse results
+			for (PairedCondition pc: pairedConditions){
+				if (pc.getDiffExpResults().exists() == false ) throw new IOException("\n\nR results file doesn't exist. Check temp files in save directory for error.\n");
+				pc.parseSamSeqStatResults(geneNamesToAnalyze, minFDR, minLog2Ratio);
+				if (verbose) System.out.println("\t"+pc.getVsName()+"\t"+pc.getDiffExpGeneNames().size());
+				geneNamesPassingThresholds.addAll(pc.getDiffExpGeneNames());
+			}
+			
+			//cleanup
+			if (deleteTempFiles) {
+				rOut.deleteOnExit();
+				scriptFile.deleteOnExit();
+			}
+
+		} catch (IOException e) {
+			e.printStackTrace();
+			Misc.printErrAndExit("Error: failed to execute EdgeR.\n");
+		}
+
+	}
 
 
 	public void analyzeForDifferentialExpression(boolean useLocalFitType){
@@ -1098,8 +1216,11 @@ public class DefinedRegionDifferentialSeq {
 		    //add count values
 		    cellIndex = addCountInfo(rows, cellIndex);
 		    
-		    //add varcor values
-		    cellIndex = addVarCorInfo(rows, cellIndex);
+		    if (!this.useSamSeq) {
+		    	//add varcor values
+			    cellIndex = addVarCorInfo(rows, cellIndex);
+		    }
+		    
 		    
 		    //add FPKM
 		    cellIndex = addFPKMInfo(rows, cellIndex);
@@ -1189,18 +1310,27 @@ public class DefinedRegionDifferentialSeq {
 	    bold.setFont(font);
 	    
 		int rowIndex = 0;
-		for (int i=0; i< descriptors.length; i++){
+		
+		String[][] usedDescriptors;
+		
+		if (useSamSeq) {
+			usedDescriptors = this.samSeqDescriptors;
+		} else {
+			usedDescriptors = this.deSeqDescriptors;
+		}
+		
+		for (int i=0; i< usedDescriptors.length; i++){
 			Row row = sheet.createRow(rowIndex++);
 			Cell cell = row.createCell(0);
 			cell.setCellStyle(bold);
-			cell.setCellValue(descriptors[i][0]);
-			if (descriptors[i][1] != null) row.createCell(1).setCellValue(descriptors[i][1]);
+			cell.setCellValue(usedDescriptors[i][0]);
+			if (usedDescriptors[i][1] != null) row.createCell(1).setCellValue(usedDescriptors[i][1]);
 		}
 		
 		sheet.autoSizeColumn((short)0);
 	}
 	
-	private String[][] descriptors = {
+	private String[][] deSeqDescriptors = {
 			{"Gene/Region info:", null},
 			{"IGB HyperLink", "Click each to reposition a running instance of IGB, http://bioviz.org/igb/"},
 			{"Alt Name", "Alternative name for this gene/region"},
@@ -1222,6 +1352,31 @@ public class DefinedRegionDifferentialSeq {
 			{"For each Replica:", null},
 			{"Counts", "Number of alignments that overlap a given gene/region by at least one base pair. Paired alignments are only counted once.  Alignments that span a gene/region but don't actually touch down are ignored. "},
 			{"VarCor", "Per gene/region variance corrected counts in log space from DESeq estimated using its blind method.  Use these for subsequent clustering.  These values are a bit different from the varCor values used in scoring paired differential expression. "},
+			{"FPKM", "Transformed count data normalized to library size and gene/region length (counts/ exonicBasesPerKB/ millionTotalMappedReadsToGeneTable)"}
+					
+	};
+	
+	private String[][] samSeqDescriptors = {
+			{"Gene/Region info:", null},
+			{"IGB HyperLink", "Click each to reposition a running instance of IGB, http://bioviz.org/igb/"},
+			{"Alt Name", "Alternative name for this gene/region"},
+			{"Coordinates", "Chromosome : Start of the gene/region - end of the gene/region"},
+			{"Strand", "Strand of the gene/region"},
+			{"Total BPs", "Total base pairs of gene/region after masking for overlapping annotations if so indicated"},
+			{"Max Abs Lg2Rto", "Maximum absolute log2 ratio observed using DESeq's varCor values"},
+			{"Max SAMseq FDR", "Maximum observed -10Log10( FDR ) between any pairwise DESeq comparisons.  Note the MaxAbsLg2Rto and MaxDESeqFDR may be from different comparisons.  "
+					+ "Moreover, all p-values and FDRs in USeq output, both printed and in graph form have been phred transformed where the value is actually -10*Log10(FDR or pval). Thus -10*Log10(0.001) = 30, -10*Log10(0.01) = 20, -10*Log10(0.05) = 13, and -10*Log10(0.1) = 10. "},
+			{"EdgeR FDR", "Maximum -10Log10( FDR ) from running edgeR's ANOVA-like analysis designed to score genes for differential expression under any conditions."},
+			{"", ""},
+			{"For each Paired Comparison:", null},
+			{"Lg2Rto", "SAMseq's log2 ratio for differential expression"},
+			{"FDR", "SAMseq's FDR"},
+			{"Spli Lg2Rto", "The maximum log2 ratio difference between two conditions and a gene's exon after correcting for differences in counts.  Use this to gauge the degree of potential differential splicing."},
+			{"Spli AdjPVal", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction is applied to the p-values."},
+			{"Spli Index", "The zero based index relative to the plus genomic strand for the exon displaying the SpliLg2Rto."},
+			{"", ""},
+			{"For each Replica:", null},
+			{"Counts", "Number of alignments that overlap a given gene/region by at least one base pair. Paired alignments are only counted once.  Alignments that span a gene/region but don't actually touch down are ignored. "},
 			{"FPKM", "Transformed count data normalized to library size and gene/region length (counts/ exonicBasesPerKB/ millionTotalMappedReadsToGeneTable)"}
 					
 	};
@@ -1520,12 +1675,14 @@ public class DefinedRegionDifferentialSeq {
 	    		index = createCell(row, "Counts "+repName, index, countCellStyle);
 	    	}
 
-	    	//VarCor values for each replica
-	    	CellStyle varCorCellStyle = createHeaderStyle(IndexedColors.WHITE.getIndex());
-	    	for (String repName: replicaNames){
-	    		index = createCell(row, "VarCor "+repName, index, varCorCellStyle);
+	    	if (!this.useSamSeq) {
+	    		//VarCor values for each replica
+		    	CellStyle varCorCellStyle = createHeaderStyle(IndexedColors.WHITE.getIndex());
+		    	for (String repName: replicaNames){
+		    		index = createCell(row, "VarCor "+repName, index, varCorCellStyle);
+		    	}
 	    	}
-
+	    	
 	    	//FPKM values for each replica	    
 	    	CellStyle fpkmCellStyle = createHeaderStyle(IndexedColors.SKY_BLUE.getIndex());
 	    	for (String repName: replicaNames){
@@ -1700,6 +1857,7 @@ public class DefinedRegionDifferentialSeq {
 					case 'g': genomeVersion = args[++i]; break;
 					case 'j': performReverseStrandedAnalysis = true; break;
 					case 'k': secondStrandFlipped = true; break;
+					case 'a': useSamSeq = true; break;
 					case 'h': printDocs(); System.exit(0);
 					//hidden options!
 					case 'd': saveCounts = true; break;
@@ -1822,6 +1980,9 @@ public class DefinedRegionDifferentialSeq {
 				"-k Second read's strand is flipped. Otherwise, assumes this was not done in the \n" +
 				"      SamTranscriptomeParser.\n" +
 				"-t Don't delete temp files (R script, R results, Rout, etc..).\n"+
+				"-a Run SAMseq in place of DESeq.  This is suggested when you have five or more\n" +
+				"      replicates in each condition, and not suggested if you have fewer.  Note \n" +
+				"      that it can't be run if you don't have at least two replicates per condition\n" +
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/DefinedRegionDifferentialSeq -c\n" +
