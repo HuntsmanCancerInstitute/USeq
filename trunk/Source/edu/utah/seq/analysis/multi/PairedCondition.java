@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.regex.Pattern;
 
 import util.gen.Misc;
+import util.gen.Num;
 
 public class PairedCondition {
 	//fields
@@ -72,6 +73,56 @@ public class PairedCondition {
 			}
 		} catch (Exception e){
 			System.err.println("\nProblem parsing DESeq stats results from R, see "+diffExpResults);
+			e.printStackTrace();
+			System.exit(1);
+		}
+	}
+	
+	/**For every gene name, creates a float[]{FDR, log2VarRto} from the SAMseq results file*/
+	public void parseSamSeqStatResults(String[] geneNames, float minFDR, float minLog2Rto){
+		this.geneNames = geneNames;
+		diffExpGeneNames = new HashSet<String>();
+		try {
+			BufferedReader inStats = new BufferedReader (new FileReader (diffExpResults));
+			String line;
+			String[] stats;
+			Pattern tab = Pattern.compile("\t");
+		
+			//Parse header
+			inStats.readLine();
+			parsedDiffExpResults = new float[geneNames.length][3];
+			
+			for (int x=0; x< geneNames.length; x++){
+				//parse stats line: padj, (meanVarCorT- meanVarCorC)
+				line= inStats.readLine();
+				stats = tab.split(line);
+				if (stats.length!=4) Misc.printErrAndExit("One of the SAMseq stats R results rows is malformed -> "+line);
+				parsedDiffExpResults[x] = new float[2];
+				//Parse FDR and convert to -10 * log10 ( FDR )
+				float FDR = Float.parseFloat(stats[3]);
+				if (FDR > 1) {
+					FDR = 1;
+				} else if (FDR == 0) {
+					FDR = Float.MIN_VALUE;
+				}
+				
+				FDR = Num.minus10log10Float(FDR);
+				
+				float log2Ratio = Float.parseFloat(stats[2]);
+				
+				parsedDiffExpResults[x][0] = FDR;
+				parsedDiffExpResults[x][1] = -(log2Ratio);
+				
+				if (FDR >= minFDR && Math.abs(log2Ratio) >= minLog2Rto) {
+					diffExpGeneNames.add(geneNames[x]);
+				}
+			}
+			
+			
+			inStats.close();
+
+		} catch (Exception e){
+			System.err.println("\nProblem parsing SAMseq stats results from R, see "+diffExpResults);
 			e.printStackTrace();
 			System.exit(1);
 		}

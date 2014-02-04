@@ -1,5 +1,6 @@
 package util.bio.annotation;
 import java.io.*;
+import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -13,10 +14,40 @@ public class ExportExons {
 	private UCSCGeneModelTableReader genes;
 	private int adder = 0;
 	private boolean trimUTRs = false;
-
+	private boolean addExonNumbers = false;
+	
+	
+	
+	private interface NameString {
+		String createNameString(String name, String strand, int exonNumber);
+	}
+	
+	
 	public ExportExons (String[] args){
+		//Parse args
+		processArgs(args);
+		
+		//create NameString command basd on addExonNumbers
+		NameString nameStringCommand;
+		if (this.addExonNumbers) {
+			nameStringCommand = new NameString() {
+				public String createNameString(String name, String strand, int exonNumber) {
+					String nameScoreStrand = "\t" + name + "_" + String.valueOf(exonNumber) +  "\t0\t" + strand;
+					return nameScoreStrand;		
+				};
+			};
+		} else {
+			nameStringCommand = new NameString() {
+				public String createNameString(String name, String strand, int exonNumber) {
+					String nameScoreStrand = "\t" + name  +  "\t0\t" + strand;
+					return nameScoreStrand;
+				};
+			};
+		}
+		
+		
 		try {
-			processArgs(args);
+			
 			genes = new UCSCGeneModelTableReader(ucscTableFile, 0);
 			UCSCGeneLine[] lines = genes.getGeneLines();
 			File exonsFile = new File (ucscTableFile.getParentFile(), Misc.removeExtension(ucscTableFile.getName())+"_Exons.bed");
@@ -27,7 +58,9 @@ public class ExportExons {
 					String chr = lines[i].getChrom();
 					int startCoding = lines[i].getCdsStart();
 					int endCoding = lines[i].getCdsEnd();
-					String nameScoreStrand = "\t"+lines[i].getDisplayNameThenName() +"\t0\t"+lines[i].getStrand();
+					String strand = lines[i].getStrand();
+					String name = lines[i].getDisplayNameThenName();
+					
 					for (int j=0; j< exons.length; j++){
 						int start = exons[j].getStart();
 						int end = exons[j].getEnd();
@@ -40,6 +73,7 @@ public class ExportExons {
 						if (start < 0) start =0;
 						end = end + adder;
 						//chr start stop name score strand
+						String nameScoreStrand = nameStringCommand.createNameString(name, strand, j+1);
 						out.println(chr+"\t"+start+"\t"+end + nameScoreStrand);
 					}
 				}
@@ -48,10 +82,14 @@ public class ExportExons {
 				for (int i=0; i< lines.length; i++){
 					ExonIntron[] exons = lines[i].getExons();
 					String chr = lines[i].getChrom();
-					String nameScoreStrand = "\t"+lines[i].getDisplayNameThenName() +"\t0\t"+lines[i].getStrand();
+					String strand = lines[i].getStrand();
+					String name = lines[i].getDisplayNameThenName();
+					
+					
 					for (int j=0; j< exons.length; j++){
 						int start = exons[j].getStart()-adder;
 						if (start < 0) start =0;
+						String nameScoreStrand = nameStringCommand.createNameString(name, strand, j+1);
 						out.println(chr+"\t"+start+"\t"+(exons[j].getEnd()+adder) + nameScoreStrand);
 					}
 				}
@@ -70,6 +108,9 @@ public class ExportExons {
 			printDocs();
 			System.exit(0);
 		}
+		
+		
+		
 		new ExportExons(args);
 	}		
 
@@ -86,6 +127,7 @@ public class ExportExons {
 					case 'g': ucscTableFile = new File (args[i+1]); i++; break;
 					case 'a': adder = Integer.parseInt(args[++i]); break;
 					case 'u': trimUTRs=true; break;
+					case 'n': addExonNumbers=true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: System.out.println("\nProblem, unknown option! " + mat.group());
 					}
@@ -95,6 +137,7 @@ public class ExportExons {
 				}
 			}
 		}
+		
 		if (ucscTableFile == null || ucscTableFile.canRead() == false) Misc.printExit("\nError: cannot find your UCSC table file!\n");
 	}	
 
@@ -109,6 +152,8 @@ public class ExportExons {
 				"-g Full path file text for the UCSC Gene table.\n"+
 				"-a Expand the size of each exon by X bp, defaults to 0\n"+
 				"-u Remove UTRs if present, defaults to including\n"+
+				"-n Append exon numbers to the gene name field.  This makes the bed file compatible \n" +
+				"      with DRDS\n" +
 
 				"\nExample: java -Xmx1000M -jar pathTo/T2/Apps/ExportExons -g /user/Jib/ucscPombe.txt\n" +
 				"      -a 50\n"+
