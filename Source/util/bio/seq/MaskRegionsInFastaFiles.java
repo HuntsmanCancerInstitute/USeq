@@ -125,7 +125,7 @@ public class MaskRegionsInFastaFiles {
 		saveDirectory.mkdirs();
 
 		//load regions, no strand
-		regionsHash = Bed.parseBedFile(bedFile, true);
+		regionsHash = Bed.parseBedFile(bedFile, true, false);
 
 		//load fastaFiles
 		fastaFiles = Seq.fetchChromosomeFastaFileHashMap(fastaFileDirectory);

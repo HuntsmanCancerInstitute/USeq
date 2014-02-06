@@ -51,11 +51,17 @@ public class MergeColumns {
 			out = new PrintWriter( new FileWriter (outFile));
 
 			//for each file print file name
+			StringBuilder sb = new StringBuilder();
+			int numColumns = data[0][0].split("\t").length;
+			System.out.println ("Num columns "+numColumns);
 			for (File f: files){
-				out.print(Misc.removeExtension(f.getName()));
-				out.print("\t");
+				String name = Misc.removeExtension(f.getName());
+				for (int i=0; i< numColumns; i++){
+					sb.append(name);
+					sb.append("\t");
+				}
 			}
-			out.println();
+			out.println(sb.toString());
 
 			//print data
 			//for each row

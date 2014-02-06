@@ -42,7 +42,7 @@ public class ParseIntersectingAlignments {
 		
 		//parse allele file, assumes interbase coordinates, returns sorted
 		System.out.println("Loading alleles...");
-		chromAlleles = Bed.parseBedFile(alleleBedFile, false);
+		chromAlleles = Bed.parseBedFile(alleleBedFile, false, true);
 		
 		//find alignments and record results in AlleleWithAlignments array
 		System.out.println("Fetching intersections...");

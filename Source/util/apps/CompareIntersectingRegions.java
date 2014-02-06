@@ -70,7 +70,7 @@ public class CompareIntersectingRegions {
 			
 			System.out.println("\t"+test.getName());
 			//parse regions and split by chromosome
-			testRegions = Bed.parseBedFile(test, true);
+			testRegions = Bed.parseBedFile(test, true, false);
 			//add name to header
 			header.append("\t"+Misc.removeExtension(test.getName()));
 

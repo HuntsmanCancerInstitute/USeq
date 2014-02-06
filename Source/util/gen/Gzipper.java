@@ -27,6 +27,13 @@ public class Gzipper {
 		out.close();
 	}
 	
+	/**Attempts a close, no exceptions thrown or warnings.*/
+	public void closeNoException(){
+		try {
+			out.close();
+		} catch (IOException e) {}
+	}
+	
 	/**Adds a return onto the line*/
 	public void println(String line) throws IOException{
 		out.write(line.getBytes());

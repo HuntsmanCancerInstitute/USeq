@@ -4,18 +4,17 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import edu.utah.seq.data.sam.SamAlignment;
 import edu.utah.seq.useq.ArchiveInfo;
 import edu.utah.seq.useq.SliceInfo;
 import edu.utah.seq.useq.USeqUtilities;
 import edu.utah.seq.useq.data.PositionScore;
 import edu.utah.seq.useq.data.PositionScoreData;
-import edu.utah.seq.useq.data.Region;
 import edu.utah.seq.useq.data.RegionScoreText;
 import net.sf.samtools.*;
 import net.sf.samtools.SAMRecord.SAMTagAndValue;
 import util.bio.annotation.Bed;
-import util.bio.annotation.Coordinate;
 import util.bio.annotation.ExportIntergenicRegions;
 import util.gen.*;
 
@@ -28,6 +27,7 @@ public class Sam2USeq {
 	private File[] samFiles;
 	private File tempDirectory;
 	private File logFile;
+	private File perRegionCoverageStats = null;
 	private String versionedGenome;
 	private boolean makeRelativeTracks = true;
 	private boolean scaleRepeats = false;
@@ -43,7 +43,7 @@ public class Sam2USeq {
 	private String adapter = "chrAdapt";
 	private String phiX = "chrPhiX";
 	private HashMap <String, ChromData> chromDataHash = new HashMap <String, ChromData>();
-	private HashMap<String,Region[]> regions = null;
+	private HashMap<String,RegionScoreText[]> regions = null;
 	private ArrayList<String> countedChromosomes = new ArrayList<String>();
 	private Histogram histogram;
 	private ArrayList<File> files2Zip = new ArrayList<File>();
@@ -60,7 +60,7 @@ public class Sam2USeq {
 	private File useqOutputFile;
 	private ArrayList<Short> baseCoverage = new ArrayList<Short>();
 	private Short zeroShort = new Short((short)0);
-
+	private Gzipper perRegionsGzipper = null;
 	private int maxNumberBases;
 
 
@@ -111,19 +111,21 @@ public class Sam2USeq {
 		makeCoverageTracks();
 
 		if (minimumCounts !=0) bedOut.close();
-		
-		
+
+
 		//finish read depth coverage stats
 		finishReadDepthStats();
+
+		if (perRegionsGzipper != null) perRegionsGzipper.closeNoException();
+
 	}
-	
+
 	public void finishReadDepthStats(){
 		if (regions != null){
-			
 			//increment chroms not scanned
 			for (String chromStrand: countedChromosomes) regions.remove(chromStrand);
-			for (Region[] chromRegions: regions.values()){
-				for (Region r: chromRegions){
+			for (RegionScoreText[] chromRegions: regions.values()){
+				for (RegionScoreText r: chromRegions){
 					int length = r.getLength();					
 					for (int i=0; i < length; i++) {
 						histogram.count(0);
@@ -131,7 +133,7 @@ public class Sam2USeq {
 					}
 				}
 			}
-			
+
 			//print histogram and summary stats
 			printStats();
 
@@ -154,7 +156,6 @@ public class Sam2USeq {
 
 				while (it.hasNext()) {
 					SAMRecord sam = it.next();
-
 					//print status blip
 					if (++counter == 2000000){
 						if (verbose) System.out.print(".");
@@ -168,9 +169,15 @@ public class Sam2USeq {
 
 					//does it pass the vendor qc?
 					if (sam.getReadFailsVendorQualityCheckFlag()) continue;
+					
+					//chromosome
+					String chromosome = sam.getReferenceName();
+					if (chromosome.startsWith("chr") == false){
+						chromosome = "chr"+chromosome;
+					}
 
 					//skip phiX and adapter
-					if (sam.getReferenceName().startsWith(phiX) || sam.getReferenceName().startsWith(adapter)) continue;
+					if (chromosome.startsWith(phiX) || chromosome.startsWith(adapter)) continue;
 
 					//does it pass the score thresholds?
 					List<SAMTagAndValue> attributes = sam.getAttributes();
@@ -195,14 +202,12 @@ public class Sam2USeq {
 					numberPassingAlignments++;
 
 					//make chromosome strand
-					String chromosome = sam.getReferenceName();
 					String strand = null;
 					if (stranded){
 						if (sam.getReadNegativeStrandFlag()) strand = "-";
 						else strand = "+";
 					}
 					else strand = ".";
-					
 					String chromosomeStrand = chromosome+strand;
 
 					//check cigar
@@ -253,7 +258,7 @@ public class Sam2USeq {
 				if (verbose) System.out.println();
 			} catch (Exception e){
 				System.err.println("\nError parsing sam file or writing split binary chromosome files.\n\nToo many open files exception? Too many chromosomes? " +
-				"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
+						"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
 				e.printStackTrace();
 				System.exit(1);
 			}
@@ -348,7 +353,7 @@ public class Sam2USeq {
 				//read binary
 				int start =  dis.readInt() - firstBase;
 				String cigar = dis.readUTF();
-				
+
 				//scaling repeats?
 				float numRepeats = 1;
 				if (scaleRepeats){
@@ -358,7 +363,7 @@ public class Sam2USeq {
 						cigar = c.group(1);
 					}
 				}
-				
+
 				//for each cigar block
 				Matcher mat = cigarSub.matcher(cigar);
 				while (mat.find()){
@@ -378,35 +383,57 @@ public class Sam2USeq {
 			}
 		} catch (EOFException eof){	
 			PositionScore[] positions = null;
-			
-			//calculate read coverage over interrogated regions
-			if (regions != null){
-				String chromStrand = chromData.chromosome+chromData.strand;
-				countedChromosomes.add(chromStrand);
-				//get regions
-				Region[] chrRegions = regions.get(chromStrand);
-				if (chrRegions != null) {
-					//for each region
-					for (Region r: chrRegions){
-						int start = r.getStart() - firstBase;
-						int stop = r.getStop() - firstBase;
-						//before counted bases? past end? Add zeros to all bases
-						for (int i=start; i< stop; i++){
-							//before or after scored bases
-							if (i < 0 || i >= baseCounts.length) {
-								histogram.count(0);
-								baseCoverage.add(zeroShort);
+			try {
+				//calculate read coverage over interrogated regions
+				if (regions != null){
+					String chromStrand = chromData.chromosome+chromData.strand;
+					if (chromData.strand.equals(".")) countedChromosomes.add(chromData.chromosome);
+					else countedChromosomes.add(chromStrand);
+					//get regions
+					RegionScoreText[] chrRegions = regions.get(chromStrand);
+					if (chrRegions == null) chrRegions = regions.get(chromData.chromosome);
+					if (chrRegions != null) {
+						//for each region
+						for (RegionScoreText r: chrRegions){
+							int start = r.getStart() - firstBase;
+							int stop = r.getStop() - firstBase;
+							float[] counts = new float[r.getLength()];
+							double num10 = 0;
+							double num20 = 0;
+							int index = 0;
+							//before counted bases? past end? Add zeros to all bases
+							for (int i=start; i< stop; i++){
+								//before or after scored bases
+								if (i < 0 || i >= baseCounts.length) {
+									histogram.count(0);
+									baseCoverage.add(zeroShort);
+									counts[index++] = 0.0f;
+								}
+								//nope inside
+								else {
+									histogram.count(baseCounts[i]);
+									baseCoverage.add((short)baseCounts[i]);
+									counts[index++] = baseCounts[i];
+									if (baseCounts[i] >= 20){
+										num10++;
+										num20++;
+									}
+									else if (baseCounts[i] >= 10) num10++;
+								}
 							}
-							//nope inside
-							else {
-								histogram.count(baseCounts[i]);
-								baseCoverage.add((short)baseCounts[i]);
-							}
+							double total = (double) counts.length;
+							String fraction10 = Num.formatNumber(num10/total, 2);
+							String fraction20 = Num.formatNumber(num20/total, 2);
+							Arrays.sort(counts);
+							perRegionsGzipper.println(chromData.chromosome+"\t"+chromData.strand+"\t"+r.getStart()+"\t"+r.getStop()+"\t"+
+									r.getText()+"\t"+fraction10+"\t"+fraction20+"\t"+Num.statFloatArrayWithSizeChecks(counts)); 
 						}
 					}
 				}
+			} catch (IOException e){
+				e.printStackTrace();
+				Misc.printErrAndExit("\nError writing data to gzipper for per region coverage stats.\n");
 			}
-
 			//do they want relative read coverage graphs and good block counts?
 			if (makeRelativeTracks && minimumCounts !=0){
 				//first make positions without scaling
@@ -470,10 +497,10 @@ public class Sam2USeq {
 				if (baseCount[i] !=0) baseCount[i] = baseCount[i]/scalar;
 			}
 		}
-		
+
 		ArrayList<PositionScore> psAL = new ArrayList<PositionScore>();
 		PositionScore ps = null;
-		
+
 		//find first non zero score
 		float hits = 0;
 		int basePosition = 0;
@@ -594,6 +621,7 @@ public class Sam2USeq {
 				try{
 					switch (test){
 					case 'f': forExtraction = new File(args[i+1]); i++; break;
+					case 'p': perRegionCoverageStats = new File(args[i+1]); i++; break;
 					case 'v': versionedGenome = args[i+1]; i++; break;
 					case 'r': makeRelativeTracks = false; break;
 					case 's': stranded = true; break;
@@ -624,7 +652,7 @@ public class Sam2USeq {
 
 		//stranded and regionFile?
 		if (regionFile !=null){
-			regions = Bed.parseRegions(regionFile, stranded == false);
+			regions = Bed.parseBedFile(regionFile, stranded == false, true);			
 			histogram = new Histogram(0, 101, 101);
 			//watch out for stranded analysis
 			if (stranded) {
@@ -632,14 +660,27 @@ public class Sam2USeq {
 					if (s.endsWith(".")) Misc.printErrAndExit("\nError: cannot perform a stranded analysis with non stranded interrogated regions.  Aborting.\n");
 				}
 			}
+			//start up gzipper for saving the individual region read coverage stats
+			if (perRegionCoverageStats == null){
+				String name = Misc.removeExtension(regionFile.getName()) +"_RegionCoverageStats.txt.gz";
+				perRegionCoverageStats = new File (regionFile.getParentFile(), name);
+			}
+			try {
+				perRegionsGzipper = new Gzipper(perRegionCoverageStats);
+				perRegionsGzipper.println("Chr\tStrand\tStart\tStop\tInfo\tFracBPs>=10\tFracBPs>=20\tMean\tMedian\tStdDev\tMin\tMax\t10th\t90th");
+			} catch (Exception e) {
+				e.printStackTrace();
+				Misc.printErrAndExit("Failed instantiating a gziper for saving the individual read coverage stats.");
+			} 
+
 		}
-		
+
 		//genome version?
 		if (versionedGenome == null) Misc.printErrAndExit("\nPlease provide a versioned genome (e.g. H_sapiens_Mar_2006).\n");
 
 		//look for point directories
 		if (samFiles == null || samFiles.length == 0) Misc.printExit("\nError: cannot find your sam files?\n");
-		
+
 
 		if (minimumCounts !=0){
 			String name = "regions";
@@ -671,7 +712,7 @@ public class Sam2USeq {
 
 
 	}	
-	
+
 	public void printStats(){
 		try {
 			PrintStream oldOut = System.out;
@@ -692,20 +733,20 @@ public class Sam2USeq {
 				if (numCounts == total) break;
 			}
 			System.out.println("\nTotal interrogated bases\t"+(int)total);
-			
+
 			//print summary stats
 
-			 short[] c = Num.arrayListOfShortToArray(baseCoverage);
-			 Arrays.sort(c);
+			short[] c = Num.arrayListOfShortToArray(baseCoverage);
+			Arrays.sort(c);
 			//calc mean
-			 double mean = Num.mean(c);
-			 short min = c[0];
-			 short max = c[c.length-1];
+			double mean = Num.mean(c);
+			short min = c[0];
+			short max = c[c.length-1];
 			//calc median
 			double median = Num.median(c);
 			System.out.println("Mean Coverage\t"+mean+"\nMedian Coverage\t"+median+"\nMinimum\t"+min+"\nMaximum\t"+max);
-			
-			
+
+
 			System.out.close();
 			System.setOut(oldOut);
 		} catch (FileNotFoundException e) {
@@ -715,12 +756,12 @@ public class Sam2USeq {
 		}
 
 	}
-	
+
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Sam 2 USeq : April 2013                            **\n" +
+				"**                                Sam 2 USeq : Feb 2014                             **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
@@ -746,6 +787,7 @@ public class Sam2USeq {
 				"-b Path to a region bed file (tab delim: chr start stop ...) to use in calculating\n" +
 				"      read coverage statistics.  Be sure these do not overlap! Run the MergeRegions app\n" +
 				"      if in doubt.\n"+ 
+				"-p Path to a file for saving per region coverage stats. Defaults to variant of -b.\n"+
 				"-c Print regions that meet a minimum # counts, defaults to 0, don't print.\n"+
 				"-l Print regions that also meet a minimum length, defaults to 0.\n"+
 				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
@@ -755,7 +797,7 @@ public class Sam2USeq {
 				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r\n"+
 				"     -v H_sapiens_Feb_2009 -b ccdsExons.bed.gz \n\n"+
 
-		"**************************************************************************************\n");
+				"**************************************************************************************\n");
 
 	}
 

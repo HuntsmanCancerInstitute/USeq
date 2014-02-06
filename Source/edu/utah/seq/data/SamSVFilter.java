@@ -17,7 +17,9 @@ import net.sf.samtools.SAMRecordIterator;
 import net.sf.samtools.SAMFileReader.ValidationStringency;
 import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.data.sam.SamAlignment;
+import edu.utah.seq.data.sam.SamAlignmentFlags;
 import edu.utah.seq.useq.data.IntersectingRegions;
+import edu.utah.seq.useq.data.Region;
 
 /**
  * @author david.nix@hci.utah.edu 
@@ -27,19 +29,21 @@ public class SamSVFilter{
 	private File[] samFiles;
 	private File saveDirectory;
 	private File bedFile;
-	private float minimumPosteriorProbability = 10;
-	private float maximumAlignmentScore = 300;
-	private int minimumSoftMaskedBases = 5;
-	private int maximumInsertSize = 2000;
-	private String[] chromToSkip = new String[]{"chrAdap", "chrPhi", "chrM", "_random", "chrUn_"};
+	private float minimumPosteriorProbability = 5;
+	private float maximumAlignmentScore = 1000;
+	private int minimumSoftMaskedBases = 10;
+	private String[] chromToSkip = new String[]{"chrAdap", "chrPhi", "chrM", "random", "chrUn"};
 	private boolean sortFinal = true;
-	private boolean removePairsInSameRegion = true;
+	private boolean isSecondary = false;
 
 	//internal fields
 	private String samHeader;
-	private Gzipper gzipOutPass;
+	private Gzipper gzipOutPassSpan;
+	private Gzipper gzipOutPassSoft;
+	private Gzipper gzipOutPassSingle;
 	private Gzipper gzipOutFail;
-	HashMap<String, IntersectingRegions> regions;
+	private HashMap<String, IntersectingRegions> regions;
+	private TreeMap<String, Integer> links = new TreeMap<String, Integer>();
 
 	//alignment counts for sam files
 	private long numberAlignments = 0;
@@ -48,13 +52,18 @@ public class SamSVFilter{
 	private long numberChrSkippedAlignments = 0;
 	private long numberAlignmentsFailingQC = 0;
 	private long numberAlignmentsUnmapped = 0;
-	private long numberProperPairedAlignments = 0;
 	
 	//pass the filters
-	private long numberPassingButNoIntersection = 0;
-	private long numberPassingButFailingSoftMasking = 0;
-	private long numberPassingButAllInternalToOneRegion = 0;
-	private long numberPassingAlignments = 0;
+	//private long numberPassingButNoIntersection = 0;
+	//private long numberPassingButFailingSoftMasking = 0;
+	//private long numberPassingButAllInternalToOneRegion = 0;
+	//private long numberPassingAlignments = 0;
+	private long numberFailingNotPaired = 0;
+	private long numberFailingBothMissingRegions = 0;
+	private long numberFailingSoftMaskThreshold = 0;
+	private long numberPassingSameRegionSoftMask = 0;
+	private long numberPassingDiffRegions = 0;
+	private long numberPassingSingleRegion = 0;
 
 	//constructors
 	public SamSVFilter(String[] args){
@@ -73,31 +82,48 @@ public class SamSVFilter{
 
 				//make gzippers
 				String name = Misc.removeExtension(samFiles[i].getName());
-				File pass = new File (saveDirectory, "pass_"+name+".sam.gz");
+				File span = new File (saveDirectory, "passSpan_"+name+".sam.gz");
+				File soft = new File (saveDirectory, "passSoft_"+name+".sam.gz");
+				File single = new File (saveDirectory, "passSingle_"+name+".sam.gz");
 				File fail = new File (saveDirectory, "fail_"+name+".sam.gz");
-				gzipOutPass = new Gzipper(pass);
+				gzipOutPassSpan = new Gzipper(span);
+				gzipOutPassSoft = new Gzipper(soft);
 				gzipOutFail = new Gzipper(fail);
+				gzipOutPassSingle = new Gzipper(single);
 
 				//parse it
 				if (parseWorkingSAMFile(samFiles[i]) == false) {
-					gzipOutPass.close();
+					gzipOutPassSpan.close();
+					gzipOutPassSoft.close();
+					gzipOutPassSingle.close();
 					gzipOutFail.close();
-					pass.delete();
+					span.delete();
+					soft.delete();
 					fail.delete();
 					Misc.printErrAndExit("\n\tERROR: failed to parse, skipping.\n");
 				}
 				
 				//close gzippers
-				gzipOutPass.close();
+				gzipOutPassSpan.close();
+				gzipOutPassSoft.close();
+				gzipOutPassSingle.close();
 				gzipOutFail.close();
 				
 				//sort
 				if (sortFinal && samHeader != null){
 					System.out.println("Sorting...");
-					File bam = new File (saveDirectory, "pass_"+name+".bam");
+					File bam = new File (saveDirectory, "passSpan_"+name+".bam");
 					//sort and convert to BAM
-					new PicardSortSam (pass, bam);
-					pass.delete();
+					new PicardSortSam (span, bam);
+					span.delete();
+					bam = new File (saveDirectory, "passSoft_"+name+".bam");
+					//sort and convert to BAM
+					new PicardSortSam (soft, bam);
+					soft.delete();
+					bam = new File (saveDirectory, "passSingle_"+name+".bam");
+					//sort and convert to BAM
+					new PicardSortSam (single, bam);
+					single.delete();
 					bam = new File (saveDirectory, "fail_"+name+".bam");
 					//sort and convert to BAM
 					new PicardSortSam (fail, bam);
@@ -106,6 +132,9 @@ public class SamSVFilter{
 				
 				//write out stats
 				printStats();
+				
+				//print hits?
+				printLinks();
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -114,6 +143,14 @@ public class SamSVFilter{
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/(1000*60);
 		System.out.println("\nDone! "+Math.round(diffTime)+" min\n");
+	}
+
+	private void printLinks() {
+		System.out.println("\nTarget region link counts:");
+		for (String coor : links.keySet()){
+			System.out.println(coor+"\t"+links.get(coor));
+		}
+		
 	}
 
 	public boolean parseWorkingSAMFile(File workingFile){
@@ -135,8 +172,10 @@ public class SamSVFilter{
 			//write header to gzippers
 			samHeader = sfh.getTextHeader().trim();
 			gzipOutFail.println(samHeader);
-			gzipOutPass.println(samHeader);
-
+			gzipOutPassSpan.println(samHeader);
+			gzipOutPassSingle.println(samHeader);
+			gzipOutPassSoft.println(samHeader);
+			
 			int counter =0;
 			int numBadLines = 0;
 			ArrayList<SamAlignment> samAL = new ArrayList<SamAlignment>();
@@ -191,12 +230,6 @@ public class SamSVFilter{
 					numberChrSkippedAlignments++;
 					pass = false;
 				}
-				//proper pair in close prox?
-				int insertSize = Math.abs(sa.getInferredInsertSize());
-				if (sa.isAProperPairedAlignment() && insertSize <= maximumInsertSize && insertSize !=0){
-					numberProperPairedAlignments++;
-					pass = false;
-				}
 				
 				if (pass == false){
 					gzipOutFail.println(samLine);
@@ -205,7 +238,7 @@ public class SamSVFilter{
 				
 				//is it an old alignment?
 				if (name.equals(sa.getName()) == false){
-					processBlock (samAL);
+					processBlock(samAL);
 					name = sa.getName();
 					samAL.clear();
 				}
@@ -224,132 +257,150 @@ public class SamSVFilter{
 		}
 		return true;
 	}
+	
 
+	
+	/**This saves alignment pairs where each map to a different region or where both do and one has significant external soft masking*/
 	private void processBlock(ArrayList<SamAlignment> samAL) throws IOException {
-		//do any of these alignments fall within a region?
+		boolean print = true;
+		SamAlignment one = null;
+		SamAlignment two = null;
+		String regionOne = null;
+		String regionTwo = null;
+		Gzipper out  = null;
+		//just one?
 		int num = samAL.size();
-		IntersectingRegions ir = null;
-		String chrom = "";
-		
-		//one alignment must intersect
-		boolean intersection = false;
-		HashSet<Integer> indexHits = null;
-		int i;
-		//scan records
-		for (i=0; i< num; i++){
-			SamAlignment sam = samAL.get(i);
-			//fetch IR?
-			if (sam.getReferenceSequence().equals(chrom) == false){
-				chrom = sam.getReferenceSequence();
-				ir = regions.get(chrom);
-			}
-			if (ir == null) continue;
-			
-			//any intersection?
-			int start = sam.getUnclippedStart();
-			indexHits = ir.fetchIntersectingIndexes(start, sam.countLengthOfAlignment()+ start);
-			if (indexHits != null){
-				intersection = true;
-				break;
-			}
+		if (num != 2) {
+			print = false;
+			numberFailingNotPaired+=num;
 		}
-		
-		//no intersection write all to fail
-		if (intersection == false){
-			for (SamAlignment sam : samAL){
-				gzipOutFail.println(sam.getUnmodifiedSamRecord());
-				numberPassingButNoIntersection++;
+		else {
+			one = samAL.get(0);
+			two = samAL.get(1);
+			regionOne =  fetchIntersectingRegion(one);
+			regionTwo =  fetchIntersectingRegion(two);
+			//both miss?
+			if (regionOne == null && regionTwo == null) {
+				print = false;
+				numberFailingBothMissingRegions+=2;
 			}
-			return;
-		}
-		
-		//just one alignment, if so then must have suff soft masking to keep
-		boolean softMaskGood = false;
-		if (samAL.size() == 1){
-			//must have soft masking to be good
-			SamAlignment sam = samAL.get(0);
-			int numS = sam.countLengthOfSoftMaskedBases();		
-			if (numS >= minimumSoftMaskedBases) softMaskGood = true;
+			//both hit?
+			else if (regionOne != null && regionTwo != null) {
+				//same region? check if pass soft masking
+				if (regionOne.equals(regionTwo)) {
+					if (failsSoftMasking (one, two)) {
+						print = false;
+						numberFailingSoftMaskThreshold+=2;
+					}
+					else {
+						numberPassingSameRegionSoftMask+=2;
+						out = gzipOutPassSoft;
+					}
+				}
+				//nope diff regions
+				else {
+					numberPassingDiffRegions+=2;
+					out = gzipOutPassSpan;
+				}
+			}
+			//must be just one hit
 			else {
-				gzipOutFail.println(sam.getUnmodifiedSamRecord());
-				numberPassingButFailingSoftMasking++;
-				return;
+				numberPassingSingleRegion+=2;
+				out = gzipOutPassSingle;
 			}
 		}
 		
-		//OK at least one intersects, its hits are in indexHits, its index is i
-		
-		//did prior alignments not hit a region?
-		//do they want to not filter for same region reads?
-		//only one alignment with a passing softMask?
-		//already hitting multiple regions?
-		if (i!=0  || removePairsInSameRegion == false || softMaskGood || indexHits.size() > 1){
-			for (SamAlignment sam : samAL){
-				gzipOutPass.println(sam.getUnmodifiedSamRecord());
-				numberPassingAlignments++;
+		//print them
+		if (print){
+			if (isSecondary){
+				if (regionOne != null) printAsSecondary(one, out);
+				if (regionTwo != null) printAsSecondary(two, out);
 			}
-			return;
+			else {
+				if (regionOne != null) out.println(one.getUnmodifiedSamRecord());
+				if (regionTwo != null) out.println(two.getUnmodifiedSamRecord());
+			}
+			
+			//make link
+			String key;
+			if (regionOne == null || regionTwo == null){
+				if (regionOne != null) key = regionOne;
+				else key = regionTwo;
+			}
+			else {
+				int comp = regionOne.compareTo(regionTwo);
+				if (comp < 0) key = regionOne+"_"+regionTwo;
+				else if (comp > 0) key = regionTwo+"_"+regionOne;
+				else key = regionOne;
+			}
+			int count = 1;
+			
+			if (links.containsKey(key)) count = links.get(key) + 1;
+			links.put(key, count); 
+		}
+		else {
+			for (SamAlignment sam : samAL) gzipOutFail.println(sam.getUnmodifiedSamRecord());
 		}
 		
-		//scan subsequent records for different regions
-		boolean printAll = false;
-		i++;
-		for (; i< num; i++){
-			SamAlignment sam = samAL.get(i);
-			//fetch IR?
-			if (sam.getReferenceSequence().equals(chrom) == false){
-				//different chrom so must fall out of other region
-				printAll = true;
-				break;
-			}
-			//any intersection?
-			HashSet<Integer> newHits = ir.fetchIntersectingIndexes(sam.getUnclippedStart(), sam.countLengthOfAlignment()+ sam.getUnclippedStart());
-			if (newHits == null){
-				//outside of any region thus print all
-				printAll = true;
-				break;
-			}
-			//ok more hits, add to original and see if change
-			indexHits.addAll(newHits);
-			//diff number?
-			if (indexHits.size() != 1){
-				//yes, added new region so print all
-				printAll = true;
-				break;
-			}
-		}
 		
-		if (printAll){
-			for (SamAlignment sam : samAL){
-				gzipOutPass.println(sam.getUnmodifiedSamRecord());
-				numberPassingAlignments++;
-			}
-		}
-		else{
-			for (SamAlignment sam : samAL){
-				gzipOutFail.println(sam.getUnmodifiedSamRecord());
-				numberPassingButAllInternalToOneRegion++;  
-			}
-		}
 	}
 	
+	private void printAsSecondary(SamAlignment sam, Gzipper out) throws IOException {
+		SamAlignmentFlags flags = new SamAlignmentFlags(sam.getFlags());
+		flags.setNotAPrimaryAlignment(true);
+		sam.setFlags(flags.getFlags());
+		out.println(sam.toString());
+	}
+
+	private boolean failsSoftMasking(SamAlignment one, SamAlignment two) {
+		//which is left?
+		SamAlignment left;
+		SamAlignment right;
+		if (one.getPosition() < two.getPosition()) {
+			left = one;
+			right = two;
+		}
+		else if (one.getPosition()> two.getPosition()){
+			left = two;
+			right = one;
+		}
+		else return true;
+		//check left
+		int num = left.countLengthOfSidedSoftMaskedBases(true);
+		if (num >= minimumSoftMaskedBases) return false;
+		num = right.countLengthOfSidedSoftMaskedBases(false);
+		if (num >= minimumSoftMaskedBases) return false;
+		return true;
+	}
+
+	/**Returns null if unmapped, or 0 or more than one intersecting regions are found.*/
+	private String fetchIntersectingRegion(SamAlignment sam){
+		IntersectingRegions ir = null;
+		ir = regions.get(sam.getReferenceSequence());
+		if (ir == null) return null;
+		int start = sam.getUnclippedStart();
+		HashSet<Integer> hits = ir.fetchIntersectingIndexes(start, sam.countLengthOfAlignment()+ start);
+		if (hits== null || hits.size() != 1) return null;
+		Region region = ir.getRegions()[hits.iterator().next()];
+		return sam.getReferenceSequence() +":"+ region.getStart()+"-"+region.getStop();
+	}
+		
+
 	public void printStats(){
 		//Alignment filtering stats
-		System.out.println("Processing statistics...");
-		System.out.println(numberAlignments+"\tSAM Records");
-		System.out.println("\t"+numberAlignmentsFailingQualityScore +"\tFailed mapping quality score ("+minimumPosteriorProbability+")");
-		System.out.println("\t"+numberAlignmentsFailingAlignmentScore +"\tFailed alignment score ("+maximumAlignmentScore+")");
-		System.out.println("\t"+numberChrSkippedAlignments +"\tAligned to control chromosomes");
-		System.out.println("\t"+numberAlignmentsFailingQC +"\tFailed vendor QC");
-		System.out.println("\t"+numberAlignmentsUnmapped +"\tAre unmapped");
-		System.out.println("\t"+numberProperPairedAlignments +"\tProper paired");
-		
-		long numPassingFilters = numberPassingButNoIntersection+ numberPassingButFailingSoftMasking+ numberPassingButAllInternalToOneRegion+ numberPassingAlignments;
-		System.out.println(numPassingFilters+"\tSAM Records remaining");
-		System.out.println("\t"+numberPassingButNoIntersection +"\tNo intersection with regions");
-		System.out.println("\t"+numberPassingButFailingSoftMasking +"\tNon paired failing minimum softmask threshold");
-		System.out.println("\t"+numberPassingButAllInternalToOneRegion +"\tInternal to one region");
-		System.out.println(numberPassingAlignments +"\tPassing all filters");
+		System.out.println("\nProcessing statistics for number of alignments...");
+		System.out.println(numberAlignments+"\tTotal SAM Records");
+		System.out.println("\t"+numberAlignmentsFailingQualityScore +"\tFailed mapping quality score ("+minimumPosteriorProbability+").");
+		System.out.println("\t"+numberAlignmentsFailingAlignmentScore +"\tFailed alignment score ("+maximumAlignmentScore+").");
+		System.out.println("\t"+numberChrSkippedAlignments +"\tAligned to control chromosomes.");
+		System.out.println("\t"+numberAlignmentsFailingQC +"\tFailed vendor QC.");
+		System.out.println("\t"+numberAlignmentsUnmapped +"\tAre unmapped.");
+		System.out.println("\t"+numberFailingNotPaired +"\tNot paired.");
+		System.out.println("\t"+numberFailingBothMissingRegions +"\tNeither of pair align to a target region.");
+		System.out.println("\t"+numberPassingSingleRegion +"\tOne of pair aligns to a target region, the other somewhere else. Single.");
+		System.out.println("\t"+numberFailingSoftMaskThreshold +"\tBoth align to the same region but fail soft masking threshold  ("+minimumSoftMaskedBases+").");
+		System.out.println("\t"+numberPassingSameRegionSoftMask +"\tBoth align to the same region yet pass soft masking threshold ("+minimumSoftMaskedBases+"). Soft.");
+		System.out.println("\t"+numberPassingDiffRegions +"\tBoth align to different target regions. Span.");
 	}
 	
 	private void zeroStats() {
@@ -359,11 +410,14 @@ public class SamSVFilter{
 		numberChrSkippedAlignments = 0;
 		numberAlignmentsFailingQC = 0;
 		numberAlignmentsUnmapped = 0;
-		numberPassingButNoIntersection = 0;
-		numberPassingButFailingSoftMasking = 0;
-		numberPassingButAllInternalToOneRegion = 0;
-		numberPassingAlignments = 0;
+		numberFailingNotPaired = 0;
+		numberFailingBothMissingRegions = 0;
+		numberFailingSoftMaskThreshold = 0;
+		numberPassingSameRegionSoftMask = 0;
+		numberPassingDiffRegions = 0;
+		numberPassingSingleRegion = 0;
 		samHeader = null;
+		links.clear();
 	}
 
 	private boolean isChromToSkip(String chr) {
@@ -398,8 +452,9 @@ public class SamSVFilter{
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'x': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'q': minimumPosteriorProbability = Float.parseFloat(args[++i]); break;
-					case 'i': maximumInsertSize = Integer.parseInt(args[++i]); break;
+					case 'm': this.minimumSoftMaskedBases = Integer.parseInt(args[++i]); break;
 					case 'd': sortFinal = false; break;
+					case 'n': isSecondary = true; break;
 					case 'c': controlChroms = args[++i]; break;
 					case 'b': bedFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
@@ -429,34 +484,37 @@ public class SamSVFilter{
 	}	
 
 	public static void printDocs(){
+		String version = IO.fetchUSeqVersion();
+		if (version.length() == 0) version = "USeq_xxx";
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Sam SV Filter: Dec 2013                          **\n" +
+				"**                                Sam SV Filter: Feb 2014                           **\n" +
 				"**************************************************************************************\n" +
 				"Filters SAM records based on their intersection with a list of target regions for\n"+
-				"structural variation analysis. Paired alignments are kept if one pair lands in a target"+
-				"region and the other aligns somewhere outside that target.  Non paired alignments\n"+
-				"must intersect a target region and pass the minimum soft masked base filter. Proper\n"+
-				"pairs are removed.\n" +
+				"structural variation analysis. Paired alignments are kept if they align to at least\n"+
+				"one target region. These are split into those that align to different targets (span),\n"+
+				"the same target with sufficient softmasking (soft), or one target and somewhere else\n"+
+				"(single).\n"+
 
 				"\nOptions:\n"+
 				"-a Alignment file or directory containing NAME sorted SAM/BAM files. Multiple files\n"+
 				"       are processed independantly. Xxx.sam(.gz/.zip) or xxx.bam are OK. Assumes only\n"+
-				"       uniquely aligned reads.\n" +
+				"       uniquely aligned reads. Remove duplicates with Picard's MarkDuplicates app.\n" +
 				"-s Save directory for the results.\n"+
-				"-b Bed file (tab delim: chr, start, stop, ...) interbase coordinates.\n"+
+				"-b Bed file (tab delim: chr, start, stop, ...) of target regions interbase coordinates.\n"+
 
 				"\nDefault Options:\n"+
+				"-n Mark passing alignments as secondary. Needed for Delly with -n 30 novoalignments.\n"+
 				"-d Don't coordinate sort and index alignments.\n"+
-				"-x Maximum alignment score. Defaults to 300, smaller numbers are more stringent.\n"+
-				"-q Minimum mapping quality score. Defaults to 10, bigger numbers are more stringent.\n" +
-				"-c Chromosomes to skip, defaults to 'chrAdap,chrPhi,chrM,_random,chrUn_'. Any SAM\n"+
+				"-x Maximum alignment score. Defaults to 1000, smaller numbers are more stringent.\n"+
+				"-q Minimum mapping quality score. Defaults to 5, bigger numbers are more stringent.\n" +
+				"-c Chromosomes to skip, defaults to 'chrAdap,chrPhi,chrM,random,chrUn'. Any SAM\n"+
 				"       record chromosome name that contains one will be failed.\n"+ 
-				"-m Minimum soft masked bases for keeping non paired alignments, defaults to 5\n"+
-				"-i Maximum insert size for scoring proper paired alignments, defaults to 2000\n"+
+				"-m Minimum soft masked bases for keeping paired alignments intersecting the same\n"+
+				"       target, defaults to 10\n"+
 
-				"\nExample: java -Xmx25G -jar pathToUSeq/Apps/SamSVFilter -x 150 -q 13 -a\n" +
-				"      /Novo/Run7/ -s /Novo/Run7/Filt/ -c 'chrPhi,_random,chrUn_' \n\n" +
+				"\nExample: java -Xmx25G -jar pathTo/"+version+"/Apps/SamSVFilter -x 150 -q 13 -a\n" +
+				"      /Novo/Run7/ -s /Novo/Run7/SSVF/ -c 'chrPhi,_random,chrUn_' \n\n" +
 
 
 				"**************************************************************************************\n");

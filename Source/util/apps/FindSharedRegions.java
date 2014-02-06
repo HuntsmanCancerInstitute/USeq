@@ -116,8 +116,8 @@ public class FindSharedRegions {
 		if (saveFile == null) Misc.printExit("\nPlease enter a file name for saving your results.\n");
 
 		//load regions, no strand
-		regionsHash1 = Bed.parseBedFile(bedFile1, true);
-		regionsHash2 = Bed.parseBedFile(bedFile2, true);
+		regionsHash1 = Bed.parseBedFile(bedFile1, true, false);
+		regionsHash2 = Bed.parseBedFile(bedFile2, true, false);
 
 	}	
 

@@ -39,7 +39,7 @@ public class Bed2Bar {
 			for (int i=0; i< bedFiles.length; i++){
 				bedFile = bedFiles[i];
 				System.out.println("Parsing "+ bedFile.getName());
-				bedLinesHash = Bed.parseBedFile(bedFile, true);
+				bedLinesHash = Bed.parseBedFile(bedFile, true, false);
 				if (bedLinesHash ==  null || bedLinesHash.size() ==0) {
 					System.out.println("Problem parsing bed file, skipping!");
 					continue;

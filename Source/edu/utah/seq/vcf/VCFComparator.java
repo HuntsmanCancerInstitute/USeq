@@ -381,22 +381,11 @@ public class VCFComparator {
 		return numberCommonBases;
 	}
 
-	public static HashMap<String, RegionScoreText[]> fixRegionChromosomeNames(HashMap<String, RegionScoreText[]> hash){
-		HashMap<String, RegionScoreText[]> fixed = new HashMap<String, RegionScoreText[]>();
-		for (String chr : hash.keySet()){
-			RegionScoreText[] regions = hash.get(chr);
-			if (chr.startsWith("chr")) fixed.put(chr, regions);
-			else fixed.put("chr"+chr, regions);
-		}
-		return fixed;
-	}
-
 	public void parseFilterFiles(){
 
 		//key regions
 		if (keyRegions== null){
-			keyRegions = Bed.parseBedFile(bedKey, true);
-			keyRegions = fixRegionChromosomeNames(keyRegions);
+			keyRegions = Bed.parseBedFile(bedKey, true, true);
 			keyBps = RegionScoreText.countBases(keyRegions);
 		}
 
@@ -405,8 +394,7 @@ public class VCFComparator {
 
 		//test regions
 		if (testRegions == null){
-			testRegions = Bed.parseBedFile(bedTest, true);
-			testRegions = fixRegionChromosomeNames (testRegions);
+			testRegions = Bed.parseBedFile(bedTest, true, true);
 			testBps = RegionScoreText.countBases(testRegions);
 		}
 
