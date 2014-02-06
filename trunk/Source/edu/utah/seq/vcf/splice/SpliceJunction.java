@@ -1,6 +1,6 @@
 package edu.utah.seq.vcf.splice;
 
-public class SpliceJunction {
+public class SpliceJunction implements Comparable<SpliceJunction>{
 	
 	//fields
 	
@@ -16,6 +16,9 @@ public class SpliceJunction {
 	//for snp, this is the interbase coor for the splice site; for INDEL then it is the variant VCF position
 	private int position;
 	
+	//concat of type position
+	private String compareToString = null;
+	
 	private double referenceScore;
 	private String referenceSequence;
 	private double alternateScore;
@@ -24,10 +27,24 @@ public class SpliceJunction {
 	/**-10Log10(pvalue)*/
 	private double transPValue;
 	
+	public SpliceJunction(char gainOrDamage, char fiveOrThreePrime, char annotation, int position){
+		this.gainOrDamage = gainOrDamage ;
+		this.fiveOrThreePrime = fiveOrThreePrime;
+		this.annotation = annotation;
+		this.position = position;
+		compareToString = getType()+position;
+	}
+	
 	public SpliceJunction(char gainOrDamage, char fiveOrThreePrime, char annotation){
 		this.gainOrDamage = gainOrDamage ;
 		this.fiveOrThreePrime = fiveOrThreePrime;
 		this.annotation = annotation;
+	}
+
+	public int compareTo(SpliceJunction o) {
+		String thisCS = this.getCompareToString();
+		String otherCS = o.getCompareToString();
+		return thisCS.compareTo(otherCS);
 	}
 	
 	public String toString(){
@@ -41,6 +58,10 @@ public class SpliceJunction {
 	}
 	
 	//getters and setters
+	/**gainOrDamage+ fiveOrThreePrime+ annotation+ position*/
+	public String getCompareToString(){
+		return compareToString;
+	}
 	public char getFiveOrThreePrime() {
 		return fiveOrThreePrime;
 	}
@@ -52,6 +73,7 @@ public class SpliceJunction {
 	}
 	public void setPosition(int position) {
 		this.position = position;
+		compareToString = getType()+position;
 	}
 	public String getType() {
 		if (type == null) type = new String (gainOrDamage+""+ fiveOrThreePrime +""+ annotation);

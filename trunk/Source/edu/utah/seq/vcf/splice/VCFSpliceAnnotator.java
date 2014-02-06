@@ -10,6 +10,7 @@ import net.sf.samtools.SAMRecord;
 import net.sf.samtools.SAMRecordIterator;
 import net.sf.samtools.SAMFileReader.ValidationStringency;
 import edu.utah.seq.mes.*;
+import edu.utah.seq.vcf.VCFInfo;
 import edu.utah.seq.vcf.VCFParser;
 import edu.utah.seq.vcf.VCFRecord;
 import util.bio.annotation.ExonIntron;
@@ -24,6 +25,11 @@ import util.gen.*;
  * @author Nix
  * */
 public class VCFSpliceAnnotator {
+	
+	/*@TODO:
+	 * don't reprocess sjs that have already been scored
+	 * memory issues?
+	 * correct the pvalues*/
 
 	//user fields
 	private File[] vcfFiles;
@@ -35,21 +41,23 @@ public class VCFSpliceAnnotator {
 	private File samSpliceFile;
 	private File saveDirectory;
 	private int minimumSpliceJunctionCoverage = 10;
-	private double minimumFractionCorrectlySpliced = 1.0;
 	private double min5Threshold = 5;
 	private double min5DeltaThreshold = 5;
 	private double min3Threshold = 5;
 	private double min3DeltaThreshold = 5;
-	private double minPValue = 13;
+	private double minPValue = 20;
 	private boolean scoreNovelIntronJunctions = true;
 	private boolean scoreNovelExonJunctions = true;
 	private boolean scoreNovelSpliceJunctionsInSplice = true;
+	private short vcfExportCategory = 0;
 	
 	//internal fields
+	private double minimumFractionCorrectlySpliced = 0.9;
 	private HashMap<String, File> chromFile;
 	private MaxEntScanScore5 score5;
 	private MaxEntScanScore3 score3;
 	private LinkedHashMap<String, ArrayList<SpliceHit>> geneNameSpliceHits = null;
+	private ArrayList<SpliceJunction> allSpliceJunctions = new ArrayList<SpliceJunction>();
 	private HashMap<String,UCSCGeneLine[]> chromGenes;
 	private HashMap<String,UCSCGeneLine[]> ccdsChromGenes;
 	private String workingChromosomeName = "";
@@ -64,9 +72,9 @@ public class VCFSpliceAnnotator {
 	private Histogram spliceHistogram3;
 	private boolean printHistograms = true;
 	private SAMFileReader samSpliceReader;
-	private ArrayList<SpliceHit> spliceHitsAL = new ArrayList<SpliceHit>();
+	private Gzipper vcfOut;
 	
-	private int numTranscripts = 0; //
+	private int numTranscripts = 0; 
 	private HashSet<String> intersectingTranscriptNames = new HashSet<String>();
 	private int numVariantsScanned = 0;
 	private int numVariantsIntersectingTranscripts = 0;
@@ -78,6 +86,12 @@ public class VCFSpliceAnnotator {
 	private int numSpliceJunctionSJsGained = 0;
 	private int numSJsLost = 0;
 	
+	//for multiple testing correction, to do!
+	private double num5GainedTested = 0;
+	private double num3GainedTested = 0;
+	private double num5LostTested = 0;
+	private double num3LostTested = 0; 
+	
 	//constructor
 	public VCFSpliceAnnotator(String[] args){
 		//start clock
@@ -85,6 +99,7 @@ public class VCFSpliceAnnotator {
 
 		//process args
 		processArgs(args);
+		printThresholds();
 
 		//fetch seqs by chrom
 		chromFile = Seq.fetchChromosomeFastaFileHashMap(chromDirectory);
@@ -107,19 +122,42 @@ public class VCFSpliceAnnotator {
 			System.out.println("\t"+vcfFiles[i]);
 			geneNameSpliceHits = new LinkedHashMap<String, ArrayList<SpliceHit>>();
 			annotateVCFWithSplices(vcfFiles[i]);
+			correctPValues();
 			printSpreadSheetResults(vcfFiles[i]);
+			System.out.println();
+			printSummary();
+			zeroSummaryStats();
 		}
-		
-		//summaries
-		System.out.println();
-		printThresholds();
-		printSummary();
 
 		//finish and calc run time
-		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
-		System.out.println("\nDone "+Math.round(diffTime)+" seconds!\n");
+		double diffTime = ((double)(System.currentTimeMillis() -startTime))/(1000*60);
+		System.out.println("\nDone "+Math.round(diffTime)+" min!\n");
 	}
 	
+	
+	private void correctPValues() {
+		double logG5 = Num.log10(num5GainedTested);
+		double logG3 = Num.log10(num3GainedTested);
+		double logL5 = Num.log10(num5LostTested);
+		double logL3 = Num.log10(num3LostTested);
+		System.out.println("\nApplying a Bonferroni correction to the spreadsheet pvalues...");
+		System.out.println("\tCorr log vals:\tG3 "+logG3+"\tG5 "+logG5+"\tD3 "+logL3+"\tD5 "+logL5);
+		for (SpliceJunction sj: allSpliceJunctions) {
+			//G3 G5 D5 D3
+			double sub;
+			String type = sj.getType();
+			if (type.startsWith("G3")) sub = logG3;
+			else if (type.startsWith("G5")) sub = logG5;
+			else if (type.startsWith("D3")) sub = logL3;
+			else sub = logL5;
+			double pval = sj.getTransPValue() - sub;
+			if (pval < 0) pval = 0;
+			sj.setTransPValue(pval);
+		}
+		
+	}
+
+
 	//methods
 	private void printSpreadSheetResults(File vcfFile) {
 		File modFile = new File (saveDirectory, Misc.removeExtension(vcfFile.getName())+".xls");
@@ -127,19 +165,19 @@ public class VCFSpliceAnnotator {
 		try {
 			out = new PrintWriter( new FileWriter (modFile));
 			//save header
-			out.println("GeneName\tTranscriptNames\tVCF RefSeq\tVCF AltSeq\tVCF Pos\tSJ Type\tSJ -10Log10(pval)\tSJ Pos\tSJ RefSeq\tSJ AltSeq\tSJ RefScore\tSJ AltScore\tVCF Record Fields...");
-			//walk through hash printing all should collapse transcripts with same hit
+			out.println("GeneName\tTranscriptNames\tChrom\tVCF RefSeq\tVCF AltSeq\tVCF Pos\tSJ Type\tSJ -10Log10(adjPVal)\tSJ Pos\tSJ RefSeq\tSJ AltSeq\tSJ RefScore\tSJ AltScore\tVCF Record Fields...");
+			LinkedHashMap<String, ArrayList<String>> dataTranscripts = new LinkedHashMap <String, ArrayList<String>>();
+			//walk through hash collapsing transcripts with same hit
 			for (String geneName : geneNameSpliceHits.keySet()) {
+				dataTranscripts.clear();
 				//for each hit
 				ArrayList<SpliceHit> spliceHits = geneNameSpliceHits.get(geneName);
 				//for each splice hit				
 				for (SpliceHit sh: spliceHits){
-					//build header
+					String transcriptName = sh.getTranscript().getName();
 					StringBuilder sb = new StringBuilder();
-					//geneName
-					sb.append(sh.getTranscript().getDisplayName()); sb.append("\t");
-					//transName
-					sb.append(sh.getTranscript().getName()); sb.append("\t");
+					//chrom
+					sb.append(sh.getTranscript().getChrom()); sb.append("\t");
 					//vcf refseq
 					sb.append(sh.getVcf().getReference()); sb.append("\t");
 					//vcf altseq
@@ -151,6 +189,8 @@ public class VCFSpliceAnnotator {
 					//for each splice junction affect, typically only one
 					ArrayList<SpliceJunction> sjAL = sh.getAffectedSpliceJunctions();					
 					for (SpliceJunction sj: sjAL){
+						//pass thresholds after multiple testing correction?
+						if (sj.getTransPValue() < minPValue) continue;
 						sb = new StringBuilder();
 						sb.append(head); 
 						//sj type
@@ -169,11 +209,22 @@ public class VCFSpliceAnnotator {
 						sb.append(sj.getAlternateScore()); sb.append("\t");
 						//vcf record
 						sb.append(sh.getVcf().toString());
-						out.println(sb.toString());
+						String data = sb.toString();
+						//add to hash
+						ArrayList<String> trans = dataTranscripts.get(data);
+						if (trans == null){
+							trans = new ArrayList<String>();
+							dataTranscripts.put(data, trans);
+						}
+						trans.add(transcriptName);
 					}
 				}
-				
-						
+				//print out each data line with concat of transcriptNames
+				for (String data: dataTranscripts.keySet()){
+					ArrayList<String> trans = dataTranscripts.get(data);
+					String transConcat = Misc.stringArrayListToString(trans, ",");
+					out.println(geneName+"\t"+transConcat+"\t"+data);
+				}
 			}
 
 			out.close();
@@ -186,6 +237,24 @@ public class VCFSpliceAnnotator {
 		
 		
 	}
+	
+	private void zeroSummaryStats(){
+		intersectingTranscriptNames.clear();
+		numVariantsScanned = 0;
+		numVariantsIntersectingTranscripts = 0;
+		numVariantsIntersectingExons = 0;
+		numVariantsIntersectingIntrons = 0;
+		numVariantsIntersectingSJs = 0;
+		numExonSJsGained = 0;
+		numIntronSJsGained = 0;
+		numSpliceJunctionSJsGained = 0;
+		numSJsLost = 0;
+		num5GainedTested = 0;
+		num3GainedTested = 0;
+		num5LostTested = 0;
+		num3LostTested = 0; 
+		allSpliceJunctions = new ArrayList<SpliceJunction>();
+	}
 
 	private void printThresholds(){
 		StringBuilder sb = new StringBuilder();
@@ -195,7 +264,6 @@ public class VCFSpliceAnnotator {
 		sb.append(min5DeltaThreshold +"\tMinimum score difference for loss or gain of a 5' splice junction\n");
 		sb.append(min3DeltaThreshold +"\tMinimum score difference for loss or gain of a 3' splice junction\n");
 		sb.append(minPValue +"\tMinimum -10Log10(pval) for reporting a loss or gain of a splice junction\n");
-		
 		System.out.println(sb);
 	}
 	
@@ -238,12 +306,13 @@ public class VCFSpliceAnnotator {
 		VCFParser parser = new VCFParser();
 		try {
 			in  = IO.fetchBufferedReader(vcfFile);
-
+			vcfOut = new Gzipper(new File(saveDirectory, Misc.removeExtension(vcfFile.getName())+"_VCFSA.vcf.gz"));
 			//add ##INFO line and find "#CHROM" line 
 			loadAndModifyHeader(in);
 
 			//For each record
 			String line;
+			HashSet<String> effects = new HashSet<String>();
 			while ((line=in.readLine()) != null){
 				//could delete for speed
 				if (line.length()== 0) continue;
@@ -268,6 +337,7 @@ public class VCFSpliceAnnotator {
 
 				//for each alternate allele, some vcf records have several
 				String[] alts = vcf.getAlternate();
+				effects.clear();
 				for (int i=0; i< alts.length; i++){	
 					numVariantsScanned++;
 					vcf.setAlternate(new String[]{alts[i]});
@@ -291,18 +361,26 @@ public class VCFSpliceAnnotator {
 								geneNameSpliceHits.put(geneName, al);
 							}
 							al.add(sh);
-							spliceHitsAL.add(sh);
+							//add vcf entry
+							effects.addAll(sh.getVcfEntries(vcfExportCategory));
 						}
 					}
 				}
 				vcf.setAlternate(alts);
-//if (spliceHitsAL.size() !=0) {
-//break;
-//}
+				//modify INFO field?
+				if (effects.size() == 0) vcfOut.println(vcf.getUnmodifiedInfoString());
+				else {
+					String e = Misc.hashSetToString(effects, ":");
+					String[] fields = VCFParser.TAB.split(vcf.getOriginalRecord());
+					fields[7] = fields[7]+";VCFSA="+e;
+					String f = Misc.stringArrayToString(fields, "\t");
+					vcfOut.println(f);
+				}
 			}
 			//last
 			System.out.println();
 			in.close();
+			vcfOut.close();
 		}catch (Exception e) {
 			System.err.println("Error -> "+e.getMessage());
 			e.printStackTrace();
@@ -599,8 +677,9 @@ public class VCFSpliceAnnotator {
 			//calc delta
 			double d= refScore- altScoreMax;
 			if (d >= min5DeltaThreshold) {
-				sj =  new SpliceJunction('D', '5', 'S');
+				sj =  new SpliceJunction('D', '5', 'S', junctionPosition);
 				pval = Num.minus10log10(spliceHistogram5.pValue(altScoreMax, false));
+				num5LostTested++;
 			}
 		}
 		else {
@@ -621,15 +700,16 @@ public class VCFSpliceAnnotator {
 			//calc delta
 			double d= refScore- altScoreMax;
 			if (d >= min3DeltaThreshold) {
-				sj =  new SpliceJunction('D', '3', 'S');
+				sj =  new SpliceJunction('D', '3', 'S', junctionPosition);
 				pval = Num.minus10log10(spliceHistogram3.pValue(altScoreMax, false));
+				num3LostTested++;
 			}
 		}
 		//damaged?
 		if (pval >= minPValue){
 			numSJsLost++;
+			allSpliceJunctions.add(sj);
 			//add info to sj
-			sj.setPosition(junctionPosition);
 			sj.setReferenceSequence(rfs[0]);
 			sj.setReferenceScore(refScore);
 			sj.setAlternateSequence(altScoreMaxSeq);
@@ -709,6 +789,8 @@ public class VCFSpliceAnnotator {
 				if (delta >= minDelta) {
 					//calc pval
 					double pval = Num.minus10log10(histogram.pValue(a[i], true));
+					if (score5Junction) num5GainedTested++;
+					else num3GainedTested++;
 					if (pval < maxPval) continue;
 					maxPval = pval;
 					//good so save info in spliceJunction
@@ -717,7 +799,7 @@ public class VCFSpliceAnnotator {
 					spliceJunction.setAlternateScore(a[i]);
 					int posOfZeroSeq;
 					int relPosSpliceInSeq;
-					if (spliceJunction.getFiveOrThreePrime() == '5') {
+					if (score5Junction) {
 						spliceJunction.setReferenceSequence(refAltSeqsToScan[0].substring(i, i+9));
 						spliceJunction.setAlternateSequence(refAltSeqsToScan[1].substring(i,i+9));
 						posOfZeroSeq = spliceHit.getVcf().getPosition() - 9 +1;
@@ -765,6 +847,8 @@ public class VCFSpliceAnnotator {
 				if (delta >= minDelta) {
 					//calc pval
 					double pval = Num.minus10log10(histogram.pValue(maxAlt, true));
+					if (score5Junction) num5GainedTested++;
+					else num3GainedTested++;
 					spliceJunction.setTransPValue(pval);
 					spliceJunction.setReferenceScore(actualMaxRef);
 					spliceJunction.setReferenceSequence(refAltSeqsToScan[0]);
@@ -776,9 +860,11 @@ public class VCFSpliceAnnotator {
 				}
 			}
 		}
+		
 		//pass pval threshold? save splice junction in splice hit
 		if (spliceJunction.getTransPValue() >= minPValue){
 			spliceHit.saveSpliceJunction(spliceJunction);
+			allSpliceJunctions.add(spliceJunction);
 			//increment counters
 			if (exonic) numExonSJsGained++;
 			else if (splice) numSpliceJunctionSJsGained++;
@@ -823,7 +909,7 @@ public class VCFSpliceAnnotator {
 	
 	private void loadNullScoreHistograms(){
 		if (histogramFile != null && histogramFile.exists()){
-			System.out.println("\tLoading histograms from serialized object file");
+			System.out.println("\tFrom serialized object file");
 			//Histogram[]{exonicHistogram5, exonicHistogram3, intronicHistogram5, intronicHistogram3, spliceHistogram5, spliceHistogram3};
 			Histogram[] hist = (Histogram[]) IO.fetchObject(histogramFile);
 			exonicHistogram5 = hist[0];
@@ -835,15 +921,14 @@ public class VCFSpliceAnnotator {
 			return;
 		}
 		//for known splice
-		spliceHistogram5 = new Histogram(-13, 13, 5000);
-		spliceHistogram3 = new Histogram(-14, 16, 5000);
+		spliceHistogram5 = new Histogram(-14, 0, 2500);
+		spliceHistogram3 = new Histogram(-14, 0, 2500);
 		samSpliceReader = new SAMFileReader(samSpliceFile);	
 		samSpliceReader.setValidationStringency(ValidationStringency.SILENT);
-		exonicHistogram5 = new Histogram(5, 13, 5000);
-		exonicHistogram3 = new Histogram(5, 17, 5000);
-		intronicHistogram5 = new Histogram(5, 13, 5000);
-		intronicHistogram3 = new Histogram(5, 17, 5000);
-		
+		exonicHistogram5 = new Histogram(0, 13, 2500);
+		exonicHistogram3 = new Histogram(0, 17, 2500);
+		intronicHistogram5 = new Histogram(0, 13, 2500);
+		intronicHistogram3 = new Histogram(0, 17, 2500);
 		
 		//for each chrom of transcripts
 		System.out.println("\tChr\tSeqLength\tTranscripts");
@@ -896,10 +981,11 @@ public class VCFSpliceAnnotator {
 			System.out.println("\n3' Splice Junctions:");
 			spliceHistogram3.printScaledHistogram();
 		}
+		System.out.println();
 		//save them
 		Histogram[] hist = new Histogram[]{exonicHistogram5, exonicHistogram3, intronicHistogram5, intronicHistogram3, spliceHistogram5, spliceHistogram3};
+		histogramFile = new File (saveDirectory, "spliceHistograms.sjo");
 		System.out.println("Saving histogram serialized object file. Use this to speed up subsequent matched species analysis: "+ histogramFile);
-		System.out.println();
 		IO.saveObject(histogramFile, hist);
 	}
 	
@@ -1148,9 +1234,15 @@ public class VCFSpliceAnnotator {
 				//add info lines?
 				if (addedInfo == false && line.startsWith("##INFO=")){
 					addedInfo = true;
-					//out.println("##INFO=<ID=MES3,Number=1,Type=Float,Description=\"MaxEntScan 3' splice score.\">");
-					//out.println("##INFO=<ID=MES5,Number=1,Type=Float,Description=\"MaxEntScan 5' splice score.\">");
+					vcfOut.println("##INFO=<ID=VCFSA,Number=.,Type=String,Description=\"USeq VCFSpliceAnnotator output. "
+							+ "One or more splice junction (SJ) annotations delimited by a : each containing comma "
+							+ "delimited SJType,SJPositon,GeneName,VCFAltSeq,SJ-10Log10(pval),SJRefScore,SJAltScore. "
+							+ "SJTypes are a three char string with Gain or Damage; 3 or 5 prime; Intron, Exon or Splice "
+							+ "(e.g. D3S, G5E, G3S). The SJPos is the interbase coordinate position of the damaged or "
+							+ "gained SJ for SNPs.  For INDELS, it is the variant position.\">");
+					
 				}
+				vcfOut.println(line);
 				//out.println(line);
 				if (line.startsWith("#CHROM")){
 					foundChrom = true;
@@ -1195,6 +1287,8 @@ public class VCFSpliceAnnotator {
 					case 'e': scoreNovelExonJunctions = false; break;
 					case 'i': scoreNovelIntronJunctions = false; break;
 					case 's': scoreNovelSpliceJunctionsInSplice = false; break;
+					case 'x': vcfExportCategory = Short.parseShort(args[++i]); break;
+					case 'p': minPValue = Double.parseDouble(args[++i]); break;
 					case 'a': min5Threshold = Double.parseDouble(args[++i]); break;
 					case 'b': min3Threshold = Double.parseDouble(args[++i]); break;
 					case 'c': min5DeltaThreshold = Double.parseDouble(args[++i]); break;
@@ -1220,10 +1314,10 @@ public class VCFSpliceAnnotator {
 			Misc.printErrAndExit("\nPlease enter a transcript table file in ucsc refflat format.\n");
 		}
 		//histogram
-		if (histogramFile == null) Misc.printErrAndExit("\nPlease enter a histogram object file, either to load or to use in saving the serialized object.\n");
-		if (histogramFile.exists() == false ){
+		if (histogramFile == null || histogramFile.exists() == false ){
 			//look for bam and ccds
-			if (ccdsTranscriptFile == null || samSpliceFile == null) Misc.printErrAndExit("\nPlease enter an indexed bam file containing splice junction reads and or a CCDS transcript table.  These will be used to generate background score histograms.\n");
+			if (ccdsTranscriptFile == null || samSpliceFile == null) Misc.printErrAndExit("\nPlease enter a histogram object file or an "
+					+ "indexed bam file containing splice junction reads and a CCDS transcript table to generate background score histograms.\n");
 		}
 		//save directory
 		if (saveDirectory == null) Misc.printErrAndExit("\nPlease enter a directory to save the results.\n");
@@ -1246,8 +1340,6 @@ public class VCFSpliceAnnotator {
 				"**************************************************************************************\n" +
 				"**                            VCF Splice Annotator : Jan 2014                       **\n" +
 				"**************************************************************************************\n" +
-				"WARNING: beta!\n"+
-				"\n"+
 				"Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and\n"+
 				"Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice\n"+
 				"acceptors and donors are scored for loss of a junction.  Exonic, intronic, and splice\n"+
@@ -1255,7 +1347,8 @@ public class VCFSpliceAnnotator {
 				"frameshifts are not annotated. This app only looks for changes in splicing. Pvalues\n"+
 				"for gained exonic or intronic splices are estimated by generating null distibutions\n"+
 				"of masked sequence scores. Likewise, damaged splice pvalues are calculated using a\n"+
-				"score distribution from the trusted splice junction file.\n\n" +
+				"score distribution from scoring high confidence splice junctions. A detailed spread\n"+
+				"sheet and modified vcf file are generated. \n\n" +
 
 				"Required Options:\n"+
 				"-r Save directory for writing results files.\n"+
@@ -1269,20 +1362,25 @@ public class VCFSpliceAnnotator {
 				"-m Full path directory name containing the me2x3acc1-9, splice5sequences and me2x5\n"+
 				"       splice model files. See USeq/Documentation/ or \n"+
 				"       http://genes.mit.edu/burgelab/maxent/download/ \n"+
-				"-h Histogram object file for estimating pvalues or complete -j -t below.\n"+
+				"-h Histogram object file for estimating pvalues or complete -j -t below. \n"+
 				"\n"+
 				
 				"Optional options:\n"+
 				"-e Don't scan exonic bases for novel splice junctions.\n"+
 				"-i Don't scan intronic bases for novel splice junctions.\n"+
 				"-s Don't scan known splice junctions for novel splice junctions.\n"+
+				"-x Export category for adding info to the vcf file, defaults to 0:\n"+
+				"       0 All types (gain or damaged in exon, intron, and splice)\n"+
+				"       1 Just damaged splices\n"+
+				"       2 Damaged splices and novel splices in exons and splice junctions\n"+
 				"-a Minimum 5' threshold for scoring the presence of a splice junction, defaults to 5.\n"+
 				"-b Minimum 3' threshold for scoring the presence of a splice junction, defaults to 5.\n"+
 				"-c Minimum difference for loss or gain of a 5' splice junction, defaults to 5.\n"+
 				"-d Minimum difference for loss or gain of a 3' splice junction, defaults to 5.\n"+
+				"-p Minimum -10Log10(pvalue) for reporting a splice junction, defaults to 20.\n"+
 				"\n"+
 				
-				"Options for generating a histogram object file:\n"+
+				"Options for generating reusable splice score histograms:\n"+
 				"-j Bam alignment splice file from running the SamTranscriptomeParser with -j to use\n"+
 				"       in checking for actual use of the known splice junction prior to scoring it for\n"+
 				"       inclusion in the known junction histograms. Besure to remove duplicates with the\n"+

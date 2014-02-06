@@ -613,7 +613,7 @@ public class AllelicMethylationDetector {
 		if (bedFile != null){
 			convertedPointDirs = null;
 			nonConvertedPointDirs = null;
-			chromRegions = Bed.parseBedFile(bedFile, true);
+			chromRegions = Bed.parseBedFile(bedFile, true, false);
 		}
 		//look for point directories?
 		else if (convertedPointDirs != null || nonConvertedPointDirs != null){

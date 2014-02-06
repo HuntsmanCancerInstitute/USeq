@@ -2853,8 +2853,34 @@ public class Num {
 		//standard deviation
 		float stndDev = (float)Num.standardDeviation(sortedFloat,mean);
 		return mean+"\t"+median+"\t"+stndDev+"\t"+minMax[0]+"\t"+minMax[1]+"\t"+perc10th+"\t"+perc90th;
-
-
+	}
+	
+	/**Returns a tab delimited string of Mean Median StdDev Min Max 10th 90th for the Float[]
+	 * if the sortedFloat size is too small then the vals will be assigned a -0*/
+	public static String statFloatArrayWithSizeChecks(float[] sortedFloat){
+		int size = sortedFloat.length;
+		if (size == 0) return "-0\t-0\t-0\t-0\t-0\t-0\t";
+		//calc mean
+		float mean = Num.mean(sortedFloat); 
+		//calc min, max
+		float[] minMax = Num.findMinMaxFloatValues(sortedFloat);
+		//calc median, need array copy to not sort referenced float!
+		float median = -0f;
+		float perc10th = -0f;
+		float perc90th = -0f;
+		float stndDev  = -0f;
+		if (size > 2) {
+			median = (float)Num.median(sortedFloat);
+			//standard deviation
+			stndDev = (float)Num.standardDeviation(sortedFloat,mean);
+			if (size > 4){
+				//calc 10th
+				perc10th = Num.percentile(sortedFloat, 0.1);
+				//calc 90th
+				perc90th = Num.percentile(sortedFloat,0.9);
+			}
+		}
+		return mean+"\t"+median+"\t"+stndDev+"\t"+minMax[0]+"\t"+minMax[1]+"\t"+perc10th+"\t"+perc90th;
 	}
 
 	/**Calculates Min, Max, Mean, Median, Mode, and Histogram/10 for a Float[]*/

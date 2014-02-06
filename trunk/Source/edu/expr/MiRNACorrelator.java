@@ -296,6 +296,7 @@ public class MiRNACorrelator {
 		double log2Rto;
 
 		public MiRNA(String line){
+			System.out.println(line);
 			String[] t = TAB.split(line);
 			name = t[0];
 			if (namesAllMiRNAs.contains(name) == false){

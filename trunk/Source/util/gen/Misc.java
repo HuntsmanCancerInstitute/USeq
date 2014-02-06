@@ -117,6 +117,21 @@ public class Misc {
 		return s;
 	}
 	
+	/**Converts a hash to a String using the delimiter to join.*/
+	public static String hashSetToString(HashSet hash, String delimiter){
+		Iterator it = hash.iterator();
+		StringBuilder s = new StringBuilder();
+		Object obj = (Object)it.next();
+		s.append(obj.toString());
+		while (it.hasNext()){
+			obj = it.next();
+			s.append(delimiter);
+			s.append(obj.toString());
+		}
+		return s.toString();
+	}
+	
+	
 	/**Converts a hash to a String[].*/
 	public static String[] setToStringArray(Set<String> hash){
 		Iterator<String> it = hash.iterator();

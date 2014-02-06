@@ -44,6 +44,8 @@ public class SamAlignment {
 	private static final Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSNIDH])");
 	private static final Pattern CIGAR_COUNTS = Pattern.compile("(\\d+)[MDN]");
 	private static final Pattern CIGAR_SOFT = Pattern.compile("(\\d+)S");
+	private static final Pattern CIGAR_SOFT_RIGHT = Pattern.compile(".+M(\\d+)S$");
+	private static final Pattern CIGAR_SOFT_LEFT = Pattern.compile("^(\\d+)S.+");
 	private static final Pattern CIGAR_COUNTS_MIN = Pattern.compile("(\\d+)[MIN]");
 	private static final Pattern CIGAR_BAD_CHARACTERS = Pattern.compile(".*[^\\dMNIDSH].*");
 	public static final Pattern CIGAR_STARTING_MASK = Pattern.compile("^(\\d+)[SH].+");
@@ -689,6 +691,17 @@ public class SamAlignment {
 		while (mat.find()){
 			length += Integer.parseInt(mat.group(1));
 		}
+		return length;
+	}
+	
+	/**Counts the number of soft masked bases in CIGAR either at the start/left or the end/right.*/
+	public int countLengthOfSidedSoftMaskedBases (boolean countLeft){
+		int length = 0;
+		//for each S block
+		Matcher mat;
+		if (countLeft) mat = CIGAR_SOFT_LEFT.matcher(cigar);
+		else mat = CIGAR_SOFT_RIGHT.matcher(cigar);
+		if (mat.matches()) length = Integer.parseInt(mat.group(1));
 		return length;
 	}
 	

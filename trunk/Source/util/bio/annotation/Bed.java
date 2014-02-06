@@ -205,8 +205,9 @@ public class Bed extends Coordinate implements Serializable{
 	}
 
 
-	/**Split a bed file by chromosome and strand into a HashMap of chromosomeStrand (e.g. chr3+, chr3-, chr3. or chr3 if ignoreStrand==true) : sorted NamedScoredCoordinate[].*/
-	public static HashMap<String,RegionScoreText[]> parseBedFile(File bedFile, boolean ignoreStrand){
+	/**Split a bed file by chromosome and strand into a HashMap of chromosomeStrand (e.g. chr3+, chr3-, chr3. or chr3 if ignoreStrand==true) : sorted NamedScoredCoordinate[].
+	 * If appendChr, chr is appended to chrom names that lack it.*/
+	public static HashMap<String,RegionScoreText[]> parseBedFile(File bedFile, boolean ignoreStrand, boolean appendChr){
 		HashMap<String,ArrayList<RegionScoreText>> chrAls = new HashMap<String,ArrayList<RegionScoreText>>();
 		Pattern tab = Pattern.compile("\\t");
 		String line = null;
@@ -231,6 +232,7 @@ public class Bed extends Coordinate implements Serializable{
 				if (ignoreStrand ) chromStrand = tokens[0];
 				else if (tokens.length==3) chromStrand = tokens[0]+".";
 				else chromStrand = tokens[0]+tokens[5];
+				if (appendChr && chromStrand.startsWith("chr") == false) chromStrand = "chr"+chromStrand;
 				//fetch ArrayList
 				if (currentChromStrand != chromStrand){
 					currentChromStrand = chromStrand;
@@ -244,7 +246,7 @@ public class Bed extends Coordinate implements Serializable{
 				int start = Integer.parseInt(tokens[1]);
 				int stop = Integer.parseInt(tokens[2]);
 				float score = 0;
-				String name = ".";
+				String name = "";
 				if (tokens.length == 4){
 					name = tokens[3];
 				}

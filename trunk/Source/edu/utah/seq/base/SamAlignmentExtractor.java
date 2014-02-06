@@ -222,7 +222,7 @@ public class SamAlignmentExtractor {
 
 		//look for bed
 		if (bedFile == null || bedFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your bed file?\n");
-		chromRegions = Bed.parseBedFile(bedFile, true);
+		chromRegions = Bed.parseBedFile(bedFile, true, false);
 		
 		//look for bed
 		if (saveFile != null && saveFile.getName().endsWith(".sam") == false) Misc.printErrAndExit("\nError: Your indicated save file doesn't end in .sam !\n");

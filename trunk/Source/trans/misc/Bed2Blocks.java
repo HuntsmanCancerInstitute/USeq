@@ -12,7 +12,7 @@ public class Bed2Blocks {
 	public static void main(String[] args) {
 		//load bed file
 		File bedFile = new File(args[0]);
-		HashMap<String,RegionScoreText[]> split = Bed.parseBedFile(bedFile, true);
+		HashMap<String,RegionScoreText[]> split = Bed.parseBedFile(bedFile, true, false);
 		
 		
 		Iterator<String> it = split.keySet().iterator();
