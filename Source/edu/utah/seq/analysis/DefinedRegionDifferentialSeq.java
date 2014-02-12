@@ -42,6 +42,7 @@ public class DefinedRegionDifferentialSeq {
 	private boolean deleteTempFiles = true;
 	private boolean filterOutliers = false;
 	private float minimumSpliceLog2Ratio = 1f;
+	private int minimumSpliceCounts = 10;
 	private boolean performStrandedAnalysis = false;
 	private boolean performReverseStrandedAnalysis = false;
 	private int maxRepeats = 0;
@@ -49,6 +50,7 @@ public class DefinedRegionDifferentialSeq {
 	private int maxAlignmentsDepth = 50000;
 	private boolean secondStrandFlipped = false;
 	private boolean useSamSeq = false;
+	private boolean trimUTRBPsFromExons = false;
 
 	//internal fields
 	private UCSCGeneLine[] genes;
@@ -923,7 +925,7 @@ public class DefinedRegionDifferentialSeq {
 		float[] log2Ratios = new float[numExons];
 		for (int i=0; i< numExons; i++){
 			//enough reads?
-			if ((tCounts[i] + cCounts[i]) < 10) continue;
+			if ((tCounts[i] + cCounts[i]) < minimumSpliceCounts) continue;
 			//check ratio
 			log2Ratios[i] = calculateLog2Ratio(tCounts[i], cCounts[i], scalarTC, scalarCT);
 			float logRatio = Math.abs(log2Ratios[i]);
@@ -1752,10 +1754,14 @@ public class DefinedRegionDifferentialSeq {
 		UCSCGeneModelTableReader reader = null;
 		if (refSeqFile != null){
 			reader = new UCSCGeneModelTableReader(refSeqFile, 0);
+			//just coding?
+			if (trimUTRBPsFromExons) reader.trimExonsOfUTRBPs();
+			//introns?
 			if (scoreIntrons){
 				if (verbose) System.out.println("\tParsing/scoring introns instead of exons from gene models.");
 				reader.swapIntronsForExons();
 			}
+			//remove overlap
 			if (removeOverlappingRegions) {
 				if (verbose) System.out.print("\tRemoving overlapping regions from gene models");
 				String deletedGenes = reader.removeOverlappingExons();
@@ -1858,6 +1864,7 @@ public class DefinedRegionDifferentialSeq {
 					case 'j': performReverseStrandedAnalysis = true; break;
 					case 'k': secondStrandFlipped = true; break;
 					case 'a': useSamSeq = true; break;
+					case 'o': trimUTRBPsFromExons = true; break;
 					case 'h': printDocs(); System.exit(0);
 					//hidden options!
 					case 'd': saveCounts = true; break;
@@ -1929,7 +1936,7 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                       Defined Region Differential Seq: Dec 2013                  **\n" +
+				"**                       Defined Region Differential Seq: Feb 2014                  **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +

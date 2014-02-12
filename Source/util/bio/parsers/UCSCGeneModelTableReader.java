@@ -354,6 +354,31 @@ public class UCSCGeneModelTableReader {
 		return geneLines;
 	}
 	
+	/**Drops utr exons and trims utr exons of utr seq leaving just coding.  Might wipe out all exons!*/
+	public void trimExonsOfUTRBPs(){
+		//for each gene
+		for (int i=0; i< geneLines.length; i++){
+				ExonIntron[] exons = geneLines[i].getExons();
+				int startCoding = geneLines[i].getCdsStart();
+				int endCoding = geneLines[i].getCdsEnd();
+				ArrayList<ExonIntron> good = new ArrayList<ExonIntron>();
+				// for each exon
+				for (int j=0; j< exons.length; j++){
+					int start = exons[j].getStart();
+					int end = exons[j].getEnd();
+					//trim utrs?
+					if (start< startCoding) start = startCoding;
+					if (end > endCoding) end = endCoding;
+					if ((end-start) <=0) continue;
+					good.add(new ExonIntron(start, end));
+				}
+				exons = new ExonIntron[good.size()];
+				good.toArray(exons);
+				geneLines[i].setExons(exons);
+			}
+		
+	}
+	
 	public boolean checkStartStopOrder(){
 		for (int i=0; i<geneLines.length; i++){
 			if (geneLines[i].getTxEnd() < geneLines[i].getTxStart()) {

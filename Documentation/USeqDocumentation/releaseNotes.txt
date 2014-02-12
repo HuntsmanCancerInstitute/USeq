@@ -1,6 +1,15 @@
 ----USeq_8.7.5----
 DRDSAnnotator
 * Initial Check-in of DRDSAnnotator application
+SamSVFilter and SamSVJoiner
+* Two new apps for processing alignments used in detecting structural variation detection
+ScanSeqs
+* Fix for FDR graph tracks where in some cases all were shown as negative
+DefinedRegionDifferentialSeq
+* Added option to run SamSeq instead of DESeq
+VCFSpliceAnnotator
+* Added vcf output and sj annotations
+* Multiple testing correction for pvalues
 
 ----USeq_8.7.4----
 MiRNACorrelator
