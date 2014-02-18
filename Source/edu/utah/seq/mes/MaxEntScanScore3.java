@@ -89,7 +89,7 @@ public class MaxEntScanScore3 {
 	public double scoreSequenceWithChecks(String seq){
 		if (seq.length() != 23) return Double.MIN_VALUE;
 		Matcher mat = MaxEntScanScore5.NonGATC.matcher(seq);
-		if (mat.find()) return Double.MAX_VALUE;
+		if (mat.find()) return Double.MIN_VALUE;
 		return scoreSequenceNoChecks(seq);
 	}
 	

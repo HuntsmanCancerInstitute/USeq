@@ -70,6 +70,7 @@ public class VCFSpliceAnnotator {
 	private Histogram intronicHistogram3;
 	private Histogram spliceHistogram5;
 	private Histogram spliceHistogram3;
+	private HashMap<String, Histogram> typeHist = new HashMap<String, Histogram>();
 	private boolean printHistograms = true;
 	private SAMFileReader samSpliceReader;
 	private Gzipper vcfOut;
@@ -165,7 +166,7 @@ public class VCFSpliceAnnotator {
 		try {
 			out = new PrintWriter( new FileWriter (modFile));
 			//save header
-			out.println("GeneName\tTranscriptNames\tChrom\tVCF RefSeq\tVCF AltSeq\tVCF Pos\tSJ Type\tSJ -10Log10(adjPVal)\tSJ Pos\tSJ RefSeq\tSJ AltSeq\tSJ RefScore\tSJ AltScore\tVCF Record Fields...");
+			out.println("GeneName\tTranscriptNames\tChrom\tVCF RefSeq\tVCF AltSeq\tVCF Pos\tSJ Type\tSJ -10Log10(adjPVal)\tSJ Pos\tSJ RefSeq\tSJ AltSeq\tSJ RefScore\tSJ AltScore\tSJ RefZScore\tSJ AltZScore\tVCF Record Fields...");
 			LinkedHashMap<String, ArrayList<String>> dataTranscripts = new LinkedHashMap <String, ArrayList<String>>();
 			//walk through hash collapsing transcripts with same hit
 			for (String geneName : geneNameSpliceHits.keySet()) {
@@ -205,8 +206,15 @@ public class VCFSpliceAnnotator {
 						sb.append(sj.getAlternateSequence()); sb.append("\t");
 						//sj ref score
 						sb.append(sj.getReferenceScore()); sb.append("\t");
-						//sj alt seq
+						//sj alt score
 						sb.append(sj.getAlternateScore()); sb.append("\t");
+						
+						//sj ref zscore
+						StandardDeviation sd = typeHist.get(sj.getType()).getStandardDeviation();
+						sb.append(sd.getZScore(sj.getReferenceScore())); sb.append("\t");
+						//sj alt zscore
+						sb.append(sd.getZScore(sj.getAlternateScore())); sb.append("\t");
+						
 						//vcf record
 						sb.append(sh.getVcf().toString());
 						String data = sb.toString();
@@ -908,6 +916,7 @@ public class VCFSpliceAnnotator {
 	}
 	
 	private void loadNullScoreHistograms(){
+		
 		if (histogramFile != null && histogramFile.exists()){
 			System.out.println("\tFrom serialized object file");
 			//Histogram[]{exonicHistogram5, exonicHistogram3, intronicHistogram5, intronicHistogram3, spliceHistogram5, spliceHistogram3};
@@ -918,17 +927,19 @@ public class VCFSpliceAnnotator {
 			intronicHistogram3 = hist[3];
 			spliceHistogram5 = hist[4];
 			spliceHistogram3 = hist[5];
+			loadTypeHisto();
 			return;
 		}
 		//for known splice
 		spliceHistogram5 = new Histogram(-14, 0, 2500);
 		spliceHistogram3 = new Histogram(-14, 0, 2500);
-		samSpliceReader = new SAMFileReader(samSpliceFile);	
-		samSpliceReader.setValidationStringency(ValidationStringency.SILENT);
 		exonicHistogram5 = new Histogram(0, 13, 2500);
 		exonicHistogram3 = new Histogram(0, 17, 2500);
 		intronicHistogram5 = new Histogram(0, 13, 2500);
 		intronicHistogram3 = new Histogram(0, 17, 2500);
+		
+		samSpliceReader = new SAMFileReader(samSpliceFile);	
+		samSpliceReader.setValidationStringency(ValidationStringency.SILENT);
 		
 		//for each chrom of transcripts
 		System.out.println("\tChr\tSeqLength\tTranscripts");
@@ -980,6 +991,13 @@ public class VCFSpliceAnnotator {
 			spliceHistogram5.printScaledHistogram();
 			System.out.println("\n3' Splice Junctions:");
 			spliceHistogram3.printScaledHistogram();
+			System.out.println("\nMean\tStandard deviation");
+			System.out.println(exonicHistogram5.getStandardDeviation()+"\tExonic 5' Scores");
+			System.out.println(exonicHistogram3.getStandardDeviation()+"\tExonic 3' Scores");
+			System.out.println(intronicHistogram5.getStandardDeviation()+"\tIntronic 5' Scores");
+			System.out.println(intronicHistogram3.getStandardDeviation()+"\tIntronic 3' Scores");
+			System.out.println(spliceHistogram5.getStandardDeviation()+"\tKnown Splice Junction  5' Scores");
+			System.out.println(spliceHistogram3.getStandardDeviation()+"\tKnown Splice Histogram 3' Scores");
 		}
 		System.out.println();
 		//save them
@@ -987,8 +1005,24 @@ public class VCFSpliceAnnotator {
 		histogramFile = new File (saveDirectory, "spliceHistograms.sjo");
 		System.out.println("Saving histogram serialized object file. Use this to speed up subsequent matched species analysis: "+ histogramFile);
 		IO.saveObject(histogramFile, hist);
+		
+		loadTypeHisto();
 	}
 	
+	private void loadTypeHisto() {
+		/*Three letter code: Gain or Damaged; 5' or 3' relative to gene not genomic; Exonic or Intronic or Splice
+		 * e.g. G5E - gain 5' splice in exonic; D3S - damaged 3' splice in splice 
+		 * G5E, G3E, G5I, G3I, D5S, D3S*/
+		typeHist.clear();
+		typeHist.put("G5E", exonicHistogram5);
+		typeHist.put("G3E", exonicHistogram3);
+		typeHist.put("G5I", intronicHistogram5);
+		typeHist.put("G3I", intronicHistogram3);
+		typeHist.put("D5S", spliceHistogram5);
+		typeHist.put("D3S", spliceHistogram3);
+	}
+
+
 	private boolean checkCoverage(int position, String toLookFor, boolean leftRight){
 		SAMRecordIterator i = samSpliceReader.queryOverlapping(workingChromosomeName, position, position);
 		HashSet<String> names = new HashSet<String>();
@@ -1121,7 +1155,7 @@ public class VCFSpliceAnnotator {
 							String seq = workingSequence.substring(startJunc, endJunc);
 							seq = Seq.reverseComplementDNA(seq);
 							double score = score3.scoreSequenceWithChecks(seq);
-							if (score != Double.MIN_VALUE) spliceHistogram5.count(score);
+							if (score != Double.MIN_VALUE) spliceHistogram3.count(score);
 							//System.out.println("- 3\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);
 						}
 					}
@@ -1338,7 +1372,7 @@ public class VCFSpliceAnnotator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Splice Annotator : Jan 2014                       **\n" +
+				"**                            VCF Splice Annotator : Feb 2014                       **\n" +
 				"**************************************************************************************\n" +
 				"Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and\n"+
 				"Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice\n"+

@@ -1,32 +1,39 @@
 package util.gen;
 
+import java.io.Serializable;
+
 /**Uses running totals to calculate the variance and standard deviation of an array of numbers.*/
-public class StandardDeviation {
+public class StandardDeviation implements Serializable {
 	
 	//running fields
-	long numberObservations = 0;
-	long sum = 0;
-	long sumSquares = 0;
+	double numberObservations = 0;
+	double sum = 0;
+	double sumSquares = 0;
+	double mean = Double.MIN_NORMAL;
+	double standardDeviation = Double.MIN_NORMAL;
+	private static final long serialVersionUID = 1L;
 	
 	/**Count each number as it becomes available.*/
-	public void count(double number) throws Exception{
+	public void count(double number){
 		numberObservations++;
 		sum+= number;
 		sumSquares+= (number*number);
 		//watch out for negative values indicating that they have exceeded the size 
-		if (sumSquares < 0) throw new Exception("You have exceeded the size of the counters.");
+		if (sumSquares < 0) System.err.println("You have exceeded the size of the StandardDeviation counters with value "+number);
 	}
 
 	public double getMean() {
-		return ((double)sum)/((double)numberObservations);
+		if (mean == Double.MIN_NORMAL) mean = sum/numberObservations;
+		return mean;
 	}
 
 	public double getVariance() {
-		return (((double)sumSquares) - ((double)sum) * getMean()) / (((double)numberObservations) - 1.0);
+		return (sumSquares - sum * getMean()) / (numberObservations - 1.0);
 	}
 
 	public double getStandardDeviation() {
-		return Math.sqrt(getVariance());
+		if (standardDeviation == Double.MIN_NORMAL) standardDeviation = Math.sqrt(getVariance());
+		return standardDeviation;
 	}
 	
 	/**@return mean tab standard deviation*/
@@ -34,7 +41,7 @@ public class StandardDeviation {
 		return getMean()+"\t"+getStandardDeviation();
 	}
 
-	public long getNumberObservations() {
+	public double getNumberObservations() {
 		return numberObservations;
 	}
 	
@@ -44,6 +51,14 @@ public class StandardDeviation {
 	
 	public double getSignal2Noise(){
 		return getMean()/ getStandardDeviation();
+	}
+	/**returns (Score - Mean) / Standard Deviation*/
+	public double getZScore(double score){
+		if (mean == Double.MIN_NORMAL){
+			getMean();
+			getStandardDeviation();
+		}
+		return (score - mean) / standardDeviation;
 	}
 	
 }

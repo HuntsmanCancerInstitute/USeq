@@ -319,6 +319,10 @@ public class BisStat {
 	
 	/**Only call when one of the two stranded datasets is missing.*/
 	private void processStrand(PointData[] pd, PointData nonCon, PointData con, String strand){	
+			if (pd == null || pd[0] == null){
+				System.out.println(chromosome+"+\tskipping, too few observations");
+				return;
+			}
 			//save fractions
 			baseFractionMethylation.add(pd[0].getScores());
 			
