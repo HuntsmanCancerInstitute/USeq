@@ -217,7 +217,7 @@ public class Sam2USeq {
 					//add number of repeats to cigar string for subsequent repeat scaling?
 					double forScaling = 1;
 					if (scaleRepeats){
-						Object o = sam.getAttribute("IH");
+						Object o = sam.getAttribute("NH");
 						if (o != null)  {
 							int numRepeats = (Integer)o;
 							cigar = cigar + numRepeats;

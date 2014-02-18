@@ -524,8 +524,8 @@ public class SamTranscriptomeParser{
 		}
 		
 		numberPrintedAlignments++;
-		//add/ replace IH tag for number of "Number of stored alignments in SAM that contains the query in the current record"
-		sam.addRepeatTag(numberRepeats);
+		//add/ replace NH tag for number of "Number of stored alignments in SAM that contains the query in the current record"
+		sam.addAlignmentCountTag(numberRepeats);
 		samOut.println(sam);
 
 		//get chromosome

@@ -192,7 +192,7 @@ public class NMer {
 			return sb.toString();
 		}
 
-		public long getNumberObservations(){
+		public double getNumberObservations(){
 			return sdA[0].getNumberObservations();
 		}
 		

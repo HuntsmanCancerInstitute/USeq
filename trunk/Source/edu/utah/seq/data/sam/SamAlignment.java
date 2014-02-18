@@ -348,15 +348,16 @@ public class SamAlignment {
 		return true;
 	}
 	
-	/**Replaces or adds an IH:i tag denoting the number of times this read is referenced in the sam file, aka number of repeats. If one just deletes it.*/
-	public void addRepeatTag (int numberAlignmentsForThisRead){
+	/**Replaces or adds an NH:i tag denoting the number of times this read is aligned in the sam file, 1 = unique;
+	 * NH:i:1 or more.*/
+	public void addAlignmentCountTag (int numberAlignmentsForThisRead){
 		ArrayList<String> tagsAL = new ArrayList<String>();
+		//remove any existing NH tag
 		for (String tag : tags){
-			if (tag.startsWith("IH:i:")) {
-				if (numberAlignmentsForThisRead != 1) tagsAL.add("IH:i:"+numberAlignmentsForThisRead);
-			}
-			else tagsAL.add(tag);
+			if (tag.startsWith("NH:i") == false) tagsAL.add(tag);
 		}
+		//addit
+		tagsAL.add("NH:i:"+numberAlignmentsForThisRead);
 		tags = new String[tagsAL.size()];
 		tagsAL.toArray(tags);
 	}

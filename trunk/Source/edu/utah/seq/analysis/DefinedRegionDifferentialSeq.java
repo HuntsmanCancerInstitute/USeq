@@ -45,7 +45,7 @@ public class DefinedRegionDifferentialSeq {
 	private int minimumSpliceCounts = 10;
 	private boolean performStrandedAnalysis = false;
 	private boolean performReverseStrandedAnalysis = false;
-	private int maxRepeats = 0;
+	private int maxNumAlignments = 1;
 	private boolean verbose = true;
 	private int maxAlignmentsDepth = 50000;
 	private boolean secondStrandFlipped = false;
@@ -627,11 +627,11 @@ public class DefinedRegionDifferentialSeq {
 		//aligned?
 		if (sam.getReadUnmappedFlag()) return true;
 		//limit to max matches?
-		if (maxRepeats !=0){
-			Object o = sam.getAttribute("IH");
+		if (maxNumAlignments !=0){
+			Object o = sam.getAttribute("NH");
 			if (o != null)  {
-				int numRepeats = (Integer)o;
-				if (numRepeats > maxRepeats) return true;
+				int num = (Integer)o;
+				if (num > maxNumAlignments) return true;
 			}
 		}
 
@@ -1854,7 +1854,7 @@ public class DefinedRegionDifferentialSeq {
 					case 'l': minLog2Ratio = Float.parseFloat(args[++i]); break;
 					case 'e': minimumCounts = Integer.parseInt(args[++i]); break;
 					case 'm': removeOverlappingRegions = true; break;
-					case 'n': maxRepeats = Integer.parseInt(args[++i]); break;
+					case 'n': maxNumAlignments = Integer.parseInt(args[++i]); break;
 					case 'x': maxAlignmentsDepth = Integer.parseInt(args[++i]); break;
 					case 'p': performStrandedAnalysis = true; break;
 					case 'i': scoreIntrons = true; break;
@@ -1975,8 +1975,8 @@ public class DefinedRegionDifferentialSeq {
 				"-m Mask overlapping gene annotations, recommended for well annotated genomes.\n"+
 				"-x Max per base alignment depth, defaults to 50000. Genes containing such high\n"+
 				"       density coverage are ignored.\n"+
-				"-n Max number repeat alignments. Defaults to all.  Assumes 'IH' tags have been set by\n" +
-				"       processing raw alignments with the SamTranscriptomeProcessor.\n"+
+				"-n Max number alignments per read. Defaults to 1, unique.  Assumes 'NH' tags have\n"+
+				"      been set by processing raw alignments with the SamTranscriptomeProcessor.\n"+
 				"-e Minimum number alignments per gene-region per replica, defaults to 20.\n"+
 				"-i Score introns instead of exons.\n"+
 				"-p Perform a stranded analysis. Only collect reads from the same strand as the\n" +

@@ -4,7 +4,7 @@ import java.io.*;
 import java.util.*;
 
 /**
- * Generates histograms.
+ * Generates histograms. Uses StandardDeviation object to track the mean and std.
  */
 public class Histogram implements Serializable {
 	//fields
@@ -23,7 +23,8 @@ public class Histogram implements Serializable {
 	private boolean meanScoresPresent = false;
 	private boolean trimLabelsToSingleInteger = false;
 	private boolean skipZeroBins = true;
-	private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 2L;
+	private StandardDeviation standardDeviation = new StandardDeviation(); 
 
 	public Histogram( double minimum, double maximum, int numberOfBins){
 		this.minimum = minimum;
@@ -171,17 +172,13 @@ public class Histogram implements Serializable {
 	/**Counts all the values incrementing the proper bin.*/
 	public void countAll (float[] values){
 		int num = values.length;
-		for (int i=0; i<num; i++){
-			count(values[i]);
-		}
+		for (int i=0; i<num; i++) count(values[i]);
 	}
 
 	/**Counts all the values incrementing the proper bin.*/
 	public void countAll (double[] values){	
 		int num = values.length;
-		for (int i=0; i<num; i++){
-			count(values[i]);
-		}
+		for (int i=0; i<num; i++) count(values[i]);
 	}
 
 	/**Counts all the values incrementing the proper bin and scores.*/
@@ -206,7 +203,10 @@ public class Histogram implements Serializable {
 		}
 		//run through bins
 		for (int i=0; i<numberOfBins; i++){
-			if (bins[i].count(value)) return;
+			if (bins[i].count(value)) {
+				standardDeviation.count(value);
+				return;
+			}
 		}
 	}
 
@@ -225,9 +225,13 @@ public class Histogram implements Serializable {
 		}
 		//run through bins
 		for (int i=0; i<numberOfBins; i++){
-			if (bins[i].count(value, score)) return;
+			if (bins[i].count(value, score)){
+				standardDeviation.count(value);
+				return;
+			}
 		}
 	}
+	
 
 	/**Returns the index of the containing bin or -1 if value is too small or big.*/
 	public int findBinIndex(double value){
@@ -590,5 +594,9 @@ public class Histogram implements Serializable {
 
 	public void setSkipZeroBins(boolean skipZeroBins) {
 		this.skipZeroBins = skipZeroBins;
+	}
+
+	public StandardDeviation getStandardDeviation() {
+		return standardDeviation;
 	}
 }
