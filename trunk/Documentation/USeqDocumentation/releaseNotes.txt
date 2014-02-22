@@ -1,3 +1,11 @@
+----USeq_8.7.6----
+SamTranscriptomeParser & DefinedRegionDifferentialSeq
+* Replaced the IH tag with NH tag for reporting the number of alignments present per read to be compatible with DEXSeq's HTSeq app.
+SamReadDepthSubSampler
+* New app for reducing extreme read depths in amplicon based sequencing datasets
+VCFSpliceAnnotator
+* Converted max ent scan scores to z-scores
+
 ----USeq_8.7.5----
 DRDSAnnotator
 * Initial Check-in of DRDSAnnotator application
