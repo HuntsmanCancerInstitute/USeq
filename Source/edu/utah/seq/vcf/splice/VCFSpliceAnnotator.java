@@ -1120,8 +1120,11 @@ public class VCFSpliceAnnotator {
 						if (checkCoverage(introns[i].getStart()-1, "-"+introns[i].getStart()+"_", true)){
 							String seq = workingSequence.substring(startJunc, endJunc);
 							double score = score5.scoreSequenceWithChecks(seq);
-							if (score != Double.MIN_VALUE) spliceHistogram5.count(score);
-							//System.out.println("+ 5\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);
+							if (score != Double.MIN_VALUE) {
+								spliceHistogram5.count(score);
+								//System.out.println("+ 5\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);
+							}
+							
 						}
 					}
 					//3'
@@ -1173,8 +1176,11 @@ public class VCFSpliceAnnotator {
 							String seq = workingSequence.substring(startJunc, endJunc);
 							seq = Seq.reverseComplementDNA(seq);
 							double score = score5.scoreSequenceWithChecks(seq);
-							if (score != Double.MIN_VALUE) spliceHistogram5.count(score);
-							//System.out.println("- 5\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);	
+							if (score != Double.MIN_VALUE) {
+								spliceHistogram5.count(score);
+								//System.out.println("- 5\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);
+							}
+								
 						}
 					}
 				}

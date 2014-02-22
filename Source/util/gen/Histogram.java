@@ -192,6 +192,8 @@ public class Histogram implements Serializable {
 
 	/**Increments the proper bin.*/
 	public void count(double value){
+		standardDeviation.count(value);
+		
 		//check to see if value is too small or too tall
 		if (value < minimum ) {
 			numLessThanMin ++;
@@ -203,15 +205,13 @@ public class Histogram implements Serializable {
 		}
 		//run through bins
 		for (int i=0; i<numberOfBins; i++){
-			if (bins[i].count(value)) {
-				standardDeviation.count(value);
-				return;
-			}
+			if (bins[i].count(value)) return;
 		}
 	}
 
 	/**Increments the proper bin.*/
 	public void count(double value, double score){
+		standardDeviation.count(value);
 		//check to see if value is too small or too tall
 		if (value < minimum ) {
 			numLessThanMin ++;
@@ -225,10 +225,7 @@ public class Histogram implements Serializable {
 		}
 		//run through bins
 		for (int i=0; i<numberOfBins; i++){
-			if (bins[i].count(value, score)){
-				standardDeviation.count(value);
-				return;
-			}
+			if (bins[i].count(value, score)) return;
 		}
 	}
 	
