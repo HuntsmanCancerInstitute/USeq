@@ -129,12 +129,29 @@ public class MotifScanner {
 		int numWithHits = 0;
 		long totalNumberHits = 0;
 		long totalLength = 0;
-		System.out.println("Name\tLength\t#Hits\tSumHitScores\tHitScores");
+		System.out.println("Name\tLength\t#Hits\tSumHitScores\tHitScores\tLocations\tBestLocation");
 		for (int i=0; i<seqs.length; i++){
 			MotifHit[] hits = scoreSequence(scoreCutOff, seqs[i].toUpperCase());
 			totalLength+= seqs[i].length();
 			double sumHits = 0;
 			String hitScores = "";
+			
+			String locs = "";
+			double maxScore = 0;
+			String maxLoc = "";
+			for (MotifHit h: hits) {
+				if (h.getScore() > maxScore) {
+					maxScore = h.getScore();
+					maxLoc = Integer.toString(h.getStart());
+				}
+				locs += "," + Integer.toString(h.getStart());
+			}
+			
+			if (locs.length() > 1) {
+				locs = locs.substring(1);
+			}
+			
+			
 			if (hits.length !=0) {
 				//System.out.println(names[i]+"\t"+len+"\t");
 				numWithHits++;
@@ -146,7 +163,7 @@ public class MotifScanner {
 				hitScores = Num.doubleArrayToString(scores, 1, " ");
 				sumHits = Num.sumArray(scores);
 			}
-			System.out.println(names[i]+"\t"+seqs[i].length()+"\t"+hits.length+"\t"+sumHits+"\t"+hitScores);
+			System.out.println(names[i]+"\t"+seqs[i].length()+"\t"+hits.length+"\t"+sumHits+"\t"+hitScores+"\t"+locs+"\t"+maxLoc);
 		}
 		System.out.println("\nNumber sequences with hits: "+numWithHits);
 		System.out.println("Total number hits: "+totalNumberHits);
