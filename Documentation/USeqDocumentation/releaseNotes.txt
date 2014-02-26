@@ -1,3 +1,10 @@
+----Useq_8.7.7----
+PullMatchingAlignments
+* New app that writes out alignments that match read names contained in a second file.  The output is the alignment in sam format, 
+preceded by true/false, depending on alignment status.
+ScoreSequences
+* Added two additional columns: 1) list of motif locations within the read and 2) top-scoring motif location within the read.
+
 ----USeq_8.7.6----
 SamTranscriptomeParser & DefinedRegionDifferentialSeq
 * Replaced the IH tag with NH tag for reporting the number of alignments present per read to be compatible with DEXSeq's HTSeq app.
