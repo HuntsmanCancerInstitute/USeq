@@ -45,6 +45,9 @@ public class RNAEditingPileUpParser {
 	private ArrayList<Integer> positionsMinus = new ArrayList<Integer>();
 	private ArrayList<Float> conversionsMinus = new ArrayList<Float>();
 	private ArrayList<Float> nonConversionsMinus = new ArrayList<Float>();
+	
+	private boolean skipChrM = false;
+	
 	public static Pattern INDEL = Pattern.compile("[-+](\\d+)");
 
 	public RNAEditingPileUpParser(String[] args){
@@ -99,13 +102,22 @@ public class RNAEditingPileUpParser {
 				
 				//new chromosome?
 				else if (tokens[chromIndex].equals(chromosome) == false){
-					System.out.print(" "+chromosome);
+					if (chromosome.equals("chrM") && this.skipChrM) {
+						System.out.print(" Skipped chrM");
+					} else {
+						System.out.print(" "+chromosome);
+					}
+					
 					//process old
 					processParsedData(positionsPlus, conversionsPlus, nonConversionsPlus, chromosome, "+");
 					processParsedData(positionsMinus, conversionsMinus, nonConversionsMinus, chromosome, "-");
 					//clear old
 					clearArrayLists();
 					chromosome = tokens[chromIndex];
+				}
+				
+				if (chromosome.equals("chrM") && this.skipChrM) {
+					continue;
 				}
 				
 				//refseq base 
@@ -276,6 +288,7 @@ public class RNAEditingPileUpParser {
 					case 's': saveDirectory = new File(args[++i]); saveDirectory.mkdir(); break;
 					case 'v': versionedGenome = args[i+1]; i++; break;
 					case 't': nonStrandedParsing = false; break;
+					case 'm': skipChrM = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -336,6 +349,7 @@ public class RNAEditingPileUpParser {
 				"-r Minimum read coverage, defaults to 5.\n"+
 				"-t Generate stranded specific reference calls, defaults to non stranded. Required for\n" +
 				"      stranded down stream analysis.\n"+
+				"-m Skip processing chrM.\n" +
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/RNAEditingPileUpParser -t -p \n" +
 				"      /Pileups/N2.mpileup.gz -v C_elegans_Oct_2010\n\n" +
