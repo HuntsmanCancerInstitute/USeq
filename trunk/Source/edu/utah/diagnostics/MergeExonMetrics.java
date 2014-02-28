@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -617,14 +618,20 @@ public class MergeExonMetrics {
 			System.exit(1);
 		}
 		
+		//Grab file names
 		File[] mFiles = metricsDir.listFiles();
+		
+		//Convert to arrayList and sort
+		ArrayList<File> mFileList = new ArrayList<File>(Arrays.asList(mFiles));
+		Collections.sort(mFileList);
+		
 		ArrayList<String> names = new ArrayList<String>();
 		Pattern p = Pattern.compile("(.+?)\\.dict\\.txt");
 		metricsList = new ArrayList<File>();
 		
 		
 		//Grab all metrics files in the directory and store their names
-		for (File file: mFiles) {
+		for (File file: mFileList) {
 			Matcher m = p.matcher(file.getName());
 			if (m.matches()) {
 				this.metricsList.add(file);
@@ -682,6 +689,9 @@ public class MergeExonMetrics {
 			}
 			
 		}
+		
+		//Sort the filelist
+		
 
 	}
 		
