@@ -129,7 +129,7 @@ public class MotifScanner {
 		int numWithHits = 0;
 		long totalNumberHits = 0;
 		long totalLength = 0;
-		System.out.println("Name\tLength\t#Hits\tSumHitScores\tHitScores\tLocations\tBestLocation");
+		System.out.println("Name\tLength\t#Hits\tSumHitScores\tHitScores\tLocations\tBestLocation\tOrientations\tBestOrientation");
 		for (int i=0; i<seqs.length; i++){
 			MotifHit[] hits = scoreSequence(scoreCutOff, seqs[i].toUpperCase());
 			totalLength+= seqs[i].length();
@@ -137,19 +137,30 @@ public class MotifScanner {
 			String hitScores = "";
 			
 			String locs = "";
+			String orients = "";
 			double maxScore = 0;
 			String maxLoc = "";
+			String maxOrient= "";
 			for (MotifHit h: hits) {
 				if (h.getScore() > maxScore) {
 					maxScore = h.getScore();
 					maxLoc = Integer.toString(h.getStart());
+					maxOrient = Integer.toString(h.getOrientation());
 				}
 				locs += "," + Integer.toString(h.getStart());
+				orients += "," + Integer.toString(h.getOrientation());
+				
 			}
 			
 			if (locs.length() > 1) {
 				locs = locs.substring(1);
 			}
+			
+			if (orients.length() > 1) {
+				orients = orients.substring(1);
+			}
+			
+			
 			
 			
 			if (hits.length !=0) {
@@ -163,7 +174,8 @@ public class MotifScanner {
 				hitScores = Num.doubleArrayToString(scores, 1, " ");
 				sumHits = Num.sumArray(scores);
 			}
-			System.out.println(names[i]+"\t"+seqs[i].length()+"\t"+hits.length+"\t"+sumHits+"\t"+hitScores+"\t"+locs+"\t"+maxLoc);
+			System.out.println(names[i]+"\t"+seqs[i].length()+"\t"+hits.length+"\t"+sumHits+"\t"+hitScores+"\t"+locs+"\t"+maxLoc+"\t"+
+			orients+"\t"+maxOrient);
 		}
 		System.out.println("\nNumber sequences with hits: "+numWithHits);
 		System.out.println("Total number hits: "+totalNumberHits);
