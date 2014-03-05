@@ -4,6 +4,8 @@ PullMatchingAlignments
 preceded by true/false, depending on alignment status.
 ScoreSequences
 * Added two additional columns: 1) list of motif locations within the read and 2) top-scoring motif location within the read.
+VCFSpliceAnnotator
+* Bug fix for vcf output where vcf records with no changes were being truncated
 
 ----USeq_8.7.6----
 SamTranscriptomeParser & DefinedRegionDifferentialSeq

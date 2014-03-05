@@ -114,7 +114,7 @@ public class VCFParser {
 	int infoIndex = 7;
 	int formatIndex = 8;
 	int firstSampleIndex = 9;
-	int minimumNumberFields = 10;
+	int minimumNumberFields = 8;
 	int numberFields = 0;
 	
 	private String[] sampleNames = null;

@@ -706,6 +706,28 @@ public class SamAlignment {
 		return length;
 	}
 	
+	/**Replaces soft masked bases with matches for display in IGB*/
+	public void deSoftMaskCigar() {
+		StringBuffer cigarSB = new StringBuffer();
+
+		//for each block
+		Matcher mat = CIGAR_SUB.matcher(cigar);
+		while (mat.find()){
+			String call = mat.group(2);
+			//soft mask? Replace with M
+			if (call.equals("S")) {
+				int numberBases = Integer.parseInt(mat.group(1));
+				cigarSB.append(numberBases);
+				cigarSB.append("M");
+			}
+			else cigarSB.append(mat.group());
+		}
+
+		//assign
+		cigar = cigarSB.toString();
+		
+	}
+	
 	/**Assumes interbase coordinates for start and returned blocks.*/
 	public static ArrayList<int[]> fetchAlignmentBlocks(String cigar, int start){
 		//for each cigar block
@@ -915,6 +937,8 @@ public class SamAlignment {
 	public String getUnmodifiedSamRecord() {
 		return unmodifiedSamRecord;
 	}
+
+	
 
 
 }
