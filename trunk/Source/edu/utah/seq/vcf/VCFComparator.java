@@ -3,13 +3,9 @@ package edu.utah.seq.vcf;
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
-
-import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
 import edu.utah.seq.useq.data.RegionScoreText;
-
 import util.bio.annotation.Bed;
 import util.bio.annotation.ExportIntergenicRegions;
-import util.bio.seq.Seq;
 import util.gen.*;
 
 /**Compares variant lists, uses the vcf QUAL score to filter.
@@ -443,19 +439,20 @@ public class VCFComparator {
 		if (removeNonSNPs) testParser.removeNonSNPs();
 		res = testParser.getVcfRecords().length +"\tTest variants\n";
 		results.append(res);
-
+		if (testParser.getVcfRecords().length == 0){
+			System.out.println(results);
+			Misc.printErrAndExit("\nNo test vcf records found? Aborting!\n");
+		}
 		testParser.filterVCFRecords(commonRegions);
 		res = testParser.getVcfRecords().length +"\tTest variants in shared regions\n";
 		results.append(res);
-		res = testParser.calculateTiTvRatio() +"\tShared test variants Ti/Tv\n";
-		results.append(res);
-		
-		results.append("\n");
-		
-		if (testParser.getVcfRecords().length == 0) {
+		if (testParser.getVcfRecords().length == 0){
 			System.out.println(results);
 			Misc.printErrAndExit("\nNo test variants in shared regions? Aboring.\n");
 		}
+		res = testParser.calculateTiTvRatio() +"\tShared test variants Ti/Tv\n";
+		results.append(res);
+		results.append("\n");
 		
 	}
 
@@ -593,7 +590,7 @@ public class VCFComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             VCF Comparator : Dec 2013                            **\n" +
+				"**                             VCF Comparator : March 2014                          **\n" +
 				"**************************************************************************************\n" +
 				"Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls\n" +
 				"that fall in the common interrogated regions are compared. WARNING tabix gzipped files\n" +

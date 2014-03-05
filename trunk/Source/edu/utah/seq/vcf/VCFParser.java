@@ -321,6 +321,7 @@ public class VCFParser {
 			if (vcf == null) continue;
 			//make boolean array representing covered bases
 			RegionScoreText[] r = goodRegions.get(chr);
+			if (r == null || r.length == 0) continue;
 			int lastBase = RegionScoreText.findLastBase(r);
 			boolean[] coveredBases = new boolean[lastBase];
 			for (int i=0; i< r.length; i++){
