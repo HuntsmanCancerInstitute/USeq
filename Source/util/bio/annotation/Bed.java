@@ -7,6 +7,7 @@ import java.util.regex.*;
 import edu.utah.seq.useq.data.Region;
 import edu.utah.seq.useq.data.RegionScoreText;
 import util.gen.IO;
+import util.gen.Misc;
 import util.gen.Num;
 
 public class Bed extends Coordinate implements Serializable{
@@ -259,7 +260,7 @@ public class Bed extends Coordinate implements Serializable{
 			}
 		}catch (Exception e){
 			e.printStackTrace();
-			System.out.println("Malformed bed line? -> "+line);
+			Misc.printErrAndExit("\nMalformed bed line? -> "+line+"\n Aborting!");
 		}
 		//sort and load hash
 		HashMap<String,RegionScoreText[]> chrSpec = new HashMap<String,RegionScoreText[]>();
