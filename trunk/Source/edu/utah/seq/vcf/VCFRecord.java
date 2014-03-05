@@ -29,7 +29,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		if (vcfParser.numberFields !=0){
 			if (fields.length != vcfParser.numberFields) throw new Exception("\nIncorrect number of fields in -> "+record+"\nTry uncompressing the vcf file?");
 		}
-		else if (fields.length < vcfParser.minimumNumberFields ) throw new Exception("\nIncorrect number of fields in -> "+record+"\nTry uncompressing the vcf file?");
+		else if (fields.length < vcfParser.minimumNumberFields ) throw new Exception("\nIncorrect number of fields ("+vcfParser.minimumNumberFields+") in -> "+record+"\nTry uncompressing the vcf file?");
 		else if (vcfParser.numberFields == 0) vcfParser.numberFields = fields.length;
 		
 		//must subtract 1 from position to put it into interbase coordinates
@@ -45,9 +45,11 @@ public class VCFRecord implements Comparable<VCFRecord> {
 			info = new VCFInfo();
 			info.parseInfoGatk(fields[vcfParser.infoIndex]);
 		}
-		format = fields[vcfParser.formatIndex];
 		
 		if (loadSamples){
+			//watch out for missing sample info
+			if (fields.length == 8) format = ".";
+			else format = fields[vcfParser.formatIndex];
 			ArrayList<VCFSample> al = new ArrayList<VCFSample>();
 			//must watch out for blank samples
 			for (int i=vcfParser.firstSampleIndex; i< fields.length; i++) {

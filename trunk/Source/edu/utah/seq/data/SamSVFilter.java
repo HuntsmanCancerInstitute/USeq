@@ -34,7 +34,7 @@ public class SamSVFilter{
 	private int minimumSoftMaskedBases = 10;
 	private String[] chromToSkip = new String[]{"chrAdap", "chrPhi", "chrM", "random", "chrUn"};
 	private boolean sortFinal = true;
-	private boolean isSecondary = false;
+	private boolean deSoftMask = false;
 
 	//internal fields
 	private String samHeader;
@@ -312,14 +312,14 @@ public class SamSVFilter{
 		
 		//print them
 		if (print){
-			if (isSecondary){
-				if (regionOne != null) printAsSecondary(one, out);
-				if (regionTwo != null) printAsSecondary(two, out);
+			if(deSoftMask) {
+				one.deSoftMaskCigar();
+				two.deSoftMaskCigar();
 			}
-			else {
-				if (regionOne != null) out.println(one.getUnmodifiedSamRecord());
-				if (regionTwo != null) out.println(two.getUnmodifiedSamRecord());
-			}
+			
+			if (regionOne != null) out.println(one.getUnmodifiedSamRecord());
+			if (regionTwo != null) out.println(two.getUnmodifiedSamRecord());
+			
 			
 			//make link
 			String key;
@@ -343,13 +343,6 @@ public class SamSVFilter{
 		}
 		
 		
-	}
-	
-	private void printAsSecondary(SamAlignment sam, Gzipper out) throws IOException {
-		SamAlignmentFlags flags = new SamAlignmentFlags(sam.getFlags());
-		flags.setNotAPrimaryAlignment(true);
-		sam.setFlags(flags.getFlags());
-		out.println(sam.toString());
 	}
 
 	private boolean failsSoftMasking(SamAlignment one, SamAlignment two) {
@@ -452,9 +445,9 @@ public class SamSVFilter{
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'x': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'q': minimumPosteriorProbability = Float.parseFloat(args[++i]); break;
-					case 'm': this.minimumSoftMaskedBases = Integer.parseInt(args[++i]); break;
+					case 'm': minimumSoftMaskedBases = Integer.parseInt(args[++i]); break;
 					case 'd': sortFinal = false; break;
-					case 'n': isSecondary = true; break;
+					case 'e': deSoftMask = true; break;
 					case 'c': controlChroms = args[++i]; break;
 					case 'b': bedFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
@@ -488,7 +481,7 @@ public class SamSVFilter{
 		if (version.length() == 0) version = "USeq_xxx";
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam SV Filter: Feb 2014                           **\n" +
+				"**                               Sam SV Filter: March 2014                          **\n" +
 				"**************************************************************************************\n" +
 				"Filters SAM records based on their intersection with a list of target regions for\n"+
 				"structural variation analysis. Paired alignments are kept if they align to at least\n"+
@@ -512,6 +505,7 @@ public class SamSVFilter{
 				"       record chromosome name that contains one will be failed.\n"+ 
 				"-m Minimum soft masked bases for keeping paired alignments intersecting the same\n"+
 				"       target, defaults to 10\n"+
+				//"-e Replace S in cigar with M, only for visualization in IGB, not for downstream use.\n"+
 
 				"\nExample: java -Xmx25G -jar pathTo/"+version+"/Apps/SamSVFilter -x 150 -q 13 -a\n" +
 				"      /Novo/Run7/ -s /Novo/Run7/SSVF/ -c 'chrPhi,_random,chrUn_' \n\n" +

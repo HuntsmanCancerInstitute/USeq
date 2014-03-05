@@ -276,12 +276,15 @@ public class VCFSpliceAnnotator {
 	}
 	
 	private void printSummary(){
+		int total = numVariantsIntersectingIntrons+ numVariantsIntersectingExons + numVariantsIntersectingSJs;
 		StringBuilder sb = new StringBuilder();
 		sb.append("Summary stats:\n");
 		sb.append(numTranscripts+"\tTranscripts\n"); 
 		sb.append(intersectingTranscriptNames.size()+"\tTranscripts intersecting variants\n"); 
 		sb.append(numVariantsScanned+"\tVariants (including alternates)\n");
-		sb.append(numVariantsIntersectingTranscripts+"\tVariants intersecting transcripts\n");
+		sb.append(numVariantsIntersectingTranscripts+"\tVariants intersecting transcripts, no repeat counting.\n");
+		sb.append("\nCounts including repeats with overlapping transcripts:\n");
+		sb.append(total + "\tVariants intersecting annotations\n");
 		sb.append(numVariantsIntersectingExons+"\tVariants intersecting exons (non splice junction)\n"); 
 		sb.append(numVariantsIntersectingIntrons+"\tVariants intersecting introns (non splice junction)\n"); 
 		sb.append(numVariantsIntersectingSJs+"\tVariants intersecting splice junctions\n"); 
@@ -340,8 +343,11 @@ public class VCFSpliceAnnotator {
 					System.out.print(workingChromosomeName+" ");
 				}
 				
-				//check if any transcripts were found, otherwise skip, might want to write out this vcf record somewhere?
-				if (workingTranscripts == null) continue;
+				//check if any transcripts were found
+				if (workingTranscripts == null) {
+					vcfOut.println(line);
+					continue;
+				}
 
 				//for each alternate allele, some vcf records have several
 				String[] alts = vcf.getAlternate();
@@ -376,7 +382,7 @@ public class VCFSpliceAnnotator {
 				}
 				vcf.setAlternate(alts);
 				//modify INFO field?
-				if (effects.size() == 0) vcfOut.println(vcf.getUnmodifiedInfoString());
+				if (effects.size() == 0) vcfOut.println(vcf.getOriginalRecord());
 				else {
 					String e = Misc.hashSetToString(effects, ":");
 					String[] fields = VCFParser.TAB.split(vcf.getOriginalRecord());
@@ -454,6 +460,7 @@ public class VCFSpliceAnnotator {
 			}
 			int varStart = vcf.getPosition();
 			int varEnd = varStart+ vcf.getReference().length();
+			boolean intersection = false;
 			for (int i=0; i< introns.length; i++){
 				//mod coordinates of intron
 				int intronStart = introns[i].getStart()+leftAdd;
@@ -461,8 +468,7 @@ public class VCFSpliceAnnotator {
 				if (intronEnd <= intronStart) continue;
 				//if a hit then score 
 				if (intersects(varStart, varEnd, intronStart, intronEnd) == false) continue;
-				//ok its a hit, set to noChange
-				numVariantsIntersectingIntrons++;
+				intersection = true;
 				//scan for novel, reference and alternate
 				String[] fiveSeqs = fetchNMerSeqs(vcf, 9);
 				scoreNewJunction(fiveSeqs, true, false, false, hit);
@@ -471,6 +477,8 @@ public class VCFSpliceAnnotator {
 				//can only have one intersection if snp or insertion
 				if (vcf.isSNP() || vcf.isInsertion()) break;
 			}
+			if (intersection) numVariantsIntersectingIntrons++;
+			
 		}
 	}
 
@@ -481,6 +489,7 @@ public class VCFSpliceAnnotator {
 			int varStart = vcf.getPosition();
 			int varEnd = varStart+ vcf.getReference().length();
 			int lastExonIndex = exons.length-1;
+			boolean intersection = false;
 			for (int i=0; i< exons.length; i++){
 				int start = exons[i].getStart();
 				int end = exons[i].getEnd();
@@ -492,7 +501,7 @@ public class VCFSpliceAnnotator {
 				}
 				//if a hit then score 
 				if (intersects(varStart, varEnd, start, end) == false) continue;
-				numVariantsIntersectingExons++;
+				intersection = true;
 				//scan for novel, reference and alternate			
 				String[] fiveSeqs = fetchNMerSeqs(vcf, 9);
 				scoreNewJunction(fiveSeqs, true, true, false, hit);
@@ -501,6 +510,7 @@ public class VCFSpliceAnnotator {
 				//can only have one intersection if snp or insertion
 				if (vcf.isSNP() || vcf.isInsertion()) break;
 			}
+			if (intersection) numVariantsIntersectingExons++;
 		}
 	}
 	
@@ -1378,7 +1388,7 @@ public class VCFSpliceAnnotator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Splice Annotator : Feb 2014                       **\n" +
+				"**                            VCF Splice Annotator : March 2014                     **\n" +
 				"**************************************************************************************\n" +
 				"Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and\n"+
 				"Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice\n"+
@@ -1387,7 +1397,7 @@ public class VCFSpliceAnnotator {
 				"frameshifts are not annotated. This app only looks for changes in splicing. Pvalues\n"+
 				"for gained exonic or intronic splices are estimated by generating null distibutions\n"+
 				"of masked sequence scores. Likewise, damaged splice pvalues are calculated using a\n"+
-				"score distribution from scoring high confidence splice junctions. A detailed spread\n"+
+				"score distribution from scoring high confidence splice junctions. A detailed spread-\n"+
 				"sheet and modified vcf file are generated. \n\n" +
 
 				"Required Options:\n"+
