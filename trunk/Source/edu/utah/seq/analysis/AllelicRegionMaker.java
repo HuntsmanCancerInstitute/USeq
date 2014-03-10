@@ -58,17 +58,28 @@ public class AllelicRegionMaker {
 
 			//fetch data
 			fetchDataAndRemove();
-
-			//are all four datasets present?
-			if( convertedMergedChromPlus != null && nonConvertedMergedChromPlus != null && convertedMergedChromMinus != null &&  nonConvertedMergedChromMinus != null) {
-				//merge strands
+			
+			//merge strands?
+			//con
+			convertedChrom = null;
+			if (convertedMergedChromPlus != null && convertedMergedChromMinus != null){
 				convertedChrom = PointData.mergePairedPointDataNoSumming(convertedMergedChromPlus, convertedMergedChromMinus);
-				nonConvertedChrom = PointData.mergePairedPointDataNoSumming(nonConvertedMergedChromPlus, nonConvertedMergedChromMinus);
-				//create regions
-				return scanChromForRegions2();
-
+			} else {
+				if (convertedMergedChromPlus != null) convertedChrom = convertedMergedChromPlus;
+				else convertedChrom = convertedMergedChromMinus;
 			}
-			else return null;
+			//nonCon
+			nonConvertedChrom = null;
+			if (nonConvertedMergedChromPlus != null && nonConvertedMergedChromMinus != null){
+				nonConvertedChrom = PointData.mergePairedPointDataNoSumming(nonConvertedMergedChromPlus, nonConvertedMergedChromMinus);
+			} else {
+				if (nonConvertedMergedChromPlus != null) nonConvertedChrom = nonConvertedMergedChromPlus;
+				else nonConvertedChrom = nonConvertedMergedChromMinus;
+			}
+			//check if null
+			if (convertedChrom == null || nonConvertedChrom == null) return null;
+			//create regions
+			return scanChromForRegions2();
 	}
 
 	/**Fetches the names of all the chromosomes in the data excluding lambda and phiX if present.*/
@@ -98,6 +109,7 @@ public class AllelicRegionMaker {
 		if (phiXChromosome != null) c.remove(phiXChromosome);
 
 		chromosomes=  Misc.hashSetToStringArray(c);
+
 	}
 
 	/**Fetchs the data for a particular chromosome.*/
@@ -335,105 +347,6 @@ public class AllelicRegionMaker {
 		return null;
 	}
 
-	/**Scores a chromosome for non-converted to total at base level.
-	 * @return PointData[2] fraction and FDRs for a given strand
-	private RegionScoreText[] scanChromForRegions(){
-		ArrayList<RegionScoreText> regionsAL = new ArrayList<RegionScoreText>();
-		
-		//fetch arrays
-		int[] positionsNonCon = nonConvertedChrom.getPositions();
-		float[] readsNonCon = nonConvertedChrom.getScores();
-		int[] positionsCon = convertedChrom.getPositions();
-		float[] readsCon = convertedChrom.getScores();
-
-		//collect all positions
-		int[] allPositions = Num.returnUniques(new int[][]{positionsNonCon, positionsCon});
-
-		//for each position 
-		int indexNonCon =0;
-		int indexCon =0;
-		ImprintBlock im = null;
-		int badBases = 0;
-		for (int i=0; i< allPositions.length; i++){
-			int testPos = allPositions[i];
-			float numNonCon =0;
-			float numCon =0;
-			//present in nonCon?
-			for (int j=indexNonCon; j < positionsNonCon.length; j++){
-				//match!
-				if (testPos == positionsNonCon[j]){
-					numNonCon = readsNonCon[j];
-					indexNonCon++;
-					break;
-				}
-				//less than
-				if (testPos < positionsNonCon[j]) break;
-				//greater than so keep advancing
-				indexNonCon = j;
-			}
-			//present in con?
-			for (int j=indexCon; j < positionsCon.length; j++){
-				//match!
-				if (testPos == positionsCon[j]){
-					numCon = readsCon[j];
-					indexCon++;
-					break;
-				}
-				//less than
-				if (testPos < positionsCon[j]) break;
-				//greater than so keep advancing
-				indexCon = j;
-			}
-
-
-			float totalObservations = numCon+numNonCon;
-			float fnc = (numNonCon+1)/(totalObservations+2);
-			
-
-			//pass thresholds?
-			boolean badBase = (totalObservations < minimumReadCoverage || fnc < minimumFractionMethylation || fnc > maximumFractionMethylation) ;
-			if (badBase){
-				//close it?
-				if (im != null){
-					if (im.numberBadCs < numberBadCsInImprintBlock) {
-						im.numberBadCs++;
-						badBases++;
-					}
-					else {
-						im.numberBadCs -= badBases;
-						RegionScoreText region = im.fetchRegion();
-						if (region!= null) regionsAL.add(region);
-						im = null;
-						badBases = 0;
-					}
-				}
-			}
-			else {
-				if (im == null) im = new ImprintBlock (testPos, numNonCon, numCon);
-				else {
-					im.numberObs++;
-					im.numberCon += numCon;
-					im.numberNonCon += numNonCon;
-					im.end = testPos;
-					badBases = 0;
-				}
-			}
-		}
-
-		//close last
-		if (im != null){
-			RegionScoreText region = im.fetchRegion();
-			if (region!= null) regionsAL.add(region);
-		}
-		
-		if (regionsAL.size() !=0) {
-			RegionScoreText[] r = new RegionScoreText[regionsAL.size()];
-			regionsAL.toArray(r);
-			return r;
-		}
-		return null;
-	}*/
-	
 
 	/**Collects and calculates a bunch of stats re the PointData.*/
 	private void fetchDataLinks(){

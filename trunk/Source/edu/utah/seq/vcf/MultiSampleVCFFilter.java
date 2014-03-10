@@ -20,7 +20,7 @@ public class MultiSampleVCFFilter {
 	private boolean filterRecordQuality = false;
 	private boolean failNonPassRecords = false;
 	private int sampleMinimumReadDepthDP = 0;
-	private int sampleMinimumGenotypeQualityGQ = 0;
+	private float sampleMinimumGenotypeQualityGQ = 0;
 	private float recordMinimumQUAL = 0;
 	private boolean printSampleNames = false;
 	private boolean filterByGenotype = false;
@@ -316,7 +316,7 @@ public class MultiSampleVCFFilter {
 					case 't': this.pathToTabix = args[++i]; break;
 					case 'f': passing = false; break;
 					case 'a': filterAnySample = true; break;
-					case 'g': sampleMinimumGenotypeQualityGQ = Integer.parseInt(args[++i]); break;
+					case 'g': sampleMinimumGenotypeQualityGQ = Float.parseFloat(args[++i]); break;
 					case 'i': failNonPassRecords = true; break;
 					case 'b': filterByGenotype = true; break;
 					case 'r': sampleMinimumReadDepthDP = Integer.parseInt(args[++i]); break;

@@ -15,7 +15,7 @@ public class VCFSample {
 	//fields, default to null or -1
 	private String genotypeGT = null;
 	private int readDepthDP = -1;
-	private int genotypeQualityGQ = -1;
+	private float genotypeQualityGQ = -1;
 	private boolean noCall = false;
 	private String originalRecord = null;
 	private String originalFormat = null;
@@ -28,7 +28,6 @@ public class VCFSample {
 		this.originalRecord = sample;
 		this.originalFormat = sampleFormat;
 		//is it a no call?
-		
 		if (sample.substring(0,3).startsWith("./.")){
 			noCall = true;
 		}
@@ -53,7 +52,7 @@ public class VCFSample {
 						readDepthDP = Integer.parseInt(data[i]);
 					}
 				}
-				else if (format[i].equals("GQ")) genotypeQualityGQ = Integer.parseInt(data[i]);
+				else if (format[i].equals("GQ")) genotypeQualityGQ = Float.parseFloat(data[i]);
 				else if (format[i].equals("AD")) {
 					alleleCounts = data[i];
 				}
@@ -75,7 +74,7 @@ public class VCFSample {
 		return readDepthDP;
 	}
 
-	public int getGenotypeQualityGQ() {
+	public float getGenotypeQualityGQ() {
 		return genotypeQualityGQ;
 	}
 

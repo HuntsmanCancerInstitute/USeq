@@ -396,10 +396,12 @@ public class BisStat {
 		//this removes the lambda data
 		fetchDataAndRemove();
 		//calc fraction non-converted, the expected non-converted
-		double numberNonCon = Num.sumArrayReturnDouble(nonConvertedMergedChromPlus.getScores());
-		double numberCon = Num.sumArrayReturnDouble(convertedMergedChromPlus.getScores());
-		numberNonCon += Num.sumArrayReturnDouble(nonConvertedMergedChromMinus.getScores());
-		numberCon += Num.sumArrayReturnDouble(convertedMergedChromMinus.getScores());
+		double numberNonCon = 0;
+		double numberCon = 0;
+		if (nonConvertedMergedChromPlus != null ) numberNonCon = Num.sumArrayReturnDouble(nonConvertedMergedChromPlus.getScores());
+		if (convertedMergedChromPlus != null) numberCon = Num.sumArrayReturnDouble(convertedMergedChromPlus.getScores());
+		if (nonConvertedMergedChromMinus != null) numberNonCon += Num.sumArrayReturnDouble(nonConvertedMergedChromMinus.getScores());
+		if (convertedMergedChromMinus != null) numberCon += Num.sumArrayReturnDouble(convertedMergedChromMinus.getScores());
 		expectedNonConverted = numberNonCon/(numberNonCon+numberCon);
 		String fraction = Num.formatNumber(expectedNonConverted, 5);
 		System.out.println("\nUsing Lambda data to set the expected fraction non-converted Cs to "+fraction+" ("+(int)numberNonCon+"/("+(int)numberNonCon+"+"+(int)numberCon+"))");
@@ -1508,7 +1510,7 @@ public class BisStat {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  BisStat: Dec 2013                               **\n" +
+				"**                                 BisStat: March 2014                              **\n" +
 				"**************************************************************************************\n" +
 				"Takes PointData from converted and non-converted C bisulfite sequencing data parsed\n" +
 				"using the NovoalignBisulfiteParser and generates several xxCxx context statistics and\n" +
