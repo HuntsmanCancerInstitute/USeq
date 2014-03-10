@@ -659,11 +659,11 @@ public class AllelicMethylationDetector {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                     Allelic Methylation Detector:  September 2012                **\n" +
+				"**                     Allelic Methylation Detector:  March 2014                    **\n" +
 				"**************************************************************************************\n" +
 				"AMD identifies regions displaying allelic methylation, e.g. ~50% average mCG\n" +
 				"methylation yet individual read pairs show a bimodal fraction distribution of either\n" +
-				"fully methylated or unmethylated.  \n\n"+
+				"fully methylated or unmethylated. Beta.\n\n"+
 
 				"Options:\n"+
 				"-s Save directory.\n"+

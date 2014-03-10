@@ -1,4 +1,12 @@
-----Useq_8.7.7----
+----USeq_8.7.8----
+BisStat
+* Added fix for single stranded lambda datasets, these were crashing the app when calculating the non-conversion rate.
+AllelicMethylationDetector
+* Added fix for single stranded datasets, this was tossing chromosomes of data that didn't have both a plus and minus strand.
+VCFComparator
+* Added a catch for GQ scores that are floats instead of ints, was causing app to crash.
+
+----USeq_8.7.7----
 PullMatchingAlignments
 * New app that writes out alignments that match read names contained in a second file.  The output is the alignment in sam format, 
 preceded by true/false, depending on alignment status.
@@ -6,6 +14,9 @@ ScoreSequences
 * Added two additional columns: 1) list of motif locations within the read and 2) top-scoring motif location within the read.
 VCFSpliceAnnotator
 * Bug fix for vcf output where vcf records with no changes were being truncated
+VCFComparator
+* Added catch for cases where no vcf records made it through the filtering.  These were crashing the application with some datasets.
+
 
 ----USeq_8.7.6----
 SamTranscriptomeParser & DefinedRegionDifferentialSeq
