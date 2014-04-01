@@ -6,8 +6,10 @@ import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -26,7 +28,7 @@ public class DRDSAnnotator {
 	private File inputFile = null;
 	private File outputFile = null;
 	private File annotationFile = null;
-	private HashMap<String,String[]> annotations = null;
+	private HashMap<String,ArrayList<HashSet<String>>> annotations = null;
 	private String[] header = null;
 	private int entries = 0;
 	private Workbook wb = null;
@@ -88,6 +90,7 @@ public class DRDSAnnotator {
 				}
 				
 				for (int c=0;c < oldSheet.getRow(c).getPhysicalNumberOfCells(); c++) {
+					//System.out.println(r + " " + c);
 					
 					//Get old cell
 					Cell oldCell = oldSheet.getRow(r).getCell(c);
@@ -131,7 +134,19 @@ public class DRDSAnnotator {
 							//Grab annotations if there is match
 							String[] annList = null;
 							if (this.annotations.containsKey(key)) {
-						    	annList = this.annotations.get(key);
+								ArrayList<String> tempList = new ArrayList<String>();
+								for (HashSet<String> res: this.annotations.get(key)) {
+									String temp = "";
+									for (String val: res) {
+										temp += "," + val;
+									}
+									if (temp.length()>0) {
+										temp = temp.substring(1);
+									}
+									
+									tempList.add(temp);
+								}
+						    	annList = tempList.toArray(new String[tempList.size()]);
 						    }
 							
 							for (int i=0;i<entries;i++) {
@@ -222,14 +237,33 @@ public class DRDSAnnotator {
 			this.entries = header.length - 2;
 			
 			//Initialize annotation container
-			this.annotations = new HashMap<String,String[]>();
+			this.annotations = new HashMap<String,ArrayList<HashSet<String>>>();
 			
 			//Read through file and add annotiation information
 			String temp = null;
 			while ((temp = br.readLine()) != null)  {
 				String[] items = temp.split("\t",-1);
 				if (!this.annotations.containsKey(items[0])) {
-					this.annotations.put(items[0], Arrays.copyOfRange(items, 2, items.length));
+					ArrayList<HashSet<String>> container = new ArrayList<HashSet<String>>();
+					for (String item: Arrays.copyOfRange(items,2,items.length)) {
+						HashSet<String> hs = new HashSet<String>();
+						if (!item.equals("")) {
+							hs.add(item);
+						}
+						
+						container.add(hs);
+					}
+					
+					this.annotations.put(items[0], container);
+				} else {
+					int counter = 0;
+					for (String item: Arrays.copyOfRange(items,2,items.length)) {
+						if (!item.equals("")) {
+							this.annotations.get(items[0]).get(counter).add(item);
+						}
+						counter++;
+					}
+					
 				}
 				
 			}
