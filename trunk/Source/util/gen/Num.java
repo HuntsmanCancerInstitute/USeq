@@ -4449,6 +4449,18 @@ public class Num {
 		}
 		return sb.toString();
 	}
+	
+	/**Converts an array of short to a String seperated by the delimiter.  */
+	public static String shortArrayToString(short[] d, String delimiter){
+		StringBuffer sb = new StringBuffer();
+		int num = d.length;
+		sb.append(d[0]);
+		for (int i=1; i<num; i++){
+			sb.append(delimiter);
+			sb.append(d[i]);
+		}
+		return sb.toString();
+	}
 
 	/**Given a String of ints delimited by something, will parse or return null.*/
 	public static int[] stringArrayToInts(String s, String delimiter){
