@@ -19,6 +19,7 @@ public class ExonIntron implements Comparable, Serializable {
 	private int index;
 	private ExonIntron[] exonsIntrons;
 	private int maxNumberSplices;
+	private float score;
 
 	//constructors
 	public ExonIntron (int start, int end){
@@ -394,5 +395,11 @@ public class ExonIntron implements Comparable, Serializable {
 	}
 	public void setMaxNumberSplices(int maxNumberSplices) {
 		this.maxNumberSplices = maxNumberSplices;
+	}
+	public float getScore() {
+		return score;
+	}
+	public void setScore(float score) {
+		this.score = score;
 	}
 }

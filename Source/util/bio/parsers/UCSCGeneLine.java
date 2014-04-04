@@ -30,9 +30,10 @@ public class UCSCGeneLine {
 	private float maxAbsLog2Ratio = 0;
 	private float maxPValue = 0;
 	//diff splicing
+	private ExonIntron[] scoredExons = null;
 	private float splicingLog2Ratio = 0;
 	private float splicingPValue = 0;
-	private int splicingExon = 0;
+	private ExonIntron maxLog2RtoSplicedExon = null;
 	private StringBuilder text;
 	private boolean flagged = false;
 	//all condition edgeR ANOVA
@@ -161,9 +162,14 @@ public class UCSCGeneLine {
 		log2Ratio = 0;
 		pValue = 0;
 		fdr = 0;
+		zeroNullSpliceScores();
+	}
+	
+	public void zeroNullSpliceScores(){
 		splicingLog2Ratio =0;
 		splicingPValue = 0;
-		splicingExon = 0;
+		maxLog2RtoSplicedExon = null;
+		scoredExons = null;
 	}
 	
 	public UCSCGeneLine partialCloneForSpliceJunctionGeneration(){
@@ -669,12 +675,6 @@ public class UCSCGeneLine {
 	public void setMaxPValue(float maxPValue) {
 		this.maxPValue = maxPValue;
 	}
-	public int getSplicingExon() {
-		return splicingExon;
-	}
-	public void setSplicingExon(int splicingExon) {
-		this.splicingExon = splicingExon;
-	}
 	public boolean isFlagged() {
 		return flagged;
 	}
@@ -686,5 +686,17 @@ public class UCSCGeneLine {
 	}
 	public void setFdrEdgeR(float fdrEdgeR) {
 		this.fdrEdgeR = fdrEdgeR;
+	}
+	public ExonIntron getMaxLog2RtoSplicedExon() {
+		return maxLog2RtoSplicedExon;
+	}
+	public void setMaxLog2RtoSplicedExon(ExonIntron maxLog2RtoSplicedExon) {
+		this.maxLog2RtoSplicedExon = maxLog2RtoSplicedExon;
+	}
+	public ExonIntron[] getScoredExons() {
+		return scoredExons;
+	}
+	public void setScoredExons(ExonIntron[] scoredExons) {
+		this.scoredExons = scoredExons;
 	}
 }

@@ -19,6 +19,13 @@ import edu.utah.seq.analysis.multi.GeneCount;
 import edu.utah.seq.analysis.multi.GeneResult;
 import edu.utah.seq.analysis.multi.PairedCondition;
 import edu.utah.seq.analysis.multi.Replica;
+import edu.utah.seq.data.HeatMapMaker;
+import edu.utah.seq.data.HeatMapMakerPosNeg;
+import edu.utah.seq.data.Info;
+import edu.utah.seq.data.PointData;
+import edu.utah.seq.data.SmoothingWindow;
+import edu.utah.seq.parsers.BarParser;
+import edu.utah.seq.useq.apps.Bar2USeq;
 import edu.utah.seq.useq.apps.Text2USeq;
 
 
@@ -41,7 +48,6 @@ public class DefinedRegionDifferentialSeq {
 	private int minimumCounts = 20;
 	private boolean deleteTempFiles = true;
 	private boolean filterOutliers = false;
-	private float minimumSpliceLog2Ratio = 1f;
 	private int minimumSpliceCounts = 10;
 	private boolean performStrandedAnalysis = false;
 	private boolean performReverseStrandedAnalysis = false;
@@ -65,24 +71,26 @@ public class DefinedRegionDifferentialSeq {
 	private String url;
 	private static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSDHN])");
 	public static final Pattern BAD_NAME = Pattern.compile("(.+)/[12]$");
-	public boolean saveCounts = false;
-	
+	public boolean saveCounts = true;
+
 	//for loading data
 	private int workingFragmentNameIndexPlus = 1;
 	private int workingFragmentNameIndexMinus = -1;
 	private HashMap<String, Integer> workingFragNameIndex = new HashMap<String, Integer>(10000);
-	
+
 	//for paired diff expression
 	private File geneCountTable;
 	private String[] conditionNamesPerReplica;
 	private String[] replicaNames;
 	private PairedCondition[] pairedConditions;
 	private File blindedVarCorData;
+	private File spliceGraphDirectory;
+	private File workingSpliceGraphDir;
 
 	//from RNASeq app integration
 	private File treatmentBamDirectory;
 	private File controlBamDirectory;
-	
+
 	//spreadsheet
 	private Workbook workbook = null;
 
@@ -124,7 +132,7 @@ public class DefinedRegionDifferentialSeq {
 	public void run(){
 		//run in non X11 mode
 		System.setProperty("java.awt.headless", "true");
-		
+
 		//load gene models
 		if (verbose) System.out.println("Loading regions/ gene models...");
 		loadGeneModels();
@@ -134,13 +142,13 @@ public class DefinedRegionDifferentialSeq {
 
 		//write out count table of genes passing minimum counts
 		writeCountTable();
-		
+
 		//cluster samples based on blinded normalization
 		executeDESeqCluster(false);
-		
+
 		//launch DESeq/SAMSeq for differential expression
 		String thresholdName = "-10Log10(FDR) "+Num.formatNumber(minFDR,1)+", Log2Ratio "+Num.formatNumber(minLog2Ratio, 1);
-	
+
 		if (this.useSamSeq) {
 			if (verbose) {
 				System.out.println("Running pairwise SAMseq analysis to identify differentially expressed genes...");
@@ -152,20 +160,23 @@ public class DefinedRegionDifferentialSeq {
 			if (verbose) System.out.println("Running pairwise DESeq analysis "+varianceFiltered+" variance outlier filtering to identify differentially expressed genes...");
 			analyzeForDifferentialExpression(false);
 		}
-		
-		
+
+
 		if (verbose) System.out.println("\n\t"+geneNamesPassingThresholds.size()+" / "+geneNamesToAnalyze.length+"\tgenes differentially expressed ("+thresholdName+")\n");
-			
+
 		//launch all pair ANOVA-like edgeR analysis, appends edgeR FDR onto gene line
 		if (conditions.length > 2){
 			if (verbose) System.out.println("Running ANOVA-like edgeR all condition analysis...");
 			if (runEdgeRAllConditionAnalysis() == false) System.err.println("Skipped edgeR analysis!\n");
 		}
-		
+
 		//launch Diff splice
 		if (verbose) System.out.println("Running pairwise chi-square tests for differential splicing...");
+		spliceGraphDirectory = new File (saveDirectory, "DiffSpliceLog2RtoGraphs");
+		spliceGraphDirectory.mkdirs();
 		analyzeForDifferentialSplicing();
-		
+		new Bar2USeq(spliceGraphDirectory,true);
+
 		//set max deseqFDR and varcorLog2Ratio in geneNamesToAnalyze
 		setMaxScores();
 
@@ -331,9 +342,14 @@ public class DefinedRegionDifferentialSeq {
 	private void analyzeForDifferentialSplicing() {
 		//for each PairedCondition
 		for (PairedCondition pc : pairedConditions){
+			//make dir to hold splice graph
+			workingSpliceGraphDir = new File (spliceGraphDirectory, pc.getName());
+			workingSpliceGraphDir.mkdirs();
+			workingSpliceGraphDir.deleteOnExit();
 			estimateDifferencesInReadDistributions(pc);
+
 		}
-		
+
 	}
 
 	private void loadConditions(){
@@ -361,7 +377,7 @@ public class DefinedRegionDifferentialSeq {
 				conditions = new Condition[conditionDirectories.length];				
 				for (int i=0; i< conditionDirectories.length; i++) conditions[i] = new Condition(conditionDirectories[i]);
 			}
-			
+
 			//If SAMseq, make sure there are least two replicas
 			if (this.useSamSeq) {
 				for (Condition c: this.conditions) {
@@ -371,7 +387,7 @@ public class DefinedRegionDifferentialSeq {
 					}
 				}
 			}
-			
+
 			//load em with data
 			for (int i=0; i< conditions.length; i++) {				
 				for (Replica r: conditions[i].getReplicas()){			
@@ -403,7 +419,7 @@ public class DefinedRegionDifferentialSeq {
 
 		}
 		geneNamesToAnalyze = Misc.hashSetToStringArray(geneNamesWithMinimumCounts);
-		
+
 		//print conditions
 		if (verbose) {
 			System.out.println("Conditions, replicas, and total gene region mapped counts:");
@@ -836,11 +852,14 @@ public class DefinedRegionDifferentialSeq {
 			UCSCGeneLine gl = name2Gene.get(geneName);
 			//any exons?
 			if (gl.getExons().length < 1) continue;
-			
+
 			//load it with counts
 			loadGeneLineWithExonCounts(gl, pair.getFirstCondition(), pair.getSecondCondition());
 
-			//check exon counts and modify if too few 
+			//null splice info
+			gl.zeroNullSpliceScores();
+
+			//check exon counts and modify if too few, sets a bunch of splice info too 
 			if (checkForMinimums(gl)){
 				al.add(gl);
 				int numEx = gl.getExonCounts()[0].length;
@@ -879,15 +898,83 @@ public class DefinedRegionDifferentialSeq {
 			float pAdj = (float) pVals[i] + bc;
 			if (pAdj > 0) genesWithExonsAndReads[i].setSplicingPValue(pAdj);
 		}
-		
+
+		//collect all scored exons for diff splicing
+		createSpliceGraphs(genesWithExonsAndReads);
+
 		//extract info and put back in PairedCondition
 		HashMap<String, float[]> geneNameSpliceStats = new HashMap<String, float[]>();
 		for (UCSCGeneLine gene: genesWithExonsAndReads){
-			float[] scores = new float[]{gene.getSplicingPValue(), gene.getSplicingLog2Ratio(), gene.getSplicingExon()};
+			ExonIntron maxLog2RtoSplicedExonIntron = gene.getMaxLog2RtoSplicedExon();
+			float[] scores = new float[]{gene.getSplicingPValue(), gene.getSplicingLog2Ratio(), maxLog2RtoSplicedExonIntron.getStart(), maxLog2RtoSplicedExonIntron.getEnd()};
 			geneNameSpliceStats.put(gene.getDisplayNameThenName(), scores);
 		}
 		pair.setGeneNameSpliceStats(geneNameSpliceStats);
+
+	}
+
+	/**Creates a square wave graph of exon log2Rtos for diff splicing.*/
+	private void createSpliceGraphs(UCSCGeneLine[] genesWithExonsAndReads) {
+		//load chromName : ExonIntron hashmap
+		HashMap<String, ArrayList<ExonIntron>> chromExons = new HashMap<String, ArrayList<ExonIntron>>();
+		String oldChr = "";
+		ArrayList<ExonIntron> al = null;
+		//walk through each gene
+		for (int i=0; i< genesWithExonsAndReads.length; i++){
+			//check thresholds, already thresholded at minLog2, check pval
+			if (genesWithExonsAndReads[i].getSplicingPValue() < minFDR) continue;
+			//make ArrayList?
+			if (genesWithExonsAndReads[i].getChrom().equals(oldChr) == false){
+				oldChr = genesWithExonsAndReads[i].getChrom();
+				al = chromExons.get(oldChr);
+				if (al == null) {
+					al = new ArrayList<ExonIntron>();
+					chromExons.put(oldChr, al);
+				}
+			}
+			//add Exons 
+			ExonIntron[] exons = genesWithExonsAndReads[i].getScoredExons();
+			for (ExonIntron e: exons) al.add(e);
+		}
+		//for each chromosome of exons 
+		for (String chrom : chromExons.keySet()){
+			al = chromExons.get(chrom);
+			ExonIntron[] exons = new ExonIntron[al.size()];
+			al.toArray(exons);
+			Arrays.sort(exons);
+			saveSmoothedHeatMapData(exons, chrom);
+		}
+
+	}
+
+
+	/**Saves bar heatmap/ stairstep graph files*/
+	public void saveSmoothedHeatMapData (ExonIntron[] exons, String chrom){
+		HashMap<String,String> map = new HashMap<String,String>();	
+		//what graph type should be used to display it?
+		map.put(BarParser.GRAPH_TYPE_TAG, BarParser.GRAPH_TYPE_STAIRSTEP);
+		//color 
+		map.put(BarParser.GRAPH_TYPE_COLOR_TAG, "#CC9900"); //mustard
+		//description
+		map.put(BarParser.DESCRIPTION_TAG, "Normalized diff splice count log2Rto");
+
+		//(String name, String versionedGenome, String chromosome, String strand, int readLength, HashMap<String,String> notes)
+		Info info = new Info(workingSpliceGraphDir.getName(), genomeVersion, chrom, ".", 0, map);
 		
+		//convert to SmoothingWindow
+		SmoothingWindow[] sm = new SmoothingWindow[exons.length];
+		for (int i=0; i< exons.length; i++){
+			float[] scores = {exons[i].getScore()};
+			sm[i] = new SmoothingWindow(exons[i].getStart(), exons[i].getEnd(), scores);
+		}
+
+		//get heatmap positions and values
+		HeatMapMakerPosNeg hm = new HeatMapMakerPosNeg(0, 0, 0);
+		PointData pd = hm.makeHeatMapPositionValues(sm);
+
+		pd.setInfo(info);
+		pd.writePointData(workingSpliceGraphDir);
+		pd.nullPositionScoreArrays();
 	}
 
 	/**Looks for minimum number of reads and minimum log2Ratio difference between exon counts.*/
@@ -896,7 +983,8 @@ public class DefinedRegionDifferentialSeq {
 		float[][] tExonCounts = gene.getTreatmentExonCounts();
 		float[][] cExonCounts = gene.getControlExonCounts();
 		int numExons = tExonCounts[0].length;
-
+		ExonIntron[] exons = gene.getExons();
+		
 		//collapse
 		float[] tCounts = new float[numExons];
 		float[] cCounts = new float[numExons];
@@ -916,16 +1004,16 @@ public class DefinedRegionDifferentialSeq {
 		float[] totalTC = gene.getScores();
 		double scalarTC = totalTC[0]/ totalTC[1];
 		double scalarCT = totalTC[1]/totalTC[0];
-
-
+		
 		//for each exon
 		ArrayList<Integer> goodIndexes = new ArrayList<Integer>();
+		ArrayList<ExonIntron> goodExonsAL = new ArrayList<ExonIntron>();
 		float maxLogRatio = 0;
 		int maxLogRatioIndex = 0;
 		float[] log2Ratios = new float[numExons];
 		for (int i=0; i< numExons; i++){
-			//enough reads?
-			if ((tCounts[i] + cCounts[i]) < minimumSpliceCounts) continue;
+			//require minimum counts in each exon from each sample
+			if (tCounts[i] < minimumSpliceCounts || cCounts[i] < minimumSpliceCounts) continue;
 			//check ratio
 			log2Ratios[i] = calculateLog2Ratio(tCounts[i], cCounts[i], scalarTC, scalarCT);
 			float logRatio = Math.abs(log2Ratios[i]);
@@ -934,17 +1022,25 @@ public class DefinedRegionDifferentialSeq {
 				maxLogRatioIndex = i;
 			}
 			goodIndexes.add(new Integer(i));
+			exons[i].setScore(log2Ratios[i]);
+			goodExonsAL.add(exons[i]);
 		}
 
 		//check ratio and good exons, need at least two for alt splicing
 		int numGoodExons = goodIndexes.size();
-		if (numGoodExons < 2 || maxLogRatio < minimumSpliceLog2Ratio) {
+		if (numGoodExons < 2 || maxLogRatio < minLog2Ratio) {
 			gene.setExonCounts(null);
 			return false;
 		}
-		//set log2Ratio 
+		//set maxLog2Ratio and maxExon
 		gene.setSplicingLog2Ratio(log2Ratios[maxLogRatioIndex]);
-		gene.setSplicingExon(maxLogRatioIndex);
+		gene.setMaxLog2RtoSplicedExon(exons[maxLogRatioIndex]);
+
+		//set good exons, for graphing splicing
+		ExonIntron[] goodExons = new ExonIntron[goodExonsAL.size()];
+		goodExonsAL.toArray(goodExons);
+		gene.setScoredExons(goodExons);
+
 		//set exon counts
 		if (numGoodExons == numExons) {
 			gene.setExonCounts(new float[][]{tCounts, cCounts});
@@ -963,13 +1059,13 @@ public class DefinedRegionDifferentialSeq {
 		return true;
 
 	}
-	
+
 	private void analyzeUsingSamSeq(){
 		ArrayList<PairedCondition> pairedConditionsAL = new ArrayList<PairedCondition>();
 		try {
 			StringBuilder sb = new StringBuilder();
 			sb.append("library(samr)\n");
-			
+
 			//diff express
 			pairedConditionsAL = new ArrayList<PairedCondition>();
 			for (int i=0; i< conditions.length; i++){
@@ -980,39 +1076,39 @@ public class DefinedRegionDifferentialSeq {
 					File results = new File (saveDirectory, pc.getName()+"DESeq.txt");
 					if (deleteTempFiles) results.deleteOnExit();
 					pc.setDiffExpResults(results);
-					
+
 					//make R script
-					
-					
+
+
 					//Load up data
 					sb.append("dataTable <- read.table('" + geneCountTable.getCanonicalPath()+"', header=TRUE,row.names=1)\n");
 					sb.append("geneNames <- rownames(dataTable)\n");
 					sb.append("conds <- as.factor(c('"+ Misc.stringArrayToString(conditionNamesPerReplica, "','") + "'))\n");
-					
+
 					//Create data model
 					sb.append("dataModel <- list(x=dataTable,y=conds,geneid=geneNames)\n");
-					
+
 					//Run SAMSeq
 					sb.append("results <- SAMseq(dataTable,conds,resp.type='Two class unpaired',geneid=geneNames,fdr.output=1)\n");
-					
+
 					//Create output table
-				    sb.append("outputTables <- samr.compute.siggenes.table(results$samr.obj,results$del,dataModel,results$delta.table,all.genes=TRUE)\n");
-				    
-				    //Merge output tables
-				    sb.append("mergeTable <- rbind(outputTables$genes.up,outputTables$genes.lo)\n");
-				    
-				    //Clean up tables
-				    sb.append("finalTable <- mergeTable[,c(3,4,7,8)]\n");
-				    sb.append("finalTable[,4] <- as.numeric(finalTable[,4]) / 100\n");
-				    sb.append("finalTable[,3] <- log(as.numeric(finalTable[,3]),2)\n");
-				    sb.append("finalTable <- finalTable[match(geneNames,finalTable[,1]),]\n");
-				    
-				    //Write Table
-				    sb.append("write.table(finalTable,file='"+results.getCanonicalPath()+"',sep='\t',quote=FALSE,row.names=FALSE)");
-					
+					sb.append("outputTables <- samr.compute.siggenes.table(results$samr.obj,results$del,dataModel,results$delta.table,all.genes=TRUE)\n");
+
+					//Merge output tables
+					sb.append("mergeTable <- rbind(outputTables$genes.up,outputTables$genes.lo)\n");
+
+					//Clean up tables
+					sb.append("finalTable <- mergeTable[,c(3,4,7,8)]\n");
+					sb.append("finalTable[,4] <- as.numeric(finalTable[,4]) / 100\n");
+					sb.append("finalTable[,3] <- log(as.numeric(finalTable[,3]),2)\n");
+					sb.append("finalTable <- finalTable[match(geneNames,finalTable[,1]),]\n");
+
+					//Write Table
+					sb.append("write.table(finalTable,file='"+results.getCanonicalPath()+"',sep='\t',quote=FALSE,row.names=FALSE)");
+
 				}
 			}
-			
+
 			//write script to file
 			File scriptFile = new File (saveDirectory,"samseq_RScript.txt");
 			File rOut = new File(saveDirectory, "samseq_RScript.txt.Rout");
@@ -1027,7 +1123,7 @@ public class DefinedRegionDifferentialSeq {
 					"--no-restore",
 					scriptFile.getCanonicalPath(),
 					rOut.getCanonicalPath()};
-			
+
 			//execute command
 			IO.executeCommandLine(command);
 
@@ -1037,7 +1133,7 @@ public class DefinedRegionDifferentialSeq {
 			//Make conditions
 			pairedConditions = new PairedCondition[pairedConditionsAL.size()];
 			pairedConditionsAL.toArray(pairedConditions);
-			
+
 			//look for results files and parse results
 			for (PairedCondition pc: pairedConditions){
 				if (pc.getDiffExpResults().exists() == false ) throw new IOException("\n\nR results file doesn't exist. Check temp files in save directory for error.\n");
@@ -1045,7 +1141,7 @@ public class DefinedRegionDifferentialSeq {
 				if (verbose) System.out.println("\t"+pc.getVsName()+"\t"+pc.getDiffExpGeneNames().size());
 				geneNamesPassingThresholds.addAll(pc.getDiffExpGeneNames());
 			}
-			
+
 			//cleanup
 			if (deleteTempFiles) {
 				rOut.deleteOnExit();
@@ -1093,12 +1189,12 @@ public class DefinedRegionDifferentialSeq {
 				sb.append("cds = estimateDispersions( cds" +outlier + local +")\n");
 			}
 			sb.append("vsd = getVarianceStabilizedData( cds )\n");
-			
+
 			//write out variance stabilized data, actually we don't want this, need it to be blinded!
 			//deseqVarCorData = new File(saveDirectory,"deseqVarCorData.txt");
 			//if (deleteTempFiles) deseqVarCorData.deleteOnExit();
 			//sb.append("write.table(vsd, file = '"+deseqVarCorData.getCanonicalPath()+"', quote=FALSE, sep ='\t', row.names = FALSE, col.names = FALSE)\n");
-			
+
 			//diff express
 			pairedConditionsAL = new ArrayList<PairedCondition>();
 			for (int i=0; i< conditions.length; i++){
@@ -1109,7 +1205,7 @@ public class DefinedRegionDifferentialSeq {
 					File results = new File (saveDirectory, pc.getName()+"DESeq.txt");
 					if (deleteTempFiles) results.deleteOnExit();
 					pc.setDiffExpResults(results);
-					
+
 					sb.append("res = nbinomTest( cds, '"+conditions[i].getName()+"', '"+conditions[j].getName()+"', pvals_only = FALSE)\n");
 					sb.append("res[,6] = (rowMeans( vsd[, conditions(cds)=='"+conditions[i].getName()+"', drop=FALSE] ) - rowMeans( vsd[, conditions(cds)=='"+conditions[j].getName()+"', drop=FALSE] ))\n");
 					//Fred adjP
@@ -1120,7 +1216,7 @@ public class DefinedRegionDifferentialSeq {
 					sb.append("write.table(res, file = '"+results.getCanonicalPath()+"', quote=FALSE, sep ='\t', row.names = FALSE, col.names = FALSE)\n");
 				}
 			}
-			
+
 			//write script to file
 			File scriptFile = new File (saveDirectory,"deseq_RScript.txt");
 			File rOut = new File(saveDirectory, "deseq_RScript.txt.Rout");
@@ -1135,7 +1231,7 @@ public class DefinedRegionDifferentialSeq {
 					"--no-restore",
 					scriptFile.getCanonicalPath(),
 					rOut.getCanonicalPath()};
-			
+
 			//execute command
 			IO.executeCommandLine(command);
 
@@ -1153,7 +1249,7 @@ public class DefinedRegionDifferentialSeq {
 			//Make conditions
 			pairedConditions = new PairedCondition[pairedConditionsAL.size()];
 			pairedConditionsAL.toArray(pairedConditions);
-			
+
 			//look for results files and parse results
 			for (PairedCondition pc: pairedConditions){
 				if (pc.getDiffExpResults().exists() == false ) throw new IOException("\n\nR results file doesn't exist. Check temp files in save directory for error.\n");
@@ -1161,7 +1257,7 @@ public class DefinedRegionDifferentialSeq {
 				if (verbose) System.out.println("\t"+pc.getVsName()+"\t"+pc.getDiffExpGeneNames().size());
 				geneNamesPassingThresholds.addAll(pc.getDiffExpGeneNames());
 			}
-			
+
 			//cleanup
 			if (deleteTempFiles) {
 				rOut.deleteOnExit();
@@ -1196,65 +1292,65 @@ public class DefinedRegionDifferentialSeq {
 		try {
 			//create a workbook
 			workbook = new XSSFWorkbook();
-		    FileOutputStream fileOut = new FileOutputStream(new File(saveDirectory, "geneStats.xlsx"));
-		    
-		    //create a worksheet
-		    Sheet sheet0 = workbook.createSheet("Analyzed Genes");
-		    sheet0.createFreezePane( 0, 1, 0, 1 );
-		    
-		    //create rows, one for each gene with counts plus header
-		    Row[] rows = new Row[geneNamesToAnalyze.length+1];
-		    for (int i=0; i< rows.length; i++) rows[i] = sheet0.createRow(i);
-		    
-		    //make header line
-		    makeHeaderLine(rows[0], true);
-		    
-		    //add gene info
-		    int cellIndex = addGeneInfo(rows);
-		    
-		    //add PairedCondition info
-		    cellIndex = addPairedConditionInfo(rows, cellIndex);
-		    
-		    //add count values
-		    cellIndex = addCountInfo(rows, cellIndex);
-		    
-		    if (!this.useSamSeq) {
-		    	//add varcor values
-			    cellIndex = addVarCorInfo(rows, cellIndex);
-		    }
-		    
-		    
-		    //add FPKM
-		    cellIndex = addFPKMInfo(rows, cellIndex);
-		    
-		    //new sheet for diff expressed genes at relaxed thresholds
-		    Sheet sheet1 = workbook.createSheet("FDR 10 Lg2Rt 0.585");
-		    sheet1.createFreezePane( 0, 1, 0, 1 );
-		    addDiffExpressedGenes(sheet1, 10f, 0.5849625f);
-		    
-		    //new sheet for diff expressed genes at standard thresholds
-		    Sheet sheet2 = workbook.createSheet("FDR 13 Lg2Rt 1");
-		    sheet2.createFreezePane( 0, 1, 0, 1 );
-		    addDiffExpressedGenes(sheet2, 13f, 1f);
-		    
-		    //new sheet for diff expressed genes at standard thresholds
-		    Sheet sheet3 = workbook.createSheet("FDR 30 Lg2Rt 1.585");
-		    sheet3.createFreezePane( 0, 1, 0, 1 );
-		    addDiffExpressedGenes(sheet3, 30f, 1.584963f);
-		    
-		    //new sheet for flagged genes
-		    Sheet sheet4 = workbook.createSheet("Flagged Genes");
-		    addFlaggedGenes(sheet4);
-		    
-		    //new sheet for descriptions of headings
-		    Sheet sheet5= workbook.createSheet("Column Descriptions");
-		    addColumnDescriptors(sheet5);
-		    
-		    //write out and close
-		    workbook.write(fileOut);
-		    fileOut.close();
+			FileOutputStream fileOut = new FileOutputStream(new File(saveDirectory, "geneStats.xlsx"));
 
-			
+			//create a worksheet
+			Sheet sheet0 = workbook.createSheet("Analyzed Genes");
+			sheet0.createFreezePane( 0, 1, 0, 1 );
+
+			//create rows, one for each gene with counts plus header
+			Row[] rows = new Row[geneNamesToAnalyze.length+1];
+			for (int i=0; i< rows.length; i++) rows[i] = sheet0.createRow(i);
+
+			//make header line
+			makeHeaderLine(rows[0], true);
+
+			//add gene info
+			int cellIndex = addGeneInfo(rows);
+
+			//add PairedCondition info
+			cellIndex = addPairedConditionInfo(rows, cellIndex);
+
+			//add count values
+			cellIndex = addCountInfo(rows, cellIndex);
+
+			if (!this.useSamSeq) {
+				//add varcor values
+				cellIndex = addVarCorInfo(rows, cellIndex);
+			}
+
+
+			//add FPKM
+			cellIndex = addFPKMInfo(rows, cellIndex);
+
+			//new sheet for diff expressed genes at relaxed thresholds
+			Sheet sheet1 = workbook.createSheet("FDR 10 Lg2Rt 0.585");
+			sheet1.createFreezePane( 0, 1, 0, 1 );
+			addDiffExpressedGenes(sheet1, 10f, 0.5849625f);
+
+			//new sheet for diff expressed genes at standard thresholds
+			Sheet sheet2 = workbook.createSheet("FDR 13 Lg2Rt 1");
+			sheet2.createFreezePane( 0, 1, 0, 1 );
+			addDiffExpressedGenes(sheet2, 13f, 1f);
+
+			//new sheet for diff expressed genes at standard thresholds
+			Sheet sheet3 = workbook.createSheet("FDR 30 Lg2Rt 1.585");
+			sheet3.createFreezePane( 0, 1, 0, 1 );
+			addDiffExpressedGenes(sheet3, 30f, 1.584963f);
+
+			//new sheet for flagged genes
+			Sheet sheet4 = workbook.createSheet("Flagged Genes");
+			addFlaggedGenes(sheet4);
+
+			//new sheet for descriptions of headings
+			Sheet sheet5= workbook.createSheet("Column Descriptions");
+			addColumnDescriptors(sheet5);
+
+			//write out and close
+			workbook.write(fileOut);
+			fileOut.close();
+
+
 		} catch (Exception e){
 			System.err.println("\nProblem printing spreadsheet!");
 			e.printStackTrace();
@@ -1282,12 +1378,12 @@ public class DefinedRegionDifferentialSeq {
 					passing.add(new GeneResult(geneNamesToAnalyze[j], fdrLog2[0], fdrLog2[1]));
 				}
 			}
-			
+
 			//convert to array and sort by abs of log2
 			GeneResult[] gr = new GeneResult[passing.size()];
 			passing.toArray(gr);
 			Arrays.sort(gr);
-			
+
 			//for each gene result
 			int rowIndex = 1;
 			for (int j=0; j< gr.length; j++){
@@ -1306,21 +1402,21 @@ public class DefinedRegionDifferentialSeq {
 
 	private void addColumnDescriptors(Sheet sheet) {
 		//make some styles
-	    CellStyle bold = workbook.createCellStyle();
-	    Font font = workbook.createFont();
-	    font.setBoldweight(Font.BOLDWEIGHT_BOLD);
-	    bold.setFont(font);
-	    
+		CellStyle bold = workbook.createCellStyle();
+		Font font = workbook.createFont();
+		font.setBoldweight(Font.BOLDWEIGHT_BOLD);
+		bold.setFont(font);
+
 		int rowIndex = 0;
-		
+
 		String[][] usedDescriptors;
-		
+
 		if (useSamSeq) {
 			usedDescriptors = this.samSeqDescriptors;
 		} else {
 			usedDescriptors = this.deSeqDescriptors;
 		}
-		
+
 		for (int i=0; i< usedDescriptors.length; i++){
 			Row row = sheet.createRow(rowIndex++);
 			Cell cell = row.createCell(0);
@@ -1328,10 +1424,10 @@ public class DefinedRegionDifferentialSeq {
 			cell.setCellValue(usedDescriptors[i][0]);
 			if (usedDescriptors[i][1] != null) row.createCell(1).setCellValue(usedDescriptors[i][1]);
 		}
-		
+
 		sheet.autoSizeColumn((short)0);
 	}
-	
+
 	private String[][] deSeqDescriptors = {
 			{"Gene/Region info:", null},
 			{"IGB HyperLink", "Click each to reposition a running instance of IGB, http://bioviz.org/igb/"},
@@ -1342,22 +1438,22 @@ public class DefinedRegionDifferentialSeq {
 			{"Max Abs Lg2Rto", "Maximum absolute log2 ratio observed using DESeq's varCor values"},
 			{"Max DESeq FDR", "Maximum observed -10Log10( FDR ) between any pairwise DESeq comparisons.  Note the MaxAbsLg2Rto and MaxDESeqFDR may be from different comparisons.  "
 					+ "Moreover, all p-values and FDRs in USeq output, both printed and in graph form have been phred transformed where the value is actually -10*Log10(FDR or pval). Thus -10*Log10(0.001) = 30, -10*Log10(0.01) = 20, -10*Log10(0.05) = 13, and -10*Log10(0.1) = 10. "},
-			{"EdgeR FDR", "Maximum -10Log10( FDR ) from running edgeR's ANOVA-like analysis designed to score genes for differential expression under any conditions."},
-			{"", ""},
-			{"For each Paired Comparison:", null},
-			{"Lg2Rto", "DESeq's log2 ratio for differential expression, log2(mean(varCorT1,varCorT2, ...)/mean(varCorC1,varCorC2,...)). Note these varCor values will differ somewhat from the blinded varCor values exported to the spreadsheet since they use a different variance estimation."},
-			{"FDR", "DESeq's negative binomial p-value following the Benjamini and Hochberg multiple testing correction."},
-			{"Spli Lg2Rto", "The maximum log2 ratio difference between two conditions and a gene's exon after correcting for differences in counts.  Use this to gauge the degree of potential differential splicing."},
-			{"Spli AdjPVal", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction is applied to the p-values."},
-			{"Spli Index", "The zero based index relative to the plus genomic strand for the exon displaying the SpliLg2Rto."},
-			{"", ""},
-			{"For each Replica:", null},
-			{"Counts", "Number of alignments that overlap a given gene/region by at least one base pair. Paired alignments are only counted once.  Alignments that span a gene/region but don't actually touch down are ignored. "},
-			{"VarCor", "Per gene/region variance corrected counts in log space from DESeq estimated using its blind method.  Use these for subsequent clustering.  These values are a bit different from the varCor values used in scoring paired differential expression. "},
-			{"FPKM", "Transformed count data normalized to library size and gene/region length (counts/ exonicBasesPerKB/ millionTotalMappedReadsToGeneTable)"}
-					
+					{"EdgeR FDR", "Maximum -10Log10( FDR ) from running edgeR's ANOVA-like analysis designed to score genes for differential expression under any conditions."},
+					{"", ""},
+					{"For each Paired Comparison:", null},
+					{"Lg2Rto", "DESeq's log2 ratio for differential expression, log2(mean(varCorT1,varCorT2, ...)/mean(varCorC1,varCorC2,...)). Note these varCor values will differ somewhat from the blinded varCor values exported to the spreadsheet since they use a different variance estimation."},
+					{"FDR", "DESeq's negative binomial p-value following the Benjamini and Hochberg multiple testing correction."},
+					{"Spli Lg2Rto", "The maximum log2 ratio difference between two conditions and a gene's exon after correcting for differences in counts.  Use this to gauge the degree of potential differential splicing."},
+					{"Spli AdjPVal", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction is applied to the p-values."},
+					{"Spli Coor", "Coordinates of the exon displaying the SpliLg2Rto."},
+					{"", ""},
+					{"For each Replica:", null},
+					{"Counts", "Number of alignments that overlap a given gene/region by at least one base pair. Paired alignments are only counted once.  Alignments that span a gene/region but don't actually touch down are ignored. "},
+					{"VarCor", "Per gene/region variance corrected counts in log space from DESeq estimated using its blind method.  Use these for subsequent clustering.  These values are a bit different from the varCor values used in scoring paired differential expression. "},
+					{"FPKM", "Transformed count data normalized to library size and gene/region length (counts/ exonicBasesPerKB/ millionTotalMappedReadsToGeneTable)"}
+
 	};
-	
+
 	private String[][] samSeqDescriptors = {
 			{"Gene/Region info:", null},
 			{"IGB HyperLink", "Click each to reposition a running instance of IGB, http://bioviz.org/igb/"},
@@ -1368,19 +1464,19 @@ public class DefinedRegionDifferentialSeq {
 			{"Max Abs Lg2Rto", "Maximum absolute log2 ratio observed using DESeq's varCor values"},
 			{"Max SAMseq FDR", "Maximum observed -10Log10( FDR ) between any pairwise DESeq comparisons.  Note the MaxAbsLg2Rto and MaxDESeqFDR may be from different comparisons.  "
 					+ "Moreover, all p-values and FDRs in USeq output, both printed and in graph form have been phred transformed where the value is actually -10*Log10(FDR or pval). Thus -10*Log10(0.001) = 30, -10*Log10(0.01) = 20, -10*Log10(0.05) = 13, and -10*Log10(0.1) = 10. "},
-			{"EdgeR FDR", "Maximum -10Log10( FDR ) from running edgeR's ANOVA-like analysis designed to score genes for differential expression under any conditions."},
-			{"", ""},
-			{"For each Paired Comparison:", null},
-			{"Lg2Rto", "SAMseq's log2 ratio for differential expression"},
-			{"FDR", "SAMseq's FDR"},
-			{"Spli Lg2Rto", "The maximum log2 ratio difference between two conditions and a gene's exon after correcting for differences in counts.  Use this to gauge the degree of potential differential splicing."},
-			{"Spli AdjPVal", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction is applied to the p-values."},
-			{"Spli Index", "The zero based index relative to the plus genomic strand for the exon displaying the SpliLg2Rto."},
-			{"", ""},
-			{"For each Replica:", null},
-			{"Counts", "Number of alignments that overlap a given gene/region by at least one base pair. Paired alignments are only counted once.  Alignments that span a gene/region but don't actually touch down are ignored. "},
-			{"FPKM", "Transformed count data normalized to library size and gene/region length (counts/ exonicBasesPerKB/ millionTotalMappedReadsToGeneTable)"}
-					
+					{"EdgeR FDR", "Maximum -10Log10( FDR ) from running edgeR's ANOVA-like analysis designed to score genes for differential expression under any conditions."},
+					{"", ""},
+					{"For each Paired Comparison:", null},
+					{"Lg2Rto", "SAMseq's log2 ratio for differential expression"},
+					{"FDR", "SAMseq's FDR"},
+					{"Spli Lg2Rto", "The maximum log2 ratio difference between two conditions and a gene's exon after correcting for differences in counts.  Use this to gauge the degree of potential differential splicing."},
+					{"Spli AdjPVal", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction is applied to the p-values."},
+					{"Spli Coor", "Coordinates of the exon displaying the SpliLg2Rto."},
+					{"", ""},
+					{"For each Replica:", null},
+					{"Counts", "Number of alignments that overlap a given gene/region by at least one base pair. Paired alignments are only counted once.  Alignments that span a gene/region but don't actually touch down are ignored. "},
+					{"FPKM", "Transformed count data normalized to library size and gene/region length (counts/ exonicBasesPerKB/ millionTotalMappedReadsToGeneTable)"}
+
 	};
 
 	private void addFlaggedGenes(Sheet sheet) {
@@ -1397,26 +1493,26 @@ public class DefinedRegionDifferentialSeq {
 		Arrays.sort(tooFew);
 		int maxNum = tooFew.length;
 		if (tooMany.length > maxNum) maxNum = tooMany.length;	
-		
+
 		//bold styles
-	    CellStyle bold = workbook.createCellStyle();
-	    Font font = workbook.createFont();
-	    font.setBoldweight(Font.BOLDWEIGHT_BOLD);
-	    bold.setFont(font);
-		
+		CellStyle bold = workbook.createCellStyle();
+		Font font = workbook.createFont();
+		font.setBoldweight(Font.BOLDWEIGHT_BOLD);
+		bold.setFont(font);
+
 		int rowIndex = 0;
 		Row header = sheet.createRow(rowIndex++);
 		header.createCell(0).setCellValue("< "+minimumCounts+ " counts");
 		header.createCell(1).setCellValue("> "+maxAlignmentsDepth+ " counts");
 		header.getCell(0).setCellStyle(bold);
 		header.getCell(1).setCellStyle(bold);
-		
+
 		for (int i=0; i< maxNum; i++){
 			String tooManyCell = "";
 			String tooFewCell = "";
 			if (tooMany.length > i) tooManyCell = tooMany[i];
 			if (tooFew.length > i) tooFewCell = tooFew[i];
-			
+
 			Row r = sheet.createRow(rowIndex++);
 			r.createCell(0).setCellValue(tooFewCell);
 			r.createCell(1).setCellValue(tooManyCell);
@@ -1428,7 +1524,7 @@ public class DefinedRegionDifferentialSeq {
 
 	private int addCountInfo(Row[] rows, int cellIndex) {
 		int ci = cellIndex;
-		
+
 		//for each gene / row
 		for (int j=0; j< geneNamesToAnalyze.length; j++){
 			int rowIndex = j+1;
@@ -1443,7 +1539,7 @@ public class DefinedRegionDifferentialSeq {
 					rows[rowIndex].createCell(ci++).setCellValue(num);
 				}
 			}
-			
+
 		}
 		return ci;
 	}
@@ -1451,7 +1547,7 @@ public class DefinedRegionDifferentialSeq {
 	private int addVarCorInfo(Row[] rows, int cellIndex) {
 		//First parse the table of numbers
 		float[][] geneVarCor = parseVarCorData(blindedVarCorData);
-				
+
 		//write them to the excel sheet
 		int ci = cellIndex;
 		for (int j=0; j< geneNamesToAnalyze.length; j++){
@@ -1461,10 +1557,10 @@ public class DefinedRegionDifferentialSeq {
 				rows[rowIndex].createCell(ci++).setCellValue(c);
 			}
 		}
-		
+
 		return ci;
 	}
-	
+
 	private int addFPKMInfo(Row[] rows, int cellIndex) {
 		int ci = cellIndex;
 		//for each gene
@@ -1507,7 +1603,7 @@ public class DefinedRegionDifferentialSeq {
 		} catch (Exception e) {
 			Misc.printErrAndExit("\nError: problem parsing varCor data, see "+deseqVarCorData+"\n"+e.getMessage());
 		}
-		
+
 		//fix negatives? remember these are in log space so it is OK to add a constant
 		if (minimum < 0){
 			minimum = -1 * minimum;
@@ -1518,17 +1614,17 @@ public class DefinedRegionDifferentialSeq {
 		return geneVarCor;
 	}
 
-	/*Adds DiffExpLg2Rto DiffExpFDR DiffSpliceLg2Rto DiffSpliceFDR DiffSpliceIndex*/
+	/*Adds DiffExpLg2Rto DiffExpFDR DiffSpliceLg2Rto DiffSpliceFDR DiffSpliceCoordinates*/
 	private int addPairedConditionInfo(Row[] rows, int cellIndex) {
-		float[] noScores = {0f,0f,0f};
+		float[] noScores = {0f,0f,0f,0f,0f};
 		int ci = 0;
-		
+
 		//for each paired condition
 		for (int i=0; i< pairedConditions.length; i++){
 			PairedCondition pc = pairedConditions[i];
 			float[][] geneScores = pc.getParsedDiffExpResults();
 			HashMap<String, float[]> spliceScores = pc.getGeneNameSpliceStats();
-			
+
 			//for each gene / row
 			for (int j=0; j< geneNamesToAnalyze.length; j++){
 				int rowIndex = j+1;
@@ -1546,8 +1642,9 @@ public class DefinedRegionDifferentialSeq {
 				rows[rowIndex].createCell(ci++).setCellValue(splice[1]);
 				//fdr splice
 				rows[rowIndex].createCell(ci++).setCellValue(splice[0]);
-				//index splice
-				rows[rowIndex].createCell(ci++).setCellValue(splice[2]);
+				//coordinates of max log2 rto spliced exon
+				String coor = (int)splice[2]+"-"+(int)splice[3];
+				rows[rowIndex].createCell(ci++).setCellValue(coor);
 			}
 			cellIndex = ci;
 		}
@@ -1557,30 +1654,30 @@ public class DefinedRegionDifferentialSeq {
 	/*Adds DisplayName Name Chr Strand Start Stop TotalBPs MaxAbsLg2Rto MaxDESeqFDR MaxEdgeRFDR*/
 	private int addGeneInfo(Row[] rows) {
 		CreationHelper createHelper = workbook.getCreationHelper();
-		
+
 		//make style for hyperlinks
 		CellStyle hlStyle = workbook.createCellStyle();
 		Font hlFont = workbook.createFont();
 		hlFont.setUnderline(Font.U_SINGLE);
 		hlFont.setColor(IndexedColors.BLUE.getIndex());
 		hlStyle.setFont(hlFont);
-		
+
 		int cellIndex = 0;
 		for (int i=0; i < geneNamesToAnalyze.length; i++){
 			cellIndex = 0;
 			int rowIndex = i+1;
 			UCSCGeneLine gene = name2Gene.get(geneNamesToAnalyze[i]);
-			
+
 			//hyperlink with displayName
 			Hyperlink link = createHelper.createHyperlink(Hyperlink.LINK_URL);
 			link.setAddress(fetchIGBHyperLink(gene));
 			link.setLabel(gene.getDisplayNameThenName());
-			
+
 			Cell hlCell = rows[rowIndex].createCell(cellIndex++);
 			hlCell.setCellStyle(hlStyle);
 			hlCell.setHyperlink(link);
 			hlCell.setCellValue(gene.getDisplayNameThenName());
-			
+
 			//alt name
 			if (gene.getName() != null) rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getName());
 			else rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getDisplayName());
@@ -1599,7 +1696,7 @@ public class DefinedRegionDifferentialSeq {
 		}
 		return cellIndex;
 	}
-	
+
 	private String fetchIGBHyperLink(UCSCGeneLine gene){
 		StringBuilder text = new StringBuilder();
 		//url
@@ -1615,7 +1712,7 @@ public class DefinedRegionDifferentialSeq {
 		text.append(end);
 		return text.toString();
 	}
-	
+
 	private int createCell (Row row, String value, int index, CellStyle style){
 		Cell cell = row.createCell(index);
 		cell.setCellType(Cell.CELL_TYPE_STRING);
@@ -1623,74 +1720,74 @@ public class DefinedRegionDifferentialSeq {
 		cell.setCellValue(value);
 		return index +1;
 	}
-	
+
 	private CellStyle createHeaderStyle(short colorIndex){
-	    CellStyle style = workbook.createCellStyle();
-	    style.setWrapText(true);
-	    style.setAlignment(CellStyle.ALIGN_CENTER);
-	    Font font = workbook.createFont();
-	    font.setBoldweight(Font.BOLDWEIGHT_BOLD);
-	    style.setFont(font);
-	    if (colorIndex != -1){
-	    	style.setFillForegroundColor(colorIndex);
-	    	style.setFillPattern(CellStyle.SOLID_FOREGROUND);
-	    }
-	    return style;
+		CellStyle style = workbook.createCellStyle();
+		style.setWrapText(true);
+		style.setAlignment(CellStyle.ALIGN_CENTER);
+		Font font = workbook.createFont();
+		font.setBoldweight(Font.BOLDWEIGHT_BOLD);
+		style.setFont(font);
+		if (colorIndex != -1){
+			style.setFillForegroundColor(colorIndex);
+			style.setFillPattern(CellStyle.SOLID_FOREGROUND);
+		}
+		return style;
 	}
 	private void makeHeaderLine(Row row, boolean all) {
 		//create header
-	    CellStyle headerCellStyle = createHeaderStyle((short)-1);
-	    
-	    int index = 0;
-	    if (all){
-	    	index = createCell(row, "IGB HyperLink", index, headerCellStyle);
-	    	index = createCell(row, "Alt Name", index, headerCellStyle);
-	    	index = createCell(row, "Coor "+genomeVersion, index, headerCellStyle);
-	    	index = createCell(row, "Strand", index, headerCellStyle);
-	    	index = createCell(row, "Total BPs", index, headerCellStyle);
-	    	index = createCell(row, "Max Abs Lg2Rto", index, headerCellStyle);
-	    	index = createCell(row, "Max DESeq FDR", index, headerCellStyle);
-	    	index = createCell(row, "EdgeR FDR", index, headerCellStyle);
-	    }
-	     
-	    //for each PairedCondition
-	    int colorIndex = 0;
-	    short[] colorIndexes = new short[]{IndexedColors.LIGHT_BLUE.getIndex(), IndexedColors.LIGHT_GREEN.getIndex(), IndexedColors.LIGHT_ORANGE.getIndex(), IndexedColors.LIGHT_TURQUOISE.getIndex(), IndexedColors.LIGHT_YELLOW.getIndex()};
-	    for (PairedCondition pc : pairedConditions){
-	    	CellStyle pcCellStyle = createHeaderStyle(colorIndexes[colorIndex++]);
-	    	if (colorIndex == colorIndexes.length) colorIndex = 0;
-	    	String name = pc.getName();
-	    	if (all == false) index = createCell(row, name, index, pcCellStyle);
-	    	index = createCell(row, "Lg2Rto "+name, index, pcCellStyle);
-	    	index = createCell(row, "FDR "+name, index, pcCellStyle);
-	    	if (all){
-	    		index = createCell(row, "Spli Lg2Rto "+name, index, pcCellStyle);
-	    		index = createCell(row, "Spli AdjPVal "+name, index, pcCellStyle);
-	    		index = createCell(row, "Spli Index "+name, index, pcCellStyle);
-	    	}
-	    }
-	    
-	    if (all){
-	    	//count values for each replica
-	    	CellStyle countCellStyle = createHeaderStyle(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
-	    	for (String repName: replicaNames){
-	    		index = createCell(row, "Counts "+repName, index, countCellStyle);
-	    	}
+		CellStyle headerCellStyle = createHeaderStyle((short)-1);
 
-	    	if (!this.useSamSeq) {
-	    		//VarCor values for each replica
-		    	CellStyle varCorCellStyle = createHeaderStyle(IndexedColors.WHITE.getIndex());
-		    	for (String repName: replicaNames){
-		    		index = createCell(row, "VarCor "+repName, index, varCorCellStyle);
-		    	}
-	    	}
-	    	
-	    	//FPKM values for each replica	    
-	    	CellStyle fpkmCellStyle = createHeaderStyle(IndexedColors.SKY_BLUE.getIndex());
-	    	for (String repName: replicaNames){
-	    		index = createCell(row, "FPKM "+repName, index, fpkmCellStyle);
-	    	}
-	    }
+		int index = 0;
+		if (all){
+			index = createCell(row, "IGB HyperLink", index, headerCellStyle);
+			index = createCell(row, "Alt Name", index, headerCellStyle);
+			index = createCell(row, "Coor "+genomeVersion, index, headerCellStyle);
+			index = createCell(row, "Strand", index, headerCellStyle);
+			index = createCell(row, "Total BPs", index, headerCellStyle);
+			index = createCell(row, "Max Abs Lg2Rto", index, headerCellStyle);
+			index = createCell(row, "Max DESeq FDR", index, headerCellStyle);
+			index = createCell(row, "EdgeR FDR", index, headerCellStyle);
+		}
+
+		//for each PairedCondition
+		int colorIndex = 0;
+		short[] colorIndexes = new short[]{IndexedColors.LIGHT_BLUE.getIndex(), IndexedColors.LIGHT_GREEN.getIndex(), IndexedColors.LIGHT_ORANGE.getIndex(), IndexedColors.LIGHT_TURQUOISE.getIndex(), IndexedColors.LIGHT_YELLOW.getIndex()};
+		for (PairedCondition pc : pairedConditions){
+			CellStyle pcCellStyle = createHeaderStyle(colorIndexes[colorIndex++]);
+			if (colorIndex == colorIndexes.length) colorIndex = 0;
+			String name = pc.getName();
+			if (all == false) index = createCell(row, name, index, pcCellStyle);
+			index = createCell(row, "Lg2Rto "+name, index, pcCellStyle);
+			index = createCell(row, "FDR "+name, index, pcCellStyle);
+			if (all){
+				index = createCell(row, "Spli Lg2Rto "+name, index, pcCellStyle);
+				index = createCell(row, "Spli AdjPVal "+name, index, pcCellStyle);
+				index = createCell(row, "Spli Coor "+name, index, pcCellStyle);
+			}
+		}
+
+		if (all){
+			//count values for each replica
+			CellStyle countCellStyle = createHeaderStyle(IndexedColors.LIGHT_CORNFLOWER_BLUE.getIndex());
+			for (String repName: replicaNames){
+				index = createCell(row, "Counts "+repName, index, countCellStyle);
+			}
+
+			if (!this.useSamSeq) {
+				//VarCor values for each replica
+				CellStyle varCorCellStyle = createHeaderStyle(IndexedColors.WHITE.getIndex());
+				for (String repName: replicaNames){
+					index = createCell(row, "VarCor "+repName, index, varCorCellStyle);
+				}
+			}
+
+			//FPKM values for each replica	    
+			CellStyle fpkmCellStyle = createHeaderStyle(IndexedColors.SKY_BLUE.getIndex());
+			for (String repName: replicaNames){
+				index = createCell(row, "FPKM "+repName, index, fpkmCellStyle);
+			}
+		}
 	}
 
 	public float parseFloat(String f){
@@ -1703,7 +1800,7 @@ public class DefinedRegionDifferentialSeq {
 		ArrayList<String> replicaNamesAL = new ArrayList<String>();
 		geneCountTable = new File(saveDirectory, "geneCountTableMin"+minimumCounts+".txt");
 		if (deleteTempFiles) geneCountTable.deleteOnExit();
-		
+
 		try {
 			//write matrix of name, t,t,t...c,c,c,c...d,d,d, to file for genes with observations
 			PrintWriter out = new PrintWriter( new FileWriter(geneCountTable));
@@ -1744,7 +1841,7 @@ public class DefinedRegionDifferentialSeq {
 			System.err.println("Problem writing out count table.");
 			e.printStackTrace();
 		}
-		
+
 		conditionNamesPerReplica = Misc.stringArrayListToStringArray(conditionNamesPerReplicaAL);
 		replicaNames = Misc.stringArrayListToStringArray(replicaNamesAL);
 	}
@@ -1773,7 +1870,7 @@ public class DefinedRegionDifferentialSeq {
 				}
 				//write out gene table sans overlaps
 				File f = new File (saveDirectory, Misc.removeExtension(refSeqFile.getName())+"_NoOverlappingExons.txt") ;
-				if (verbose) System.out.println("\tWrote the trimmed gene table to the save directory. Use this table and the -o option to speed up subsequent processing.");
+				if (verbose) System.out.println("\tWrote the trimmed gene table to the save directory. Use this table to speed up subsequent processing.");
 				reader.writeGeneTableToFile(f);
 			}
 			genes = reader.getGeneLines();
@@ -1800,7 +1897,7 @@ public class DefinedRegionDifferentialSeq {
 
 		chromGenes = reader.getChromSpecificGeneLines();
 
-		
+
 		name2Gene = new HashMap<String, UCSCGeneLine>();
 		for (UCSCGeneLine gl: genes) {
 			String name = gl.getDisplayNameThenName();
@@ -1936,7 +2033,7 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                       Defined Region Differential Seq: Feb 2014                  **\n" +
+				"**                     Defined Region Differential Seq:    March 2014               **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +
@@ -1996,7 +2093,7 @@ public class DefinedRegionDifferentialSeq {
 				"      /Data/TimeCourse/ESCells/ -s /Data/TimeCourse/DRDS -g H_sapiens_Feb_2009\n" +
 				"     -u /Anno/mergedHg19EnsemblGenes.ucsc.gz\n\n" +
 
-		"**************************************************************************************\n");
+				"**************************************************************************************\n");
 
 	}
 }
