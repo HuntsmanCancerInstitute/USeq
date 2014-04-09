@@ -44,7 +44,7 @@ public class IntersectRegions {
 		processArgs(arguments);
 		System.out.println("\nLaunching...");
 		if (entirelyContained) System.out.println("\tIntersections are scored where 2nd regions are entirely contained in 1st regions.");
-		else System.out.println("\tMax gap "+gap);
+		else System.out.println("\tMax gap "+ (gap-1));
 
 		//make StringBuffer to hold total bases and median lengths
 		StringBuffer stats = new StringBuffer();
@@ -104,7 +104,7 @@ public class IntersectRegions {
 				
 				//count regions
 				String twoName =  Misc.removeExtension(secondRegionsFiles[i].getName());
-				summaryLines.append(gap+"\t"+oneName+"\t"+twoName+"\t");
+				summaryLines.append((gap-1)+"\t"+oneName+"\t"+twoName+"\t");
 
 				//make histogram to hold length distribution?
 				if (printHistogram) histogram = new Histogram(minMaxBins[0], minMaxBins[1], (int)minMaxBins[2]);
@@ -225,9 +225,12 @@ public class IntersectRegions {
 					if (chromFastaFile.exists() ==  false ) Misc.printExit("Error: Cannot find genomic sequence file -> "+chromFastaFile);
 					MultiFastaParser fastaParser = new MultiFastaParser();
 					fastaParser.parseIt(chromFastaFile);
-					chromosomeSequence = fastaParser.getSeqs()[0];
+					chromosomeSequence = fastaParser.getSeqs()[0].toLowerCase();
 				}
 			}
+			
+			
+			
 			if (i % 1000 == 0 && i != 0) {
 				Date currTime = new Date();
 				float seconds = (currTime.getTime() - startTime.getTime()) / 1000;
@@ -246,17 +249,33 @@ public class IntersectRegions {
 			//generate numberRandom set of of coordinates
 			int[][] randomCoordinates; 
 
-			if (genomicSequenceDirectory == null) randomCoordinates = rr.fetchRandomCoordinates(set2[i].getEnd()-set2[i].getStart()+1, numberRandom);
+			double gc = 0;
+			
+			if (genomicSequenceDirectory == null) {
+				randomCoordinates = rr.fetchRandomCoordinates(set2[i].getEnd()-set2[i].getStart()+1, numberRandom);
+			}
 			//match gc content
 			else {
-				double gc = set2[i].getGcContent();
+				int len = 0;
+				int gcCount = 0;
+				String sequence = chromosomeSequence.substring(set2[i].getStart(),set2[i].getEnd()).toLowerCase();
+				for (char b: sequence.toCharArray()) {
+					len++;
+					if (b == 'g' || b == 'c') {
+						gcCount++;
+					}
+				}
+				gc = (double)gcCount / len ;
 				randomCoordinates = rr.fetchRandomCoordinates(set2[i].getEnd()-set2[i].getStart()+1, numberRandom, gc);
 			}
 			//failed to make?
-			if (randomCoordinates == null ) System.err.println("\nERROR: Problem making random coordinates for "+set2[i].simpleSummaryLine()+" Skipping!\n");
+			if (randomCoordinates == null ) System.err.println(String.format("WARNING: Problem making random coordinates for %s.  GC content: %.2f. Length: %d.",set2[i].simpleSummaryLine(),gc,set2[i].getLength()));
 			else {
 				//convert to an array of BindingRegion
 				BindingRegion[] randomBRs = makeBindingRegions(randomCoordinates, chrom);
+//				for (BindingRegion br: randomBRs) {
+//					System.out.println(br.getStart() + " " + br.getEnd() + " " + br.getGcContent() + "\n");
+//				}
 				//increment the hitsPerTrial counter
 				intersectRandomBindingRegions(randomBRs, chromSpecificOne);
 

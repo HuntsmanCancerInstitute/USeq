@@ -104,6 +104,7 @@ public class RandomRegions {
 		int[][] rrs = new int[number][2];
 		for (int i=0; i< number; i++){
 			//attempt 10K times to find a length and GC matched random region
+			
 			for (int x =0; x<10000; x++){
 				//randomly select a region of the correct size
 				GenomicRegion r = findRandomRegion(length);
@@ -126,7 +127,7 @@ public class RandomRegions {
 				}
 			}
 			//found a matched gc frag?
-			if (rrs[i] == null) return null;
+			if (rrs[i][0] == 0 && rrs[i][1] ==0) return null;
 		}
 		return rrs;
 	}
