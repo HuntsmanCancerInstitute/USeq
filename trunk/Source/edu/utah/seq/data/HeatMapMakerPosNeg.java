@@ -99,15 +99,20 @@ public class HeatMapMakerPosNeg {
 
 	/**Make a heatmap blocks from given window indexes, stop not included.*/
 	public void addHeatMapBlocks(int startIndex, int stopIndex){
+		
+		//find first and last base
+		int startBase = windows[startIndex].getStart();
+		int stopBase = windows[stopIndex-1].getStop();
+		for (int i=startIndex; i< stopIndex; i++){
+			if (windows[i].getStart() < startBase) startBase = windows[i].getStart();
+			if (windows[i].getStop() > stopBase) stopBase = windows[i].getStop();
+		}
 
 		//create arrays of float, one per base to hold max positive and max negative scores
-		int startBase = windows[startIndex].getStart();
-		int stopIndexMin1 = stopIndex -1;
-		int stopBase = windows[stopIndexMin1].getStop();
 		int numBases = stopBase- startBase;
 		float[] maxPosValues = new float[numBases];
 		float[] maxNegValues = new float[numBases];
-
+	
 		//load max arrays with max scores
 		//for each window
 		for (int i=startIndex; i< stopIndex; i++){
@@ -165,8 +170,6 @@ public class HeatMapMakerPosNeg {
 		//close last block
 		add(numBases-1+startBase,blockValue);
 		add(numBases+startBase,0);
-
-
 	}
 
 	/**Adds a line to the global ArrayLists.*/
@@ -175,11 +178,9 @@ public class HeatMapMakerPosNeg {
 		values.add(new Float(value));
 	}
 
-	/**Assumes right window is to right of left or abuts or doesn't overlap.*/
 	public boolean overlapOrAbut (SmoothingWindow left, SmoothingWindow right){
-		//overlap or abut, note not using sizeOfOligoMinusOne to include abuts
-		if (left.getStop() >= right.getStart()) return true;
-		return false;
+		if (left.getStop() <= right.getStart()  || right.getStop() <= left.getStart()) return false;
+		return true;
 	}
 
 	public float getMaxWindowFilter() {

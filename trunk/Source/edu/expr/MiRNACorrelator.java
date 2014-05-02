@@ -24,6 +24,7 @@ public class MiRNACorrelator {
 	private File targetData;
 	private File geneExpressionData;
 	private File results;
+	private boolean noFDR = false;
 
 	//internal fields
 	private static final Pattern TAB = Pattern.compile("\t");
@@ -230,7 +231,9 @@ public class MiRNACorrelator {
 				if (skip) continue;
 
 				double[] lg2FDR = genes.get(geneName);
-				String val = "\t"+lg2FDR[0]+" "+lg2FDR[1];
+				String val = null;
+				if (noFDR) val = "\t"+lg2FDR[0];
+				else val = "\t"+lg2FDR[0]+" "+lg2FDR[1];
 
 				//print name
 				out.print(geneName);
@@ -380,6 +383,7 @@ public class MiRNACorrelator {
 					case 't': targetData = new File(args[++i]); break;
 					case 'e': geneExpressionData = new File(args[++i]); break;
 					case 'r': results = new File(args[++i]); break;
+					case 'f': noFDR = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -399,7 +403,7 @@ public class MiRNACorrelator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             MiRNA Correlator: Dec 2013                           **\n" +
+				"**                            MiRNA Correlator: March 2014                          **\n" +
 				"**************************************************************************************\n" +
 				"Generates a spreadsheet to use in comparing changing miRNA levels to changes in gene\n"+
 				"expression.\n"+
@@ -410,6 +414,7 @@ public class MiRNACorrelator {
 				"-m MiRNA data (two columns: miRNA name, miRNA log2Rto).\n"+
 				"-t Gene target to miRNA data (two columns: gene target name, miRNA name).\n"+
 				"-e Gene expression data (three columns: gene name, log2Rto, FDR).\n"+
+				"-f Don't print the gene expression FDR value in the spreadsheet.\n"+
 
 				"\n"+
 

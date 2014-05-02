@@ -1309,11 +1309,6 @@ public class OverdispersedRegionScanSeqs {
 						"(http://www-huber.embl.de/users/anders/DESeq/)?  See the author's websites for installation instructions. Once installed, " +
 						"launch an R terminal and type 'library(DESeq)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
 			}
-			//look for estimateDispersions() function
-			boolean useEstimateDispersions = DefinedRegionDifferentialSeq.estimateDispersions(fullPathToR, saveDirectory);
-			if (useEstimateDispersions == false){
-				Misc.printErrAndExit("\nError: Please upgrade DESeq to the latest version, see http://www-huber.embl.de/users/anders/DESeq/ \n");
-			}
 		}
 
 
