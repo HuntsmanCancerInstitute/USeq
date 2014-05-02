@@ -94,9 +94,6 @@ public class MultipleReplicaScanSeqs {
 		this.bypassVarianceOutlierFiltering = bypassVarianceOutlierFiltering;
 		this.verbose = verbose;
 		
-		//check DESeq?
-		DefinedRegionDifferentialSeq.estimateDispersions(fullPathToR, saveDirectory);
-		
 		//System.out.println("ED? "+useEstimateDispersions);
 		
 		halfPeakShift = (int)Math.round( ((double)peakShift)/2 );
@@ -805,9 +802,6 @@ public class MultipleReplicaScanSeqs {
 						"launch an R terminal and type 'library(qvalue)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
 			}
 		}
-		
-		//look for estimateDispersions() function
-		DefinedRegionDifferentialSeq.estimateDispersions(fullPathToR, saveDirectory);
 
 		//make matrixFile
 		tempRDirectory = new File (saveDirectory, "TempRDir_"+Passwords.createRandowWord(7));

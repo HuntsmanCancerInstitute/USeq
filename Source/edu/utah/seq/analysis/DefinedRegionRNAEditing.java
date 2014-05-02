@@ -24,6 +24,7 @@ public class DefinedRegionRNAEditing {
 	private double errorRateMinOne;
 	private int minimumBaseCoverage = 5;
 	private boolean runStrandedAnalysis = false;
+	private boolean removeSingletons = false;
 
 	//internal fields
 	private boolean plusStrand = true;
@@ -295,8 +296,12 @@ public class DefinedRegionRNAEditing {
 		//remove those 100% edited (likely snvs)
 		ArrayList<MethylatedBaseObservationOneSample> good = new ArrayList<MethylatedBaseObservationOneSample>();
 		for (int i=0; i< editedBases.length; i++){
+			float bfe = editedBases[i].getFractionMethylationNoAddOne();
+			//remove those with a non zero bfm and only 1 ob in the nonCon
+			if (removeSingletons && bfe > 0 && editedBases[i].getNonCon() == 1) continue;
 			if (editedBases[i].getCon() != 0) good.add(editedBases[i]);
 		}
+		
 		editedBases = new MethylatedBaseObservationOneSample[good.size()];
 		good.toArray(editedBases);
 		editedBasePositions = MethylatedBaseObservationOneSample.fetchPositions(editedBases);
@@ -515,6 +520,7 @@ public class DefinedRegionRNAEditing {
 					case 'b': regionsFile = new File(args[++i]); break;
 					case 't': runStrandedAnalysis = true; break;
 					case 'a': minimumBaseCoverage = Integer.parseInt(args[++i]); break;
+					case 'i': removeSingletons = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -564,7 +570,7 @@ public class DefinedRegionRNAEditing {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Defined Region RNA Editing: Dec 2013                   **\n" +
+				"**                           Defined Region RNA Editing: April 2014                 **\n" +
 				"**************************************************************************************\n" +
 				"DRRE scores regions for the pseudomedian of the base fraction edits as well as the\n" +
 				"probability that the observations occured by chance using a permutation test based on\n" +
@@ -579,6 +585,8 @@ public class DefinedRegionRNAEditing {
 				"-r Reference PointData directory from the RNAEditingPileUpParser. Ditto.\n" +
 				"-a Minimum base read coverage, defaults to 5.\n"+
 				"-t Run a stranded analysis, defaults to non-stranded.\n"+
+				"-i Remove base fraction edits that are non zero and represented by just one edited\n"+
+				"       base.\n"+
 
 				"\n"+
 

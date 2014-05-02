@@ -1,3 +1,15 @@
+----USeq_8.8.0----
+DefinedRegionDifferentialSeq
+* Updated DESeq to DESeq2, major changes, different dispersion fit, different log2Rto calculation, automatic independence filtering.  All results in more diff expressed genes compared to the older depreciated methods. Old diff genes are pretty much a subset of new diff genes.
+
+----USeq_8.7.9----
+RNAEditingScanSeqs and DefinedRegionRNAEditing
+* Added option to exclude base observations where the editing was > 0 and supported by only one read
+DefinedRegionDifferentialSeq
+* Added a requirement that exons included in differential splicing have 10 or more reads in both t and c samples
+* Added a relative log2Rto diff exon splicing graph for each comparison
+* Exported the coordinates of the exon with the biggest diff log2Rto instead of just the index
+
 ----USeq_8.7.8----
 BisStat
 * Added fix for single stranded lambda datasets, these were crashing the app when calculating the non-conversion rate.

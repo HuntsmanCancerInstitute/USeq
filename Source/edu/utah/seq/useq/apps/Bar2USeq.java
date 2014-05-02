@@ -207,14 +207,13 @@ public class Bar2USeq {
 			int[] pos = bp.getBasePositions();
 			float[] scores = bp.getValues();
 			int lastPosition = 0;
-			int numBadPos = 0;
+			//int numBadPos = 0;
 			for (int j=0; j< pos.length; j++) {
 				//watch out for unsorted positions!
 				if (pos[j] < lastPosition) {
-					System.err.println("\n\nWarning: your bar file isn't sorted by position! See new position -> "+pos[j]+", prior position "+lastPosition+", line # "+j+", replacing new with prior.");
+					//if (numBadPos < 10) System.err.println("Warning: your bar file isn't sorted by position! See new position -> "+pos[j]+", prior position "+lastPosition+", line # "+j+", replacing new with prior.");
 					pos[j] = lastPosition;
-					numBadPos++;
-					if (numBadPos > 10)Misc.printErrAndExit("\nError: too many mis sorted positions, aborting, see -> "+barFiles[i]+"\n");
+					//numBadPos++;
 				}
 				lastPosition = pos[j];
 				positions[j] = new PositionScore(pos[j], scores[j]);
