@@ -310,15 +310,12 @@ public class VCFComparator {
 			if (matchingKey == null) {
 				nonMatches.add(vcfTest[i]);
 			}
-			else {
-//System.out.println("VCFTEST "+vcfTest[i]);				
+			else {				
 				//for each match
 				boolean matchFound = false;
-				for (int x=0; x< matchingKey.length; x++){
-//System.out.println("VCFKey "+matchingKey[x]);					
+				for (int x=0; x< matchingKey.length; x++){				
 					//check to see if it matches
 					if (vcfTest[i].matchesAlternateAlleleGenotype(matchingKey[x], requireGenotypeMatch)) {
-//System.out.println("MatchFound");
 						matchingKey[x].setFilter(VCFRecord.PASS);
 						vcfTest[i].setFilter(VCFRecord.PASS);
 						matches.add(new VCFMatch(matchingKey[x], vcfTest[i]));
@@ -326,9 +323,7 @@ public class VCFComparator {
 						break;
 					}
 				}
-
-				if (matchFound == false) {
-//System.out.println("NoMatch");					
+				if (matchFound == false) {					
 					nonMatches.add(vcfTest[i]);
 				}
 			}

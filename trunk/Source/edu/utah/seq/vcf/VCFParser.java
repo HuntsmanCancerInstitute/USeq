@@ -10,10 +10,11 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.regex.Pattern;
-import edu.utah.seq.useq.data.RegionScoreText;
 
+import edu.utah.seq.useq.data.RegionScoreText;
 import util.gen.Gzipper;
 import util.gen.IO;
+import util.gen.Misc;
 import util.gen.Num;
 
 /*
@@ -404,12 +405,12 @@ public class VCFParser {
 	 * Returns the min and max scores found.*/
 	public float[] setRecordQUALAsScore() {
 		float minScore = vcfRecords[0].getQuality();
-		float maxScore = minScore;
+		float maxScore = minScore;		
 		for (VCFRecord r : vcfRecords) {
 			float score = r.getQuality();
 			if (score < minScore) minScore = score;
 			if (score > maxScore) maxScore = score;
-			r.setScore((float)score);
+			r.setScore((float)score);		
 		}
 		return new float[]{minScore, maxScore};
 	}
@@ -421,6 +422,25 @@ public class VCFParser {
 	public float[] setRecordScore(String infoName) throws Exception{
 		float minScore = vcfRecords[0].getInfoObject().getInfoFloat(infoName);
 		float maxScore = minScore;
+		
+		/*
+		int counter = 0;
+		for (VCFRecord r : vcfRecords) {
+			float vqs = r.getInfoObject().getInfoFloat(infoName);
+			float qual = r.getQuality();
+System.out.println(vqs+"\t"+qual);
+		if (counter++ > 1000) break;
+		}
+		System.exit(0);
+		
+		
+System.out.println("\nSetting "+infoName);	
+*/
+
+
+
+
+
 		for (VCFRecord r : vcfRecords) {
 			float score = r.getInfoObject().getInfoFloat(infoName);
 			if (score < minScore) minScore = score;

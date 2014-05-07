@@ -102,6 +102,7 @@ public class PairedCondition {
 				parsedDiffExpResults[x] = new float[2];
 				//adjPval, log transform
 				if (stats[6].equals("Inf")) parsedDiffExpResults[x][0] = Float.MIN_VALUE;
+				else if (stats[6].equals("NA")) parsedDiffExpResults[x][0] = 0f;
 				else {
 					parsedDiffExpResults[x][0] = Float.parseFloat(stats[6]);
 					if (parsedDiffExpResults[x][0] > maxAdjPVal) maxAdjPVal = parsedDiffExpResults[x][0];
