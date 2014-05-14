@@ -40,7 +40,7 @@ public class BisStat {
 	private float fdrThreshold = 20;
 	private boolean useLambda = false;
 	private int minimumCsInWindow = 5;
-	private boolean performStrandedAnalysis = true;
+	private boolean performStrandedAnalysis = false;
 	private float firstQuartileThreshold = 0.25f;
 	private float fourthQuartileThreshold = 0.75f;
 
@@ -1274,7 +1274,7 @@ public class BisStat {
 					case 'p': fdrThreshold = Float.parseFloat(args[++i]); break;
 					case 'e': expectedNonConverted = Float.parseFloat(args[++i]); useLambda = false; break;
 					case 'l': useLambda = true; break;
-					case 'd': performStrandedAnalysis = false; break;
+					case 'g': performStrandedAnalysis = true; break;
 					case 'r': fullPathToR = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
@@ -1510,7 +1510,7 @@ public class BisStat {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 BisStat: March 2014                              **\n" +
+				"**                                 BisStat: May 2014                                **\n" +
 				"**************************************************************************************\n" +
 				"Takes PointData from converted and non-converted C bisulfite sequencing data parsed\n" +
 				"using the NovoalignBisulfiteParser and generates several xxCxx context statistics and\n" +
@@ -1541,7 +1541,7 @@ public class BisStat {
 				"-w Window size, defaults to 1000.\n"+
 				"-m Minimum number Cs passing read coverage in window to score, defaults to 5. \n"+
 				"-r Full path to R, defaults to '/usr/bin/R'\n" +
-				"-d Merge stranded data, defaults to running a stranded analysis. Affects CG's.\n"+
+				"-g Don't merge stranded data, defaults to running a non stranded analysis. Affects CG's.\n"+
 				"-a First density quartile fraction methylation threshold, defaults to 0.25\n"+
 				"-b Fourth density quartile fraction methylation threshold, defaults to 0.75\n"+
 
