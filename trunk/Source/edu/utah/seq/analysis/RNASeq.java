@@ -309,7 +309,7 @@ public class RNASeq {
 		
 		if (useDESeq) {
 			System.out.println();
-			MultipleReplicaScanSeqs ss = new MultipleReplicaScanSeqs(treatmentPointData, controlPointData, scanSeqs, rApplication, scanSeqsWindowSize, 0, 10, minimumFDR, true, verbose);
+			MultipleReplicaScanSeqs ss = new MultipleReplicaScanSeqs(treatmentPointData, controlPointData, scanSeqs, rApplication, scanSeqsWindowSize, 0, 10, verbose);
 			swiFile = ss.getSwiFile();
 		}
 		else {
@@ -532,22 +532,11 @@ public class RNASeq {
 			passed = false;
 		}
 		else {
-			String errors = IO.runRCommandLookForError("library(DESeq)", rApplication, resultsDirectory);
+			String errors = IO.runRCommandLookForError("library(DESeq2); library(qvalue); library(gplots) ", rApplication, resultsDirectory);
 			if (errors == null || errors.length() !=0){
 				passed = false;
-				notes.append("\nError: Cannot find the required R library.  Did you install DESeq " +
-						"(http://www-huber.embl.de/users/anders/DESeq/)?  See the author's websites for installation instructions. Once installed, " +
-						"launch an R terminal and type 'library(DESeq)' to see if it is present. Error message:\n\t\t"+errors+"\n\n");
-			}
-			if (useDESeq == false){
-				//look for qvalue library
-				errors = IO.runRCommandLookForError("library(qvalue)", rApplication, resultsDirectory);
-				if (errors == null || errors.length() !=0){
-					passed = false;
-					notes.append("\nError: Cannot find the required R library.  Did you install qvalue " +
-							"(http://genomics.princeton.edu/storeylab/qvalue/)?  See the author's websites for installation instructions. Once installed, " +
-							"launch an R terminal and type 'library(qvalue)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
-				}
+				notes.append("\nError: Cannot find the required R libraries.  Did you install DESeq2, gplots, and qvalue? Once installed, " +
+						"launch an R terminal and type 'library(DESeq2); library(qvalue); library(gplots)' to see if it is present. Error message:\n\t\t"+errors+"\n\n");
 			}
 		}
 
@@ -714,10 +703,10 @@ public class RNASeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                   RNASeq: July 2012                              **\n" +
+				"**                                    RNASeq: May 2014                              **\n" +
 				"**************************************************************************************\n" +
 				"The RNASeq application is a wrapper for processing RNA-Seq data through a variety of\n" +
-				"USeq applications. It uses the DESeq package for calling significant differential\n" +
+				"USeq applications. It uses the DESeq2 package for calling significant differential\n" +
 				"expression.  3-4 biological replicas per condition are strongly recommended. See \n" +
 				"http://useq.sourceforge.net/usageRNASeq.html for details constructing splice indexes,\n" +
 				"aligning your reads, and building a proper gene (NOT transcript) table.\n\n" +
@@ -726,10 +715,10 @@ public class RNASeq {
 				"   1) Converts raw sam alignments containing splice junction coordinates into genome\n "+
 				"         coordinates outputting sorted bam alignemnts.\n"+
 				"   2) Makes relative read depth coverage tracks.\n"+
-				"   3) Scores known genes for differential exonic and intronic expression using DESeq\n" +
+				"   3) Scores known genes for differential exonic and intronic expression using DESeq2\n" +
 				"         and alternative splicing with a chi-square test.\n" +
 				"   4) Identifies unannotated differentially expressed transfrags using a window\n" +
-				"         scan and DESeq.\n" +
+				"         scan and DESeq2.\n" +
 
 				"\nUse this application as a starting point in your transcriptome analysis.\n\n" +
 
@@ -748,7 +737,7 @@ public class RNASeq {
 				"      of the alignments to match the orientation of the annotation in Illumina stranded \n" +
 				"      UTP sequencing.\n" +
 				"-x Max per base alignment depth, defaults to 50000. Genes containing such high\n"+
-				"       density coverage are ignored. Warnings are thrown.\n"+
+				"       density coverage are ignored.\n"+
 				"-v Genome version (e.g. H_sapiens_Feb_2009, M_musculus_Jul_2007), see UCSC FAQ,\n"+
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
 				"-g UCSC RefFlat or RefSeq gene table file, full path. Tab delimited, see RefSeq Genes\n"+
@@ -759,8 +748,8 @@ public class RNASeq {
 				"       this table should contain only ONE composite transcript per gene (e.g. use\n" +
 				"       Ensembl genes NOT transcripts). Use the MergeUCSCGeneTable app to collapse\n" +
 				"       transcripts to genes. See the RNASeq usage guide for details.\n"+
-				"-r Full path to R, defaults to '/usr/bin/R'. Be sure to install Ander's DESeq\n" +
-				"       (http://www-huber.embl.de/users/anders/DESeq/) R library.\n"+
+				"-r Full path to R, defaults to '/usr/bin/R'. Be sure to install DESeq2, gplots, and\n" +
+				"       qvalue Bioconductor packages.\n"+
 				
 				
 				"\nAdvanced Options:\n"+

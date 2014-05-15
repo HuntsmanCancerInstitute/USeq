@@ -8,6 +8,7 @@ import edu.utah.seq.data.ReadCoverage;
 import edu.utah.seq.data.SmoothingWindowInfo;
 import edu.utah.seq.data.SubSamplePointData;
 import edu.utah.seq.parsers.*;
+
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.*;
@@ -26,12 +27,10 @@ public class ChIPSeq {
 	private File rApplication = new File ("/usr/bin/R");
 	private File resultsDirectory;
 	private File windowFilterFile = null;
-	private boolean convert2USeq = false;
-	private float minimumFDR = 0.9f;
 	private float maximumAlignmentScore = 60;
 	private float minimumMappingQualityScore = 13;
 	private String genomeVersion;
-	private int minimumNumberReadsInWindow = 10;
+	private int minimumNumberReadsInWindow = 15;
 	/*currently only sam, eland, novoalign, bed are supported*/
 	private String alignmentType;
 	private String alignmentTypeSam = "sam";
@@ -43,7 +42,6 @@ public class ChIPSeq {
 	private boolean runMultipleReplicaAnalysis = true;
 	private boolean findReducedRegions = true;
 	private boolean verbose = false;
-	private boolean bypassVarianceOutlierFiltering = false;
 
 	//internal fields
 	private File readCoverageTracks;
@@ -136,12 +134,10 @@ public class ChIPSeq {
 	public void cleanUp(){
 		System.out.println("\n*******************************************************************************");
 		System.out.println("Converting data...");
-		if (convert2USeq){
-			//convert ReadCoverageTracks
-			if (readCoverageTracks!= null) new Bar2USeq(readCoverageTracks, true);
-			//convert ScanSeqs
-			if (scanSeqs!= null) new Bar2USeq(scanSeqs,true);
-		}
+		//convert ReadCoverageTracks
+		if (readCoverageTracks!= null) new Bar2USeq(readCoverageTracks, true);
+		//convert ScanSeqs
+		if (scanSeqs!= null) new Bar2USeq(scanSeqs,true);
 	}
 
 	public void enrichedRegionMaker(){
@@ -175,7 +171,7 @@ public class ChIPSeq {
 				return;
 			}
 			scanSeqs.mkdir();
-			MultipleReplicaScanSeqs ss = new MultipleReplicaScanSeqs(treatmentPointData, controlPointData, scanSeqs, rApplication, windowSize, peakShift, minimumNumberReadsInWindow, minimumFDR, bypassVarianceOutlierFiltering, verbose);
+			MultipleReplicaScanSeqs ss = new MultipleReplicaScanSeqs(treatmentPointData, controlPointData, scanSeqs, rApplication, windowSize, peakShift, minimumNumberReadsInWindow, verbose);
 			swiFile = ss.getSwiFile();
 		}
 		else {
@@ -337,23 +333,11 @@ public class ChIPSeq {
 			passed = false;
 		}
 		else {
-			//DESeq?
-			if (this.runMultipleReplicaAnalysis){
-				String errors = IO.runRCommandLookForError("library(DESeq)", rApplication, resultsDirectory);
-				if (errors == null || errors.length() !=0){
-					passed = false;
-					notes.append("\nError: Cannot find the required R library.  Did you install DESeq " +
-							"(http://www-huber.embl.de/users/anders/DESeq/)?  See the author's websites for installation instructions. Once installed, " +
-							"launch an R terminal and type 'library(DESeq)' to see if it is present. Error message:\n\t\t"+errors+"\n\n");
-				}
-			}
-			else {
-				String errors = IO.runRCommandLookForError("library(qvalue)", rApplication, resultsDirectory);
-				if (errors == null || errors.length() !=0){
-					Misc.printExit("\nError: Cannot find the required R library.  Did you install qvalue " +
-							"(http://genomics.princeton.edu/storeylab/qvalue/)?  See the author's websites for installation instructions. Once installed, " +
-							"launch an R terminal and type 'library(qvalue)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
-				}
+			String errors = IO.runRCommandLookForError("library(DESeq2); library(qvalue); library(gplots) ", rApplication, resultsDirectory);
+			if (errors == null || errors.length() !=0){
+				passed = false;
+				notes.append("\nError: Cannot find the required R libraries.  Did you install DESeq2, gplots, and qvalue? Once installed, " +
+						"launch an R terminal and type 'library(DESeq2); library(qvalue); library(gplots)' to see if it is present. Error message:\n\t\t"+errors+"\n\n");
 			}
 		}
 
@@ -445,8 +429,7 @@ public class ChIPSeq {
 		System.out.println("\tGenome version = "+genomeVersion);
 		System.out.println("\tTreatment replica directories:\n\t\t"+IO.concatinateFileFullPathNames(treatmentReplicaDirectories, "\n\t\t"));
 		System.out.println("\tControl replica directories:\n\t\t"+IO.concatinateFileFullPathNames(controlReplicaDirectories, "\n\t\t"));
-		System.out.println("\tConvert bar graph files to useq format = "+convert2USeq);
-		System.out.println("\tRun multiple replica DESeq analysis = "+runMultipleReplicaAnalysis);
+		System.out.println("\tRun multiple replica DESeq2 analysis = "+runMultipleReplicaAnalysis);
 		System.out.println("\tFind reduced regions = "+findReducedRegions);
 		System.out.println("\tMinimum number reads in each window = "+minimumNumberReadsInWindow);
 	}
@@ -477,13 +460,10 @@ public class ChIPSeq {
 					case 'f': windowFilterFile = new File(args[++i]); break;
 					case 'r': rApplication = new File(args[++i]); break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
-					case 'd': minimumFDR = Float.parseFloat(args[++i]); break;
 					case 'q': minimumMappingQualityScore = Float.parseFloat(args[++i]); break;
-					case 'u': convert2USeq = true; break;
 					case 'g': verbose = true; break;
 					case 'e': findReducedRegions = false; break;
 					case 'm': runMultipleReplicaAnalysis = false; break;
-					case 'b': bypassVarianceOutlierFiltering = true; break;
 					case 'i': minimumNumberReadsInWindow = Integer.parseInt(args[++i]); break;
 					case 'w': windowSize = Integer.parseInt(args[++i]);break;
 					case 'p': peakShift = Integer.parseInt(args[++i]);break;
@@ -502,7 +482,7 @@ public class ChIPSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  ChIPSeq: April 2012                             **\n" +
+				"**                                   ChIPSeq: May 2014                              **\n" +
 				"**************************************************************************************\n" +
 				"The ChIPSeq application is a wrapper for processing ChIP-Seq data through a variety of\n" +
 				"USeq applications. It:\n" +
@@ -511,10 +491,8 @@ public class ChIPSeq {
 				"   3) Makes relative ReadCoverage tracks from the PointData (reads per million mapped)\n" +
 				"   4) Runs the PeakShiftFinder to estimate the peak shift and optimal window size\n" +
 				"   5) Runs the MultipleReplicaScanSeqs to window scan the genome generating enrichment\n" +
-				"        tracks using DESeq's negative binomial pvalues and B&H's FDRs\n" +
+				"        tracks using DESeq2's negative binomial pvalues and B&H's FDRs\n" +
 				"   6) Runs the EnrichedRegionMaker to identify likely chIP peaks (FDR < 1%, >2x).\n" +
-
-				"\nNote, given R's poor memory management, this app requires 64bit R and >6-8G RAM.\n"+
 
 				"\nOptions:\n"+
 				"-s Save directory, full path.\n"+
@@ -526,13 +504,12 @@ public class ChIPSeq {
 				"-y Type of alignments, either novoalign, sam, bed, or eland (sorted or export).\n"+
 				"-v Genome version (e.g. H_sapiens_Feb_2009, M_musculus_Jul_2007), see UCSC FAQ,\n"+
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
-				"-r Full path to 64bit R, defaults to '/usr/bin/R'. Be sure to install Ander's DESeq\n" +
-				"       (http://www-huber.embl.de/users/anders/DESeq/) R library.\n"+
+				"-r Full path to R, defaults to '/usr/bin/R'. Be sure to install DESeq2, gplots, and\n" +
+				"      qvalue Bioconductor packages.\n"+
 
 				"\nAdvanced Options:\n"+
 				"-m Combine any replicas and run single replica analysis (ScanSeqs), defaults to\n" +
-				"      using DESeq.\n"+
-				"-d Minimum FDR threshold for filtering windows, defaults to 0.9\n"+
+				"      using DESeq2.\n"+
 				"-a Maximum alignment score. Defaults to 60, smaller numbers are more stringent.\n"+
 				"-q Minimum mapping quality score. Defaults to 13, bigger numbers are more stringent.\n" +
 				"      This is a phred-scaled posterior probability that the mapping position of read\n" +
@@ -541,13 +518,10 @@ public class ChIPSeq {
 				"      RNASeq data.\n"+
 				"-w Window size, defaults to the PeakShiftFinder peak shift + stnd dev or 250bp.\n"+
 				"-i Minimum number reads in window, defaults to 10.\n"+
-				"-u Convert bar graph folders to xxx.useq format.\n"+
 				"-f Filter bed file (tab delimited: chr start stop) to use in excluding intersecting\n" +
 				"      windows while making peaks, e.g. satelliteRepeats.bed .\n"+
 				"-g Print verbose output from each application.\n"+
 				"-e Don't look for reduced regions.\n"+
-				"-b Bypass DESeq's variance outlier filtering. Recommended for first pass.\n"+
-				
 
 				"\n"+
 				"Example: java -Xmx2G -jar pathTo/USeq/Apps/ChIPSeq -y eland -v D_rerio_Dec_2008 -t \n" +

@@ -1565,11 +1565,6 @@ public class DefinedRegionDifferentialSeq {
 		}
 	}
 
-	public float parseFloat(String f){
-		if (f.equals("Inf") || f.equals("NA")) return Float.MIN_VALUE;
-		else return Float.parseFloat(f);
-	}
-
 	public void writeCountTable(){
 		ArrayList<String> conditionNamesPerReplicaAL = new ArrayList<String>();
 		ArrayList<String> replicaNamesAL = new ArrayList<String>();

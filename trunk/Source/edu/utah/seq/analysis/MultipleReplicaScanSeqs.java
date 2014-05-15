@@ -3,10 +3,12 @@ package edu.utah.seq.analysis;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
+
 import trans.tpmap.WindowMaker;
 import util.gen.*;
 import edu.utah.seq.data.*;
 import edu.utah.seq.parsers.BarParser;
+import edu.utah.seq.useq.apps.Bar2USeq;
 import util.bio.cluster.*;
 
 
@@ -24,16 +26,11 @@ public class MultipleReplicaScanSeqs {
 	private int windowSize = -1;
 	private int peakShift = -1;
 	private int halfPeakShift = 0;
-	private int minimumNumberReadsInWindow = 10;
-	private float minimumFDR = 0.9f;
-	private boolean cluster = true;
-	private boolean poolReplicas = false;
-	private boolean bypassVarianceOutlierFiltering = false;
+	private int minimumNumberReadsInWindow = 15;
 
 	//internal fields
 	private WindowMaker windowMaker; 
 	private int[][] windows;
-	private int totalNumberWindows = 0;
 	private int totalNumberWindowsPassingThresholds = 0;
 	private SmoothingWindowInfo[] smoothingWindowInfo;
 	private int totalInterrogatedTreatmentObservations = 0;
@@ -82,7 +79,7 @@ public class MultipleReplicaScanSeqs {
 	}
 	
 	/**For integration with ChIPSeq and RNASeq*/
-	public MultipleReplicaScanSeqs(File[] treatmentPointDirs, File[] controlPointDirs, File saveDirectory, File fullPathToR, int windowSize, int peakShift, int minimumNumberReadsInWindow, float minimumFDR, boolean bypassVarianceOutlierFiltering, boolean verbose){
+	public MultipleReplicaScanSeqs(File[] treatmentPointDirs, File[] controlPointDirs, File saveDirectory, File fullPathToR, int windowSize, int peakShift, int minimumNumberReadsInWindow, boolean verbose){
 		this.treatmentPointDirs = treatmentPointDirs;
 		this.controlPointDirs = controlPointDirs;
 		this.saveDirectory = saveDirectory;
@@ -90,12 +87,7 @@ public class MultipleReplicaScanSeqs {
 		this.windowSize = windowSize;
 		this.peakShift = peakShift;
 		this.minimumNumberReadsInWindow = minimumNumberReadsInWindow;
-		this.minimumFDR = minimumFDR;
-		this.bypassVarianceOutlierFiltering = bypassVarianceOutlierFiltering;
 		this.verbose = verbose;
-		
-		//System.out.println("ED? "+useEstimateDispersions);
-		
 		halfPeakShift = (int)Math.round( ((double)peakShift)/2 );
 		if (peakShift == 0 && windowSize == -1) windowSize = peakShift;
 		saveDirectory.mkdir();
@@ -120,9 +112,7 @@ public class MultipleReplicaScanSeqs {
 		calculateReadCountStatistics();
 		System.out.println("\t"+peakShift+"\tPeak shift");
 		System.out.println("\t"+windowSize+"\tWindow size");
-		System.out.println("\t"+minimumFDR+"\tMinimum Window FDR");
 		System.out.println("\t"+minimumNumberReadsInWindow+"\tMinimum number reads in window");
-		System.out.println("\t"+bypassVarianceOutlierFiltering+"\tBypass DESeq's variance outlier filtering");
 
 		//make print writer for generating the matrix file
 		try{
@@ -142,18 +132,15 @@ public class MultipleReplicaScanSeqs {
 		}
 		if (verbose) System.out.println();
 		matrixFileOut.close();
-		
-		//enough to cluster?
-		if (totalNumberReplicas <= 2) cluster = false;
 
-		//convert binomial pvalues to FDRs
-		if (verbose) System.out.println("\nCalculating negative binomial p-values and FDRs in R using DESeq (http://www-huber.embl.de/users/anders/DESeq/). This requires patience, 64bit R, and lots of RAM.");
+		//convert binomial pvalues to AdjPs
+		if (verbose) System.out.println("\nCalculating negative binomial p-values and AdjPs in R using DESeq2. This requires patience, 64bit R, and lots of RAM.");
 		//call DESeq
-		File[] deseqResults = executeDESeq();
+		File deseqResults = executeDESeq2();
 
 		//parse window stats, if no windows then exit
 		if (verbose) System.out.println("\nParsing results...");
-		if (deseqResults == null || parseDESeqStatResults (deseqResults[0]) == false) return;
+		if (parseDESeq2Results (deseqResults) == false) return;
 
 		//save window data 
 		if (verbose) System.out.println("\nSaving "+totalNumberWindowsPassingThresholds+" serialized window data.");
@@ -165,15 +152,6 @@ public class MultipleReplicaScanSeqs {
 		//write out bar file graphs, call after saving since Info is modified
 		if (verbose) System.out.println("\nWriting bar file window summary graphs.");
 		writeBarFileGraphs();
-
-		//cluster
-		File clusterFile =null;
-		if (cluster){
-			//parse and cluster variance corrected count data
-			if (verbose) System.out.println("\nHierarchical clustering replicas based on DESeq's variance corrected read counts, experimental.");
-			clusterFile = new File (saveDirectory,"clusterPlot.png");
-			parseAndClusterDESeqDataResults (deseqResults[1], clusterFile);
-		}
 
 		//clean up
 		if (deleteTempFiles) {
@@ -189,16 +167,16 @@ public class MultipleReplicaScanSeqs {
 		//make directories
 		File windowSummaryTracks = new File (saveDirectory, "WindowSummaryTracks");
 		windowSummaryTracks.mkdir();
-		File FDR = new File(windowSummaryTracks, "FDR");
-		FDR.mkdir();
+		File AdjP = new File(windowSummaryTracks, "AdjP");
+		AdjP.mkdir();
 		File log2Ratio = new File(windowSummaryTracks, "Log2Ratio");
 		log2Ratio.mkdir();
-		//scores = FDR, Log2Ratio
+		//scores = AdjP, Log2Ratio
 		//for each chromosome
 		for (int i=0; i< smoothingWindowInfo.length; i++){
 			Info info = smoothingWindowInfo[i].getInfo();
 			SmoothingWindow[] sm = smoothingWindowInfo[i].getSm();
-			//convert FDRs sign to match log2Ratio
+			//convert AdjPs sign to match log2Ratio
 			for (int x=0; x< sm.length; x++){
 				float[] scores = sm[x].getScores();
 				if (scores[1]<0){
@@ -206,9 +184,12 @@ public class MultipleReplicaScanSeqs {
 				}
 			}
 			//save graphs
-			saveSmoothedHeatMapData (0, sm, info, FDR, "#00FF00", true); //green
+			saveSmoothedHeatMapData (0, sm, info, AdjP, "#00FF00", true); //green
 			saveSmoothedHeatMapData (1, sm, info, log2Ratio, "#FF0000", true); //red
 		}
+		//convert to useq format
+		new Bar2USeq(AdjP,true);
+		new Bar2USeq(log2Ratio,true);
 	}
 
 	/**Saves bar heatmap/ stairstep graph files*/
@@ -275,7 +256,6 @@ public class MultipleReplicaScanSeqs {
 			windows[i][0] = positions[windows[i][0]];
 			windows[i][1] = positions[windows[i][1]]+1;	//last base isn't included
 		}
-		totalNumberWindows += windows.length;
 	}
 
 	/**Fetches the names of all the chromosomes in the data.*/
@@ -293,62 +273,48 @@ public class MultipleReplicaScanSeqs {
 		}
 		return Misc.hashSetToStringArray(c);
 	}
-
-
+	
 	/**Returns the deseq stats file and the variance stabilized data.*/
-	private File[] executeDESeq(){
-		File rResultsStats = new File (tempRDirectory, "DESeqResults.txt");
-		File rResultsData = new File (tempRDirectory, "DESeqResultsData.txt");
+	private File executeDESeq2(){
+		File rResultsStats = new File (tempRDirectory, "dESeq2Results.txt");
+		File clusterFile = new File (saveDirectory,"sampleClusterPlot.pdf");
 		try {
 			//make R script
 			StringBuilder sb = new StringBuilder();
-			sb.append("library(DESeq)\n");
-			sb.append("countsTable = read.delim('"+matrixFile.getCanonicalPath()+"', header=FALSE)\n");
-			sb.append("rownames(countsTable) = countsTable$V1\n");
-			sb.append("countsTable = countsTable[,-1]\n");
-			sb.append("conds = c(");
+			sb.append("library(DESeq2); library(gplots); library(RColorBrewer)\n");
+			sb.append("countTable = read.delim('"+matrixFile.getCanonicalPath()+"', header=FALSE)\n");
+			sb.append("rownames(countTable) = countTable[,1]\n");
+			sb.append("countTable = countTable[,-1]\n");
+			
+			//make labels
+			StringBuilder groups = new StringBuilder();
+			StringBuilder replicas = new StringBuilder();
 			for (int i=0; i< numberTreatmentReplicas; i++){
-				sb.append("'T',");
+				groups.append("'T',");
+				replicas.append("'T"+i+"',");
 			}
-			sb.append("'N'");
+			groups.append("'C'");
+			replicas.append("'C0'");
 			for (int i=1; i< numberControlReplicas; i++){
-				sb.append(",'N'");
+				groups.append(",'C'");
+				replicas.append(",'C"+i+"'");
 			}
-			sb.append(")\n");
-			sb.append("cds = newCountDataSet( countsTable, conds)\n");
-			sb.append("rm(countsTable)\n");
-			sb.append("gc()\n");
-			sb.append("cds = estimateSizeFactors( cds )\n");
-			if (totalNumberReplicas == 2 || poolReplicas) {
-				sb.append("cds = estimateDispersions(cds,method='blind',sharingMode='fit-only')\n");
-				if (verbose) System.out.println("\tCalling DESeq's estimateDispersions(cds,method='blind',sharingMode='fit-only') method");
-			}
-			else if (bypassVarianceOutlierFiltering){
-				sb.append("cds = estimateDispersions(cds, sharingMode='fit-only')\n");
-				if (verbose) System.out.println("\tCalling DESeq's estimateDispersions(cds, sharingMode='fit-only')");
-			}
-			else {
-				sb.append("cds = estimateDispersions(cds)\n");
-				if (verbose) System.out.println("\tCalling DESeq's default estimateDispersions(cds)");
-			}
-			sb.append("res = nbinomTest( cds, 'N', 'T', pvals_only = FALSE)\n");
-			//filter for significant padj
-			sb.append("res = res[res$padj <= "+minimumFDR+" ,]\n");
-			sb.append("gc()\n");
-			//Recalculate log2 ratio with add one, note flip
-			sb.append("res[,6] = log2((1+res[,4])/(1+res[,3]))\n");
-			//Fred  adjPVal
-			sb.append("res[,8] = -10 * log10(res[,8])\n");
-			//Parse name, padj, log2ratio
-			sb.append("res = res[,c(1,8,6)]\n");
-			sb.append("gc()\n");
-			//note, the order of the rows is the same as the input
-			sb.append("write.table(res, file = '"+rResultsStats.getCanonicalPath()+"', quote=FALSE, sep ='\t', row.names = FALSE, col.names = FALSE)\n");
-			//pull variance stabilized data for each replica, note these are not flipped
-			if (cluster) {
-				sb.append("res = getVarianceStabilizedData( cds )\n");
-				sb.append("write.table(res, file = '"+rResultsData.getCanonicalPath()+"', quote=FALSE, sep ='\t', row.names = FALSE, col.names = FALSE)\n");
-			}
+			
+			sb.append("sampleInfo = data.frame(condition=as.factor(c("+groups+")))\n");
+			sb.append("rownames(sampleInfo) = c("+replicas+")\n");
+			sb.append("cds = DESeqDataSetFromMatrix(countData=countTable, colData=sampleInfo, design = ~condition)\n");
+			sb.append("cds = DESeq(cds)\n");
+			sb.append("rld = rlog(cds)\n");
+			sb.append("sampleDists = dist(t(assay(rld)))\n");
+			sb.append("sampleDistMatrix <- as.matrix( sampleDists )\n");
+			sb.append("colours = colorRampPalette( rev(brewer.pal(9, 'Blues')) )(255)\n");
+			sb.append("pdf('"+clusterFile.getCanonicalPath()+"')\n");
+			sb.append("heatmap.2( sampleDistMatrix, trace='none', col=colours)\n");
+			sb.append("dev.off()\n");
+			sb.append("res = results(cds, contrast = c('condition', 'T', 'C'))\n");
+			sb.append("res[,6] = -10 * log10(res[,6])\n");
+			sb.append("write.table(res, file = '"+rResultsStats.getCanonicalPath()+"', quote=FALSE, sep ='\t')\n");
+			
 			
 			//write script to file
 			File scriptFile = new File (tempRDirectory, "RScript.txt");
@@ -368,22 +334,7 @@ public class MultipleReplicaScanSeqs {
 			//execute command
 			IO.executeCommandLine(command);
 			
-			if (rResultsStats.exists() == false || (cluster && rResultsData.exists() == false)) {
-				//did it fail to fit?
-				if (deseqFailedToFitError(rOut)){
-					System.err.print("\nWARNING: DESeq's parametric dispersion fit failed.");
-					if (poolReplicas == false) {
-						System.err.println(" Rerunning with pooled replicas...\n");
-						poolReplicas = true;
-						return executeDESeq();
-					}
-					else {
-						System.err.println(" Aborting.");
-						return null;
-					}
-				}
-				throw new IOException("\nR results file(s) doesn't exist. Check temp files in save directory for error.\n");
-			}
+			if (rResultsStats.exists() == false) throw new IOException("\nDESeq2 R results file doesn't exist. Check temp files in save directory for error.\n");
 
 			//cleanup
 			if (deleteTempFiles) {
@@ -391,50 +342,52 @@ public class MultipleReplicaScanSeqs {
 				scriptFile.delete();
 			}
 			
-
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(1);
 			return null;
 		}
-		return new File[]{rResultsStats,rResultsData};
-	}
-	
-	/**Looks at file's contents for the "dispersion fit" phrase from DESeq when it fails to fit or converge.*/
-	public static boolean deseqFailedToFitError(File rOut){
-		//look at log and see if it failed to fit
-		String[] lines = IO.loadFile(rOut);
-		Pattern error = Pattern.compile(".+dispersion fit.+");
-		for (String line : lines){
-			if (error.matcher(line.toLowerCase()).matches()) return true; 
-		}
-		return false;
+		return rResultsStats;
 	}
 
-	public boolean parseDESeqStatResults(File results){
+	/**
+	 * Parses DESeq2 results:
+xxxx	baseMean	log2FoldChange	lfcSE	stat	pvalue	-10Log10(padj)
+ 0         1              2            3      4        5      6
+chr1:137696784:137697035	26.22543451	-4.834447206	0.476843548	-10.13843476	3.73E-24	182.971445
+chr1:137696786:137697037	26.35263802	-4.83905225	0.476808555	-10.1488369	3.35E-24	182.971445
+chr1:137696787:137697038	26.28706518	-4.834058806	0.477129062	-10.1315539	4.00E-24	182.971445
+*/
+	public boolean parseDESeq2Results(File results){
 		try {
 			BufferedReader in = new BufferedReader (new FileReader (results));
 			String line;
 			String[] tokens;
 			Pattern tab = Pattern.compile("\t");
 			Pattern coor = Pattern.compile("(.+):(\\d+):(\\d+)");
-			float maxFDR = 0;
+			float maxAdjP = 0;
 			ArrayList<SmoothingWindow> alSM = new ArrayList<SmoothingWindow>();
 			ArrayList<SmoothingWindowInfo> alSMI = new ArrayList<SmoothingWindowInfo>(); 
-			ArrayList<SmoothingWindow> alSMToFixFDR = new ArrayList<SmoothingWindow>();
+			ArrayList<SmoothingWindow> alSMToFixAdjP = new ArrayList<SmoothingWindow>();
 			String currentChromosome = null;
 			int counter = 0;
+			//skip header
+			in.readLine();
+			//for each data row
 			while((line = in.readLine())!= null){
 				counter++;
 				//parse line: name, padj, log2ratio
 				tokens = tab.split(line);
-				if (tokens.length!=3) Misc.printErrAndExit("One of the DESeq R results rows is malformed -> "+line);
-				//parse fdr, watch out for Inf, assign max?
-				float fdr = Float.MAX_VALUE;
-				if (tokens[1].equals("Inf") == false && tokens[1].equals("NA") == false) {
-					fdr = Float.parseFloat(tokens[1]);
-					if (fdr > maxFDR) maxFDR = fdr;
+				if (tokens.length!=7) Misc.printErrAndExit("One of the DESeq2 R results rows is malformed -> "+line);
+				//parse -10Log10(adjP), watch out for Inf, assign max?
+				float adjP;
+				if (tokens[6].equals("Inf")) adjP = Float.MAX_VALUE ;
+				else if (tokens[6].equals("NA")) adjP = 0;
+				else {
+					adjP = Float.parseFloat(tokens[6]);
+					if (adjP > maxAdjP) maxAdjP = adjP;
 				}
+				
 				//parse ratio
 				float ratio = Float.parseFloat(tokens[2]);
 				//parse chromosome:start:stop
@@ -445,7 +398,7 @@ public class MultipleReplicaScanSeqs {
 				int start = Integer.parseInt(mat.group(2));
 				int stop = Integer.parseInt(mat.group(3));
 				//instantiate new window
-				SmoothingWindow sm = new SmoothingWindow(start,stop, new float[]{fdr,ratio});
+				SmoothingWindow sm = new SmoothingWindow(start,stop, new float[]{adjP,ratio});
 				//first time through?
 				if (currentChromosome == null) currentChromosome = chr;
 				//nope new chromosome
@@ -459,9 +412,9 @@ public class MultipleReplicaScanSeqs {
 					currentChromosome = chr;
 					totalNumberWindowsPassingThresholds += sma.length;
 				}
-				//add window and check fdr
+				//add window and check adjP
 				alSM.add(sm);
-				if (fdr == Float.MAX_VALUE) alSMToFixFDR.add(sm);	
+				if (adjP == Float.MAX_VALUE) alSMToFixAdjP.add(sm);	
 			}
 			//close last
 			SmoothingWindow[] sma = new SmoothingWindow[alSM.size()];
@@ -473,17 +426,17 @@ public class MultipleReplicaScanSeqs {
 			in.close();
 			//check number
 			if (counter == 0){
-				if (verbose) System.out.println("\nWARNING: No significant windows found?! FDR threshold is set to "+minimumFDR+" . Try restarting with a less stringent threshold.\n");
+				if (verbose) System.out.println("\nWARNING: No significant windows found?!\n");
 				return false;
 			}
 			if (deleteTempFiles) results.delete();
 			//convert Inf to max values * 1%
-			maxFDR = maxFDR * 1.01f;
-			int numToCovert = alSMToFixFDR.size();
+			maxAdjP = maxAdjP * 1.01f;
+			int numToCovert = alSMToFixAdjP.size();
 			for (int i=0; i< numToCovert; i++){
-				SmoothingWindow swToFix = alSMToFixFDR.get(i);
+				SmoothingWindow swToFix = alSMToFixAdjP.get(i);
 				float[] scores = swToFix.getScores();
-				scores[0] = maxFDR;
+				scores[0] = maxAdjP;
 			}
 			//convert SWI
 			smoothingWindowInfo = new SmoothingWindowInfo[alSMI.size()];
@@ -516,63 +469,6 @@ public class MultipleReplicaScanSeqs {
 	}
 
 	
-	private void parseAndClusterDESeqDataResults(File results, File clusterFile){
-		try {
-			//load the counts
-			float[][] varCounts = new float[totalNumberWindows][totalNumberReplicas];
-			BufferedReader in = new BufferedReader (new FileReader (results));
-			String line;
-			String[] tokens;
-			Pattern tab = Pattern.compile("\t");
-			int counter = 0;
-			while ((line=in.readLine())!=null){
-				//parse line
-				tokens = tab.split(line);
-				if (tokens.length!=totalNumberReplicas) Misc.printErrAndExit("One of the DESeq data R results rows is malformed -> "+line);
-				//parse the scores
-				for (int i=0; i< totalNumberReplicas; i++) varCounts[counter][i] = Float.parseFloat(tokens[i]);
-				counter++;
-			}
-			if (counter != totalNumberWindows) Misc.printErrAndExit("\nError, the number of DESeq var corrected count lines ("+counter+") is different than the number of windows ("+totalNumberWindows+") ?!");
-			in.close();
-			if (deleteTempFiles) results.delete();
-			
-			//save the float[]s
-			File[] files = new File[totalNumberReplicas];
-			File tempDir = new File (saveDirectory,".TempClusterDir_"+Passwords.createRandowWord(7));
-			tempDir.mkdir();
-			tempDir.deleteOnExit();
-			Pattern slash = Pattern.compile("/");
-			for (int i=0; i< numberTreatmentReplicas; i++){
-				String fullPathName = treatmentPointDirs[i].getCanonicalPath();
-				fullPathName = slash.matcher(fullPathName).replaceAll("_");
-				files[i] = new File(tempDir, fullPathName);
-				files[i].deleteOnExit();
-			}
-			int index = 0;
-			for (int i=numberTreatmentReplicas; i< totalNumberReplicas ; i++){
-				String fullPathName = controlPointDirs[index++].getCanonicalPath();
-				fullPathName = slash.matcher(fullPathName).replaceAll("_");
-				files[i] = new File(tempDir, fullPathName);
-				files[i].deleteOnExit();
-			}
-			for (int x=0; x< totalNumberReplicas; x++) IO.saveObject(files[x], varCounts[x]);
-
-			//cluster
-			new HierarchicalClustering(files, clusterFile);
-
-			//delete tempDir, not working!
-			IO.deleteDirectory(tempDir);
-			IO.deleteDirectoryViaCmdLine(tempDir);
-			
-		} catch (Exception e){
-			System.err.println("Problem parsing and clustering DESeq data results from R.\n");
-			e.printStackTrace();
-			System.exit(1);
-		}
-	}
-
-
 	/**Fetchs the data for a particular chromosome.*/
 	public boolean fetchData(){		
 		//fetch treatments
@@ -713,15 +609,15 @@ public class MultipleReplicaScanSeqs {
 	/**Sets score names/ descriptions/ units base on whether control data is present.*/
 	public void setScoreStrings(){
 		scoreNames = new String[]{
-				"FDR",
+				"AdjP",
 				"Log2((sumT+1)/(sumC+1))",
 		};
 		scoreDescriptions = new String[]{
-				"Benjamini and Hochberg FDR estimation based on the DESeq's negative binomial p-values",
+				"Benjamini and Hochberg adjusted p-value estimation based on the DESeq2's negative binomial",
 				"Log2((sumT+1)/(sumC+1)) of linearly scaled sumT and sumC",
 		};
 		scoreUnits = new String[]{	
-				"-10Log10(FDR)",
+				"-10Log10(AdjP)",
 				"Log2((sumT+1)/(sumC+1))",
 		};
 	}
@@ -752,9 +648,7 @@ public class MultipleReplicaScanSeqs {
 					case 'p': peakShift = Integer.parseInt(args[++i]); break;
 					case 'w': windowSize = Integer.parseInt(args[++i]); break;
 					case 'm': minimumNumberReadsInWindow = Integer.parseInt(args[++i]); break;
-					case 'f': minimumFDR = Float.parseFloat(args[++i]); break;
 					case 'd': deleteTempFiles = false; break;
-					case 'b': bypassVarianceOutlierFiltering = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -784,7 +678,7 @@ public class MultipleReplicaScanSeqs {
 		//set half peak shift and windowSize
 		if (peakShift == -1) Misc.printExit("\nPlease enter a peak shift, the results from running the PeakShiftFinder application or use 100-150 if you don't know.\n");
 		halfPeakShift = (int)Math.round( ((double)peakShift)/2 );
-		if (peakShift == 0 && windowSize == -1) windowSize = peakShift;
+		if (windowSize == -1) windowSize = peakShift;
 
 		//look for and or create the save directory
 		if (saveDirectory == null) Misc.printExit("\nError: enter a directory to save results.\n");
@@ -795,11 +689,10 @@ public class MultipleReplicaScanSeqs {
 			Misc.printExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
 		}
 		else {
-			String errors = IO.runRCommandLookForError("library(qvalue)", fullPathToR, saveDirectory);
+			String errors = IO.runRCommandLookForError("library(DESeq2); library(gplots)", fullPathToR, saveDirectory);
 			if (errors == null || errors.length() !=0){
-				Misc.printExit("\nError: Cannot find the required R library.  Did you install qvalue " +
-						"(http://genomics.princeton.edu/storeylab/qvalue/)?  See the author's websites for installation instructions. Once installed, " +
-						"launch an R terminal and type 'library(qvalue)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
+				Misc.printExit("\nError: Cannot find the required R libraries?  Did you install DESeq2? gplots? Once installed, " +
+						"launch an R terminal and type 'library(DESeq2); library(gplots)' to see if present. R error message:\n\t\t"+errors+"\n\n");
 			}
 		}
 
@@ -812,12 +705,12 @@ public class MultipleReplicaScanSeqs {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Multiple Replica Scan Seqs: May 2012                      **\n" +
+				"**                        Multiple Replica Scan Seqs: May 2014                      **\n" +
 				"**************************************************************************************\n" +
 				"MRSS uses a sliding window and Ander's DESeq negative binomial pvalue -> Benjamini & \n" +
-				"Hochberg FDR statistics to identify enriched and reduced regions in a genome. Both\n" +
+				"Hochberg AdjP statistics to identify enriched and reduced regions in a genome. Both\n" +
 				"treatment and control PointData sets are required, one or more biological replicas.\n" +
-				"MRSS generates window level differential count tracks for the FDR and normalized\n" +
+				"MRSS generates window level differential count tracks for the AdjP and normalized\n" +
 				"log2Ratio as well as a binary window objec xxx.swi file for downstream use by the\n" +
 				"EnrichedRegionMaker. MRSS also makes use of DESeq's variance corrected count data to\n" +
 				"cluster your biological replics. Given R's poor memory management, running DESeq\n" +
@@ -842,11 +735,8 @@ public class MultipleReplicaScanSeqs {
 				"       For RNA-Seq data, set this to 100-250.\n"+
 				
 				"\nAdvanced Options:\n"+
-				"-f Minimum FDR threshold for saving windows, defaults to 0.9\n"+
-				"-m Minimum number of reads in a window, defaults to 10\n"+
+				"-m Minimum number of reads in a window, defaults to 15\n"+
 				"-d Don't delete temp files\n" +
-				"-b Bypass DESeq variance outlier filtering with estimateDispersions(cds,\n" +
-				"       sharingMode='fit-only'), recommended for biologically noisy data.\n\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/MultipleReplicaScanSeqs -t\n" +
 				"      /Data/PolIIRep1/,/Data/PolIIRep2/ -c /Data/Input1/,Data/Input2/ -s\n" +
