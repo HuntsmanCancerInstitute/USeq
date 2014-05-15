@@ -572,7 +572,7 @@ public class MethylationArrayScanner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Methylation Array Scanner: Oct 2013                       **\n" +
+				"**                        Methylation Array Scanner: May 2014                       **\n" +
 				"**************************************************************************************\n" +
 				"MAS takes paired or non-paired sample PointData representing beta values (0-1) from\n" +
 				"arrays and scores regions with enriched/ reduced signal using a sliding window\n" +
@@ -583,7 +583,7 @@ public class MethylationArrayScanner {
 				"MAS generates several data tracks for visualization in IGB including paired sample bp\n" +
 				"log2 ratios, window level Wilcoxon FDRs, and window level pseudomedian log2 ratios. \n" +
 				"Note, non-paired analysis are very underpowered and require > 30 obs/ window to see\n" +
-				"any significant FDRs.\n"+
+				"any significant FDRs.\n\n"+
 
 				"Required Options:\n"+
 				"-s Path to a directory for saving the results.\n"+
@@ -603,7 +603,7 @@ public class MethylationArrayScanner {
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/MethylationArrayScanner -s ~/MAS/Res\n" +
-				"     -v H_sapiens_Feb_2009 -d ~/MAS/Bar/ -t Early1,Early2,Early3 -c Late1,Late2,Late3\n" +
+				"     -d ~/MAS/Bar/ -t Early1,Early2,Early3 -c Late1,Late2,Late3\n" +
 				"     -w 1500\n\n" +
 
 		"**************************************************************************************\n");
