@@ -41,11 +41,11 @@ public class VCFSpliceAnnotator {
 	private File samSpliceFile;
 	private File saveDirectory;
 	private int minimumSpliceJunctionCoverage = 10;
-	private double min5Threshold = 5;
-	private double min5DeltaThreshold = 5;
-	private double min3Threshold = 5;
-	private double min3DeltaThreshold = 5;
-	private double minPValue = 20;
+	private double min5Threshold = 4;
+	private double min5DeltaThreshold = 4;
+	private double min3Threshold = 4;
+	private double min3DeltaThreshold = 4;
+	private double minPValue = 13;
 	private boolean scoreNovelIntronJunctions = true;
 	private boolean scoreNovelExonJunctions = true;
 	private boolean scoreNovelSpliceJunctionsInSplice = true;
@@ -1388,7 +1388,7 @@ public class VCFSpliceAnnotator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Splice Annotator : March 2014                     **\n" +
+				"**                            VCF Splice Annotator : May 2014                       **\n" +
 				"**************************************************************************************\n" +
 				"Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and\n"+
 				"Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice\n"+
@@ -1423,11 +1423,11 @@ public class VCFSpliceAnnotator {
 				"       0 All types (gain or damaged in exon, intron, and splice)\n"+
 				"       1 Just damaged splices\n"+
 				"       2 Damaged splices and novel splices in exons and splice junctions\n"+
-				"-a Minimum 5' threshold for scoring the presence of a splice junction, defaults to 5.\n"+
-				"-b Minimum 3' threshold for scoring the presence of a splice junction, defaults to 5.\n"+
-				"-c Minimum difference for loss or gain of a 5' splice junction, defaults to 5.\n"+
-				"-d Minimum difference for loss or gain of a 3' splice junction, defaults to 5.\n"+
-				"-p Minimum -10Log10(pvalue) for reporting a splice junction, defaults to 20.\n"+
+				"-a Minimum 5' threshold for scoring the presence of a splice junction, defaults to 4.\n"+
+				"-b Minimum 3' threshold for scoring the presence of a splice junction, defaults to 4.\n"+
+				"-c Minimum difference for loss or gain of a 5' splice junction, defaults to 4.\n"+
+				"-d Minimum difference for loss or gain of a 3' splice junction, defaults to 4.\n"+
+				"-p Minimum -10Log10(pvalue) for reporting a splice junction, defaults to 13.\n"+
 				"\n"+
 				
 				"Options for generating reusable splice score histograms:\n"+
