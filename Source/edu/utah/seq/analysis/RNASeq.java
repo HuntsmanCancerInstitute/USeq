@@ -37,7 +37,6 @@ public class RNASeq {
 	private File controlDirectory;
 	private File[] treatmentReplicaDirectories;
 	private File[] controlReplicaDirectories;
-	private float minimumFDR = 0.5f;
 	private int maxMatches = 1;
 	private boolean useDESeq = true;
 	private boolean verbose = false;
@@ -230,12 +229,12 @@ public class RNASeq {
 			//score exons
 			DefinedRegionDifferentialSeq o = new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, 
 					genomeVersion, exons, rApplication, filteredGeneTableFile, false, stranded, verbose, 
-					this.performReverseStrandedAnalysis, this.secondStrandFlipped, this.maxAlignmentsDepth,this.useSamSeq);
+					performReverseStrandedAnalysis, secondStrandFlipped, maxAlignmentsDepth,useSamSeq);
 			System.out.println("Introns....");
 			//score introns
 			o= new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, genomeVersion, 
 					introns, rApplication, filteredGeneTableFile, true, stranded, verbose, 
-					this.performReverseStrandedAnalysis, this.secondStrandFlipped, this.maxAlignmentsDepth,this.useSamSeq);
+					performReverseStrandedAnalysis, secondStrandFlipped, maxAlignmentsDepth,useSamSeq);
 	
 		}
 		else {
@@ -582,7 +581,7 @@ public class RNASeq {
 			
 			//too few reps?
 			int numReps = treatmentReplicaDirectories.length + controlReplicaDirectories.length;
-			if (numReps < 6) notes.append("\tWarning: Too few biological replicas. DESeq tends to be very conservative when analyzing data with < 4 replicas.\n");
+			if (numReps < 6) notes.append("\tWarning: Too few biological replicas. DESeq tends to be very conservative when analyzing data with < 3 replicas in each condition.\n");
 			
 		}
 		
@@ -646,7 +645,6 @@ public class RNASeq {
 		System.out.println("\tGene table = "+geneTableFile);
 		System.out.println("\tRemove overlapping exons = "+filterGeneTable);
 		System.out.println("\tMaximum alignment score = "+maximumAlignmentScore);
-		System.out.println("\tMinimum window FDR = "+minimumFDR);
 		System.out.println("\tGenome version = "+genomeVersion);
 		System.out.println("\tRun multiple replica DESeq analysis = "+useDESeq);
 		System.out.println("\tTreatment replicas:\n\t\t"+IO.concatinateFileFullPathNames(treatmentReplicaDirectories, "\n\t\t"));
@@ -679,7 +677,6 @@ public class RNASeq {
 					case 'r': rApplication = new File(args[++i]); break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'o': filterGeneTable = false; break;
-					case 'd': minimumFDR = Float.parseFloat(args[++i]); break;
 					case 'n': stranded = true; break;
 					case 'e': verbose = true; break;
 					case 'm': useDESeq = false; break;
@@ -731,11 +728,10 @@ public class RNASeq {
 				"-n Data is stranded. Only analyze reads from the same strand as the annotation.\n"+
 				"-j Reverse stranded analysis.  Only count reads from the opposite strand of the\n" +
 				"       annotation.  This setting should be used for the Illumina's strand-specific dUTP protocol.\n" +
-				"-k Second read flipped. This setting can be used to flip the strand of the second read in a pair.\n" +
-				"       This setting makes it easier to view in IGB, but can break other downstream applications.\n" +
+				"-k Flip the strand of the second read pair.\n" +
 				"-b Reverse the strand of both pairs.  Use this option if you would like the orientation\n" +
 				"      of the alignments to match the orientation of the annotation in Illumina stranded \n" +
-				"      UTP sequencing.\n" +
+				"      dUTP sequencing.\n" +
 				"-x Max per base alignment depth, defaults to 50000. Genes containing such high\n"+
 				"       density coverage are ignored.\n"+
 				"-v Genome version (e.g. H_sapiens_Feb_2009, M_musculus_Jul_2007), see UCSC FAQ,\n"+
@@ -756,7 +752,6 @@ public class RNASeq {
 				"-m Combine replicas and run single replica analysis using binomial based statistics,\n" +
 				"       defaults to DESeq and a negative binomial test.\n"+
 				"-a Maximum alignment score. Defaults to 120, smaller numbers are more stringent.\n"+
-				"-d Minimum FDR threshold for filtering windows, defaults to 0.5\n"+
 				"-o Don't delete overlapping exons from the gene table.\n"+
 				"-e Print verbose output from each application.\n"+
 				"-p Run SAMseq in place of DESeq.  This is suggested when you have five or more\n" +
@@ -769,26 +764,5 @@ public class RNASeq {
 				"      /Data/Results/MutVsWT -g /Anno/zv8Genes.ucsc \n\n" +
 
 		"**************************************************************************************\n");		
-	}
-
-	public static LinkedHashMap <String,String> loadKeyValueFile(File file){
-		LinkedHashMap<String,String> map = new LinkedHashMap<String,String>();
-		String line = null;
-		try{
-			BufferedReader in = new BufferedReader(new FileReader(file));
-
-			Pattern equal = Pattern.compile("(.+)\\s*=\\s*(.+)");
-			while ((line = in.readLine())!=null){
-				line = line.trim();
-				if (line.startsWith("#") || line.length() ==0) continue;
-				Matcher mat = equal.matcher(line);
-				if (mat.matches()) map.put(mat.group(1), mat.group(2));
-				else Misc.printErrAndExit("\tProblem parsing parameter file line -> "+line);
-			}
-		}catch(Exception e){
-			System.out.println("Prob with loadin parameter file.\n\t"+line);
-			e.printStackTrace();
-		}
-		return map;
 	}
 }
