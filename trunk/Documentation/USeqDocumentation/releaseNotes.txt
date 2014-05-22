@@ -1,3 +1,9 @@
+----USeq_8.8.1----
+VCFSpliceAnnotator
+* Relaxed the thresholds for calling a novel or damaging an existing splice junction
+ChIPSeq, RNASeq, MultipleReplicaScanSeqs
+* Updated each to utilize the new DESeq2 algorithm.
+
 ----USeq_8.8.0----
 DefinedRegionDifferentialSeq
 * Updated DESeq to DESeq2, major changes, different dispersion fit, different log2Rto calculation, automatic independence filtering.  All results in more diff expressed genes compared to the older depreciated methods. Old diff genes are pretty much a subset of new diff genes.
