@@ -9,10 +9,10 @@ import util.gen.*;
 
 import java.util.*;
 
-import net.sf.samtools.SAMFileReader;
-import net.sf.samtools.SAMRecord;
-import net.sf.samtools.SAMRecordIterator;
-import net.sf.samtools.SAMFileReader.ValidationStringency;
+import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.SAMRecordIterator;
+import htsjdk.samtools.ValidationStringency;
 import edu.utah.ames.bioinfo.PicardMarkDuplicates;
 import edu.utah.seq.data.*;
 import edu.utah.seq.data.sam.PicardSortSam;

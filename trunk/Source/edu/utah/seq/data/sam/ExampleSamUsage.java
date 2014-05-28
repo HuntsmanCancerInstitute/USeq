@@ -1,6 +1,6 @@
 package edu.utah.seq.data.sam;
 
-import net.sf.samtools.*;
+import htsjdk.samtools.*;
 
 import java.io.File;
 

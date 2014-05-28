@@ -3,9 +3,9 @@ package edu.utah.seq.base;
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
-import net.sf.samtools.*;
-import net.sf.samtools.SAMFileReader.ValidationStringency;
-import net.sf.samtools.SAMRecord.SAMTagAndValue;
+import htsjdk.samtools.*;
+import htsjdk.samtools.ValidationStringency;
+import htsjdk.samtools.SAMRecord.SAMTagAndValue;
 
 import util.gen.*;
 

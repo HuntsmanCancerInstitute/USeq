@@ -3,7 +3,7 @@ package edu.utah.seq.analysis;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
-import net.sf.samtools.*;
+import htsjdk.samtools.*;
 import util.bio.annotation.Bed;
 import util.bio.annotation.ExonIntron;
 import util.bio.parsers.*;

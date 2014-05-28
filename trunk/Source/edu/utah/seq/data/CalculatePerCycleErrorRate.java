@@ -9,8 +9,8 @@ import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
 import edu.utah.seq.data.sam.MalformedSamAlignmentException;
 import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.data.sam.SamAlignment;
-import net.sf.samtools.*;
-import net.sf.samtools.SAMFileReader.ValidationStringency;
+import htsjdk.samtools.*;
+import htsjdk.samtools.ValidationStringency;
 import util.bio.parsers.MultiFastaParser;
 import util.gen.*;
 

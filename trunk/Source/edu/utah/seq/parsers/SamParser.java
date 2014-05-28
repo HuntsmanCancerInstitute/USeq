@@ -8,11 +8,11 @@ import edu.utah.seq.data.sam.MalformedSamAlignmentException;
 import edu.utah.seq.data.sam.SamAlignment;
 import util.gen.*;
 import java.util.*;
-import net.sf.samtools.SAMFileReader;
-import net.sf.samtools.SAMRecord;
-import net.sf.samtools.SAMRecordIterator;
-import net.sf.samtools.SAMFileReader.ValidationStringency;
-import net.sf.samtools.SAMRecord.SAMTagAndValue;
+import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.SAMRecordIterator;
+import htsjdk.samtools.ValidationStringency;
+import htsjdk.samtools.SAMRecord.SAMTagAndValue;
 
 
 /**Parses a SAM or BAM files into point chromPointData, split by chromosome and strand.

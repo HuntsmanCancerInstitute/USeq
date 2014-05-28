@@ -10,8 +10,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import net.sf.samtools.*;
-import net.sf.samtools.SAMFileReader.ValidationStringency;
+import htsjdk.samtools.*;
+import htsjdk.samtools.ValidationStringency;
 
 import util.gen.Misc;
 

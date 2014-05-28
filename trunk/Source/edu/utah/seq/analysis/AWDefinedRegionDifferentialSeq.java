@@ -4,8 +4,8 @@ import java.io.*;
 import java.util.regex.*;
 import java.util.*;
 
-import net.sf.samtools.*;
-import net.sf.samtools.SAMFileReader.ValidationStringency;
+import htsjdk.samtools.*;
+import htsjdk.samtools.ValidationStringency;
 import util.bio.annotation.Bed;
 import util.bio.annotation.ExonIntron;
 import util.bio.parsers.*;
@@ -455,7 +455,7 @@ public class AWDefinedRegionDifferentialSeq {
 		if (sam.getReadUnmappedFlag()) { return true; }
 		//limit to max matches?
 		if (maxRepeats != 0) {
-			final Object o = sam.getAttribute("IH");
+			final Object o = sam.getAttribute("NH");
 			if (o != null) {
 				final int numRepeats = (Integer)o;
 				if (numRepeats > maxRepeats) { return true; } // failure!
@@ -975,7 +975,7 @@ public class AWDefinedRegionDifferentialSeq {
 		}
 		//set log2Ratio 
 		gene.setSplicingLog2Ratio(log2Ratios[maxLogRatioIndex]);
-		gene.setSplicingExon(maxLogRatioIndex);
+		//gene.setSplicingExon(maxLogRatioIndex);
 		//set exon counts
 		if (numGoodExons == numExons) {
 			gene.setExonCounts(new float[][]{tCounts, cCounts});
@@ -1041,7 +1041,7 @@ public class AWDefinedRegionDifferentialSeq {
 		}
 		//set log2Ratio 
 		gene.setSplicingLog2Ratio(log2Ratios[maxLogRatioIndex]);
-		gene.setSplicingExon(maxLogRatioIndex);
+		//gene.setSplicingExon(maxLogRatioIndex);
 
 	}
 
@@ -1235,7 +1235,7 @@ public class AWDefinedRegionDifferentialSeq {
 		theText.append("\t");
 		theText.append(theGene.getSplicingLog2Ratio());  // log2
 		theText.append("\t");
-		theText.append(theGene.getSplicingExon());	
+		//theText.append(theGene.getSplicingExon());	
 	}
 
 	private boolean parseDESeqStatResults(){

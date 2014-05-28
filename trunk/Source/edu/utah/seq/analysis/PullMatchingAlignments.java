@@ -16,7 +16,7 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.ZipInputStream;
 
 
-import net.sf.samtools.*;
+import htsjdk.samtools.*;
 
 
 public class PullMatchingAlignments {
@@ -58,7 +58,7 @@ public class PullMatchingAlignments {
 			}
 			
 			 
-			sfr.setValidationStringency(SAMFileReader.ValidationStringency.SILENT);
+			sfr.setValidationStringency(ValidationStringency.SILENT);
 			
 			SAMRecordIterator sri = sfr.iterator();
 			SAMRecord sr = null;

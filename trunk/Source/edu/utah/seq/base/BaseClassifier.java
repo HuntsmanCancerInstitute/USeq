@@ -10,8 +10,8 @@ import org.apache.commons.math3.stat.inference.ChiSquareTest;
 import org.apache.commons.math3.util.FastMath;
 
 import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
-import net.sf.samtools.*;
-import net.sf.samtools.SAMRecord.SAMTagAndValue;
+import htsjdk.samtools.*;
+import htsjdk.samtools.SAMRecord.SAMTagAndValue;
 
 import util.bio.annotation.Bed;
 import util.gen.*;

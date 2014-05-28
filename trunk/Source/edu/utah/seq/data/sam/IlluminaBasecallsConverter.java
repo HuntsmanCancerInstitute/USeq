@@ -23,13 +23,13 @@
  */
 package edu.utah.seq.data.sam;
 
-import net.sf.picard.PicardException;
-import net.sf.picard.illumina.parser.*;
-import net.sf.picard.util.FileChannelJDKBugWorkAround;
-import net.sf.picard.util.Log;
-import net.sf.picard.util.ProgressLogger;
-import net.sf.samtools.util.PeekIterator;
-import net.sf.samtools.util.SortingCollection;
+import picard.PicardException;
+import picard.illumina.parser.*;
+import picard.util.FileChannelJDKBugWorkAround;
+import htsjdk.samtools.util.Log;
+import htsjdk.samtools.util.ProgressLogger;
+import htsjdk.samtools.util.PeekIterator;
+import htsjdk.samtools.util.SortingCollection;
 
 import java.io.File;
 import java.util.*;
@@ -65,9 +65,10 @@ public class IlluminaBasecallsConverter<CLUSTER_OUTPUT_RECORD> {
 
     private static final Log log = Log.getInstance(IlluminaBasecallsConverter.class);
 
-    //public static final IlluminaDataType[] DATA_TYPES_NO_BARCODE = {IlluminaDataType.BaseCalls, IlluminaDataType.QualityScores, IlluminaDataType.Position, IlluminaDataType.PF};
+    public static final IlluminaDataType[] DATA_TYPES_NO_BARCODE = {IlluminaDataType.BaseCalls, IlluminaDataType.QualityScores, IlluminaDataType.Position, IlluminaDataType.PF};
+    
     //nix edits
-    public static final IlluminaDataType[] DATA_TYPES_NO_BARCODE = {IlluminaDataType.BaseCalls, IlluminaDataType.QualityScores, IlluminaDataType.Position, IlluminaDataType.PF, IlluminaDataType.RawIntensities};
+   // public static final IlluminaDataType[] DATA_TYPES_NO_BARCODE = {IlluminaDataType.BaseCalls, IlluminaDataType.QualityScores, IlluminaDataType.Position, IlluminaDataType.PF, IlluminaDataType.RawIntensities};
     
     private static final IlluminaDataType[] DATA_TYPES_WITH_BARCODE = Arrays.copyOf(DATA_TYPES_NO_BARCODE, DATA_TYPES_NO_BARCODE.length + 1);
     static {
@@ -171,7 +172,7 @@ public class IlluminaBasecallsConverter<CLUSTER_OUTPUT_RECORD> {
             gcTimerTask = null;
         }
 
-        this.factory = new IlluminaDataProviderFactory(basecallsDir, lane, readStructure, getDataTypesFromReadStructure(readStructure, demultiplex));
+        this.factory = null; // new IlluminaDataProviderFactory(basecallsDir, lane, readStructure, getDataTypesFromReadStructure(readStructure, demultiplex));
         this.factory.setApplyEamssFiltering(applyEamssFiltering);
 
         if (numProcessors == 0) {

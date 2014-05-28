@@ -2,7 +2,7 @@ package edu.utah.seq.analysis.multi;
 
 import java.io.*;
 import java.util.HashMap;
-import net.sf.samtools.SAMFileReader;
+import htsjdk.samtools.SAMFileReader;
 
 public class Replica implements Serializable{
 	//fields
