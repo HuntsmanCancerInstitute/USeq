@@ -12,8 +12,8 @@ import edu.utah.seq.useq.USeqUtilities;
 import edu.utah.seq.useq.data.PositionScore;
 import edu.utah.seq.useq.data.PositionScoreData;
 import edu.utah.seq.useq.data.RegionScoreText;
-import net.sf.samtools.*;
-import net.sf.samtools.SAMRecord.SAMTagAndValue;
+import htsjdk.samtools.*;
+import htsjdk.samtools.SAMRecord.SAMTagAndValue;
 import util.bio.annotation.Bed;
 import util.bio.annotation.ExportIntergenicRegions;
 import util.gen.*;
@@ -35,6 +35,7 @@ public class Sam2USeq {
 	private float maximumAlignmentScore = 1000;
 	private boolean uniquesOnly = false;
 	private boolean stranded = false;
+	private boolean makeAveReadLengthGraph = false;
 	private float minimumCounts = 0;
 	private int minimumLength = 0;
 
@@ -107,7 +108,10 @@ public class Sam2USeq {
 		}
 
 		//make coverage track
-		if (verbose) System.out.print("Making depth coverage tracks");
+		if (verbose) {
+			if (makeAveReadLengthGraph) System.out.print("Making average alignment lenght coverage tracks");
+			else System.out.print("Making depth coverage tracks");
+		}
 		makeCoverageTracks();
 
 		if (minimumCounts !=0) bedOut.close();
@@ -151,7 +155,7 @@ public class Sam2USeq {
 			ChromData data = null;
 			try {
 				samReader = new SAMFileReader(samFile);
-				samReader.setValidationStringency(SAMFileReader.ValidationStringency.SILENT);
+				samReader.setValidationStringency(ValidationStringency.SILENT);
 				SAMRecordIterator it = samReader.iterator();
 
 				while (it.hasNext()) {
@@ -337,12 +341,29 @@ public class Sam2USeq {
 		}
 		USeqUtilities.deleteDirectory(tempDirectory);
 	}
+	
+	/**Sums M bases in cigar.*/
+	public int alignmentLength (String cigar){
+		//for each cigar block
+		Matcher mat = cigarSub.matcher(cigar);
+		int alignmentLength = 0;
+		while (mat.find()){
+			String call = mat.group(2);
+			//a match
+			if (call.equals("M")) {
+				int numberBases = Integer.parseInt(mat.group(1));
+				alignmentLength+= numberBases;
+			}
+		}
+		return alignmentLength;
+	}
 
 	public void makeCoverageTrack(){	
 		//make array to hold counts
 		int firstBase = chromData.firstBase;
 		int lastBase = chromData.lastBase;
 		float[] baseCounts = new float[lastBase - firstBase];
+		float[] alignmnentLengths = new float[baseCounts.length];
 
 		//fetch dis
 		DataInputStream dis = null;
@@ -366,17 +387,21 @@ public class Sam2USeq {
 
 				//for each cigar block
 				Matcher mat = cigarSub.matcher(cigar);
+				int alignmentLength = alignmentLength(cigar);
 				while (mat.find()){
 					String call = mat.group(2);
 					int numberBases = Integer.parseInt(mat.group(1));
 					//a match
 					if (call.equals("M")) {
-						for (int i = 0; i< numberBases; i++) baseCounts[start++] += numRepeats;
+						for (int i = 0; i< numberBases; i++) {
+							baseCounts[start] += numRepeats;
+							alignmnentLengths[start] += alignmentLength;
+							start++;
+						}
 						if (numberBases > maxNumberBases) maxNumberBases = numberBases;
 					}
 					//just advance for all but insertions which should be skipped via the failure to match
 					else start += numberBases;
-
 				}
 
 
@@ -434,8 +459,22 @@ public class Sam2USeq {
 				e.printStackTrace();
 				Misc.printErrAndExit("\nError writing data to gzipper for per region coverage stats.\n");
 			}
+			//make ave read length graph?
+			if (makeAveReadLengthGraph){
+				//make averages
+				for (int i=0; i< baseCounts.length; i++) {
+					if (baseCounts[i] != 0 ) alignmnentLengths[i] = alignmnentLengths[i] / baseCounts[i];
+				}
+				//make PositionScore[]
+				positions = makeStairStepGraph(firstBase, alignmnentLengths, false);
+				//write data to disk
+				SliceInfo sliceInfo = new SliceInfo(chromData.chromosome, chromData.strand,0,0,0,null);
+				PositionScoreData psd = new PositionScoreData (positions, sliceInfo);
+				psd.sliceWritePositionScoreData(rowChunkSize, tempDirectory, files2Zip);
+				
+			}
 			//do they want relative read coverage graphs and good block counts?
-			if (makeRelativeTracks && minimumCounts !=0){
+			else if (makeRelativeTracks && minimumCounts !=0){
 				//first make positions without scaling
 				positions = makeStairStepGraph(firstBase, baseCounts, false);
 				//make blocks 
@@ -513,7 +552,6 @@ public class Sam2USeq {
 			}
 		}
 
-
 		//set beginning zero point?
 		if (basePosition !=0) {
 			int basePositionMinusOne = basePosition-1;
@@ -561,7 +599,6 @@ public class Sam2USeq {
 		psAL.toArray(p);
 
 		return p;
-
 	}
 
 	public static void printSam(SAMRecord sam){
@@ -626,6 +663,7 @@ public class Sam2USeq {
 					case 'r': makeRelativeTracks = false; break;
 					case 's': stranded = true; break;
 					case 'e': scaleRepeats = true; break;
+					case 'k': makeAveReadLengthGraph = true; break;
 					case 'm': minimumMappingQuality = Float.parseFloat(args[++i]); break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'c': minimumCounts  = Float.parseFloat(args[++i]); break;
@@ -698,8 +736,13 @@ public class Sam2USeq {
 		//settings
 		if (verbose) {
 			System.out.println("Settings:");
-			System.out.println(makeRelativeTracks+"\tMake relative covererage tracks.");
-			System.out.println(scaleRepeats+"\tScale repeat alignments by the number of matches.");
+			if (makeAveReadLengthGraph){
+				System.out.println(makeAveReadLengthGraph+"\tMake average alignment length graph.");
+			}
+			else {
+				System.out.println(makeRelativeTracks+"\tMake relative covererage tracks.");
+				System.out.println(scaleRepeats+"\tScale repeat alignments by the number of matches.");
+			}
 			System.out.println(stranded+"\tMake stranded covererage tracks.");
 			System.out.println(minimumMappingQuality+"\tMinimum mapping quality score.");
 			System.out.println(maximumAlignmentScore+"\tMaximum alignment score.");
@@ -761,7 +804,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam 2 USeq : Feb 2014                             **\n" +
+				"**                                Sam 2 USeq : May 2014                             **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
@@ -791,6 +834,7 @@ public class Sam2USeq {
 				"-c Print regions that meet a minimum # counts, defaults to 0, don't print.\n"+
 				"-l Print regions that also meet a minimum length, defaults to 0.\n"+
 				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
+				"-k Make average alignment length graph instead of read depth.\n"+
 
 				"\n"+
 

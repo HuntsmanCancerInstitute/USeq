@@ -3,7 +3,7 @@ package edu.utah.seq.base;
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
-import net.sf.samtools.*;
+import htsjdk.samtools.*;
 
 import util.gen.*;
 

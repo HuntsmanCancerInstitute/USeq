@@ -4,11 +4,11 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
-import net.sf.samtools.AlignmentBlock;
-import net.sf.samtools.SAMFileReader;
-import net.sf.samtools.SAMRecord;
-import net.sf.samtools.SAMRecordIterator;
-import net.sf.samtools.SAMFileReader.ValidationStringency;
+import htsjdk.samtools.AlignmentBlock;
+import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.SAMRecordIterator;
+import htsjdk.samtools.ValidationStringency;
 import edu.utah.seq.mes.*;
 import edu.utah.seq.vcf.VCFInfo;
 import edu.utah.seq.vcf.VCFParser;

@@ -3,8 +3,8 @@ package edu.utah.seq.base;
 import java.util.Arrays;
 import java.util.List;
 
-import net.sf.samtools.AlignmentBlock;
-import net.sf.samtools.SAMRecord;
+import htsjdk.samtools.AlignmentBlock;
+import htsjdk.samtools.SAMRecord;
 import util.gen.Num;
 
 public class VariantAlignment{

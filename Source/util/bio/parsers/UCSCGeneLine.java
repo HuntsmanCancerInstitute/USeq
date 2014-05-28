@@ -154,6 +154,16 @@ public class UCSCGeneLine {
 		}
 	}
 	
+	public static int[] findMinMax (UCSCGeneLine[] genes){
+		int min = Integer.MAX_VALUE;
+		int max = -1;
+		for (UCSCGeneLine g: genes){
+			if (g.getTxStart() < min) min = g.getTxStart();
+			if (g.getTxEnd() > max) max = g.getTxEnd();
+		}
+		return new int[]{min, max};
+	}
+	
 	public void zeroNullScores(){
 		scores = null;
 		exonCounts = null;

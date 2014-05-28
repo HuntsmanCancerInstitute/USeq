@@ -23,17 +23,17 @@
  */
 package edu.utah.seq.data.sam;
 
-import net.sf.picard.filter.SamRecordFilter;
-import net.sf.picard.filter.SolexaNoiseFilter;
-import net.sf.picard.illumina.parser.ClusterData;
-import net.sf.picard.illumina.parser.FourChannelIntensityData;
-import net.sf.picard.illumina.parser.ReadData;
-import net.sf.picard.illumina.parser.ReadStructure;
-import net.sf.picard.sam.ReservedTagConstants;
-import net.sf.picard.util.AdapterPair;
-import net.sf.picard.util.ClippingUtility;
-import net.sf.picard.util.IlluminaUtil;
-import net.sf.samtools.SAMRecord;
+import htsjdk.samtools.filter.SamRecordFilter;
+import htsjdk.samtools.filter.SolexaNoiseFilter;
+import picard.illumina.parser.ClusterData;
+import picard.illumina.parser.FourChannelIntensityData;
+import picard.illumina.parser.ReadData;
+import picard.illumina.parser.ReadStructure;
+import htsjdk.samtools.ReservedTagConstants;
+import picard.util.AdapterPair;
+import picard.util.ClippingUtility;
+import picard.util.IlluminaUtil;
+import htsjdk.samtools.SAMRecord;
 
 import java.util.List;
 
@@ -136,7 +136,7 @@ public class ClusterDataToSamConverter implements
 
         final IlluminaBasecallsToSam.SAMRecordsForCluster ret = new IlluminaBasecallsToSam.SAMRecordsForCluster(outputRecordsPerCluster);
 
-        final String readName = IlluminaUtil.makeReadName(runBarcode, cluster.getLane(), cluster.getTile(), cluster.getX(), cluster.getY());
+        final String readName = ""; //IlluminaUtil.makeReadName(runBarcode, cluster.getLane(), cluster.getTile(), cluster.getX(), cluster.getY());
 
         // Get and transform the unmatched barcode, if any, to store with the reads
         String unmatchedBarcode = null;

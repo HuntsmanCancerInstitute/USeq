@@ -30,10 +30,9 @@ package edu.utah.seq.data.sam;
  * @author davidnix
  * 
  */
-import net.sf.picard.sam.*;
-import net.sf.picard.cmdline.CommandLineProgram;
-import net.sf.picard.io.IoUtil;
-import net.sf.samtools.*;
+import picard.sam.*;
+import picard.cmdline.CommandLineProgram;
+import htsjdk.samtools.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
@@ -47,7 +46,7 @@ public class PicardSortSam extends CommandLineProgram {
 
 	protected int doWork() {
 
-		SAMFileReader reader = new SAMFileReader(IoUtil.openFileForReading(INPUT));
+		SAMFileReader reader = new SAMFileReader(INPUT);
 		reader.getFileHeader().setSortOrder(SORT_ORDER);
 		SAMFileWriter writer = new SAMFileWriterFactory().makeSAMOrBAMWriter(reader.getFileHeader(), false, OUTPUT);
 

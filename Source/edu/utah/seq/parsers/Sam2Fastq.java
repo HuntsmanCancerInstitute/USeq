@@ -10,10 +10,10 @@ import edu.utah.seq.data.sam.SamAlignment;
 import util.gen.*;
 
 import java.util.*;
-import net.sf.samtools.SAMFileReader;
-import net.sf.samtools.SAMRecord;
-import net.sf.samtools.SAMRecordIterator;
-import net.sf.samtools.SAMRecord.SAMTagAndValue;
+import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SAMRecord;
+import htsjdk.samtools.SAMRecordIterator;
+import htsjdk.samtools.SAMRecord.SAMTagAndValue;
 
 
 /**Takes an unsorted sam file and the original fastq files and pulls the original fastq data lines.  Assumes the order of the reads is preserved in all files.

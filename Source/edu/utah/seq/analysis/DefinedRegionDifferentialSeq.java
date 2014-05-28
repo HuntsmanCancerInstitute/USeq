@@ -3,10 +3,11 @@ package edu.utah.seq.analysis;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
+
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
-import net.sf.samtools.*;
-import net.sf.samtools.SAMFileReader.ValidationStringency;
+
+import htsjdk.samtools.*;
 import util.bio.annotation.Bed;
 import util.bio.annotation.ExonIntron;
 import util.bio.parsers.*;
@@ -372,7 +373,7 @@ public class DefinedRegionDifferentialSeq {
 		//the idea here is to take a sorted bam file and add the reads to an ArrayList, basically every base should have a ArrayList of reads that overlap that base
 		//one can then count the number of overlapping fragments for an exon or a collection of exons by hashing the ArrayList
 		//assumes each read (first or second) has the same name
-
+long start = System.currentTimeMillis();
 		//make reader
 		SAMFileReader reader = new SAMFileReader(replica.getBamFile());	
 		reader.setValidationStringency(ValidationStringency.SILENT);
@@ -485,6 +486,10 @@ public class DefinedRegionDifferentialSeq {
 		iterator = null;
 		seqs = null;
 		chromLength = null;
+		
+		long diff = System.currentTimeMillis() - start;
+		System.out.println("OneRepOld "+diff);
+		System.exit(0);
 	}
 
 	private boolean alignmentFails(SAMRecord sam){

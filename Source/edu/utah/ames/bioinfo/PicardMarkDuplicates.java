@@ -31,10 +31,9 @@ package edu.utah.ames.bioinfo;
  * 
  */
 
-import net.sf.picard.sam.*;
-import net.sf.picard.cmdline.*;
-import net.sf.picard.io.IoUtil;
-import net.sf.samtools.*;
+import picard.sam.*;
+import picard.cmdline.*;
+import htsjdk.samtools.*;
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
@@ -48,7 +47,7 @@ public class PicardMarkDuplicates extends CommandLineProgram {
 
 	protected int doWork() {
 		
-		SAMFileReader reader = new SAMFileReader(IoUtil.openFileForReading(INPUT));
+		SAMFileReader reader = new SAMFileReader(INPUT);
 		SAMFileWriter writer = new SAMFileWriterFactory().makeSAMOrBAMWriter(reader.getFileHeader(), false, OUTPUT);
 		
 		//iterate over the records

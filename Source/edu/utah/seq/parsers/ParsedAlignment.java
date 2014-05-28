@@ -6,7 +6,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.utah.seq.data.Point;
 import edu.utah.seq.data.sam.SamAlignment;
-import net.sf.samtools.SAMRecord;
+import htsjdk.samtools.SAMRecord;
 import util.bio.seq.Seq;
 import util.gen.Misc;
 
