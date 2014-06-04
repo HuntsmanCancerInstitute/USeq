@@ -1,4 +1,4 @@
-package edu.utah.tomato;
+package edu.utah.tomato.daemon;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -11,6 +11,8 @@ import java.util.Date;
 import java.util.concurrent.Callable;
 import java.util.regex.Pattern;
 
+import edu.utah.tomato.util.TFLogger;
+
 public class TFThread implements Callable<Boolean> {
 		private File logFile = null;
 		private TFLogger tfLogger = null;
@@ -20,6 +22,7 @@ public class TFThread implements Callable<Boolean> {
 		private File endFile = null;
 		private File tmpFailFile = null;
 		private File running = null;
+		private File pbsFile = null;
 		private static volatile Integer failCount = 0;
 		private int failMax = 0;
 		private int threadnumber = 0;
@@ -29,16 +32,25 @@ public class TFThread implements Callable<Boolean> {
 		private ArrayList<File> deleteEarly = null;
 		private boolean deleted = false;
 		
+		public static void setFailCount(int fc) {
+			failCount = fc;
+		}
+		
 		public TFThread(File directory, int failMax, int threadnumber, int heartbeat, ArrayList<File> keepers, ArrayList<File> deleteEarly, TFLogger tfLogger) {
 			this(directory,failMax,threadnumber,heartbeat,keepers,tfLogger);
 			this.deleteEarly = deleteEarly;
 		}
 		
 		public TFThread(File directory, int failMax, int threadnumber, int heartbeat, ArrayList<File> keepers, TFLogger tfLogger) {
-			this.logFile = new File(directory,"log.txt");
+			//this.logFile = new File(directory,"log.txt");
 			this.tmpFailFile = new File(directory,"tmp.fail");
 			this.errorFile = new File(directory,"stderr.txt");
-			this.stdoutFile = new File(directory,"stdout.txt");
+			//this.stdoutFile = new File(directory,"stdout.txt");
+			
+			this.logFile = new File(directory,"stdout.txt");
+			//this.errorFile = new File(directory,"stdout.txt");
+			
+			this.pbsFile = new File(directory,"pbs.sh");
 			this.startFile = new File(directory,"b");
 			this.endFile = new File(directory,"a");
 			this.running = new File(directory,"r");
@@ -48,6 +60,8 @@ public class TFThread implements Callable<Boolean> {
 			this.directory = directory;
 			this.keepers = keepers;
 			this.tfLogger = tfLogger;
+			this.keepers.add(this.running);
+			this.keepers.add(this.endFile);
 		}
 		
 		private void writeErrorMessage(String message, boolean internal) {
@@ -61,8 +75,18 @@ public class TFThread implements Callable<Boolean> {
 			tfLogger.writeWarningMessage("[T" + this.threadnumber + "] " + message);
 		}
 		
-		private void transferExisting() {
+		public void cleanDirectory() {
 			this.writeInfoMessage("Cleaning directory.");
+			File[] fileList = this.directory.listFiles();
+			for (File file: fileList) {
+				if (!file.isDirectory() && !this.keepers.contains(file)) {
+					file.delete();
+				}
+			}
+		}
+		
+		private void transferExisting() {
+			this.writeInfoMessage("Backing up logs.");
 			
 			DateFormat dateFormat = new SimpleDateFormat("yyyyMMddHHmmss");
 			Date date = new Date();
@@ -70,40 +94,29 @@ public class TFThread implements Callable<Boolean> {
 			
 			File destDir = new File(this.directory,logName);
 			
-			if (this.stdoutFile.exists()) {
+			
+			if (this.pbsFile.exists()) {
 				if (!destDir.exists()) {
 					destDir.mkdir();
 				}
-				if (this.stdoutFile.exists()) {
-					moveFile(stdoutFile,new File(destDir,"stdout.txt"));
-				}
+				moveFile(pbsFile,new File(destDir,"pbs_old.sh"));
 			}
 			
 			if (this.errorFile.exists()) {
 				if (!destDir.exists()) {
 					destDir.mkdir();
 				}
-				if (this.errorFile.exists()) {
-					moveFile(errorFile,new File(destDir,"stderr.txt"));
-				}
+				moveFile(errorFile,new File(destDir,"stderr.txt"));
 			}
 			
 			if (this.logFile.exists()) {
 				if (!destDir.exists()) {
 					destDir.mkdir();
 				}
-				if (this.logFile.exists()) {
-					moveFile(logFile,new File(destDir,"log.txt"));
-				}
+				moveFile(logFile,new File(destDir,"stdout.txt"));
 			}
 			
-			
-			File[] fileList = this.directory.listFiles();
-			for (File file: fileList) {
-				if (!file.isDirectory() && !this.keepers.contains(file)) {
-					file.delete();
-				}
-			}
+			this.cleanDirectory();
 			
 		}
 		
@@ -162,7 +175,7 @@ public class TFThread implements Callable<Boolean> {
 						}
 						
 											
-						if (errorFile.exists()) {
+						if (logFile.exists() && !running.exists()) {
 							foundStderr = true;
 							
 							this.writeInfoMessage("Found log file!");
@@ -180,10 +193,13 @@ public class TFThread implements Callable<Boolean> {
 								}
 								br.close();
 								
-								if (Pattern.matches(".+?Job failed.*", lastLine)) {
+								//if (Pattern.matches(".+?Job failed.*", lastLine)) {
+								if (Pattern.matches("failure", lastLine)) {
 									this.writeInfoMessage("Tomato job finished with errors");
 									tomatoFailed = true;
-								} else if (Pattern.matches(".+?Job completed successfully.*", lastLine)) {
+								} 
+								//else if (Pattern.matches(".+?Job completed successfully.*", lastLine)) {
+								else if (Pattern.matches("success", lastLine)) {
 									this.writeInfoMessage("Tomato job finished correctly");
 									analysisFinished = true;
 								} else {
@@ -191,23 +207,24 @@ public class TFThread implements Callable<Boolean> {
 									tomatoFailed = true;
 								}
 							}
-						} else if (this.tmpFailFile.exists()) {
+						} else if (this.tmpFailFile.exists() && !running.exists()) {
 							foundStderr = true;
-							this.writeInfoMessage("Found tmp.fail, resubmitting");
-						} else if (this.logFile.exists() && !startFile.exists() && !running.exists() && !errorFile.exists()) {
-							BufferedReader br = new BufferedReader(new FileReader(logFile));
-							String line = "";
-							String lastLine = "";
-							while ((line=br.readLine()) != null) {
-								lastLine = line;
-							}
-							br.close();
-							
-							if (Pattern.matches(".+?Job failed.*", lastLine)) {
-								this.writeInfoMessage("Apparent tomato failure, resubmitting, resubmitting");
-								foundStderr = true;
-							}
-						}
+							tomatoFailed = true;
+							this.writeInfoMessage("Tomato job finished with errors (tmp.fail found)");
+//						} else if (this.logFile.exists() && !startFile.exists() && !running.exists() && !errorFile.exists()) {
+//							BufferedReader br = new BufferedReader(new FileReader(logFile));
+//							String line = "";
+//							String lastLine = "";
+//							while ((line=br.readLine()) != null) {
+//								lastLine = line;
+//							}
+//							br.close();
+//							
+//							if (Pattern.matches(".+?Job failed.*", lastLine)) {
+//								this.writeInfoMessage("Apparent tomato failure, resubmitting.");
+//								foundStderr = true;
+//							}
+//						}
 //						} else if (deleteEarly != null && logFile.exists() && !errorFile.exists() && !tmpFailFile.exists()) {
 //							BufferedReader br = new BufferedReader(new FileReader(logFile));
 //							String line = "";
@@ -231,13 +248,14 @@ public class TFThread implements Callable<Boolean> {
 //							
 //							this.deleted = true;
 //							
-//						}
+						}
 							
 							
 						if (tomatoFailed) {
 							failCount += 1;
 							if (failCount > this.failMax) {
 								this.writeInfoMessage("Too many tomato run failures, killing all jobs and exiting");
+								this.cleanDirectory();
 								analysisFinished = true;
 								analysisFailed = true;
 							} else if (this.deleted) {
@@ -254,8 +272,9 @@ public class TFThread implements Callable<Boolean> {
 			} catch (InterruptedException iex) {
 				this.writeInfoMessage("Thread interrupted, killing job");
 				try {
-					Process p = Runtime.getRuntime().exec("touch " + endFile.toString());
+					Process p = Runtime.getRuntime().exec("touch " + endFile.getAbsolutePath());
 					p.waitFor();
+					this.cleanDirectory();
 				} catch (IOException ioex) {
 					this.writeErrorMessage("Could not send tomato termination signal, please kill the jobs yourself",true);
 				} catch (InterruptedException iex2) {

@@ -1,4 +1,4 @@
-package edu.utah.tomato;
+package edu.utah.tomato.daemon;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -9,6 +9,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
+
+import edu.utah.tomato.util.TFLogger;
 
 public class TFThreadDaemon extends Thread {
 	
@@ -112,7 +114,6 @@ public class TFThreadDaemon extends Thread {
 						System.exit(1);
 					} 
 				}
-				
 				
 				
 				if (finishedJobs == this.totalJobs) {

@@ -20,6 +20,7 @@ import java.util.zip.GZIPInputStream;
 import htsjdk.samtools.BAMIndexer;
 import htsjdk.samtools.CigarOperator;
 import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.SAMFileWriter;
 import htsjdk.samtools.SAMFileWriterFactory;
 import htsjdk.samtools.SAMRecord;
@@ -40,6 +41,7 @@ public class AlignmentEndTrimmer {
 	private int mmScore = 2;
 	private int minLength = 10;
 	private boolean verbose = false;
+	private boolean rnaEditing = false;
 	
 	public static HashMap<Character,Character> revCompHash = new HashMap<Character,Character>() {
 		private static final long serialVersionUID = 1L;
@@ -91,6 +93,7 @@ public class AlignmentEndTrimmer {
 						case 'm': this.mScore = Integer.parseInt(args[++i]); break;
 						case 'n': this.mmScore = Integer.parseInt(args[++i]); break;
 						case 'l': this.minLength = Integer.parseInt(args[++i]); break;
+						case 'e': this.rnaEditing = true; break;
 						case 'h': printDocs(); System.exit(0);
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -144,6 +147,7 @@ public class AlignmentEndTrimmer {
 		
 			//Set up file reader
 			SAMFileReader sfr = new SAMFileReader(this.inputFile);
+			sfr.setValidationStringency(ValidationStringency.LENIENT);
 			
 			//Set up file writer
 			SAMFileWriterFactory sfrf = new SAMFileWriterFactory();
@@ -198,7 +202,7 @@ public class AlignmentEndTrimmer {
 					String[] alns = this.createAlignmentStrings(cigar, refSeq, obsSeq, totalReads);
 					
 					//Identify Trim Point
-					int idx = this.identifyTrimPoint(alns);
+					int idx = this.identifyTrimPoint(alns,sr.getReadNegativeStrandFlag());
 					
 					//Create new cigar string
 					if (idx < minLength) {
@@ -442,7 +446,7 @@ public class AlignmentEndTrimmer {
 		
 	}
 	
-	public int identifyTrimPoint(String[] alignments) {
+	public int identifyTrimPoint(String[] alignments, boolean isReversed) {
 		char[] aln1 = alignments[0].toCharArray();
 		char[] aln2 = alignments[1].toCharArray();
 		
@@ -453,7 +457,16 @@ public class AlignmentEndTrimmer {
 			if (aln1[i] == '-' || aln2[i] == '-' || aln1[i] == 'S' || aln2[i] == 'S') {
 				
 			} else if (aln1[i] != aln2[i]) {
-				lastScore = lastScore - this.mmScore;
+				if (this.rnaEditing) {
+					if ((isReversed && aln1[i] == 'T' && aln2[i] == 'C') ||
+						 !isReversed && aln1[i] == 'A' && aln2[i] == 'G') {
+						lastScore = lastScore + this.mScore;
+					} else {
+						lastScore = lastScore - this.mmScore;
+					}
+				} else {
+					lastScore = lastScore - this.mmScore;
+				}
 			} else {
 				lastScore = lastScore + this.mScore;
 			}
@@ -618,6 +631,8 @@ public class AlignmentEndTrimmer {
 				"-i Path to the orignal alignment, sam/bam/sam.gz OK.\n"+
 				"-r Path to the reference sequence, gzipped OK.\n" +
 				"-o Name of the trimmed alignment output.  Output is bam and bai.\n" +
+				"-e Turn on RNA Editing mode.  A>G (forward reads) and T>C (reverse reads) are considered\n" +
+				"   matches.\n" +
 				
 				"\nOptional:\n" +
 				"-m Score of match. Default 1\n" +

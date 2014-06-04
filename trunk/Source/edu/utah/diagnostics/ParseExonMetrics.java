@@ -333,7 +333,9 @@ public class ParseExonMetrics {
 				values.add(Float.parseFloat(items[1]));
 			}
 			
+			
 			this.generateRBarplot(xaxis, values, "PEM.insert.txt", "Insert Size Distribution", "Insert Size", "Counts", insertGraph,"insert");
+		
 			br.close();
 			
 		} catch (IOException ioex) {
@@ -377,8 +379,14 @@ public class ParseExonMetrics {
 			File insertData = new File(outputFile + suffix);
 			bw = new BufferedWriter(new FileWriter(insertData));
 			
-			for (int i=0; i<xvalues.size(); i++) {
-				bw.write(String.format("%d\t%f\n",xvalues.get(i),yvalues.get(i)));
+			if (xvalues.size() == 0) {
+				for (int i=0;i<100;i++) {
+					bw.write(String.format("%d\t%d",i,0));
+				}
+			} else {
+				for (int i=0; i<xvalues.size(); i++) {
+					bw.write(String.format("%d\t%f\n",xvalues.get(i),yvalues.get(i)));
+				}
 			}
 			
 			bw.close();
@@ -403,7 +411,7 @@ public class ParseExonMetrics {
 				System.exit(1);
 			}
 			
-			sb.append("ggtitle(paste('" + outputFile.getName() + "','" + title + "',sep=': '))\n");
+			sb.append("ggtitle(paste('" + outputFile.getName() + "','" + title + "',sep=': ')) + theme(plot.title=element_text(family=\"Times\",face=\"bold\",size=9))\n");
 			sb.append("ggsave(p,file='" + output.getPath() + "',width=6,height=4)\n");
 	
 			//write script to file
