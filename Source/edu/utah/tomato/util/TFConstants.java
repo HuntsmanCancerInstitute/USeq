@@ -1,4 +1,4 @@
-package edu.utah.tomato;
+package edu.utah.tomato.util;
 
 import java.io.File;
 import java.util.HashSet;
@@ -20,18 +20,31 @@ public class TFConstants {
 	
 	public static String FILE_FASTQ1 = "fastq1";
 	public static String FILE_FASTQ2 = "fastq2";
+	
 	public static String FILE_BAM = "bam";
 	public static String FILE_BAI = "bai";
 	public static String FILE_LANE_BAM = "lane_bam";
 	public static String FILE_LANE_BAI = "lane_bai";
 	public static String FILE_SAMPLE_BAM = "sample_bam";
 	public static String FILE_SAMPLE_BAI = "sample_bai";
-	public static String FILE_SPLIT_LANE_BAM = "split_lane_bam";
-	public static String FILE_SPLIT_LANE_BAI = "split_lane_bai";
-	public static String FILE_REALIGN_SAMPLE_BAM = "realign_sample_bam";
-	public static String FILE_REALIGN_SAMPLE_BAI = "realign_sample_bai";
+	public static String FILE_SPLIT_BAM = "split_bam";
+	public static String FILE_SPLIT_BAI = "split_bai";
+	public static String FILE_FINAL_BAM = "final_bam";
+	public static String FILE_FINAL_BAI = "final_bai";
 	public static String FILE_REDUCE_BAM = "reduce_bam";
 	public static String FILE_REDUCE_BAI = "reduce_bai";
+	
+	public static String FILE_ID_FINAL_BAM = "idFinalBam";
+	public static String FILE_ID_FINAL_BAI = "idFinalBai";
+	public static String FILE_ID_REDUCE_BAM = "idReduceBam";
+	public static String FILE_ID_REDUCE_BAI = "idReduceBai";
+	
+	public static String FILE_VCF_RAW = "vcf_raw";
+	public static String FILE_VCF_RAW_IDX = "vcf_raw_idx";
+	public static String FILE_VCF_FILTER = "vcf_filter";
+	public static String FILE_VCF_FILTER_IDX = "vcf_filter_idx";
+	public static String FILE_VCF_PASSING = "vcf_passing";
+	public static String FILE_VCF_PASSING_IDX = "vcf_passing_idx";
 	
 	public static String FILE_SAM = "sam";
 	public static String FILE_METRICS = "pdf";
@@ -46,6 +59,18 @@ public class TFConstants {
 	public static String TARGET_CUSTOM = "custom";
 	public static String TARGET_ALL = "all";
 	
+	public static String PREFIX_SAMPLEID = "sampleid";
+	public static String PREFIX_SAMPLENAME = "samplename";
+	public static String PREFIX_PUID = "puid";
+	
+	public static HashSet<String> prefixTypes;
+	static
+	{
+		prefixTypes = new HashSet<String>();
+		prefixTypes.add(TFConstants.PREFIX_SAMPLENAME);
+		prefixTypes.add(TFConstants.PREFIX_SAMPLEID);
+		prefixTypes.add(TFConstants.PREFIX_PUID);
+	}
 
 	
 	public static HashSet<String> validTypes = new HashSet<String>() {

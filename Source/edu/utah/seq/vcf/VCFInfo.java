@@ -120,7 +120,7 @@ public class VCFInfo {
 	private String checkForMods(String key, String value, String style) {
 		String moddedValue;
 		if (style.equals(VCFInfo.CLEAN) && key.equals("SIFT")) {
-			moddedValue = String.valueOf(1-Float.parseFloat(value));
+			moddedValue = String.valueOf(Float.parseFloat(value));
 		} else if (style.equals(VCFInfo.CLEAN) && key.equals("VarDesc")) {
 			moddedValue = value.split(",")[0];
 		} else {

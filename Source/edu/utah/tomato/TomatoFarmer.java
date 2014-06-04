@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -15,6 +16,8 @@ import java.util.Scanner;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
 
 import javax.mail.Message;
 import javax.mail.MessagingException;
@@ -23,7 +26,10 @@ import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 import javax.mail.Session;
 
-import edu.utah.tomato.TFConstants;
+import edu.utah.tomato.model.TFCommand;
+import edu.utah.tomato.model.TFSampleInfo;
+import edu.utah.tomato.util.TFConstants;
+import edu.utah.tomato.util.TFLogger;
 
 
 import util.gen.IO;
@@ -36,23 +42,17 @@ public class TomatoFarmer {
 	private String username;
 	private File rootDirectory = null;
 	private String email = null;
-	
 	private boolean isFull = false;
 	private HashMap<String,String> properties = new HashMap<String,String>();
 	
 	
 	private boolean tomatoFarmerFailed = true;
 	
-	//Sample list
-	private ArrayList<TFSampleInfo> sampleList= null;
 	
 	//Analysis step management
 	private ArrayList<TFCommand> commandList = null;
 	
-	 
-	
-	
-	
+
 	//Email validation
 	public static final Pattern VALID_EMAIL_ADDRESS_REGEX = 
 		    Pattern.compile("^[A-Z0-9._%+-]+@[A-Z0-9.-]+\\.[A-Z]{2,6}$", Pattern.CASE_INSENSITIVE);
@@ -73,34 +73,32 @@ public class TomatoFarmer {
 		try {
 			BufferedWriter br = new BufferedWriter(new FileWriter(new File(this.rootDirectory,"run.conf")));
 			
+			ArrayList<TFSampleInfo> sampleList = new ArrayList<TFSampleInfo>();
 			
 			for (TFCommand command: this.commandList) {
-				br.write(command.commandString);
-				command.run(sampleList);
+				br.write(command.getCommandString());
+				sampleList = command.run(sampleList);
 				
 			}
 			
 			br.close();
 		} catch (IOException ioex) {
-			logFile.writeErrorMessage("Could not write to run configuration file",true);
+			logFile.writeErrorMessage("[TomatoFarmer] Could not write to run configuration file",true);
 			System.exit(1);
 		}
-		
-		
-		
 		
 		
 		try {
 			this.postMail(this.email, "TomatoFarmer finished successfully", "", "Farmer@tomatosareawesome.org");
 		} catch (MessagingException e) {
-			logFile.writeErrorMessage("Failed to send ending email", true);
+			logFile.writeErrorMessage("[TomatoFarmer] Failed to send ending email", true);
 			e.printStackTrace();
 		} catch (NoClassDefFoundError ncdfe) {
- 			logFile.writeErrorMessage("Failed to send ending email", true);
+ 			logFile.writeErrorMessage("[TomatoFarmer] Failed to send ending email", true);
  		}
 		
 		this.tomatoFarmerFailed = false;
-		logFile.writeInfoMessage("TomatoFarmer finished successfully!");
+		logFile.writeInfoMessage("[TomatoFarmer] TomatoFarmer finished successfully!");
 	}
 
 	
@@ -165,113 +163,7 @@ public class TomatoFarmer {
 	}
 
 
-	private void validateFileSet(TFSampleInfo fi) {
-		logFile.writeInfoMessage("Validating fastq files for sample: " + fi.getSampleName());
-		logFile.writeInfoMessage("Validating paired-end file 1");
-		int lines1 = validateFastq(fi,TFConstants.FILE_FASTQ1);
-		if (lines1 == 0) {
-			logFile.writeErrorMessage("Paired-end fastq file 1 is empty",false);
-			System.exit(1);
-		}
-		logFile.writeInfoMessage("Validated " + lines1 + " records");
-		logFile.writeInfoMessage("Validating paired-end file 2");
-		int lines2 = validateFastq(fi,TFConstants.FILE_FASTQ2);
-		if (lines2 == 0) {
-			logFile.writeErrorMessage("Paired-end fastq file 2 is empty",false);
-			System.exit(1);
-		}
-		logFile.writeInfoMessage("Validated " + lines2 + " records");
-		if (lines2 != lines1) {
-			logFile.writeErrorMessage("Paired-end fastq files have unequal numbers of lines: " + lines1 + " " + lines2,false);
-			System.exit(1);
-		}
-		fi.setRecordCount(lines1);
-	}
 	
-	private int validateFastq(TFSampleInfo fi, String type) {
-		int retval = 0;
-		try {
-			GZIPInputStream gzip = new GZIPInputStream(new FileInputStream(fi.getFile(type)));
-			BufferedReader br = new BufferedReader(new InputStreamReader(gzip));
-			int counter = 0;
-			int readLength = 0;
-			Pattern p = Pattern.compile("^[ACTGN]+$");
-			String line = null;
-			int min = 100000000;
-			int max = 0;
-			int rl = 0;
-			
-		
-			while((line = br.readLine()) != null) {
-				if (counter % 4 == 0) {
-					if (!line.startsWith("@")) {
-						logFile.writeErrorMessage("Fastq line 1 does not start with @,  Error at line#: " + (counter + 1) + ". Contents: " + line,false);
-						System.exit(1);
-					}
-				} else if (counter % 4 == 1) {
-					Matcher m = p.matcher(line);
-					readLength = line.length();
-					if (readLength > rl) {
-						rl = readLength;
-					}
-					if (!m.matches()) {
-						logFile.writeErrorMessage("Fastq line 2 has characters other than A,C,G,T or N.  Error at line#: " + (counter + 1) + ". Contents: " + line,false);
-						System.exit(1);
-					}
-				} else if (counter % 4 == 2) {
-					if (!line.startsWith("+")) {
-						logFile.writeErrorMessage("Fastq line 3 does not start with +.  Error at line#: " + (counter + 1) + ". Contents: " + line,false);
-						System.exit(1);
-					}
-				} else if (counter % 4 == 3) {
-					if (line.length() != readLength) {
-						logFile.writeErrorMessage("Fastq line 4 length does not match fastq line 2,  Error at line#: " + (counter + 1) + ". Contents: " + line,false);
-						System.exit(1);
-					}
-					//Quality check
-					for (int i = 0; i < line.length(); i++){
-					    char c = line.charAt(i);        
-					  
-					    int val = (int)c;
-					    if (val > max) {
-					    	max = val;
-					    } else if (val < min) {
-					    	min = val;
-					    }
-					    
-					}
-				} else {
-					logFile.writeErrorMessage("Should not reach this line",true);
-					System.exit(1);
-				}
-				counter++;
-			}
-			
-			if (min-33 >= 31) {
-				logFile.writeInfoMessage("Fastq detected as ASCII-64.  Min: " + (min-64) + ". Max: " + (max-64));
-				fi.setQual64();
-			} else {
-				logFile.writeInfoMessage("Fastq detected as ASCII-33.  Min: " + (min-33) + ". Max: " + (max-33));
-				
-			}
-			
-			
-			if (counter % 4 != 0) {
-				logFile.writeErrorMessage("Fastq file number not divible by 4, exiting",false);
-				System.exit(1);
-			}
-			
-			br.close();
-			retval = counter / 4;
-			
-			fi.setReadLength(rl);
-		} catch (Exception ioex) {
-			logFile.writeErrorMessage("Error reading fastq file, exiting: " + ioex.getMessage(),true) ;
-			ioex.printStackTrace();
-			System.exit(1);
-		}
-		return retval;
-	}
 	
 	private void postMail(String recipients, String subject, String message, String from) throws MessagingException {
 
@@ -320,8 +212,7 @@ public class TomatoFarmer {
 		boolean noSplit = false;
 		boolean suppressEmail = true;
 		boolean use1KGenomes = false;
-		boolean deleteMetricsBam = true;
-		boolean deleteReducedBam = true;
+		boolean validateFastq = false;
 		
 		
 		
@@ -347,8 +238,7 @@ public class TomatoFarmer {
 					case 'x': suppressEmail = false; break; 
 					case 'p': propertiesFile = new File(args[++i]); break; 
 					case 'h': printDocs(); System.exit(0);
-					case 'u': deleteMetricsBam = false; break;
-					case 'v': deleteReducedBam = false; break;
+					case 'v': validateFastq = true; break;
 					case 'g': use1KGenomes = true; break;
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -381,8 +271,7 @@ public class TomatoFarmer {
 		logFile = new TFLogger(new File(this.properties.get("TEMPLATE_PATH")),this.rootDirectory,this.username,logLevel);
 		
 		//Write Username to file
-		logFile.writeSystemMessage("Username: " + this.username);
-		logFile.writeInfoMessage("");
+		logFile.writeSystemMessage("[TomatoFarmer] Username: " + this.username);
 		
 		//************************************************
 		// Parse command line arguments
@@ -393,7 +282,7 @@ public class TomatoFarmer {
 		//Determine run type
 		if (splitChroms == true) {
 			if (noSplit == true) {
-				logFile.writeErrorMessage("Argument '-c' and '-n' can't be used together.", true);
+				logFile.writeErrorMessage("[TomatoFarmer] Argument '-c' and '-n' can't be used together.", true);
 				System.exit(1);
 			} else {
 				splitType = "chrom";
@@ -405,17 +294,17 @@ public class TomatoFarmer {
 		
 		
 		//Write out system arguments
-		logFile.writeInfoMessage(IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " "));
+		logFile.writeInfoMessage("[TomatoFarmer] " + IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " "));
 		
 		if (directory == null) {
-			logFile.writeErrorMessage("You must set directory name",false);
+			logFile.writeErrorMessage("[TomatoFarmer] You must set directory name",false);
 			System.exit(1);
 		}
 		
 		this.rootDirectory = directory;
 		
 		if (email == null) {
-			logFile.writeErrorMessage("You must set email",false);
+			logFile.writeErrorMessage("[TomatoFarmer] You must set email",false);
 			System.exit(1);
 		}
 		
@@ -428,29 +317,29 @@ public class TomatoFarmer {
 //		}
 		
 		if (!directory.canWrite() || !directory.canRead() || !directory.canExecute()) {
-			logFile.writeErrorMessage("Your directory is not accessable to tomatoFarmer, please edit permissions",false);
+			logFile.writeErrorMessage("[TomatoFarmer] Your directory is not accessable to tomatoFarmer, please edit permissions",false);
 			System.exit(1);
 		}
 		
 		
 		if (!logLevel.equals("INFO") && !logLevel.equals("WARNING") && !logLevel.equals("ERROR")) {
-			logFile.writeWarningMessage("Logging level must be INFO, WARNING or ERROR.  Reverting to INFO");
+			logFile.writeWarningMessage("[TomatoFarmer] Logging level must be INFO, WARNING or ERROR.  Reverting to INFO");
 		}
 		
 		if (jobNumber > 20 || jobNumber < 1) {
-			logFile.writeErrorMessage("Job number must be between 1 and 20",false);
+			logFile.writeErrorMessage("[TomatoFarmer] Job number must be between 1 and 20",false);
 		}
 		
-		logFile.writeInfoMessage("Using " + jobNumber + " threads for this project");
+		logFile.writeInfoMessage("[TomatoFarmer] Using " + jobNumber + " threads for this project");
 		
 		if (!validateEmail(email)) {
-			logFile.writeErrorMessage("Email does not pass our format check, please check if it was entered properly.  Offending email: " + email,false);
+			logFile.writeErrorMessage("[TomatoFarmer] Email does not pass our format check, please check if it was entered properly.  Offending email: " + email,false);
 			System.exit(1);
 		}
 	
 		//Check to make sure the run type is valid
 		if (analysisType == null) {
-			logFile.writeErrorMessage("You must set runtype",false);
+			logFile.writeErrorMessage("[TomatoFarmer] You must set runtype",false);
 			System.exit(1);
 		}
 	
@@ -458,7 +347,7 @@ public class TomatoFarmer {
 		if (TFConstants.validTypes.contains(analysisType)) {
 			configFile = new File(this.properties.get("TEMPLATE_PATH"),"defaults/" + analysisType + ".default.txt");
 			if (!configFile.exists()) {
-				logFile.writeErrorMessage("Default configuration file for runtype " + analysisType + " does not exist", true);
+				logFile.writeErrorMessage("[TomatoFarmer] Default configuration file for runtype " + analysisType + " does not exist", true);
 				System.exit(1);
 			}
 			
@@ -468,9 +357,9 @@ public class TomatoFarmer {
 			}
 		} else {
 			configFile = new File(analysisType);
-			logFile.writeInfoMessage("Non-standard analysis type, looking for custom configuration file");
+			logFile.writeInfoMessage("[TomatoFarmer] Non-standard analysis type, looking for custom configuration file");
 			if (!configFile.exists()) {
-				logFile.writeErrorMessage("Specified configuration file does not exist, exiting",false);
+				logFile.writeErrorMessage("[TomatoFarmer] Specified configuration file does not exist, exiting",false);
 				System.exit(1);
 			}
 		}
@@ -485,15 +374,17 @@ public class TomatoFarmer {
 			if (TFConstants.validTargets.contains(targetType)) {
 				targetFile = new File(targetDirectory,targetType + ".bed");
 				if (!targetFile.exists()) {
-					logFile.writeErrorMessage("The target capture bed file is missing: " + targetFile.getAbsolutePath(), true);
+					logFile.writeErrorMessage("[TomatoFarmer] The target capture bed file is missing: " + targetFile.getAbsolutePath(), true);
 					System.exit(1);
 				}
 			} else {
-				logFile.writeInfoMessage("Non-standard target capture, looking for custom target file");
+				logFile.writeInfoMessage("[TomatoFarmer] Non-standard target capture, looking for custom target file");
 				targetFile = new File(targetType);
 				if (!targetFile.exists()) {
-					logFile.writeErrorMessage("Specified target region file does not exist, exiting", false);
+					logFile.writeErrorMessage("[TomatoFarmer] Specified target region file does not exist, exiting", false);
 					System.exit(1);
+				} else {
+					targetFile = this.checkTarget(targetFile);
 				}
 			}
 		} else {
@@ -512,7 +403,7 @@ public class TomatoFarmer {
 				if (manualFail) {
 					Scanner scanner = new Scanner(System.in);
 					while(true) {
-						logFile.writeInputMessage("User selected manual failmax.  Please enter your selection for " + commandString + ". [Leave blank for default]");
+						logFile.writeInputMessage("[TomatoFarmer] User selected manual failmax.  Please enter your selection for " + commandString + ". [Leave blank for default]");
 						String input = scanner.nextLine();
 						try {
 							if (input.equals("")) {
@@ -520,55 +411,28 @@ public class TomatoFarmer {
 							} else {
 								failmax = Integer.parseInt(input);
 								if (failmax < 1 || failmax > 20) {
-									logFile.writeWarningMessage("Failmax must be between 1 and 20, try again");
+									logFile.writeWarningMessage("[TomatoFarmer] Failmax must be between 1 and 20, try again");
 								} else {
 									break;
 								}
 							}
 						} catch(NumberFormatException nfe) {
-							logFile.writeWarningMessage(input + " is not a number, try again");
+							logFile.writeWarningMessage("[TomatoFarmer] " + input + " is not a number, try again");
 						}
 					}
 					scanner.close();
 				} 
 				TFCommand cmd = TFCommand.getCommandObject(directory, commandString, logFile, email, wallTime, heartbeat, 
-						failmax, jobNumber, suppressEmail, deleteMetricsBam, deleteReducedBam, isFull, use1KGenomes, studyName, 
+						failmax, jobNumber, suppressEmail, false, false, isFull, use1KGenomes, validateFastq, studyName, 
 						splitType, targetFile, this.properties);
 				commandList.add(cmd);
 			}
 			br.close();
 		} catch (IOException ioex) {
-			logFile.writeErrorMessage("Could not read configuration file",true);
+			logFile.writeErrorMessage("[TomatoFarmer] Could not read configuration file",true);
 			System.exit(1);
 		}
 		
-		
-		//**************************************
-		// Look through the files in the directory and assign filetypes
-		//**************************************
-		
-		//Create file lists
-		sampleList = TFSampleInfo.identifyAndValidateSamples(directory, commandList.get(0).getCommandType(), this.logFile);
-		
-		logFile.writeInfoMessage("Found " + this.sampleList.size() + " samples in the study " + studyName);
-		
-		if (sampleList.size() == 0) {
-			logFile.writeErrorMessage("No valid input file found",false);
-			System.exit(1);
-		}
-		
-		
-		//************************************
-		// Validate fastq files, if needed
-		//************************************
-		
-		
-		if (commandList.get(0).getCommandType().equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) || 
-				commandList.get(0).getCommandType().equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO)) {
-			for (TFSampleInfo fi: sampleList) {
-				validateFileSet(fi);
-			}
-		}
 
 		
 		//************************************
@@ -577,6 +441,109 @@ public class TomatoFarmer {
 		attachShutDownHook();
 		
 	}	
+	
+	private File checkTarget(File origTarget) {
+		
+		String name = origTarget.getName();
+		File directory = origTarget.getParentFile();
+		
+		File usedFile = origTarget;
+		
+		//Unzip target if zipped
+		if (origTarget.getName().endsWith(".gz")) {
+			this.logFile.writeInfoMessage("[TomatoFarmer]  Found gzipped target file, decompressing");
+			byte[] buffer = new byte[1024];
+			
+			try {
+				GZIPInputStream gzis = new GZIPInputStream(new FileInputStream(origTarget));
+				File unzipped = new File(directory,name.substring(0, name.length()-3));
+			    FileOutputStream fos = new FileOutputStream(unzipped);
+			 
+		        int len;
+		        while ((len = gzis.read(buffer)) > 0) {
+		        	fos.write(buffer, 0, len);
+		        }
+		 
+		        gzis.close();
+		    	fos.close();
+		    	
+		    	usedFile = unzipped;
+			} catch (IOException ioex) {
+				this.logFile.writeErrorMessage("[TomatoFarmer]  Error decompressing target file, exiting", true);
+				System.exit(1);
+			}
+		} else if (origTarget.getName().endsWith(".zip")) {
+			this.logFile.writeInfoMessage("[TomatoFarmer]  Found zipped target file, decompressing");
+			byte[] buffer = new byte[1024];
+			
+			try {
+				ZipInputStream zis = new ZipInputStream(new FileInputStream(origTarget));
+				ZipEntry ze = zis.getNextEntry();
+				
+				if (ze == null) {
+					this.logFile.writeErrorMessage("[TomatoFarmer]  Zip file appears corruped, exiting", true);
+					System.exit(1);
+				}
+				
+				String entryName = ze.getName();
+				File unzipped = new File(directory,entryName);
+				FileOutputStream fos = new FileOutputStream(unzipped);
+				
+				int len;
+				while ((len = zis.read(buffer)) > 0) {
+	                fos.write(buffer, 0, len);
+	            }
+			
+				fos.close();
+				zis.close();
+				
+				usedFile = unzipped;
+				
+			} catch (IOException ioex) {
+				this.logFile.writeErrorMessage("[TomatoFarmer]  Error decompressing target file, exiting", true);
+				System.exit(1);
+			}	
+		}
+		
+		
+		//Go through the file, strip "chr"
+		File cleanedFile = new File(directory,usedFile.getName() + "_Cleaned.bed");
+		
+		
+		try {
+			BufferedReader br = new BufferedReader(new FileReader(usedFile));
+			BufferedWriter bw = new BufferedWriter(new FileWriter(cleanedFile));
+			
+			String temp = null;
+			boolean editMade = false;
+			while ( (temp = br.readLine() ) != null ) {
+				//if (temp.startsWith("chr")) {
+				//	editMade = true;
+				//	String fixed = temp.substring(3);
+			//		bw.write(fixed + "\n");
+				//} else {
+					bw.write(temp + "\n");
+				//}
+			}
+			
+			br.close();
+			bw.close();
+			
+			if (editMade) {
+				this.logFile.writeInfoMessage("[TomatoFarmer] Stripped 'chr' from target chromosomes");
+				usedFile = cleanedFile;
+			} else {
+				cleanedFile.delete();
+			}
+			
+		} catch (IOException ioex) {
+			this.logFile.writeErrorMessage("[TomatoFarmer] Error writing cleaned target file", true);
+			System.exit(1);
+		}
+		
+		
+		return usedFile;
+	}
 	
 	private static void printDocs(){
 		System.out.println("\n" +
@@ -607,7 +574,7 @@ public class TomatoFarmer {
 				"          4) exome_align_bwa - Alignment/recalibration only (bwa).\n" +
 				"          5) exome_align_best - Align - core best practices.\n" +
 				"          6) exome_metrics - Sample QC metrics only. Requires *mate.bam and \n" +
-				"             *split.lane.bam from one of 1-5 in the launch directory.\n" +
+				"             *split.bam from one of 1-5 in the launch directory.\n" +
 				"          7) exome_variant_raw - Variant detection and filtering (raw settings). \n" + 
 				"             Requires *reduced.bam from one of 1-5 in the launch directory.\n" + 
 				"          8) exome_variant_vqsr - Variant detection and filtering (vqsr) \n" +
@@ -644,6 +611,9 @@ public class TomatoFarmer {
 				"      region.  By default, the genome is split by callable region,  Example '-n'. \n" +
 				"-x Unsuppress tomato emails.  Receive both tomato and TomatoFarmer emails. \n" +
 				"      Example: '-x'.\n" +
+				"-v Validate fastq files.  TomatoFarmer will validate your fastq files before running" +
+				"      This is required if any of your samples are ASCII-64\n" +
+				
 				
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/TomatoFarmer -d /tomato/version/job/demo/\n" +
 				"      -e herschel.krustofsky@hci.utah.edu -y exome_bwa -s DEMO -c -t AgilentAllExon50MB\n\n" +
@@ -662,12 +632,11 @@ public class TomatoFarmer {
 		      
 		     if (tomatoFarmerFailed) {
 		    	try {
-		    		
-		 			postMail(email, "TomatoFarmer failed, check logs ","", "Farmer@tomatosareawesome.org");
+		 			postMail(email, "TomatoFarmer failed, exiting.","", "Farmer@tomatosareawesome.org");
 		 		} catch (MessagingException e) {
-		 			logFile.writeErrorMessage("Failed to send ending email", true);
+		 			logFile.writeErrorMessage("[TomatoFarmer] Failed to send ending email", true);
 		 		} catch (NoClassDefFoundError ncdfe) {
-		 			logFile.writeErrorMessage("Failed to send ending email", true);
+		 			logFile.writeErrorMessage("[TomatoFarmer] Failed to send ending email", true);
 		 		}
 		     }
 		     

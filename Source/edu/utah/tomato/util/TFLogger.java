@@ -1,4 +1,4 @@
-package edu.utah.tomato;
+package edu.utah.tomato.util;
 
 import java.io.BufferedWriter;
 import java.io.File;
