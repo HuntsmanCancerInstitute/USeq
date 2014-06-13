@@ -17,7 +17,7 @@ import util.gen.Misc;
  * All the necessary input data is contained in the fresh data report that comes out of the pipeline.
  * Samples are run individually. A new analysis report is created in GNomEx (linked to experiment numbers) for all 
  * samples of the same request number. Bisulphite files are first split into smaller chunks and aligned separately. 
- * Tomato will email the user only if there are exceptions and/or job failures (-ef option, i.e. #e email@nobody.com -ef). 
+ * Pysano will email the user only if there are exceptions and/or job failures (-ef option, i.e. #e email@nobody.com -ef). 
  * All input fastq files are first run through fastqc app. A log is created for each run, with data reported on how 
  * each sample is handled. Run parameters supplied through the autoalign_run_configs.txt file.
  * 
@@ -33,13 +33,13 @@ public class Autoaligner {
 	private String autoalignReport = null;
 	private String novoindexNames = null;
 	private String parsedReports = null;
-	private String tomatoJobDir = null;
+	private String jobDir = null;
 	private File configFile = null;
 	private String logDir = null;
 	private String createAnalysisMain = null;
 	static String EMAILREGEX = "^#e\\s+(.+@.+)"; //email address pattern
 	static String LABNAMEREGEX = "\\w+\\s\\w+(?=\\WLab)"; //matches first and last name of lab using positive look
-	
+
 
 	private HashMap<String, String> genomeIndex;
 	boolean isSmallRNA = false;
@@ -131,6 +131,7 @@ public class Autoaligner {
 			else {
 				logFile.writeInfoMessage("Fastq file:\t" + s.getFastqFileName());
 			}
+			logFile.writeInfoMessage("Adapters included:\t" + s.adaptersIncluded());
 			//adapters present
 			if (s.adaptersIncluded() == true) {
 				logFile.writeInfoMessage("Read adapter 1:\t" + s.getRead1Adapter());
@@ -158,7 +159,7 @@ public class Autoaligner {
 
 	/**
 	 * Loads a list of novoindices into a hash. First column (build_sequencingApplication[_radius?]) 
-	 * is the key, abbreviated index name used by Tomato in second column is the value.
+	 * is the key, abbreviated index name used by Pysano in second column is the value.
 	 * @param s
 	 * @return
 	 * @throws IOException
@@ -214,12 +215,10 @@ public class Autoaligner {
 				Sample s = new Sample(dataValue);
 
 				//catch B37 genome if specified
-				//TODO catch B37 only with RNA-Seq, not exome stuff
-				//TODO make sure we have B37 index in data dir
 				if (s.getGenome().toString().equals("H_sapiens_Jun_2003")) {
 					s.setGenome("hg19; H_sapiens_Feb_2009; GRCh37");
 				}
-				
+
 				//if paired-end
 				if (s.getSingleOrPairedEnd().toString().equals("Paired-end")) {
 
@@ -228,7 +227,7 @@ public class Autoaligner {
 					//split on comma
 					String[] pairedFiles = s.getFastqFilePath().split(",");
 
-					//set paths
+					//set file paths
 					s.setFastqFilePath1(pairedFiles[0]);
 					String f1 = pairedFiles[0].toString();
 					s.setFastqFile1(f1);
@@ -271,6 +270,7 @@ public class Autoaligner {
 					//get new analysis report number for samples that have a matching novoindex
 					analysisNumber = hm.get(s.getRequestNumber());
 					if (analysisNumber == null) {
+
 						//populate with request numbers
 						analysisNumber = this.getAnalysisNumber(s);
 						s.setAnalysisNumber(analysisNumber);
@@ -279,7 +279,7 @@ public class Autoaligner {
 					else if (hm.containsKey(s.getRequestNumber())) {
 						s.setAnalysisNumber(hm.get(s.getRequestNumber()));
 					}
-					this.createCmdFile(s);
+					// check if sequence adapters are present
 					this.sequencingAdapterState(s);
 				}
 				else {
@@ -288,6 +288,7 @@ public class Autoaligner {
 				}
 				//print logs for each sample
 				this.printLogs(s);
+				this.createCmdFile(s);
 			}
 		}
 		//close the reader
@@ -324,7 +325,7 @@ public class Autoaligner {
 	/**
 	 * Runs an external shell script, writing params to stdin and collecting output in stderr/stdout. 
 	 * The method grabs a new analysis number in GNomEx for each unique request number that has 
-	 * a matching novoindex in the tomato/data directory. New analysis reports and their corresponding
+	 * a matching novoindex in the pysano/data directory. New analysis reports and their corresponding
 	 * experiment numbers are linked. Makes the new directory after fetching the new analysis number.
 	 * @param s
 	 * @throws IOException
@@ -338,7 +339,7 @@ public class Autoaligner {
 
 		//feed input params into string array
 		String cmd[] = {"./httpclient_create_analysis.sh", "-properties", "gnomex_httpclient.properties", 
-				"-serverURL", "https://bioserver.hci.utah.edu", "-name", s.getProjectName(), 
+				"-serverURL", "https://hci-bio-app.hci.utah.edu", "-name", s.getProjectName(), 
 				"-folderName", "novoalignments", "-lab", s.getLab(), "-organism", s.getOrganism(), 
 				"-genomeBuild", s.getBuildCode(), "-analysisType", "Alignment", "-seqLane", s.getSequenceLaneNumber()};
 
@@ -406,7 +407,7 @@ public class Autoaligner {
 	 * @throws Exception 
 	 */
 	public void setCondSeqAppCode(Sample s) throws Exception {
-		
+
 		//set isPaired flag
 		if (s.getSingleOrPairedEnd().toString().equals("Paired-end")) {
 			s.setPairedEnd(true);
@@ -437,6 +438,7 @@ public class Autoaligner {
 				s.getSequencingApplicationCode().toString().equals("SMRNASEQ") || 
 				s.getSequencingApplicationCode().toString().equals("APP27") ||
 				s.getSequencingApplicationCode().toString().equals("APP9") || 
+				s.getSequencingApplicationCode().toString().equals("APP38") ||
 				s.getSequencingApplicationCode().toString().equals("DMRNASEQ")) {
 			s.setSequencingApplication("_MRNASEQ_");
 			s.setKnownSeqAppCode(true);
@@ -460,7 +462,8 @@ public class Autoaligner {
 				s.getSequencingApplicationCode().toString().equals("APP42") ||
 				s.getSequencingApplicationCode().toString().equals("CHIPSEQ") ||
 				s.getSequencingApplicationCode().toString().equals("EXCAPSSC") ||
-				s.getSequencingApplicationCode().toString().equals("TDNASEQ")) {
+				s.getSequencingApplicationCode().toString().equals("TDNASEQ") ||
+				s.getSequencingApplicationCode().toString().equals("DNASEQ")) {
 			s.setSequencingApplication("_DNASEQ");
 			s.setKnownSeqAppCode(true);
 		}
@@ -526,7 +529,7 @@ public class Autoaligner {
 		String BUILDCODE = "([A-Za-z]+[0-9]+)(?=[;,:])"; 
 		//match versioned genome (D_rerio_Jul_2010, etc)
 		String VERSIONEDGENOME = "\\w_\\w+_\\w{3}_[0-9]{4}";
-		
+
 		if (s.getGenome() != null) {
 			Pattern p = Pattern.compile(BUILDCODE);
 			Matcher m = p.matcher(s.getGenome());
@@ -553,7 +556,7 @@ public class Autoaligner {
 	/**
 	 * Builds the shortened novoindex name from data in the fresh data report.
 	 * Uses this shortened name as key for matching sample to the associated matching novoindex
-	 * name that's recognized by Tomato
+	 * name that's recognized by Pysano
 	 * @param s
 	 * @return
 	 * @throws IOException
@@ -603,7 +606,7 @@ public class Autoaligner {
 					s.setIndexCode(key);
 					s.setNovoindex(genomeIndex.get(key));
 					s.setHasNovoindex(true);
-					//TODO remove this line below to align bisulfite seqs
+					// remove this line below to align bisulfite seqs
 					s.setAlign(false);
 				}
 				else {
@@ -612,7 +615,6 @@ public class Autoaligner {
 				}
 			}
 		}
-		createCmdFile(s);
 	}
 
 	/**
@@ -626,7 +628,7 @@ public class Autoaligner {
 	 * @throws IOException
 	 */
 	public void createCmdFile(Sample s) throws IOException {
-		String jobDirPath = tomatoJobDir + s.getRequestNumber() + "/" + s.getSampleID();
+		String jobDirPath = jobDir + s.getRequestNumber() + "/" + s.getSampleID();
 		try {
 			//first make sure an index exists before continuing
 			if (!(s.getIndexCode() == null)) {
@@ -634,7 +636,7 @@ public class Autoaligner {
 				File dir = new File(jobDirPath);
 				//make appropriate new directory and subdirectories
 				dir.mkdirs();
-				//change dir permissions so Tomato can execute 
+				//change dir permissions so Pysano can execute 
 				Runtime.getRuntime().exec("chmod 777 " + dir);
 				//create cmd.txt file
 				FileWriter fw = new FileWriter(jobDirPath + "/" + "cmd.txt");
@@ -662,14 +664,14 @@ public class Autoaligner {
 
 	/**
 	 * This method soft links the appropriate input fastq file in Repository 
-	 * to its respective Tomato job directory.
+	 * to its respective Pysano job directory.
 	 * @param s
 	 * @param dirPath
 	 * @throws IOException
 	 */
 	public void softLinkFiles(Sample s, String dirPath) throws IOException {
 		//job folder
-		String jobDirPath = tomatoJobDir + s.getRequestNumber() + "/" + s.getSampleID();
+		String jobDirPath = jobDir + s.getRequestNumber() + "/" + s.getSampleID();
 
 		//paired-end reads?
 		if (s.isPairedEnd() == true) {
@@ -697,8 +699,7 @@ public class Autoaligner {
 		String msg = "#e " + myEmail + "\n#a " + s.getAnalysisNumber() + "\n## Novoalignments of " 
 				+ s.getRequestNumber() + " " + s.getProjectName() + "\n## Aligning to " 
 				+ s.getBuildCode() + " for " + s.getRequester() + " in the " + s.getLab() + "Lab "
-				+ "\n\nfastqc *.gz --noextract" 
-				+ "\n\n@align -novoalign ";
+				+ "\n\nfastqc *.gz --noextract" + "\n\n@align -novoalign ";
 		//set string for first non-variable part of cmd.txt params
 		String msg2 = " -g " + s.getNovoindex() + " -i *.gz" + " -gzip\n\n";
 
@@ -753,7 +754,7 @@ public class Autoaligner {
 		String dirPath = "/Repository/MicroarrayData/" + s.getRequestYear() + "/" + s.getRequestNumber() + "/Fastq/"; 
 		this.softLinkFiles(s, dirPath);
 		//start the job by creating the b file
-		this.startTomatoJob(s);
+		this.startJob(s);
 		return sb.toString();
 	}
 
@@ -806,8 +807,10 @@ public class Autoaligner {
 	 * @return
 	 */
 	public String getCmdFileMessageStdParams(Sample s) {
+
 		//paired-end data
 		if (s.isPairedEnd() == true) {
+
 			//adapters included
 			if (s.adaptersIncluded() == true) {
 				s.setParams("[-o SAM -r All 50 -a " + s.getRead1Adapter() + " " + s.getRead2Adapter() + "]");
@@ -819,6 +822,7 @@ public class Autoaligner {
 		}
 		//single-end data
 		else if (s.isPairedEnd() == false) {
+
 			//adapter included
 			if (s.adaptersIncluded() == true) {
 				s.setParams("[-o SAM -r All 50 -a " + s.getRead1Adapter() + "]");
@@ -835,12 +839,12 @@ public class Autoaligner {
 	 * This method creates a new empty "b" file if the file with the same name does 
 	 * not already exist. Returns true if the file with the same name did not 
 	 * exist and it was created successfully, false otherwise. This starts the 
-	 * Tomato job. 
+	 * Pysano job. 
 	 */
-	public void startTomatoJob(Sample s) {
+	public void startJob(Sample s) {
 		if (s.toAlign() == true) {
 			//create b file to start the jobs
-			File f = new File(tomatoJobDir + s.getRequestNumber() + "/" + s.getSampleID() + "/" + "b");
+			File f = new File(jobDir + s.getRequestNumber() + "/" + s.getSampleID() + "/" + "b");
 			try {
 				f.createNewFile();
 			}
@@ -937,7 +941,7 @@ public class Autoaligner {
 		}
 		return var;
 	}
-	
+
 	/**
 	 * Parses the config run file to populate necessary parameters
 	 */
@@ -954,7 +958,7 @@ public class Autoaligner {
 			}
 			this.novoindexNames = this.checkExistance("novoindexNames", hm);
 			this.parsedReports = this.checkExistance("parsedReports", hm);
-			this.tomatoJobDir = this.checkExistance("tomatoJobDir", hm);
+			this.jobDir = this.checkExistance("tomatoJobDir", hm);
 			this.logDir = this.checkExistance("logDir", hm);
 			this.createAnalysisMain = this.checkExistance("createAnalysisMain", hm);
 
@@ -970,10 +974,10 @@ public class Autoaligner {
 	public static void printDocs() {
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              Autoaligner: Jan 2014                               **\n" +
+				"**                              Autoaligner: Mar 2014                               **\n" +
 				"**************************************************************************************\n" + 
 				"This class contains methods to automatically align fastq sequences using novoalign\n" +
-				"via Tomato after they come out of the HiSeq Pipeline. All the necessary input data\n" +
+				"via Pysano after they come out of the HiSeq Pipeline. All the necessary input data\n" +
 				"is contained in the autoalign report that comes out of the HiSeq Pipeline. Files\n" +
 				"are aligned individually. A new analysis report is created in GNomEx (linked to\n" +
 				"experiment numbers) for all samples of the same request number. The requester is\n" +
