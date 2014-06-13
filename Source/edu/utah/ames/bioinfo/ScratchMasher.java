@@ -13,7 +13,7 @@ import javax.mail.Transport;
 import javax.mail.internet.InternetAddress;
 import javax.mail.internet.MimeMessage;
 
-import edu.utah.tomato.TFLogger;
+import edu.utah.ames.bioinfo.*;
 
 import util.gen.Misc;
 
@@ -47,7 +47,7 @@ public class ScratchMasher {
 	Date startDate = sdf.parse("2013/07/27");
 	Date todayDate = new Date();
 	//create logger
-	private TFLogger logFile = new TFLogger(new File("/home/u0785353/UtilLogs/ScratchMasher/logs/"), "log", "INFO");
+	//private Logger logFile = new Logger(new File("/home/u0785353/UtilLogs/ScratchMasher/logs/"), "log", "INFO");
 
 	//constructor
 	public ScratchMasher (String[] args) throws ParseException {
@@ -68,8 +68,8 @@ public class ScratchMasher {
 		for (User user : users) {
 
 			//write to log file
-			logFile.writeInfoMessage("Running ScratchMasher");
-			logFile.writeInfoMessage("Working in directory: " + user.getDirectory());
+			//logFile.writeInfoMessage("Running ScratchMasher");
+			//logFile.writeInfoMessage("Working in directory: " + user.getDirectory());
 
 			//find email addresses for each user
 			boolean found = fetchEmailAddress(user);
@@ -88,8 +88,8 @@ public class ScratchMasher {
 		Stuff.saveObject(savedFileDates, fileDates);
 
 		//write info to log and close it
-		logFile.writeInfoMessage("Finished running ScratchMashser");
-		logFile.closeLogger();
+		//logFile.writeInfoMessage("Finished running ScratchMashser");
+		//logFile.closeLogger();
 	}
 
 	/**
@@ -182,7 +182,7 @@ public class ScratchMasher {
 							user.getWarnFiles().add(fileObject);
 
 							//log it
-							logFile.writeInfoMessage("Found these warn files: " + fileObject.getPath());
+							//logFile.writeInfoMessage("Found these warn files: " + fileObject.getPath());
 						}
 						//delete cutoff >=16 days ago
 						else if (fileDate.longValue() <= deleteDate) {
@@ -191,7 +191,7 @@ public class ScratchMasher {
 							user.getDeleteFiles().add(fileObject);
 
 							//log it
-							logFile.writeInfoMessage("Will delete the following files: " + fileObject.getPath());
+							//logFile.writeInfoMessage("Will delete the following files: " + fileObject.getPath());
 
 							//****uncomment this to start deleting offending files****
 							//fileObject.deleteOnExit();
@@ -269,7 +269,7 @@ public class ScratchMasher {
 			}
 			//write to log
 			for (String emailString : user.getEmail()) {
-				logFile.writeInfoMessage(String.format("Found email %s for user %s", emailString, user.getName()));
+				//logFile.writeInfoMessage(String.format("Found email %s for user %s", emailString, user.getName()));
 			}
 		}
 		catch (Exception e) {
@@ -480,7 +480,7 @@ public class ScratchMasher {
 				this.postMail(this.arrayToString(emails, ","), "Scratch directory cleanup", this.getMessage(msg, user), "doNotReply@hci.utah.edu");
 				
 				//log it
-				logFile.writeInfoMessage("Sending email notification to: " + this.arrayToString(emails, ","));
+				//logFile.writeInfoMessage("Sending email notification to: " + this.arrayToString(emails, ","));
 			} catch (MessagingException e1) {
 				e1.printStackTrace();
 			} catch (IOException e1) {
