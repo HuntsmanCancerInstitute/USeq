@@ -43,6 +43,10 @@ public class AlignmentEndTrimmer {
 	private boolean verbose = false;
 	private boolean rnaEditing = false;
 	
+	//mismatch scoring
+	private int maxMM = 0;
+	private boolean mmMode = false;
+	
 	public static HashMap<Character,Character> revCompHash = new HashMap<Character,Character>() {
 		private static final long serialVersionUID = 1L;
 
@@ -94,6 +98,8 @@ public class AlignmentEndTrimmer {
 						case 'n': this.mmScore = Integer.parseInt(args[++i]); break;
 						case 'l': this.minLength = Integer.parseInt(args[++i]); break;
 						case 'e': this.rnaEditing = true; break;
+						case 's': this.mmMode = true; break;
+						case 'x': this.maxMM = Integer.parseInt(args[++i]); break;
 						case 'h': printDocs(); System.exit(0);
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -159,6 +165,8 @@ public class AlignmentEndTrimmer {
 			int totalReads = 0;
 			int trimmedReads = 0;
 			int droppedReads = 0;
+			int dropTrimReads = 0;
+			int dropMmReads = 0;
 			
 			//Containers
 			HashSet<String> notFound = new HashSet<String>();
@@ -204,8 +212,15 @@ public class AlignmentEndTrimmer {
 					//Identify Trim Point
 					int idx = this.identifyTrimPoint(alns,sr.getReadNegativeStrandFlag());
 					
+					//Check error rate
+					boolean mmPassed = true;
+					if (mmMode) {
+						mmPassed = this.isPoorQuality(alns, sr.getReadNegativeStrandFlag(), idx);
+					}
+					
+					
 					//Create new cigar string
-					if (idx < minLength) {
+					if (idx < minLength || mmPassed) {
 						sr.setAlignmentStart(0);
 						sr.setReadUnmappedFlag(true);
 						sr.setProperPairFlag(false);
@@ -217,6 +232,11 @@ public class AlignmentEndTrimmer {
 							}
 						} 
 						droppedReads += 1;
+						if (idx < minLength) {
+							dropTrimReads += 1;
+						} else {
+							dropMmReads += 1;
+						}
 					} else if (idx+1 != alns[0].length()) {
 						trimmedReads++;
 						Cigar oldCig = sr.getCigar();
@@ -265,7 +285,8 @@ public class AlignmentEndTrimmer {
 				}
 			}
 			
-			System.out.println(String.format("Finished processing %d reads. %d were trimmed, %d were set as unmapped. Currently storing mates for %d reads.",totalReads,trimmedReads,droppedReads,mateList.size()));
+			System.out.println(String.format("Finished processing %d reads. %d were trimmed, %d were set as unmapped. Of the unmapped, %d were too short and %d had too many mismatches. Currently storing mates for %d reads.",
+					totalReads,trimmedReads,droppedReads,dropTrimReads, dropMmReads, mateList.size()));
 			System.out.println(String.format("Reads left in hash: %d.  Writing to disk.",mateList.size()));
 			for (SAMRecord sr2: mateList.values()) {
 				sfw.addAlignment(sr2);
@@ -443,6 +464,39 @@ public class AlignmentEndTrimmer {
 		}
 		
 		return new Cigar(ce);
+		
+	}
+	
+	
+	public boolean isPoorQuality(String[] alignments, boolean isReversed, int trimPoint) {
+		char[] aln1 = alignments[0].toCharArray();
+		char[] aln2 = alignments[1].toCharArray();
+		
+		int totalMM = 0;
+		
+		for (int i=0; i<trimPoint; i++) {
+			if (aln1[i] == '-' || aln2[i] == '-' || aln1[i] == 'S' || aln2[i] == 'S') {
+				
+			} else if (aln1[i] != aln2[i]) {
+				if (this.rnaEditing) {
+					if ((isReversed && aln1[i] == 'T' && aln2[i] == 'C') ||
+						 !isReversed && aln1[i] == 'A' && aln2[i] == 'G') {
+						//OK
+					} else {
+						totalMM++;
+					}
+				} else {
+					totalMM++;
+				}
+			} 
+		}
+		
+		if (totalMM > this.maxMM) {
+			return true;
+		} else {
+			return false;
+		}
+		
 		
 	}
 	
@@ -631,8 +685,7 @@ public class AlignmentEndTrimmer {
 				"-i Path to the orignal alignment, sam/bam/sam.gz OK.\n"+
 				"-r Path to the reference sequence, gzipped OK.\n" +
 				"-o Name of the trimmed alignment output.  Output is bam and bai.\n" +
-				"-e Turn on RNA Editing mode.  A>G (forward reads) and T>C (reverse reads) are considered\n" +
-				"   matches.\n" +
+				
 				
 				"\nOptional:\n" +
 				"-m Score of match. Default 1\n" +
@@ -641,6 +694,12 @@ public class AlignmentEndTrimmer {
 				"    It is suggested to use this option only on small test files.\n" +
 				"-l Min length.  If the trimmed length is less than this value, the read is switched\n" +
 				"    to unaligned. Default 10bp\n" +
+				"-e Turn on RNA Editing mode.  A>G (forward reads) and T>C (reverse reads) are considered\n" +
+				"   matches.\n" +
+				"-s Turn on mismatch scoring mode. Reads with more than -x mismatches are dropped. If \n" +
+				"   RNA Editing mode is on, A>G (forward reads) and T>C (reverse reads) are considered \n" +
+				"   matches.\n" +
+				"-x Max number of mismatches allowed in max scoring mode. Default 0\n" +
 
 				"\nExamples: \n" +
 				"1) java -Xmx4G -jar /path/to/AlignmentEndTrimmer -i 1000X1.bam -o 100X1.trim.bam\n" +
