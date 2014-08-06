@@ -41,7 +41,7 @@ public class SamAlignment {
 	private static final Pattern COLON = Pattern.compile(":");
 	private static final Pattern UNDER_SCORE = Pattern.compile("_");
 	private static final Pattern MINUS = Pattern.compile("-");
-	private static final Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSNIDH])");
+	public static final Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSNIDH])");
 	private static final Pattern CIGAR_COUNTS = Pattern.compile("(\\d+)[MDN]");
 	private static final Pattern CIGAR_SOFT = Pattern.compile("(\\d+)S");
 	private static final Pattern CIGAR_SOFT_RIGHT = Pattern.compile(".+M(\\d+)S$");
@@ -673,6 +673,14 @@ public class SamAlignment {
 		return length;
 	}
 	
+	/**Counts the number of things in CIGAR, H,S,M,D,I,N .*/
+	public static int countLengthOfCIGAR (String cigar){
+		int length = 0;
+		Matcher mat = CIGAR_SUB.matcher(cigar);
+		while (mat.find()) length += Integer.parseInt(mat.group(1));
+		return length;
+	}
+	
 	/**Counts the number of MIN bases in the cigar string. This is the length of the insert for merged pairs.*/
 	public static int countLengthOfCigarMIN (String cigar){
 		int length = 0;
@@ -875,6 +883,18 @@ public class SamAlignment {
 			}
 		}
 		return md;
+	}
+	
+	public void removeMD(){
+		ArrayList<String> goodTags = new ArrayList<String>();
+		for (String tag : tags){
+			if (tag.startsWith("MD:") == false) goodTags.add(tag);
+		}
+		int numTags = goodTags.size();
+		if (numTags != tags.length) {
+			tags = new String[numTags];
+			goodTags.toArray(tags);
+		}
 	}
 	public void setMappingQuality(int mappingQuality) {
 		this.mappingQuality = mappingQuality;

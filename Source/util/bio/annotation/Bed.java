@@ -280,8 +280,14 @@ public class Bed extends Coordinate implements Serializable{
 	public String toStringNoStrand(){
 		return chromosome+"\t"+start+"\t"+stop+"\t"+name+"\t"+score;
 	}
+	public String toStringNoStrandNoName(){
+		return chromosome+"\t"+start+"\t"+stop+"\t"+score;
+	}
 	public String toString(){
 		return chromosome+"\t"+start+"\t"+stop+"\t"+name+"\t"+score+"\t"+strand;
+	}
+	public String toStringScoreName() {
+		return chromosome+"\t"+start+"\t"+stop+"\t"+score+"\t"+name;
 	}
 	public double getScore() {
 		return score;
@@ -328,4 +334,6 @@ public class Bed extends Coordinate implements Serializable{
 			
 		}
 	}
+
+
 }

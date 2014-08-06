@@ -117,6 +117,12 @@ public class VCFInfo {
 		return Float.parseFloat(val);
 	}
 	
+	public int getInfoInt(String key) throws Exception{
+		String val = hashInfoString.get(key);
+		if (val == null) throw new Exception ("Info key not found? -> "+key);
+		return Integer.parseInt(val);
+	}
+	
 	private String checkForMods(String key, String value, String style) {
 		String moddedValue;
 		if (style.equals(VCFInfo.CLEAN) && key.equals("SIFT")) {

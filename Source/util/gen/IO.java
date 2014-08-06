@@ -940,6 +940,14 @@ public class IO {
 		}
 		else return new File[]{directory};
 	}
+	
+	public static void p(Object obj){
+		System.out.println(obj.toString());
+	}
+	
+	public static void e(Object obj){
+		System.err.println(obj.toString());
+	}
 
 	/**Extracts the full path file names of all the files in a given directory with a given extension (ie txt or .txt).
 	 * If the dirFile is a file and ends with the extension then it returns a File[] with File[0] the

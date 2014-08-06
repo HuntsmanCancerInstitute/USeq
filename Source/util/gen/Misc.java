@@ -15,6 +15,9 @@ public class Misc {
 	
 	public static final Pattern PATTERN_SEMICOLON = Pattern.compile(";");
 	public static final Pattern PATTERN_EQUALS = Pattern.compile("=");
+	public static final Pattern TAB = Pattern.compile("\t");
+	public static final Pattern COLON = Pattern.compile(":");
+	public static final Pattern GREATER_THAN = Pattern.compile(">");
 	
 	/**Calls garbage collection then returns total - free.*/
 	public static long fetchUsedMemory(){
@@ -68,6 +71,19 @@ public class Misc {
 	
 	public static void randomize (Object[] array, long seed){
 	    Random rng = new Random(seed);       
+	    // n is the number of items left to shuffle
+	    for (int n = array.length; n > 1; n--) {
+	        // Pick a random element to move to the end
+	        int k = rng.nextInt(n);  // 0 <= k <= n - 1.
+	        // Simple swap of variables
+	        Object tmp = array[k];
+	        array[k] = array[n - 1];
+	        array[n - 1] = tmp;
+	    }
+	}
+	
+	/**For multiple iterations.*/
+	public static void randomize (Object[] array, Random rng){     
 	    // n is the number of items left to shuffle
 	    for (int n = array.length; n > 1; n--) {
 	        // Pick a random element to move to the end
@@ -575,7 +591,7 @@ public class Misc {
 			return;
 		}
 		int len = array.length;
-		for (int i=0; i<len; i++) System.out.print(array[i]+" ");
+		for (int i=0; i<len; i++) System.out.print(array[i]+"\t");
 		System.out.println();
 	}
 	/**Prints a char[] to System.out*/
@@ -616,7 +632,7 @@ public class Misc {
 			return;
 		}
 		int len = array.length;
-		for (int i=0; i<len; i++) System.out.print(array[i]+" ");
+		for (int i=0; i<len; i++) System.out.print(array[i]+"\t");
 		System.out.println();
 	}
 
@@ -759,6 +775,13 @@ public class Misc {
 		String[] s = new String[stringAL.size()];
 		stringAL.toArray(s);
 		return s;
+	}
+	
+	/**Returns a String given an ArrayList of Character.*/
+	public static String charArrayListToString(ArrayList<Character> al){
+		char[] s = new char[al.size()];
+		for (int i=0; i< s.length; i++) s[i] = al.get(i).charValue();
+		return new String(s);
 	}
 
 	

@@ -103,7 +103,7 @@ public class UCSCGeneLine {
 				}
 				for (int j=0; j< exonCount; j++){
 					int stop = stops[j]-numToSubtractFromEnd;
-					if (stop <= starts[j] ) Misc.printExit("\nError: One of your exon stops is <= its start! Correct and restart.  See ->\n"+Misc.stringArrayToString(tokens, "\t"));
+					if (stop <= starts[j] ) System.err.println("Warning: One of your exon stops is <= its start! Correct and restart.  See ->\n"+Misc.stringArrayToString(tokens, "\t"));
 					exons[j] = new ExonIntron(starts[j], stops[j]-numToSubtractFromEnd);
 				}
 				if (exonCount > 1) Arrays.sort(exons);
