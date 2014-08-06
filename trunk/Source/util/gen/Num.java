@@ -703,6 +703,19 @@ public class Num {
 
 		}
 	}
+	
+	/**Inverts the int[].*/
+	public static void invertArray(int[] x){
+		int lenthMinusOne = x.length -1;
+		int stop = x.length/2;
+		for (int i=0; i<stop; i++){
+			int switchIndex = lenthMinusOne - i;
+			int first = x[i];
+			int last = x[switchIndex];
+			x[i] = last;
+			x[switchIndex] = first;
+		}
+	}
 
 	/**Converts a double[] to float[] */
 	public static float[] convertToFloat(double[] d){
@@ -3217,6 +3230,41 @@ public class Num {
 			return index;
 		}
 	}
+	
+	/**Returns the index of the closest values[index] to the key. Rounds up
+	 * if the value is equi distant between two indexes.  Will not return an
+	 * index <0 or > length-1 .
+	 * Don't forget to SORT!.
+	 * If identical values are present, returns the smallest index containing the key.*/
+	public static int findClosestIndexBeforeValue(int[] sortedValues, int key){
+		int index = Arrays.binarySearch(sortedValues,key);
+		//no exact match
+		if (index<0){
+			int indexAfter = (-1* index) -1;
+			if (indexAfter >= sortedValues.length) return sortedValues.length-1;
+			int indexBefore = indexAfter -1;
+			return indexBefore;
+		}
+		//exact match look for smaller indexes with same value
+		else {
+			float value = sortedValues[index];
+			int testIndex = index;
+			while (true){
+				testIndex--;
+				//look for negative index
+				if (testIndex< 0) {
+					index = 0;
+					break;
+				}
+				//if different value break
+				if (value != sortedValues[testIndex]) {
+					index = ++testIndex;
+					break;
+				}
+			}
+			return index-1;
+		}
+	}
 
 	/**Returns the index of the closest values[index] to the key. Rounds up
 	 * if the value is equi distant between two indexes.  Will not return an
@@ -3252,6 +3300,30 @@ public class Num {
 					index = ++testIndex;
 					break;
 				}
+			}
+			return index;
+		}
+	}
+	
+	/**Returns the index of the smalles values[index] to the key. Returns -1 if none found
+	 * If identical values are present, returns the smallest index containing the key.
+	 * Don't forget to SORT!.*/
+	public static int findSmallestIndexToValue(int[] sortedValues, int key){
+		int index = Arrays.binarySearch(sortedValues,key);
+		//no exact match
+		if (index<0){
+			return -1;
+		}
+		//exact match look for smaller indexes with same value
+		else {
+			int value = sortedValues[index];
+			while (true){
+				int testIndex = index-1;
+				//too far left?
+				if (testIndex< 0) return 0;
+				//same or different
+				if (value == sortedValues[testIndex]) index--;
+				else break;
 			}
 			return index;
 		}
@@ -4596,6 +4668,32 @@ public class Num {
 		}
 		double ave = (double)total/(double)len;
 		return (int)Math.round(ave);
+	}
+	
+	/**Averages an ArrayList of Integer objects.*/
+	public static double meanIntegersReturnDouble(ArrayList<Integer> al){
+		int len = al.size();
+		if (len==0) return 0;
+		double total = 0;
+		for (int i=0; i<len; i++){
+			double num = (double) al.get(i);
+			total += num;
+		}
+		double ave = total/(double)len;
+		return ave;
+	}
+	
+	/**Averages an ArrayList of Integer objects.*/
+	public static double meanDouble(ArrayList<Double> al){
+		int len = al.size();
+		if (len==0) return 0;
+		double total = 0;
+		for (int i=0; i<len; i++){
+			double num = al.get(i);
+			total += num;
+		}
+		double ave = total/(double)len;
+		return ave;
 	}
 
 	/**Averages an ArrayList of Double objects.*/

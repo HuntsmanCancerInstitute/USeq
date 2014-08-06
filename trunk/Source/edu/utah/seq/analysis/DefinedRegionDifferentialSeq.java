@@ -52,7 +52,11 @@ public class DefinedRegionDifferentialSeq {
 	private int maxAlignmentsDepth = 50000;
 	private boolean secondStrandFlipped = false;
 	private boolean useSamSeq = false;
+	
+	//hidden options
 	private boolean trimUTRBPsFromExons = false;
+	private boolean printFirstLastCountTable = false;
+	private int maxFirstLast = 250;
 
 	//internal fields
 	private UCSCGeneLine[] genes;
@@ -373,7 +377,7 @@ public class DefinedRegionDifferentialSeq {
 		//the idea here is to take a sorted bam file and add the reads to an ArrayList, basically every base should have a ArrayList of reads that overlap that base
 		//one can then count the number of overlapping fragments for an exon or a collection of exons by hashing the ArrayList
 		//assumes each read (first or second) has the same name
-long start = System.currentTimeMillis();
+
 		//make reader
 		SAMFileReader reader = new SAMFileReader(replica.getBamFile());	
 		reader.setValidationStringency(ValidationStringency.SILENT);
@@ -438,7 +442,8 @@ long start = System.currentTimeMillis();
 			}
 			else {
 				//different chrom so time to scan
-				loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases);
+				if (printFirstLastCountTable) loadFirstLastGeneCounts(replica, bpNames, chrStartBp, chrom);
+				else loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases);
 
 				//check that new chrom from SAM is something interrogated by their gene list
 				boolean reset = false;
@@ -478,7 +483,8 @@ long start = System.currentTimeMillis();
 		//add last
 		if (verbose) System.out.println();
 		if (chromGenes.containsKey(sam.getReferenceName())) {
-			loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases);
+			if (printFirstLastCountTable) loadFirstLastGeneCounts(replica, bpNames, chrStartBp, chrom);
+			else loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases);
 		}
 
 		reader.close();
@@ -486,10 +492,6 @@ long start = System.currentTimeMillis();
 		iterator = null;
 		seqs = null;
 		chromLength = null;
-		
-		long diff = System.currentTimeMillis() - start;
-		System.out.println("OneRepOld "+diff);
-		System.exit(0);
 	}
 
 	private boolean alignmentFails(SAMRecord sam){
@@ -518,9 +520,7 @@ long start = System.currentTimeMillis();
 
 		for (int i=0; i< chrGenes.length; i++){
 			//flagged gene
-
 			if (chrGenes[i].isFlagged()) continue;
-
 
 			String geneName = chrGenes[i].getDisplayNameThenName();
 			boolean plusStrand = chrGenes[i].getStrand().equals("+");					
@@ -582,9 +582,100 @@ long start = System.currentTimeMillis();
 		exonReads = null;
 	}
 
+	private void loadFirstLastGeneCounts(Replica replica, ArrayList<Integer>[] bpNames, int chrStartBp, String chromosome){
+		HashMap<String, GeneCount> geneCounts = replica.getGeneCounts();
+		HashSet<Integer> allReads = new HashSet<Integer>();
+		
+		int lengthBpNames = bpNames.length -1;
 
+		//for each gene in the chromosome 
+		UCSCGeneLine[] chrGenes = chromGenes.get(chromosome);
 
-	
+		for (int i=0; i< chrGenes.length; i++){
+			//flagged gene
+			if (chrGenes[i].isFlagged()) continue;
+
+			String geneName = chrGenes[i].getDisplayNameThenName();
+			boolean plusStrand = chrGenes[i].getStrand().equals("+");					
+
+			//get exons
+			ExonIntron[] geneExons = chrGenes[i].getExons();
+			
+			//get exon set describing first third and last third of gene
+			ExonIntron[] firstThird = ExonIntron.fetchFirstExonSet(geneExons, maxFirstLast, 3);
+			ExonIntron[] lastThird = ExonIntron.fetchLastExonSet(geneExons, maxFirstLast, 3);
+			
+			//for each first third exons
+			for (int x=0; x< firstThird.length; x++){
+				//set first and last
+				int start = firstThird[x].getStart() - chrStartBp;
+				if (start < 0) start = 0;
+				int end = firstThird[x].getEnd() - chrStartBp;
+				if (end > lengthBpNames) end = lengthBpNames;
+				//for each base in the exon, see if there is a read
+				for (int y=start; y< end; y++){
+					//any reads?
+					if (bpNames[y] != null) {
+						if (performStrandedAnalysis){
+							for (Integer id : bpNames[y]){
+								if ((id > 0 && plusStrand == true) || (id < 0 && plusStrand == false )) allReads.add(id);
+							}
+						} else if (performReverseStrandedAnalysis) {
+							for (Integer id: bpNames[y]) {
+								if ((id > 0 && plusStrand == false) || (id < 0 && plusStrand == true)) allReads.add(id);
+							}
+						}
+						else allReads.addAll(bpNames[y]);
+					}
+				}
+			}
+			int numCountsFirst = allReads.size();
+			allReads.clear();
+			
+			//for each last third exons
+			for (int x=0; x< lastThird.length; x++){
+				//set first and last
+				int start = lastThird[x].getStart() - chrStartBp;
+				if (start < 0) start = 0;
+				int end = lastThird[x].getEnd() - chrStartBp;
+				if (end > lengthBpNames) end = lengthBpNames;
+				//for each base in the exon, see if there is a read
+				for (int y=start; y< end; y++){
+					//any reads?
+					if (bpNames[y] != null) {
+						if (performStrandedAnalysis){
+							for (Integer id : bpNames[y]){
+								if ((id > 0 && plusStrand == true) || (id < 0 && plusStrand == false )) allReads.add(id);
+							}
+						} else if (performReverseStrandedAnalysis) {
+							for (Integer id: bpNames[y]) {
+								if ((id > 0 && plusStrand == false) || (id < 0 && plusStrand == true)) allReads.add(id);
+							}
+						}
+						else allReads.addAll(bpNames[y]);
+					}
+				}
+			}
+			int numCountsSecond = allReads.size();
+			allReads.clear();
+			
+			int totalCounts = numCountsFirst + numCountsSecond;
+			//order counts by gene strand
+			int[] counts;
+			if (chrGenes[i].getStrand().equals("-")) counts = new int[]{numCountsSecond, numCountsFirst};
+			else counts = new int[]{numCountsFirst, numCountsSecond};
+			
+			if (totalCounts !=0){
+				GeneCount tcg = new GeneCount(totalCounts, counts);
+				geneCounts.put(geneName, tcg);
+				replica.setTotalCounts(replica.getTotalCounts() + totalCounts);
+				if (totalCounts >= minimumCounts) geneNamesWithMinimumCounts.add(geneName);
+			}
+		}	
+		//clean up
+		allReads = null;
+	}
+
 	public void loadGeneLineWithExonCounts(UCSCGeneLine gl, Condition treatment, Condition control){
 		int numTReps = treatment.getReplicas().length;
 		int numCReps = control.getReplicas().length;
@@ -1223,7 +1314,7 @@ long start = System.currentTimeMillis();
 					{"", ""},
 					{"For each Paired Comparison:", null},
 					{"Lg2Rto", "DESeq2's log2 ratio for differential expression."},
-					{"AdjP", "DESeq2's negative binomial p-value following the Benjamini and Hochberg multiple testing correction."},
+					{"AdjP", "DESeq2's negative binomial -10Log10(adjusted p-value) following the Benjamini and Hochberg multiple testing correction."},
 					{"Spli Lg2Rto", "The maximum log2 ratio difference between two conditions and a gene's exon after correcting for differences in counts.  Use this to gauge the degree of potential differential splicing."},
 					{"Spli AdjPVal", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction is applied to the p-values."},
 					{"Spli Coor", "Coordinates of the exon displaying the SpliLg2Rto."},
@@ -1248,7 +1339,7 @@ long start = System.currentTimeMillis();
 					{"", ""},
 					{"For each Paired Comparison:", null},
 					{"Lg2Rto", "SAMseq's log2 ratio for differential expression"},
-					{"AdjP", "SAMseq's AdjP"},
+					{"AdjP", "SAMseq's -10Log10(AdjP)"},
 					{"Spli Lg2Rto", "The maximum log2 ratio difference between two conditions and a gene's exon after correcting for differences in counts.  Use this to gauge the degree of potential differential splicing."},
 					{"Spli AdjPVal", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction is applied to the p-values."},
 					{"Spli Coor", "Coordinates of the exon displaying the SpliLg2Rto."},
@@ -1602,10 +1693,21 @@ long start = System.currentTimeMillis();
 					//for each replica
 					for (Replica r: c.getReplicas()){
 						out.print("\t");
-						int num = 0;
-						//remember that genes with zero counts are not stored in a replica
-						if (r.getGeneCounts().get(geneName) != null) num = r.getGeneCounts().get(geneName).getCount();
-						out.print(num);
+						//printing 5' and 3' counts or standard?
+						if (printFirstLastCountTable){
+							String num = "0:0";
+							if (r.getGeneCounts().get(geneName) != null) {
+								int[] fiveThree = r.getGeneCounts().get(geneName).getExonCounts();
+								num = fiveThree[0]+":"+ fiveThree[1];
+							}
+							out.print(num);
+						}
+						else {
+							int num = 0;
+							//remember that genes with zero counts are not stored in a replica
+							if (r.getGeneCounts().get(geneName) != null) num = r.getGeneCounts().get(geneName).getCount();
+							out.print(num);
+						}
 					}
 				}
 				out.println();
@@ -1619,6 +1721,9 @@ long start = System.currentTimeMillis();
 
 		conditionNamesPerReplica = Misc.stringArrayListToStringArray(conditionNamesPerReplicaAL);
 		replicaNames = Misc.stringArrayListToStringArray(replicaNamesAL);
+		
+		//exit?
+		if (printFirstLastCountTable) System.exit(0);
 	}
 
 	public void loadGeneModels(){
@@ -1730,7 +1835,10 @@ long start = System.currentTimeMillis();
 					case 'j': performReverseStrandedAnalysis = true; break;
 					case 'k': secondStrandFlipped = true; break;
 					case 'a': useSamSeq = true; break;
+					//hidden options
 					case 'o': trimUTRBPsFromExons = true; break;
+					case 'z': printFirstLastCountTable = true; break;
+					
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -1757,11 +1865,11 @@ long start = System.currentTimeMillis();
 		if (saveDirectory == null) Misc.printErrAndExit("\nError: enter a directory text to save results.\n");
 		saveDirectory.mkdir();
 
-		//check for R and required libraries
+		//check for R and required libraries, don't need it if they just want the first and last 1/3 count table
 		if (fullPathToR == null || fullPathToR.canExecute()== false) {
 			Misc.printErrAndExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
 		}
-		else {
+		else if (printFirstLastCountTable == false) {
 			String errors = IO.runRCommandLookForError("library(DESeq2); library(gplots)", fullPathToR, saveDirectory);
 			if (errors == null || errors.length() !=0){
 				Misc.printErrAndExit("\nError: Cannot find the required R library.  Did you install DESeq2 " +
@@ -1784,7 +1892,7 @@ long start = System.currentTimeMillis();
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                     Defined Region Differential Seq:    May 2014                 **\n" +
+				"**                     Defined Region Differential Seq:   June 2014                 **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +

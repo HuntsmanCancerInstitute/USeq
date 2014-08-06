@@ -607,5 +607,18 @@ public class Seq {
 		return cSeq.toString();
 	}
 
+	/**Only works with GATCgatc, returns 0 if no match*/
+	public static char getComplement(char seq) {
+		if (seq == 'G') return 'C';
+		if (seq == 'A') return 'T';
+		if (seq == 'T') return 'A';
+		if (seq == 'C') return 'G';
+		if (seq == 'g') return 'c';
+		if (seq == 'a') return 't';
+		if (seq == 't') return 'a';
+		if (seq == 'c') return 'g';
+		return '0';
+	}
+
 
 }

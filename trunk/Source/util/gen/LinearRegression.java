@@ -1,5 +1,4 @@
 package util.gen;
-import util.gen.*;
 
 /**For calculating a simple linear regression.
  * Adapted from http://www-stat.stanford.edu/~naras/java/course/lec2/

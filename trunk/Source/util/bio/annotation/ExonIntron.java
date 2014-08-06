@@ -1,6 +1,7 @@
 package util.bio.annotation;
 import java.io.*;
 import java.util.*;
+
 import util.bio.parsers.*;
 import util.bio.parsers.gff.Gff3Feature;
 import util.bio.seq.MakeSpliceJunctionFasta;
@@ -340,6 +341,14 @@ public class ExonIntron implements Comparable, Serializable {
 		}
 		return new int[]{min,max};
 	}
+	
+	public static int totalSize(ExonIntron[] exons) {
+		int size = 0;
+		for (ExonIntron ei : exons){
+			size += ei.getLength();
+		}
+		return size;
+	}
 
 	//getters
 	/**Assumes interbase coordinants.*/
@@ -402,4 +411,109 @@ public class ExonIntron implements Comparable, Serializable {
 	public void setScore(float score) {
 		this.score = score;
 	}
+	
+	/**Creates a new set of ExonIntrons that contain their total length/divider and maxing out at maxSize.
+	 * Use this to fetch say the first third of the transcript.*/
+	public static ExonIntron[] fetchFirstExonSet(ExonIntron[] exons, int maxSize, double divider) {
+		double totalBp = ExonIntron.totalSize(exons);
+		//System.out.println("total "+totalBp);		
+		int third = (int) Math.round(totalBp/divider);
+		if (third > maxSize) third = maxSize;
+		//System.out.println("thirds "+third+"\n");
+
+		//for firstThird
+		ArrayList<ExonIntron> firstThird = new ArrayList<ExonIntron>();
+		int bpCounter = 0;
+		//for each exon, walk bp by bp until third met, creating new exons as needed
+		for (int i=0; i< exons.length; i++){
+			//System.out.println(i+" exon "+exons[i]);
+			//System.out.println("bpCounter "+bpCounter);
+
+			int start = exons[i].getStart();
+			int stop = 0;
+			//walk bp by bp until third met
+			for (int j=start; j< exons[i].getEnd(); j++){
+				//define current stop
+				int len = j-start;
+				stop = start + len +1;
+
+				//enough bases?
+				if (bpCounter < third) bpCounter++;
+				else {
+					stop--;
+					break;
+				}
+			}
+			//create exon
+			ExonIntron e = new ExonIntron(start, stop);
+			firstThird.add(e);
+			//System.out.println("adding "+e);			
+
+			//did enough bps found? otherwise keep going!
+			if (bpCounter == third) {
+				//System.out.println("enough found exiting! ");
+				break;
+			}
+		}
+
+		ExonIntron[] ei = new ExonIntron[firstThird.size()];
+		firstThird.toArray(ei);
+		return ei;
+	}
+	
+	/**Creates a new set of ExonIntrons that contain their total length/divider and maxing out at maxSize.
+	 * Use this to fetch say the last third of the transcript.*/
+	public static ExonIntron[] fetchLastExonSet(ExonIntron[] exons, int maxSize, double divider) {
+		double totalBp = ExonIntron.totalSize(exons);
+		//System.out.println("total "+totalBp);		
+		int third = (int)Math.round(totalBp/divider);
+		if (third > maxSize) third = maxSize;
+		//System.out.println("third "+third+"\n");
+
+		//for firstThird
+		ArrayList<ExonIntron> firstThird = new ArrayList<ExonIntron>();
+		int bpCounter = 0;
+		//for each exon, walk bp by bp until third met, creating new exons as needed
+		for (int i=exons.length-1; i>=0; i--){
+			//System.out.println(i+" exon "+exons[i]);
+			//System.out.println("bpCounter "+bpCounter);
+
+			int start = 0;
+			int stop = exons[i].getEnd();
+			int exonLength = exons[i].getLength();
+			//walk bp by bp until third met
+			for (int j=exons[i].getLength()-1; j>=0; j--){
+				//define current stop
+				int lenFromEnd = exonLength - j;
+				start = stop - lenFromEnd;
+				//System.out.println("\tss "+start+" - "+stop);
+				//enough bases?
+				if (bpCounter < third) bpCounter++;
+				else {
+					start++;
+					break;
+				}
+			}
+			//create exon
+			ExonIntron e = new ExonIntron(start, stop);
+			firstThird.add(e);
+			//System.out.println("adding "+e);			
+
+			//did enough bps found? otherwise keep going!
+			if (bpCounter == third) {
+				//System.out.println("enough found exiting! ");
+				break;
+			}
+		}
+
+		//make array and reverse order
+		ExonIntron[] ei = new ExonIntron[firstThird.size()];
+		int index = 0;
+		for (int i= ei.length-1; i>=0; i--){
+			ei[index++] = firstThird.get(i);
+		}
+		return ei;
+	}
+
+
 }
