@@ -99,11 +99,14 @@ public class VCFParser {
 	public static final Pattern TAB = Pattern.compile("\\t");
 	public static final Pattern COLON = Pattern.compile(":");
 	public static final Pattern COMMA = Pattern.compile(",");
+	public static final Pattern SLASH = Pattern.compile("/");
 	private ArrayList<String> badVcfRecords = new ArrayList<String>();
 	private HashMap<String, VCFLookUp> chromosomeVCFRecords = null;
 	private boolean loadRecords = true;
 	private boolean loadSamples = true;
 	private boolean loadInfo = true;
+	private boolean missingQual = false;
+	
 	//indexs for ripping vcf records
 	int chromosomeIndex= 0;
 	int positionIndex = 1;
@@ -117,6 +120,8 @@ public class VCFParser {
 	int firstSampleIndex = 9;
 	int minimumNumberFields = 8;
 	int numberFields = 0;
+	
+
 	
 	private String[] sampleNames = null;
 	
@@ -199,6 +204,8 @@ public class VCFParser {
 			int maxRecord = this.chunkSize * this.chunkNumber + this.chunkSize;
 			int recordCount = 0;
 			
+			boolean zeroQualFlag = false;
+			
 			while ((line=in.readLine()) != null){
 				if (recordCount < minRecord) { //Ignore records less than starting point
 					//pass
@@ -207,6 +214,14 @@ public class VCFParser {
 				} else { //Juuust right.
 					try {
 						VCFRecord vcf = new VCFRecord(line, this, loadSamples, loadInfo);
+						
+						if (!missingQual && vcf.isMissingQual()) {
+							System.out.println("\n\nWARNING: Sample variant quality (GQ) is missing from record: " + line + ".\n\nMissing sample qualities are set to zero.  Missing quality information is normal "
+									+ "when parsing VCF files from tumor/normal varscan, but not VCF files from GATK.  This error is only reported once to reduce "
+									+ "on-screen messages, so there may be other variants throughout the file with missing qualities.\n\n");
+							missingQual = true;
+							
+						}
 						//old chrom
 						if (vcf.getChromosome().equals(oldChrom)){
 							//check position

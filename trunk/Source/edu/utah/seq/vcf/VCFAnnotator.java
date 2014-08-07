@@ -22,8 +22,8 @@ import util.gen.Misc;
 public class VCFAnnotator {
 	//Hard coded paths
 	private String pathToAnnovarDir = new String("/home/u0855942/annovar_version");
-	private String pathToAnnovar = new String(pathToAnnovarDir + "/annotate_variation.pl");
-	private String pathToRespository = new String(pathToAnnovarDir + "/humandb");
+	private String pathToAnnovar;
+	private String pathToRespository;
 	
 	//User specified options
 	private File vcfFile;
@@ -80,6 +80,9 @@ public class VCFAnnotator {
 		long startTime = System.currentTimeMillis();
 		
 		processArgs(args);
+		
+		pathToAnnovar = new String(pathToAnnovarDir + "/annotate_variation.pl");
+		pathToRespository = new String(pathToAnnovarDir + "/humandb");
 		
 		//Count vcf records
 		ArrayList<File> tempVcfFiles = new ArrayList<File>();
@@ -247,14 +250,20 @@ public class VCFAnnotator {
 				String endPosition = String.valueOf(this.getAnnovarEndPosition(vr));
 				if (ref.length() == 1 && alt.length() > 1) {
 					if (!ref.equals(alt.substring(0, 1))) {
-						System.out.println("First base of InDel doesn't match, skipping");
+						System.out.println("First base of InDel doesn't match, skipping.  The reference allele should match the first base of the alternate.");
+						System.out.println("Reference: " + ref);
+						System.out.println("Alternate: " + alt);
+						continue;
 					} else {
 						ref = "-";
 						alt = alt.substring(1);
 					}
 				} else if (ref.length() > 1 && alt.length() == 1) {
 					if (!alt.equals(ref.substring(0,1))) {
-						System.out.println("First base of InDel doesn't match, skipping");
+						System.out.println("First base of InDel doesn't match, skipping. The alternate allele should match the first base of the reference");
+						System.out.println("Reference: " + ref);
+						System.out.println("Alternate: " + alt);
+						continue;
 					} else {
 						ref = ref.substring(1);
 						alt = "-";
@@ -264,7 +273,6 @@ public class VCFAnnotator {
 					
 				}
 				
-				String altAllele = vr.getAlternate()[0];
 				bw.write(chrom + "\t" + String.valueOf(position) + "\t" + endPosition + "\t" + ref + "\t" + alt + "\n");
 			}
 			
@@ -310,7 +318,7 @@ public class VCFAnnotator {
     			+ "intergenic (6).\">");
     	String il4Ensembl = new String("##INFO=<ID=EnsemblName,Number=1,Type=String,Description=\"Closest ENSEMBL gene.  If the variant intersects multiple genes, "
     			+ "both will be listed.  If the variant doesn't intersect any gene, the closest upstream and downstream genes are listed with distances.\">");
-    	OutputParser op1Ensembl = new OutputParser(new int[]{0,1},new String[]{"EnsemblRegion","EnsemblName"},new String[]{il3Ensembl,il4Ensembl},null,"STANDARD","variant_function");
+    	OutputParser op1Ensembl = new OutputParser(new int[]{0,1},new String[]{"EnsemblRegion","EnsemblName"},new String[]{il3Ensembl,il4Ensembl},2,"UNSORTED","variant_function");
     	OutputParser op2Ensembl = new OutputParser(new int[]{1,2},new String[]{"VarType","VarDesc"},new String[]{il1Ensembl,il2Ensembl},3,"UNSORTED","exonic_variant_function");
     	commandMap.get(cmdName).addCommand(pbEnsembl);
     	commandMap.get(cmdName).addOutputParser(op1Ensembl);
@@ -321,7 +329,7 @@ public class VCFAnnotator {
     	ProcessBuilder pbRefseq = new ProcessBuilder(this.pathToAnnovar,"--geneanno","--buildver","hg19","-dbtype","gene",this.inputname,this.pathToRespository);
     	String il1Refseq = new String("##INFO=<ID=RefSeq,Number=1,Type=String,Description=\"Closest Refseq gene.  If the variant intersects multiple genes, "
     			+ "both will be listed.  If the variant doesn't intersect any gene, the closest upstream and downstream genes are listed with distances.\">");
-    	OutputParser op1Refseq = new OutputParser(new int[]{1},new String[]{"RefSeq"},new String[]{il1Refseq},null,"STANDARD","variant_function");
+    	OutputParser op1Refseq = new OutputParser(new int[]{1},new String[]{"RefSeq"},new String[]{il1Refseq},1,"UNSORTED","variant_function");
     	OutputParser op2Refseq = new OutputParser("exonic_variant_function");
     	commandMap.get(cmdName).addCommand(pbRefseq);
     	commandMap.get(cmdName).addOutputParser(op1Refseq);
@@ -750,7 +758,7 @@ public class VCFAnnotator {
 		private VCFParser parsedVCF;
 		private int column;
 		
-		/** The argument-less version of this command simply marks the output file for deletion.
+		/** The argumentless version of this command simply marks the output file for deletion.
 		 */
 		public OutputParser(String extension) {
 			annovarRunOutput = new File(inputname + "." + extension);
@@ -886,7 +894,24 @@ public class VCFAnnotator {
 			BufferedReader roBR = null;
 			
 			try {
-				roBR = new BufferedReader(new FileReader(annovarRunOutput)); 
+				roBR = new BufferedReader(new FileReader(annovarRunOutput));
+				
+				//Make sure the line counts match.
+				int count=0;
+				String temp = null;
+			    while ((temp = roBR.readLine()) != null) {
+			    	count +=1;
+			    } 
+			    
+			    if (count != this.parsedVCF.getVcfRecords().length) {
+			    	System.out.println("The number of annovar annotations doesn't equal the number of VCF records."
+			    			+ "  This tends to be indicative of malformed annovar input, so you will need the fix "
+			    			+ "the errors mention in the annovar invalid_input file.\n");
+			    }
+			    roBR.close();
+			    
+			    //parse the output
+			    roBR = new BufferedReader(new FileReader(annovarRunOutput));
 				
 				for (VCFRecord record: this.parsedVCF.getVcfRecords()) {
 					String roLine = roBR.readLine();
