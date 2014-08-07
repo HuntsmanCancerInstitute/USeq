@@ -22,6 +22,8 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	public static final String FAIL = "FAIL";
 	private float score = 0;
 	
+	private boolean missingQual = false;
+	
 	/**Only extracts some of the fields from a record*/
 	public VCFRecord(String record, VCFParser vcfParser, boolean loadSamples, boolean loadInfo) throws Exception{
 		originalRecord = record;
@@ -35,8 +37,25 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		//must subtract 1 from position to put it into interbase coordinates
 		chromosome = fields[vcfParser.chromosomeIndex] ;
 		position = Integer.parseInt(fields[vcfParser.positionIndex]) - 1;
-		reference = fields[vcfParser.referenceIndex];
-		alternate = VCFParser.COMMA.split(fields[vcfParser.alternateIndex]);
+		
+		String[] refByComma = VCFParser.COMMA.split(fields[vcfParser.referenceIndex]);
+		String[] refBySlash = VCFParser.SLASH.split(fields[vcfParser.referenceIndex]);
+		if (refBySlash.length > 1) {
+			reference = refBySlash[0];
+		} else if (refByComma.length > 1) {
+			reference = refByComma[0];
+		} else {
+			reference = fields[vcfParser.referenceIndex];
+		}
+		
+		String[] altByComma = VCFParser.COMMA.split(fields[vcfParser.alternateIndex]);
+		String[] altBySlash = VCFParser.SLASH.split(fields[vcfParser.alternateIndex]);
+		if (altByComma.length > altBySlash.length) {
+			alternate = altByComma;
+		} else {
+			alternate = altBySlash;
+		}
+		
 		rsNumber = fields[vcfParser.rsIndex];
 		if (fields[vcfParser.qualityIndex].equals(".")) quality = 0;
 		else quality = Float.parseFloat(fields[vcfParser.qualityIndex]);
@@ -58,8 +77,17 @@ public class VCFRecord implements Comparable<VCFRecord> {
 			if (al.size()!= 0){
 				sample = new VCFSample[al.size()];
 				al.toArray(sample);
+				
+				//Check for missing qualities.  This is valid for things like varscan, so simply store the fact that there were missing quals.
+				for (VCFSample s: sample) {
+					if (s.isMissingQual()) {
+						this.missingQual = true;
+					}
+				}
 			}
 			else sample = null;
+			
+			
 		}
 	}
 	
@@ -220,6 +248,10 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		this.quality = quality;
 	}
 	
+	public boolean isMissingQual() {
+		return this.missingQual;
+	}
+	
 	/**Checks that there is only one alternate. Otherwise false.*/
 	public boolean isSNP() {
 		if (alternate.length != 1) return false;
@@ -267,7 +299,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 			if (sample.isNoCall()) {
 				full.append("\tNA");
 			} else {
-				full.append("\tGT:" + genotype + ":" + sample.getAlleleCount());
+				full.append("\tGT:" + genotype + ":" + sample.getReferenceCount() + "," + sample.getAlternateCounts());
 			}
 		}
 		full.append("\n");

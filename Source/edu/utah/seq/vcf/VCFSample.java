@@ -20,7 +20,14 @@ public class VCFSample {
 	private String originalRecord = null;
 	private String originalFormat = null;
 	private String alleleCounts = null;
+	
+	private String referenceCounts = null;
+    private String alternateCounts = null;
+    
+    private boolean missingQual = false;
+	
 	private static final Pattern PIPE = Pattern.compile("\\|");
+	
 
 	/**Finding vcf files with mixed sample formats so must determine each record by record :( 
 	 * Add rippers as needed.*/
@@ -52,13 +59,47 @@ public class VCFSample {
 						readDepthDP = Integer.parseInt(data[i]);
 					}
 				}
-				else if (format[i].equals("GQ")) genotypeQualityGQ = Float.parseFloat(data[i]);
+				else if (format[i].equals("GQ")) {
+					if (data[i].equals(".")) {
+						genotypeQualityGQ = 0;
+						missingQual = true;
+					} else {
+						genotypeQualityGQ = Float.parseFloat(data[i]);
+					}
+					
+				}
+					
 				else if (format[i].equals("AD")) {
 					alleleCounts = data[i];
+					
+					String[] multiple = data[i].split(",");
+					if (multiple.length > 1) {
+						this.referenceCounts = multiple[0];
+						this.alternateCounts = multiple[1];
+					} else if (multiple.length ==  1) {
+						this.alternateCounts = multiple[0];
+					} else {
+						throw new Exception("There is no data in the 'AD' field, please make sure your file is formed correctly.  If it is formed correctly, "
+								+ "please harass the HCI core to fix this problem");
+					}
+				} else if (format[i].equals("RD")) {
+					this.referenceCounts = data[i];
 				}
 			}
 			
+			if (referenceCounts == null || alternateCounts == null) {
+				throw new Exception("Could not parse counts for either the reference (" + referenceCounts + ") or alternate (" + alternateCounts + ")allele.".format(referenceCounts, alternateCounts));
+			}
+			
 		}
+	}
+	
+	public String getReferenceCount() {
+		return referenceCounts;
+	}
+	
+	public String getAlternateCounts() {
+		return alternateCounts;
 	}
 	
 	public String getAlleleCount() {
@@ -88,5 +129,9 @@ public class VCFSample {
 	
 	public String getUnmodifiedSampleString() {
 		return this.originalRecord;
+	}
+	
+	public boolean isMissingQual() {
+		return this.missingQual;
 	}
 }

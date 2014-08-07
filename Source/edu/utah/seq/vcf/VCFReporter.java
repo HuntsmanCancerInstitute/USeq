@@ -200,7 +200,7 @@ public class VCFReporter {
 						+ "A zero in the genotype field signifies the reference base and 1 through N represent alternate alleles.  0/1 would be heterozygous for first alternate allele, 0/0 homozygous for the reference, "
 						+ "and 1/1 homozygous for the first alternate. A genotype of 0/2 would mean the sample was heterozygous for the second alternate allele.  The coverage field contains the "
 						+ "number of reads representing each allele, separated by commas.  The first value is the number of observed reference bases, the second value is the number of observed "
-						+ "first alternate bases.  There there was more than one alternate allele observed at the position, there will be more than two coverage values.");
+						+ "first alternate bases.  The counts for additional alternate alleles are not reported.");
 				
 				bwKey.close();
 			}

@@ -479,9 +479,10 @@ public class AlignmentEndTrimmer {
 				
 			} else if (aln1[i] != aln2[i]) {
 				if (this.rnaEditing) {
-					if ((isReversed && aln1[i] == 'T' && aln2[i] == 'C') ||
-						 !isReversed && aln1[i] == 'A' && aln2[i] == 'G') {
-						//OK
+					if (aln1[i] == 'A' && aln2[i] == 'G') {
+//					if ((isReversed && aln1[i] == 'T' && aln2[i] == 'C') ||
+//						 !isReversed && aln1[i] == 'A' && aln2[i] == 'G') {
+//						//OK
 					} else {
 						totalMM++;
 					}
@@ -512,8 +513,9 @@ public class AlignmentEndTrimmer {
 				
 			} else if (aln1[i] != aln2[i]) {
 				if (this.rnaEditing) {
-					if ((isReversed && aln1[i] == 'T' && aln2[i] == 'C') ||
-						 !isReversed && aln1[i] == 'A' && aln2[i] == 'G') {
+					if (aln1[i] == 'A' && aln2[i] == 'G') {
+//					if ((isReversed && aln1[i] == 'T' && aln2[i] == 'C') ||
+//						 !isReversed && aln1[i] == 'A' && aln2[i] == 'G') {
 						lastScore = lastScore + this.mScore;
 					} else {
 						lastScore = lastScore - this.mmScore;
