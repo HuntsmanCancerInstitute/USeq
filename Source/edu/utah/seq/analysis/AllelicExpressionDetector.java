@@ -22,8 +22,8 @@ public class AllelicExpressionDetector {
 	private double minimumGenCallScore = 0.2;
 	private int minimumReadCoverage = 4;
 	private int minimumBaseQuality = 20;
-	private File resultsFile;
-	private HashMap<String, Snp> nameSnp = new HashMap<String, Snp>();
+	private File resultsDirectory;
+	private LinkedHashMap<String, Snp> nameSnp = new LinkedHashMap<String, Snp>();
 	private HashMap<String, SamReader> sampleNameSamReader = new HashMap<String, SamReader>();
 	private Random random = new Random(System.currentTimeMillis());
 	
@@ -62,10 +62,33 @@ public class AllelicExpressionDetector {
 
 	private void scoreSnps() {
 		//write out count table
-		System.out.println("Writing count table...");
+		System.out.println("Writing filtered count table for DESeq2...");
 		writeOutCountTable();
+		
+		//write out summary
+		System.out.println("Writing summary table...");
+		writeOutSummaryTable();
 
 	}
+	
+	private void writeOutSummaryTable() {
+		try {
+		
+			//make gzipper
+			File f = new File (resultsDirectory, "summaryTable.xls");
+			Gzipper out = new Gzipper(f);
+			
+			//for each Snp
+			out.println("Chr\tPos\tRef\tAlt\tName\tSampleNames\tRefAltCounts\tSampleGCScores");
+			for (Snp s : nameSnp.values()) out.println(s.toString());
+			
+			out.close();
+			
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
 
 	private void writeOutCountTable() {
 		try {
@@ -73,7 +96,8 @@ public class AllelicExpressionDetector {
 			int maxSamples = findMaxNumberSamples();
 
 			//make gzipper
-			Gzipper out = new Gzipper(resultsFile);
+			File f = new File (resultsDirectory, "countTableForDESeq.txt");
+			Gzipper out = new Gzipper(f);
 			
 			//for each Snp
 			boolean flip = true;
@@ -103,8 +127,8 @@ public class AllelicExpressionDetector {
 						int[] refAltCounts = s.getRefAltCounts(s.gatcnCounts.get(i));
 						//filter here for cases with no evidence of being hetero?
 						//flip?
-						if (flip) cps[i] = new CountPair(refAltCounts[1], refAltCounts[0]);
-						else cps[i] = new CountPair(refAltCounts[0], refAltCounts[1]);
+						if (flip) cps[i] = new CountPair(refAltCounts[1], refAltCounts[0], s.sampleName.get(i));
+						else cps[i] = new CountPair(refAltCounts[0], refAltCounts[1], s.sampleName.get(i));
 					}
 					//for (int i=numSamples; i< maxSamples; i++) cps[i]= new CountPair(0,0);
 					
@@ -115,6 +139,11 @@ public class AllelicExpressionDetector {
 					StringBuilder sb = new StringBuilder(coordName);
 					if (flip) sb.append("_Alt");
 					else sb.append("_Ref");
+					//appendSampleNames
+					for (int i=0; i< numSamples; i++){
+						sb.append("_");
+						sb.append(cps[i].sampleName);
+					}
 					//for (int i=0; i< maxSamples; i++){
 					for (int i=0; i< numSamples; i++){
 						sb.append("\t");
@@ -137,9 +166,11 @@ public class AllelicExpressionDetector {
 	private class CountPair{
 		int numA = 0;
 		int numB = 0;
-		private CountPair(int a, int b){
+		String sampleName;
+		private CountPair(int a, int b, String sampleName){
 			numA = a;
 			numB = b;
+			this.sampleName = sampleName;
 		}
 	}
 
@@ -196,7 +227,8 @@ public class AllelicExpressionDetector {
 				}
 
 				//one of the samples to process?
-				SamReader sr = sampleNameSamReader.get(tokens[1]);
+				String sampleName = tokens[1];
+				SamReader sr = sampleNameSamReader.get(sampleName);
 				if (sr == null) {
 					//System.out.println("Not a sample to test!");
 					continue;
@@ -245,9 +277,9 @@ public class AllelicExpressionDetector {
 				int[] gatcn = countHash(counts);
 				if (Num.sumIntArray(gatcn) < minimumReadCoverage) continue;
 				if (snp.sampleName == null) snp.initializeALs();
-				snp.sampleName.add(tokens[1]);
+				snp.sampleName.add(sampleName);
 				snp.gatcnCounts.add(gatcn);
-				snp.snpData.add(line);
+				snp.sampleGCScore.add(new Float((float)score));
 
 				//System.out.println(snp);
 				//if (counter++ > 10) System.exit(0);
@@ -255,7 +287,6 @@ public class AllelicExpressionDetector {
 			System.out.println();
 
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 	}
@@ -305,7 +336,7 @@ public class AllelicExpressionDetector {
 		for (Bed b : bed){
 			//parse name: name_reference_alternate
 			String[] tokens = underscore.split(b.getName());
-			Snp s = new Snp (b.getChromosome(), b.getStart(), tokens[1], tokens[2]);
+			Snp s = new Snp (b.getChromosome(), b.getStart(), tokens[0], tokens[1], tokens[2]);
 			if (nameSnp.containsKey(tokens[0])) Misc.printErrAndExit("\nError: same snp name found, aborting! "+tokens[0]+"\n");
 			nameSnp.put(tokens[0], s);
 		}
@@ -314,15 +345,17 @@ public class AllelicExpressionDetector {
 	private class Snp{
 		String chromosome;
 		int position;
+		String name;
 		String reference;
 		String alternate;
 		ArrayList<String> sampleName;
 		ArrayList<int[]> gatcnCounts;
-		ArrayList<String> snpData;
+		ArrayList<Float> sampleGCScore;
 
-		private Snp(String chromosome, int position, String reference, String alternate){
+		private Snp(String chromosome, int position, String name, String reference, String alternate){
 			this.chromosome = chromosome;
 			this.position = position;
+			this.name = name;
 			this.reference = reference;
 			this.alternate = alternate;
 		}
@@ -345,37 +378,48 @@ public class AllelicExpressionDetector {
 		private void initializeALs(){
 			sampleName = new ArrayList<String>();
 			gatcnCounts = new ArrayList<int[]>();
-			snpData = new ArrayList<String>();
+			sampleGCScore = new ArrayList<Float>();
 		}
 
 		public String toStringCoordinates(){
 			StringBuilder sb = new StringBuilder();
 			sb.append(chromosome); sb.append("_");
 			sb.append(position); sb.append("_");
+			sb.append(name); sb.append("_");
 			sb.append(reference); sb.append("_");
 			sb.append(alternate); 
+			
 			return sb.toString();
 		}
 
+		/**Chr\tPos\tRef\tAlt\tName\tSampleNames\tRefAltCounts\tSampleGCScores*/
 		public String toString(){
 			StringBuilder sb = new StringBuilder();
 			sb.append(chromosome); sb.append("\t");
 			sb.append(position); sb.append("\t");
 			sb.append(reference); sb.append("\t");
-			sb.append(alternate); sb.append("\n");
+			sb.append(alternate); sb.append("\t");
+			sb.append(name); 
 			if (sampleName != null){
-				for (int i=0; i< sampleName.size(); i++){
-					sb.append("\t");
-					sb.append(sampleName.get(i));
-					int[] gatcn = gatcnCounts.get(i);
-					for (int x=0; x< gatcn.length; x++) {
-						sb.append("\t");
-						sb.append(gatcn[x]);
-					}
-					sb.append("\t");
-					sb.append(snpData.get(i));
-					sb.append("\n");
+				sb.append("\t");
+				//sampleNames
+				String sampleNames = Misc.stringArrayListToString(sampleName, ",");
+				sb.append(sampleNames); sb.append("\t");
+				
+				//ref/alt counts
+				int[] refAltCounts = getRefAltCounts(gatcnCounts.get(0));
+				sb.append(refAltCounts[0]); sb.append("_"); sb.append(refAltCounts[1]); 
+				for (int i=1; i< gatcnCounts.size(); i++){
+					sb.append(",");
+					refAltCounts = getRefAltCounts(gatcnCounts.get(i));
+					sb.append(refAltCounts[0]); sb.append("_"); sb.append(refAltCounts[1]);
 				}
+				sb.append("\t");
+				
+				//sample scores
+				float[] s = Num.arrayListOfFloatToArray(sampleGCScore);
+				String scores = Misc.floatArrayToString(s, ",");
+				sb.append(scores);
 			}
 			return sb.toString();
 		}
@@ -415,7 +459,7 @@ public class AllelicExpressionDetector {
 					case 'g': minimumGenCallScore = Double.parseDouble(args[++i]); break;
 					case 'c': minimumReadCoverage = Integer.parseInt(args[++i]); break;
 					case 'q': minimumBaseQuality = Integer.parseInt(args[++i]); break;
-					case 'r': resultsFile = new File(args[++i]); break;
+					case 'r': resultsDirectory = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -430,7 +474,9 @@ public class AllelicExpressionDetector {
 		if (snpBedFile == null || snpBedFile.canRead() == false) Misc.printErrAndExit("\nError: can't find your SNP Map bed file generated by the ReferenceMutator?\n");
 		if (snpDataFile == null || snpDataFile.canRead() == false) Misc.printErrAndExit("\nError: can't find your SNP data file?\n");
 		if (sampleNamesToProcess == null || sampleNamesToProcess.length == 0) Misc.printErrAndExit("\nError: please enter the name(s) of samples to process.\n");
-
+		if (resultsDirectory == null) Misc.printErrAndExit("\nError: please enter a directory in which to save the results.\n");
+		resultsDirectory.mkdirs();
+		if (resultsDirectory.canWrite() == false || resultsDirectory.isDirectory() == false) Misc.printErrAndExit("\nError: please enter a directory in which to save the results.\n");
 	}	
 
 	public static void printDocs(){
@@ -438,14 +484,14 @@ public class AllelicExpressionDetector {
 				"**************************************************************************************\n" +
 				"**                      Allelic Expression Detector:  August 2014                   **\n" +
 				"**************************************************************************************\n" +
-				"Scores snps for allelic expression bias using a Wilcoxon Signed Rank test.\n\n"+
+				"Beta!\n\n"+
 
 				"Required Options:\n"+
 				"-n Sample names to process, comma delimited, no spaces.\n"+
 				"-b Directory containing coordinate sorted bam and index files named according to their\n"+
 				"      sample name.\n"+
 				"-d SNP data file containing all sample snp calls.\n"+
-				"-r Results file name.\n"+
+				"-r Results directory.\n"+
 				"-s SNP map bed file from the ReferenceMutator app.\n"+
 
 				"\nDefault Options:\n"+
