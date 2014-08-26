@@ -56,7 +56,7 @@ public class DefinedRegionDifferentialSeq {
 	//hidden options
 	private boolean trimUTRBPsFromExons = false;
 	private boolean printFirstLastCountTable = false;
-	private int maxFirstLast = 250;
+	private int maxFirstLast = 150;
 
 	//internal fields
 	private UCSCGeneLine[] genes;
@@ -845,6 +845,7 @@ public class DefinedRegionDifferentialSeq {
 		//get heatmap positions and values
 		HeatMapMakerPosNeg hm = new HeatMapMakerPosNeg(0, 0, 0);
 		PointData pd = hm.makeHeatMapPositionValues(sm);
+		
 
 		pd.setInfo(info);
 		pd.writePointData(workingSpliceGraphDir);
@@ -1892,7 +1893,7 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                     Defined Region Differential Seq:   June 2014                 **\n" +
+				"**                     Defined Region Differential Seq:   Aug 2014                  **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +
