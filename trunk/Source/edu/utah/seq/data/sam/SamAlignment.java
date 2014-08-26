@@ -29,6 +29,7 @@ public class SamAlignment {
 	private String unmodifiedSamRecord;
 	private boolean spliceJunction = false;
 	private boolean convertedJunctionCoordinates = false;
+	private int misc;
 
 	//static patterns
 	private static final Pattern TAB = Pattern.compile("\t");
@@ -956,6 +957,14 @@ public class SamAlignment {
 
 	public String getUnmodifiedSamRecord() {
 		return unmodifiedSamRecord;
+	}
+
+	public int getMisc() {
+		return misc;
+	}
+
+	public void setMisc(int misc) {
+		this.misc = misc;
 	}
 
 	

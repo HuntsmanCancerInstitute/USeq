@@ -32,7 +32,9 @@ package edu.utah.seq.data.sam;
  */
 import picard.sam.*;
 import picard.cmdline.CommandLineProgram;
+import util.gen.Misc;
 import htsjdk.samtools.*;
+
 import java.io.File;
 import java.io.IOException;
 import java.util.Iterator;
@@ -57,6 +59,14 @@ public class PicardSortSam extends CommandLineProgram {
 		writer.close();
 
 		return 0;
+	}
+	
+	/**Makes a bam based on the name of the inputSamFile.*/
+	public PicardSortSam(File inputSamFile){
+		//make bam File
+		String name = Misc.removeExtension(inputSamFile.getName());
+		File bam = new File (inputSamFile.getParentFile(), name+".bam");
+		new PicardSortSam (inputSamFile, bam);
 	}
 
 	/** Launches SortSam suppressing all output except warnings and errors

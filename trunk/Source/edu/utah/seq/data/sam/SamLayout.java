@@ -10,7 +10,7 @@ public class SamLayout{
 	private char[] seq;
 	private int[] qual;
 	private char[] call;
-	private Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MDIN])");
+	private static final Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MDIN])");
 
 	public SamLayout(int size){
 		seq = new char[size];
