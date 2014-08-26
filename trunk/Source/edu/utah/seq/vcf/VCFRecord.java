@@ -254,9 +254,12 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	
 	/**Checks that there is only one alternate. Otherwise false.*/
 	public boolean isSNP() {
-		if (alternate.length != 1) return false;
-		if (alternate[0].length() == 1 && reference.length() == 1 && alternate.equals(".") == false) return true;
-		return false;
+		if (reference.length() != 1) return false;
+		//check each alternate for non snp
+		for (int i=0; i< alternate.length; i++){
+			if (alternate[i].length() != 1 || alternate[i].equals(".") == true) return false;
+		}
+		return true;
 	}
 	/**Checks that there is only one alternate. Otherwise false.*/
 	public boolean isInsertion(){
