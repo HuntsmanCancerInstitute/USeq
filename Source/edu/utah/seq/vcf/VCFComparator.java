@@ -25,6 +25,7 @@ public class VCFComparator {
 	private boolean removeNonSNPs = false;
 	private boolean removeNonPass = false;
 	private boolean useVQSLOD = false;
+	private boolean requireAltMatch = true;
 
 	private HashMap<String,RegionScoreText[]> keyRegions = null;
 	private HashMap<String,RegionScoreText[]> testRegions = null;
@@ -191,7 +192,8 @@ public class VCFComparator {
 		results.append("QUALThreshold\tNumMatchTest\tNumNonMatchTest\tFDR=nonMatchTest/(matchTest+nonMatchTest)\tdecreasingFDR\tTPR=matchTest/totalKey\tFPR=nonMatchTest/totalKey\tPPV=matchTest/(matchTest+nonMatchTest)\n");
 
 		//first do without thresholds
-		float oldScore = testNonMatchingVCF[0].getScore();
+		float oldScore = 0;
+		if (testNonMatchingVCF.length !=0) oldScore = testNonMatchingVCF[0].getScore();
 		int numNonMatches = testNonMatchingVCF.length;
 		int numMatches = testMatchingVCF.length;
 		float oldFDR = ((float)numNonMatches)/((float)(numMatches + numNonMatches));
@@ -281,7 +283,7 @@ public class VCFComparator {
 			}
 			countMatches(key, test, matches, testNonMatches);
 		} 
-		if (matches.size() == 0) Misc.printExit("\tNo matching vcf records?! Aborting.\n");
+		//if (matches.size() == 0) Misc.printExit("\tNo matching vcf records?! Aborting.\n");
 
 		//set arrays
 		testMatchingVCF = new VCFMatch[matches.size()];
@@ -305,7 +307,8 @@ public class VCFComparator {
 		VCFRecord[] vcfTest = test.getVcfRecord();
 		for (int i=0; i< vcfTest.length; i++){
 			//fetch records from key
-			VCFRecord[] matchingKey = key.fetchVCFRecords(posTest[i], posTest[i]+1);
+			VCFRecord[] matchingKey = key.fetchVCFRecords(posTest[i], posTest[i]+1);			
+			
 			//no records found
 			if (matchingKey == null) {
 				nonMatches.add(vcfTest[i]);
@@ -313,9 +316,9 @@ public class VCFComparator {
 			else {				
 				//for each match
 				boolean matchFound = false;
-				for (int x=0; x< matchingKey.length; x++){				
+				for (int x=0; x< matchingKey.length; x++){	
 					//check to see if it matches
-					if (vcfTest[i].matchesAlternateAlleleGenotype(matchingKey[x], requireGenotypeMatch)) {
+					if (requireAltMatch == false || vcfTest[i].matchesAlternateAlleleGenotype(matchingKey[x], requireGenotypeMatch)) {
 						matchingKey[x].setFilter(VCFRecord.PASS);
 						vcfTest[i].setFilter(VCFRecord.PASS);
 						matches.add(new VCFMatch(matchingKey[x], vcfTest[i]));
@@ -407,7 +410,8 @@ public class VCFComparator {
 			keyParser.appendChrFixMT();			
 			if (removeSNPs) keyParser.removeSNPs();
 			if (removeNonSNPs) keyParser.removeNonSNPs();
-			numberUnfilteredKeyVariants = keyParser.getVcfRecords().length;		
+			numberUnfilteredKeyVariants = keyParser.getVcfRecords().length;	
+			if (numberUnfilteredKeyVariants == 0) Misc.printErrAndExit("\nNo key variants passing filters? Aboring.\n");
 			keyParser.filterVCFRecords(commonRegions);
 		}
 		res = numberUnfilteredKeyVariants +"\tKey variants\n";
@@ -526,6 +530,7 @@ public class VCFComparator {
 					case 'd': bedTest = new File(args[++i]); break;
 					case 'p': saveDirectory = new File(args[++i]); break;
 					case 'g': requireGenotypeMatch = true; break;
+					case 'f': requireAltMatch = false; break;
 					case 's': removeNonSNPs = true; break;
 					case 'v': useVQSLOD = true; break;
 					case 'n': removeSNPs = true; break;
@@ -570,6 +575,7 @@ public class VCFComparator {
 		res.append(vcfTest+"\tTest vcf file\n");
 		res.append(bedTest+"\tTest interrogated regions file\n");
 		res.append(saveDirectory+"\tSave directory for parsed datasets\n");
+		res.append(requireAltMatch+"\tRequire matching alternate bases\n");
 		res.append(requireGenotypeMatch+"\tRequire matching genotypes\n");
 		res.append(useVQSLOD+"\tUse record VQSLOD score as ranking statistic\n");
 		res.append(removeNonPass+ "\tExclude non PASS or . records\n");
@@ -585,7 +591,7 @@ public class VCFComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             VCF Comparator : March 2014                          **\n" +
+				"**                            VCF Comparator : August 2014                          **\n" +
 				"**************************************************************************************\n" +
 				"Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls\n" +
 				"that fall in the common interrogated regions are compared. WARNING tabix gzipped files\n" +
@@ -601,6 +607,7 @@ public class VCFComparator {
 				"\nOptional Options:\n"+
 				"-g Require the genotype to match, defaults to scoring a match when the alternate\n" +
 				"       allele is present.\n"+
+				"-f Only require the position to match, don't consider the alt base or genotype.\n"+
 				"-v Use VQSLOD score as ranking statistic in place of the QUAL score.\n"+
 				"-s Only compare SNPs, defaults to all.\n"+
 				"-n Only compare non SNPs, defaults to all.\n"+
