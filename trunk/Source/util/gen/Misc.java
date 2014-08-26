@@ -4,6 +4,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.io.FileWriter;
 import java.io.PrintWriter;
+
 import org.apache.log4j.Logger;
 
 
@@ -985,5 +986,18 @@ public class Misc {
 	/**Short cut for debugging*/
 	public static void p(String s) {
 		System.err.println(s);
+	}
+
+	public static void invertArray(Object[] obj) {
+		int lenthMinusOne = obj.length -1;
+		int stop = obj.length/2;
+		for (int i=0; i<stop; i++){
+			int switchIndex = lenthMinusOne - i;
+			Object first = obj[i];
+			Object last = obj[switchIndex];
+			obj[i] = last;
+			obj[switchIndex] = first;
+		}
+		
 	}	
 }

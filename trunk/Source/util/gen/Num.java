@@ -342,6 +342,15 @@ public class Num {
 		}
 		return ints;
 	}
+	
+	/**Rounds floats to ints*/
+	public static int[] floatArraysToInt (float[] flt){
+		int[] ints = new int[flt.length];
+		for (int i=0; i< flt.length; i++){
+			ints[i] = Math.round(flt[i]);
+		}
+		return ints;
+	}
 
 	/**@param treatmentsControls - int[window index][counts T1,T2,T..., counts C1,C2,C...]
 	 * @param totalNumberObservationsInEachReplica - total number of observations in each treatment and control replica*/
@@ -3729,22 +3738,19 @@ public class Num {
 		return means;
 	}	
 
-	/** Slides a window along an array, one index at a time, averaging the contents. */
-	public static float[] windowAverageScores(float[] scores, int windowSize) {
-		double window = windowSize;
+	/** Slides a window along an array, one index at a time, calculating the median contents. */
+	public static float[] windowMedianScores(float[] scores, int windowSize) {
 		int num = 1+ scores.length - windowSize;
 		if (num < 1) return null;
-		float[] means = new float[num];
+		float[] medians = new float[num];
+		float[] slice;
 		for (int i=0; i<num; i++){
-			//sum window
-			double stop = i+window;
-			double total = 0;
-			for (int j=i; j< stop; j++){
-				total += scores[j];
-			}
-			means[i] = new Double(total/window).floatValue();
+			slice = new float[windowSize];
+			System.arraycopy(scores, i, slice, 0, windowSize);
+			Arrays.sort(slice);
+			medians[i] = (float)Num.median(slice);
 		}
-		return means;
+		return medians;
 	}
 
 	/** Slides a window along an array, one index at a time, averaging the contents. 
