@@ -1,157 +1,158 @@
 package edu.utah.seq.analysis.tele;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashSet;
-
-import util.gen.Misc;
 import util.gen.Num;
 
 public class TeleStats {
-	//fields
+	
 	private int numberExonicAlignments;
-	private float[] baseCoverage;
+	private int numberUnsplicedAlignments;
+	//these are exonic not genomic
+	private int[] baseCoverage;
 	private ArrayList<String>[] baseCoverageNames;
-	private float[] exonicBaseCoverage;
-	private ArrayList<String>[] exonicBaseCoverageNames;
-	private int[] types;
-	private int[] misSplicePositions;
-	private float fivePrimeMedianBaseCoverage;
-	private int fivePrimeWindowIndex;
-	private float threePrimeMedianBaseCoverage;
-	private int fivePrimeAlignmentFragmentCount;
-	private int threePrimeAlignmentFragmentCount;
-	private float pAdjSkewedReadCount;
-	
-	//methods
-	public double getLog2MedianSkew(){
-		double ratio = (1+fivePrimeMedianBaseCoverage) / (1+threePrimeMedianBaseCoverage);
-		return Num.log2(ratio);
-	}
-	public double getLog2CountSkew(double windowSize, double cDNALength, double fractionLengthBackground){
-		double ratio = ((double)(1+fivePrimeAlignmentFragmentCount)/windowSize) / ((double)(1+threePrimeAlignmentFragmentCount)/ (cDNALength* fractionLengthBackground));
-		return Num.log2(ratio);
+	private double medianBackground;
+	private int backgroundStartIndex;
+	private double medianWindow;
+	private int medianWindowIndex;
+	private int countBackground;
+	private double normalizedBackgroundCount;
+	private int countWindow;
+	private double normalizedWindowCount;
+	private double backgroundCoeffVar;
+
+	public TeleStats(int numberExonicAlignments, int numberUnsplicedAlignments, int[] baseCoverage, ArrayList<String>[] baseCoverageNames) {
+		this.numberExonicAlignments = numberExonicAlignments;
+		this.numberUnsplicedAlignments = numberUnsplicedAlignments;
+		this.baseCoverage = baseCoverage;
+		this.baseCoverageNames = baseCoverageNames;
 	}
 	
-	/**Returns tab delim, 5'median, 3'median,log2RtoSkew*/
-	public void addMedianInfo(StringBuilder sb){
-		sb.append(fivePrimeMedianBaseCoverage); sb.append("\t");
-		sb.append(threePrimeMedianBaseCoverage); sb.append("\t");
-		sb.append(getLog2MedianSkew()); 
+	public void nullBigArrays(){
+		baseCoverage = null;
+		baseCoverageNames = null;
 	}
 	
-	/**Returns tab delim, 5'count, 3'count,count log2RtoSkew*/
-	public void addCountInfo(StringBuilder sb, double windowSize, double cDNALength, double fractionLengthBackground){
-		sb.append(fivePrimeAlignmentFragmentCount); sb.append("\t");
-		sb.append(threePrimeAlignmentFragmentCount); sb.append("\t");
-		sb.append(getLog2CountSkew(windowSize,cDNALength, fractionLengthBackground)); 
-	}
-	
-	/**This hashes the names and sets the counts for the best 5' window and the background count.*/
-	public void setReadCountsForBestAndBackground(int windowSize, int startIndexBkgrnd) {
-		HashSet<String> names = new HashSet<String>();
-		//5' end
-		int stop = fivePrimeWindowIndex + windowSize;
-		for (int i=fivePrimeWindowIndex; i< stop; i++){
-			ArrayList<String> al = exonicBaseCoverageNames[i];
-			if (al != null){
-				for (String name: al) names.add(name);
+	public void windowScan(int length5PrimeWindowScan) {
+		int[] toScan = new int[backgroundStartIndex];
+		System.arraycopy(baseCoverage, 0, toScan, 0, backgroundStartIndex);
+		double[] medians = Num.windowMedianScores(toScan, length5PrimeWindowScan);
+		int bestIndex = 0;
+		double maxMedian = medians[0];
+		for (int i=1; i< medians.length; i++){
+			if (medians[i]> maxMedian){
+				maxMedian = medians[i];
+				bestIndex = i;
 			}
 		}
-		fivePrimeAlignmentFragmentCount = names.size();
-		names.clear();
+		medianWindow = maxMedian;
+		medianWindowIndex = bestIndex;
+	}
+	
+	public void calculateMedianBackground(double fractionLengthBackground) {
+		int num = (int)Math.round( (double)baseCoverage.length * fractionLengthBackground );
+		backgroundStartIndex = baseCoverage.length - num;
+		int[] slice = new int[num];
+		System.arraycopy(baseCoverage, backgroundStartIndex, slice, 0, num);
+		Arrays.sort(slice);
+		medianBackground = Num.median(slice);
+	}
+	
+	public void windowScanBackground(int length5PrimeWindowScan) {
+		int len = baseCoverage.length - backgroundStartIndex;
+		int[] toScan = new int[len];
+		System.arraycopy(baseCoverage, backgroundStartIndex, toScan, 0, len);
+		double[] aves = Num.windowAverageScoresIgnoreZeros(Num.intArrayToDouble(toScan), length5PrimeWindowScan);
+		aves = Num.removeNaNAndInfinite(aves);
+		double mean = Num.mean(aves);
+		double stdDev = Num.standardDeviation(aves, mean);
+		backgroundCoeffVar = stdDev/mean;
 		
-		//3' end
-		for (int i=startIndexBkgrnd; i< exonicBaseCoverageNames.length; i++){
-			ArrayList<String> al = exonicBaseCoverageNames[i];
-			if (al != null){
-				for (String name: al) names.add(name);
-			}
-		}
-		threePrimeAlignmentFragmentCount = names.size();
 	}
 	
-	//getters and setters
+	public void calculateMedianWindow(int windowIndex, int windowLength) {
+		medianWindowIndex = windowIndex;
+		int[] slice = new int[windowLength];
+		System.arraycopy(baseCoverage, medianWindowIndex, slice, 0, windowLength);
+		Arrays.sort(slice);
+		medianWindow = Num.median(slice);
+	}
+	
+	public void countBackgroundReads() {
+		HashSet<String> uniqueNames = new HashSet<String>();
+		int num = baseCoverageNames.length;
+		for (int i=backgroundStartIndex; i< num; i++) if (baseCoverageNames[i]!=null) uniqueNames.addAll(baseCoverageNames[i]);
+		countBackground = uniqueNames.size();
+		normalizedBackgroundCount = (double)(countBackground+1) / (double)(num-backgroundStartIndex);
+	}
+	
+	public void countWindowReads(int windowSize){
+		int stop = windowSize+medianWindowIndex;
+		HashSet<String> uniqueNames = new HashSet<String>();
+		for (int i=medianWindowIndex; i< stop; i++) {
+			if (baseCoverageNames[i]!=null) uniqueNames.addAll(baseCoverageNames[i]);
+		}
+		countWindow = uniqueNames.size();
+		normalizedWindowCount = (double)(countWindow+1)/ (double) windowSize;
+	}
+	
+	public double getCountSkewLog2Rto(){
+		return Num.log2(normalizedWindowCount/ normalizedBackgroundCount);
+	}
+	
+	public double getMedianSkewLog2Rto(){
+		double t = (medianWindow +1.0) / (medianBackground + 1.0);
+		return Num.log2(t);
+	}
+
+
 	public int getNumberExonicAlignments() {
 		return numberExonicAlignments;
 	}
-	public void setNumberExonicAlignments(int numberExonicAlignments) {
-		this.numberExonicAlignments = numberExonicAlignments;
+	public int getNumberUnsplicedAlignments() {
+		return numberUnsplicedAlignments;
 	}
-	public float[] getBaseCoverage() {
+	public int[] getBaseCoverage() {
 		return baseCoverage;
 	}
-	public void setBaseCoverage(float[] baseCoverage) {
-		this.baseCoverage = baseCoverage;
-	}
-	public int[] getTypes() {
-		return types;
-	}
-	public void setTypes(int[] types) {
-		this.types = types;
-	}
-	public int[] getMisSplicePositions() {
-		return misSplicePositions;
-	}
-	public void setMisSplicePositions(int[] misSplicePositions) {
-		this.misSplicePositions = misSplicePositions;
-	}
-	public float getFivePrimeMedianBaseCoverage() {
-		return fivePrimeMedianBaseCoverage;
-	}
-	public void setFivePrimeMedianBaseCoverage(float fivePrimeMedianBaseCoverage) {
-		this.fivePrimeMedianBaseCoverage = fivePrimeMedianBaseCoverage;
-	}
-	public float getThreePrimeMedianBaseCoverage() {
-		return threePrimeMedianBaseCoverage;
-	}
-	public void setThreePrimeMedianBaseCoverage(float threePrimeMedianBaseCoverage) {
-		this.threePrimeMedianBaseCoverage = threePrimeMedianBaseCoverage;
-	}
-	public int getFivePrimeWindowIndex() {
-		return fivePrimeWindowIndex;
-	}
-	public void setFivePrimeWindowIndex(int fivePrimeWindowIndex) {
-		this.fivePrimeWindowIndex = fivePrimeWindowIndex;
-	}
-
-	public float[] getExonicBaseCoverage() {
-		return exonicBaseCoverage;
-	}
-
-	public void setExonicBaseCoverage(float[] exonicBaseCoverage) {
-		this.exonicBaseCoverage = exonicBaseCoverage;
-	}
-
-	public void setBaseCoverageNames(ArrayList<String>[] baseCoverageNames) {
-		this.baseCoverageNames = baseCoverageNames;
-		
-	}
-
 	public ArrayList<String>[] getBaseCoverageNames() {
 		return baseCoverageNames;
 	}
-
-	public void setExonicBaseCoverageNames(ArrayList<String>[] rcNamesExonic) {
-		this.exonicBaseCoverageNames = rcNamesExonic;	
+	public int getBackgroundStartIndex() {
+		return backgroundStartIndex;
+	}
+	public void setBackgroundStartIndex(int backgroundStartIndex) {
+		this.backgroundStartIndex = backgroundStartIndex;
+	}
+	public double getMedianBackground() {
+		return medianBackground;
+	}
+	public void setMedianBackground(double medianBackground) {
+		this.medianBackground = medianBackground;
+	}
+	public double getMedianWindow() {
+		return medianWindow;
+	}
+	public void setMedianWindow(double medianWindow) {
+		this.medianWindow = medianWindow;
+	}
+	public int getMedianWindowIndex() {
+		return medianWindowIndex;
+	}
+	public void setMedianWindowIndex(int medianWindowIndex) {
+		this.medianWindowIndex = medianWindowIndex;
 	}
 
-	public int getFivePrimeAlignmentFragmentCount() {
-		return fivePrimeAlignmentFragmentCount;
+	public int getCountBackground() {
+		return countBackground;
 	}
 
-	public int getThreePrimeAlignmentFragmentCount() {
-		return threePrimeAlignmentFragmentCount;
-	}
-	public float getpAdjSkewedReadCount() {
-		return pAdjSkewedReadCount;
-	}
-	public void setpAdjSkewedReadCount(float pAdjSkewedReadCount) {
-		this.pAdjSkewedReadCount = pAdjSkewedReadCount;
+	public int getCountWindow() {
+		return countWindow;
 	}
 
-	
-
-
-	
-	
+	public double getBackgroundCoeffVar() {
+		return backgroundCoeffVar;
+	}
 }

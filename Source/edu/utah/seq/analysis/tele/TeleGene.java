@@ -1,111 +1,113 @@
 package edu.utah.seq.analysis.tele;
 
-import java.util.ArrayList;
-
 import util.bio.parsers.UCSCGeneLine;
-import util.gen.Misc;
+import util.gen.Num;
 
 public class TeleGene {
 	
-	//fields
-	private String name;
-	private ArrayList<TeleTranscript> scoredTranscripts;
+	private UCSCGeneLine gene;
+	private TeleStats treatment;
+	private TeleStats control;
 	
-	//0 All Exon, 1 Splice Exon, 2 All Intron, 3 MisSpliced
-	private int[] masterTypesTreatment;
-	private int[] masterTypesControl;
-	
-	//chiSquareTest
+	//unspliced stats
 	private double transMisSplicePVal = 0;
 	private double misSpliceLog2Rto = 0;
 	
-	//constructor
-	public TeleGene( ArrayList<TeleTranscript> scoredTranscripts, int[] masterTypesTreatment, int[] masterTypesControl) {
-		this.scoredTranscripts = scoredTranscripts;
-		this.masterTypesTreatment = masterTypesTreatment;
-		this.masterTypesControl = masterTypesControl;
-		name = scoredTranscripts.get(0).getTranscript().getDisplayName();
+	//skew stats
+	private double pAdjSkewedReadCount;
+	
+	public TeleGene (UCSCGeneLine gene, TeleStats treatment, TeleStats control){
+		this.gene = gene;
+		this.treatment = treatment;
+		this.control = control;
 	}
 	
-	// methods
-	
-	/**GeneName tTypes cTypes transMisSplicePVal misSpliceLog2Rto*/
-	public String toStringTabLine(){
+	/**Bunch of info*/
+	public String toString(){
 		StringBuilder sb = new StringBuilder();
-		sb.append(fetchIGBExcelHyperLink()); sb.append("\t");
-		sb.append(Misc.intArrayToString(masterTypesTreatment, ",")); sb.append("\t");
-		sb.append(Misc.intArrayToString(masterTypesControl, ",")); sb.append("\t");
+		addIGBExcelHyperLink(sb); sb.append("\t");
+		addPNGExcelHyperLink(sb); sb.append("\t");
+		sb.append(gene.getTotalExonicBasePairs()); sb.append("\t");
+		sb.append(treatment.getNumberExonicAlignments()); sb.append("\t");
+		sb.append(treatment.getNumberUnsplicedAlignments()); sb.append("\t");
+		sb.append(control.getNumberExonicAlignments()); sb.append("\t");
+		sb.append(control.getNumberUnsplicedAlignments()); sb.append("\t");
+		
+		sb.append(misSpliceLog2Rto); sb.append("\t");
 		sb.append(transMisSplicePVal); sb.append("\t");
-		sb.append(misSpliceLog2Rto); 
+		sb.append(treatment.getMedianWindowIndex()); sb.append("\t");
+		
+		sb.append(treatment.getMedianWindow()); sb.append("\t");
+		sb.append(treatment.getMedianBackground()); sb.append("\t");
+		sb.append(treatment.getMedianSkewLog2Rto()); sb.append("\t");
+		sb.append(control.getMedianWindow()); sb.append("\t");
+		sb.append(control.getMedianBackground()); sb.append("\t");
+		sb.append(control.getMedianSkewLog2Rto()); sb.append("\t");
+		sb.append(getMedianSkewLog2Rto()); sb.append("\t");
+		
+		sb.append(treatment.getCountWindow()); sb.append("\t");
+		sb.append(treatment.getCountBackground()); sb.append("\t");
+		sb.append(treatment.getCountSkewLog2Rto()); sb.append("\t");
+		sb.append(treatment.getBackgroundCoeffVar()); sb.append("\t");
+		sb.append(control.getCountWindow()); sb.append("\t");
+		sb.append(control.getCountBackground()); sb.append("\t");
+		sb.append(control.getCountSkewLog2Rto()); sb.append("\t");
+		sb.append(control.getBackgroundCoeffVar()); sb.append("\t");
+		sb.append(getCountSkewLog2Rto()); sb.append("\t");
+		sb.append(pAdjSkewedReadCount);
 		return sb.toString();
 	}
 	
-	private String fetchIGBExcelHyperLink(){
-		//find min start and max end
-		int start = Integer.MAX_VALUE;
-		int end = -1;
-		for (TeleTranscript tt : scoredTranscripts){
-			if (start > tt.getTranscript().getTxStart()) start = tt.getTranscript().getTxStart();
-			if (end < tt.getTranscript().getTxEnd()) end = tt.getTranscript().getTxEnd();
-		}
-		StringBuilder text = new StringBuilder();
+	private void addPNGExcelHyperLink(StringBuilder sb){
+		sb.append("=HYPERLINK(\"Genes/");
+		sb.append(gene.getDisplayName());
+		sb.append("/");
+		sb.append(gene.getDisplayName());
+		sb.append("_Exonic.png\",\"");
+		sb.append(gene.getName());
+		sb.append("\")");
+	}
+	
+	private void addIGBExcelHyperLink(StringBuilder text){
+		int start = gene.getTxStart();
+		int end = gene.getTxEnd();
 		start = start - 10000;
 		if (start < 0) start = 0;
 		end = end + 10000;
-
 		text.append("=hyperlink(\"http://localhost:7085/UnibrowControl?seqid=");
-		text.append(scoredTranscripts.get(0).getTranscript().getChrom());
+		text.append(gene.getChrom());
 		text.append("&start=");
 		text.append(start);
 		text.append("&end=");
 		text.append(end);
 		text.append("\",\"");
-		text.append(scoredTranscripts.get(0).getTranscript().getDisplayName());
+		text.append(gene.getDisplayName());
 		text.append("\")");
-		return text.toString();
 	}
 
-	public String toString(){
-		StringBuilder sb = new StringBuilder();
-		sb.append(name); sb.append("\tGene name\n");
-		sb.append(scoredTranscripts.size()); sb.append("\tNumber scored transcripts\n");
-		sb.append(Misc.intArrayToString(masterTypesTreatment, "\t")); sb.append("\tTreatment type count (Exon, SplicedExon, Intron, MisSpliced)\n");
-		sb.append(Misc.intArrayToString(masterTypesControl, "\t")); sb.append("\tControl type count (Exon, SplicedExon, Intron, MisSpliced)\n");
-		sb.append(transMisSplicePVal); sb.append("\t-10Log10(bonn corr pval) chi-square test\n");
-		sb.append(misSpliceLog2Rto); sb.append("\tMis splice log2(((tMisSpliced+1)/(tMisSpliced+2+tSpliced)) / ((cMisSpliced+1)/(cMisSpliced+2+cSpliced)))");
-		return sb.toString();
+	public double getMedianSkewLog2Rto(){
+		return treatment.getMedianSkewLog2Rto() - control.getMedianSkewLog2Rto();
+	}
+	
+	public double getCountSkewLog2Rto(){
+		return treatment.getCountSkewLog2Rto() - control.getCountSkewLog2Rto();
+	}
+	
+	public UCSCGeneLine getGene() {
+		return gene;
 	}
 
-	public String getName() {
-		return name;
+	public TeleStats getTreatment() {
+		return treatment;
 	}
 
-	public void setName(String name) {
-		this.name = name;
+	public TeleStats getControl() {
+		return control;
 	}
 
-	public ArrayList<TeleTranscript> getScoredTranscripts() {
-		return scoredTranscripts;
-	}
-
-	public void setScoredTranscripts(ArrayList<TeleTranscript> scoredTranscripts) {
-		this.scoredTranscripts = scoredTranscripts;
-	}
-
-	public int[] getMasterTypesTreatment() {
-		return masterTypesTreatment;
-	}
-
-	public void setMasterTypesTreatment(int[] masterTypesTreatment) {
-		this.masterTypesTreatment = masterTypesTreatment;
-	}
-
-	public int[] getMasterTypesControl() {
-		return masterTypesControl;
-	}
-
-	public void setMasterTypesControl(int[] masterTypesControl) {
-		this.masterTypesControl = masterTypesControl;
+	public void setMisSpliceLog2Rto(double lrto) {
+		this.misSpliceLog2Rto = lrto;
+		
 	}
 
 	public double getTransMisSplicePVal() {
@@ -120,8 +122,14 @@ public class TeleGene {
 		return misSpliceLog2Rto;
 	}
 
-	public void setMisSpliceLog2Rto(double misSpliceLog2Rto) {
-		this.misSpliceLog2Rto = misSpliceLog2Rto;
+	public double getpAdjSkewedReadCount() {
+		return pAdjSkewedReadCount;
 	}
+
+	public void setpAdjSkewedReadCount(double pAdjSkewedReadCount) {
+		this.pAdjSkewedReadCount = pAdjSkewedReadCount;
+	}
+
+	
 	
 }
