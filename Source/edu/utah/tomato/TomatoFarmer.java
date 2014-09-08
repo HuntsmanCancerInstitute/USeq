@@ -517,13 +517,13 @@ public class TomatoFarmer {
 			String temp = null;
 			boolean editMade = false;
 			while ( (temp = br.readLine() ) != null ) {
-				//if (temp.startsWith("chr")) {
-				//	editMade = true;
-				//	String fixed = temp.substring(3);
-			//		bw.write(fixed + "\n");
-				//} else {
+				if (temp.startsWith("chr")) {
+					editMade = true;
+					String fixed = temp.substring(3);
+					bw.write(fixed + "\n");
+				} else {
 					bw.write(temp + "\n");
-				//}
+				}
 			}
 			
 			br.close();

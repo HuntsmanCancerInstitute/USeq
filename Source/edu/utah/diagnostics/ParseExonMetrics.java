@@ -412,7 +412,7 @@ public class ParseExonMetrics {
 			}
 			
 			sb.append("ggtitle(paste('" + outputFile.getName() + "','" + title + "',sep=': ')) + theme(plot.title=element_text(family=\"Times\",face=\"bold\",size=9))\n");
-			sb.append("ggsave(p,file='" + output.getPath() + "',width=6,height=4)\n");
+			sb.append("ggsave(p,file='" + output.getPath() + "',width=6,height=4,type='cairo')\n");
 	
 			//write script to file
 			IO.writeString(sb.toString(), scriptFile);

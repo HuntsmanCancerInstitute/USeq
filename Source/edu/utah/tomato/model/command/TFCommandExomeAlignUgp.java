@@ -129,12 +129,6 @@ public class TFCommandExomeAlignUgp extends TFCommand {
 		
 		
 		for (TFSampleInfo si: sampleList) {
-			//Make sure files are initialized
-			if (!si.getFileObject(TFConstants.FILE_FASTQ1).doesFinalExist() || !si.getFileObject(TFConstants.FILE_FASTQ2).doesFinalExist()) {
-				logFile.writeErrorMessage("[TFExomeAlignUgp] Your fastq files weren't found by TF",true);
-				System.exit(1);
-			}
-			
 			//Create working directory
 			File workingDir = new File(this.rootDirectory,"JOB_" + si.getSampleID() + "_align");
 			
@@ -155,6 +149,12 @@ public class TFCommandExomeAlignUgp extends TFCommand {
 					(tfoFinalBam.doesFinalExist() && tfoFinalBai.doesFinalExist()))) {
 				//OK
 			} else{
+				//Make sure files are initialized
+				if (!si.getFileObject(TFConstants.FILE_FASTQ1).doesFinalExist() || !si.getFileObject(TFConstants.FILE_FASTQ2).doesFinalExist()) {
+					logFile.writeErrorMessage("[TFExomeAlignUgp] Your fastq files weren't found by TF",true);
+					System.exit(1);
+				}
+				
 				if (!tfoBam.doesWorkingExist() || !tfoBai.doesWorkingExist() || !tfoLaneBam.doesWorkingExist() || !tfoLaneBai.doesWorkingExist()) {
 					samplesToRun.add(si); 
 				} else {
@@ -322,11 +322,6 @@ public class TFCommandExomeAlignUgp extends TFCommand {
 			}
 			
 			for (TFSampleInfo si: samples.get(sampleName)) {
-				if (!si.getFileObject(TFConstants.FILE_LANE_BAM).doesFinalExist() || !si.getFileObject(TFConstants.FILE_LANE_BAI).doesFinalExist()) {
-					logFile.writeErrorMessage("[TFExomeAlignUgp] Split sample bam files weren't found by TF", true);
-					System.exit(1);
-				}
-				
 				
 				
 				//Create output objects for each sample
@@ -345,6 +340,11 @@ public class TFCommandExomeAlignUgp extends TFCommand {
 				} else {
 					si.setFileObject(TFConstants.FILE_SAMPLE_BAM,tfoSampleBam);
 					si.setFileObject(TFConstants.FILE_SAMPLE_BAI,tfoSampleBai);
+					
+					if (!si.getFileObject(TFConstants.FILE_LANE_BAM).doesFinalExist() || !si.getFileObject(TFConstants.FILE_LANE_BAI).doesFinalExist()) {
+						logFile.writeErrorMessage("[TFExomeAlignUgp] Raw alignment files weren't found by TF.", true);
+						System.exit(1);
+					}
 					
 					if (skipFile) {
 						samplesToRename.add(sampleName);
@@ -536,10 +536,7 @@ public class TFCommandExomeAlignUgp extends TFCommand {
 			}
 			
 			for (TFSampleInfo si: samples.get(sampleName)) {
-				if (!si.getFileObject(TFConstants.FILE_SAMPLE_BAM).doesFinalExist() || !si.getFileObject(TFConstants.FILE_SAMPLE_BAI).doesFinalExist()) {
-					logFile.writeErrorMessage("[TFExomeAlignUgp] Merged sample files weren't found by TF", true);
-					System.exit(1);
-				}
+				
 				
 				
 				//Create output objects for each sample
@@ -550,6 +547,10 @@ public class TFCommandExomeAlignUgp extends TFCommand {
 				
 				//Check for the existance of output files
 				if (!tfoFinalBam.doesFinalExist() || !tfoFinalBai.doesFinalExist()) {
+					if (!si.getFileObject(TFConstants.FILE_SAMPLE_BAM).doesFinalExist() || !si.getFileObject(TFConstants.FILE_SAMPLE_BAI).doesFinalExist()) {
+						logFile.writeErrorMessage("[TFExomeAlignUgp] Merged sample files weren't found by TF", true);
+						System.exit(1);
+					}
 					if (skipFile) {
 						samplesToRename.add(sampleName);
 					} else if (!tfoFinalBam.doesWorkingExist() || !tfoFinalBai.doesWorkingExist()) {
@@ -715,10 +716,7 @@ public class TFCommandExomeAlignUgp extends TFCommand {
 			File workingDir = new File(this.rootDirectory,"JOB_" + sampleName + "_reduce");
 			
 			for (TFSampleInfo tfsi: samples.get(sampleName)) {
-				if (!tfsi.getFileObject(TFConstants.FILE_FINAL_BAM).doesFinalExist() || !tfsi.getFileObject(TFConstants.FILE_FINAL_BAI).doesFinalExist()) {
-					logFile.writeErrorMessage("[TFExomeAlignUgp] Final bam files weren't found by TF", true);
-					System.exit(1);
-				}
+				
 				
 				//Create output objects for each sample
 				TFFileObject tfoReduceBam = new TFFileObject(tfsi.getSampleName() + ".reduce.bam",this.finalDirectory,workingDir);
@@ -728,6 +726,11 @@ public class TFCommandExomeAlignUgp extends TFCommand {
 				
 				//Check for existance of output files
 				if (!tfoReduceBam.doesFinalExist() || !tfoReduceBai.doesFinalExist()) {
+					if (!tfsi.getFileObject(TFConstants.FILE_FINAL_BAM).doesFinalExist() || !tfsi.getFileObject(TFConstants.FILE_FINAL_BAI).doesFinalExist()) {
+						logFile.writeErrorMessage("[TFExomeAlignUgp] Final bam files weren't found by TF", true);
+						System.exit(1);
+					}
+					
 					if (!tfoReduceBam.doesWorkingExist() || !tfoReduceBai.doesWorkingExist()) {
 						samplesToRun.add(sampleName);
 					} else {

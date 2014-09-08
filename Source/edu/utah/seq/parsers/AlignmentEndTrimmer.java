@@ -20,13 +20,14 @@ import java.util.zip.GZIPInputStream;
 import htsjdk.samtools.BAMIndexer;
 import htsjdk.samtools.CigarOperator;
 import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.SAMFileWriter;
 import htsjdk.samtools.SAMFileWriterFactory;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.Cigar;
 import htsjdk.samtools.CigarElement;
-
 import util.gen.Misc;
 
 
@@ -152,13 +153,15 @@ public class AlignmentEndTrimmer {
 	public void processData() {
 		
 			//Set up file reader
-			SAMFileReader sfr = new SAMFileReader(this.inputFile);
-			sfr.setValidationStringency(ValidationStringency.LENIENT);
+		    SamReader sfr = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.LENIENT).open(this.inputFile);
+		    
 			
 			//Set up file writer
-			SAMFileWriterFactory sfrf = new SAMFileWriterFactory();
-			sfrf.setCreateIndex(true);
-			SAMFileWriter sfw = sfrf.makeBAMWriter(sfr.getFileHeader(), false, this.outputFile);
+		    SAMFileWriterFactory sfwf = new SAMFileWriterFactory();
+		    sfwf.setCreateIndex(true);
+		    SAMFileWriter sfw = sfwf.makeSAMOrBAMWriter(sfr.getFileHeader(), false, this.outputFile);
+		    
+		    
 			
 			
 			//counters
@@ -172,15 +175,18 @@ public class AlignmentEndTrimmer {
 			HashSet<String> notFound = new HashSet<String>();
 			HashMap<String, SAMRecord> mateList = new HashMap<String,SAMRecord>();
 			HashSet<String> removedList = new HashSet<String>();
-			HashSet<String> editedList = new HashSet<String>();
+			HashMap<String,SAMRecord> editedList = new HashMap<String,SAMRecord>();
 			
 			for (SAMRecord sr: sfr) {
 				//Messaging
 				if (totalReads % 1000000 == 0 && totalReads != 0) {
 					System.out.println(String.format("Finished processing %d reads. %d were trimmed, %d were set as unmapped. Currently storing mates for %d reads.",totalReads,trimmedReads,droppedReads,mateList.size()));
+					
 				}
 				totalReads += 1;
 				
+				String keyToCheck = sr.getReadName() + ":" + String.valueOf(sr.getIntegerAttribute("HI"));
+			
 				//Make sure chromsome is available
 				String chrom  = sr.getReferenceName();
 				if (!this.refHash.containsKey(chrom)) {
@@ -213,22 +219,31 @@ public class AlignmentEndTrimmer {
 					int idx = this.identifyTrimPoint(alns,sr.getReadNegativeStrandFlag());
 					
 					//Check error rate
-					boolean mmPassed = true;
+					boolean mmPassed = false;
 					if (mmMode) {
 						mmPassed = this.isPoorQuality(alns, sr.getReadNegativeStrandFlag(), idx);
 					}
 					
 					
+					
 					//Create new cigar string
 					if (idx < minLength || mmPassed) {
+						
+						
 						sr.setAlignmentStart(0);
 						sr.setReadUnmappedFlag(true);
 						sr.setProperPairFlag(false);
+						sr.setReferenceIndex(-1);
+						sr.setMappingQuality(0);
+						sr.setNotPrimaryAlignmentFlag(false);
+						
+						
+						
 						if (sr.getReadPairedFlag() && !sr.getMateUnmappedFlag()) {
-							if (mateList.containsKey(sr.getReadName())) {
-								mateList.put(sr.getReadName(), this.changeMateUnmapped(mateList.get(sr.getReadName())));
+							if (mateList.containsKey(keyToCheck)) {
+								mateList.put(keyToCheck, this.changeMateUnmapped(mateList.get(keyToCheck)));
 							} else {
-								removedList.add(sr.getReadName());
+								removedList.add(keyToCheck);
 							}
 						} 
 						droppedReads += 1;
@@ -254,10 +269,10 @@ public class AlignmentEndTrimmer {
 						}
 						
 						if (sr.getReadPairedFlag() && !sr.getMateUnmappedFlag()) {
-							if (mateList.containsKey(sr.getReadName())) {
-								mateList.put(sr.getReadName(), this.changeMatePos(mateList.get(sr.getReadName())));
+							if (mateList.containsKey(keyToCheck)) {
+								mateList.put(keyToCheck, this.changeMatePos(mateList.get(keyToCheck),sr.getAlignmentStart()));
 							} else {
-								editedList.add(sr.getReadName());
+								editedList.put(keyToCheck,sr);
 							}
 						}
 					}
@@ -265,23 +280,26 @@ public class AlignmentEndTrimmer {
 				
 				//System.out.println(sr.getReadName());
 				if (sr.getReadPairedFlag() && !sr.getMateUnmappedFlag()) {
-					String rn = sr.getReadName();
-					if (mateList.containsKey(rn)) {
-						if (editedList.contains(rn)) {
-							sr = this.changeMatePos(sr);
-							editedList.remove(rn);
-						} else if (removedList.contains(rn)) {
+					//String rn = sr.getReadName();
+					if (mateList.containsKey(keyToCheck)) {
+						if (editedList.containsKey(keyToCheck)) {
+							sr = this.changeMatePos(sr,editedList.get(keyToCheck).getAlignmentStart());
+							editedList.remove(keyToCheck);
+						} else if (removedList.contains(keyToCheck)) {
 							sr = this.changeMateUnmapped(sr);
-							removedList.remove(rn);
+							removedList.remove(keyToCheck);
 						}
 						sfw.addAlignment(sr);
-						sfw.addAlignment(mateList.get(rn));
-						mateList.remove(rn);
+						sfw.addAlignment(mateList.get(keyToCheck));
+						mateList.remove(keyToCheck);
 					} else {
-						mateList.put(rn, sr);
+						mateList.put(keyToCheck, sr);
 					}
 				} else {
 					sfw.addAlignment(sr);
+					if (mateList.containsKey(keyToCheck)) {
+						mateList.remove(keyToCheck);
+					}
 				}
 			}
 			
@@ -294,18 +312,25 @@ public class AlignmentEndTrimmer {
 			}
 			
 			sfw.close();
-			sfr.close();		
+			try {
+				sfr.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}		
 	}
 	
 	public SAMRecord changeMateUnmapped(SAMRecord sr) {
 		sr.setMateAlignmentStart(0);
 		sr.setMateUnmappedFlag(true);
 		sr.setProperPairFlag(false);
+		sr.setMateReferenceIndex(-1);
+
 		return sr;	
 	}
 	
-	public SAMRecord changeMatePos(SAMRecord sr) {
-		sr.setMateAlignmentStart(0);
+	public SAMRecord changeMatePos(SAMRecord sr, int pos) {
+		//sr.setMateAlignmentStart(pos);
 		return sr;
 	}
 	
@@ -406,10 +431,10 @@ public class AlignmentEndTrimmer {
 		char[] aln1 = alignments[0].toCharArray();
 		char[] aln2 = alignments[1].toCharArray();
 		
-//		//Soft trims at the beginning aren't included at the beginning of the alignment string, so add them back.
-//		if (cigar.get(0).getOperator() == CigarOperator.S) {
-//			ce.add(cigar.get(0));
-//		}
+		//Hard trims at the beginning aren't included at the beginning of the alignment string, so add them back.
+		if (cigar.get(0).getOperator() == CigarOperator.H) {
+			ce.add(cigar.get(0));
+		}
 		
 		int cigLen = 0;
 		
@@ -453,10 +478,10 @@ public class AlignmentEndTrimmer {
 		
 		ce.add(new CigarElement(cigLen,cigOp));
 		
-//		//Soft trims at the end are included so add them back. 
-//		if (cigar.get(cigar.size()-1).getOperator() == CigarOperator.S) {
-//			ce.add(cigar.get(cigar.size()-1));
-//		}
+		//Hard trims at the end are included so add them back. 
+		if (cigar.get(cigar.size()-1).getOperator() == CigarOperator.H) {
+			ce.add(cigar.get(cigar.size()-1));
+		}
 		
 		
 		if (isReverse) {
@@ -587,6 +612,8 @@ public class AlignmentEndTrimmer {
 						aln2.append(this.createString('-', cel));
 						pos1 += cel;
 					}
+					break;
+				case H:
 					break;
 				default:
 					System.out.println(String.format("Don't know how to handle this CIGAR tag: %s. Record %d",ce.getOperator().toString(),totalReads));
