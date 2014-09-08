@@ -1013,7 +1013,7 @@ public class TFCommandExomeVariant extends TFCommand {
 //			System.exit(1);
 //		}
 		
-		return 80000000;
+		return 50000000;
 	}
 	
 	private void splitByChrom(String chrom, File source, File dest) {

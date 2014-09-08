@@ -72,8 +72,17 @@ public class ExportExons {
 						start = start - adder;
 						if (start < 0) start =0;
 						end = end + adder;
+						
+						//Determine exon number
+						int exon = -1;
+						if (lines[i].getStrand().equals("-")) {
+							exon = exons.length - j;
+						} else if (lines[i].getStrand().equals("+")) {
+							exon = j + 1;
+						}
+						
 						//chr start stop name score strand
-						String nameScoreStrand = nameStringCommand.createNameString(name, strand, j+1);
+						String nameScoreStrand = nameStringCommand.createNameString(name, strand, exon);
 						out.println(chr+"\t"+start+"\t"+end + nameScoreStrand);
 					}
 				}
@@ -89,7 +98,16 @@ public class ExportExons {
 					for (int j=0; j< exons.length; j++){
 						int start = exons[j].getStart()-adder;
 						if (start < 0) start =0;
-						String nameScoreStrand = nameStringCommand.createNameString(name, strand, j+1);
+						
+						//Determine exon number
+						int exon = -1;
+						if (lines[i].getStrand().equals("-")) {
+							exon = exons.length - j;
+						} else if (lines[i].getStrand().equals("+")) {
+							exon = j + 1;
+						}
+						
+						String nameScoreStrand = nameStringCommand.createNameString(name, strand, exon);
 						out.println(chr+"\t"+start+"\t"+(exons[j].getEnd()+adder) + nameScoreStrand);
 					}
 				}

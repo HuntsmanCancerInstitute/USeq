@@ -56,6 +56,13 @@ public class SamTranscriptomeParser{
 	private double numberMergedPairs = 0;
 	private double numberFailedMergedPairs = 0;
 	private int maximumMappingQuality = 0;
+	
+	private HashMap<String,String> chromDict = new HashMap<String,String>();
+	private Pattern splicePattern = Pattern.compile("^@SQ\\s+SN:\\S+:\\S+:\\S+\\s+AS:\\S+\\s+LN:\\d+$");
+	private Pattern chromPattern = Pattern.compile("^@SQ\\s+SN:(\\S+)\\s+AS:\\S+\\s+LN:\\d+$");
+	
+	private ArrayList<String> programLines = new ArrayList<String>();
+	private ArrayList<String> readGroupLines = new ArrayList<String>();
 
 	//constructors
 	public SamTranscriptomeParser(String[] args){
@@ -177,8 +184,20 @@ public class SamTranscriptomeParser{
 
 				//header line?
 				if (line.startsWith("@")){
-					//parse genome version?
+					if (line.startsWith("@SQ")) {
+						Matcher spliceMatcher = splicePattern.matcher(line);
+						Matcher chromMatcher = chromPattern.matcher(line);
+						if (!spliceMatcher.matches() && chromMatcher.matches()) {
+							this.chromDict.put(chromMatcher.group(1), chromMatcher.group(0));
+						}
+					} else if (line.startsWith("@PG")) {
+						this.programLines.add(line);
+					} else if (line.startsWith("@RG")) {
+						this.readGroupLines.add(line);
+					}
+					
 					if (genomeVersion == null) {
+						//parse genome version?
 						String[] tokens = TAB.split(line);
 						for (String t : tokens){
 							if (t.startsWith("AS:")) {
@@ -575,18 +594,37 @@ public class SamTranscriptomeParser{
 		ArrayList<String> al = new ArrayList<String>();
 		//add unsorted
 		al.add("@HD\tVN:1.0\tSO:unsorted");
+		
 		//add program
 		al.add("@PG\tID:SamTranscriptomeParser\tCL: args "+programArguments);
+		if (this.programLines.size() > 0) {
+			for (String pline: this.programLines) {
+				al.add(pline);
+			}
+		}
+		
 		//add readgroup
-		al.add("@RG\tID:unknownReadGroup\tSM:unknownSample");
+		if (this.readGroupLines.size() > 0) {
+			for (String rgline: this.readGroupLines) {
+				al.add(rgline);
+			}
+		} else {
+			al.add("@RG\tID:unknownReadGroup\tSM:unknownSample");
+		}
+		
 		//as sq lines for each chromosome @SQ	SN:chr10	AS:mm9	LN:129993255
 		String gv = "";
 		if (genomeVersion != null) gv = "\tAS:" +genomeVersion;
 		//remove = chromosomes
 		chromLength.remove("=");
 		for (String chromosome: chromLength.keySet()){
-			int length = chromLength.get(chromosome);
-			al.add("@SQ\tSN:"+chromosome+ gv+ "\tLN:"+length);
+			if (this.chromDict.containsKey(chromosome)) {
+				al.add(this.chromDict.get(chromosome));
+			} else {
+				System.out.println(String.format("Expected chromosome: %s was not found in the header, guessing length using sam body"));
+				int length = chromLength.get(chromosome);
+				al.add("@SQ\tSN:"+chromosome+ gv+ "\tLN:"+length);
+			}
 		}
 		return al;
 	}

@@ -310,8 +310,7 @@ public class TFCommandExomeAlignHci extends TFCommand {
 			}
 			
 			for (TFSampleInfo si: samples.get(sampleName)) {
-				if (!si.getFileObject(TFConstants.FILE_ID_FINAL_BAM).doesFinalExist() || !si.getFileObject(TFConstants.FILE_ID_FINAL_BAI).doesFinalExist() || 
-						!si.getFileObject(TFConstants.FILE_ID_REDUCE_BAM).doesFinalExist() || !si.getFileObject(TFConstants.FILE_ID_REDUCE_BAI).doesFinalExist()) {
+				if (!si.getFileObject(TFConstants.FILE_ID_FINAL_BAM).doesFinalExist() || !si.getFileObject(TFConstants.FILE_ID_FINAL_BAI).doesFinalExist()) {
 					logFile.writeErrorMessage("[TFExomeAlignHci] Final/Reduced bam/bai files cannot be found, exiting", true);
 					System.exit(1);
 				}
@@ -531,72 +530,91 @@ public class TFCommandExomeAlignHci extends TFCommand {
 		 ************************************************************************/
 		
 		if (samplesToRun.size() > 0) {
-			this.daemon = new TFThreadDaemon(this.logFile,this.templateFiles.get(templateIdx).getName(),samplesToRun.size(),this.jobs);
-			this.daemon.start();
-			int counter = 1;
+//			this.daemon = new TFThreadDaemon(this.logFile,this.templateFiles.get(templateIdx).getName(),samplesToRun.size(),this.jobs);
+//			this.daemon.start();
+//			int counter = 1;
+//			
+//			for(String sampleName: samples.keySet()) {
+//				//Get representative sample
+//				TFSampleInfo siRep = samples.get(sampleName).get(0);
+//				
+//				//Create input/output objecst
+//				TFFileObject tfoReduceBam = siRep.getFileObject(TFConstants.FILE_REDUCE_BAM);
+//				TFFileObject tfoFinalBam = siRep.getFileObject(TFConstants.FILE_FINAL_BAM);
+//				TFFileObject tfoFinalBai = siRep.getFileObject(TFConstants.FILE_FINAL_BAI);
+//				
+//				//Create job directory
+//				File runDirectory = tfoReduceBam.getWorkingDirectory();
+//				if (runDirectory.exists()) {
+//					this.deleteFolder(runDirectory);
+//				}
+//				runDirectory.mkdir();
+//				samplesToPostProcess.add(sampleName);
+//				
+//				//Create files
+//				File fileFinalBam = tfoFinalBam.createDestForFileObject(runDirectory);
+//				File fileFinalBai = tfoFinalBai.createDestForFileObject(runDirectory);
+//				
+//				//Create links
+//				this.createLink(tfoFinalBam.getFinalPath(),fileFinalBam);
+//				this.createLink(tfoFinalBai.getFinalPath(),fileFinalBai);
+//				
+//				//Create run-specific protection
+//				ArrayList<File> protectList = new ArrayList<File>();
+//				
+//				//create properties list
+//				HashMap<String,String> replacements = new HashMap<String,String>();
+//				replacements.put("NAME", sampleName);
+//				replacements.putAll(this.properties);
+//				
+//				//create files
+//				File cmdFile = new File(runDirectory,"cmd.txt");
+//				this.createCmd(replacements,cmdFile,templateIdx);
+//				
+//				deleteList.add(fileFinalBam);
+//				deleteList.add(fileFinalBai);
+//				protectList.add(fileFinalBam);
+//				protectList.add(fileFinalBai);
+//				protectList.add(cmdFile);
+//				
+//				//Run job
+//				TFThread thread = new TFThread(runDirectory,this.failmax, counter, this.heartbeat, protectList, this.logFile);
+//				this.daemon.addJob(thread);
+//				counter ++;		
+//			}
+//				
+//			//Wait for command to finish
+//			try {
+//				this.daemon.join();
+//				Thread.sleep(5000);
+//				if (this.daemon.getFailed()) {
+//					System.exit(1);
+//				}
+//			} catch (InterruptedException ie) {
+//				logFile.writeErrorMessage("[TFExomeAlignUgp] Daemon interrupted",true);
+//				System.exit(1);
+//			}
 			
 			for(String sampleName: samples.keySet()) {
 				//Get representative sample
 				TFSampleInfo siRep = samples.get(sampleName).get(0);
 				
 				//Create input/output objecst
-				TFFileObject tfoReduceBam = siRep.getFileObject(TFConstants.FILE_REDUCE_BAM);
 				TFFileObject tfoFinalBam = siRep.getFileObject(TFConstants.FILE_FINAL_BAM);
 				TFFileObject tfoFinalBai = siRep.getFileObject(TFConstants.FILE_FINAL_BAI);
+				TFFileObject tfoReduceBam = siRep.getFileObject(TFConstants.FILE_REDUCE_BAM);
+				TFFileObject tfoReduceBai = siRep.getFileObject(TFConstants.FILE_REDUCE_BAI);
 				
-				//Create job directory
 				File runDirectory = tfoReduceBam.getWorkingDirectory();
 				if (runDirectory.exists()) {
 					this.deleteFolder(runDirectory);
 				}
 				runDirectory.mkdir();
 				samplesToPostProcess.add(sampleName);
-				
-				//Create files
-				File fileFinalBam = tfoFinalBam.createDestForFileObject(runDirectory);
-				File fileFinalBai = tfoFinalBai.createDestForFileObject(runDirectory);
-				
-				//Create links
-				this.createLink(tfoFinalBam.getFinalPath(),fileFinalBam);
-				this.createLink(tfoFinalBai.getFinalPath(),fileFinalBai);
-				
-				//Create run-specific protection
-				ArrayList<File> protectList = new ArrayList<File>();
-				
-				//create properties list
-				HashMap<String,String> replacements = new HashMap<String,String>();
-				replacements.put("NAME", sampleName);
-				replacements.putAll(this.properties);
-				
-				//create files
-				File cmdFile = new File(runDirectory,"cmd.txt");
-				this.createCmd(replacements,cmdFile,templateIdx);
-				
-				deleteList.add(fileFinalBam);
-				deleteList.add(fileFinalBai);
-				protectList.add(fileFinalBam);
-				protectList.add(fileFinalBai);
-				protectList.add(cmdFile);
-				
-				//Run job
-				TFThread thread = new TFThread(runDirectory,this.failmax, counter, this.heartbeat, protectList, this.logFile);
-				this.daemon.addJob(thread);
-				counter ++;		
-			}
-				
-			//Wait for command to finish
-			try {
-				this.daemon.join();
-				Thread.sleep(5000);
-				if (this.daemon.getFailed()) {
-					System.exit(1);
-				}
-			} catch (InterruptedException ie) {
-				logFile.writeErrorMessage("[TFExomeAlignUgp] Daemon interrupted",true);
-				System.exit(1);
-			}
 			
-			
+				this.cpFile(tfoFinalBam.getFinalPath(), tfoReduceBam.getWorkingPath());
+				this.cpFile(tfoFinalBai.getFinalPath(), tfoReduceBai.getWorkingPath());
+			}
 		}
 		
 		/**************************************************************************
