@@ -470,7 +470,8 @@ public class Num {
 			//execute
 			IO.executeCommandLine(command);
 			//load results
-			double[] values = Num.loadDoubles(results, 3234.0);
+			double[] values = Num.loadDoublesNoNegs(results, 3234.0);
+			
 			//check
 			if (values == null || values.length != data.length) throw new Exception ("Number of results from R does not match the number of trials.");
 			//clean up
@@ -2743,6 +2744,33 @@ public class Num {
 		}
 		return values;
 	}
+	
+	/**Loads a column of double from a file into an array.
+	 * Returns null if nothing found.
+	 * Skips blank lines. Will substitute defaultValue if value = "Inf"
+	 * Any string with a '-' sign is assigned zero*/
+	public static double[] loadDoublesNoNegs(File f, Double defaultValue){
+		BufferedReader in ;
+		double[] values = null;
+		Double zero = new Double(0);
+		try{
+			in = new BufferedReader (new FileReader(f));
+			ArrayList<Double> al = new ArrayList<Double>();
+			String line;
+			while((line= in.readLine()) != null){
+				line = line.trim();
+				if (line.length() == 0) continue;
+				if (line.equals("Inf")) al.add(defaultValue);
+				else if (line.contains("-")) al.add(zero);
+				else al.add(Double.valueOf(line));
+			}
+			values = Num.arrayListToDoubles(al);
+			in.close();
+		} catch (Exception e){
+			e.printStackTrace();
+		}
+		return values;
+	}
 
 	/**Loads a column of float from a file into an array.
 	 * Returns null if nothing found.
@@ -3667,7 +3695,7 @@ public class Num {
 		return means;
 	}
 
-	/** Slides a window along an array, one index at a time, averaging the contents, ignores zero values. */
+	/** Slides a window along an array, one index at a time, averaging the contents, ignores zero values, returns NaN's for zero count windows. */
 	public static double[] windowAverageScoresIgnoreZeros(double[] scores, int windowSize) {
 		double window = windowSize;
 		int num = 1+ scores.length - windowSize;
@@ -3681,12 +3709,18 @@ public class Num {
 			for (int j=i; j< stop; j++){
 				if (scores[j] !=0){
 					total += scores[j];
-					count ++;
+					count++;
 				}
 			}
 			means[i] = total/count;
 		}
 		return means;
+	}
+	
+	public static double[] removeNaNAndInfinite(double[] d){
+		ArrayList<Double> al = new ArrayList<Double>(d.length);
+		for (int i=0; i< d.length; i++) if (Double.isNaN(d[i]) == false && Double.isInfinite(d[i]) == false) al.add(new Double(d[i]));
+		return Num.arrayListOfDoubleToArray(al);
 	}
 
 	/** Slides a window along an array, one index at a time, averaging the contents, ignores zero values. */
@@ -3749,6 +3783,21 @@ public class Num {
 			System.arraycopy(scores, i, slice, 0, windowSize);
 			Arrays.sort(slice);
 			medians[i] = (float)Num.median(slice);
+		}
+		return medians;
+	}
+	
+	/** Slides a window along an array, one index at a time, calculating the median contents. */
+	public static double[] windowMedianScores(int[] scores, int windowSize) {
+		int num = 1+ scores.length - windowSize;
+		if (num < 1) return null;
+		double[] medians = new double[num];
+		int[] slice;
+		for (int i=0; i<num; i++){
+			slice = new int[windowSize];
+			System.arraycopy(scores, i, slice, 0, windowSize);
+			Arrays.sort(slice);
+			medians[i] = Num.median(slice);
 		}
 		return medians;
 	}
@@ -4457,11 +4506,18 @@ public class Num {
 		return floats;
 	}
 
-	/**Converts a double[] to int[] using Math.round()*/
+	/**Converts a int[] to float[]*/
 	public static float[] intArrayToFloat(int[] ints){
 		float[] floats = new float[ints.length];
 		for (int i=0; i< ints.length; i++) floats[i] = ints[i];
 		return floats;
+	}
+	
+	/**Converts a int[] to double[]*/
+	public static double[] intArrayToDouble(int[] ints){
+		double[] d = new double[ints.length];
+		for (int i=0; i< ints.length; i++) d[i] = ints[i];
+		return d;
 	}
 
 	/**Converts an array of double to a String with a defined number of decimal places and a delimiter.  */
@@ -4875,7 +4931,13 @@ public class Num {
 
 		return new double[][]{tA, tB};
 	}
-
+	public static float maxValue(float[] ds) {
+		float max = ds[0];
+		for (int i=1; i< ds.length; i++){
+			if (max < ds[i]) max = ds[i];
+		}
+		return max;
+	}
 	public static double maxValue(double[] ds) {
 		double max = ds[0];
 		for (int i=1; i< ds.length; i++){
@@ -4889,5 +4951,19 @@ public class Num {
 			if (max < ds[i]) max = ds[i];
 		}
 		return max;
+	}
+
+	/**Skips zero values when calculating average.*/
+	public static double averageIntArrayIgnoreZeros(int[] toScan) {
+		double total = 0;
+		double numCounted = 0;
+		for (int i=0; i< toScan.length; i++){
+			if (toScan[i] != 0) {
+				total+= (double)toScan[i];
+				numCounted++;
+			}
+			
+		}
+		return total/numCounted;
 	}
 }

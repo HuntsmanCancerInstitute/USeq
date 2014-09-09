@@ -30,6 +30,33 @@ public class Misc {
 	      Runtime.getRuntime().freeMemory();
 	}
 	
+	/**Finds Strings common to all, any zero sized or null members will cause a return of a zero sized AL.*/
+	public static ArrayList<String> commonToAll (ArrayList<String>[] als){
+		//find smallest and copy it
+		ArrayList<String> common = new ArrayList<String>();
+		if (als[0] == null) return common;
+		int smallestIndex = 0;
+		int smallestNum = als[0].size();
+		for (int i=1; i< als.length; i++){
+			if (als[i] == null) return common;
+			int size = als[i].size();
+			if (size < smallestNum){
+				smallestNum = size;
+				smallestIndex = i;
+			}
+		}
+		//any zeros?
+		if (smallestNum == 0) return common;
+		
+		//copy
+		common.addAll(als[smallestIndex]);
+		
+		for (int i=0; i< als.length; i++){
+			if (i != smallestIndex)  common.retainAll(als[i]);
+		}
+		return common;
+	}
+	
 	/**Flips key:value to value:key.*/
 	public static HashMap invert(HashMap h){
 		HashMap inverted = new HashMap (h.size());
@@ -494,7 +521,8 @@ public class Misc {
 			return;
 		}
 		int len = array.length;
-		for (int i=0; i<len; i++) System.out.println(array[i]);
+		for (int i=0; i<len; i++) System.out.print(array[i]+"\t");
+		System.out.println();
 	}
 	
 	/**Prints a short[] to System.out on one line*/
