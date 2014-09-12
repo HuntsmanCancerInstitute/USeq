@@ -621,7 +621,7 @@ public class SamTranscriptomeParser{
 			if (this.chromDict.containsKey(chromosome)) {
 				al.add(this.chromDict.get(chromosome));
 			} else {
-				System.out.println(String.format("Expected chromosome: %s was not found in the header, guessing length using sam body"));
+				System.out.println(String.format("Expected chromosome: %s was not found in the header, guessing length using sam body",chromosome));
 				int length = chromLength.get(chromosome);
 				al.add("@SQ\tSN:"+chromosome+ gv+ "\tLN:"+length);
 			}
