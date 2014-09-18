@@ -3,6 +3,7 @@ package edu.utah.seq.analysis.tele;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
+
 import htsjdk.samtools.*;
 import util.bio.annotation.ExonIntron;
 import util.bio.parsers.UCSCGeneLine;
@@ -106,6 +107,9 @@ public class Telescriptor {
 		System.out.println("\nSorting and writing mis-spliced sam alignments to file...");
 		new PicardSortSam(treatmentMisSplicedSamOut.getGzipFile());
 		new PicardSortSam(controlMisSplicedSamOut.getGzipFile());
+		
+		//write out skipped genes
+		IO.writeArrayList(skippedGenes, new File (resultsDirectory, "skippedGenes.txt"));
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
@@ -142,6 +146,10 @@ public class Telescriptor {
 			System.out.println("\tRunning read count skew chiSquare test...");
 			calcDiffSkewSplicePVal();
 			
+			//run chisquare test on 3'UTR diff for t and c
+			System.out.println("\tRunning read count 3'UTR chiSquare test...");
+			calcDiffUTRPVal();
+			
 	} 
 
 	
@@ -151,6 +159,7 @@ public class Telescriptor {
 			PrintWriter spreadSheetOut = new PrintWriter( new FileWriter( new File (resultsDirectory, "teleStatsSummary.xls")));
 			spreadSheetOut.println("GeneName\tAltName: Description\tcDNA Length\t"
 					+ "# A align\t# A Unspliced\t# B align\t# B Unspliced\tlog2RtoMisSplice\tpAdjMisSplice\t"
+					+ "# A 3'UTR\t# B 3'UTR\tlog2Rto((AUtrFPKM/NonUtrFPKM)/ (BUtrFPKM/NonUtrFPKM))\tpAdj UTR\t"
 					+ "5' Index\tA 5' Median\t"
 					+ "A 3' Median\tA Median Log2Rto\tB 5' Median\tB 3' Median\tB Median Log2Rto"
 					+ "\tMedian Log2 (aSkew/ bSkew)\tA 5' Count\tA 3' Count\tA Count Log2Rto\tA Bkgrnd Coeff Var\tB 5' Count"
@@ -178,9 +187,9 @@ public class Telescriptor {
 			TeleStats tts = tg.getTreatment();
 			TeleStats cts = tg.getControl();
 			int numMisT = tts.getNumberUnsplicedAlignments();
-			int numNonMisT = tts.getNumberExonicAlignments() - numMisT;
+			int numNonMisT = Math.abs(tts.getNumberExonicAlignments() - numMisT);
 			int numMisC = cts.getNumberUnsplicedAlignments();
-			int numNonMisC = cts.getNumberExonicAlignments() - numMisC;
+			int numNonMisC = Math.abs(cts.getNumberExonicAlignments() - numMisC);
 			
 			treatment[i] = new int[]{numMisT, numNonMisT};
 			control[i] = new int[]{numMisC, numNonMisC};
@@ -205,6 +214,48 @@ public class Telescriptor {
 			if (pAdj > 0) scoredGenes.get(i).setTransMisSplicePVal(pAdj);
 		}
 	} 
+	
+	private void calcDiffUTRPVal(){
+		//collect counts
+		int numGenes = scoredGenes.size();
+		int[][] treatment = new int[numGenes][2];
+		int[][] control = new int[numGenes][2];
+		
+		for (int i=0; i< numGenes; i++){
+			TeleGene tg = scoredGenes.get(i);
+			TeleStats tts = tg.getTreatment();
+			TeleStats cts = tg.getControl();
+			int numUtrT = tts.getNumber3UTRAlignments();
+			int numNonUtrT = Math.abs(tts.getNumberExonicAlignments()-numUtrT);
+			int numUtrC = cts.getNumber3UTRAlignments();
+			int numNonUtrC = Math.abs(cts.getNumberExonicAlignments()-numUtrT);
+			
+			treatment[i] = new int[]{numUtrT, numNonUtrT};
+			control[i] = new int[]{numUtrC, numNonUtrC};
+
+			//calc log2Rto
+			//double t = (double)(numUtrT+1)/(double)(tts.getNumberExonicAlignments()+1);
+			double t = tts.getUtrFpkm() / tts.getNonUtrFpkm();
+			double c = cts.getUtrFpkm() / cts.getNonUtrFpkm();
+			//double c = (double)(numUtrC+1)/(double)(cts.getNumberExonicAlignments()+1);
+			double lrto = Num.log2( t / c );
+			tg.setUtrLog2Rto(lrto);
+		}
+
+		//estimate chi-square pvalues using R for resolution of extreemly small p-values, radiculously slow
+		double[] pVals = Num.chiSquareIndependenceTest(treatment, control, resultsDirectory, fullPathToR, true);
+
+		//bonferroni correction
+		double bc = Num.minus10log10(numGenes);
+
+		//add back
+		for (int i=0; i< numGenes; i++){
+			//set corrected p-value 
+			double pAdj = pVals[i] + bc;
+			if (pAdj > 0) scoredGenes.get(i).setpAdjUTR(pAdj);
+		}
+	} 
+
 
 	
 	private void calcDiffSkewSplicePVal(){
@@ -496,10 +547,24 @@ public class Telescriptor {
 		int[] baseCoverage = new int[cDNALength];
 		ArrayList<String>[] baseCoverageNames = new ArrayList[cDNALength];
 		
+		//3'UTRs
+		int utrStart = 0; 
+		int utrEnd = 0;
+		int lengthUtr = 0;
+		int lengthNonUtr = 0;
+		if (gene.isPlusStrand()){
+			utrStart = gene.getCdsEnd() - firstGeneBase;
+			utrEnd = gene.getTxEnd() - firstGeneBase;
+		}
+		else utrEnd = gene.getCdsStart()- firstGeneBase;	
+		
+		HashSet<String> unique3UTRNames = new HashSet<String>();
+		
 		int indexLast = exons.length-1;
 		int index = 0;
 		boolean examineStart;
 		boolean examineEnd;	
+		
 		//for each exon
 		for (int i=0; i< exons.length; i++){
 			int start = exons[i].getStart() - firstGeneBase;
@@ -511,9 +576,18 @@ public class Telescriptor {
 					uniqueNames.addAll(readCoverage[j]);
 					baseCoverage[index] = readCoverage[j].size();
 					baseCoverageNames[index] = readCoverage[j];
+					//check if in utr
+					if (j >= utrStart && j < utrEnd) {
+						unique3UTRNames.addAll(readCoverage[j]);
+						lengthUtr++;
+					}
+					else lengthNonUtr++;
 				} 
 				index++;
 			}
+			
+			//skip exons with less than 6 bp for diff splice
+			if (exons[i].getLength() < 6) continue;
 			
 			//scan for unspliced
 			examineStart = true;
@@ -546,8 +620,8 @@ public class Telescriptor {
 			Num.invertArray(baseCoverage);
 			Misc.invertArray(baseCoverageNames);
 		}
-		
-		return new TeleStats(numUniqueAlignments, numUnspliced, baseCoverage, baseCoverageNames);
+
+		return new TeleStats(lengthNonUtr, lengthUtr, numUniqueAlignments, unique3UTRNames.size(), numUnspliced, baseCoverage, baseCoverageNames);
 		
 	}
 
@@ -766,6 +840,19 @@ public class Telescriptor {
 		geneResultsDirectory = new File(resultsDirectory, "Genes");
 		geneResultsDirectory.mkdir();
 		if (fullPathToR == null || fullPathToR.canExecute() == false) Misc.printErrAndExit("\nError: can't find or execute R? "+fullPathToR+"\n");
+		
+		//check for R and required libraries, don't need it if they just want the first and last 1/3 count table
+		if (fullPathToR == null || fullPathToR.canExecute()== false) {
+			Misc.printErrAndExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
+		}
+
+		String errors = IO.runRCommandLookForError("library(ggplot2);", fullPathToR, resultsDirectory);
+		if (errors == null || errors.length() !=0){
+			Misc.printErrAndExit("\nError: Cannot find the required R library.  Did you install ggplot2? R error message:\n\t\t"+errors+"\n\n");
+		}
+
+
+
 	}	
 
 	public static void printDocs(){
@@ -783,7 +870,7 @@ public class Telescriptor {
 				"-c Directory of bam files representing the second condition B.\n"+
 				"-u UCSC refflat formatted Gene table. Run MergeUCSCGeneTable on a transcript table.\n"+
 				"-s Director in which to save the results.\n"+
-				"-r Full path to R, defaults to '/usr/bin/R'\n"+
+				"-r Full path to R, defaults to '/usr/bin/R', with installed ggplot2 package.\n"+
 
 				"\nDefault Options:\n"+
 				"-g Minimum gene alignment count, defaults to 50\n"+
