@@ -42,7 +42,8 @@ public class MergeColumns {
 		String[][] data = new String[files.length][];
 		//load data
 		for (int i=0; i< files.length; i++){
-			data[i] = IO.loadFile(files[i]);
+			//data[i] = IO.loadFile(files[i]);
+			data[i] = IO.loadFileIntoStringArray(files[i]);
 		}
 		//print
 		File outFile = new File (dir, "mergedColumns.txt");

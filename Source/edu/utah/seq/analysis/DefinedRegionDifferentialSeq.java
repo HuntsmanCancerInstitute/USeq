@@ -1046,6 +1046,7 @@ public class DefinedRegionDifferentialSeq {
 			sb.append("library(DESeq2)\n");
 			sb.append("library(gplots)\n");
 			sb.append("library(RColorBrewer)\n");
+			sb.append("as.data.frame.DataFrame <- selectMethod('as.data.frame', signature='DataFrame')\n");
 			
 			sb.append("\n#load count table, replace rownames with first column\n");
 			sb.append("countTable = read.delim('"+geneCountTable.getCanonicalPath()+"', header=TRUE)\n");
@@ -1893,7 +1894,7 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                     Defined Region Differential Seq:   Aug 2014                  **\n" +
+				"**                     Defined Region Differential Seq:   Sept 2014                 **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +

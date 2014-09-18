@@ -13,6 +13,10 @@ public class TeleGene {
 	private double transMisSplicePVal = 0;
 	private double misSpliceLog2Rto = 0;
 	
+	//utr stats
+	private double utrLog2Rto;
+	private double pAdjUTR;
+	
 	//skew stats
 	private double pAdjSkewedReadCount;
 	
@@ -32,9 +36,15 @@ public class TeleGene {
 		sb.append(treatment.getNumberUnsplicedAlignments()); sb.append("\t");
 		sb.append(control.getNumberExonicAlignments()); sb.append("\t");
 		sb.append(control.getNumberUnsplicedAlignments()); sb.append("\t");
-		
+				
 		sb.append(misSpliceLog2Rto); sb.append("\t");
 		sb.append(transMisSplicePVal); sb.append("\t");
+		
+		sb.append(treatment.getNumber3UTRAlignments()); sb.append("\t");
+		sb.append(control.getNumber3UTRAlignments()); sb.append("\t");
+		sb.append(utrLog2Rto); sb.append("\t");
+		sb.append(pAdjUTR); sb.append("\t");
+		
 		sb.append(treatment.getMedianWindowIndex()); sb.append("\t");
 		
 		sb.append(treatment.getMedianWindow()); sb.append("\t");
@@ -128,6 +138,22 @@ public class TeleGene {
 
 	public void setpAdjSkewedReadCount(double pAdjSkewedReadCount) {
 		this.pAdjSkewedReadCount = pAdjSkewedReadCount;
+	}
+
+	public double getUtrLog2Rto() {
+		return utrLog2Rto;
+	}
+
+	public void setUtrLog2Rto(double utrLog2Rto) {
+		this.utrLog2Rto = utrLog2Rto;
+	}
+
+	public double getpAdjUTR() {
+		return pAdjUTR;
+	}
+
+	public void setpAdjUTR(double pAdjUTR) {
+		this.pAdjUTR = pAdjUTR;
 	}
 
 	
