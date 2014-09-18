@@ -3,7 +3,9 @@ VCFComparator
 * Added option to ignore the alt comparison when scoring whether the test and key match.  Thus just scores the position.
 * Fixed an issue where SNP's with two alternates were called as a non SNP.
 Telescriptor
-* Added new app to score two transcriptomes for possible telescripting.
+* Added new app to score two transcriptomes for possible telescripting and 3' UTR changes
+DefinedRegionDifferentialSeq
+* Added patch to fix DESeq2 rLog method call.  Thanks Russ Bell!
 
 ----USeq_8.8.2----
 ReferenceMutator
