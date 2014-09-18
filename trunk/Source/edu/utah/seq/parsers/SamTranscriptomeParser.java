@@ -597,15 +597,41 @@ public class SamTranscriptomeParser{
 		
 		//add program
 		al.add("@PG\tID:SamTranscriptomeParser\tCL: args "+programArguments);
+		HashMap<String,Integer> pgIdCount = new HashMap<String,Integer>();
+		Pattern pgPattern = Pattern.compile("(@PG\\s+ID:)(\\S+)(\\s+)");
 		if (this.programLines.size() > 0) {
 			for (String pline: this.programLines) {
+				Matcher pgMatcher = pgPattern.matcher(pline);
+				if (pgMatcher.find()) {
+					String id = pgMatcher.group(2);
+					if (pgIdCount.containsKey(id)) {
+						String addendum = String.valueOf(pgIdCount.get(id));
+						pgIdCount.put(id,pgIdCount.get(id) +  1);
+						pline = pgMatcher.replaceFirst(pgMatcher.group(1) + pgMatcher.group(2) + "." + addendum + pgMatcher.group(3));
+					} else {
+						pgIdCount.put(id,1);
+					}
+				} 
 				al.add(pline);
 			}
 		}
 		
 		//add readgroup
+		Pattern rgPattern = Pattern.compile("(@RG\\s+ID:)(\\S+)(\\s+)");
+		HashMap<String,Integer> rgIdCount = new HashMap<String,Integer>();
 		if (this.readGroupLines.size() > 0) {
 			for (String rgline: this.readGroupLines) {
+				Matcher rgMatcher = rgPattern.matcher(rgline);
+				if (rgMatcher.find()) {
+					String id = rgMatcher.group(2);
+					if (rgIdCount.containsKey(id)) {
+						String addendum = String.valueOf(rgIdCount.get(id));
+						rgIdCount.put(id,rgIdCount.get(id) +  1);
+						rgline = rgMatcher.replaceFirst(rgMatcher.group(1) + rgMatcher.group(2) + "." + addendum + rgMatcher.group(3));
+					} else {
+						rgIdCount.put(id,1);
+					}
+				} 
 				al.add(rgline);
 			}
 		} else {
@@ -614,7 +640,7 @@ public class SamTranscriptomeParser{
 		
 		//as sq lines for each chromosome @SQ	SN:chr10	AS:mm9	LN:129993255
 		String gv = "";
-		if (genomeVersion != null) gv = "\tAS:" +genomeVersion;
+		if (genomeVersion != null) gv = "\t" +genomeVersion;
 		//remove = chromosomes
 		chromLength.remove("=");
 		for (String chromosome: chromLength.keySet()){
