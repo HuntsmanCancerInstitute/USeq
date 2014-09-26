@@ -12,7 +12,8 @@ public class TFLogger {
 	private BufferedWriter logWriter = null;
 	private BufferedWriter localLogWriter = null;
 	private String logLevel = null;
-	
+	private String lastEror = "";
+	private boolean failed = false;
 
 	public TFLogger(File logDirectory, File localDirectory, String logPrefix, String logLevel) {
 		this.logLevel = logLevel;
@@ -73,11 +74,15 @@ public class TFLogger {
 			String fullMessage = "ERROR (internal): " + message + ". Exiting run, please contact core with the run log: bioinformaticscore@utah.edu\n";
 			System.out.println(fullMessage);
 			writeToLog(fullMessage);
+			this.lastEror = fullMessage;
 		} else {
 			String fullMessage = "ERROR (user): " + message + ". Exiting run, please correct errors and re-submit. Contact the core with questions: bioinformaticscore@utah.edu\n";
 			System.out.println(fullMessage);
 			writeToLog(fullMessage);
+			this.lastEror = fullMessage;
 		}
+		this.failed = true;
+		
 	}
 	
 	public void writeWarningMessage(String message) {
@@ -103,6 +108,14 @@ public class TFLogger {
 		} catch (IOException ioex) {
 			writeErrorMessage("Failed to close TomatoFarmer logging file",true);
 		}
+	}
+	
+	public String getLastErrorMessage() {
+		return this.lastEror;
+	}
+	
+	public boolean getFailed() {
+		return this.failed;
 	}
 
 }

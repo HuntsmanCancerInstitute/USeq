@@ -30,9 +30,10 @@ public class TFCommandExomeMetrics extends TFCommand {
 	public TFCommandExomeMetrics(ArrayList<File> templateFile, File rootDirectory,
 			String commandString, String commandType, TFLogger logFile,
 			String email, Integer wallTime, Integer heartbeat, Integer failmax,
-			Integer jobs, boolean suppress, boolean deleteMetricsBam, boolean isFull, String studyName, File targetFile, HashMap<String,String> properties) {
+			Integer jobs, boolean suppress, boolean deleteMetricsBam, boolean isFull, String studyName, 
+			File targetFile, HashMap<String,String> properties, String cluster) {
 		super(templateFile, rootDirectory, commandString, commandType, logFile, email,
-				wallTime, heartbeat, failmax, jobs, suppress, isFull, properties);
+				wallTime, heartbeat, failmax, jobs, suppress, isFull, properties, cluster);
 		this.targetFile = targetFile;
 		this.studyName = studyName;
 		this.deleteMetricsBam = deleteMetricsBam;
@@ -47,10 +48,8 @@ public class TFCommandExomeMetrics extends TFCommand {
 		//Create patterns of interest
 		ArrayList<TFMatchObject> dependantPatterns = new ArrayList<TFMatchObject>();
 		
-		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_BAM,Pattern.compile("(.+?)(\\.raw\\.bam$)"),TFConstants.PREFIX_SAMPLEID));
-		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_BAI,Pattern.compile("(.+?)(\\.raw\\.bai$)"),TFConstants.PREFIX_SAMPLEID));
-		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_SPLIT_BAM,Pattern.compile("(.+?)(\\.split.bam$)"),TFConstants.PREFIX_SAMPLEID));
-		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_SPLIT_BAI,Pattern.compile("(.+?)(\\.split.bai$)"),TFConstants.PREFIX_SAMPLEID));
+		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_SAMPLE_BAM,Pattern.compile("(.+?)(\\.raw\\.bam$)"),TFConstants.PREFIX_SAMPLENAME));
+		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_SAMPLE_BAI,Pattern.compile("(.+?)(\\.raw\\.bai$)"),TFConstants.PREFIX_SAMPLENAME));
 		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_FINAL_BAM,Pattern.compile("(.+?)(\\.final\\.bam$)"),TFConstants.PREFIX_SAMPLENAME));
 		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_FINAL_BAI,Pattern.compile("(.+?)(\\.final\\.bai$)"),TFConstants.PREFIX_SAMPLENAME));
 		
@@ -85,11 +84,8 @@ public class TFCommandExomeMetrics extends TFCommand {
 		ArrayList<TFMatchObject> masterPatterns = new ArrayList<TFMatchObject>();
 		ArrayList<TFMatchObject> dependantPatterns = new ArrayList<TFMatchObject>();
 		
-		masterPatterns.add(new TFMatchObject(TFConstants.FILE_BAM,Pattern.compile("(.+?)(\\.raw\\.bam$)"),TFConstants.PREFIX_SAMPLEID));
-		masterPatterns.add(new TFMatchObject(TFConstants.FILE_BAI,Pattern.compile("(.+?)(\\.raw\\.bai$)"),TFConstants.PREFIX_SAMPLEID));
-
-		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_SPLIT_BAM,Pattern.compile("(.+?)(\\.split.bam$)"),TFConstants.PREFIX_SAMPLEID));
-		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_SPLIT_BAI,Pattern.compile("(.+?)(\\.split.bai$)"),TFConstants.PREFIX_SAMPLEID));
+		masterPatterns.add(new TFMatchObject(TFConstants.FILE_SAMPLE_BAM,Pattern.compile("(.+?)(\\.raw\\.bam$)"),TFConstants.PREFIX_SAMPLENAME));
+		masterPatterns.add(new TFMatchObject(TFConstants.FILE_SAMPLE_BAI,Pattern.compile("(.+?)(\\.raw\\.bai$)"),TFConstants.PREFIX_SAMPLENAME));
 		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_FINAL_BAM,Pattern.compile("(.+?)(\\.final\\.bam$)"),TFConstants.PREFIX_SAMPLENAME));
 		dependantPatterns.add(new TFMatchObject(TFConstants.FILE_FINAL_BAI,Pattern.compile("(.+?)(\\.final\\.bai$)"),TFConstants.PREFIX_SAMPLENAME));
 		
@@ -138,11 +134,8 @@ public class TFCommandExomeMetrics extends TFCommand {
 		boolean valid = true;
 		
 		for (TFSampleInfo tfsi: sampleList) {				
-			if (tfsi.finalFileExists(TFConstants.FILE_SPLIT_BAM) && tfsi.finalFileExists(TFConstants.FILE_SPLIT_BAI)) {
-				//OK!
-			} else if (tfsi.finalFileExists(TFConstants.FILE_FINAL_BAM) && tfsi.finalFileExists(TFConstants.FILE_FINAL_BAI)) {
-				tfsi.setFileObject(TFConstants.FILE_SPLIT_BAM, tfsi.getFileObject(TFConstants.FILE_FINAL_BAM));
-				tfsi.setFileObject(TFConstants.FILE_SPLIT_BAI, tfsi.getFileObject(TFConstants.FILE_FINAL_BAI));
+			if (tfsi.finalFileExists(TFConstants.FILE_SAMPLE_BAM) && tfsi.finalFileExists(TFConstants.FILE_SAMPLE_BAI) && 
+					tfsi.finalFileExists(TFConstants.FILE_FINAL_BAM) && tfsi.finalFileExists(TFConstants.FILE_FINAL_BAI)) {
 			} else {
 				valid = false;
 			}
@@ -169,15 +162,8 @@ public class TFCommandExomeMetrics extends TFCommand {
 		
 //		if (this.deleteMetricsBam) {
 //			for (TFSampleInfo tfsi: sampleList) {
-//				if (tfsi.fileExists(TFConstants.FILE_FINAL_BAM)) {
-//					if (tfsi.getFileObject(TFConstants.FILE_SPLIT_BAM).getFinalPath() != tfsi.getFileObject(TFConstants.FILE_FINAL_BAM).getFinalPath()) {
-//						tfsi.getFileObject(TFConstants.FILE_SPLIT_BAM).getFinalPath().delete();
-//						tfsi.getFileObject(TFConstants.FILE_SPLIT_BAI).getFinalPath().delete();
-//					}
-//				} else {
-//					tfsi.getFileObject(TFConstants.FILE_SPLIT_BAM).getFinalPath().delete();
-//					tfsi.getFileObject(TFConstants.FILE_SPLIT_BAI).getFinalPath().delete();
-//				}
+//				tfsi.getFileObject(TFConstants.FILE_SAMPLE_BAM).getFinalPath().delete();
+//				tfsi.getFileObject(TFConstants.FILE_SAMPLE_BAI).getFinalPath().delete();
 //			}
 //		}
 		
@@ -213,27 +199,44 @@ public class TFCommandExomeMetrics extends TFCommand {
 	}
 	
 	private void generateMetrics(ArrayList<TFSampleInfo> sampleList) {
-		ArrayList<TFSampleInfo> samplesToRun = new ArrayList<TFSampleInfo>();
-		ArrayList<TFSampleInfo> samplesToPostProcess = new ArrayList<TFSampleInfo>();
+		HashSet<String> samplesToRun = new HashSet<String>();
+		HashSet<String> samplesToPostProcess = new HashSet<String>();
 		HashSet<File> deleteList = new HashSet<File>();
 		
-		//Check sample stage
+		/**************************************************************************
+		 * Group by sample
+		 ************************************************************************/
+		
+		HashMap<String,ArrayList<TFSampleInfo>> samples = new HashMap<String,ArrayList<TFSampleInfo>>();
+		
 		for (TFSampleInfo si: sampleList) {
-			File workingDir = new File(this.rootDirectory,"JOB_" + si.getSampleID() + "_metrics");
-			
-			//Create output objects for each sample
-			TFFileObject tfoMetricsDict = new TFFileObject(si.getSampleID() + ".dict.txt",this.finalDirectory,workingDir);
-			TFFileObject tfoFinalMetrics = new TFFileObject(this.studyName + ".xlsx",this.finalDirectory,this.finalDirectory);
-			si.setFileObject(TFConstants.FILE_METRICS, tfoMetricsDict);
-			
-			if (!tfoFinalMetrics.doesFinalExist()) { //Final output exists, do nothing
-				if (!tfoMetricsDict.doesWorkingExist()) { 
-					samplesToRun.add(si);
-				} else {
-					samplesToPostProcess.add(si);
+			if (!samples.containsKey(si.getSampleName())) {
+				samples.put(si.getSampleName(), new ArrayList<TFSampleInfo>());
+			}
+			samples.get(si.getSampleName()).add(si);
+		}
+		
+		//Check sample stage
+		for (String sampleName: samples.keySet()) {
+			File workingDir = new File(this.rootDirectory,"JOB_" + sampleName + "_metrics");
+			for (TFSampleInfo si: samples.get(sampleName)) {
+				
+				
+				//Create output objects for each sample
+				TFFileObject tfoMetricsDict = new TFFileObject(si.getSampleName() + ".dict.txt",this.finalDirectory,workingDir);
+				TFFileObject tfoFinalMetrics = new TFFileObject(this.studyName + ".xlsx",this.finalDirectory,this.finalDirectory);
+				si.setFileObject(TFConstants.FILE_METRICS, tfoMetricsDict);
+				
+				if (!tfoFinalMetrics.doesFinalExist()) { //Final output exists, do nothing
+					if (!tfoMetricsDict.doesWorkingExist()) { 
+						samplesToRun.add(sampleName);
+					} else {
+						samplesToPostProcess.add(sampleName);
+					}
 				}
 			}
 		}
+		
 		
 		//Process samples
 		if (samplesToRun.size() > 0) {
@@ -243,13 +246,14 @@ public class TFCommandExomeMetrics extends TFCommand {
 			this.daemon.start();
 			
 	
-			for (TFSampleInfo si: samplesToRun) {
-				samplesToPostProcess.add(si);
+			for (String sampleName: samplesToRun) {
+				samplesToPostProcess.add(sampleName);
+				TFSampleInfo repSI = samples.get(sampleName).get(0);
 				
 				//Create sample-specific storage
 				ArrayList<File> protectList = new ArrayList<File>();
 				
-				TFFileObject tfoMetricsDict = si.getFileObject(TFConstants.FILE_METRICS);
+				TFFileObject tfoMetricsDict = repSI.getFileObject(TFConstants.FILE_METRICS);
 
 				//Create run directory
 				File runDirectory = tfoMetricsDict.getWorkingDirectory();
@@ -257,17 +261,17 @@ public class TFCommandExomeMetrics extends TFCommand {
 				
 				
 				//Get input objects
-				TFFileObject tfoRawBam = si.getFileObject(TFConstants.FILE_BAM);
-				TFFileObject tfoRawBai = si.getFileObject(TFConstants.FILE_BAI);
-				TFFileObject tfoFinalBam = si.getFileObject(TFConstants.FILE_SPLIT_BAM);
-				TFFileObject tfoFinalBai = si.getFileObject(TFConstants.FILE_SPLIT_BAI);
+				TFFileObject tfoRawBam = repSI.getFileObject(TFConstants.FILE_SAMPLE_BAM);
+				TFFileObject tfoRawBai = repSI.getFileObject(TFConstants.FILE_SAMPLE_BAI);
+				TFFileObject tfoFinalBam = repSI.getFileObject(TFConstants.FILE_FINAL_BAM);
+				TFFileObject tfoFinalBai = repSI.getFileObject(TFConstants.FILE_FINAL_BAI);
 				
 				//Create local versions of the input files
 				File fileRawBam = tfoRawBam.createDestForFileObject(runDirectory);
 				File fileRawBai = tfoRawBai.createDestForFileObject(runDirectory);
 				
-				File fileFinalBam = tfoFinalBam.createDestForFileObject(runDirectory,new String[]{"split",si.getSampleName() + "."},new String[]{"final",si.getSampleID() + "."});
-				File fileFinalBai = tfoFinalBai.createDestForFileObject(runDirectory,new String[]{"split",si.getSampleName() + "."},new String[]{"final",si.getSampleID() + "."});
+				File fileFinalBam = tfoFinalBam.createDestForFileObject(runDirectory);
+				File fileFinalBai = tfoFinalBai.createDestForFileObject(runDirectory);
 				
 				//Create links
 				this.createLink(tfoRawBam.getFinalPath(), fileRawBam);
@@ -287,7 +291,7 @@ public class TFCommandExomeMetrics extends TFCommand {
 				this.cpFile(targetFile, destFile);
 		
 				
-				replacements.put("NAME", si.getSampleID());
+				replacements.put("NAME", sampleName);
 				replacements.put("TARGETS", destFile.getName());
 				replacements.put("FILE",targetFile.getName());
 				replacements.putAll(this.properties);
@@ -295,7 +299,7 @@ public class TFCommandExomeMetrics extends TFCommand {
 				
 				//Create cmd.txt file
 				File cmdFile = new File(runDirectory,"cmd.txt");
-				this.createCmd(replacements, cmdFile,0);
+				this.createCmd(replacements, cmdFile, 0);
 				
 			
 				//Mark files for deletion of cleanup protection
@@ -335,8 +339,9 @@ public class TFCommandExomeMetrics extends TFCommand {
 			this.jobDirectory.mkdir();
 			HashSet<File> runDirectoryList = new HashSet<File>();
 			
-			for (TFSampleInfo tfsi: samplesToPostProcess) {
-				TFFileObject tfoMetricsDict = tfsi.getFileObject(TFConstants.FILE_METRICS);
+			for (String sampleName: samplesToPostProcess) {
+				TFSampleInfo repSI = samples.get(sampleName).get(0);
+				TFFileObject tfoMetricsDict = repSI.getFileObject(TFConstants.FILE_METRICS);
 				
 				File workingDir = tfoMetricsDict.getWorkingDirectory();
 				runDirectoryList.add(workingDir);

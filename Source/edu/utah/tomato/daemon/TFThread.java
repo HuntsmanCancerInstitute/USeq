@@ -83,6 +83,9 @@ public class TFThread implements Callable<Boolean> {
 					file.delete();
 				}
 			}
+			if (endFile.exists()) {
+				endFile.delete();
+			}
 		}
 		
 		private void transferExisting() {
@@ -164,6 +167,7 @@ public class TFThread implements Callable<Boolean> {
 					}
 					
 					boolean foundStderr = false; //If we find the stderr file
+					boolean foundR = false;
 					int heartbeat = 0;
 					
 					while(!foundStderr) {
@@ -211,6 +215,14 @@ public class TFThread implements Callable<Boolean> {
 							foundStderr = true;
 							tomatoFailed = true;
 							this.writeInfoMessage("Tomato job finished with errors (tmp.fail found)");
+						} else if (!running.exists() && !logFile.exists() && !errorFile.exists() && !startFile.exists() && !endFile.exists() && foundR) {
+							foundStderr = true;
+							this.writeInfoMessage("Tomato job directory has no control or output files, resubmitting job");
+						}
+						
+						if (running.exists()) {
+							foundR = true;
+						}
 //						} else if (this.logFile.exists() && !startFile.exists() && !running.exists() && !errorFile.exists()) {
 //							BufferedReader br = new BufferedReader(new FileReader(logFile));
 //							String line = "";
@@ -248,14 +260,13 @@ public class TFThread implements Callable<Boolean> {
 //							
 //							this.deleted = true;
 //							
-						}
+//						}
 							
 							
 						if (tomatoFailed) {
 							failCount += 1;
 							if (failCount > this.failMax) {
-								this.writeInfoMessage("Too many tomato run failures, killing all jobs and exiting");
-								this.cleanDirectory();
+								this.writeErrorMessage("Too many tomato run failures, killing all jobs and exiting", false);
 								analysisFinished = true;
 								analysisFailed = true;
 							} else if (this.deleted) {
@@ -274,7 +285,6 @@ public class TFThread implements Callable<Boolean> {
 				try {
 					Process p = Runtime.getRuntime().exec("touch " + endFile.getAbsolutePath());
 					p.waitFor();
-					this.cleanDirectory();
 				} catch (IOException ioex) {
 					this.writeErrorMessage("Could not send tomato termination signal, please kill the jobs yourself",true);
 				} catch (InterruptedException iex2) {
