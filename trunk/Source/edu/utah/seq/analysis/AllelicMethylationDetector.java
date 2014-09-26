@@ -14,9 +14,6 @@ import util.gen.*;
 import edu.utah.seq.data.sam.SamAlignment;
 import edu.utah.seq.parsers.*;
 
-
-
-
 /** Application for examining select regions for a bimodal distribution of methylation in reads.
  * @author Nix
  * */
@@ -663,7 +660,7 @@ public class AllelicMethylationDetector {
 				"**************************************************************************************\n" +
 				"AMD identifies regions displaying allelic methylation, e.g. ~50% average mCG\n" +
 				"methylation yet individual read pairs show a bimodal fraction distribution of either\n" +
-				"fully methylated or unmethylated. Beta.\n\n"+
+				"fully methylated or unmethylated.\n\n"+
 
 				"Options:\n"+
 				"-s Save directory.\n"+
@@ -687,7 +684,8 @@ public class AllelicMethylationDetector {
 
 				"\n"+
 
-				"Example: java -Xmx4G -jar pathTo/USeq/Apps/ beta! \n\n" +
+				"Example: java -Xmx4G -jar pathTo/USeq/Apps/AllelicMethylationDetector -s AMD\n"+
+				"-f Fastas/ -t Bams/ -c PointData/Con -n PointData/NonCon \n\n" +
 
 		"**************************************************************************************\n");
 

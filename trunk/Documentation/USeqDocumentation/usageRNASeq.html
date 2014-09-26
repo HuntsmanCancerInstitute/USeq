@@ -65,13 +65,13 @@ Custom Analysis:
 <ol>
 <li> Convert splice-junction coordinates to genomic coordinates by running the <a href="cmdLnMenus.html#SamTranscriptomeParser">SamTranscriptomeParser</a>  (e.g. java -jar -Xmx4G ~/AppsUSeq/SamTranscriptomeParser -a 90 -f 7410X6_s_5_raw.sam.gz Sam headers are created automatically.)
 <li> Generate relative read/ depth coverage graphs using the USeq <a href="cmdLnMenus.html#Sam2USeq">Sam2USeq</a> apps. These can be visualized in IGB (and UCSC Genome Browser if you upload your data to GenoPub) to show the sequence depth over every base.  
-<li> Run the <a href="cmdLnMenus.html#DefinedRegionDifferentialSeq">DefinedRegionDifferentialSeq</a> to score known annotation for differential expression using Anders' DESeq package and your processed BAM files.
+<li> Run the <a href="cmdLnMenus.html#DefinedRegionDifferentialSeq">DefinedRegionDifferentialSeq</a> to score known annotation for differential expression using Loves et. al. DESeq2 package and your processed BAM files.
     <ol>
     <li> First create a gene table containing collapsed transcripts using the modified transcript table downloaded from UCSC, see above. This should contain 
        the following columns: geneName transcriptName chrom strand txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds.  Use the USeq 
        <a href="cmdLnMenus.html#MergeUCSCGeneTable">MergeUCSCGeneTable</a> app to merge any transcripts that share the same geneName.  Exons are maximized, introns minimized.
        (e.g. java -jar -Xmx4G ~/AppsUSeq/MergeUCSCGeneTable -u mm9EnsTrans_Corr.ucsc )
-    <li> Install R and the DESeq package, see http://www-huber.embl.de/users/anders/DESeq/
+    <li> Install R and the DESeq2 package, see http://www.bioconductor.org/packages/release/bioc/html/DESeq2.html
     <li> Run the <a href="cmdLnMenus.html#DefinedRegionDifferentialSeq">DefinedRegionDifferentialSeq</a> app to score genes (or other defined regions) for differential expression and alternative splicing 
        (e.g. java -Xmx4G -jar ~/AppsUSeq/DefinedRegionDifferentialSeq -c /Data/PolIIConditions -s PolIIResults/ -u /Anno/mm9EnsGenes.ucsc.gz -g H_sapiens_Feb_2009)
     </ol>  

@@ -484,7 +484,9 @@ public class AllelicExpressionDetector {
 				"**************************************************************************************\n" +
 				"**                      Allelic Expression Detector:  August 2014                   **\n" +
 				"**************************************************************************************\n" +
-				"Beta!\n\n"+
+				"Application for identifying allelic expression based on a table of snps and bam\n"+
+				"alignments that have been filtered for alignment bias.  See the ReferenceMutator and\n"+
+				"SamComparator apps.\n\n"+
 
 				"Required Options:\n"+
 				"-n Sample names to process, comma delimited, no spaces.\n"+
@@ -500,7 +502,9 @@ public class AllelicExpressionDetector {
 				"-c Minimum alignment read coverage, defaults to 4\n"+
 				"\n"+
 
-				"Example: java -Xmx4G -jar pathTo/USeq/Apps/ beta! \n\n" +
+				"Example: java -Xmx4G -jar pathTo/USeq/Apps/AllelicExpressionDetector -b Bam/RPENormal/\n"+
+				"-n D002-14,D005-14,D006-14,D009-14 -d GenotypingResults.txt.gz -s SNPMap_Ref2Alt_Int.txt\n"+
+				"-r RPENormal\n\n" +
 
 				"**************************************************************************************\n");
 

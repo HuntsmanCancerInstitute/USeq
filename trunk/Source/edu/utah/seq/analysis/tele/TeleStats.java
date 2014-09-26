@@ -10,8 +10,6 @@ public class TeleStats {
 	private int numberExonicAlignments;
 	private int number3UTRAlignments;
 	private int numberUnsplicedAlignments;
-	private int lengthNonUtr;
-	private int lengthUtr;
 	//these are exonic not genomic
 	private int[] baseCoverage;
 	private ArrayList<String>[] baseCoverageNames;
@@ -25,9 +23,7 @@ public class TeleStats {
 	private double normalizedWindowCount;
 	private double backgroundCoeffVar;
 
-	public TeleStats(int lengthNonUtr, int lengthUtr, int numberExonicAlignments, int number3UTRAlignments, int numberUnsplicedAlignments, int[] baseCoverage, ArrayList<String>[] baseCoverageNames) {
-		this.lengthNonUtr = lengthNonUtr;
-		this.lengthUtr = lengthUtr;
+	public TeleStats(int numberExonicAlignments, int number3UTRAlignments, int numberUnsplicedAlignments, int[] baseCoverage, ArrayList<String>[] baseCoverageNames) {
 		this.numberExonicAlignments = numberExonicAlignments;
 		this.number3UTRAlignments = number3UTRAlignments;
 		this.numberUnsplicedAlignments = numberUnsplicedAlignments;
@@ -40,12 +36,8 @@ public class TeleStats {
 		baseCoverageNames = null;
 	}
 	
-	public double getUtrFpkm(){
-		return (double)(1+number3UTRAlignments) / (double)(1+lengthUtr); 
-	}
-	
-	public double getNonUtrFpkm(){
-		return (double)Math.abs(1+numberExonicAlignments-number3UTRAlignments) / (double)(1+lengthNonUtr); 
+	public double fractionUTRCounts(){
+		return (double)(1+number3UTRAlignments) / (double)(1+numberExonicAlignments);
 	}
 	
 	public void windowScan(int length5PrimeWindowScan) {
@@ -172,13 +164,5 @@ public class TeleStats {
 
 	public int getNumber3UTRAlignments() {
 		return number3UTRAlignments;
-	}
-
-	public int getLengthNonUtr() {
-		return lengthNonUtr;
-	}
-
-	public int getLengthUtr() {
-		return lengthUtr;
 	}
 }
