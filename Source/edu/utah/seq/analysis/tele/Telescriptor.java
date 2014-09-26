@@ -159,7 +159,7 @@ public class Telescriptor {
 			PrintWriter spreadSheetOut = new PrintWriter( new FileWriter( new File (resultsDirectory, "teleStatsSummary.xls")));
 			spreadSheetOut.println("GeneName\tAltName: Description\tcDNA Length\t"
 					+ "# A align\t# A Unspliced\t# B align\t# B Unspliced\tlog2RtoMisSplice\tpAdjMisSplice\t"
-					+ "# A 3'UTR\t# B 3'UTR\tlog2Rto((AUtrFPKM/NonUtrFPKM)/ (BUtrFPKM/NonUtrFPKM))\tpAdj UTR\t"
+					+ "# A 3'UTR\t# B 3'UTR\tlog2Rto((AUtrCounts/Total)/ (BUtr/Total))\tpAdj UTR\t"
 					+ "5' Index\tA 5' Median\t"
 					+ "A 3' Median\tA Median Log2Rto\tB 5' Median\tB 3' Median\tB Median Log2Rto"
 					+ "\tMedian Log2 (aSkew/ bSkew)\tA 5' Count\tA 3' Count\tA Count Log2Rto\tA Bkgrnd Coeff Var\tB 5' Count"
@@ -234,12 +234,13 @@ public class Telescriptor {
 			control[i] = new int[]{numUtrC, numNonUtrC};
 
 			//calc log2Rto
-			//double t = (double)(numUtrT+1)/(double)(tts.getNumberExonicAlignments()+1);
-			double t = tts.getUtrFpkm() / tts.getNonUtrFpkm();
-			double c = cts.getUtrFpkm() / cts.getNonUtrFpkm();
-			//double c = (double)(numUtrC+1)/(double)(cts.getNumberExonicAlignments()+1);
-			double lrto = Num.log2( t / c );
+			double t = tts.fractionUTRCounts();	
+			double c = cts.fractionUTRCounts();
+			double lrto = Num.log2( t / c );			
 			tg.setUtrLog2Rto(lrto);
+			
+			
+			
 		}
 
 		//estimate chi-square pvalues using R for resolution of extreemly small p-values, radiculously slow
@@ -550,8 +551,6 @@ public class Telescriptor {
 		//3'UTRs
 		int utrStart = 0; 
 		int utrEnd = 0;
-		int lengthUtr = 0;
-		int lengthNonUtr = 0;
 		if (gene.isPlusStrand()){
 			utrStart = gene.getCdsEnd() - firstGeneBase;
 			utrEnd = gene.getTxEnd() - firstGeneBase;
@@ -579,9 +578,7 @@ public class Telescriptor {
 					//check if in utr
 					if (j >= utrStart && j < utrEnd) {
 						unique3UTRNames.addAll(readCoverage[j]);
-						lengthUtr++;
 					}
-					else lengthNonUtr++;
 				} 
 				index++;
 			}
@@ -621,7 +618,7 @@ public class Telescriptor {
 			Misc.invertArray(baseCoverageNames);
 		}
 
-		return new TeleStats(lengthNonUtr, lengthUtr, numUniqueAlignments, unique3UTRNames.size(), numUnspliced, baseCoverage, baseCoverageNames);
+		return new TeleStats(numUniqueAlignments, unique3UTRNames.size(), numUnspliced, baseCoverage, baseCoverageNames);
 		
 	}
 
