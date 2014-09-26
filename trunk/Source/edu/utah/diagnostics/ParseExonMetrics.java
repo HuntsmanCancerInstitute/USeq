@@ -398,6 +398,7 @@ public class ParseExonMetrics {
 			StringBuffer sb = new StringBuffer("");
 			
 			sb.append("library(ggplot2)\n");
+			sb.append("options(bitmapType='cairo')\n");
 			sb.append("data=read.table('" + insertData.getCanonicalPath() + "')\n");
 			
 			if (style.equals("insert")) {
@@ -428,8 +429,8 @@ public class ParseExonMetrics {
 					System.out.println("Creation of insertion length histogram failed, exiting (Look at Rout for errors)");
 					System.exit(1);
 				} else {
-					scriptFile.delete();
-					rOut.delete();
+					//scriptFile.delete();
+					//rOut.delete();
 					insertData.delete();
 				}
 			} catch (Exception ex ) {

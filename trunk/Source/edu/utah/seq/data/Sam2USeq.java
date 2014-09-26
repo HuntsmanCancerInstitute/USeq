@@ -59,10 +59,12 @@ public class Sam2USeq {
 	private PrintWriter bedOut = null;
 	private boolean verbose = true;
 	private File useqOutputFile;
-	private ArrayList<Short> baseCoverage = new ArrayList<Short>();
+	//private ArrayList<Short> baseCoverage = new ArrayList<Short>();
 	private Short zeroShort = new Short((short)0);
 	private Gzipper perRegionsGzipper = null;
 	private int maxNumberBases;
+	private HashMap<Long,Long> baseCoverageHist = new HashMap<Long,Long>();
+	
 
 
 	/**For stand alone app.*/
@@ -133,7 +135,11 @@ public class Sam2USeq {
 					int length = r.getLength();					
 					for (int i=0; i < length; i++) {
 						histogram.count(0);
-						baseCoverage.add(zeroShort);
+						if (!baseCoverageHist.containsKey((long)0)) {
+							baseCoverageHist.put((long)0,(long) 0);
+						}
+						baseCoverageHist.put((long)0,baseCoverageHist.get((long)0) + 1);
+						//baseCoverage.add(zeroShort);
 					}
 				}
 			}
@@ -431,13 +437,22 @@ public class Sam2USeq {
 								//before or after scored bases
 								if (i < 0 || i >= baseCounts.length) {
 									histogram.count(0);
-									baseCoverage.add(zeroShort);
+									if (!baseCoverageHist.containsKey((long)0)) {
+										baseCoverageHist.put((long)0,(long) 0);
+									}
+									baseCoverageHist.put((long)0,baseCoverageHist.get((long)0) + 1);
+									//baseCoverage.add(zeroShort);
 									counts[index++] = 0.0f;
 								}
 								//nope inside
 								else {
 									histogram.count(baseCounts[i]);
-									baseCoverage.add((short)baseCounts[i]);
+									long bc = (long)baseCounts[i];
+									if (!baseCoverageHist.containsKey(bc)) {
+										baseCoverageHist.put(bc, (long)0);
+									}
+									baseCoverageHist.put(bc,baseCoverageHist.get(bc) + 1);
+									//baseCoverage.add((short)baseCounts[i]);
 									counts[index++] = baseCounts[i];
 									if (baseCounts[i] >= 20){
 										num10++;
@@ -763,8 +778,8 @@ public class Sam2USeq {
 				System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream(logFile))));		
 			}
 			System.out.println("\nInterrogated region read depth coverage statistics");
-			int[] counts = histogram.getBinCounts();
-			double total = histogram.getTotalBinCounts();
+			float[] counts = histogram.getBinCountsFloat();
+			float total = histogram.getTotalBinCountsFloat();
 
 			System.out.println("BaseCoverage\tObservedBasesWithGivenCoverage\tFractionObserved\tFractionObservedWithGivenOrMoreCoverage");
 			double numCounts = 0;
@@ -775,19 +790,19 @@ public class Sam2USeq {
 				numCounts += counts[i];
 				if (numCounts == total) break;
 			}
-			System.out.println("\nTotal interrogated bases\t"+(int)total);
+			System.out.println("\nTotal interrogated bases\t"+ total);
 
 			//print summary stats
-
-			short[] c = Num.arrayListOfShortToArray(baseCoverage);
-			Arrays.sort(c);
+			//short[] c = Num.arrayListOfShortToArray(baseCoverage);
+			//Arrays.sort(c);
 			//calc mean
-			double mean = Num.mean(c);
-			short min = c[0];
-			short max = c[c.length-1];
+			//double mean = Num.mean(c);
+			//short min = c[0];
+			//short max = c[c.length-1];
 			//calc median
-			double median = Num.median(c);
-			System.out.println("Mean Coverage\t"+mean+"\nMedian Coverage\t"+median+"\nMinimum\t"+min+"\nMaximum\t"+max);
+			//double median = Num.median(c);
+			//System.out.println("Mean Coverage\t"+mean+"\nMedian Coverage\t"+median+"\nMinimum\t"+min+"\nMaximum\t"+max);
+			System.out.println("Mean Coverage\t"+this.calcHistMean()+"\nMedian Coverage\t"+this.calcHistMedian()+"\nMinimum\t"+calcHistMin()+"\nMaximum\t"+calcHistMax());
 
 
 			System.out.close();
@@ -798,6 +813,80 @@ public class Sam2USeq {
 			System.exit(1);
 		}
 
+	}
+	
+	private long calcHistMin() {
+		return Collections.min(this.baseCoverageHist.keySet());
+	}
+	
+	private long calcHistMax() {
+		return Collections.max(this.baseCoverageHist.keySet());
+	}
+	
+	private double calcHistMean() {
+		long totalPositions = 0;
+		
+		long totalCoverage = 0;
+		for (long k: this.baseCoverageHist.keySet()) {
+			long count = this.baseCoverageHist.get(k);
+			totalPositions += count;
+			totalCoverage += (count * k);
+		}
+		System.out.println("Total postitions: " + totalPositions);
+		double mean = (double)totalCoverage / totalPositions; 
+		return mean;
+		
+	}
+	
+	private double calcHistMedian() {
+		int totalPositions = 0;
+		for (long i: this.baseCoverageHist.values()) {
+			totalPositions += i;
+		}
+		int midPosition = totalPositions / 2; 
+		
+		ArrayList<Long> keySet = new ArrayList<Long>();
+		keySet.addAll(this.baseCoverageHist.keySet());
+		Collections.sort(keySet);
+		
+		double median = 0;
+		
+		if (totalPositions % 2 == 1) {
+			long count = 0;
+			for (Long key: keySet) {
+				long elements = this.baseCoverageHist.get(key);
+				if (midPosition > count && midPosition < count+elements) {
+					median = key;
+					break;
+				}
+				count += elements;
+			}
+		} else {
+			long count = 0;
+			long e1 = 0;
+			long e2 = 0;
+			boolean e1found = false;
+			boolean e2found = false;
+			for (long key: keySet) {
+				long elements = this.baseCoverageHist.get(key);
+				if (!e1found && (midPosition > count) && (midPosition < (count+elements))) {
+					e1 = key;
+					e1found = true;
+				} 
+				if (!e2found && ((midPosition+1) > count) && ((midPosition+1) < (count + elements))) {
+					e2 = key;
+					e2found = true;
+				}
+				
+				if (e1found && e2found) {
+					break;
+				}
+				count += elements;
+			}
+			
+			median = (e1 + e2) / 2.0;
+		}
+		return median;
 	}
 
 

@@ -4,47 +4,53 @@ import java.io.File;
 import java.util.HashSet;
 
 public class TFConstants {
-	public static String ANALYSIS_EXOME_NOVO_RAW = "exome_novo_raw";
-	public static String ANALYSIS_EXOME_NOVO_VQSR = "exome_novo_vqsr";
-	public static String ANALYSIS_EXOME_BWA_RAW = "exome_bwa_raw";
-	public static String ANALYSIS_EXOME_BWA_VQSR = "exome_bwa_vqsr";
-	public static String ANALYSIS_EXOME_ALIGN_NOVO = "exome_align_novo";
-	public static String ANALYSIS_EXOME_ALIGN_BWA = "exome_align_bwa";
-	public static String ANALYSIS_EXOME_ALIGN_BEST = "exome_align_best";
-	public static String ANALYSIS_EXOME_METRICS = "exome_metrics";
-	public static String ANALYSIS_EXOME_VARIANT_RAW = "exome_variant_raw";
-	public static String ANALYSIS_EXOME_VARIANT_VQSR = "exome_variant_vqsr";
-	public static String ANALYSIS_EXOME_VARIANT_BEST = "exome_variant_best";
-	public static String ANALYSIS_EXOME_BEST = "exome_best";
-	public static String ANALYSIS_CUSTOM = "custom";
+	public static String MENU_UGP_FULL = "ugp_full";
+	public static String MENU_UGP_ALIGN = "ugp_align";
+	public static String MENU_UGP_VARIANT = "upg_variant";
+	public static String MENU_CORE_FULL = "core_full";
+	public static String MENU_CORE_ALIGN = "core_align";
+	public static String MENU_CORE_VARIANT = "core_variant";
+	public static String MENU_METRICS = "metrics";
 	
+	
+	public static String ANALYSIS_CORE_FULL_NOV = "core_full_nov";
+	public static String ANALYSIS_CORE_FULL_BWA = "core_full_bwa";
+	public static String ANALYSIS_CORE_ALIGN_NOV = "core_align_nov";
+	public static String ANALYSIS_CORE_ALIGN_BWA = "core_align_baw";
+	public static String ANALYSIS_CORE_VARIANT = "core_variant";
+	public static String ANALYSIS_METRICS = "metrics";
+	public static String ANALYSIS_UGP_FULL_NOV_RAW = "ugp_full_nov_raw";
+	public static String ANALYSIS_UGP_FULL_NOV_VQSR = "ugp_full_nov_vqsr";
+	public static String ANALYSIS_UGP_FULL_BWA_RAW = "ugp_full_bwa_raw";
+	public static String ANALYSIS_UGP_FULL_BWA_VQSR = "ugp_full_bwa_vqsr";
+	public static String ANALYSIS_UGP_ALIGN_NOV = "ugp_align_nov";
+	public static String ANALYSIS_UGP_ALIGN_BWA = "ugp_align_bwa";
+	public static String ANALYSIS_UGP_VARIANT_RAW = "ugp_variant_raw";
+	public static String ANALYSIS_UGP_VARIANT_VQSR = "ugp_variant_vqsr";
+
+		
 	public static String FILE_FASTQ1 = "fastq1";
 	public static String FILE_FASTQ2 = "fastq2";
 	
 	public static String FILE_BAM = "bam";
 	public static String FILE_BAI = "bai";
-	public static String FILE_LANE_BAM = "lane_bam";
-	public static String FILE_LANE_BAI = "lane_bai";
 	public static String FILE_SAMPLE_BAM = "sample_bam";
 	public static String FILE_SAMPLE_BAI = "sample_bai";
-	public static String FILE_SPLIT_BAM = "split_bam";
-	public static String FILE_SPLIT_BAI = "split_bai";
 	public static String FILE_FINAL_BAM = "final_bam";
 	public static String FILE_FINAL_BAI = "final_bai";
-	public static String FILE_REDUCE_BAM = "reduce_bam";
-	public static String FILE_REDUCE_BAI = "reduce_bai";
 	
-	public static String FILE_ID_FINAL_BAM = "idFinalBam";
-	public static String FILE_ID_FINAL_BAI = "idFinalBai";
-	public static String FILE_ID_REDUCE_BAM = "idReduceBam";
-	public static String FILE_ID_REDUCE_BAI = "idReduceBai";
-	
+	public static String FILE_GVCF = "gvcf";
+	public static String FILE_GVCF_IDX = "gvcf_dx";
+	public static String FILE_GVCF_STUDY = "gvcf_study";
+	public static String FILE_GVCF_STUDY_IDX = "gvcf_study_idx";
+
 	public static String FILE_VCF_RAW = "vcf_raw";
 	public static String FILE_VCF_RAW_IDX = "vcf_raw_idx";
 	public static String FILE_VCF_FILTER = "vcf_filter";
 	public static String FILE_VCF_FILTER_IDX = "vcf_filter_idx";
 	public static String FILE_VCF_PASSING = "vcf_passing";
 	public static String FILE_VCF_PASSING_IDX = "vcf_passing_idx";
+	
 	
 	public static String FILE_SAM = "sam";
 	public static String FILE_METRICS = "pdf";
@@ -72,25 +78,85 @@ public class TFConstants {
 		prefixTypes.add(TFConstants.PREFIX_PUID);
 	}
 
+	public static HashSet<String> validMenu = new HashSet<String>() {
+		private static final long serialVersionUID = 1L;
+
+	{
+		add(TFConstants.MENU_METRICS);
+		add(TFConstants.MENU_UGP_FULL);
+		add(TFConstants.MENU_UGP_ALIGN);
+		add(TFConstants.MENU_UGP_VARIANT);
+		add(TFConstants.MENU_CORE_FULL);
+		add(TFConstants.MENU_CORE_ALIGN);
+		add(TFConstants.MENU_CORE_VARIANT);
+	}};
+	
+	public static HashSet<String> alignOptions = new HashSet<String>() {
+		private static final long serialVersionUID = 1L;
+
+	{
+		add(TFConstants.MENU_CORE_FULL);
+		add(TFConstants.MENU_CORE_ALIGN);
+		add(TFConstants.MENU_UGP_FULL);
+		add(TFConstants.MENU_CORE_ALIGN);
+	}};
+	
+	public static HashSet<String> variantOptions = new HashSet<String>() {
+		private static final long serialVersionUID = 1L;
+
+	{
+		add(TFConstants.MENU_UGP_FULL);
+		add(TFConstants.MENU_UGP_VARIANT);
+	}};
+	
+	public static HashSet<String> alignTypes = new HashSet<String>() {
+		private static final long serialVersionUID = 1L;
+
+	{
+		add("core_bwa");
+		add("core_nov");
+		add("ugp_nov");
+		add("ugp_bwa");
+	}};
+	
+	public static HashSet<String> metricsTypes = new HashSet<String>() {
+		private static final long serialVersionUID = 1L;
+
+	{
+		add("metrics");
+	}};
+	
+	public static HashSet<String> variantTypes = new HashSet<String>() {
+		private static final long serialVersionUID = 1L;
+
+	{
+		add("core_variant");
+		add("ugp_raw");
+		add("ugp_vqsr");
+	}};
+	
 	
 	public static HashSet<String> validTypes = new HashSet<String>() {
 		private static final long serialVersionUID = 1L;
 
 	{
-		add(TFConstants.ANALYSIS_CUSTOM);
-		add(TFConstants.ANALYSIS_EXOME_BWA_RAW);
-		add(TFConstants.ANALYSIS_EXOME_BWA_VQSR);
-		add(TFConstants.ANALYSIS_EXOME_NOVO_RAW);
-		add(TFConstants.ANALYSIS_EXOME_NOVO_VQSR);
-		add(TFConstants.ANALYSIS_EXOME_ALIGN_BWA);
-		add(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO);
-		add(TFConstants.ANALYSIS_EXOME_ALIGN_BEST);
-		add(TFConstants.ANALYSIS_EXOME_METRICS);
-		add(TFConstants.ANALYSIS_EXOME_VARIANT_RAW);
-		add(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR);
-		add(TFConstants.ANALYSIS_EXOME_VARIANT_BEST);
-		add(TFConstants.ANALYSIS_EXOME_BEST);
+		add(TFConstants.ANALYSIS_CORE_FULL_NOV);
+		add(TFConstants.ANALYSIS_CORE_FULL_BWA);
+		add(TFConstants.ANALYSIS_CORE_ALIGN_NOV);
+		add(TFConstants.ANALYSIS_CORE_ALIGN_BWA);
+		add(TFConstants.ANALYSIS_CORE_VARIANT);
+		add(TFConstants.ANALYSIS_METRICS);
+		add(TFConstants.ANALYSIS_UGP_FULL_BWA_VQSR);
+		add(TFConstants.ANALYSIS_UGP_FULL_BWA_RAW);
+		add(TFConstants.ANALYSIS_UGP_FULL_NOV_VQSR);
+		add(TFConstants.ANALYSIS_UGP_FULL_BWA_RAW);
+		add(TFConstants.ANALYSIS_UGP_ALIGN_NOV);
+		add(TFConstants.ANALYSIS_UGP_ALIGN_BWA);
+		add(TFConstants.ANALYSIS_UGP_VARIANT_RAW);
+		add(TFConstants.ANALYSIS_UGP_VARIANT_VQSR);
 	}};
+	
+	
 	
 	public static HashSet<String> validTargets = new HashSet<String>() {
 		private static final long serialVersionUID = 1L;

@@ -455,11 +455,29 @@ public class Histogram implements Serializable {
 		totalBinHits += numLessThanMin;
 		return totalBinHits;
 	}
+	
+	public float getTotalBinCountsFloat(){
+		float totalBinHits = 0;
+		for (int i=0; i< numberOfBins; i++){
+			totalBinHits += bins[i].getHitsFloat();
+		}
+		totalBinHits += numMoreThanMax;
+		totalBinHits += numLessThanMin;
+		return totalBinHits;
+	}
 
 	public int[] getBinCounts(){
 		int[] counts = new int[numberOfBins];
 		for (int i=0; i< numberOfBins; i++){
 			counts[i] = bins[i].getHits();
+		}
+		return counts;
+	}
+	
+	public float[] getBinCountsFloat() {
+		float[] counts = new float[numberOfBins];
+		for (int i=0; i< numberOfBins; i++){
+			counts[i] = bins[i].getHitsFloat();
 		}
 		return counts;
 	}

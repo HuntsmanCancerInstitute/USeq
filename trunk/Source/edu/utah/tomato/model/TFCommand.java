@@ -23,7 +23,6 @@ import java.util.zip.GZIPInputStream;
 
 import edu.utah.tomato.daemon.TFThreadDaemon;
 import edu.utah.tomato.model.command.TFCommandExomeAlignUgp;
-import edu.utah.tomato.model.command.TFCommandExomeAlignHci;
 import edu.utah.tomato.model.command.TFCommandExomeMetrics;
 import edu.utah.tomato.model.command.TFCommandExomeVariant;
 import edu.utah.tomato.util.TFConstants;
@@ -51,6 +50,7 @@ public abstract class TFCommand {
 	protected boolean suppress = false;
 	protected boolean isFull = false;
 	protected Integer jobs= null;
+	protected String cluster = null;
 	
 	//Tomato thread options
 	protected Integer heartbeat = null;
@@ -68,8 +68,8 @@ public abstract class TFCommand {
 	
 	public static TFCommand getCommandObject(File rootDirectory, String commandLine, TFLogger logFile, 
 			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress,
-			boolean deleteMetricsBams, boolean deleteReducedBams, boolean isFull, boolean use1KGenomes, boolean validateFastq, String study, String splitType,  
-			File targetFile, HashMap<String,String> properties) {
+			boolean deleteMetricsBams, boolean deleteReducedBams, boolean isFull, boolean use1KGenomes, boolean validateFastq, String study,  
+			File targetFile, HashMap<String,String> properties, String cluster) {
 		
 		//Validate template file
 		File templateDir = new File(properties.get("TEMPLATE_PATH"));
@@ -78,18 +78,14 @@ public abstract class TFCommand {
 			logFile.writeErrorMessage("[TFCommand] Must be at least two parts for every command", true);
 			System.exit(1);
 		}
-		ArrayList<File> templateFiles = new ArrayList<File>();
-		File templateFile = new File(templateDir,"templates/" + commandParts[0] + "/" + commandParts[0] + "." + commandParts[1] + ".txt");
-		if (!templateFile.exists()) {
-			logFile.writeErrorMessage("[TFCommand] Configuration file invalid, specified template file doesn not exist: " + commandLine,false);
-			System.exit(1);
-		}
-		templateFiles.add(templateFile);
 		
-		//Check for dependencies
-		File depFile = new File(templateDir,"templates/" + commandParts[0] + "/deps." + commandParts[1] + ".txt");
+		
+		ArrayList<File> templateFiles = new ArrayList<File>();
+		
+		//Add template files to list
+		File depFile = new File(templateDir,"templates/" + commandParts[0] + "/steps." + commandParts[1] + ".txt");
 		if (depFile.exists()) {
-			logFile.writeInfoMessage("[TFCommand] Found dependencies: ");
+			logFile.writeInfoMessage("[TFCommand] " + commandLine + " has the following pysano steps: ");
 			try {
 				BufferedReader br = new BufferedReader(new FileReader(depFile));
 				String line = "";
@@ -104,42 +100,37 @@ public abstract class TFCommand {
 				}
 				br.close();
 			} catch (FileNotFoundException fnfe) {
-				logFile.writeErrorMessage("[TFCommand] Count not find deps file", true);
+				logFile.writeErrorMessage("[TFCommand] Count not find command steps file", true);
 			} catch (IOException ioex) {
-				logFile.writeErrorMessage("[TFCommand]  Error reading deps file",true);
+				logFile.writeErrorMessage("[TFCommand]  Error reading command steps file",true);
 			}
 		}
 		
+		if (templateFiles.size() == 0) {
+			logFile.writeErrorMessage("[TFCommand] There were no analysis steps found in the steps file: " + depFile.getAbsolutePath() , true);
+			System.exit(1);
+		}
+		
 		TFCommand returnCommand = null;
-		if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_NOVO) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_BWA) ) {
+		if (TFConstants.alignTypes.contains(commandParts[0])) {
 			if (failmax == null) {
 				failmax = 3;
 			}
 			returnCommand = new TFCommandExomeAlignUgp(templateFiles,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, 
-					heartbeat, failmax, jobs, suppress, isFull, validateFastq, properties);
-		} else if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_ALIGN_BEST)) {
-			if (failmax == null) {
-				failmax = 3;
-			}
-			returnCommand = new TFCommandExomeAlignHci(templateFiles,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, 
-					heartbeat, failmax, jobs, suppress, isFull, validateFastq, properties);
-		}
-		
-		else if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_METRICS)) {
+					heartbeat, failmax, jobs, suppress, isFull, validateFastq, properties, cluster);
+		} else if (TFConstants.metricsTypes.contains(commandParts[0])) {
 			if (failmax == null) {
 				failmax = 3;
 			}
 			returnCommand = new TFCommandExomeMetrics(templateFiles,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, 
-					heartbeat, failmax, jobs, suppress, deleteMetricsBams, isFull, study, targetFile, properties);
-		} else if (commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_RAW) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_VQSR) || commandParts[0].equals(TFConstants.ANALYSIS_EXOME_VARIANT_BEST)) {
+					heartbeat, failmax, jobs, suppress, deleteMetricsBams, isFull, study, targetFile, properties, cluster);
+		}  else if (TFConstants.variantTypes.contains(commandParts[0])) {
 			if (failmax == null) {
 				failmax = 5;
 			}
 			returnCommand = new TFCommandExomeVariant(templateFiles,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, 
-					heartbeat, failmax, jobs, suppress, deleteReducedBams, isFull, use1KGenomes, study, splitType, targetFile, properties);
-		}
-		
-		else {
+					heartbeat, failmax, jobs, suppress, deleteReducedBams, isFull, use1KGenomes, study, targetFile, properties, cluster);
+		} else {
 			logFile.writeErrorMessage("[TFCommand] Command type not recognized: " + commandParts[0], true);
 			System.exit(1);
 		}
@@ -151,7 +142,8 @@ public abstract class TFCommand {
 	
 
 	public TFCommand(ArrayList<File> templateFile, File rootDirectory, String commandString, String commandType, TFLogger logFile, 
-			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress, boolean isFull, HashMap<String,String> properties) {
+			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress, boolean isFull, 
+			HashMap<String,String> properties, String cluster) {
 		this.templateFiles = templateFile;
 		this.rootDirectory  = rootDirectory;
 		this.commandString = commandString;
@@ -165,6 +157,7 @@ public abstract class TFCommand {
 		this.suppress  = suppress;
 		this.properties = properties;
 		this.isFull = isFull;
+		this.cluster = cluster;
 	}
 	
 	
@@ -675,6 +668,10 @@ public abstract class TFCommand {
 			} else {
 				bw.write(String.format("#e %s \n", this.email));
 				//bw.write(String.format("#e %s \n#c ember\n", this.email));
+			}
+			
+			if (this.cluster != null) {
+				bw.write(String.format("#c " + this.cluster));
 			}
 			
 			if (this.wallTime != null) {
