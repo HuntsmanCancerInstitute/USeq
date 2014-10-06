@@ -289,6 +289,8 @@ public class DefinedRegionDifferentialSeq {
 		for (int[] b : blocks){
 			int start = b[0] - chrStartBp;
 			int stop = b[1] - chrStartBp;
+			//need to watch for out of bounds issues, sometimes the length of the chromosome is incorrect in the bam header.
+			if (stop > badBases.length) stop = badBases.length;
 			for (int i=start; i < stop; i++){
 				//bad base?
 				if (badBases[i]) continue;
@@ -386,7 +388,7 @@ public class DefinedRegionDifferentialSeq {
 		//fetch chromName: length for all chroms
 		HashMap<String, Integer> chromLength = new HashMap<String, Integer>();
 		List<SAMSequenceRecord> seqs =  reader.getFileHeader().getSequenceDictionary().getSequences();
-		for (SAMSequenceRecord sr: seqs) chromLength.put(sr.getSequenceName(), sr.getSequenceLength());
+		for (SAMSequenceRecord sr: seqs) chromLength.put(sr.getSequenceName(), sr.getSequenceLength()+1000);
 
 		SAMRecordIterator iterator = reader.iterator();
 
