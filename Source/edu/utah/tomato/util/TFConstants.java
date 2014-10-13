@@ -6,7 +6,7 @@ import java.util.HashSet;
 public class TFConstants {
 	public static String MENU_UGP_FULL = "ugp_full";
 	public static String MENU_UGP_ALIGN = "ugp_align";
-	public static String MENU_UGP_VARIANT = "upg_variant";
+	public static String MENU_UGP_VARIANT = "ugp_variant";
 	public static String MENU_CORE_FULL = "core_full";
 	public static String MENU_CORE_ALIGN = "core_align";
 	public static String MENU_CORE_VARIANT = "core_variant";
@@ -16,7 +16,7 @@ public class TFConstants {
 	public static String ANALYSIS_CORE_FULL_NOV = "core_full_nov";
 	public static String ANALYSIS_CORE_FULL_BWA = "core_full_bwa";
 	public static String ANALYSIS_CORE_ALIGN_NOV = "core_align_nov";
-	public static String ANALYSIS_CORE_ALIGN_BWA = "core_align_baw";
+	public static String ANALYSIS_CORE_ALIGN_BWA = "core_align_bwa";
 	public static String ANALYSIS_CORE_VARIANT = "core_variant";
 	public static String ANALYSIS_METRICS = "metrics";
 	public static String ANALYSIS_UGP_FULL_NOV_RAW = "ugp_full_nov_raw";

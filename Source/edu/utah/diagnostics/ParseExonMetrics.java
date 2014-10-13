@@ -191,7 +191,7 @@ public class ParseExonMetrics {
 			
 			this.meanErrorRate = Float.parseFloat(br.readLine().split("\t")[1]);
 			
-			this.generateRBarplot(xaxis, values, ".PEM.error.txt", "Per Base Error Rate", "Position", "Error Rate", errorGraph,"error");
+			this.generateRBarplot(xaxis, values, ".PEM.error.txt", "Per Base Error Rate (PhiX)", "Position", "Error Rate", errorGraph,"error");
 			
 			
 			br.close();
