@@ -3,6 +3,10 @@ MergeSams
 * Created a new app to merge sam and bam files.  Creates a stripped header from the files if one isn't provided.  This won't play nicely with downstream GATK or Picard apps. Have yet to find at good app for doing this, SamTools and Picard's are riddled with error/ validation headaches.
 DefinedRegionDifferentialSeq
 * Added catch for alignments that are run off the end of the last reported base in a chromosome
+SamSplitter
+* New app for splitting a sam file in half. Randomly assigns paired read groups to either half.
+VCFComparator
+* Removed requirement that read depths are provided for the alleles.  Added a skip for finding common regions when the same bed file is provided.
 
 ----USeq_8.8.3----
 VCFComparator

@@ -71,7 +71,6 @@ public class VCFSample {
 					
 				else if (format[i].equals("AD")) {
 					alleleCounts = data[i];
-					
 					String[] multiple = data[i].split(",");
 					if (multiple.length > 1) {
 						this.referenceCounts = multiple[0];
@@ -86,10 +85,10 @@ public class VCFSample {
 					this.referenceCounts = data[i];
 				}
 			}
-			
-			if (referenceCounts == null || alternateCounts == null) {
-				throw new Exception("Could not parse counts for either the reference (" + referenceCounts + ") or alternate (" + alternateCounts + ")allele.".format(referenceCounts, alternateCounts));
-			}
+			//not all vcf records have counts! so don't require it
+			/*if (referenceCounts == null || alternateCounts == null) {
+				throw new Exception("Could not parse counts for either the reference (" + referenceCounts + ") or alternate (" + alternateCounts + ") allele.");
+			}*/
 			
 		}
 	}

@@ -386,6 +386,14 @@ public class VCFComparator {
 		String res = keyBps +"\tInterrogated bps in key\n";
 		results.append(res);
 
+		//same interrogated regions?
+		if (bedKey.toString().equals(bedTest.toString())){
+			testRegions = keyRegions;
+			testBps = keyBps;
+			commonRegions = keyRegions;
+			commonBps = keyBps;
+		}
+		
 		//test regions
 		if (testRegions == null){
 			testRegions = Bed.parseBedFile(bedTest, true, true);
