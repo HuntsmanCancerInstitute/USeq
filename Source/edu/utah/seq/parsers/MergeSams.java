@@ -74,6 +74,7 @@ public class MergeSams{
 			}
 			samHeader = fetchSamHeader();
 		}
+		samOut.println(samHeader);
 
 		//for each file, parse and save to disk	
 		System.out.println("\nParsing, filtering, and merging SAM files...");

@@ -204,17 +204,14 @@ public class VCFParser {
 			int maxRecord = this.chunkSize * this.chunkNumber + this.chunkSize;
 			int recordCount = 0;
 			
-			boolean zeroQualFlag = false;
-			
 			while ((line=in.readLine()) != null){
 				if (recordCount < minRecord) { //Ignore records less than starting point
 					//pass
 				} else if (recordCount >= maxRecord) { //Quit looking for records beyond ending point
 					break;
 				} else { //Juuust right.
-					try {
+					try {					
 						VCFRecord vcf = new VCFRecord(line, this, loadSamples, loadInfo);
-						
 						if (!missingQual && vcf.isMissingQual()) {
 							System.out.println("\n\nWARNING: Sample variant quality (GQ) is missing from record: " + line + ".\n\nMissing sample qualities are set to zero.  Missing quality information is normal "
 									+ "when parsing VCF files from tumor/normal varscan, but not VCF files from GATK.  This error is only reported once to reduce "
