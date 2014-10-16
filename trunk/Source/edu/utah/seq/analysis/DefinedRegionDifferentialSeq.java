@@ -481,10 +481,12 @@ public class DefinedRegionDifferentialSeq {
 				}
 
 			}
+			
 		}
 		//add last
 		if (verbose) System.out.println();
-		if (chromGenes.containsKey(sam.getReferenceName())) {
+		
+		if (chromGenes.containsKey(chrom)) {
 			if (printFirstLastCountTable) loadFirstLastGeneCounts(replica, bpNames, chrStartBp, chrom);
 			else loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases);
 		}
@@ -519,7 +521,7 @@ public class DefinedRegionDifferentialSeq {
 
 		//for each gene in the chromosome 
 		UCSCGeneLine[] chrGenes = chromGenes.get(chromosome);
-
+		
 		for (int i=0; i< chrGenes.length; i++){
 			//flagged gene
 			if (chrGenes[i].isFlagged()) continue;
