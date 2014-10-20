@@ -189,13 +189,11 @@ public class VCFUtilities {
 				command.add(bam.getAbsolutePath());
 			}
 			
-			
 			ProcessBuilder pb = new ProcessBuilder(command);
 			Process p = pb.start();
 			
 			BufferedInputStream bis = new BufferedInputStream(p.getInputStream());
 			BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(dest));
-			
 			
 			byte[] buffer = new byte[1024*1024*10];
 			int n = -1;
@@ -203,13 +201,11 @@ public class VCFUtilities {
 			while((n = bis.read(buffer))!=-1) {
 			  bos.write(buffer,0,n);
 			}
-		
 
 			int val = p.waitFor();
 			bos.close();
 			bis.close();
 
-			
 			if (val != 0) {
 				System.out.println("[mergeVcf] Error while merging the VCF files: " + dest.getAbsolutePath());
 				BufferedReader br2 = new BufferedReader(new InputStreamReader(p.getErrorStream()));
@@ -220,13 +216,13 @@ public class VCFUtilities {
 				System.exit(1);
 			}
 			
-			
-			
 		} catch (IOException ioex) {
 			System.out.println("[mergeVcf] IO Exception while trying to merge the VCF files: " + dest.getAbsolutePath());
+			ioex.printStackTrace();
 			System.exit(1);
 		} catch (InterruptedException ieex) {
 			System.out.println("[mergeVcf] Process was interrupted while trying to merge the VCF files: " + dest.getAbsolutePath());
+			ieex.printStackTrace();
 			System.exit(1);
 		}
 	}

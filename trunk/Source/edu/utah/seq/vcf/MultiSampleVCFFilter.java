@@ -5,6 +5,8 @@ import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import edu.utah.seq.useq.data.RegionScoreText;
+import util.bio.annotation.Bed;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -25,13 +27,9 @@ public class MultiSampleVCFFilter {
 	private boolean printSampleNames = false;
 	private boolean filterByGenotype = false;
 	private boolean failNoCall = false;
-
-	
+	private HashMap<String,RegionScoreText[]> regions = null;
 	private String[][] samplesByGroup = null;
 	private String[] flagsByGroup = null;
-
-
-
 
 	public MultiSampleVCFFilter(String[] args){
 		long startTime = System.currentTimeMillis();
@@ -45,31 +43,36 @@ public class MultiSampleVCFFilter {
 		int recordCount = VCFUtilities.countReads(vcfInFile);
 		int chunks = recordCount / VCFUtilities.readsToChunk + 1;
 		
+		File tempDir = null;
 		if (chunks > 1) {
 			System.out.println("File too big to intersect all in one go, splitting into " + chunks + " chunks\n");
+			//make tempDirectory
+			tempDir = new File("tempVCF");
+			if (tempDir.exists()) {
+				IO.deleteDirectory(tempDir);
+			}
+			tempDir.mkdir();
 		}
 				
-		//make tempDirectory
-		File tempDir = new File("tempVCF");
-		if (tempDir.exists()) {
-			IO.deleteDirectory(tempDir);
-		}
-		tempDir.mkdir();
-		
+
+		//for each file or file chunk
+		System.out.println("\nFile\tFilterType\tStarting#\tEnding#");
 		for (int i=0;i<chunks;i++) {
-			System.out.println("Working on file chunk: " + (i + 1));
-			//Create temporary vcf files
-			File tempVcf = new File(tempDir,"tempVcf_" + i + ".vcf");
-			tempVcfFiles.add(tempVcf);
 			
-		
-			//for each file
-			System.out.println("\nFile\tFilterType\tStarting#\tEnding#");
+			//create VCF parser
+			VCFParser parser = null;
 			
+			//Create temporary vcf file?
+			File tempVcf = null;
+			if (tempDir != null){
+				tempVcf = new File(tempDir,"tempVcf_" + i + ".vcf");
+				tempVcfFiles.add(tempVcf);
+				parser =  new VCFParser(vcfInFile, true, true, true, i,VCFUtilities.readsToChunk);
+			}
+			else parser = new VCFParser(vcfInFile,true, true, true);
+			parser.appendChrFixMT();
 			
-			VCFParser parser =  new VCFParser(vcfInFile, true, true, true, i,VCFUtilities.readsToChunk);
-			
-			//set everything to pass (note this won't change the original when you print because printing grabs the original record line)?
+			//set all to pass? or keep incoming status?
 			if (failNonPassRecords) {
 				parser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
 				int pass  = parser.countMatchingVCFRecords(VCFRecord.PASS);
@@ -77,7 +80,13 @@ public class MultiSampleVCFFilter {
 				System.out.println(vcfInFile.getName()+ "\tPASSRecordFILTER\t"+total+"\t"+pass);
 			}
 			else parser.setFilterFieldOnAllRecords(VCFRecord.PASS);
-	
+
+			//filter on regions?
+			if (regions != null){			
+				int[] startEndCounts = parser.filterVCFRecords(regions);
+				System.out.println(vcfInFile.getName()+ "\tRegionFilter\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+			}
+			
 			if (filterRecordQuality){
 				int[] startEndCounts = filterRecordQuality(parser);
 				System.out.println(vcfInFile.getName()+ "\tRecordQuality\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
@@ -94,25 +103,24 @@ public class MultiSampleVCFFilter {
 			}
 	
 			//print good or bad records 
-			if (this.passing) {
-				parser.printFilteredRecords(tempVcf,VCFRecord.PASS);
-			} else {
-				parser.printFilteredRecords(tempVcf, VCFRecord.FAIL);
-			}
+			File out = vcfOutFile;
+			if (tempDir != null) out = tempVcf;
+			if (passing) parser.printFilteredRecords(out,VCFRecord.PASS);
+			else parser.printFilteredRecords(out, VCFRecord.FAIL);
 			
 			parser = null;
-			
-			System.out.println("\n\n");
 		}
 		
-		//Merge vcf file
-		VCFUtilities.mergeVcf(tempVcfFiles, this.vcfOutFile);
-				
-		//delete temp files
-		IO.deleteDirectory(tempDir);
+		//chunking?
+		if (tempDir != null){
+			//Merge vcf file
+			VCFUtilities.mergeVcf(tempVcfFiles, vcfOutFile);	
+			//delete temp files
+			IO.deleteDirectory(tempDir);
+		}
 
-		if (this.compressOutput) {
-			VCFUtilities.createTabix(this.vcfOutFile, this.pathToTabix);
+		if (compressOutput) {
+			VCFUtilities.createTabix(vcfOutFile, pathToTabix);
 		}
 
 		//finish and calc run time
@@ -133,8 +141,6 @@ public class MultiSampleVCFFilter {
 		VCFRecord[] records = parser.getVcfRecords();
 		int startingRecordNumber = parser.countMatchingVCFRecords(VCFRecord.PASS);
 		
-		
-
 		//filter
 		for (VCFRecord test : records){
 			//is it a passing record?
@@ -264,24 +270,21 @@ public class MultiSampleVCFFilter {
 		System.out.println(failNonPassRecords + "\tFail records where the original FILTER field is not 'PASS' or '.'");
 		System.out.println(filterRecordQuality+"\tFail records with QUAL scores < "+ recordMinimumQUAL);
 		System.out.println(filterAnySample + "\tPass records where any sample passses thresholds");
+		boolean regionFilter = (regions != null);
+		System.out.println(regionFilter+"\tFail records that don't intersect the user provided regions");
 		
 		System.out.println(sampleMinimumReadDepthDP + "\tMinimum sample read depth DP");
 		System.out.println(sampleMinimumGenotypeQualityGQ + "\tMinimum sample genotype quality GQ");
 		
-		if (this.filterByGenotype) {
-			for (int i=0; i<this.flagsByGroup.length;i++) {
+		if (filterByGenotype) {
+			for (int i=0; i<flagsByGroup.length;i++) {
 				System.out.println("\nGroup: " + i);
-				System.out.println("Flag: " + this.flagsByGroup[i]);
-				for (int j=0; j<this.samplesByGroup[i].length; j++) {
-					System.out.println("\tSample: " + this.samplesByGroup[i][j]);
+				System.out.println("Flag: " + flagsByGroup[i]);
+				for (int j=0; j<samplesByGroup[i].length; j++) {
+					System.out.println("\tSample: " + samplesByGroup[i][j]);
 				}
 			}
 		}
-		
-		System.out.println("\n\n");
-		
-		
-		
 	}
 
 	public static void main(String[] args) {
@@ -296,13 +299,11 @@ public class MultiSampleVCFFilter {
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
-
 		File inputFile = null;
 		String outputFile = null;
-		
+		File regionFile = null;
 		String[] sampleNames = null;
 		String[] groups = null;
-
 
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -312,8 +313,9 @@ public class MultiSampleVCFFilter {
 				try{
 					switch (test){
 					case 'v': inputFile = new File(args[++i]); break;
+					case 'c': regionFile = new File(args[++i]); break;
 					case 'p': outputFile = args[++i]; break;
-					case 't': this.pathToTabix = args[++i]; break;
+					case 't': pathToTabix = args[++i]; break;
 					case 'f': passing = false; break;
 					case 'a': filterAnySample = true; break;
 					case 'g': sampleMinimumGenotypeQualityGQ = Float.parseFloat(args[++i]); break;
@@ -334,6 +336,11 @@ public class MultiSampleVCFFilter {
 					Misc.printExit("\nSorry, something doesn't look right with this parameter: -"+test+"\n");
 				}
 			}
+		}
+		
+		//region file
+		if (regionFile != null){
+			regions = Bed.parseBedFile(regionFile, true, true);
 		}
 		
 		//Check sample name / group / flag information
@@ -431,8 +438,8 @@ public class MultiSampleVCFFilter {
 
 
 		if (outputFile == null) {
-			System.out.println("Output file was no specified, exiting.\n");
-			System.exit(1);
+			String name = Misc.removeExtension(inputFile.getName());
+			vcfOutFile = new File (inputFile.getParentFile(), name+"_Filt.vcf");
 		} else if (Pattern.matches(".+?.vcf",outputFile)) {
 			this.compressOutput = false;
 			this.vcfOutFile = new File(outputFile);
@@ -461,23 +468,25 @@ public class MultiSampleVCFFilter {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Multi Sample VCF Filter  : May 2013                   **\n" +
+				"**                            Multi Sample VCF Filter  : Oct 2014                   **\n" +
 				"**************************************************************************************\n" +
 				"Filters a vcf file containing multiple sample records into those that pass or fail the\n" +
 				"tests below. This works with VCFv4.1 files created by the GATK package. Note, the \n" +
 				"records are not modified. If the number of records in the VCF file is greater than \n" +
-				"500,000, the VCF file is intersected in chunks. The chunks are merged and compressed \n" + 
+				"500000, the VCF file is intersected in chunks. The chunks are merged and compressed \n" + 
 				"automatically at the end of the application.\n\n" +
 
 				"Required:\n"+
-				"-v Full path to a sorted multi sample vcf file (xxx.vcf/xxx.vcf.gz)). \n"+
-				"-p Full path to the output VCF (xxx.vcf/xxx.vcf.gz).  Specifying xxx.vcf.gz will \n" + 
-				"       compress and index the VCF using tabix (set -t too).\n\n" +
-				
+				"-v Full path to a sorted single or multi sample vcf file (xxx.vcf/xxx.vcf.gz)). Note,\n"+
+				"       Java often fails to parse tabix compressed vcf files.  Best to uncompress.\n\n"+
+								
 				"Optional:\n" +
+				"-p Full path to an output VCF (xxx.vcf or xxx.vcf.gz).  Specifying xxx.vcf.gz will \n" + 
+				"       compress and index the VCF using tabix (set -t too). Defaults to input_Filt.vcf\n" +
 				"-f Print out failing records, defaults to printing those passing the filters.\n" +
 				"-a Fail records where no sample passes the sample thresholds.\n"+
 				"-i Fail records where the original FILTER field is not 'PASS' or '.'\n"+
+				"-c Fail records that don't intersect the regions in this bed file, full path.\n"+
 				"-b Filter by genotype flags.  -n, -u and -l must be set.\n" +
 				"-n Sample names ordered by category.  \n" +
 				"-u Number of samples in each category.  \n" +
@@ -504,7 +513,7 @@ public class MultiSampleVCFFilter {
 				"\n"+
 
 				"Example: java -Xmx10G -jar pathTo/USeq/Apps/MultiSampleVCFFilter \n" +
-				"       -v DEMO.passing.vcf.gz -p DEMO.intersection.vcf.gz -b \n" +
+				"       -v DEMO.passing.vcf -p DEMO.intersection.vcf -c exomeV4.bed -b \n" +
 				"       -n SRR504516,SRR776598,SRR504515,SRR504517,SRR504483 -u 2,2,1 -l M,H,-M \n\n" +
 
 				"**************************************************************************************\n");
