@@ -277,7 +277,9 @@ public class VCFParser {
 	public void splitVCFRecordsByChromosome() {
 		try {
 			chromosomeVCFRecords = new HashMap<String, VCFLookUp>();
-
+			
+			if (vcfRecords == null || vcfRecords.length == 0) return;
+			
 			String oldChrom = vcfRecords[0].getChromosome();
 			int oldPosition = vcfRecords[0].getPosition();
 			ArrayList<VCFRecord> recordsAL = new ArrayList<VCFRecord>();
@@ -321,7 +323,9 @@ public class VCFParser {
 		}
 	}
 
-	public void filterVCFRecords(HashMap<String,RegionScoreText[]> goodRegions){
+	public int[] filterVCFRecords(HashMap<String,RegionScoreText[]> goodRegions){
+		int starting = countMatchingVCFRecords(VCFRecord.PASS);
+		
 		//call chrom splitter
 		getChromosomeVCFRecords();
 
@@ -351,8 +355,8 @@ public class VCFParser {
 				}
 			}
 		}
-		//remove records that are failing
-		filterVCFRecords(VCFRecord.PASS);
+		int ending = countMatchingVCFRecords(VCFRecord.PASS);
+		return new int[]{starting,ending};
 	}
 
 	/**This is a hard filter that only keeps VCFRecords whose Filter field matches the matchFilterText2Keep.
@@ -367,8 +371,6 @@ public class VCFParser {
 
 			//remake split chrom data?
 			if (chromosomeVCFRecords != null) splitVCFRecordsByChromosome();
-
-		
 	}
 
 	public int countMatchingVCFRecords(String matchFilterText){

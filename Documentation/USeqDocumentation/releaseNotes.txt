@@ -1,3 +1,8 @@
+----USeq_8.8.5----
+MultiSampleVCFFilter
+* Added option to filter by region
+* Cleaned up chunking issues when no chunking is indicated
+
 ----USeq_8.8.4----
 MergeSams
 * Created a new app to merge sam and bam files.  Creates a stripped header from the files if one isn't provided.  This won't play nicely with downstream GATK or Picard apps. Have yet to find at good app for doing this, SamTools and Picard's are riddled with error/ validation headaches.
