@@ -2,6 +2,14 @@
 MultiSampleVCFFilter
 * Added option to filter by region
 * Cleaned up chunking issues when no chunking is indicated
+VarScanVCFParser
+* New app to extract SOMATIC calls and replace QUAL score with the ssc score.
+SamAlignmentExtractor
+* Added option to output alignments that don't intersect the regions. 
+BamSurgeonMutator
+* Generates random mutations in a list of regions for the BamSurgeon application
+BisStat
+* Fixed an issue where some runs were throwing a comparator contract sort error due to lack of data in a particular base context and thus null fraction values
 
 ----USeq_8.8.4----
 MergeSams

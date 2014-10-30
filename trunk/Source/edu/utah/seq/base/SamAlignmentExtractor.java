@@ -21,6 +21,7 @@ public class SamAlignmentExtractor {
 	private File saveFile;
 	private int minimumReadDepth = 1;
 	private int maximumReadDepth = -1;
+	int numNoInt = 0;
 
 	//internal fields
 	private SAMFileReader[] samReaders;
@@ -28,6 +29,7 @@ public class SamAlignmentExtractor {
 	private String chromosome;
 	private static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSDHN])");
 	private Gzipper samOut;
+	private HashSet<String> hits = null;
 
 	//constructors
 	/**Stand alone.*/
@@ -84,6 +86,14 @@ public class SamAlignmentExtractor {
 				scanRegions();
 			}
 			System.out.println("\n");
+			
+			//look for no hits?
+			if (hits != null){
+				System.out.println("Scanning for alignments that don't intersect...");
+				System.out.println("#Ints\t"+hits.size());
+				printNoHits();
+				System.out.println("#NonInts\t"+numNoInt);
+			}
 
 			//close readers
 			closeSamReaders();
@@ -94,6 +104,30 @@ public class SamAlignmentExtractor {
 		} 
 
 
+	}
+
+	private void printNoHits() throws Exception{
+		//for each sam reader
+		for (int i=0; i< samReaders.length; i++) {
+			//make gzipper
+			Gzipper samOutNoHit = new Gzipper(new File (bamFiles[i].getParentFile(), Misc.removeExtension(bamFiles[i].getName())+"NoInt.sam.gz"));
+			//add header
+			String header = samReaders[i].getFileHeader().getTextHeader();
+			samOutNoHit.println(header.trim());
+			//get iterator
+			SAMRecordIterator it = samReaders[i].iterator();
+			while (it.hasNext()) {
+				SAMRecord sam = it.next();
+				String samString = sam.getSAMString().trim();
+				if (hits.contains(samString) == false) {
+					samOutNoHit.println(samString);
+					numNoInt++;
+				}
+			}
+			it.close();
+			samOutNoHit.close();
+		}
+		
 	}
 
 	/**Checks that the alignment actually touches down on at least one base of the region to avoid spanners.*/
@@ -148,7 +182,7 @@ public class SamAlignmentExtractor {
 	private void scanRegions() throws IOException{
 		RegionScoreText[] regions = chromRegions.get(chromosome);
 		HashSet<String> uniqueAlignments = new HashSet<String>();
-		//for each region 
+		//for each region in a particular chromosome
 		for (int i=0; i< regions.length; i++){
 			//fetch the overlapping alignments
 			ArrayList<String> alignments = fetchOverlappingAlignments (regions[i]);
@@ -172,8 +206,9 @@ public class SamAlignmentExtractor {
 				}
 				samOut.println(toPrint);
 			}
-			
 		}
+		//save hits?
+		if (hits != null) hits.addAll(uniqueAlignments);
 	}
 
 
@@ -202,6 +237,7 @@ public class SamAlignmentExtractor {
 					case 'a': bamFiles = IO.extractFiles(args[++i], ".bam"); break;
 					case 'b': bedFile = new File(args[++i]); break;
 					case 's': saveFile = new File(args[++i]); break;
+					case 'n': hits = new HashSet<String>(); break;
 					case 'i': minimumReadDepth = Integer.parseInt(args[++i]); break;
 					case 'x': maximumReadDepth = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
@@ -246,7 +282,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Sam Alignment Extractor: Jan 2013                     **\n" +
+				"**                            Sam Alignment Extractor: Oct 2014                     **\n" +
 				"**************************************************************************************\n" +
 
 				"Given a bed file containing regions of interest, parses all of the intersecting sam\n" +
@@ -262,6 +298,7 @@ public class SamAlignmentExtractor {
 				"       permutation of the bed file.\n"+
 				"-i Minimum read depth, defaults to 1\n"+
 				"-x Maximum read depth, defaults to unlimited\n"+
+				"-n Save alignments that don't intersect the regions of interest. Memory intensive!\n"+
 
 				"\n"+
 

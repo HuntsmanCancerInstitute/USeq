@@ -3,9 +3,11 @@ package edu.utah.seq.analysis;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
+
 import htsjdk.samtools.*;
 import util.bio.annotation.Bed;
 import util.gen.*;
+import edu.utah.seq.analysis.multi.PairedCondition;
 import edu.utah.seq.data.sam.SamAlignment;
 import edu.utah.seq.data.sam.SamLayoutForMutation;
 
@@ -18,14 +20,25 @@ public class AllelicExpressionDetector {
 	private File snpBedFile;
 	private File[] bamFiles;
 	private String[] sampleNamesToProcess;
+	private String[] treatmentSampleNames;
+	private String[] controlSampleNames;
+	private File fullPathToR = new File ("/usr/bin/R");
 	private File snpDataFile;
 	private double minimumGenCallScore = 0.2;
 	private int minimumReadCoverage = 4;
 	private int minimumBaseQuality = 20;
+	private int minimumReplicas = 3;
 	private File resultsDirectory;
 	private LinkedHashMap<String, Snp> nameSnp = new LinkedHashMap<String, Snp>();
 	private HashMap<String, SamReader> sampleNameSamReader = new HashMap<String, SamReader>();
 	private Random random = new Random(System.currentTimeMillis());
+	private int minNumSnpsForDESeq = 50;
+	
+	//each round of DESeq2
+	private File dataTable = null;
+	private int numReplicas = 0;
+	private int numSnps = 0;
+	private String[] deseqResults;
 	
 	
 	//constructor
@@ -51,8 +64,26 @@ public class AllelicExpressionDetector {
 		//close readers
 		closeSamReaders();
 
-		//score snps and print results
-		scoreSnps();
+		//write out count table
+		System.out.println("Launching DESeq for snps with: ");
+		numReplicas = minimumReplicas;
+		while (true){
+			System.out.print("\t"+numReplicas+" replicas ");
+			writeOutCountTable(numReplicas);
+			if (dataTable == null) {
+				System.out.println(" too few!");
+				break;
+			}
+			executeDESeq2();
+			System.out.println();
+			parseDESeq2Results();
+			numReplicas++;
+		}
+		System.out.println("Writing filtered count table for DESeq2...");
+		
+		//write out summary
+		System.out.println("Writing summary table...");
+		writeOutSummaryTable();
 
 
 		//finish and calc run time
@@ -60,17 +91,80 @@ public class AllelicExpressionDetector {
 		System.out.println("\nDone! "+Num.formatNumber(diffTime, 2)+" minutes\n");
 	}
 
-	private void scoreSnps() {
-		//write out count table
-		System.out.println("Writing filtered count table for DESeq2...");
-		writeOutCountTable();
-		
-		//write out summary
-		System.out.println("Writing summary table...");
-		writeOutSummaryTable();
 
-	}
 	
+	private void parseDESeq2Results() {
+		//name	baseMean	log2FoldChange	lfcSE	stat	pvalue	padj
+		//name chr20_47731157_kgp10629917_T_C_Ref_D005-14_D006-14_D040-13_D012-14_OS_Mac_RPE
+		for (int i=1; i< deseqResults.length; i++){
+			String[] t = Misc.TAB.split(deseqResults[i]);
+			//String[] n = Misc.  here
+		}
+		
+	}
+
+
+
+	private void executeDESeq2() {
+		try {
+			File results = new File (resultsDirectory, "resultsDESeq2_"+numReplicas+"Reps.txt");
+			//make R script
+			StringBuilder sb = new StringBuilder();
+			sb.append("#load libraries\n");
+			sb.append("library(DESeq2)\n");
+			sb.append("countTable = read.delim('"+dataTable.getCanonicalPath()+"', header=FALSE)\n");
+			sb.append("rownames(countTable) = countTable[,1]\n");
+			sb.append("countTable = countTable[,-1]\n");
+			
+			//add column names
+			sb.append("colnames(countTable) = c('A0','B0'");
+			for (int i=1; i< numReplicas; i++) sb.append(",'A"+i+"','B"+i+"'");
+			sb.append(")\n");
+			
+			//add condition info
+			sb.append("sampleInfo = data.frame(condition=as.factor(c('A','B'");
+			for (int i=1; i< numReplicas; i++) sb.append(",'A','B'");
+			sb.append(")))\n");
+
+			sb.append("rownames(sampleInfo) = colnames(countTable)\n");
+			sb.append("cds = DESeqDataSetFromMatrix(countData=countTable, colData=sampleInfo, design = ~condition)\n");
+			sb.append("cds = DESeq(cds)\n");
+			sb.append("res = results(cds, contrast = c('condition', 'A', 'B'))\n");
+			sb.append("res[,5] = -10 * log10(res[,5])\n"); //transform pvals since java can't handle some of these big numbers
+			sb.append("res[,6] = -10 * log10(res[,6])\n"); 
+			sb.append("write.table(res, file = '"+results+"', quote=FALSE, sep='\t')\n");
+
+			//write script to file
+			File scriptFile = new File (resultsDirectory,"rScriptDESeq2_"+numReplicas+"Reps.txt");
+			File rOut = new File(resultsDirectory, "rScriptDESeq2_"+numReplicas+"Reps.ROut.txt");
+			IO.writeString(sb.toString(), scriptFile);
+
+			//make command
+			String[] command = new String[] {
+					fullPathToR.getCanonicalPath(),
+					"CMD",
+					"BATCH",
+					"--no-save",
+					"--no-restore",
+					scriptFile.getCanonicalPath(),
+					rOut.getCanonicalPath()};
+
+			//execute command
+			IO.executeCommandLine(command);
+
+			//check for warnings?
+			deseqResults = IO.loadFile(results);
+			if ((deseqResults.length-1) != numSnps) Misc.printErrAndExit("\nERROR: the number of result rows ("+(deseqResults.length-1)+") does not match the number of snps ("+numSnps+")? See temp files for details.\n");
+
+
+		} catch (IOException e) {
+			e.printStackTrace();
+			Misc.printErrAndExit("Error: failed to execute DESeq2.\n");
+		}
+	}
+
+
+
 	private void writeOutSummaryTable() {
 		try {
 		
@@ -80,7 +174,9 @@ public class AllelicExpressionDetector {
 			
 			//for each Snp
 			out.println("Chr\tPos\tRef\tAlt\tName\tSampleNames\tRefAltCounts\tSampleGCScores");
-			for (Snp s : nameSnp.values()) out.println(s.toString());
+			for (Snp s : nameSnp.values()) {
+				if (s.sampleName != null) out.println(s.toString());
+			}
 			
 			out.close();
 			
@@ -90,37 +186,37 @@ public class AllelicExpressionDetector {
 	}
 
 
-	private void writeOutCountTable() {
+	
+	
+	private File writeOutCountTable(int numReps) {
 		try {
-			//find max number samples in a Snp
-			int maxSamples = findMaxNumberSamples();
 
 			//make gzipper
-			File f = new File (resultsDirectory, "countTableForDESeq.txt");
-			Gzipper out = new Gzipper(f);
+			dataTable = new File (resultsDirectory, "countTableForDESeq2_"+numReps+"Reps.txt.gz");
+			Gzipper out = new Gzipper(dataTable);
 			
 			//for each Snp
 			boolean flip = true;
 			HashSet<String> coordinates = new HashSet<String>();
-			int numSnps = 0;
-			int numSnpsWithData =0;
+
+			numSnps =0;
 			for (Snp s : nameSnp.values()){
-				numSnps++;
 				
 				//minSamples
 				if (s.sampleName != null) {
 					int numSamples = s.sampleName.size();
+					if (numSamples < numReps) continue;
+					
 					//already been saved?
 					String coordName = s.toStringCoordinates();
 					if (coordinates.contains(coordName)) continue;
 					coordinates.add(coordName);
-					numSnpsWithData++;
+					numSnps++;
 					
 					//flip alt vs ref counts
 					if (flip) flip = false;
 					else flip = true;
 
-					//CountPair[] cps = new CountPair[maxSamples];
 					CountPair[] cps = new CountPair[numSamples];
 					//for each sample
 					for (int i=0; i< numSamples; i++){
@@ -130,7 +226,6 @@ public class AllelicExpressionDetector {
 						if (flip) cps[i] = new CountPair(refAltCounts[1], refAltCounts[0], s.sampleName.get(i));
 						else cps[i] = new CountPair(refAltCounts[0], refAltCounts[1], s.sampleName.get(i));
 					}
-					//for (int i=numSamples; i< maxSamples; i++) cps[i]= new CountPair(0,0);
 					
 					//randomize CountPairs
 					Misc.randomize(cps, random);
@@ -140,12 +235,12 @@ public class AllelicExpressionDetector {
 					if (flip) sb.append("_Alt");
 					else sb.append("_Ref");
 					//appendSampleNames
-					for (int i=0; i< numSamples; i++){
+					for (int i=0; i< numReps; i++){
 						sb.append("_");
 						sb.append(cps[i].sampleName);
 					}
 					//for (int i=0; i< maxSamples; i++){
-					for (int i=0; i< numSamples; i++){
+					for (int i=0; i< numReps; i++){
 						sb.append("\t");
 						sb.append(cps[i].numA);
 						sb.append("\t");
@@ -155,11 +250,18 @@ public class AllelicExpressionDetector {
 				}
 			}
 			out.close();
-			System.out.println("\t"+numSnps+"\tNumber Snps");
-			System.out.println("\t"+numSnpsWithData+"\tNumber Snps with data");
+			
+			//enough snps?
+			System.out.print(numSnps);
+			if (numSnps < minNumSnpsForDESeq ) {
+				dataTable.delete();
+				dataTable = null;
+			}
+			return dataTable;
 			
 		} catch (IOException e) {
 			e.printStackTrace();
+			return null;
 		}
 	}
 
@@ -339,6 +441,7 @@ public class AllelicExpressionDetector {
 			Snp s = new Snp (b.getChromosome(), b.getStart(), tokens[0], tokens[1], tokens[2]);
 			if (nameSnp.containsKey(tokens[0])) Misc.printErrAndExit("\nError: same snp name found, aborting! "+tokens[0]+"\n");
 			nameSnp.put(tokens[0], s);
+			Misc.printErrAndExit(tokens[0]);
 		}
 	}
 
@@ -454,12 +557,14 @@ public class AllelicExpressionDetector {
 					switch (test){
 					case 'b': bamFiles = IO.extractFiles(new File(args[++i]), ".bam"); break;
 					case 's': snpBedFile = new File(args[++i]); break;
+					case 't': treatmentSampleNames = args[++i].split(","); break;
+					case 'c': controlSampleNames = args[++i].split(","); break;
 					case 'n': sampleNamesToProcess = args[++i].split(","); break;
 					case 'd': snpDataFile = new File(args[++i]); break;
 					case 'g': minimumGenCallScore = Double.parseDouble(args[++i]); break;
-					case 'c': minimumReadCoverage = Integer.parseInt(args[++i]); break;
+					case 'm': minimumReadCoverage = Integer.parseInt(args[++i]); break;
 					case 'q': minimumBaseQuality = Integer.parseInt(args[++i]); break;
-					case 'r': resultsDirectory = new File(args[++i]); break;
+					case 'e': resultsDirectory = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -473,33 +578,50 @@ public class AllelicExpressionDetector {
 		if (bamFiles == null || bamFiles[0].canRead() == false) Misc.printErrAndExit("\nError: can't find your bam alignment files?\n");
 		if (snpBedFile == null || snpBedFile.canRead() == false) Misc.printErrAndExit("\nError: can't find your SNP Map bed file generated by the ReferenceMutator?\n");
 		if (snpDataFile == null || snpDataFile.canRead() == false) Misc.printErrAndExit("\nError: can't find your SNP data file?\n");
-		if (sampleNamesToProcess == null || sampleNamesToProcess.length == 0) Misc.printErrAndExit("\nError: please enter the name(s) of samples to process.\n");
+		
+		//if (treatmentSampleNames == null || controlSampleNames == null) Misc.printErrAndExit("\nError: please enter the name(s) of samples to process with -t -c\n");
+		//sampleNamesToProcess = Misc.copyAndMerge(treatmentSampleNames, controlSampleNames);
+		
 		if (resultsDirectory == null) Misc.printErrAndExit("\nError: please enter a directory in which to save the results.\n");
 		resultsDirectory.mkdirs();
 		if (resultsDirectory.canWrite() == false || resultsDirectory.isDirectory() == false) Misc.printErrAndExit("\nError: please enter a directory in which to save the results.\n");
+
+		//check for R and required libraries
+		if (fullPathToR == null || fullPathToR.canExecute()== false) {
+			Misc.printErrAndExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
+		}
+
+		String errors = IO.runRCommandLookForError("library(DESeq2)", fullPathToR, resultsDirectory);
+		if (errors == null || errors.length() !=0){
+			Misc.printErrAndExit("\nError: Cannot find the required R library.  Did you install DESeq2?. R error message:\n\t\t"+errors+"\n\n");
+		}
+
 	}	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                      Allelic Expression Detector:  August 2014                   **\n" +
+				"**                      Allelic Expression Detector:  Oct 2014                      **\n" +
 				"**************************************************************************************\n" +
 				"Application for identifying allelic expression based on a table of snps and bam\n"+
 				"alignments that have been filtered for alignment bias.  See the ReferenceMutator and\n"+
 				"SamComparator apps.\n\n"+
 
 				"Required Options:\n"+
-				"-n Sample names to process, comma delimited, no spaces.\n"+
+				"-t Treatment sample names to process, comma delimited, no spaces.\n"+
+				"-c Control sample names to process, comma delimited, no spaces.\n"+
 				"-b Directory containing coordinate sorted bam and index files named according to their\n"+
 				"      sample name.\n"+
 				"-d SNP data file containing all sample snp calls.\n"+
-				"-r Results directory.\n"+
+				"-e Results directory.\n"+
 				"-s SNP map bed file from the ReferenceMutator app.\n"+
 
 				"\nDefault Options:\n"+
-				"-g Minimum GenCall score, defaults to >= 0.2\n"+
+				"-g Minimum GenCall score, defaults to >= 0.25\n"+
 				"-q Minimum alignment base quality at snp, defaults to 20\n"+
-				"-c Minimum alignment read coverage, defaults to 4\n"+
+				"-m Minimum alignment read coverage, defaults to 4\n"+
+				"-r Full path to R (version 3+) loaded with DESeq2, see http://www.bioconductor.org\n"+
+				"       Type 'library(DESeq2) in R to see if it is installed. Defaults to '/usr/bin/R'\n"+
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/AllelicExpressionDetector -b Bam/RPENormal/\n"+
