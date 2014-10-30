@@ -370,7 +370,7 @@ public class IO {
 	}
 
 	/**Merges all files in File[][] to a File[].*/
-	public static File[] collapseFileArray(File[][] f){
+	public static File[] collapseFileArray(File[][] f){		
 		ArrayList al = new ArrayList();
 		for (int i=0; i< f.length; i++){
 			if (f[i] != null){

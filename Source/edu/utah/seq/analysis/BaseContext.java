@@ -3,7 +3,7 @@ package edu.utah.seq.analysis;
 import java.util.ArrayList;
 import util.gen.*;
 
-public class BaseContext implements Comparable{
+public class BaseContext implements Comparable<BaseContext>{
 
 	private String sequence;
 	private long numberConvertedReads;
@@ -26,8 +26,7 @@ public class BaseContext implements Comparable{
 		return sequence+"\t"+numberNonConvertedReads+"\t"+numberConvertedReads+"\t"+Num.formatNumber(ratioReads, 3)+"\t"+ numberNonConvertedGenomicContexts+"\t"+ numberConvertedGenomicContexts +"\t"+ Num.formatNumber(ratioGC, 3);
 	}
 
-	public int compareTo(Object o) {
-		BaseContext other = (BaseContext)o;
+	public int compareTo(BaseContext other) {
 		if (fractionNonConvertedReads > other.fractionNonConvertedReads) return -1;
 		if (fractionNonConvertedReads < other.fractionNonConvertedReads) return 1;
 		return 0;
@@ -35,7 +34,9 @@ public class BaseContext implements Comparable{
 	
 	public void setFractionNonConverted(){
 		fractionNonConvertedReads = (double) numberNonConvertedReads/ (double)(numberConvertedReads+ numberNonConvertedReads);
+		if (Double.isNaN(fractionNonConvertedReads)) fractionNonConvertedReads = 0;
 		fractionNonConvertedGenomicContexts = (double) numberNonConvertedGenomicContexts/ (double)(numberConvertedGenomicContexts+ numberNonConvertedGenomicContexts);
+		if (Double.isNaN(fractionNonConvertedGenomicContexts)) fractionNonConvertedGenomicContexts = 0;
 	}
 	
 	public void addFractionNonConvertedToHistogram (double fractionNonConverted){

@@ -89,7 +89,7 @@ chr1	725822	rs199845677	G	A	45.59	PASS	AC=1;AF=0.167;AN=6;BaseQRankSum=-1.231;DB
 
  */
 public class VCFParser {
-	
+
 	//user defined fields
 	private File vcfFile;
 
@@ -106,7 +106,7 @@ public class VCFParser {
 	private boolean loadSamples = true;
 	private boolean loadInfo = true;
 	private boolean missingQual = false;
-	
+
 	//indexs for ripping vcf records
 	int chromosomeIndex= 0;
 	int positionIndex = 1;
@@ -120,17 +120,17 @@ public class VCFParser {
 	int firstSampleIndex = 9;
 	int minimumNumberFields = 8;
 	int numberFields = 0;
-	
 
-	
+
+
 	private String[] sampleNames = null;
-	
+
 	//Chunking arguments
-    int chunkNumber = 0;
+	int chunkNumber = 0;
 	int chunkSize = Integer.MAX_VALUE; //hopefully a vcf file will never have more than 2.1 Billion lines
-	
-	
-	
+
+
+
 	//Constructors
 	/**If loadRecords is false then just the header and #CHROM line with sample names is parsed.
 	 * If loadSamples is false then none of the sample info is loaded, just the required vcf fields. */
@@ -141,7 +141,7 @@ public class VCFParser {
 		this.loadInfo = loadInfo;
 		parseVCF();
 	}
-	
+
 	public VCFParser(File vcfFile, boolean loadRecords, boolean loadSamples, boolean loadInfo, int chunkNumber, int chunkSize) {
 		this. vcfFile = vcfFile;
 		this.loadRecords = loadRecords;
@@ -152,8 +152,19 @@ public class VCFParser {
 		parseVCF();
 	}
 	
+	/**If loadRecords is false then just the header and #CHROM line with sample names is parsed.
+	 * If loadSamples is false then none of the sample info is loaded, just the required vcf fields. */
+	public VCFParser(File vcfFile) {
+		this. vcfFile = vcfFile;
+		this.loadRecords = true;
+		this.loadSamples = true;
+		this.loadInfo = true;
+		missingQual = true;
+		parseVCF();
+	}
+
 	public VCFParser() {}
-	
+
 	//Methods
 
 	/**Adds a chr onto chromosome names that lack it. Converts chrMT to chrM.*/
@@ -198,12 +209,12 @@ public class VCFParser {
 			String oldChrom = "";
 			int oldPosition = -1;
 			HashSet<String> chromNames = new HashSet<String>();
-			
+
 			//Setup chunking variables
 			int minRecord = this.chunkSize * this.chunkNumber;
 			int maxRecord = this.chunkSize * this.chunkNumber + this.chunkSize;
 			int recordCount = 0;
-			
+
 			while ((line=in.readLine()) != null){
 				if (recordCount < minRecord) { //Ignore records less than starting point
 					//pass
@@ -213,11 +224,12 @@ public class VCFParser {
 					try {					
 						VCFRecord vcf = new VCFRecord(line, this, loadSamples, loadInfo);
 						if (!missingQual && vcf.isMissingQual()) {
-							System.out.println("\n\nWARNING: Sample variant quality (GQ) is missing from record: " + line + ".\n\nMissing sample qualities are set to zero.  Missing quality information is normal "
-									+ "when parsing VCF files from tumor/normal varscan, but not VCF files from GATK.  This error is only reported once to reduce "
-									+ "on-screen messages, so there may be other variants throughout the file with missing qualities.\n\n");
+							//this is a bothersome warning that disrupts alot of apps that work with NIST and VarScan vcf files so I'm Nixing it. 
+							//System.out.println("\n\nWARNING: Sample variant quality (GQ) is missing from record: " + line + ".\n\nMissing sample qualities are set to zero.  Missing quality information is normal "
+									//+ "when parsing VCF files from tumor/normal varscan, but not VCF files from GATK.  This error is only reported once to reduce "
+									//+ "on-screen messages, so there may be other variants throughout the file with missing qualities.\n\n");
 							missingQual = true;
-							
+
 						}
 						//old chrom
 						if (vcf.getChromosome().equals(oldChrom)){
@@ -234,7 +246,7 @@ public class VCFParser {
 						//add record and set position
 						records.add(vcf);
 						oldPosition = vcf.getPosition();
-	
+
 					} catch (Exception e) {
 						System.err.println("Skipping malformed VCF Record-> "+line);
 						System.err.println("Error-> "+e.getMessage());
@@ -261,7 +273,7 @@ public class VCFParser {
 			} catch (IOException e) {}
 		}
 	}
-	
+
 	public double calculateTiTvRatio(){
 		double numTransitions = 0;
 		double numTransversions = 0;
@@ -272,14 +284,14 @@ public class VCFParser {
 		}
 		return numTransitions/numTransversions;
 	}
-	
+
 	/**This reloads the chromosomeVCFRecords HashMap<String (chromosome), VCFLookUp>() with the current vcfRecords. */
 	public void splitVCFRecordsByChromosome() {
 		try {
 			chromosomeVCFRecords = new HashMap<String, VCFLookUp>();
-			
+
 			if (vcfRecords == null || vcfRecords.length == 0) return;
-			
+
 			String oldChrom = vcfRecords[0].getChromosome();
 			int oldPosition = vcfRecords[0].getPosition();
 			ArrayList<VCFRecord> recordsAL = new ArrayList<VCFRecord>();
@@ -325,12 +337,12 @@ public class VCFParser {
 
 	public int[] filterVCFRecords(HashMap<String,RegionScoreText[]> goodRegions){
 		int starting = countMatchingVCFRecords(VCFRecord.PASS);
-		
+
 		//call chrom splitter
 		getChromosomeVCFRecords();
-
-		//set all records to fail
-		setFilterFieldOnAllRecords(VCFRecord.FAIL);
+		
+		//set scores to -1
+		for (VCFRecord r: vcfRecords) r.setScore(-1f);
 
 		//for each interrogated region
 		for (String chr: goodRegions.keySet()){		
@@ -353,6 +365,15 @@ public class VCFParser {
 				if (vcfRecords[i].getPosition() < lastBase && coveredBases[vcfRecords[i].getPosition()] == true) {
 					vcfRecords[i].setFilter(VCFRecord.PASS);
 				}
+				else vcfRecords[i].setFilter(VCFRecord.FAIL);
+				vcfRecords[i].setScore(0f);
+			}
+		}
+		//fail any records with a -1 score, these weren't scored thus couldn't have intersected a region
+		for (VCFRecord r: vcfRecords) {
+			if (r.getScore() == -1f) {
+				r.setScore(0f);
+				r.setFilter(VCFRecord.FAIL);
 			}
 		}
 		int ending = countMatchingVCFRecords(VCFRecord.PASS);
@@ -362,15 +383,15 @@ public class VCFParser {
 	/**This is a hard filter that only keeps VCFRecords whose Filter field matches the matchFilterText2Keep.
 	 * Will reload the chromosomeVCFRecords if needed.*/
 	public void filterVCFRecords(String matchFilterText2Keep){
-			ArrayList<VCFRecord> keep = new ArrayList<VCFRecord>();
-			for (VCFRecord r : vcfRecords){
-				if (r.getFilter().equals(matchFilterText2Keep)) keep.add(r);
-			}
-			vcfRecords = new VCFRecord[keep.size()];
-			keep.toArray(vcfRecords);
+		ArrayList<VCFRecord> keep = new ArrayList<VCFRecord>();
+		for (VCFRecord r : vcfRecords){
+			if (r.getFilter().equals(matchFilterText2Keep)) keep.add(r);
+		}
+		vcfRecords = new VCFRecord[keep.size()];
+		keep.toArray(vcfRecords);
 
-			//remake split chrom data?
-			if (chromosomeVCFRecords != null) splitVCFRecordsByChromosome();
+		//remake split chrom data?
+		if (chromosomeVCFRecords != null) splitVCFRecordsByChromosome();
 	}
 
 	public int countMatchingVCFRecords(String matchFilterText){
@@ -380,7 +401,7 @@ public class VCFParser {
 		}
 		return numMatches;
 	}
-	
+
 	public int countNonMatchingVCFRecords(String matchFilterText){
 		int numNonMatches = 0;
 		for (VCFRecord r : vcfRecords){
@@ -393,14 +414,14 @@ public class VCFParser {
 	public void setFilterFieldOnAllRecords (String text){
 		for (VCFRecord r : vcfRecords) r.setFilter(text);
 	}
-	
+
 	/**Sets the filter field in each record to the indicated text if it is '.'*/
 	public void setFilterFieldPeriodToTextOnAllRecords (String text){
 		for (VCFRecord r : vcfRecords) {
 			if (r.getFilter().equals(".")) r.setFilter(text);
 		}
 	}
-	
+
 	/**Sets the GQ sample score as the thresholding score in each VCFRecord.
 	 * Returns the min and max scores found.*/
 	public float[] setGenotypeQualityGQScore(int sampleIndex) {
@@ -414,7 +435,7 @@ public class VCFParser {
 		}
 		return new float[]{minScore, maxScore};
 	}
-	
+
 	/**Sets the QUAL score as the thresholding score in each VCFRecord.
 	 * Returns the min and max scores found.*/
 	public float[] setRecordQUALAsScore() {
@@ -428,7 +449,7 @@ public class VCFParser {
 		}
 		return new float[]{minScore, maxScore};
 	}
-	
+
 	/**Sets the infoNamed score as the thresholding score in each VCFRecord.
 	 * Returns the min and max scores found.
 	 * Throw an exception if it can't be found or parsed as a double.
@@ -436,25 +457,6 @@ public class VCFParser {
 	public float[] setRecordScore(String infoName) throws Exception{
 		float minScore = vcfRecords[0].getInfoObject().getInfoFloat(infoName);
 		float maxScore = minScore;
-		
-		/*
-		int counter = 0;
-		for (VCFRecord r : vcfRecords) {
-			float vqs = r.getInfoObject().getInfoFloat(infoName);
-			float qual = r.getQuality();
-System.out.println(vqs+"\t"+qual);
-		if (counter++ > 1000) break;
-		}
-		System.exit(0);
-		
-		
-System.out.println("\nSetting "+infoName);	
-*/
-
-
-
-
-
 		for (VCFRecord r : vcfRecords) {
 			float score = r.getInfoObject().getInfoFloat(infoName);
 			if (score < minScore) minScore = score;
@@ -463,15 +465,15 @@ System.out.println("\nSetting "+infoName);
 		}
 		return new float[]{minScore, maxScore};
 	}
-	
-    /**Prints out all unmodified records to a file with the specified suffix
-     * 
-     * @param suffix
-     */
+
+	/**Prints out all unmodified records to a file with the specified suffix
+	 * 
+	 * @param suffix
+	 */
 	public void printRecords(File outfile) {
 		printRecords(outfile,false);
 	}
-	
+
 	/**Prints out all modified records to a file with the given suffix 
 	 * 
 	 * @param suffix
@@ -480,7 +482,7 @@ System.out.println("\nSetting "+infoName);
 	public void printRecords(File outfile,boolean modified) {
 		printRecords(outfile,modified,this.getVcfComments().getInfoOrder());
 	}
-	
+
 	/**Prints out all modified records to a file with the given suffix.  Only specified INFO fields are used.
 	 * 
 	 * @param suffix
@@ -490,13 +492,13 @@ System.out.println("\nSetting "+infoName);
 	public void printRecords(File outfile,boolean modified, ArrayList<String> infoToUse) {
 		printRecords(outfile,modified,infoToUse,VCFInfo.UNMODIFIED);
 	}
-	
-	
+
+
 	/** The method that actually writes the records to file. This version of the method writes to a single file*/
 	public void printRecords(File records, boolean modified, ArrayList<String> infoToUse, String style) {
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(records));
-			
+
 			//Write header
 			this.getVcfComments().setAnnotationStyle(style);
 			String[] comments;
@@ -508,7 +510,7 @@ System.out.println("\nSetting "+infoName);
 			for (String comment: comments) {
 				bw.write(comment + "\n");
 			}
-			
+
 			//Write body
 			if (modified) {
 				for (VCFRecord r: vcfRecords) {
@@ -524,7 +526,7 @@ System.out.println("\nSetting "+infoName);
 			ex.printStackTrace();
 		}
 	}
-	
+
 	public void printRecords(VCFRecord[] sortedRecords, File file) {
 		try {
 			Gzipper out = new Gzipper(file);
@@ -538,21 +540,21 @@ System.out.println("\nSetting "+infoName);
 			e.printStackTrace();
 			System.exit(1);
 		}
-		
+
 	}
 
-	
+
 	/**The method that actually writes the records to file.  This version writes Passed/Failed records to separate files*/
 	public void printFilteredRecords(File records, String filter) {
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(records));
-			
+
 			String[] comments = this.getStringComments();
-			
+
 			for (String comment: comments) {
 				bw.write(comment + "\n");
 			}
-			
+
 			for (VCFRecord r: vcfRecords) {
 				if (r.getFilter().equals(filter)) {
 					bw.write(r + "\n");
@@ -563,11 +565,11 @@ System.out.println("\nSetting "+infoName);
 			e.printStackTrace();
 		}
 	}
-	
-	
-	
-	
-	
+
+
+
+
+
 	public void removeSNPs() {
 		//set all to pass
 		setFilterFieldOnAllRecords(VCFRecord.PASS);
@@ -578,7 +580,7 @@ System.out.println("\nSetting "+infoName);
 		//remove fails
 		filterVCFRecords(VCFRecord.PASS);
 	}
-	
+
 	public void removeNonSNPs() {
 		//set all to fail
 		setFilterFieldOnAllRecords(VCFRecord.FAIL);
@@ -601,11 +603,11 @@ System.out.println("\nSetting "+infoName);
 	public String[] getStringComments() {
 		return comments.getComments();
 	}
-	
+
 	public VCFComments getVcfComments() {
 		return comments;
 	}
-	
+
 	public String[] getStringComments(ArrayList<String> infoFieldsToUse) {
 		return comments.getComments(infoFieldsToUse);
 	}

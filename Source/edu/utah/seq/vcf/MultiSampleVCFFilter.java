@@ -15,13 +15,14 @@ public class MultiSampleVCFFilter {
 	//user defined fields
 	private File vcfInFile;
 	private File vcfOutFile;
-	private String pathToTabix = "/tomato/app/tabix/";
+	private String pathToTabix = null;
 	private boolean filterAnySample = false;
 	private boolean passing = true;
-	private boolean compressOutput = true;
+	private boolean compressOutput = false;
 	private boolean filterRecordQuality = false;
 	private boolean failNonPassRecords = false;
 	private int sampleMinimumReadDepthDP = 0;
+	private int sampleMaximumReadDepthDP = Integer.MAX_VALUE;
 	private float sampleMinimumGenotypeQualityGQ = 0;
 	private float recordMinimumQUAL = 0;
 	private boolean printSampleNames = false;
@@ -61,8 +62,6 @@ public class MultiSampleVCFFilter {
 			
 			//create VCF parser
 			VCFParser parser = null;
-			
-			//Create temporary vcf file?
 			File tempVcf = null;
 			if (tempDir != null){
 				tempVcf = new File(tempDir,"tempVcf_" + i + ".vcf");
@@ -158,8 +157,7 @@ public class MultiSampleVCFFilter {
 				for (int j=0; j<groupSamples.length; j++) {
 					VCFSample s = samples[groupSamples[j]];
 					
-					if (s.isNoCall()== true || s.getReadDepthDP() < sampleMinimumReadDepthDP || 
-							s.getGenotypeQualityGQ() < sampleMinimumGenotypeQualityGQ) {
+					if (s.isNoCall()== true || s.getReadDepthDP() < sampleMinimumReadDepthDP || s.getReadDepthDP() > sampleMaximumReadDepthDP || s.getGenotypeQualityGQ() < sampleMinimumGenotypeQualityGQ) {
 						if (failNoCall) {
 							passFlag = false;
 						} 
@@ -237,8 +235,10 @@ public class MultiSampleVCFFilter {
 			boolean passes = false;
 			for (VCFSample sample: test.getSample()){
 				//is it a passing record?
+				int dp = sample.getReadDepthDP();
 				if (sample.isNoCall() == false && 
-						sample.getReadDepthDP() >= sampleMinimumReadDepthDP && 
+						dp >= sampleMinimumReadDepthDP && 
+						dp <= sampleMaximumReadDepthDP &&
 						sample.getGenotypeQualityGQ() >= sampleMinimumGenotypeQualityGQ) {
 					passes = true;
 					break;
@@ -274,6 +274,8 @@ public class MultiSampleVCFFilter {
 		System.out.println(regionFilter+"\tFail records that don't intersect the user provided regions");
 		
 		System.out.println(sampleMinimumReadDepthDP + "\tMinimum sample read depth DP");
+		if (sampleMaximumReadDepthDP == Integer.MAX_VALUE) System.out.println("unlim\tMaximum sample read depth DP");
+		else System.out.println(sampleMaximumReadDepthDP + "\tMaximum sample read depth DP");
 		System.out.println(sampleMinimumGenotypeQualityGQ + "\tMinimum sample genotype quality GQ");
 		
 		if (filterByGenotype) {
@@ -322,6 +324,7 @@ public class MultiSampleVCFFilter {
 					case 'i': failNonPassRecords = true; break;
 					case 'b': filterByGenotype = true; break;
 					case 'r': sampleMinimumReadDepthDP = Integer.parseInt(args[++i]); break;
+					case 'x': sampleMaximumReadDepthDP = Integer.parseInt(args[++i]); break;
 					case 'd': recordMinimumQUAL = Float.parseFloat(args[++i]); filterRecordQuality = true; break;
 					case 's': printSampleNames = true; break;
 					case 'n': sampleNames = args[++i].split(","); break;
@@ -430,7 +433,7 @@ public class MultiSampleVCFFilter {
 		} else if (Pattern.matches(".+?.vcf",inputFile.getName())) {
 			this.vcfInFile = inputFile;
 		} else if (Pattern.matches(".+?.vcf.gz",inputFile.getName())) {
-			this.vcfInFile = VCFUtilities.unzipTabix(inputFile,this.pathToTabix);
+			if (pathToTabix != null) vcfInFile = VCFUtilities.unzipTabix(inputFile,pathToTabix);
 		} else {
 			System.out.println("Input file does not appear to be a XXX.vcf/XXX.vcf.gz file.\n");
 			System.exit(1);
@@ -473,8 +476,7 @@ public class MultiSampleVCFFilter {
 				"Filters a vcf file containing multiple sample records into those that pass or fail the\n" +
 				"tests below. This works with VCFv4.1 files created by the GATK package. Note, the \n" +
 				"records are not modified. If the number of records in the VCF file is greater than \n" +
-				"500000, the VCF file is intersected in chunks. The chunks are merged and compressed \n" + 
-				"automatically at the end of the application.\n\n" +
+				"500000, the VCF file is intersected in chunks.\n\n" +
 
 				"Required:\n"+
 				"-v Full path to a sorted single or multi sample vcf file (xxx.vcf/xxx.vcf.gz)). Note,\n"+
@@ -502,13 +504,14 @@ public class MultiSampleVCFFilter {
 				"		   f) '-M' : not homozygous rare\n" +
 				"-e Strict genotype matching. If this is selected, records with no-call samples \n" +
 				"       or samples falling below either minimum sample genotype quality (-g) or \n" +
-				"       minimum sample read depth (-r) won't be reported. Only samples listed in (-n)" +
+				"       minimum sample read depth (-r) won't be reported. Only samples listed in (-n)\n" +
 				"       will be checked \n"+
-				"-d Minimum record QUAL score, defaults to 0, recommend >=20 .\n"+
-				"-g Minimum sample genotype quality GQ, defaults to 0, recommend >= 20 .\n"+
-				"-r Minimum sample read depth DP, defaults to 0, recommend >=10 .\n"+
+				"-d Minimum record QUAL score, defaults to 0, recommend >=20 \n"+
+				"-g Minimum sample genotype quality GQ, defaults to 0, recommend >= 20 \n"+
+				"-r Minimum sample read depth DP, defaults to 0, recommend >=10 \n"+
+				"-x Maximum sample read depth DP, defaults to unlimited\n"+
 				"-s Print sample names and exit.\n"+
-				"-t Path to tabix\n" +
+				"-t Path to tabix.\n" +
 
 				"\n"+
 

@@ -40,7 +40,7 @@ public class MergeSams{
 	private String programArguments;
 	private static final Pattern TAB = Pattern.compile("\\t");
 	private String genomeVersion = null;
-	private SamReaderFactory factory = SamReaderFactory.makeDefault().enable(SamReaderFactory.Option.DONT_MEMORY_MAP_INDEX).validationStringency(ValidationStringency.SILENT);
+	private SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
 
 	//constructors
 	public MergeSams(String[] args){
@@ -204,7 +204,7 @@ public class MergeSams{
 					int endPosition = sam.getAlignmentEnd();
 					//bad length?
 					if (endPosition >= maxLength) {
-						System.err.println("\nWARNING: the end of the following alignment exceeds the the max length of the index? "+maxLength+"\n"+sam.getSAMString());
+						System.err.println("WARNING: the end of the following alignment exceeds the the max length of the index? "+maxLength+"\n"+sam.getSAMString());
 						if (saveBadReads) samOut.println(sam.getSAMString().trim());
 						numberExceedingEnd++;
 						continue;
@@ -329,7 +329,7 @@ public class MergeSams{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 MergeSams: Oct 2014                              **\n" +
+				"**                                 Merge Sams: Oct 2014                             **\n" +
 				"**************************************************************************************\n" +
 				"Merges sam and bam files. Adds a stripped header if one is not provided. This most\n"+
 				"likely will not play nicely with GATK or Picard downstream apps, good for USeq.\n"+
