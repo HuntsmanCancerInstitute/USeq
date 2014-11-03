@@ -393,6 +393,33 @@ public class SamAlignment {
 		}
 		return null;
 	}
+	
+	/**Looks for the polyA tag At:i:### returns null if not found or the length of polyA from the tag, e.g. At:i:9 will return 9 for the length of the polyA tag */
+	public Integer getAtPolyATagValue (){
+		Integer pALength;
+		for (String tag : tags){
+			if (tag.startsWith("At:i:")) {
+				String pAlength = tag.substring(5);
+				pALength = Integer.parseInt(pAlength);
+				return pALength;
+			}
+		}
+		return null;
+	}
+	
+	/**remove polyA tag from rest of tags*/
+	public void removePolyAtag(){
+		ArrayList<String> tempTags = new ArrayList<String>();
+		for (String tag : tags){
+			if (tag.startsWith("At:i:")) {
+				//do not copy
+			}else{
+				tempTags.add(tag);
+			}
+		}
+		//overwrite the tags array to delete the polyA tag
+		tags = tempTags.toArray(new String[tempTags.size()]);
+	}
 
 	private boolean convertTranscriptomePosition(String coordinatesString, boolean convertMatePosition){
 		//split coordinates on underscore to get chunks
@@ -772,7 +799,7 @@ public class SamAlignment {
 	 * 3	8	isMateUnMapped	0x0008	the mate is unmapped  
 	 * 4	16	isQueryReverseStrand	0x0010	strand of the query (false for forward; true for reverse strand) 
 	 * 5	32	isMateReverseStrand	0x0020	strand of the mate 
-	 * 6	64	isReadFirstPair	0x0040	the read is the Þrst read in a pair 
+	 * 6	64	isReadFirstPair	0x0040	the read is the ï¿½rst read in a pair 
 	 * 7	128	isReadSecondPair	0x0080	the read is the second read in a pair 
 	 * 8	256	isAlignmentNotPrimary	0x0100	the alignment is not primary (a read having split hits may have multiple primary alignment records) 
 	 * 9	512	doesReadFailVendorQC	0x0200	the read fails platform/vendor quality checks 
@@ -805,7 +832,7 @@ public class SamAlignment {
 	public boolean isMateReverseStrand(){
 		return testBitwiseFlag(32);
 	}
-	/**The read is the Þrst read in a pair*/
+	/**The read is the ï¿½rst read in a pair*/
 	public boolean isFirstPair(){
 		return testBitwiseFlag(64);
 	}
