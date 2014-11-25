@@ -28,6 +28,7 @@ public class SamComparator {
 	private File firstSamFile;
 	private File secondSamFile;
 	private File saveDirectory;
+	private boolean checkSequence = false;
 	private Gzipper goodSamFirst;
 	private Gzipper badSamFirst;
 	private Gzipper goodSamSecond;
@@ -126,14 +127,14 @@ public class SamComparator {
 		
 		//get and check chromosomes
 		List<SAMSequenceRecord> firstChroms = samReaderFirst.getFileHeader().getSequenceDictionary().getSequences();
-		List<SAMSequenceRecord> secondChroms = samReaderFirst.getFileHeader().getSequenceDictionary().getSequences();
+		List<SAMSequenceRecord> secondChroms = samReaderSecond.getFileHeader().getSequenceDictionary().getSequences();
 		if (checkChromNames(firstChroms, secondChroms) == false) {
 			samReaderFirst.close();
 			samReaderSecond.close();
 			Misc.printErrAndExit("\nDifferent chromosomes are present in the two sam/bam files, aborting.\n");
 		}
 		
-		//add headers
+		//add headers to output files
 		addHeaders();
 		
 		//for each chrom
@@ -147,7 +148,7 @@ public class SamComparator {
 			//load first records into a hash
 			loadFirstHash();
 			
-			//fetch iterator on second records
+			//walk through second records
 			SAMRecordIterator it = samReaderSecond.queryOverlapping(workingChrom, 0, 0);
 			while (it.hasNext()){
 				SAMRecord second = it.next();
@@ -177,10 +178,10 @@ public class SamComparator {
 				badSamFirst.println(s.getSAMString().trim());
 				numberMisMatchesFirst++;
 			}
-			
-			
 		}
 	}
+	
+	
 
 	private void addHeaders() throws IOException {
 		String firstHeader = samReaderFirst.getFileHeader().getTextHeader().trim();
@@ -226,7 +227,14 @@ public class SamComparator {
 		//check chrom
 		if (samFirst.getReferenceName().equals(samSecond.getReferenceName())) {
 			//check position
-			if (samFirst.getUnclippedStart() == samSecond.getUnclippedStart()) match = true;
+			if (samFirst.getUnclippedStart() == samSecond.getUnclippedStart()) {
+				//check sequence?
+				if (checkSequence){
+					if (samFirst.getReadString().equals(samSecond.getReadString())) match = true;
+				}
+				else match = true;
+			}
+			
 		}
 		//match?
 		if (match){
@@ -280,7 +288,7 @@ public class SamComparator {
 					case 'b': secondSamFile = new File(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'p': printMisMatches = true; break;
-
+					case 'e': checkSequence = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -300,16 +308,17 @@ public class SamComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Sam Comparator  : July 2014                          **\n" +
+				"**                             Sam Comparator  : Nov 2014                           **\n" +
 				"**************************************************************************************\n" +
 				"Compares coordinate sorted, unique, alignment sam/bam files.  Splits alignments into\n"+
-				"those that match chrom and position or mismatch.\n\n"+
+				"those that match or mismatch chrom and position (or sequence).\n\n"+
 
 				"Required:\n"+
 				"-a Full path sam/bam file name. zip/gz OK.\n"+
 				"-b Full path sam/bam file name. zip/gz OK.\n"+
 				"-s Full path to a directory to save the results.\n" +
-				"-p Print paired mismatches to screen.\n\n" +
+				"-p Print paired mismatches to screen.\n" +
+				"-e Check sequence of pairs.\n\n"+
 
 				"Example: java -Xmx10G -jar pathTo/USeq/Apps/SamComparator -a /hg19/ref.sam.gz\n" +
 				"       -b /hg19/alt.sam.gz -s /hg19/SplitAlignments/\n\n" +

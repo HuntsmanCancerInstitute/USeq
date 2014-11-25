@@ -15,18 +15,18 @@ public class ExportExons {
 	private int adder = 0;
 	private boolean trimUTRs = false;
 	private boolean addExonNumbers = false;
-	
-	
-	
+	private boolean export5PrimeUTR = false;
+
+
 	private interface NameString {
 		String createNameString(String name, String strand, int exonNumber);
 	}
-	
-	
+
+
 	public ExportExons (String[] args){
 		//Parse args
 		processArgs(args);
-		
+
 		//create NameString command basd on addExonNumbers
 		NameString nameStringCommand;
 		if (this.addExonNumbers) {
@@ -44,10 +44,10 @@ public class ExportExons {
 				};
 			};
 		}
-		
-		
+
+
 		try {
-			
+
 			genes = new UCSCGeneModelTableReader(ucscTableFile, 0);
 			UCSCGeneLine[] lines = genes.getGeneLines();
 			File exonsFile = new File (ucscTableFile.getParentFile(), Misc.removeExtension(ucscTableFile.getName())+"_Exons.bed");
@@ -60,7 +60,7 @@ public class ExportExons {
 					int endCoding = lines[i].getCdsEnd();
 					String strand = lines[i].getStrand();
 					String name = lines[i].getDisplayNameThenName();
-					
+
 					for (int j=0; j< exons.length; j++){
 						int start = exons[j].getStart();
 						int end = exons[j].getEnd();
@@ -72,7 +72,7 @@ public class ExportExons {
 						start = start - adder;
 						if (start < 0) start =0;
 						end = end + adder;
-						
+
 						//Determine exon number
 						int exon = -1;
 						if (lines[i].getStrand().equals("-")) {
@@ -80,7 +80,7 @@ public class ExportExons {
 						} else if (lines[i].getStrand().equals("+")) {
 							exon = j + 1;
 						}
-						
+
 						//chr start stop name score strand
 						String nameScoreStrand = nameStringCommand.createNameString(name, strand, exon);
 						out.println(chr+"\t"+start+"\t"+end + nameScoreStrand);
@@ -93,22 +93,28 @@ public class ExportExons {
 					String chr = lines[i].getChrom();
 					String strand = lines[i].getStrand();
 					String name = lines[i].getDisplayNameThenName();
-					
-					
-					for (int j=0; j< exons.length; j++){
-						int start = exons[j].getStart()-adder;
-						if (start < 0) start =0;
-						
-						//Determine exon number
-						int exon = -1;
-						if (lines[i].getStrand().equals("-")) {
-							exon = exons.length - j;
-						} else if (lines[i].getStrand().equals("+")) {
-							exon = j + 1;
+
+					if (export5PrimeUTR){
+						ExonIntron fiveUTR;
+						if (lines[i].getStrand().equals("+")) fiveUTR = exons[0];
+						else fiveUTR = exons[exons.length-1];
+						out.println(chr+"\t"+fiveUTR.getStart()+"\t"+fiveUTR.getEnd()+"\t"+lines[i].getNames("_")+"\t0\t"+strand);
+					}
+
+					else {
+						for (int j=0; j< exons.length; j++){
+							int start = exons[j].getStart()-adder;
+							if (start < 0) start =0;
+							//Determine exon number
+							int exon = -1;
+							if (lines[i].getStrand().equals("-")) {
+								exon = exons.length - j;
+							} else if (lines[i].getStrand().equals("+")) {
+								exon = j + 1;
+							}
+							String nameScoreStrand = nameStringCommand.createNameString(name, strand, exon);
+							out.println(chr+"\t"+start+"\t"+(exons[j].getEnd()+adder) + nameScoreStrand);
 						}
-						
-						String nameScoreStrand = nameStringCommand.createNameString(name, strand, exon);
-						out.println(chr+"\t"+start+"\t"+(exons[j].getEnd()+adder) + nameScoreStrand);
 					}
 				}
 			}
@@ -126,9 +132,9 @@ public class ExportExons {
 			printDocs();
 			System.exit(0);
 		}
-		
-		
-		
+
+
+
 		new ExportExons(args);
 	}		
 
@@ -146,6 +152,7 @@ public class ExportExons {
 					case 'a': adder = Integer.parseInt(args[++i]); break;
 					case 'u': trimUTRs=true; break;
 					case 'n': addExonNumbers=true; break;
+					case 'f': export5PrimeUTR=true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: System.out.println("\nProblem, unknown option! " + mat.group());
 					}
@@ -155,14 +162,14 @@ public class ExportExons {
 				}
 			}
 		}
-		
+
 		if (ucscTableFile == null || ucscTableFile.canRead() == false) Misc.printExit("\nError: cannot find your UCSC table file!\n");
 	}	
 
 	public static void printDocs(){ 
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              Export Exons   Sept 2013                            **\n" +
+				"**                              Export Exons   Nov 2014                             **\n" +
 				"**************************************************************************************\n" +
 				"EE takes a UCSC Gene table and prints the exons to a bed file.\n\n"+
 
@@ -172,11 +179,12 @@ public class ExportExons {
 				"-u Remove UTRs if present, defaults to including\n"+
 				"-n Append exon numbers to the gene name field.  This makes the bed file compatible \n" +
 				"      with DRDS\n" +
+				"-f Export just 5' UTRs\n"+
 
 				"\nExample: java -Xmx1000M -jar pathTo/T2/Apps/ExportExons -g /user/Jib/ucscPombe.txt\n" +
 				"      -a 50\n"+
 
-		"**************************************************************************************\n");		
+				"**************************************************************************************\n");		
 	}		
 
 

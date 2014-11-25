@@ -145,12 +145,15 @@ public class IntervalTree<T> implements java.io.Serializable {
 	 */
 	public ArrayList<T> search(int low, int high) {
 		low++;
+		if (low >= high) {
+			System.err.println("Low cannot be >= High for searching IntervalTree.\n");
+		}
 		ArrayList<Interval<T>> result = new ArrayList<Interval<T>>();
 		/* reset */
 		this.leftNeighbor = null;
 		this.rightNeighbor = null;
-		// System.out.println("Search for (" + low + "," + high + ")");
-		// debugPrint(this.root);
+		//System.out.println("Search for (" + low + "," + high + ")");
+		//debugPrint(this.root);
 		searchInterval(root, result, low, high);
 		ArrayList<T> obtlst = new ArrayList<T>();
 		for (Interval<T> it : result) {

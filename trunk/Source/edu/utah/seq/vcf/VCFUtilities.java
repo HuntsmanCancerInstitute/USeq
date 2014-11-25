@@ -72,7 +72,9 @@ public class VCFUtilities {
 		return uncompressed;
 	}
 	
-	public static int readsToChunk = 500000;
+	//public static int readsToChunk = 500000;
+	//dropped size since I'm getting out of mem errors at 50G!, Nix
+	public static int readsToChunk = 100000;
 	
 	public static int countReads(File vcfFile) {
 		BufferedReader in=null;

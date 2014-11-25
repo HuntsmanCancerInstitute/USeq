@@ -3,6 +3,7 @@ package edu.utah.seq.analysis;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
+
 import util.gen.*;
 import edu.utah.seq.data.*;
 
@@ -22,6 +23,7 @@ public class BisStatRegionMaker {
 	private String chromosome;
 	private int scoreIndex = 0;
 	private long numberERs = 0;
+	private File fullPathToR = new File ("/usr/bin/R");
 
 	//constructors
 	/**Stand alone.*/
@@ -30,6 +32,8 @@ public class BisStatRegionMaker {
 		processArgs(args);
 		
 		EnrichedRegionMaker erm = new EnrichedRegionMaker(maximumGap);
+		erm.setR(fullPathToR);
+		
 		try{
 			String index = "";
 			if (scoreIndex !=0) index = "_Indx"+scoreIndex;
@@ -100,6 +104,7 @@ public class BisStatRegionMaker {
 					case 'x': maximumFraction = Float.parseFloat(args[++i]); break;
 					case 'g': maximumGap = Integer.parseInt(args[++i]); break;
 					case 'q': scoreIndex = Integer.parseInt(args[++i]); break;
+					case 'r': fullPathToR = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -126,7 +131,7 @@ public class BisStatRegionMaker {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           BisStat Region Maker: March 2012                       **\n" +
+				"**                           BisStat Region Maker:    Nov 2014                      **\n" +
 				"**************************************************************************************\n" +
 				"Takes serialized window objects from BisStat, thresholds based on the min and max\n" +
 				"fraction methylation params and prints regions in bed format meeting the criteria.\n" +
@@ -143,6 +148,7 @@ public class BisStatRegionMaker {
 				"-g Maximum gap, defaults to 0.\n"+
 				"-q Merge windows based on their quartile density score, not fraction methylation, by\n" +
 				"      indicating 1,2,or 3 for 1st, 2nd+3rd, or 4th, respectively.\n"+
+				"-r Full path to R, defaults to '/usr/bin/R'\n" +
 
 				"\n"+
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/BisStatRegionMaker -m 0.8 -x 1.0 -g 100\n" +

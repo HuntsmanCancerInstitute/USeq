@@ -24,22 +24,25 @@ public class MergePairedSamAlignments{
 	private float maximumAlignmentScore = 120;
 	private float minimumMappingQualityScore = 13;
 	private boolean secondPairReverseStrand = false;
-	private boolean removeControlAlignments = false;
 	private boolean skipMergingPairs = false;
 	private boolean onlyMergeOverlappingAlignments = true;
 	private int minimumDiffQualScore = 3;
 	private double minimumFractionInFrameMismatch = 0.05;
 	private int maximumProperPairDistanceForMerging = 5000;
+	private String namePhiXChromosome = "chrPhiX";
+	private String nameAdapterChromosome = "chrAdap";
+	private boolean printPairedStatsAndHistogram = false;
 
 	//counters for initial filtering
 	private int numberAlignments = 0;
 	private int numberUnmapped = 0;
 	private int numberFailingVendorQC = 0;
-	private int numberPassingAlignments = 0;
 	private int numberFailingAlignmentScore = 0;
 	private int numberFailingMappingQualityScore = 0;
 	private int numberAdapter = 0;
 	private int numberPhiX = 0;
+	private int numberDuplicates = 0;
+	private int numberPassingAlignments = 0;
 
 	//for trimming/ merging paired data
 	ArrayList<SamAlignment> firstPairs = new ArrayList<SamAlignment>();
@@ -69,6 +72,7 @@ public class MergePairedSamAlignments{
 	private Histogram insertSize = new Histogram(0,2001,400);
 	private String programArguments;
 	private boolean alignmentsOverlap;
+	
 
 	//constructors
 	public MergePairedSamAlignments(String[] args){
@@ -121,44 +125,48 @@ public class MergePairedSamAlignments{
 		}
 
 		//stats
-		double fractionPassing = ((double)numberPassingAlignments)/((double)numberAlignments);
 		System.out.println("\nStats (some flags aren't set so be suspicious of zero read catagories):\n");
-		System.out.println("\t"+numberAlignments+"\tTotal # alignments from sam/bam file");
-		System.out.println("\t"+numberPassingAlignments+"\tAlignments passing individual read filters ("+Num.formatPercentOneFraction(fractionPassing)+")");
-		System.out.println("\t\t"+numberUnmapped+"\t# Unmapped reads");
-		System.out.println("\t\t"+numberFailingVendorQC+"\t# Alignments failing vendor/ platform QC");
-		System.out.println("\t\t"+numberFailingAlignmentScore+"\t# Alignments failing alignment score ("+(int)maximumAlignmentScore+")");
-		System.out.println("\t\t"+numberFailingMappingQualityScore+"\t# Alignments failing mapping quality score ("+(int)minimumMappingQualityScore+")");
-		System.out.println("\t\t"+numberAdapter+"\t# Adapter alignments");
-		System.out.println("\t\t"+numberPhiX+"\t# PhiX alignments");
+		System.out.println(numberAlignments+"\tTotal # alignments from sam/bam file");
+		System.out.println(format(numberUnmapped, numberAlignments)+"# Unmapped reads");
+		System.out.println(format(numberFailingVendorQC,numberAlignments)+"# Alignments failing vendor/ platform QC");
+		System.out.println(format(numberFailingAlignmentScore,numberAlignments)+"# Alignments failing alignment score ("+(int)maximumAlignmentScore+")");
+		System.out.println(format(numberFailingMappingQualityScore,numberAlignments)+"# Alignments failing mapping quality score ("+(int)minimumMappingQualityScore+")");
+		if (numberAdapter!=0) System.out.println(format(numberAdapter,numberAlignments)+"# Adapter alignments");
+		System.out.println(format(numberPhiX,numberAlignments)+"# PhiX alignments");
+		System.out.println(format(numberDuplicates,numberAlignments)+"# Duplicate alignments");
+		System.out.println(format(numberPassingAlignments,numberAlignments)+"Alignments passing all filters");
 		System.out.println();
-		System.out.println("Paired alignment stats:\n");
-		System.out.println("\t\t"+numberNonPairedAlignments+"\t# Non paired alignments");
-		System.out.println("\t\t"+numberNonProperPairedAlignments+"\t# Non proper paired alignments");
-		System.out.println("\t\t"+numberUnmappedMatePairedAlignments+"\t# Non mapped mate paired alignments");
-		System.out.println("\t\t"+numberAlignmentsMissingPair+"\t# Alignments missing mate paired alignment");
-		System.out.println("\t\t"+numberPairsFailingChrDistStrand+"\t# Paired alignments failing chromosome, distance, or strand check");
-		System.out.println("\t\t"+numberPairsFailingMateCrossCoordinateCheck+"\t# Paired alignments failing mate pair cross coordinate check");
-		System.out.println("\t\t"+numberRepeatAlignmentsLackingMate+"\t# Repeat alignments lacking a mate");
-		System.out.println("\t\t"+(int)numberFailedMergedPairs+"\t# Proper paired alignments that could not be unambiguously merged");
-		System.out.println("\t\t"+(int)numberMergedPairs+"\t# Proper paired alignments that were merged");
+		System.out.println("Paired alignment stats:\n");  
+		if (printPairedStatsAndHistogram){
+			System.out.println(numberNonPairedAlignments+"# Non paired alignments");
+			System.out.println(numberNonProperPairedAlignments+"# Non proper paired alignments");
+			System.out.println(numberUnmappedMatePairedAlignments+"# Non mapped mate paired alignments");
+			System.out.println(numberAlignmentsMissingPair+"# Alignments missing mate paired alignment");
+			System.out.println(numberPairsFailingChrDistStrand+"# Paired alignments failing chromosome, distance, or strand check");
+			System.out.println(numberPairsFailingMateCrossCoordinateCheck+"# Paired alignments failing mate pair cross coordinate check");
+			System.out.println(numberRepeatAlignmentsLackingMate+"# Repeat alignments lacking a mate");
+			System.out.println((int)numberFailedMergedPairs+"# Proper paired alignments that could not be unambiguously merged");
+		}
+		System.out.println(format(numberMergedPairs, (numberMergedPairs+numberFailedMergedPairs))+"# Proper paired alignments that were merged");
 		double totalBases = numberNonOverlappingBases + numberOverlappingBases;
 		double fractionOverlap = numberOverlappingBases/totalBases;
 		String fractionString = Num.formatNumber(fractionOverlap, 4);
-		System.out.println("\t\t\t"+fractionString+"\tFraction overlapping bases in paired alignments");		
+		System.out.println(fractionString+"\tFraction overlapping bases in paired alignments");		
 		//histogram
-		if (insertSize.getTotalBinCounts() !=0){
+		if (printPairedStatsAndHistogram && insertSize.getTotalBinCounts() !=0){
 			System.out.println("\nMapped genomic insert length distribution for merged paired alignments:\n");
 			insertSize.setSkipZeroBins(true);
 			insertSize.setTrimLabelsToSingleInteger(true);
 			insertSize.printScaledHistogram();
 		}
-
-		System.out.println("\n\t"+numberPrintedAlignments+"\t# Alignments written to SAM/BAM file.");
-
-
+		System.out.println("\n"+numberPrintedAlignments+"\t# Alignments written to SAM/BAM file.");
 	}
 
+	public String format (double stat, double total){
+		double frac = stat/total;
+		return (int)stat +"\t"+Num.formatNumber(frac, 4)+"\t";
+	}
+	
 	public boolean parseTextFile(File samFile){
 		BufferedReader in = null;
 		int numBadLines = 0;
@@ -195,13 +203,8 @@ public class MergePairedSamAlignments{
 				}
 				numberAlignments++;
 
+				//check for bad reads and whether it should be saved for pairing
 				if (checkSamAlignment(sa, line) == false) continue;
-				
-				//phiX? don't merge since this throws the per cycle error estimation
-				if (sa.getReferenceSequence().startsWith("chrPhiX")){
-					samOut.println(sa);
-					continue;
-				}
 
 				String readName = sa.getName();
 
@@ -318,33 +321,34 @@ public class MergePairedSamAlignments{
 		return true;
 	}
 
-	/**Checks a bunch of flags and scores to see if alignment should be saved.*/
+	/**Checks a bunch of flags and scores to see if alignment should be saved for attempted merging.*/
 	public boolean checkSamAlignment(SamAlignment sa, String line) throws IOException{
+		boolean isGood = true;
+
 		//is it aligned?
 		if (sa.isUnmapped()) {
 			numberUnmapped++;
-			failedSamOut.println(line);
-			return false;
+			isGood = false;
 		}
 
 		//does it pass the vendor qc?
 		if (sa.failedQC()) {
 			numberFailingVendorQC++;
-			failedSamOut.println(line);
-			return false;
+			isGood = false;
 		}
 
 		//increment phiX
-		boolean firstIsPhiX = sa.getReferenceSequence().startsWith("chrPhiX");
-		if (firstIsPhiX){
+		boolean firstIsPhiX = sa.getReferenceSequence().startsWith(namePhiXChromosome);
+		if (firstIsPhiX) {
 			numberPhiX++;
+			isGood = false;
 		}
 		
 		//skip adapter
-		boolean firstIsAdapt = sa.getReferenceSequence().startsWith("chrAdapt");
+		boolean firstIsAdapt = sa.getReferenceSequence().startsWith(nameAdapterChromosome);
 		if (firstIsAdapt){
 			numberAdapter++;
-			return false;
+			isGood = false;
 		}
 
 		//does it pass the scores threshold?
@@ -352,8 +356,7 @@ public class MergePairedSamAlignments{
 		if (alignmentScore != Integer.MIN_VALUE){
 			if (alignmentScore > maximumAlignmentScore){
 				numberFailingAlignmentScore++;
-				failedSamOut.println(line);
-				return false;
+				isGood = false;
 			}
 		}
 
@@ -361,26 +364,38 @@ public class MergePairedSamAlignments{
 		if (minimumMappingQualityScore !=0){
 			if (sa.getMappingQuality() < minimumMappingQualityScore){
 				numberFailingMappingQualityScore++;
-				failedSamOut.println(line);
-				return false;
+				isGood = false;
 			}
 		}
+		
+		//duplicate?
+		if (sa.isADuplicate()){
+			numberDuplicates++;
+			isGood = false;
+		}
+		
+		//did any fail?
+		if (isGood == false){
+			failedSamOut.println(line);
+			return false;
+		}
+		
+		//OK, it passes individual checks, increment counter, now check for pairing.
+		numberPassingAlignments++;
 
 		//modify second read if phiX or adapter; some paired reads have a mate hitting the control chroms
 		SamAlignmentFlags saf = null;
-		if (removeControlAlignments && sa.isPartOfAPairedAlignment() && sa.isMateUnMapped() == false){
-			if ( sa.getMateReferenceSequence().startsWith("chrPhiX") || sa.getMateReferenceSequence().startsWith("chrAdapt")) {
+		if (sa.isPartOfAPairedAlignment() && sa.isMateUnMapped() == false){
+			if ( sa.getMateReferenceSequence().startsWith(namePhiXChromosome) || sa.getMateReferenceSequence().startsWith(nameAdapterChromosome)) {
 				saf = new SamAlignmentFlags(sa.getFlags());
 				saf.setMateUnMapped(true);
 				saf.setaProperPairedAlignment(false);
 				sa.setUnMappedMate();
 				sa.setFlags(saf.getFlags());
+				
 			}
 		}
-
-		//OK, it passes individual checks, increment counter, now check for pairing.
-		numberPassingAlignments++;
-
+		
 		//is it not part of a pair?
 		if (sa.isPartOfAPairedAlignment()== false){
 			numberNonPairedAlignments++;
@@ -403,7 +418,7 @@ public class MergePairedSamAlignments{
 			numberPrintedAlignments++;
 			return false;
 		}
-
+		//OK looks good to add for potential pairing
 		return true;
 
 	}
@@ -866,6 +881,7 @@ public class MergePairedSamAlignments{
 					case 'o': onlyMergeOverlappingAlignments = false; break;
 					case 'r': secondPairReverseStrand = true; break;
 					case 'k': skipMergingPairs = true; break;
+					case 'p': printPairedStatsAndHistogram = true; break;
 					case 'd': maximumProperPairDistanceForMerging = Integer.parseInt(args[++i]); break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'q': minimumMappingQualityScore = Float.parseFloat(args[++i]); break;
@@ -912,7 +928,6 @@ public class MergePairedSamAlignments{
 		//print info
 		System.out.println(maximumAlignmentScore+ "\tMaximum alignment score.");
 		System.out.println(minimumMappingQualityScore+ "\tMinimum mapping quality score.");
-		System.out.println(removeControlAlignments +"\tRemove control chrPhiX and chrAdapter alignments.");
 		System.out.println(secondPairReverseStrand +"\tSecond read pair's strand has been reversed.");
 		System.out.println(crossCheckMateCoordinates +"\tCross check read mate coordinates.");
 		System.out.println(maximumProperPairDistanceForMerging +"\tMaximum bp distance for merging paired alignments.");
@@ -954,6 +969,7 @@ public class MergePairedSamAlignments{
 				"-o Merge all proper paired alignments. Defaults to only merging those that overlap.\n"+
 				"-k Skip merging paired alignments. Defaults to merging. Useful for testing effect of\n" +
 				"      merging on downstream analysis.\n"+
+				"-p Print paired alignment statistics and insert size histogram.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/MergePairedSamAlignments -f /Novo/Run7/\n" +
 				"     -c -s /Novo/STPParsedBams/run7.bam -d 10000 \n\n" +

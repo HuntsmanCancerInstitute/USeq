@@ -566,10 +566,6 @@ public class VCFParser {
 		}
 	}
 
-
-
-
-
 	public void removeSNPs() {
 		//set all to pass
 		setFilterFieldOnAllRecords(VCFRecord.PASS);

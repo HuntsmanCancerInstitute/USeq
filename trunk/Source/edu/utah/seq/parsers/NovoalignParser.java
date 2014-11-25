@@ -722,7 +722,7 @@ public class NovoalignParser{
 					numberPassingAlignments++;
 
 					//count bases that pass minimum quality threshold
-					int[] qscores = Seq.convertScores(tokens[3]);
+					int[] qscores = Seq.convertSangerQualityScores(tokens[3]);
 					for (int i=0; i< qscores.length; i++) if (qscores[i]>= minimumBasePairQuality) numberAlignedBasePairs++;
 
 					//continue?

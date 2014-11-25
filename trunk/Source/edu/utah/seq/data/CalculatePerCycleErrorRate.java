@@ -1,16 +1,16 @@
 package edu.utah.seq.data;
 
 import java.io.*;
-
 import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
 import edu.utah.seq.data.sam.MalformedSamAlignmentException;
 import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.data.sam.SamAlignment;
 import htsjdk.samtools.*;
-import htsjdk.samtools.ValidationStringency;
 import util.bio.parsers.MultiFastaParser;
 import util.gen.*;
 
@@ -24,6 +24,9 @@ public class CalculatePerCycleErrorRate {
 	private File fastaFile;
 	private File logFile;
 	private String readNamePrefix = null;
+	private double firstReadMaximumError = 0.01;
+	private double secondReadMaximumError = 0.0175;
+	private double maximumFractionFailingCycles = 0.1;
 
 	//internal
 	private String chromName;
@@ -39,10 +42,14 @@ public class CalculatePerCycleErrorRate {
 	private double[][] correctBases;
 	private double[][] incorrectBases;
 	private int fileIndex;
+	private int index;
 	private boolean isBam;
 	private boolean deleteTempFiles = true;
 	private Pattern headerLine = Pattern.compile("^@[HSRPC][DQGO]\\s.+");
-	
+	private boolean mergeStrands = true;
+	private ArrayList<String> failingSampleNames = new ArrayList<String>();
+	private double[] numberFailingCycles;
+	private int totalCycles;
 
 	/**For stand alone app.*/
 	public CalculatePerCycleErrorRate(String[] args){
@@ -67,22 +74,29 @@ public class CalculatePerCycleErrorRate {
 		chromLength = chromSeq.length+1;
 		chromName = p.getNames()[0];
 
+		int numberDatasets = alignmentFiles.length;
+		if (mergeStrands== false) numberDatasets = numberDatasets*2;
+		
 		//make arrays to hold data
-		correctBases = new double[alignmentFiles.length][];
-		incorrectBases = new double[alignmentFiles.length][];
-		numberAlignments = new double[alignmentFiles.length];
-		numberAlignments = new double[alignmentFiles.length];
-		numberAlignmentsWithInsertions = new double[alignmentFiles.length];
-		numberAlignmentsWithDeletions = new double[alignmentFiles.length];
-		numberAlignmentsWithSoftMasking = new double[alignmentFiles.length];
-		numberAlignmentsWithHardMasking = new double[alignmentFiles.length];
+		correctBases = new double[numberDatasets][];
+		incorrectBases = new double[numberDatasets][];
+		for (int i=0; i< numberDatasets; i++){
+			correctBases[i] = new double[1000];
+			incorrectBases[i] = new double[1000];
+		}
+		numberAlignments = new double[numberDatasets];
+		numberAlignments = new double[numberDatasets];
+		numberAlignmentsWithInsertions = new double[numberDatasets];
+		numberAlignmentsWithDeletions = new double[numberDatasets];
+		numberAlignmentsWithSoftMasking = new double[numberDatasets];
+		numberAlignmentsWithHardMasking = new double[numberDatasets];
 
 		//process each file
 		System.out.println("Processing...");
 		for (int i=0; i< alignmentFiles.length; i++){
 			fileIndex = i;
-			correctBases[fileIndex] = new double[1000];
-			incorrectBases[fileIndex] = new double[1000];
+			if (mergeStrands == false) index = i*2;
+			else index = fileIndex;
 			System.out.println("\t"+ alignmentFiles[fileIndex].getName());
 			isBam = alignmentFiles[fileIndex].getName().endsWith(".bam");
 			if (isBam) {
@@ -123,31 +137,48 @@ public class CalculatePerCycleErrorRate {
 			if (logFile != null) {
 				System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream(logFile))));
 			}
+			int numberDatasets = alignmentFiles.length;
+			if (mergeStrands == false) numberDatasets = numberDatasets*2;
 	
 			System.out.println("Per cycle error rates for aligned bases:\n");
 			//print header
+			String[] names = new String[numberDatasets];
+			int nameIndex = 0;
 			System.out.print("Cycle#");
-			for (int i=0; i< alignmentFiles.length; i++) System.out.print("\t"+Misc.removeExtension(alignmentFiles[i].getName()));
+			for (int i=0; i< alignmentFiles.length; i++) {
+				String name = Misc.removeExtension(alignmentFiles[i].getName());
+				if (mergeStrands) {
+					System.out.print("\t"+name);
+					names[nameIndex++] = name;
+				}
+				else {
+					System.out.print("\t"+name+"_1\t"+name+"_2");
+					names[nameIndex++] = name;
+					names[nameIndex++] = name;
+				}
+			}
 			System.out.println();
 	
 			//make array lists to hold errors
-			ArrayList<Double>[] fractionError = new ArrayList[alignmentFiles.length];
-			for (int i=0; i< alignmentFiles.length; i++) fractionError[i] = new ArrayList<Double>();
-	
+			ArrayList<Double>[] fractionError = new ArrayList[numberDatasets];
+			for (int i=0; i< numberDatasets; i++) fractionError[i] = new ArrayList<Double>();
+			numberFailingCycles = new double[numberDatasets];
+			totalCycles = 0;
 			//for each row that contains any data correctBases[fileIndex][0-1000]
 			for (int i=0; i< correctBases[0].length; i++){
-				//skip?
+				//for each dataset sum correct and in correct bases
 				double total = 0;
-				for (int j=0; j< alignmentFiles.length; j++) {
+				for (int j=0; j< numberDatasets; j++) {
 					total+= correctBases[j][i];
 					total+= incorrectBases[j][i];
 				}
 				if (total == 0.0) continue;
-	
+				totalCycles++;
+				
 				StringBuilder sb = new StringBuilder();
 				sb.append(i+1);
 				//for each dataset
-				for (int j=0; j< alignmentFiles.length; j++){
+				for (int j=0; j< numberDatasets; j++){
 					sb.append("\t");
 					double error = incorrectBases[j][i]/ (incorrectBases[j][i] + correctBases[j][i]);
 					sb.append(error);
@@ -155,36 +186,60 @@ public class CalculatePerCycleErrorRate {
 					/*sb.append("\t");
 					sb.append(incorrectBases[j][i]);
 					sb.append("\t");
-					sb.append(correctBases[j][i]);
-					 */
+					sb.append(correctBases[j][i]);*/
+					
+					//increment failed cycles?
+					boolean isEven = Num.isEven(j);
+					if (mergeStrands || isEven){
+						//use first strand error rate
+						if (error>= firstReadMaximumError) numberFailingCycles[j]++;
+					}
+					//use second
+					else if (error>= secondReadMaximumError) numberFailingCycles[j]++;						
 				}
 				System.out.println(sb);
 			}
 	
 			//calculate average error
-			double[] averageError = new double[alignmentFiles.length];
-			for (int i=0; i< alignmentFiles.length; i++) {
+			double[] averageError = new double[numberDatasets];
+			for (int i=0; i< numberDatasets; i++) {
 				double[] err = Num.arrayListOfDoubleToArray(fractionError[i]);
 				averageError[i] = Num.mean(err);
 			}
 			System.out.println("\nMean\t"+Num.doubleArrayToString(averageError, "\t"));
+			
+			//calc failing 
+			LinkedHashSet<String> badGuys = new LinkedHashSet<String>();
+			for (int i=0; i< numberDatasets; i++){
+				numberFailingCycles[i] = numberFailingCycles[i]/totalCycles;
+				if (numberFailingCycles[i] > maximumFractionFailingCycles) badGuys.add(names[i]);
+			}
+			System.out.println("\nFractionFailingCycles\t"+Num.doubleArrayToString(numberFailingCycles, 4, "\t"));
 	
 			//print alignment stats
-			for (int i=0; i<numberAlignmentsWithInsertions.length; i++ ) numberAlignmentsWithInsertions[i] = 100* numberAlignmentsWithInsertions[i]/numberAlignments[i];
-			for (int i=0; i<numberAlignmentsWithDeletions.length; i++ ) numberAlignmentsWithDeletions[i] = 100* numberAlignmentsWithDeletions[i]/numberAlignments[i];
-			for (int i=0; i<numberAlignmentsWithSoftMasking.length; i++ ) numberAlignmentsWithSoftMasking[i] = 100* numberAlignmentsWithSoftMasking[i]/numberAlignments[i];
-			for (int i=0; i<numberAlignmentsWithHardMasking.length; i++ ) numberAlignmentsWithHardMasking[i] = 100* numberAlignmentsWithHardMasking[i]/numberAlignments[i];
+			for (int i=0; i<numberAlignmentsWithInsertions.length; i++ ) numberAlignmentsWithInsertions[i] = numberAlignmentsWithInsertions[i]/numberAlignments[i];
+			for (int i=0; i<numberAlignmentsWithDeletions.length; i++ ) numberAlignmentsWithDeletions[i] = numberAlignmentsWithDeletions[i]/numberAlignments[i];
+			for (int i=0; i<numberAlignmentsWithSoftMasking.length; i++ ) numberAlignmentsWithSoftMasking[i] = numberAlignmentsWithSoftMasking[i]/numberAlignments[i];
+			for (int i=0; i<numberAlignmentsWithHardMasking.length; i++ ) numberAlignmentsWithHardMasking[i] = numberAlignmentsWithHardMasking[i]/numberAlignments[i];
 	
 			System.out.println("\n# Alignments\t"+Num.doubleArrayToString(numberAlignments, 0, "\t"));
-			System.out.println("% WithInsertions\t"+Num.doubleArrayToString(numberAlignmentsWithInsertions, 3, "\t"));
-			System.out.println("% WithDeletions\t"+Num.doubleArrayToString(numberAlignmentsWithDeletions, 3, "\t"));
-			System.out.println("% WithSoftMasking\t"+Num.doubleArrayToString(numberAlignmentsWithSoftMasking, 3, "\t"));
-			System.out.println("% WithHardMasking\t"+Num.doubleArrayToString(numberAlignmentsWithHardMasking, 3, "\t"));
+			System.out.println("FractionWithInsertions\t"+Num.doubleArrayToString(numberAlignmentsWithInsertions, 4, "\t"));
+			System.out.println("FractionWithDeletions\t"+Num.doubleArrayToString(numberAlignmentsWithDeletions, 4, "\t"));
+			System.out.println("FractionWithSoftMasking\t"+Num.doubleArrayToString(numberAlignmentsWithSoftMasking, 4, "\t"));
+			System.out.println("FractionWithHardMasking\t"+Num.doubleArrayToString(numberAlignmentsWithHardMasking, 4, "\t"));
 			
-			System.out.close();
-			System.setOut(oldStream);
+			System.out.println("\nDatasets failing thresholds ("+Num.formatNumber(maximumFractionFailingCycles, 4)+
+					" maxFracFailingCycles, "+Num.formatNumber(firstReadMaximumError, 4)+
+					" maxFirstReadOrMergeError, "+Num.formatNumber(secondReadMaximumError, 4)+
+					" maxSecondReadError):\n"+ Misc.hashSetToString(badGuys, ", "));
+			
+			if (logFile != null) {
+				System.out.close();
+				System.setOut(oldStream);
+			}
+			
 		} catch (FileNotFoundException ex) {
-			System.out.println("Could not create the log file: " + ex.getMessage());
+			System.err.println("Could not create the log file: " + ex.getMessage());
 			ex.printStackTrace();
 			System.exit(1);
 		}
@@ -205,9 +260,7 @@ public class CalculatePerCycleErrorRate {
 			if (samReader.hasIndex()) it = samReader.queryOverlapping(chromName, 0, chromLength);
 			else it = samReader.iterator();
 
-			int counter = 0;
 			while (it.hasNext()) {
-				counter++;
 				SAMRecord sam = it.next();
 
 				//is it aligned?
@@ -222,8 +275,6 @@ public class CalculatePerCycleErrorRate {
 				if (readNamePrefix != null) {
 					if (sam.getReadName().startsWith(readNamePrefix) == false) continue;
 				}
-
-				
 				scoreAlignment(sam);
 					
 			}
@@ -349,13 +400,16 @@ public class CalculatePerCycleErrorRate {
 	}
 
 	private int scoreAlignment(SAMRecord sam) {
+		int localIndex = index;
+		if (mergeStrands == false && sam.getReadPairedFlag() == true && sam.getSecondOfPairFlag() == true) localIndex++;
+
 		//get start and end, watch out for those that are off ends
 		int start = sam.getUnclippedStart() -1;
 		if (start < 0) return -1;
 		int end = sam.getAlignmentEnd();
 		if (end >= chromLength) return -2;
 
-		numberAlignments[fileIndex]++;
+		numberAlignments[localIndex]++;
 
 		//need to flip index for negative strand reads!
 		int cycleSubtractor = 0;
@@ -386,12 +440,12 @@ public class CalculatePerCycleErrorRate {
 			if (call.equals("M")) {
 				for (int i = 0; i< numberBases; i++) {
 					if (chromSeq[start] == seq[seqIndex]) {
-						if (cycleSubtractor !=0) correctBases[fileIndex][cycleSubtractor - seqIndex]++;
-						else correctBases[fileIndex][seqIndex]++;
+						if (cycleSubtractor !=0) correctBases[localIndex][cycleSubtractor - seqIndex]++;
+						else correctBases[localIndex][seqIndex]++;
 					}
 					else if (seq[seqIndex] != 'N') {
-						if (cycleSubtractor !=0) incorrectBases[fileIndex][cycleSubtractor - seqIndex]++;
-						else incorrectBases[fileIndex][seqIndex]++;
+						if (cycleSubtractor !=0) incorrectBases[localIndex][cycleSubtractor - seqIndex]++;
+						else incorrectBases[localIndex][seqIndex]++;
 						numberMismatches++;
 					}
 					start++;
@@ -427,79 +481,14 @@ public class CalculatePerCycleErrorRate {
 		}
 
 		//increment counters
-		if (insertionFound) numberAlignmentsWithInsertions[fileIndex]++;
-		if (deletionFound) numberAlignmentsWithDeletions[fileIndex]++;
-		if (hardMaskingFound) numberAlignmentsWithHardMasking[fileIndex]++;
-		if (softMaskingFound) numberAlignmentsWithSoftMasking[fileIndex]++;
+		if (insertionFound) numberAlignmentsWithInsertions[localIndex]++;
+		if (deletionFound) numberAlignmentsWithDeletions[localIndex]++;
+		if (hardMaskingFound) numberAlignmentsWithHardMasking[localIndex]++;
+		if (softMaskingFound) numberAlignmentsWithSoftMasking[localIndex]++;
 
 		return numberMismatches;
 
 	}
-
-	private int scoreAlignmentDebug(SAMRecord sam) {
-		//get start and end
-		int start = sam.getUnclippedStart() -1;
-		if (start < 0) return -1;
-		int end = sam.getAlignmentEnd();
-		if (end >= chromLength) return -2;
-		System.out.println(sam.getReadName() + " "+ sam.getCigarString() +" "+start);
-		System.out.println(sam.getReadString());
-		for (int x=start; x< end; x++) System.out.print(chromSeq[x]);
-		System.out.println();
-
-		//walk through Ms
-		//for each cigar block
-		Matcher mat = cigarSub.matcher(sam.getCigarString());
-		char[] seq = sam.getReadString().toUpperCase().toCharArray();
-		int seqIndex =0;
-		int numberMismatches = 0;
-		while (mat.find()){
-			String call = mat.group(2);
-			int numberBases = Integer.parseInt(mat.group(1));
-			//a match
-			if (call.equals("M")) {
-				for (int i = 0; i< numberBases; i++) {
-					int match = -1;
-					if (chromSeq[start] == seq[seqIndex]) {
-						match = 0;
-					}
-					else if (seq[seqIndex] != 'N') {
-						numberMismatches++;
-						match = 1;
-					}
-					System.out.println("\t"+ seqIndex+"\t"+chromSeq[start]+"\t"+seq[seqIndex]+"\t"+match);
-					start++;
-					seqIndex++;
-				}
-			}
-			//a hard mask
-			else if (call.equals("H")){
-				//just increment start
-				start+= numberBases;
-			}
-			//a soft mask
-			else if (call.equals("S")){
-				//advance both
-				start += numberBases;
-				seqIndex += numberBases;
-			}
-			// a deletion
-			else if (call.equals("D")){
-				//just increment start
-				start+= numberBases;
-			}
-			else if (call.equals("I")){
-				//just advance seqIndex
-				seqIndex += numberBases;
-			}
-			else Misc.printErrAndExit("\nError: unsupported CIGAR string see -> \n"+sam.getSAMString()+"\n");
-
-		}
-
-		return numberMismatches;
-
-	}
-
 
 	public static void main(String[] args) {
 		if (args.length ==0){
@@ -512,7 +501,7 @@ public class CalculatePerCycleErrorRate {
 
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
-		Pattern pat = Pattern.compile("-[a-z]");
+		Pattern pat = Pattern.compile("-[a-z12]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		File forExtraction = null;
 		for (int i = 0; i<args.length; i++){
@@ -525,8 +514,12 @@ public class CalculatePerCycleErrorRate {
 					case 'b': forExtraction = new File(args[i+1]); i++; break;
 					case 'f': fastaFile = new File (args[++i]); break;
 					case 't': deleteTempFiles = false; break;
+					case 's': mergeStrands = false; break;
 					case 'n': readNamePrefix = args[++i]; break;
 					case 'o': logFile = new File(args[++i]); break;
+					case '1': firstReadMaximumError = Double.parseDouble(args[++i]); break;
+					case '2': secondReadMaximumError = Double.parseDouble(args[++i]); break;
+					case 'c': maximumFractionFailingCycles = Double.parseDouble(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -562,7 +555,7 @@ public class CalculatePerCycleErrorRate {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Calculate Per Cycle Error Rate : Feb 2013                 **\n" +
+				"**                        Calculate Per Cycle Error Rate : Nov 2014                 **\n" +
 				"**************************************************************************************\n" +
 				"Calculates per cycle error rates provided a sorted indexed bam file and a fasta\n" +
 				"sequence file. Only checks CIGAR M bases not masked or INDEL bases.\n\n" +
@@ -574,6 +567,10 @@ public class CalculatePerCycleErrorRate {
 				"-f Full path to the single fasta file you wish to use in calculating the error rate.\n" +
 				"-n Require read names to begin with indicated text, defaults to accepting everything.\n"+
 				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
+				"-s Perform separate first read second read analysis, defaults to merging.\n"+
+				"-c Maximum fraction failing cycles, defaults to 0.1\n"+
+				"-1 Maximum first read or merged read error rate, defaults to 0.01\n"+
+				"-2 Maximum second read error rate, defaults to 0.0175\n"+
 
 				"\n"+
 
@@ -583,6 +580,4 @@ public class CalculatePerCycleErrorRate {
 		"**************************************************************************************\n");
 
 	}
-
-
 }

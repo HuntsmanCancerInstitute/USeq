@@ -943,6 +943,7 @@ public class BisSeq {
 		
 		//add info to hashmap for writing to bar file
 		HashMap<String,String> map = info.getNotes();
+		
 		//what graph type should be used to display it?
 		map.put(BarParser.GRAPH_TYPE_TAG, BarParser.GRAPH_TYPE_BAR);
 		map.put(BarParser.GRAPH_TYPE_COLOR_TAG, "#A020F0"); //purple
@@ -1069,7 +1070,7 @@ public class BisSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  BisSeq: July 2013                               **\n" +
+				"**                                   BisSeq: Nov 2014                               **\n" +
 				"**************************************************************************************\n" +
 				"Takes two condition (treatment and control) PointData from converted and non-converted\n" +
 				"C bisulfite sequencing data parsed using the NovoalignBisulfiteParser and scores\n" +
@@ -1098,7 +1099,7 @@ public class BisSeq {
 				"\nDefault Options:\n"+
 				"-d Minimum per base read coverage, defaults to 5.\n"+
 				"-w Window size, defaults to 250.\n"+
-				"-m Minimum number reads in window, defaults to 5. \n" +
+				"-m Minimum number methy C observations in window, defaults to 5. \n" +
 				"-f FDR threshold, defaults to 30 (-10Log10(0.01)).\n"+
 				"-l Log2Ratio threshold, defaults to 1.585 (3x).\n"+
 				"-r Full path to R, defaults to '/usr/bin/R'\n" +
@@ -1107,7 +1108,7 @@ public class BisSeq {
 
 				"\n"+
 
-				"Example: java -Xmx10G -jar pathTo/USeq/Apps/BisStat -c /Sperm/Converted -n \n" +
+				"Example: java -Xmx10G -jar pathTo/USeq/Apps/BisSeq -c /Sperm/Converted -n \n" +
 				"      /Sperm/NonConverted -C /Egg/Converted -N /Egg/NonConverted -s /Res/BisSeq\n" +
 				"      -w 500 -m 10 -l 2 -f 50 \n\n" +
 

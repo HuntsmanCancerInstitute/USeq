@@ -86,8 +86,6 @@ public class VCFRecord implements Comparable<VCFRecord> {
 				}
 			}
 			else sample = null;
-			
-			
 		}
 	}
 	
@@ -271,6 +269,28 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	public boolean isDeletion(){
 		if (alternate.length != 1) return false;
 		if (alternate[0].length() < reference.length()) return true;
+		return false;
+	}
+	
+	/**Checks to see if any of the alternates matches the type (0 SNV, 1 INS, 2 DEL)*/
+	public boolean matchesVariantType(int type){
+		//snp
+		if (type == 0){
+			for (int i=0; i< alternate.length; i++){
+				if (alternate[i].length() == 1 || alternate[i].equals(".") == false) return true;
+			}
+		}
+		//insertion
+		else if (type == 1){
+			for (int i=0; i< alternate.length; i++){
+				if (alternate[i].length() > reference.length()) return true;
+			}
+		}
+		else {
+			for (int i=0; i< alternate.length; i++){
+				if (alternate[i].length() < reference.length()) return true;
+			}
+		}
 		return false;
 	}
 	

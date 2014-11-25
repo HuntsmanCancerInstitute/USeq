@@ -1,13 +1,22 @@
 package edu.utah.seq.vcf;
 
+import edu.utah.seq.useq.data.RegionScoreText;
+
 
 public class VCFMatch implements Comparable<VCFMatch>{
 	private float score;
 	private VCFRecord key;
 	private VCFRecord test;
+	private RegionScoreText regionKey;
 
 	public VCFMatch (VCFRecord key, VCFRecord test){
 		this.key = key;
+		this.test = test;
+		score = test.getScore();
+	}
+	
+	public VCFMatch (RegionScoreText key, VCFRecord test){
+		regionKey = key;
 		this.test = test;
 		score = test.getScore();
 	}
@@ -46,5 +55,9 @@ public class VCFMatch implements Comparable<VCFMatch>{
 	}
 	public void setTest(VCFRecord test) {
 		this.test = test;
+	}
+
+	public RegionScoreText getRegionKey() {
+		return regionKey;
 	}
 }

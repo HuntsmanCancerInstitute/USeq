@@ -1,3 +1,17 @@
+----USeq_8.8.6----
+BisSeq
+* Added another catch for missing stranded datasets from targeted capture experiments that were throwing null pointer errors.
+BisStatRegionMaker
+* Added option to set R path. 
+Sam2USeq
+* Added option to output base level read coverage PointData in bar format for AggregatePlotter
+CalculatePerCycleErrorRate
+* Added option to process 1st and 2nd reads separately
+ReadCoverageParser
+* Parses output of Sam2USeq to plot many read coverage plots and flag samples that fail set thresholds for coverage
+MergePairedAlignments
+* New app focused on H1K QC.  Works with either queryname or coordinate sorted bams.  
+
 ----USeq_8.8.5----
 MultiSampleVCFFilter
 * Added option to filter by region

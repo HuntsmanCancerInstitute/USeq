@@ -111,6 +111,12 @@ public class VCFInfo {
 		}
 	}
 	
+	/** Returns value of key or null. */
+	public String getInfo(String key) {
+		return hashInfoString.get(key);
+			
+	}
+	
 	public float getInfoFloat(String key) throws Exception{
 		String val = hashInfoString.get(key);
 		if (val == null) throw new Exception ("Info key not found? -> "+key);

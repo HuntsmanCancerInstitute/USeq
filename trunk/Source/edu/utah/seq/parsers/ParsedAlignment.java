@@ -8,7 +8,6 @@ import edu.utah.seq.data.Point;
 import edu.utah.seq.data.sam.SamAlignment;
 import htsjdk.samtools.SAMRecord;
 import util.bio.seq.Seq;
-import util.gen.Misc;
 
 public class ParsedAlignment implements Comparable<ParsedAlignment>{
 	private String readID;
@@ -110,21 +109,9 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 		containsIndels = INDEL.matcher(baseCalls).find();
 		baseObservations = SPACE.split(baseCalls);
 
-		//Hmm why the scan SAM()?  and not just use scan();
-//if (samFormat) scanSAM();
-//else scan();
-		
 		scan();
 	}
 	
-	private void scanSAM(){
-			ArrayList<BaseObservation> boALX = null;
-			if (baseObservations[0].equals("CT")) boALX = processLineCTObject(position, sequenceChar, baseScores, baseObservations);
-			else if (baseObservations[0].equals("GA")) boALX = processLineGAObject(position, sequenceChar, baseScores, baseObservations);
-			bo = new BaseObservation[boALX.size()];
-			boALX.toArray(bo);
-		
-	}
 
 	private void scan(){
 		//scan for insertions and deletions
@@ -164,7 +151,7 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 
 		else {
 			bases = sequence.toCharArray();
-			baseScores = Seq.convertScores(baseQualities);
+			baseScores = Seq.convertSangerQualityScores(baseQualities);			
 			ArrayList<BaseObservation> boALX = null;
 			if (baseObservations[0].equals("CT")) boALX = processLineCTObject(position, bases, baseScores, baseObservations);
 			else if (baseObservations[0].equals("GA")) boALX = processLineGAObject(position, bases, baseScores, baseObservations);
@@ -216,7 +203,7 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 		try {
 			refSeqChar = refSeq.toCharArray();
 			sequenceChar = samSequence.toCharArray();
-			baseScores = Seq.convertScores(baseQualities);
+			baseScores = Seq.convertSangerQualityScores(baseQualities);
 
 
 			if (isGA) sb.append("GA");
@@ -340,7 +327,6 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 			System.out.println("samSequence "+samSequence);
 			System.out.println("refSeq "+refSeq);
 			System.out.println("isGA "+isGA);
-
 			System.exit(0);
 		}
 
@@ -384,7 +370,7 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 		for (int i=1; i< baseObs.length; i++){
 			Matcher mat = CONVERTED_BASE.matcher(baseObs[i]);
 			if (mat.matches()){
-				int relPos = Integer.parseInt(mat.group(1)) - 1;
+				int relPos = Integer.parseInt(mat.group(1)) - 1;				
 				//check score?
 				if (containsIndels == false) {
 					if (scores[relPos] < minScore) {
@@ -415,6 +401,7 @@ public class ParsedAlignment implements Comparable<ParsedAlignment>{
 			System.err.println("\tStart "+start);
 			System.err.println("\tGenSeq "+genSeq);
 			System.err.println("\tBedLine "+bedLine);
+			System.err.println("\tCIGAR "+cigar);
 			System.exit(1);
 		}
 		return boAL;

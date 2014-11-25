@@ -1301,6 +1301,9 @@ public class EnrichedRegionMaker {
 	public void setInvertScores(boolean invertScores) {
 		this.invertScores = invertScores;
 	}
+	public void setR(File fullPathToR) {
+		this.fullPathToR = fullPathToR;
+	}
 
 
 

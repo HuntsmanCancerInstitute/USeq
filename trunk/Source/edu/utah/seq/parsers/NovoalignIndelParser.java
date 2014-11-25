@@ -125,7 +125,7 @@ public class NovoalignIndelParser {
 				String strand = "+";
 				if (tokens[9].equals("R")) strand = "-";
 				//convert quality scores
-				int[] baseQualities = Seq.convertScores(tokens[3]);
+				int[] baseQualities = Seq.convertSangerQualityScores(tokens[3]);
 				//coordinate in 1base
 				int coordinate = Integer.parseInt(tokens[8]);
 				//parse modification(s), these are single base insertions or deletions

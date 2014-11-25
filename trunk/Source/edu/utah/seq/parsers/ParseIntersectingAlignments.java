@@ -130,7 +130,7 @@ public class ParseIntersectingAlignments {
 						String[] seqQual = fetchBPs(alignment, alleles[i], true);
 						//check quality scores
 						if (seqQual[1].equals("") == false){
-							int[] vals = Seq.convertScores(seqQual[1]);
+							int[] vals = Seq.convertSangerQualityScores(seqQual[1]);
 							double ave = Num.averageIntArray(vals);
 							if (ave < minimumBaseQuality) continue;
 							baseScores.add(new Double (ave));
@@ -150,7 +150,7 @@ public class ParseIntersectingAlignments {
 						String[] seqQual = fetchBPs(alignment, alleles[i], false);
 						//check quality scores
 						if (seqQual[1].equals("") == false){
-							int[] vals = Seq.convertScores(seqQual[1]);
+							int[] vals = Seq.convertSangerQualityScores(seqQual[1]);
 							double ave = Num.averageIntArray(vals);
 							if (ave < minimumBaseQuality) continue;
 							baseScores.add(new Double (ave));

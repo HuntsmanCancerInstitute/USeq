@@ -9,6 +9,7 @@ import edu.utah.seq.useq.data.RegionScoreText;
 import util.bio.annotation.Bed;
 import util.gen.IO;
 import util.gen.Misc;
+import util.gen.Num;
 
 public class MultiSampleVCFFilter {
 
@@ -23,6 +24,7 @@ public class MultiSampleVCFFilter {
 	private boolean failNonPassRecords = false;
 	private int sampleMinimumReadDepthDP = 0;
 	private int sampleMaximumReadDepthDP = Integer.MAX_VALUE;
+	private int sampleMinimumReadDepthAD = 0;
 	private float sampleMinimumGenotypeQualityGQ = 0;
 	private float recordMinimumQUAL = 0;
 	private boolean printSampleNames = false;
@@ -31,6 +33,7 @@ public class MultiSampleVCFFilter {
 	private HashMap<String,RegionScoreText[]> regions = null;
 	private String[][] samplesByGroup = null;
 	private String[] flagsByGroup = null;
+	
 
 	public MultiSampleVCFFilter(String[] args){
 		long startTime = System.currentTimeMillis();
@@ -236,10 +239,26 @@ public class MultiSampleVCFFilter {
 			for (VCFSample sample: test.getSample()){
 				//is it a passing record?
 				int dp = sample.getReadDepthDP();
+				int ad = 0;
+				String adString = sample.getAlleleCount();
+				if (adString != null) ad = Integer.parseInt(adString);
+				else {
+					//look for info DP4, from SamTools, 
+					//DP4=1,4,5,11 high-quality ref-forward bases, ref-reverse, alt-forward and alt-reverse bases
+					String dp4 = test.getInfoObject().getInfo("DP4");
+					if (dp4 != null){
+						int[] baseCounts = Num.parseInts(dp4, Misc.COMMA);
+						if (baseCounts.length == 4) {
+							ad = baseCounts[2]+baseCounts[3];
+							if (dp == -1) dp = ad + baseCounts[0]+baseCounts[1];
+						}
+					}
+				}
 				if (sample.isNoCall() == false && 
 						dp >= sampleMinimumReadDepthDP && 
 						dp <= sampleMaximumReadDepthDP &&
-						sample.getGenotypeQualityGQ() >= sampleMinimumGenotypeQualityGQ) {
+						sample.getGenotypeQualityGQ() >= sampleMinimumGenotypeQualityGQ &&
+						ad >= sampleMinimumReadDepthAD) {
 					passes = true;
 					break;
 				}
@@ -249,7 +268,7 @@ public class MultiSampleVCFFilter {
 		int numStillPassing = parser.countMatchingVCFRecords(VCFRecord.PASS);
 		return new int[]{startingRecordNumber, numStillPassing};
 	}
-
+	
 	/**Sets passing records to fail if the don't pass the record quality. Returns int[startingNumPassing, endingNumPassing]*/
 	private int[] filterRecordQuality(VCFParser parser) {
 		//fetch records
@@ -276,6 +295,7 @@ public class MultiSampleVCFFilter {
 		System.out.println(sampleMinimumReadDepthDP + "\tMinimum sample read depth DP");
 		if (sampleMaximumReadDepthDP == Integer.MAX_VALUE) System.out.println("unlim\tMaximum sample read depth DP");
 		else System.out.println(sampleMaximumReadDepthDP + "\tMaximum sample read depth DP");
+		System.out.println(sampleMinimumReadDepthAD + "\tMinimum sample allele read depth AD or DP4");
 		System.out.println(sampleMinimumGenotypeQualityGQ + "\tMinimum sample genotype quality GQ");
 		
 		if (filterByGenotype) {
@@ -320,11 +340,12 @@ public class MultiSampleVCFFilter {
 					case 't': pathToTabix = args[++i]; break;
 					case 'f': passing = false; break;
 					case 'a': filterAnySample = true; break;
-					case 'g': sampleMinimumGenotypeQualityGQ = Float.parseFloat(args[++i]); break;
+					case 'g': sampleMinimumGenotypeQualityGQ = Float.parseFloat(args[++i]); filterAnySample = true; break;
 					case 'i': failNonPassRecords = true; break;
 					case 'b': filterByGenotype = true; break;
-					case 'r': sampleMinimumReadDepthDP = Integer.parseInt(args[++i]); break;
-					case 'x': sampleMaximumReadDepthDP = Integer.parseInt(args[++i]); break;
+					case 'r': sampleMinimumReadDepthDP = Integer.parseInt(args[++i]); filterAnySample = true; break;
+					case 'x': sampleMaximumReadDepthDP = Integer.parseInt(args[++i]); filterAnySample = true; break;
+					case 'y': sampleMinimumReadDepthAD = Integer.parseInt(args[++i]); filterAnySample = true;break;
 					case 'd': recordMinimumQUAL = Float.parseFloat(args[++i]); filterRecordQuality = true; break;
 					case 's': printSampleNames = true; break;
 					case 'n': sampleNames = args[++i].split(","); break;
@@ -471,7 +492,7 @@ public class MultiSampleVCFFilter {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Multi Sample VCF Filter  : Oct 2014                   **\n" +
+				"**                            Multi Sample VCF Filter  : Nov 2014                   **\n" +
 				"**************************************************************************************\n" +
 				"Filters a vcf file containing multiple sample records into those that pass or fail the\n" +
 				"tests below. This works with VCFv4.1 files created by the GATK package. Note, the \n" +
@@ -510,6 +531,7 @@ public class MultiSampleVCFFilter {
 				"-g Minimum sample genotype quality GQ, defaults to 0, recommend >= 20 \n"+
 				"-r Minimum sample read depth DP, defaults to 0, recommend >=10 \n"+
 				"-x Maximum sample read depth DP, defaults to unlimited\n"+
+				"-y Minimum sample allele count read depth AD or DP4, defaults to 0\n"+
 				"-s Print sample names and exit.\n"+
 				"-t Path to tabix.\n" +
 

@@ -37,7 +37,7 @@ public class SamLayout{
 		int index = 0;
 		int layoutIndex = position;
 		char[] samSeq = sam.getSequence().toCharArray();
-		int[] samQual = Seq.convertScores(sam.getQualities());
+		int[] samQual = Seq.convertSangerQualityScores(sam.getQualities());
 		while (mat.find()){
 			String cCall = mat.group(2);
 			int numberBases = Integer.parseInt(mat.group(1));

@@ -6,6 +6,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import edu.utah.seq.data.sam.SamAlignment;
+import edu.utah.seq.parsers.BarParser;
 import edu.utah.seq.useq.ArchiveInfo;
 import edu.utah.seq.useq.SliceInfo;
 import edu.utah.seq.useq.USeqUtilities;
@@ -64,6 +65,7 @@ public class Sam2USeq {
 	private Gzipper perRegionsGzipper = null;
 	private int maxNumberBases;
 	private HashMap<Long,Long> baseCoverageHist = new HashMap<Long,Long>();
+	private File barDirectory;
 	
 
 
@@ -409,8 +411,6 @@ public class Sam2USeq {
 					//just advance for all but insertions which should be skipped via the failure to match
 					else start += numberBases;
 				}
-
-
 			}
 		} catch (EOFException eof){	
 			PositionScore[] positions = null;
@@ -474,6 +474,9 @@ public class Sam2USeq {
 				e.printStackTrace();
 				Misc.printErrAndExit("\nError writing data to gzipper for per region coverage stats.\n");
 			}
+			//write out bar point data?
+			if (barDirectory != null) saveBarPointData(firstBase, baseCounts);
+			
 			//make ave read length graph?
 			if (makeAveReadLengthGraph){
 				//make averages
@@ -527,6 +530,37 @@ public class Sam2USeq {
 				} catch (IOException ignored) {}
 			}
 		}
+	}
+
+	/**Saves bar formatted point data for use in apps like AggregatePlotter.*/
+	private void saveBarPointData(int firstBase, float[] baseCounts) {
+		//create non zero Point data
+		ArrayList<Point> al = new ArrayList<Point>();
+		double scoreTotal = 0;
+		for (int i=0; i< baseCounts.length; i++){
+			if (baseCounts[i] != 0) {
+				al.add(new Point (i+firstBase, baseCounts[i]));
+				scoreTotal += baseCounts[i];
+			}
+		}
+		Point[] pts = new Point[al.size()];
+		al.toArray(pts);
+
+		PointData hitTrack = Point.extractPositionScores(pts);
+		Info info = new Info();
+		info.setChromosome(chromData.chromosome);
+		info.setStrand(chromData.strand);
+		info.setNumberObservations(pts.length);
+		info.setScoreTotal(scoreTotal);
+		info.setVersionedGenome(versionedGenome);
+		//add info to hashmap for writing to bar file
+		HashMap<String,String> map = new HashMap<String,String>();		
+		//what graph type should be used to display it?
+		map.put(BarParser.GRAPH_TYPE_TAG, BarParser.GRAPH_TYPE_BAR);
+		//save in info
+		info.setNotes(map);
+		hitTrack.setInfo(info);
+		hitTrack.writePointData(barDirectory);	
 	}
 
 	public void makeGoodBlocks(int firstBase, float[] baseCount, String chromosome, String strand){
@@ -676,6 +710,7 @@ public class Sam2USeq {
 					case 'p': perRegionCoverageStats = new File(args[i+1]); i++; break;
 					case 'v': versionedGenome = args[i+1]; i++; break;
 					case 'r': makeRelativeTracks = false; break;
+					case 'd': barDirectory = new File(args[i+1]); i++; break;
 					case 's': stranded = true; break;
 					case 'e': scaleRepeats = true; break;
 					case 'k': makeAveReadLengthGraph = true; break;
@@ -694,6 +729,9 @@ public class Sam2USeq {
 				}
 			}
 		}
+		
+		//barDirectory for saving point data?
+		if (barDirectory!= null) barDirectory.mkdirs();
 
 		File[][] tot = new File[4][];
 		tot[0] = IO.extractFiles(forExtraction,".sam");
@@ -893,7 +931,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam 2 USeq : May 2014                             **\n" +
+				"**                                Sam 2 USeq : Nov 2014                             **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
@@ -924,6 +962,7 @@ public class Sam2USeq {
 				"-l Print regions that also meet a minimum length, defaults to 0.\n"+
 				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
 				"-k Make average alignment length graph instead of read depth.\n"+
+				"-d Full path to a directory for saving bar binary PointData, defaults to not saving.\n"+
 
 				"\n"+
 

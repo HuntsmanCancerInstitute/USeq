@@ -17,4 +17,14 @@ public class VCFCluster {
 			sb.append(samples.get(i).getSampleIndex());
 		}
 	}
+
+	public void fetchSampleNames(StringBuilder sb) {
+		sb.append(samples.get(0).getSampleName());
+		int num = samples.size();
+		for (int i=1; i< num; i++){
+			sb.append("_");
+			sb.append(samples.get(i).getSampleName());
+		}
+		
+	}
 }

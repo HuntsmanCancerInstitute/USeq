@@ -705,7 +705,7 @@ public class NovoalignBisulfiteParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Novoalign Bisulfite Parser: Dec 2013                      **\n" +
+				"**                        Novoalign Bisulfite Parser: Nov 2014                      **\n" +
 				"**************************************************************************************\n" +
 				"Parses Novoalign -b2 and -b4 single and paired bisulfite sequence alignment files into\n" +
 				"PointData file formats. Generates several summary statistics on converted and non-\n" +
@@ -713,8 +713,8 @@ public class NovoalignBisulfiteParser{
 				"Note: for paired read RNA-Seq data run through the SamTranscriptomeParser first.\n" +
 
 				"\nOptions:\n"+
-				"-a Alignment file or directory containing novoalignments in SAM/BAM\n"+
-				"      (xxx.sam(.zip/.gz OK) or xxx.bam) format. Multiple files are merged.\n" +
+				"-a Alignment file or directory containing non merged novoalignments in SAM/BAM\n"+
+				"      (xxx.sam(.zip/.gz OK) or xxx.bam) format. Multiple files are combine. \n" +
 				"-f Fasta file directory, chromosome specific xxx.fa/.fasta(.zip/.gz OK) files.\n" +
 				"-s Save directory.\n"+
 				"-v Versioned Genome (ie H_sapiens_Mar_2006), see UCSC Browser,\n"+

@@ -78,11 +78,10 @@ public class SamAlignmentExtractor {
 
 			//for each chromosome of gene models
 			System.out.println("\nScanning regions by chromosome... ");
-			System.out.println("\t#IntersectingAlignments\tRegionInfo");
+			System.out.println("RegionCoordinates\t#Alignments");
 			Iterator<String> it = chromRegions.keySet().iterator();
 			while (it.hasNext()){
 				chromosome = it.next();
-				System.out.println(chromosome);
 				scanRegions();
 			}
 			System.out.println("\n");
@@ -195,7 +194,7 @@ public class SamAlignmentExtractor {
 					if (numAlignments > maximumReadDepth) continue;
 				}
 				//print em
-				if (alignments.size() !=0) System.out.println("\t"+alignments.size()+"\t"+regions[i].toString());
+				System.out.println(chromosome+"\t"+regions[i].toString()+"\t"+alignments.size());
 				//strip those already fetched to avoid repeat extraction!
 				ArrayList<String> toPrint = new ArrayList<String>(alignments.size());
 				for (String sam: alignments){
@@ -282,7 +281,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Sam Alignment Extractor: Oct 2014                     **\n" +
+				"**                            Sam Alignment Extractor: Nov 2014                     **\n" +
 				"**************************************************************************************\n" +
 
 				"Given a bed file containing regions of interest, parses all of the intersecting sam\n" +

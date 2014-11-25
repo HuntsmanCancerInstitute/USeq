@@ -72,9 +72,10 @@ public class Interval<T> implements java.io.Serializable {
 	 * @param value The object represented by the interval.
 	 */
 	public Interval(int low, int high, T value)   {
+		//modified by Nix to convert from interbase coordinates to 1 start and end included
+		low++;
 		if (low <= high) {
-			//modified by Nix to convert from interbase coordinates to 1 start and end included
-			this.lowpoint = low + 1;
+			this.lowpoint = low;
 			this.highpoint = high;
 			this.value = value;
 		} else {
