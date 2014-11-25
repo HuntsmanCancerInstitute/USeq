@@ -93,7 +93,7 @@ public class SamLayoutForMutation{
 		int index = 0;
 		int layoutIndex = 0;
 		char[] samSeq = sam.getSequence().toUpperCase().toCharArray();
-		int[] samQual = Seq.convertScores(sam.getQualities());
+		int[] samQual = Seq.convertSangerQualityScores(sam.getQualities());
 		while (mat.find()){
 			String cCall = mat.group(2);
 			int numberBases = Integer.parseInt(mat.group(1));

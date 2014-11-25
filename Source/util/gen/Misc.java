@@ -17,7 +17,9 @@ public class Misc {
 	public static final Pattern PATTERN_SEMICOLON = Pattern.compile(";");
 	public static final Pattern PATTERN_EQUALS = Pattern.compile("=");
 	public static final Pattern TAB = Pattern.compile("\t");
+	public static final Pattern UNDERSCORE = Pattern.compile("_");
 	public static final Pattern COLON = Pattern.compile(":");
+	public static final Pattern COMMA = Pattern.compile(",");
 	public static final Pattern GREATER_THAN = Pattern.compile(">");
 	
 	/**Calls garbage collection then returns total - free.*/
@@ -163,6 +165,7 @@ public class Misc {
 	
 	/**Converts a hash to a String using the delimiter to join.*/
 	public static String hashSetToString(HashSet hash, String delimiter){
+		if (hash.size() == 0) return "";
 		Iterator it = hash.iterator();
 		StringBuilder s = new StringBuilder();
 		Object obj = (Object)it.next();
@@ -686,6 +689,18 @@ public class Misc {
 			return sb.toString();
 		}
 		return string;
+	}
+	
+	/**Returns a nicely formated time, 15 May 2004 21:53.
+	 * (Note, all I can say is that the GC DateFormat Date classes are so convoluted as to be utterly useless. Shame!)*/
+	public static String getDateTime(){
+		String[] months = {"Jan","Feb","Mar","Apr","May","June","July", "Aug","Sept","Oct","Nov","Dec"};
+		GregorianCalendar c = new GregorianCalendar();
+		int minutes = c.get(Calendar.MINUTE);
+		String min;
+		if (minutes < 10) min = "0"+minutes;
+		else min = ""+minutes;
+		return c.get(Calendar.DAY_OF_MONTH)+" "+months[c.get(Calendar.MONTH)]+" "+ c.get(Calendar.YEAR)+" "+c.get(Calendar.HOUR_OF_DAY)+":"+min;
 	}
 
 	/**Returns a nicely formated time (15 May 2004).

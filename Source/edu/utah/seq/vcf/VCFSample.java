@@ -20,10 +20,8 @@ public class VCFSample {
 	private String originalRecord = null;
 	private String originalFormat = null;
 	private String alleleCounts = null;
-	
 	private String referenceCounts = null;
     private String alternateCounts = null;
-    
     private boolean missingQual = false;
 	
 	private static final Pattern PIPE = Pattern.compile("\\|");

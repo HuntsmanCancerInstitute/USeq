@@ -1,6 +1,8 @@
 package edu.utah.seq.vcf.cluster;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -20,12 +22,16 @@ public class ClusterMultiSampleVCF {
 	private File saveDirectory;
 	private float minimumRecordQuality = 20;
 	private float minimumSampleGenotypeQuality = 20;
+	private int minumumSamplesWithVariant = 1;
+	private boolean useTrimmedSampleName = true;
 	
 	VCFClusterSample[] vcfClusterSample = null;
 	private int numberRecords = 0;
 	private int numberPassingRecords = 0;
 	private HashMap<String, VCFClusterPair> clusterPairs = new HashMap<String, VCFClusterPair>();
 	double[][] similarityMatrix = null;
+	private String[] trimmedSampleNames;
+	private String[] sampleNames;
 
 	public ClusterMultiSampleVCF(String[] args){
 		//start clock
@@ -33,10 +39,11 @@ public class ClusterMultiSampleVCF {
 		
 		processArgs(args);
 		
-		System.out.println("Loading vcf samples...");
+		System.out.print("Loading vcf samples...");
 		buildClusterSamples();
 		System.out.println("\t"+ numberRecords+ "\t# VCF Records");
-		System.out.println("\t"+ numberPassingRecords+ "\t# Passing VCF Records (minQUAL "+Num.formatNumber(minimumRecordQuality, 1) +", minGT "+Num.formatNumber(minimumSampleGenotypeQuality, 1)+")");
+		System.out.println("\t"+ numberPassingRecords+ "\t# Passing VCF Records (minQUAL "+Num.formatNumber(minimumRecordQuality, 1) +
+				", minGT "+Num.formatNumber(minimumSampleGenotypeQuality, 1)+"minNum "+minumumSamplesWithVariant+")");
 		System.out.println("\t"+ vcfClusterSample.length+ "\t# Samples");
 
 		statClusterSamples();
@@ -60,10 +67,8 @@ public class ClusterMultiSampleVCF {
 			clusters[i] = new VCFCluster();
 			clusters[i].getSamples().add(vcfClusterSample[i]);
 		}
-		
-		
+
 		while (true){
-			//find best pair
 			if (findBestPair(clusters) == false) break;
 		}
 		
@@ -94,9 +99,11 @@ public class ClusterMultiSampleVCF {
 		StringBuilder sb = new StringBuilder("\t");
 		sb.append(maxSim);
 		sb.append("\t");
-		clusters[bestA].fetchIndexNames(sb);
+		if (useTrimmedSampleName) clusters[bestA].fetchSampleNames(sb);
+		else clusters[bestA].fetchIndexNames(sb);
 		sb.append("\t");
-		clusters[bestB].fetchIndexNames(sb);
+		if (useTrimmedSampleName) clusters[bestB].fetchSampleNames(sb);
+		else clusters[bestB].fetchIndexNames(sb);
 		System.out.println (sb);
 		//nuke em
 		//add b's to a
@@ -144,11 +151,13 @@ public class ClusterMultiSampleVCF {
 	}
 
 	private void statClusterSamples() {
-		System.out.println("\nSampleIndex\tName\t#NoCall\tFracNoCall");
+		System.out.println("\nSampleIndex\tName\tTrimmedName\t#NoCall\tFracNoCall");
 		double numPassRec = numberPassingRecords;
 		for (int i=0; i< vcfClusterSample.length; i++){
 			StringBuilder sb = new StringBuilder();
 			sb.append(vcfClusterSample[i].getSampleIndex());
+			sb.append("\t");
+			sb.append(sampleNames[i]);
 			sb.append("\t");
 			sb.append(vcfClusterSample[i].getSampleName());
 			sb.append("\t");
@@ -159,62 +168,111 @@ public class ClusterMultiSampleVCF {
 			sb.append(noCallFrac);
 			System.out.println(sb);
 		}
-		
+	}
+	
+	private BufferedReader fetchVCFBufferedReader() throws Exception{
+		BufferedReader in = null;
+		String line = null;
+		int firstSampleIndex = 9;
+		in  = IO.fetchBufferedReader(vcfFile);
+		//find "#CHROM" line and parse sample names
+		while ((line=in.readLine()) != null){
+			//comments
+			if (line.startsWith("#")){
+				if (line.startsWith("#CHROM")) {
+					String[] header = Misc.TAB.split(line);
+					sampleNames = new String[header.length - firstSampleIndex];
+					int index =0;
+					for (int i=firstSampleIndex; i< header.length; i++) sampleNames[index++] = header[i];
+					trimmedSampleNames = Misc.trimCommon(sampleNames);
+					break;
+				}
+			}
+		}
+		if (trimmedSampleNames == null) throw new Exception("\nFailed to find the #CHROM header line.");
+		return in;
 	}
 
 	private void buildClusterSamples() {
-		VCFParser parser = new VCFParser(vcfFile);
-		
-		//make vcf samples
-		String[] sampleName = parser.getSampleNames();
-		vcfClusterSample = new VCFClusterSample[sampleName.length];
-		for (int i=0; i< vcfClusterSample.length; i++) vcfClusterSample[i] = new VCFClusterSample(new String(sampleName[i]), i);
-		 
-		//walk through each record, check, if passes add genotype to samples
-		VCFRecord[] records = parser.getVcfRecords();
-		numberRecords = records.length;
-		HashSet<String> genotypes = new HashSet<String>();
-		for (VCFRecord vr : records){
-			//pass record QUAL?
-			if (vr.getQuality() < minimumRecordQuality) continue;
-			
-			//different genotypes?
-			VCFSample[] sample = vr.getSample();
-			genotypes.clear();
-			for (int i=0; i< sample.length; i++){
-				//no call? pass qc?
-				if (sample[i].isNoCall() || sample[i].getGenotypeQualityGQ() < minimumSampleGenotypeQuality) continue;
-				//add genotype to hash
-				genotypes.add(sample[i].getGenotypeGT());
-			}
-			//more than one genotype?
-			if (genotypes.size() < 2) continue;
-			numberPassingRecords++;
-			
-			//add info to VCFClusterSamples
-			///0=homozygous ref, 1=heterozygous, 2=homozygous alt, 3=no call
-			for (int i=0; i< sample.length; i++){
-				byte gt = -1;
-				//no call? pass qc?
-				if (sample[i].isNoCall() || sample[i].getGenotypeQualityGQ() < minimumSampleGenotypeQuality) gt = 3;
-				//figure out genotype
-				else {
-					String genotype = sample[i].getGenotypeGT();
-					if (genotype.equals("0/0")) gt = 0;
-					else if (genotype.equals("0/1")) gt = 1;
-					else if (genotype.equals("1/1")) gt = 2;
-					else {
-						//System.err.println("WARNING: Odd genotype for sample "+i+" "+sample[i].getUnmodifiedSampleString()+" skipping");
-						gt = 3;
-					}
+		try {
+			//fetch reader on vcf file and parse sample names
+			BufferedReader in = fetchVCFBufferedReader();
+
+			//make vcf samples
+			vcfClusterSample = new VCFClusterSample[trimmedSampleNames.length];
+			for (int i=0; i< vcfClusterSample.length; i++) vcfClusterSample[i] = new VCFClusterSample(trimmedSampleNames[i], i);
+
+			//walk through each record, check, if passes add genotype to samples
+			HashMap<String, Integer> genotypes = new HashMap<String,Integer>();
+
+			String line;
+			VCFParser parser = new VCFParser();
+			int counter = 0;
+			while ((line=in.readLine()) != null){
+				VCFRecord vr = new VCFRecord(line, parser, true, true); 
+				numberRecords++;
+				if (counter++ > 10000) {
+					System.out.print(".");
+					counter = 0;
 				}
-				vcfClusterSample[i].getCallsAL().add(new Byte(gt));
+				//pass record QUAL?
+				if (vr.getQuality() < minimumRecordQuality) continue;
+
+				//different genotypes?
+				VCFSample[] sample = vr.getSample();
+				genotypes.clear();
+				for (int i=0; i< sample.length; i++){
+					//no call? pass qc?
+					if (sample[i].isNoCall() || sample[i].getGenotypeQualityGQ() < minimumSampleGenotypeQuality) continue;
+					//add genotype to hash
+					String geno = sample[i].getGenotypeGT();
+					int count = 0;
+					if (genotypes.containsKey(geno)) count = genotypes.get(geno).intValue();
+					genotypes.put(geno, new Integer(++count));
+				}
+				//more than one genotype?
+				if (genotypes.size() < 2) continue;
+				//more than one sample?
+				
+				if (minumumSamplesWithVariant !=1){
+					boolean skip = false;
+					for (Integer count: genotypes.values()){
+						if (count.intValue() < minumumSamplesWithVariant) {
+							skip = true;
+							break;
+						}
+					}
+					if (skip) continue;
+				}
+				numberPassingRecords++;
+
+				//add info to VCFClusterSamples
+				///0=homozygous ref, 1=heterozygous, 2=homozygous alt, 3=no call
+				for (int i=0; i< sample.length; i++){
+					byte gt = -1;
+					//no call? pass qc?
+					if (sample[i].isNoCall() || sample[i].getGenotypeQualityGQ() < minimumSampleGenotypeQuality) gt = 3;
+					//figure out genotype
+					else {
+						String genotype = sample[i].getGenotypeGT();
+						if (genotype.equals("0/0")) gt = 0;
+						else if (genotype.equals("0/1")) gt = 1;
+						else if (genotype.equals("1/1")) gt = 2;
+						else {
+							//System.err.println("WARNING: Odd genotype for sample "+i+" "+sample[i].getUnmodifiedSampleString()+" skipping");
+							gt = 3;
+						}
+					}
+					vcfClusterSample[i].getCallsAL().add(new Byte(gt));
+				}
+				vr = null;
 			}
-			vr = null;
+			System.out.println();
+			in.close();
+		} catch (Exception e) {
+			System.out.println("\n\nError parsing vcf file! Aborting....\n");
+			e.printStackTrace();
 		}
-		//clean up, this app is a memory pig!
-		parser = null;
-		System.gc();
 	}
 
 	public static void main(String[] args) {
@@ -240,6 +298,7 @@ public class ClusterMultiSampleVCF {
 					//case 's': saveDirectory = new File(args[++i]); break;
 					case 'r': minimumRecordQuality = Float.parseFloat(args[++i]); break;
 					case 'g': minimumSampleGenotypeQuality = Float.parseFloat(args[++i]); break;
+					case 'i': useTrimmedSampleName = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -269,6 +328,8 @@ public class ClusterMultiSampleVCF {
 				"       to parse tabix compressed vcf files.  Best to uncompress.\n\n"+
 				"-r Minimum record QUAL score, defaults to 20.\n" +
 				"-g Minimum sample genotype GT score, defaults to 20.\n" +
+				"-i Use sample index instead of trimmed name in output.\n"+
+				"-c Minimum # samples with given genotype, defaults to 1.\n"+
 				
 				"\n"+
 				"Example: java -Xmx2G -jar pathTo/USeq/Apps/ClusterMultiSampleVCF -v ~/UGP/suicide.vcf\n" +

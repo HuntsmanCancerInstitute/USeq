@@ -3,18 +3,23 @@ package edu.utah.seq.vcf;
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
+
+import edu.utah.seq.its.Interval;
+import edu.utah.seq.its.IntervalTree;
 import edu.utah.seq.useq.data.RegionScoreText;
+import edu.utah.seq.useq.data.RegionScoreTextData;
 import util.bio.annotation.Bed;
 import util.bio.annotation.ExportIntergenicRegions;
 import util.gen.*;
 
-/**Compares variant lists, uses the vcf QUAL score to filter.
+/**Compares variant lists calculating pseudo ROC data 
  * @author Nix
  * */
 public class VCFComparator {
 
 	//user fields
 	private File vcfKey;
+	private File vcfBedKey;
 	private File bedKey;
 	private File[] testVcfFiles;
 	private File vcfTest;
@@ -27,6 +32,8 @@ public class VCFComparator {
 	private boolean useVQSLOD = false;
 	private boolean requireAltMatch = true;
 
+	private HashMap<String,RegionScoreText[]> keyBedCalls = null;
+	private HashMap<String,IntervalTree<RegionScoreText>> keyIntervalTrees = null;
 	private HashMap<String,RegionScoreText[]> keyRegions = null;
 	private HashMap<String,RegionScoreText[]> testRegions = null;
 	private HashMap<String,RegionScoreText[]> commonRegions = null;
@@ -40,7 +47,8 @@ public class VCFComparator {
 	private long keyBps;
 	private long testBps;
 	private long commonBps;
-	private int numberUnfilteredKeyVariants;
+	private int numberUnfilteredKeyVariants = 0;
+	private int numberFilteredKeyVariants = 0;
 	private ArrayList<Float> tprAL = new ArrayList<Float>();
 	private ArrayList<Float> fdrAL = new ArrayList<Float>();
 	private ArrayList<ScoredCalls> scoredCallsAL = new ArrayList<ScoredCalls>();
@@ -166,7 +174,6 @@ public class VCFComparator {
 			
 			out.close();
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		
@@ -174,9 +181,7 @@ public class VCFComparator {
 		
 	}
 
-	public void thresholdAndCompareCalls(){
-		//starting totals
-		float totalKey = keyParser.getVcfRecords().length;		
+	public void thresholdAndCompareCalls(){	
 		
 		//clear old results
 		tprAL.clear();
@@ -197,7 +202,7 @@ public class VCFComparator {
 		int numNonMatches = testNonMatchingVCF.length;
 		int numMatches = testMatchingVCF.length;
 		float oldFDR = ((float)numNonMatches)/((float)(numMatches + numNonMatches));
-		String res = formatResults(Float.MIN_NORMAL, totalKey, oldFDR, numMatches, numNonMatches);
+		String res = formatResults(Float.MIN_NORMAL, numberFilteredKeyVariants, oldFDR, numMatches, numNonMatches);
 		results.append(res.toString());
 		results.append("\n");
 
@@ -209,7 +214,7 @@ public class VCFComparator {
 			numMatches = countNumberMatches(score);
 			float fdr = ((float)numNonMatches)/((float)(numMatches + numNonMatches));
 			if (fdr < oldFDR) oldFDR = fdr;
-			res = formatResults(score, totalKey, oldFDR, numMatches, numNonMatches);
+			res = formatResults(score, numberFilteredKeyVariants, oldFDR, numMatches, numNonMatches);
 			results.append(res.toString());
 			results.append("\n");
 			if (numNonMatches == 0 || numMatches == 0) break;
@@ -266,39 +271,78 @@ public class VCFComparator {
 
 	public void intersectVCF(){
 		//set all records to fail
-		keyParser.setFilterFieldOnAllRecords(VCFRecord.FAIL);
+		if (keyParser != null) keyParser.setFilterFieldOnAllRecords(VCFRecord.FAIL);
 		testParser.setFilterFieldOnAllRecords(VCFRecord.FAIL);
 
 		ArrayList<VCFMatch> matches = new ArrayList<VCFMatch>();
 		ArrayList<VCFRecord> testNonMatches = new ArrayList<VCFRecord>();
 
 		//for each test record
-		for (String chr: testParser.getChromosomeVCFRecords().keySet()){			
-			VCFLookUp key = keyParser.getChromosomeVCFRecords().get(chr);
+		for (String chr: testParser.getChromosomeVCFRecords().keySet()){
+			boolean keyFound = true;
 			VCFLookUp test = testParser.getChromosomeVCFRecords().get(chr);
-			if (key == null) {
+			
+			//vcf key?
+			if (keyParser != null){
+				VCFLookUp key = keyParser.getChromosomeVCFRecords().get(chr);
+				if (key == null)  keyFound = false;
+				else countMatches(key, test, matches, testNonMatches);
+			}
+			//nope bed key
+			else {
+				 IntervalTree<RegionScoreText> treeKey = keyIntervalTrees.get(chr);
+				 if (treeKey == null) keyFound = false;
+				 else countMatches(treeKey, test, matches, testNonMatches);
+			}
+			if (keyFound == false) {
 				//add all test to nonMatch
 				for (VCFRecord r: test.getVcfRecord()) testNonMatches.add(r);
-				continue;
 			}
-			countMatches(key, test, matches, testNonMatches);
+			
+			
 		} 
-		//if (matches.size() == 0) Misc.printExit("\tNo matching vcf records?! Aborting.\n");
-
+		
 		//set arrays
 		testMatchingVCF = new VCFMatch[matches.size()];
 		testNonMatchingVCF = new VCFRecord[testNonMatches.size()];
 		matches.toArray(testMatchingVCF);
 		testNonMatches.toArray(testNonMatchingVCF);
 
-		//Add failing key records to nonMatches
-		ArrayList<VCFRecord> keyNonMatches = new ArrayList<VCFRecord>();
-		for (VCFRecord v : keyParser.getVcfRecords()){
-			if (v.getFilter().equals(VCFRecord.FAIL)) keyNonMatches.add(v);
+		//split key into match and nonMatch
+		if (keyParser != null){
+			ArrayList<VCFRecord> keyNonMatches = new ArrayList<VCFRecord>();
+			for (VCFRecord v : keyParser.getVcfRecords()){
+				if (v.getFilter().equals(VCFRecord.FAIL)) keyNonMatches.add(v);
+			}
+			keyNonMatchingVCF = new VCFRecord[keyNonMatches.size()];
+			keyNonMatches.toArray(keyNonMatchingVCF);
 		}
-		keyNonMatchingVCF = new VCFRecord[keyNonMatches.size()];
-		keyNonMatches.toArray(keyNonMatchingVCF);
+	}
 
+	private String[] splitBedKeyIntoMatchNonMatch() {
+		//collect matches
+		HashSet<String> matches = new HashSet<String>();
+		for (int i=0; i< testMatchingVCF.length; i++){
+			String chr = testMatchingVCF[i].getTest().getChromosome();
+			matches.add(testMatchingVCF[i].getRegionKey().getBedLine(chr));
+		}
+		StringBuilder hits = new StringBuilder();
+		StringBuilder miss = new StringBuilder();
+		for (String chr: keyBedCalls.keySet()){
+			RegionScoreText[] regions = keyBedCalls.get(chr);
+			for (RegionScoreText r: regions){
+				String bed = r.getBedLine(chr);
+				if (matches.contains(bed)) {
+					hits.append(bed);
+					hits.append("\n");
+				}
+				else {
+					miss.append(bed);
+					miss.append("\n");
+				}
+			}
+		}
+		return new String[]{hits.toString(), miss.toString()};
 	}
 
 	public void countMatches(VCFLookUp key, VCFLookUp test, ArrayList<VCFMatch> matches, ArrayList<VCFRecord> nonMatches){
@@ -331,6 +375,49 @@ public class VCFComparator {
 				}
 			}
 		}
+	}
+	
+	public void countMatches(IntervalTree<RegionScoreText> key, VCFLookUp test, ArrayList<VCFMatch> matches, ArrayList<VCFRecord> testNonMatches) {
+		//for each record in the test
+		VCFRecord[] vcfTest = test.getVcfRecord();
+		for (int i=0; i< vcfTest.length; i++){
+			//fetch records from key
+			int size = vcfTest[i].getAlternate().length;
+			if (size < vcfTest[i].getReference().length()) size = vcfTest[i].getReference().length();
+			ArrayList<RegionScoreText> matchingKey = key.search(vcfTest[i].getPosition(), vcfTest[i].getPosition()+size+2);
+			
+			//no records found
+			int numKey = matchingKey.size();			
+			if (numKey ==0) testNonMatches.add(vcfTest[i]);
+			else {				
+				//for each match
+				boolean matchFound = false;
+				for (int x=0; x< numKey; x++){	
+					//get type 0 snp, 1 insertion, 2 deletion
+					int keyType = fetchType(matchingKey.get(x).getText());
+					//check to see if it matches
+					if (vcfTest[i].matchesVariantType(keyType)){
+						vcfTest[i].setFilter(VCFRecord.PASS);
+						matches.add(new VCFMatch(matchingKey.get(x), vcfTest[i]));
+						matchFound = true;
+						break;
+					}
+				}
+				if (matchFound == false) testNonMatches.add(vcfTest[i]);
+			}
+		}
+	}
+
+	/**
+	81_81_SNV          0
+	80_65_INS_ACAGGA   1           
+	81_15_DEL          2   */
+	private int fetchType(String text) {
+		if (text.contains("SNV")) return 0;
+		if (text.contains("INS")) return 1;
+		if (text.contains("DEL")) return 2;
+		Misc.printErrAndExit("\nError: failed to parse the variant type (SNV, INS, DEL) from the bed key file?\n");
+		return 0;
 	}
 
 	public long overlapRegions(){
@@ -409,7 +496,17 @@ public class VCFComparator {
 		res = commonBps +"\tInterrogated bps in common\n";
 		results.append(res);
 
-		if (keyParser == null){			
+		//parse key variants, either from a bed file or from a vcf file
+		if (vcfBedKey != null && keyBedCalls == null){
+			keyBedCalls = Bed.parseBedFile(vcfBedKey, true, true);
+			//count unfiltered
+			for (RegionScoreText[] r : keyBedCalls.values()) numberUnfilteredKeyVariants+= r.length;
+			//filter
+			numberFilteredKeyVariants = filterKeyBedCalls();
+			//create interval trees
+			createIntervalTreesForBedCalls();
+		}
+		else if (keyParser == null){			
 			keyParser = new VCFParser(vcfKey, true, true, false);
 			if (removeNonPass){				
 				keyParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
@@ -421,21 +518,24 @@ public class VCFComparator {
 			numberUnfilteredKeyVariants = keyParser.getVcfRecords().length;	
 			if (numberUnfilteredKeyVariants == 0) Misc.printErrAndExit("\nNo key variants passing filters? Aboring.\n");
 			keyParser.filterVCFRecords(commonRegions);
+			numberFilteredKeyVariants = keyParser.getVcfRecords().length;
 		}
 		res = numberUnfilteredKeyVariants +"\tKey variants\n";
 		results.append(res);
 		
-		res = keyParser.getVcfRecords().length +"\tKey variants in shared regions\n";
+		res = numberFilteredKeyVariants +"\tKey variants in shared regions\n";
 		results.append(res);
-		
-		res = keyParser.calculateTiTvRatio() +"\tShared key variants Ti/Tv\n";
-		results.append(res);
-		
-		if (keyParser.getVcfRecords().length == 0) {
+
+		if (numberFilteredKeyVariants == 0) {
 			System.out.println(results);
 			Misc.printErrAndExit("\nNo key variants in shared regions? Aboring.\n");
 		}
-
+		
+		//calc Ti/Tv for key if in vcf format
+		if (keyParser != null) res = keyParser.calculateTiTvRatio() +"\tShared key variants Ti/Tv\n";
+		results.append(res);
+		
+		//parse test variants!
 		testParser = new VCFParser(vcfTest, true, true, useVQSLOD);
 		if (removeNonPass){
 			testParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
@@ -463,6 +563,69 @@ public class VCFComparator {
 		
 	}
 
+	private void createIntervalTreesForBedCalls() {
+		//make HashMap of trees
+		keyIntervalTrees = new HashMap<String,IntervalTree<RegionScoreText>>();
+		for (String chr : keyBedCalls.keySet()){
+			RegionScoreText[] regions = keyBedCalls.get(chr);
+			ArrayList<Interval<RegionScoreText>> ints = new ArrayList();
+			for (int i =0; i< regions.length; i++) {				
+				ints.add(new Interval<RegionScoreText>(regions[i].getStart(), regions[i].getStop(), regions[i]));
+			}
+			IntervalTree<RegionScoreText> tree = new IntervalTree(ints, false);
+			keyIntervalTrees.put(chr, tree);
+		}
+	}
+
+	//parses key bed variants for those that fall in the common interrogated regions
+	private int filterKeyBedCalls() {
+		int numGoodRegions = 0;
+		HashMap<String,RegionScoreText[]> goodKey = new HashMap<String,RegionScoreText[]>();
+		//for each chromosome of common regions
+		for (String chr: commonRegions.keySet()){	
+			//any keyBedCalls?
+			if (keyBedCalls.containsKey(chr) == false) continue;
+			//make boolean array representing covered bases
+			RegionScoreText[] r = commonRegions.get(chr);
+			if (r == null || r.length == 0) continue;
+			int lastBase = RegionScoreText.findLastBase(r);
+			boolean[] coveredBases = new boolean[lastBase];
+			for (int i=0; i< r.length; i++){
+				int stop = r[i].getStop();
+				for (int j=r[i].getStart(); j< stop; j++){
+					coveredBases[j] = true;
+				}
+			}
+			//for each key call, if any base is covered then pass it.
+			ArrayList<RegionScoreText> goodRegions = new ArrayList<RegionScoreText>();
+			RegionScoreText[] k = keyBedCalls.get(chr);
+			for (int i=0; i< k.length; i++){
+				int start = k[i].getStart();
+				int stop = k[i].getStop();
+				//after last base?
+				if (start >= lastBase || stop >= lastBase) continue;
+				boolean good = false;
+				for (int j= start; j< stop; j++){
+					if (coveredBases[j]){
+						good = true;
+						break;
+					}
+				}
+				if (good) goodRegions.add(k[i]);
+			}
+			//add to good key?
+			if (goodRegions.size() != 0) {
+				k = new RegionScoreText[goodRegions.size()];
+				goodRegions.toArray(k);
+				goodKey.put(chr, k);
+				numGoodRegions += goodRegions.size();
+			}
+		}
+		//reset key bed calls
+		keyBedCalls = goodKey;
+		return numGoodRegions;
+	}
+
 	public void printParsedDatasets(){
 		try {
 			String filter = "All_";
@@ -482,19 +645,40 @@ public class VCFComparator {
 
 			//sort arrays by chromosome and position
 			VCFRecord[][] keyTestMatches = VCFMatch.split(testMatchingVCF);
-			Arrays.sort(keyTestMatches[0]);
 			Arrays.sort(keyTestMatches[1]);
 			Arrays.sort(testNonMatchingVCF);
-			Arrays.sort(keyNonMatchingVCF);
+			if (keyParser != null) {
+				Arrays.sort(keyTestMatches[0]);
+				Arrays.sort(keyNonMatchingVCF);
+			}
 
-			//print matching and non matching vcf files
-			String keyName = Misc.removeExtension(vcfKey.getName()); 
+			//fetch names for the key and test variant data
+			String keyName ;
+			if (keyParser != null) keyName = Misc.removeExtension(vcfKey.getName()); 
+			else keyName = Misc.removeExtension(vcfBedKey.getName());
 			String testName = Misc.removeExtension(vcfTest.getName());
-			File matchingKey = new File (saveDirectory, "match_"+filter+keyName+"_"+testName+".vcf.gz");
-			File noMatchingKey = new File (saveDirectory, "noMatch_"+filter+keyName+"_"+testName+".vcf.gz");
-			keyParser.printRecords(keyTestMatches[0],matchingKey);
-			keyParser.printRecords(keyNonMatchingVCF,noMatchingKey);
+			
+			//vcf key
+			if (keyParser != null){
+				File matchingKey = new File (saveDirectory, "match_"+filter+keyName+"_"+testName+".vcf.gz");
+				File noMatchingKey = new File (saveDirectory, "noMatch_"+filter+keyName+"_"+testName+".vcf.gz");
+				keyParser.printRecords(keyTestMatches[0],matchingKey);
+				keyParser.printRecords(keyNonMatchingVCF,noMatchingKey);
+			}
+			//region based key
+			else {
+				String[] hitMiss = splitBedKeyIntoMatchNonMatch();
+				if (hitMiss[0].length() !=0){
+					File matchingKey = new File (saveDirectory, "match_"+filter+keyName+"_"+testName+".bed");
+					IO.writeString(hitMiss[0], matchingKey);
+				}
+				if (hitMiss[1].length() !=0){
+					File noMatchingKey = new File (saveDirectory, "noMatch_"+filter+keyName+"_"+testName+".bed");
+					IO.writeString(hitMiss[1], noMatchingKey);
+				}
+			}
 
+			//vcf Test
 			File matchingTest = new File (saveDirectory, "match_"+filter+testName+"_"+keyName+".vcf.gz");
 			File noMatchingTest = new File (saveDirectory, "noMatch_"+filter+testName+"_"+keyName+".vcf.gz");
 			testParser.printRecords(keyTestMatches[1],matchingTest);
@@ -505,7 +689,7 @@ public class VCFComparator {
 			IO.writeString(results.toString(), intersection);
 
 		} catch (Exception e){
-
+			e.printStackTrace();
 		}
 	}
 
@@ -533,6 +717,7 @@ public class VCFComparator {
 				try{
 					switch (test){
 					case 'a': vcfKey = new File(args[++i]); break;
+					case 'k': vcfBedKey = new File(args[++i]); break;
 					case 'b': bedKey = new File(args[++i]); break;
 					case 'c': forExtraction = new File(args[++i]); break;
 					case 'd': bedTest = new File(args[++i]); break;
@@ -553,10 +738,10 @@ public class VCFComparator {
 			}
 		}
 		//checkfiles
-		if (vcfKey == null || vcfKey.canRead() == false || 
-				bedKey == null || bedKey.canRead() == false ||
-				bedTest == null || bedTest.canRead() == false ) Misc.printErrAndExit("\nError: looks like you are missing or cannot read one of the four required files!\n");
-
+		if (vcfKey == null && vcfBedKey == null) Misc.printErrAndExit("\nError: please provide either a vcf or bed variant key file.\n");
+		if (bedKey == null || bedKey.canRead() == false) Misc.printErrAndExit("\nError: please provide a bed file of interrogated regions for the key dataset\n");
+		if (bedTest == null) bedTest = bedKey;
+		
 		//pull files
 		if (forExtraction == null || forExtraction.canRead() == false) Misc.printExit("\nError: please provide a test vcf file or directory containing such to compare against the key.\n");
 		File[][] tot = new File[3][];
@@ -578,11 +763,12 @@ public class VCFComparator {
 	private void printOptions() {
 		StringBuilder res = new StringBuilder();
 		res.append("VCF Comparator Settings:\n\n");
-		res.append(vcfKey+"\tKey vcf file\n");
-		res.append(bedKey+"\tKey interrogated regions file\n");
-		res.append(vcfTest+"\tTest vcf file\n");
-		res.append(bedTest+"\tTest interrogated regions file\n");
-		res.append(saveDirectory+"\tSave directory for parsed datasets\n");
+		if (this.vcfBedKey != null) res.append(vcfBedKey.getName()+"\tKey vcf bed file\n");
+		else res.append(vcfKey.getName()+"\tKey vcf file\n");
+		res.append(bedKey.getName()+"\tKey interrogated regions file\n");
+		res.append(vcfTest.getName()+"\tTest vcf file\n");
+		res.append(bedTest.getName()+"\tTest interrogated regions file\n");
+		if (saveDirectory != null ) res.append(saveDirectory.getName()+"\tSave directory for parsed datasets\n");
 		res.append(requireAltMatch+"\tRequire matching alternate bases\n");
 		res.append(requireGenotypeMatch+"\tRequire matching genotypes\n");
 		res.append(useVQSLOD+"\tUse record VQSLOD score as ranking statistic\n");
@@ -603,10 +789,12 @@ public class VCFComparator {
 				"**************************************************************************************\n" +
 				"Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls\n" +
 				"that fall in the common interrogated regions are compared. WARNING tabix gzipped files\n" +
-				"often fail to parse correctly with java. Seeing odd error messages? Try uncompressing.\n\n" +
+				"often fail to parse correctly with java. Seeing odd error messages? Try uncompressing.\n"+
+				"Be sure a score is provided in the QUAL field.\n\n" +
 
 				"Required Options:\n"+
 				"-a VCF file for the key dataset (xxx.vcf(.gz/.zip OK)).\n"+
+				"-k Or, bed file of approx key variants (chr start stop type[#alt_#ref_SNV/INS/DEL]\n"+
 				"-b Bed file of interrogated regions for the key dataset (xxx.bed(.gz/.zip OK)).\n"+
 				"-c VCF file for the test dataset (xxx.vcf(.gz/.zip OK)). May also provide a directory\n" +
 				"       containing xxx.vcf(.gz/.zip OK) files to compare.\n"+

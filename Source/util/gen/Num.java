@@ -4,6 +4,11 @@ import java.util.regex.Pattern;
 import java.text.*;
 import java.io.*;
 
+import edu.utah.seq.data.ComparatorPointAscendingScore;
+import edu.utah.seq.data.ComparatorPointPosition;
+import edu.utah.seq.data.Point;
+import edu.utah.seq.data.SmoothingWindow;
+
 /**
  * Math and statistical static methods.
  */
@@ -12,6 +17,12 @@ public class Num {
 	public static final double log2 = Math.log(2);
 	private static final double sRConstant = Math.log(Math.PI) / 2.0;
 
+	/**Returns true if the int is even.*/
+	public static boolean isEven(int x){
+		if ( (x & 1) == 0 ) return true;
+		return false;
+	}
+	
 	/**Does a linear regression type interpolation, assumes 2's are > 1's.*/
 	public static float interpolateY(float x1, float y1, float x2, float y2, float fixedX){
 		float diffX = x2-x1;
@@ -968,6 +979,23 @@ public class Num {
 			else sortedPValDecending[i] = prior;
 		}
 	}
+	
+	/**Returns B&H corrected -10Log10(FDRs) in order provided.  Assumes -10log10(pvals).*/
+	public static float[] benjaminiHochbergCorrectUnsorted(float[] unsortedPValues){
+		//load Point[] with all of the pvalues
+		Point[] point = new Point[unsortedPValues.length];
+		for (int i=0; i< point.length; i++) point[i] = new Point(i, unsortedPValues[i]);
+		//sort by score smallest -10Log10(pval) to largest
+		Arrays.sort(point, new ComparatorPointAscendingScore());
+		//correct
+		Point.benjaminiHochbergCorrect(point, 0);
+		//sort back to original position
+		Arrays.sort(point, new ComparatorPointPosition());
+		//assign FDRs to pVals
+		float[] fdr = new float[point.length];
+		for (int i=0; i< point.length; i++) fdr[i] = point[i].getScore();
+		return fdr;
+	}
 
 	/**Assumes pvalues are -10Log10(pval) transformed and sorted in ascending order. Alters the input array.*/
 	public static void benjaminiHochbergCorrect(float[] sortedMin10Log10PVals){
@@ -1720,6 +1748,18 @@ public class Num {
 			int k = rng.nextInt(n);  // 0 <= k <= n - 1.
 			// Simple swap of variables
 			float tmp = array[k];
+			array[k] = array[n - 1];
+			array[n - 1] = tmp;
+		}
+	}
+	
+	public static void randomize (byte[] array, Random rng){      
+		// n is the number of items left to shuffle
+		for (int n = array.length; n > 1; n--) {
+			// Pick a random element to move to the end
+			int k = rng.nextInt(n);  // 0 <= k <= n - 1.
+			// Simple swap of variables
+			byte tmp = array[k];
 			array[k] = array[n - 1];
 			array[n - 1] = tmp;
 		}
@@ -4966,4 +5006,10 @@ public class Num {
 		}
 		return total/numCounted;
 	}
+
+	public static int[] parseInts(String s, Pattern comma) {
+		String[] i = comma.split(s);
+		return Num.parseInts(i);
+	}
+
 }

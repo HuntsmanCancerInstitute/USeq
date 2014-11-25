@@ -113,9 +113,10 @@ public class AggregatePlotter {
 		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
 	}
 	
-	/**Prints smoothed arrays of 5, 10, and 20% of region size.*/
+	/**Prints smoothed arrays of 2.5, 5, 10, and 20% of region size.*/
 	private void printSmoothedArrays(){
-		
+		int twoFivePercent = Math.round((float)scaleSize * 0.025f);
+		float[] smoothedTwoFive = Num.windowAverageScoresNoShrink(mergedRegionScores, twoFivePercent);
 		int fivePercent = Math.round((float)scaleSize * 0.05f);
 		float[] smoothedFive = Num.windowAverageScoresNoShrink(mergedRegionScores, fivePercent);
 		int tenPercent = Math.round((float)scaleSize * 0.10f);
@@ -124,9 +125,9 @@ public class AggregatePlotter {
 		float[] smoothedTwentyFive = Num.windowAverageScoresNoShrink(mergedRegionScores, twentyFivePercent);
 		
 		System.out.println("\nPrinting region size window smoothed data:\n");
-		System.out.println("Index\t0%\t5%("+fivePercent+")\t10%("+tenPercent+")\t25%("+twentyFivePercent+")");
+		System.out.println("Index\t0%\t2.5%("+twoFivePercent+")\t5%("+fivePercent+")\t10%("+tenPercent+")\t25%("+twentyFivePercent+")");
 		for (int i=0; i< mergedRegionScores.length; i++){
-			System.out.println((i+1)+"\t"+mergedRegionScores[i]+"\t"+smoothedFive[i]+"\t"+smoothedTen[i]+"\t"+smoothedTwentyFive[i]);
+			System.out.println((i+1)+"\t"+mergedRegionScores[i]+"\t"+smoothedTwoFive[i]+"\t"+smoothedFive[i]+"\t"+smoothedTen[i]+"\t"+smoothedTwentyFive[i]);
 		}
 		
 		

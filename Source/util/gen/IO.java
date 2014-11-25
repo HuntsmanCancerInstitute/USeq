@@ -55,7 +55,7 @@ public class IO {
 			System.err.println("\nProblem fetching version information from the jar file.\n");
 			x.printStackTrace();  
 		}
-		return version;
+		return "["+Misc.getDateTime()+"] "+version;
 	}
 
 	/**Returns the names of the files or directories.*/

@@ -99,6 +99,7 @@ public class Info implements Serializable{
 	}
 
 	public HashMap<String,String> getNotes() {
+		if (notes == null) notes = new HashMap<String,String>();
 		return notes;
 	}
 

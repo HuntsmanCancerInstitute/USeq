@@ -101,14 +101,18 @@ public class Seq {
 		return map;
 	}
 	
-	/**Converts the ascii quality scores to numeric scores. Assumes Sanger fastq.*/
-	public static int[] convertScores(String seqQual){
+	/**Converts the ascii quality scores to numeric scores. Returns null if not Sanger or Illumina 1.8+
+	 * See http://onetipperday.blogspot.com/2012/10/code-snip-to-decide-phred-encoding-of.html */
+	public static int[] convertSangerQualityScores(String seqQual){
 		int[] scores = new int[seqQual.length()];
 		for (int i=0; i< seqQual.length(); i++){
 			String sub = seqQual.substring(i, i+1);
 			Integer val = asci2FastQScore.get(sub);
-			if (val != null) scores[i] = val.intValue();
-			else System.err.println("\nError converting seq quality character -> "+sub+" from "+seqQual);
+			if (val == null || val > 41) {
+				System.err.println("\nError converting seq quality character -> "+sub+" from "+seqQual);
+				return null;
+			}
+			scores[i] = val.intValue();
 		}
 		return scores;
 	}

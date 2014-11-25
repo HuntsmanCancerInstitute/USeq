@@ -134,10 +134,10 @@ public class FilterDuplicateAlignments {
 				//save best?
 				else if (qualityColumnIndex != -1){
 					String bestLine = block.get(0).getLine();
-					int bestScore = Num.sumIntArray(Seq.convertScores( tab.split(bestLine)[qualityColumnIndex]));
+					int bestScore = Num.sumIntArray(Seq.convertSangerQualityScores( tab.split(bestLine)[qualityColumnIndex]));
 					for (int x=1; x< numReads; x++){
 						String line = block.get(x).getLine();
-						int totalScore = Num.sumIntArray(Seq.convertScores( tab.split(line)[qualityColumnIndex]));
+						int totalScore = Num.sumIntArray(Seq.convertSangerQualityScores( tab.split(line)[qualityColumnIndex]));
 						if (totalScore > bestScore) {
 							bestLine = line;
 							bestScore = totalScore;
@@ -193,10 +193,10 @@ public class FilterDuplicateAlignments {
 		//save best?
 		else if (qualityColumnIndex != -1){
 			String bestLine = block.get(0).getLine();
-			int bestScore = Num.sumIntArray(Seq.convertScores( tab.split(bestLine)[qualityColumnIndex]));
+			int bestScore = Num.sumIntArray(Seq.convertSangerQualityScores( tab.split(bestLine)[qualityColumnIndex]));
 			for (int x=1; x< numReads; x++){
 				String line = block.get(x).getLine();
-				int totalScore = Num.sumIntArray(Seq.convertScores( tab.split(line)[qualityColumnIndex]));
+				int totalScore = Num.sumIntArray(Seq.convertSangerQualityScores( tab.split(line)[qualityColumnIndex]));
 				if (totalScore > bestScore) {
 					bestLine = line;
 					bestScore = totalScore;
