@@ -52,6 +52,7 @@ public class DefinedRegionDifferentialSeq {
 	private int maxAlignmentsDepth = 50000;
 	private boolean secondStrandFlipped = false;
 	private boolean useSamSeq = false;
+	private boolean independentFiltering = true;
 	
 	//hidden options
 	private boolean trimUTRBPsFromExons = false;
@@ -956,13 +957,77 @@ public class DefinedRegionDifferentialSeq {
 					if (deleteTempFiles) results.deleteOnExit();
 					pc.setDiffExpResults(results);
 
+					
+					//Create conditions
+					ArrayList<String> cn = new ArrayList<String>();
+					for (int n=0; n<conditions[i].getReplicas().length; n++) {
+						cn.add(conditions[i].getName());
+					}
+					for (int n=0; n<conditions[j].getReplicas().length; n++) {
+						cn.add(conditions[j].getName());
+					}
+					String[] cna = cn.toArray(new String[cn.size()]);
+					
+					//Write out count table
+					
+					File pairwiseFile = new File(saveDirectory, conditions[i].getName() + "vs" + conditions[j].getName() + ".txt");
+					if (deleteTempFiles) pairwiseFile.deleteOnExit();
+
+					try {
+						PrintWriter out = new PrintWriter( new FileWriter(pairwiseFile));
+
+						Condition[] set = new Condition[]{conditions[i],conditions[j]};
+						
+						//print header
+						out.print("GeneName");
+						for (Condition c: set) {
+							for (Replica r: c.getReplicas()){
+								out.print("\t");
+								out.print(r.getNameNumber());
+							}
+						}
+						
+						out.println();
+
+						//print counts for genes with minimal counts in any replica
+						for (String geneName: geneNamesToAnalyze){
+							out.print(geneName);
+							for (Condition c: set){
+								for (Replica r: c.getReplicas()){
+									out.print("\t");
+									//printing 5' and 3' counts or standard?
+									if (printFirstLastCountTable){
+										String num = "0:0";
+										if (r.getGeneCounts().get(geneName) != null) {
+											int[] fiveThree = r.getGeneCounts().get(geneName).getExonCounts();
+											num = fiveThree[0]+":"+ fiveThree[1];
+										}
+										out.print(num);
+									}
+									else {
+										int num = 0;
+										//remember that genes with zero counts are not stored in a replica
+										if (r.getGeneCounts().get(geneName) != null) num = r.getGeneCounts().get(geneName).getCount();
+										out.print(num);
+									}
+								}
+							}
+							out.println();
+						}
+						out.close();
+					}
+					catch (Exception e){
+						System.err.println("Problem writing out count table.");
+						e.printStackTrace();
+					}
+					
+					
+					
 					//make R script
-
-
 					//Load up data
-					sb.append("dataTable <- read.table('" + geneCountTable.getCanonicalPath()+"', header=TRUE,row.names=1)\n");
+					sb.append("dataTable <- read.table('" + pairwiseFile.getCanonicalPath()+"', header=TRUE,row.names=1)\n");
 					sb.append("geneNames <- rownames(dataTable)\n");
-					sb.append("conds <- as.factor(c('"+ Misc.stringArrayToString(conditionNamesPerReplica, "','") + "'))\n");
+					sb.append("conds <- as.factor(c('"+ Misc.stringArrayToString(cna, "','") + "'))\n");
 
 					//Create data model
 					sb.append("dataModel <- list(x=dataTable,y=conds,geneid=geneNames)\n");
@@ -983,7 +1048,7 @@ public class DefinedRegionDifferentialSeq {
 					sb.append("finalTable <- finalTable[match(geneNames,finalTable[,1]),]\n");
 
 					//Write Table
-					sb.append("write.table(finalTable,file='"+results.getCanonicalPath()+"',sep='\t',quote=FALSE,row.names=FALSE)");
+					sb.append("write.table(finalTable,file='"+results.getCanonicalPath()+"',sep='\t',quote=FALSE,row.names=FALSE)\n");
 
 				}
 			}
@@ -1086,7 +1151,14 @@ public class DefinedRegionDifferentialSeq {
 					File results = new File (saveDirectory, pc.getName()+"DESeq2.txt");
 					if (deleteTempFiles) results.deleteOnExit();
 					pc.setDiffExpResults(results);
-					sb.append("res = results(cds, contrast = c('condition', '"+conditions[i].getName()+"', '"+conditions[j].getName()+"'))\n");
+					if (independentFiltering) {
+						sb.append("res = results(cds, contrast = c('condition', '"+conditions[i].getName()+"', '"+conditions[j].getName()+"'))\n");
+					} else {
+						sb.append("res = results(cds, independentFiltering=FALSE, contrast = c('condition', '"+conditions[i].getName()+"', '"+conditions[j].getName()+"'))\n");
+
+					}
+					
+					
 					sb.append("res[,6] = -10 * log10(res[,6])\n"); //transform pvals since java can't handle some of these big numbers
 					sb.append("write.table(res, file = '"+results.getCanonicalPath()+"', quote=FALSE, sep ='\t')\n");
 				}
@@ -1841,6 +1913,7 @@ public class DefinedRegionDifferentialSeq {
 					case 'j': performReverseStrandedAnalysis = true; break;
 					case 'k': secondStrandFlipped = true; break;
 					case 'a': useSamSeq = true; break;
+					case 'f': independentFiltering = false; break;
 					//hidden options
 					case 'o': trimUTRBPsFromExons = true; break;
 					case 'z': printFirstLastCountTable = true; break;
@@ -1930,6 +2003,7 @@ public class DefinedRegionDifferentialSeq {
 				"       http://genome.ucsc.edu/FAQ/FAQformat#format1\n"+
 				"-g Genome Version  (ie H_sapiens_Mar_2006), see UCSC Browser,\n"+
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
+				"-f Turn off DESeq2 independent filtering\n" +
 
 				"\nAdvanced Options:\n"+
 				"-m Mask overlapping gene annotations, recommended for well annotated genomes.\n"+

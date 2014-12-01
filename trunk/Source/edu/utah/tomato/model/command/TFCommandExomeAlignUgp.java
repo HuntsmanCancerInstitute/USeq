@@ -231,6 +231,7 @@ public class TFCommandExomeAlignUgp extends TFCommand {
 				protectList.add(fastq1);
 				protectList.add(fastq2);
 				protectList.add(cmdFile);
+				
 				deleteList.add(fastq1);
 				deleteList.add(fastq2);
 				
@@ -331,8 +332,6 @@ public class TFCommandExomeAlignUgp extends TFCommand {
 			}
 			
 			for (TFSampleInfo si: samples.get(sampleName)) {
-				
-				
 				//Create output objects for each sample
 				TFFileObject tfoSampleBam = new TFFileObject(si.getSampleName() + ".raw.bam",this.finalDirectory,workingDir);
 				TFFileObject tfoSampleBai = new TFFileObject(si.getSampleName() + ".raw.bai",this.finalDirectory,workingDir);
@@ -453,6 +452,20 @@ public class TFCommandExomeAlignUgp extends TFCommand {
 				logFile.writeErrorMessage("[TFExomeAlignUgp] Daemon interrupted",true);
 				System.exit(1);
 			}
+			
+			
+			for(String sampleName: samplesToRun) {
+				for (TFSampleInfo tfsi: samples.get(sampleName)) {
+					//Create input objects
+					TFFileObject tfoLaneBam = tfsi.getFileObject(TFConstants.FILE_BAM);
+					TFFileObject tfoLaneBai = tfsi.getFileObject(TFConstants.FILE_BAI);
+					
+					this.deleteFile(tfoLaneBam.getFinalPath());
+					this.deleteFile(tfoLaneBai.getFinalPath());
+				}
+			}
+			
+			
 			
 			
 		}

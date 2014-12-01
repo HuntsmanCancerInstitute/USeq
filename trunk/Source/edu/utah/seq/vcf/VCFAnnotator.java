@@ -21,9 +21,11 @@ import util.gen.Misc;
 
 public class VCFAnnotator {
 	//Hard coded paths
-	private String pathToAnnovarDir = new String("/home/u0855942/annovar_version");
+	
+	//private String pathToAnnovarDir = new String("/home/u0855942/annovar_version");
+	private String pathToAnnovarDir;
 	private String pathToAnnovar;
-	private String pathToRespository;
+	private String pathToRepository;
 	
 	//User specified options
 	private File vcfFile;
@@ -31,10 +33,13 @@ public class VCFAnnotator {
 	private File vcfOutFile;
 	private String pathToTabix = "/tomato/app/tabix/";
 	
-	private String dbSnpFile;
-	private String espFile = "esp6500_all";
-	private String cosmicFile= "cosmic63";
+	//private String dbSnpFile;
+	//private String espFile = "esp6500_all";
+	//private String cosmicFile= "cosmic63";
 	private boolean compressOutput = false;
+	private Long genotypesPerChunk = (long)25000000;
+	
+	private HashMap<String,String> annovarCallHash = new HashMap<String,String>();
 	
 	
 	//Shared variables
@@ -44,7 +49,6 @@ public class VCFAnnotator {
 		put("SEGDUP",new AnnovarCommand("Segdup Annotations"));
 		put("GWAS",new AnnovarCommand("GWAS Annotations"));
 		put("DBSNP",new AnnovarCommand("dbSNP Annotations"));
-		put("PHYLOP",new AnnovarCommand("Phylop Annotations"));
 		put("COSMIC",new AnnovarCommand("COSMIC Annotations"));
 		put("ESP",new AnnovarCommand("ESP Annotations"));
 		put("ONEK",new AnnovarCommand("1K Genome Annotations"));
@@ -52,19 +56,13 @@ public class VCFAnnotator {
 		put("TFBS",new AnnovarCommand("TFBS Annotations"));
 		put("DGV",new AnnovarCommand("DGV Annotations"));
 		put("OMIM",new AnnovarCommand("OMIM Annotations"));
-		put("V_FLAG",new AnnovarCommand("V_FLAG Annotations"));
-		put("ACMG",new AnnovarCommand("ACMG Annotations"));
+		//put("V_FLAG",new AnnovarCommand("V_FLAG Annotations"));
+		//put("ACMG",new AnnovarCommand("ACMG Annotations"));
 		put("NIST",new AnnovarCommand("NIST Annotations"));
-		
+		put("CLINVAR",new AnnovarCommand("CLINVAR annotations"));
+		put("NCI60",new AnnovarCommand("NCI60 annotations"));
 	}};
 	
-	private HashMap<String,String> ethnicityMap = new HashMap<String,String>() {{
-		put("ALL","1000g2012apr_all");
-		put("EUR","1000g2012apr_eur");
-		put("AFR","1000g2012apr_afr");
-		put("AMR","1000g2012apr_amr");
-		put("ASN","1000g2012apr_asn");
-	}};
 	
 	private String usedEthnicity;
 	private String inputname;
@@ -81,13 +79,16 @@ public class VCFAnnotator {
 		
 		processArgs(args);
 		
-		pathToAnnovar = new String(pathToAnnovarDir + "/annotate_variation.pl");
-		pathToRespository = new String(pathToAnnovarDir + "/humandb");
-		
 		//Count vcf records
+		System.out.println("Counting VCF samples and records");
 		ArrayList<File> tempVcfFiles = new ArrayList<File>();
+		int sampleCount = VCFUtilities.countSamples(vcfFile);
 		int recordCount = VCFUtilities.countReads(vcfFile);
-		int chunks = recordCount / VCFUtilities.readsToChunk + 1;
+		//int chunks = recordCount / VCFUtilities.readsToChunk + 1;
+		int chunks = (int)((recordCount * sampleCount) / this.genotypesPerChunk + 1);
+		int recordsPerChunk = recordCount / chunks;
+		
+		System.out.println(String.format("Found %d samples and %d records in the vcf file.",sampleCount,recordCount));
 		
 		if (chunks > 1) {
 			System.out.println("File too big to annotate all in one go, splitting into " + chunks + " chunks");
@@ -115,10 +116,8 @@ public class VCFAnnotator {
 			
 			
 			//Create a parsed file per-chunk
-			VCFParser parsedVCF = new VCFParser(vcfFile, true, true, true, i,VCFUtilities.readsToChunk);
-			
-			
-			
+			VCFParser parsedVCF = new VCFParser(vcfFile, true, true, true, i, recordsPerChunk);
+
 			
 			//Write annovar input file
 			this.writeAnnovarInput(parsedVCF);
@@ -301,10 +300,11 @@ public class VCFAnnotator {
 	
     private void setupCommands() {
     	String cmdName = null;
+    	String annovarCall = null;
     	
     	//Annovar gene
     	cmdName = "ENSEMBL";
-    	ProcessBuilder pbEnsembl = new ProcessBuilder(this.pathToAnnovar,"--geneanno","--buildver","hg19","-dbtype","ensgene","-splicing_threshold","25","-hgvs",this.inputname,this.pathToRespository);
+    	ProcessBuilder pbEnsembl = new ProcessBuilder(this.pathToAnnovar,"--geneanno","--buildver","hg19","-dbtype","ensgene","-splicing_threshold","25","-hgvs",this.inputname,this.pathToRepository);
     	String il1Ensembl = new String("##INFO=<ID=VarType,Number=1,Type=String,Description=\"Exonic variant effect.  If the variant is exonic, this column lists the "
     			+ "functional consequences of the change.  Possible values and (precedence): frameshift insertion (1), frameshift deletion (2), frameshift block "
     			+ "substitution (3), stopgain (4), stoploss (5), nonframeshift insertion (6), nonframeshift deletion (7), nonframeshift block substitution (8), "
@@ -326,7 +326,7 @@ public class VCFAnnotator {
     	
     	//Annovar refseq
     	cmdName = "REFSEQ";
-    	ProcessBuilder pbRefseq = new ProcessBuilder(this.pathToAnnovar,"--geneanno","--buildver","hg19","-dbtype","gene",this.inputname,this.pathToRespository);
+    	ProcessBuilder pbRefseq = new ProcessBuilder(this.pathToAnnovar,"--geneanno","--buildver","hg19","-dbtype","gene",this.inputname,this.pathToRepository);
     	String il1Refseq = new String("##INFO=<ID=RefSeq,Number=1,Type=String,Description=\"Closest Refseq gene.  If the variant intersects multiple genes, "
     			+ "both will be listed.  If the variant doesn't intersect any gene, the closest upstream and downstream genes are listed with distances.\">");
     	OutputParser op1Refseq = new OutputParser(new int[]{1},new String[]{"RefSeq"},new String[]{il1Refseq},1,"UNSORTED","variant_function");
@@ -337,7 +337,7 @@ public class VCFAnnotator {
     	
     	//Annovar TFBS
     	cmdName = "TFBS";
-    	ProcessBuilder pbTfbs = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","tfbs",this.inputname,this.pathToRespository);
+    	ProcessBuilder pbTfbs = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","tfbs",this.inputname,this.pathToRepository);
     	String il1Tfbs = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Transcrition factor binding sites (TFBS).  If the variant intersects "
     			+ "with a predicted TFBS, the name of the TFBS and the normalized prediction score are listed.  The annotations are the standard TFBS sites used by "
     			+ "annovar.\">");
@@ -347,7 +347,7 @@ public class VCFAnnotator {
   
     	//Annovar Segdup
     	cmdName = "SEGDUP";
-    	ProcessBuilder pbSegdup = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","segdup",this.inputname ,this.pathToRespository);
+    	ProcessBuilder pbSegdup = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","segdup",this.inputname ,this.pathToRepository);
     	String il1Segdup = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Segmental duplications (SEGDUP). If the variant intersects with a "
     			+ "known segmental duplication, the identifier and score are listed.  Variants that map to known segmental duplications are often alignment errors and "
     			+ "could be false positives.\">");
@@ -357,7 +357,7 @@ public class VCFAnnotator {
     	
     	//Annovar DGV
     	cmdName = "DGV";
-    	ProcessBuilder pbDgv = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","dgv",this.inputname,this.pathToRespository);
+    	ProcessBuilder pbDgv = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","dgv",this.inputname,this.pathToRepository);
     	String il1Dgv = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Database of genomic variants (DGV).  If the variant intersects with a "
     			+ "previously reported structural variant listed in DGV, the DGV identifier is listed.  In the case of insertions and deletions, only 1bp of overlap "
     			+ "is required for a successful intersection.\">");
@@ -367,21 +367,30 @@ public class VCFAnnotator {
     	
     	//Annovar DBSNP
     	cmdName = "DBSNP";
-    	ProcessBuilder pbSnp = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",this.dbSnpFile,this.inputname,this.pathToRespository);
-    	String il1Snp = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"dbSNP identifier, using database: " + this.dbSnpFile + ".  If the database "
+    	
+    	annovarCall = getAnnovarCall(cmdName);
+    	
+    	ProcessBuilder pbSnp = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype", annovarCall,this.inputname,this.pathToRepository);
+    	String il1Snp = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"dbSNP identifier, using database: " + annovarCall + ".  If the database "
     			+ "is listed as NonFlagged, dbSNP variants with < 1% minor allele frequency or map only once to the reference assembly are not used in the annotation. \">");
-    	OutputParser op1Snp = new OutputParser(cmdName,il1Snp,"hg19_" + this.dbSnpFile + "_dropped");
-    	OutputParser op2Snp = new OutputParser("hg19_" + this.dbSnpFile + "_filtered");
+    	OutputParser op1Snp = new OutputParser(cmdName,il1Snp,"hg19_" + annovarCall + "_dropped");
+    	OutputParser op2Snp = new OutputParser("hg19_" + annovarCall + "_filtered");
     	commandMap.get(cmdName).addCommand(pbSnp);
     	commandMap.get(cmdName).addOutputParser(op1Snp);
     	commandMap.get(cmdName).addOutputParser(op2Snp);
     	
     	
+    	//Annovar mutation scores
     	cmdName = "SCORES";
-    	ProcessBuilder pbScore = new ProcessBuilder(this.pathToAnnovar,"--filter","-buildver","hg19","-dbtype","ljb2_all",this.inputname,this.pathToRespository,"-otherinfo");
+    	
+    	annovarCall = this.annovarCallHash.get(cmdName);
+    	
+    	ProcessBuilder pbScore = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",annovarCall,this.inputname,this.pathToRepository,"-otherinfo");
     	String il1Sift = new String("##INFO=<ID=SIFT,Number=1,Type=Float,Description=\"SIFT score.  Standard SIFT scores below 0.05 are considered damaging. "
     			+ "If the annovarStyle of the VCF/Report is CLEAN, the SIFT score is reported as 1-SIFT_SCORE, making higher scores more damaging.  This is done "
     			+ "to make the SIFT scores compatible with Polyphen2, MutationTaster and other functional effect predictors.\">");
+    	String il1SiftP = new String("##INFO=<ID=SIFT_P,Number=1,Type=String,Description=\"SIFT prediction. Prediction can be (D) daamging or (N) not "
+    			+ "damaging.\">");
     	String il1PolyHvar = new String("##INFO=<ID=PP2_HVAR,Number=1,Type=Float,Description=\"Polyphen2 HVAR score. Scores range from 0-1.  Scores larger than "
     			+ "0.909 are considered 'probably damaging', scores between 0.447 and 0.908 are considered 'possibly damaging', scores less than 0.446 are considered "
     			+ "benign.  The PolyPhen HVAR score should be used for diagnositics of Mendelian disease\">");
@@ -409,13 +418,13 @@ public class VCFAnnotator {
     			+ "The larger the score, the more conserved the site\">");
     	String il1Siphy = new String("##INFO=<ID=SIPHY,Number=1,Type=Float,Description=\"Siphy score. The SiPhy score is based on multiple alignments of 29 mammalian genomes. "
     			+ "The larger the score, the more conserved the site\">");
-    	int[] colLocs = new int[]{0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15};
-    	String[] colNames = new String[]{"SIFT","PP2_HVAR","PP2_HVAR_P","PP2_HDIV","PP2_HDIV_P","LRT","LRT_P","MT","MT_P","MA","MA_P","FATHMM","GERP","PHYLOP","SIPHY"};
+    	int[] colLocs = new int[]{0,1,4,5,2,3,6,7,8,9,10,11,22,24};
+    	String[] colNames = new String[]{"SIFT","SIFT_P","PP2_HVAR","PP2_HVAR_P","PP2_HDIV","PP2_HDIV_P","LRT","LRT_P","MT","MT_P","MA","MA_P","PHYLOP","SIPHY"};
     	String[] colDesc = new String[]{il1Sift,il1PolyHvar,il1PolyHvarP,il1PolyHidv,il1PolyHidvP,il1Lrt,il1LrtP,il1Mt,il1MtP,il1Mt,il1MtP,il1Ma,il1MaP,il1Fathmm,il1Gerp,
     			il1Phylop,il1Siphy};
     	
-    	OutputParser opScore1 = new OutputParser(colLocs,colNames,colDesc,2,"hg19_ljb2_all_dropped",1);
-    	OutputParser opScore2 = new OutputParser("hg19_ljb2_all_filtered");
+    	OutputParser opScore1 = new OutputParser(colLocs,colNames,colDesc,2,"hg19_" + annovarCall + "_dropped",1);
+    	OutputParser opScore2 = new OutputParser("hg19_" + annovarCall + "_filtered");
     	
     	commandMap.get(cmdName).addCommand(pbScore);
     	commandMap.get(cmdName).addOutputParser(opScore1);
@@ -424,39 +433,76 @@ public class VCFAnnotator {
 
     	//Annovar 1K Genomes
     	cmdName = "ONEK";
-    	ProcessBuilder pbOneK = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",this.ethnicityMap.get(this.usedEthnicity),this.inputname,this.pathToRespository);
-    	String il1OneK = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Float,Description=\"1000 Genomes observation Frequency, using database: " + this.ethnicityMap.get(this.usedEthnicity) +"\">");
-    	OutputParser op1OneK = new OutputParser(cmdName,il1OneK,"hg19_" + this.usedEthnicity + ".sites.2012_04_dropped");
-    	OutputParser op2OneK = new OutputParser("hg19_" + this.usedEthnicity + ".sites.2012_04_filtered");
+    	
+    	annovarCall = getAnnovarCall(this.usedEthnicity);
+    	String suffix = getAnnovarCall("1K_SUFFIX");
+    	
+    	ProcessBuilder pbOneK = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",annovarCall,this.inputname,this.pathToRepository);
+    	String il1OneK = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=Float,Description=\"1000 Genomes observation Frequency, using database: " + annovarCall +"\">");
+    	OutputParser op1OneK = new OutputParser(cmdName,il1OneK,"hg19_" + this.usedEthnicity + ".sites." + suffix + "_dropped");
+    	OutputParser op2OneK = new OutputParser("hg19_" + this.usedEthnicity + ".sites." + suffix + "_filtered");
     	commandMap.get(cmdName).addCommand(pbOneK);
     	commandMap.get(cmdName).addOutputParser(op1OneK);
     	commandMap.get(cmdName).addOutputParser(op2OneK);
     	
     	//Annovar COSMIC
     	cmdName = "COSMIC";
-    	ProcessBuilder pbCosmic = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",this.cosmicFile,this.inputname,this.pathToRespository);
+    	
+    	annovarCall = getAnnovarCall(cmdName);
+    	
+    	ProcessBuilder pbCosmic = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",annovarCall,this.inputname,this.pathToRepository);
     	String il1Cosmic = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Catalogue of Somatic Mutations in Cancer (COSMIC) annotations, using "
-    			+ "database: " + this.cosmicFile + ".  If the variant intersects with a COSMIC annotation, the variant identifier and number of observations are listed.\">");
-    	OutputParser op1Cosmic = new OutputParser(cmdName,il1Cosmic,"hg19_cosmic63_dropped");
-    	OutputParser op2Cosmic = new OutputParser("hg19_cosmic63_filtered");
+    			+ "database: " + annovarCall + ".  If the variant intersects with a COSMIC annotation, the variant identifier and number of observations are listed.\">");
+    	OutputParser op1Cosmic = new OutputParser(cmdName,il1Cosmic,"hg19_" + annovarCall +"_dropped");
+    	OutputParser op2Cosmic = new OutputParser("hg19_" + annovarCall +"_filtered");
     	commandMap.get(cmdName).addCommand(pbCosmic);
     	commandMap.get(cmdName).addOutputParser(op1Cosmic);
     	commandMap.get(cmdName).addOutputParser(op2Cosmic);
     	
     	//Annovar ESP
     	cmdName = "ESP";
-    	ProcessBuilder pbEsp = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",this.espFile,this.inputname,this.pathToRespository);
-    	String il1Esp = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"NHLBI exome sequencing project (ESP) annotations using: " + this.espFile + ". "
+    	
+    	annovarCall = getAnnovarCall(cmdName);
+    	
+    	ProcessBuilder pbEsp = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",annovarCall,this.inputname,this.pathToRepository);
+    	String il1Esp = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"NHLBI exome sequencing project (ESP) annotations using: " + annovarCall + ". "
     			+ "Variation frequency in the 6500 exomes sequenced in the project.  The samples are from healthy individuals as well as subjects with different diseases.\">");
-    	OutputParser op1Esp = new OutputParser(cmdName,il1Esp,"hg19_esp6500_all_dropped");
-    	OutputParser op2Esp = new OutputParser("hg19_esp6500_all_filtered");
+    	OutputParser op1Esp = new OutputParser(cmdName,il1Esp,"hg19_" + annovarCall + "_dropped");
+    	OutputParser op2Esp = new OutputParser("hg19_" + annovarCall + "_filtered");
     	commandMap.get(cmdName).addCommand(pbEsp);
     	commandMap.get(cmdName).addOutputParser(op1Esp);
     	commandMap.get(cmdName).addOutputParser(op2Esp);
     	
+    	//Annovar ESP
+    	cmdName = "CLINVAR";
+    	
+    	annovarCall = getAnnovarCall(cmdName);
+    	
+    	ProcessBuilder pbClinvar = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",annovarCall,this.inputname,this.pathToRepository);
+    	String il1Clinvar = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"CLINVAR database with Variant Clinical Significance (unknown, untested, non-pathogenic, "
+    			+ "probable-non-pathogenic, probable-pathogenic, pathogenic, drug-response, histocompatibility, other) and Variant disease name.\">");
+    	OutputParser op1Clinvar = new OutputParser(cmdName,il1Clinvar,"hg19_" + annovarCall + "_dropped");
+    	OutputParser op2Clinvar = new OutputParser("hg19_" + annovarCall + "_filtered");
+    	commandMap.get(cmdName).addCommand(pbClinvar);
+    	commandMap.get(cmdName).addOutputParser(op1Clinvar);
+    	commandMap.get(cmdName).addOutputParser(op2Clinvar);
+    	
+    	//Annovar ESP
+    	cmdName = "NCI60";
+    	
+    	annovarCall = getAnnovarCall(cmdName);
+    	
+    	ProcessBuilder pbNci60 = new ProcessBuilder(this.pathToAnnovar,"--filter","--buildver","hg19","-dbtype",annovarCall,this.inputname,this.pathToRepository);
+    	String il1Nci60 = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"NCI-60 human tumor cell line panel exome sequencing allele frequency data.\">");
+    	OutputParser op1Nci60 = new OutputParser(cmdName,il1Nci60,"hg19_" + annovarCall + "_dropped");
+    	OutputParser op2Nci60 = new OutputParser("hg19_" + annovarCall + "_filtered");
+    	commandMap.get(cmdName).addCommand(pbNci60);
+    	commandMap.get(cmdName).addOutputParser(op1Nci60);
+    	commandMap.get(cmdName).addOutputParser(op2Nci60);
+    	
     	//Annovar GWAS
     	cmdName = "GWAS";
-    	ProcessBuilder pbGwas = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","gwascatalog",this.inputname,this.pathToRespository);
+    	ProcessBuilder pbGwas = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-dbtype","gwascatalog",this.inputname,this.pathToRepository);
     	String il1Gwas = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"GWAS catalog associations.  If the variant intersects with a GWAS catalog listing, "
     			+ "the score and associated disease are listed.  The GWAS calalog stores SNP-trait associations with p-values < 1.0x10^5. This annotation is not comprehensive.\">");
     	OutputParser op1Gwas = new OutputParser(cmdName,il1Gwas,"hg19_gwasCatalog");
@@ -465,39 +511,47 @@ public class VCFAnnotator {
     	
     	//Annovar OMIM
     	cmdName = "OMIM";
-    	ProcessBuilder pbOmim = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_omim.gff3",this.inputname,this.pathToRespository);
+    	ProcessBuilder pbOmim = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_omim.gff3",this.inputname,this.pathToRepository);
     	String il1Omim = new String("##INFO=<ID=" + cmdName + ",Number=1,Type=String,Description=\"Online Mendelian Inheritance in Man (OMIM) annotations.  If the variant intersects "
     			+ "a OMIM gene, the gene identifier and associated diseases are listed.\">");
     	OutputParser op1Omim = new OutputParser(cmdName,il1Omim,"hg19_gff3");
     	commandMap.get(cmdName).addCommand(pbOmim);
     	commandMap.get(cmdName).addOutputParser(op1Omim);
     	
-    	//Annovar ACMG
-    	cmdName = "ACMG";
-    	ProcessBuilder pbAcmg = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_acmg.gff3",this.inputname,this.pathToRespository);
-    	String il1Acmg = new String("##INFO=<ID=" + cmdName + ",Number=0,Type=Flag,Description=\"American College of Medical Genetics and Genomics (ACMG) annotations.  ACMG recommends reporting variants "
-    			+ "with this flag, since they are contained within clinically relevant genes.\">");
-    	OutputParser op1Acmg = new OutputParser(cmdName,il1Acmg,"hg19_gff3",true);
-    	commandMap.get(cmdName).addCommand(pbAcmg);
-    	commandMap.get(cmdName).addOutputParser(op1Acmg);
-    	
-    	//Annovar OMIM
-    	cmdName = "V_FLAG";
-    	ProcessBuilder pbVflag = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_vflag.gff3",this.inputname,this.pathToRespository);
-    	String il1Vflag = new String("##INFO=<ID=" + cmdName + ",Number=0,Type=Flag,Description=\"Incendentalome annotations. Variants marked with this flag are within genes that "
-    			+ "commonly come up as positive in VAAST runs.\">");
-    	OutputParser op1Vflag = new OutputParser(cmdName,il1Vflag,"hg19_gff3",true);
-    	commandMap.get(cmdName).addCommand(pbVflag);
-    	commandMap.get(cmdName).addOutputParser(op1Vflag);
+//    	//Annovar ACMG
+//    	cmdName = "ACMG";
+//    	ProcessBuilder pbAcmg = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_acmg.gff3",this.inputname,this.pathToRepository);
+//    	String il1Acmg = new String("##INFO=<ID=" + cmdName + ",Number=0,Type=Flag,Description=\"American College of Medical Genetics and Genomics (ACMG) annotations.  ACMG recommends reporting variants "
+//    			+ "with this flag, since they are contained within clinically relevant genes.\">");
+//    	OutputParser op1Acmg = new OutputParser(cmdName,il1Acmg,"hg19_gff3",true);
+//    	commandMap.get(cmdName).addCommand(pbAcmg);
+//    	commandMap.get(cmdName).addOutputParser(op1Acmg);
+//    	
+//    	//Annovar VAAST
+//    	cmdName = "V_FLAG";
+//    	ProcessBuilder pbVflag = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_vflag.gff3",this.inputname,this.pathToRepository);
+//    	String il1Vflag = new String("##INFO=<ID=" + cmdName + ",Number=0,Type=Flag,Description=\"Incendentalome annotations. Variants marked with this flag are within genes that "
+//    			+ "commonly come up as positive in VAAST runs.\">");
+//    	OutputParser op1Vflag = new OutputParser(cmdName,il1Vflag,"hg19_gff3",true);
+//    	commandMap.get(cmdName).addCommand(pbVflag);
+//    	commandMap.get(cmdName).addOutputParser(op1Vflag);
     	
     	//Annovar NIST
     	cmdName = "NIST";
-    	ProcessBuilder pbNist = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_nist.gff3",this.inputname,this.pathToRespository);
+    	ProcessBuilder pbNist = new ProcessBuilder(this.pathToAnnovar,"--regionanno","--buildver","hg19","-gff3attrib","-dbtype","gff3","-gff3dbfile","hg19_nist.gff3",this.inputname,this.pathToRepository);
     	String il1Nist = new String("##INFO=<ID=" + cmdName + ",Number=0,Type=Flag,Description=\"Regions that can be resolved with high certainty in the female HapMap individual NA12878 according to NIST.\">");
     	OutputParser op1Nist = new OutputParser(cmdName,il1Nist,"hg19_gff3",true);
     	commandMap.get(cmdName).addCommand(pbNist);
     	commandMap.get(cmdName).addOutputParser(op1Nist);
  
+    }
+    
+    private String getAnnovarCall(String cmdName) {
+    	if (!this.annovarCallHash.containsKey(cmdName)) {
+    		System.out.println(String.format("This software expects data for %s in the key.txt file in: %s.",cmdName, this.pathToRepository));
+    		System.exit(1);
+    	}
+    	return this.annovarCallHash.get(cmdName);
     }
 	
 
@@ -508,7 +562,7 @@ public class VCFAnnotator {
 	private void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Annotator : March 2013                          **\n" +
+				"**                              VCF Annotator : November 2014                       **\n" +
 				"**************************************************************************************\n" +
 				"VCFAnnotator adds user-specifed annotations to the VCF file INFO field.  Only hg19 is \n" +
 				"supported at this time.  If your VCF file has more than 500,000 records, it will be \n" +
@@ -520,7 +574,8 @@ public class VCFAnnotator {
 				"Required:\n" +
 				"-v VCF file. Path to a multi-sample vcf file, compressed ok (XXX.vcf/XXX.vcf.gz).\n"+
 				"-o Output VCF file.  Path to the annotated vcf file, can be specifed as XXX.vcf or \n" + 
-				"   XXX.vcf.gz. If XXX.vcf.gz, the file will be compressed and indexed using tabix.\n\n" +
+				"   XXX.vcf.gz. If XXX.vcf.gz, the file will be compressed and indexed using tabix.\n" +
+				"-p Path to annovar directory.\n\n" +
 				
 				"Optional:\n"+
 				"-d dbSNP database.  By default, this application uses dbSNP 137 for annotation. Use \n" +
@@ -528,24 +583,30 @@ public class VCFAnnotator {
 				"      i.e. snp129. The annovar-formatted dbSNP database must be in the annovar data \n" +
 				"      directory for this option to work.\n" +
 				"-e Ethnicity.  By default, the 1K frequency is calculated across all ethnicities.  \n" +
-				"      If you want to restrict it to one of EUR, AFR, ASN or AMR, use this option \n" +
+				"      If you want to restrict it to one of African (AFR), Admixed American (AMR) \n" + 
+				"      East Asian (EAS), European (EUR), South Asian (SAS), use this option \n" +
 				"      followed by the ethnicity identifier.\n" +
-				"-a Annotations to add.  By default, this application uses all available annovar \n" +
+				"-a Annotations to add.  By default, this application uses a subset of annovar  \n" +
 				"      annotations.  Use a comma-separated list of keys to specify a custom set. \n" + 
 				"      Available annotations with (keys): ensembl gene annotations (ENSEMBL), refSeq \n" +
 				"      gene names (REFSEQ), transcription factor binding sites (TFBS), segmental \n" +
 				"      duplicatons (SEGDUP), database of genomic variants (DGV), variant scores \n" + 
-				"      (SCORES), GWAS catalog annotations (GWAS), dbsnp annotations (DBSNP), 1K \n" +
-				"      genomes annotations (ONEK), COSMIC annotations (COSMIC), ESP annotations (ESP),\n" +
-				"      OMIM genes and diseases (OMIM), flagged VAAST genes (V-FLAG), ACMG genes (ACMG),\n" +
-				"      and NIST callable ragions (NIST).  The SCORES option includes SIFT, PolyPhen2, \n" +
-				"      MutationTaster, MutationAssessor, LRT, GERP++, FATHMM, PhyloP and SiPhy.\n" +
-				"      The ENSEMBL option includes the columns EnsemblRegion, EnsemblName, VarType and \n" +
-				"      VarDesc. \n" +
+				"      (SCORES), GWAS catalog annotations (GWAS), clinvar variations (CLINVAR), \n" +
+				"      dbsnp annotations (DBSNP), nci60 annotations (NCI60), 1K genomes annotations \n" + 
+				"      (ONEK), COSMIC annotations (COSMIC), ESP annotations (ESP), OMIM genes and \n" + 
+				"      diseases (OMIM), and NIST callable ragions (NIST).  The SCORES option \n " + 
+				"      includes SIFT, PolyPhen2, MutationTaster, MutationAssessor, LRT, PhyloP and \n" +
+				"      SiPhy. The ENSEMBL option includes the columns EnsemblRegion, EnsemblName, \n" +
+				"      VarType and VarDesc. \n" +
+				"-r Path to annovar repository.  By default, VCFAnnotator uses the humandb directory in \n" +
+				"      the annovar program directory.  Use this if you want to specify a different \n " +
+				"      directory\n " +
 				"-n VAAST output.  If a VAAST output file is specified, the VCF file is annotated with\n" +
 				"      the VAAST variation score and gene rank.\n" +
-				"-p Path to annovar directory.\n" +
 				"-t Path to tabix directory.\n" +
+				"-c Number of genotypes to process per chunk.  The total number of genotypes is the \n" +
+				"      number of records in the VCF * the number of samples in the VCF.  By default \n" +
+				"      the file is split into 25M genotypes, which uses about 30GB of memory.\n" +
 				"\n\n"+
 
 				"Example: java -Xmx20G -jar pathTo/USeq/Apps/VCFAnnotator -v 9908R.vcf \n" + 
@@ -572,13 +633,15 @@ public class VCFAnnotator {
 				try{
 					switch (test){
 					case 'v': inputFile = new File(args[++i]); break;
-					case 'd': dbSnpFile = args[++i]; break;
+					case 'd': this.annovarCallHash.put("DBSNP", args[++i]); break;
 					case 'a': annotationsToAdd = args[++i]; break;
 					case 'e': ethnicity = args[++i]; break;
 					case 'p': this.pathToAnnovarDir = args[++i]; break;
+					case 'r': this.pathToRepository = args[++i]; break;
 					case 't': this.pathToTabix = args[++i]; break;
 					case 'n': vaastName = args[++i]; break;
 					case 'o': outputFile = args[++i]; break;
+					case 'c': this.genotypesPerChunk = Long.parseLong(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -589,11 +652,11 @@ public class VCFAnnotator {
 			}
 		}
 		
-		//Set up default annotation files
-		if (dbSnpFile == null) {
-			dbSnpFile = "snp137NonFlagged";
+		if (pathToAnnovarDir == null) {
+			System.out.println("The path to annovar (-d) must be specified. \n");
+			System.exit(1);
 		}
-		
+	
 		if (vaastName != null) {
 			vaastFile = new File(vaastName);
 			if (!vaastFile.exists()) {
@@ -601,16 +664,49 @@ public class VCFAnnotator {
 			}
 		}
 		
+		//Make sure files are present and accounted for.
+		pathToAnnovar = new String(pathToAnnovarDir + "/annotate_variation.pl");
+		if (!(new File(pathToAnnovar).exists())) {
+			System.out.println(String.format("Path to annovar does not exist: %s,  exiting",pathToAnnovar));
+			System.exit(1);
+		}
+		pathToRepository = new String(pathToAnnovarDir + "/humandb");
+		File repoFile = new File(pathToRepository);
+		if (!repoFile.exists()) {
+			System.out.println(String.format("Can't find the annovar data repository: %s, exiting",pathToRepository));
+			System.exit(1);
+		}
+		File indexFile = new File(repoFile,"key.txt");
+		if (!indexFile.exists()) {
+			System.out.println(String.format("Can't find the annovar key file ( %s ) in the data directory: %s, exiting",indexFile.getAbsolutePath(),repoFile.getAbsolutePath()));
+			System.exit(1);
+		}
+		
+		//Read in key file
+		try {
+			BufferedReader br = new BufferedReader(new FileReader(indexFile));
+			String temp = "";
+			while((temp = br.readLine()) != null) {
+				String[] items = temp.split("=");
+				if (!this.annovarCallHash.containsKey(items[0])) {
+					this.annovarCallHash.put(items[0], items[1]);
+				}	
+			}
+			br.close();
+		} catch (IOException ioex) {
+			System.out.println(String.format("Could not read key file: %s ", ioex.getMessage()));
+			System.exit(1);
+		}
+		
 
 		//Set up 1K ethnicities
 		if (ethnicity == null) {
 			this.usedEthnicity = "ALL";
 			System.out.println("Using ALL 1K samples for annotation");
-		} else {
-			if (this.ethnicityMap.containsKey(ethnicity)) {
+		} else { 
+			if (this.annovarCallHash.containsKey(ethnicity)) {
 				this.usedEthnicity = ethnicity;
 				System.out.println("Using " + ethnicity + " 1K samples for annotation");
-				
 			} else {
 				System.out.println("Don't recognize the following ethnicity: " + ethnicity + ", exiting");
 				System.exit(1);
@@ -631,7 +727,7 @@ public class VCFAnnotator {
 			}
 		} else {
 			//Set up default command, command map keys aren't sorted, so manually set it up
-			String[] ctr = new String[]{"ENSEMBL","REFSEQ","DBSNP","ONEK","COSMIC","ESP","SCORES","SEGDUP","GWAS","OMIM","ACMG","V_FLAG","NIST"};
+			String[] ctr = new String[]{"ENSEMBL","REFSEQ","DBSNP","ONEK","ESP","COSMIC","NCI60","SCORES","CLINVAR","SEGDUP","GWAS","OMIM","NIST"};
 			//String[] ctr = new String[]{"ENSEMBL","REFSEQ"};
 			this.annsToRun.addAll(Arrays.asList(ctr));
 		}
@@ -645,6 +741,7 @@ public class VCFAnnotator {
 		} else if (Pattern.matches(".+?.vcf",inputFile.getName())) {
 			vcfFile = inputFile;
 		} else if (Pattern.matches(".+?.vcf.gz",inputFile.getName())) {
+			System.out.println("Decompressing VCF file");
 			vcfFile = VCFUtilities.unzipTabix(inputFile,this.pathToTabix);
 		} else {
 			System.out.println("Input file does not appear to be a XXX.vcf/XXX.vcf.gz file");
@@ -662,8 +759,9 @@ public class VCFAnnotator {
 		} else if (Pattern.matches(".+?.vcf.gz",outputFile)) {
 			File vcfOutComp = new File(outputFile);
 			if (vcfOutComp.exists()) {
-				System.out.println("Tabix won't overwrite an existing file, rename the output or delete exisiting file");
-				System.exit(1);
+				vcfOutComp.delete();
+				//System.out.println("Tabix won't overwrite an existing file, rename the output or delete exisiting file");
+				//System.exit(1);
 			}
 			this.vcfOutFile = new File(outputFile.substring(0,outputFile.length()-3));
 			this.compressOutput = true;

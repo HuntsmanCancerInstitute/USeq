@@ -166,8 +166,12 @@ public class SamAlignment {
 	/**Looks for chromosomes named 1,2,3,MT,X,Y and converts to chr1,chr2,chr3,chrM,chrY,chrX*/
 	public String fixChromosomeName(String chr){
 		if (chr.equals("=")) return chr;
-		if (digitChrom.matcher(chr).matches() || chr.length() == 1) return "chr"+chr;
-		if (chr.equals("MT") || chr.equals("chrMT")) return "chrM";
+//		if (digitChrom.matcher(chr).matches() || chr.length() == 1) return "chr"+chr;
+		if (chr.equals("MT")) {
+			return "M";
+		} else if (chr.equals("chrMT")) {
+			return "chrM";
+		}
 		return chr;
 	}
 

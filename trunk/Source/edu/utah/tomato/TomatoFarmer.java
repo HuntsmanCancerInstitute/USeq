@@ -352,9 +352,7 @@ public class TomatoFarmer {
 			logFile.writeWarningMessage("[TomatoFarmer] The option -r is not valid for your analysis type, ignoring");
 		}
 		
-		
-	
-		//Specify the configuration file
+
 		if (TFConstants.validTypes.contains(analysisType)) {
 			configFile = new File(this.properties.get("TEMPLATE_PATH"),"defaults/" + analysisType + ".default.txt");
 			if (!configFile.exists()) {

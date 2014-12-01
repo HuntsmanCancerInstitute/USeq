@@ -76,6 +76,30 @@ public class VCFUtilities {
 	//dropped size since I'm getting out of mem errors at 50G!, Nix
 	public static int readsToChunk = 100000;
 	
+	
+	public static int countSamples(File vcfFile) {
+		BufferedReader in=null;
+		String line = null;
+		try {
+			in = new BufferedReader(new FileReader(vcfFile));
+			while ((line=in.readLine()) != null) {
+				if (line.startsWith("#CHROM")) {
+					String[] header = line.split("\t");
+					int sampleCount = header.length - 10;
+					in.close();
+					return sampleCount;
+				}
+			}
+			in.close();
+			System.out.println("Could not finx the #CHROM line in the VCF file, exiting.");
+			System.exit(1);
+		} catch (IOException ioex) {
+			System.out.println("Could not process the VCF file, exiting. " + ioex.getMessage() );
+			System.exit(1);
+		}
+		return -1;
+	}
+	
 	public static int countReads(File vcfFile) {
 		BufferedReader in=null;
 		String line = null;

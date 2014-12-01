@@ -107,7 +107,7 @@ public class TFCommandExomeMetrics extends TFCommand {
 			ArrayList<TFSampleInfo> foundSampleList = this.findPatternsNew(this.rootDirectory, masterPatterns, dependantPatterns);
 			if (foundSampleList.size() > 0) {
 				sampleList = foundSampleList;
-				logFile.writeInfoMessage(String.format("[TFExomeMetrics] Found %d samples in the run directory directory.",foundSampleList));
+				logFile.writeInfoMessage(String.format("[TFExomeMetrics] Found %d samples in the run directory directory.",foundSampleList.size()));
 			} else {
 				logFile.writeErrorMessage("[TFExomeMetrics] Did not find any potential samples in the run directory, exiting",false);
 				System.exit(1);
