@@ -58,8 +58,8 @@ public class SamTranscriptomeParser{
 	private int maximumMappingQuality = 0;
 	
 	private HashMap<String,String> chromDict = new HashMap<String,String>();
-	private Pattern splicePattern = Pattern.compile("^@SQ\\s+SN:\\S+:\\S+:\\S+\\s+AS:\\S+\\s+LN:\\d+$");
-	private Pattern chromPattern = Pattern.compile("^@SQ\\s+SN:(\\S+)\\s+AS:\\S+\\s+LN:\\d+$");
+	private Pattern splicePattern = Pattern.compile("^@SQ\\s+SN:\\S+:\\S+:\\S+\\s+(AS:|LN:).+");
+	private Pattern chromPattern = Pattern.compile("^@SQ\\s+SN:(\\S+)\\s+(AS:|LN:).+");
 	
 	private ArrayList<String> programLines = new ArrayList<String>();
 	private ArrayList<String> readGroupLines = new ArrayList<String>();

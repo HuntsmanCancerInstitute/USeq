@@ -291,7 +291,9 @@ public class VCFReporter {
 			this.columnsToUse.add("ONEK");
 			this.columnsToUse.add("COSMIC");
 			this.columnsToUse.add("ESP");
+			this.columnsToUse.add("NCI60");
 			this.columnsToUse.add("SIFT");
+			this.columnsToUse.add("SIFT_P");
 			this.columnsToUse.add("PP2_HVAR");
 			this.columnsToUse.add("PP2_HVAR_P");
 			this.columnsToUse.add("PP2_HDIV");
@@ -302,17 +304,18 @@ public class VCFReporter {
 			this.columnsToUse.add("MT_P");
 			this.columnsToUse.add("MA");
 			this.columnsToUse.add("MA_P");
-			this.columnsToUse.add("FATHMM");
-			this.columnsToUse.add("GERP");
+			//this.columnsToUse.add("FATHMM");
+			//this.columnsToUse.add("GERP");
 			this.columnsToUse.add("PHYLOP");
 			this.columnsToUse.add("SIPHY");
-			this.columnsToUse.add("SEGDUP");
+			this.columnsToUse.add("CLINVAR");
 			this.columnsToUse.add("GWAS");
 			this.columnsToUse.add("OMIM");
 			this.columnsToUse.add("V_LRS");
 			this.columnsToUse.add("V_RANK");
-			this.columnsToUse.add("V_FLAG");
-			this.columnsToUse.add("ACMG");
+			//this.columnsToUse.add("V_FLAG");
+			//this.columnsToUse.add("ACMG");
+			this.columnsToUse.add("SEGDUP");
 			this.columnsToUse.add("NIST");
 			if (desiredColumns != null) {
 				System.out.println("********************************** WARNING ****************************************");

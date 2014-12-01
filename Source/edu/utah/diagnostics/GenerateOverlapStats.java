@@ -32,19 +32,17 @@ import edu.utah.seq.parsers.MergePairedSamAlignments;
 public class GenerateOverlapStats {
 	//user defined fields
 		private File[] dataFiles;
-		private File saveFile;
-		private File outputFile;
+		
 		private float maximumAlignmentScore = 120;
 		private float minimumMappingQualityScore = 0;
 		private boolean secondPairReverseStrand = false;
 		private boolean removeControlAlignments = false;
 		private boolean skipMergingPairs = false;
-		private boolean onlyMergeOverlappingAlignments = true;
 		private int minimumDiffQualScore = 3;
 		private double minimumFractionInFrameMismatch = 0.05;
 		private int maximumProperPairDistanceForMerging = 5000;
 		private File logFile=null;
-		private boolean writeSam = true;
+		
 
 		//counters for initial filtering
 		private int numberAlignments = 0;
@@ -76,8 +74,6 @@ public class GenerateOverlapStats {
 
 
 		//internal fields
-		private PrintWriter samOut;
-		private Gzipper failedSamOut = null;
 		private LinkedHashSet<String> samHeader = new LinkedHashSet<String>();
 		public static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MDIN])");
 		public static Pattern CIGAR_BAD = Pattern.compile(".*[^\\dMDIN].*");
@@ -173,13 +169,10 @@ public class GenerateOverlapStats {
 			int numBadLines = 0;
 			try {
 				String line;
-				String priorReadName = "";
-				boolean priorSet = false;
+			
 				ArrayList<SamAlignment> alignmentsToSave = new ArrayList<SamAlignment>();
 				int dotCounter = 0;
-				int timCounter = 0;
-				int matched = 0;
-				int unmatched = 0;
+				
 
 				samReader = new SAMFileReader(bamFile);
 				
@@ -239,12 +232,10 @@ public class GenerateOverlapStats {
 					
 					if (!storedReads.containsKey(readName)) {
 						storedReads.put(readName,sa);
-						unmatched += 1;
 						continue;
 					}
 					
-					matched += 1;
-					
+
 					//Grab first observed
 					SamAlignment firstObserved = storedReads.get(readName);
 					
@@ -380,7 +371,6 @@ public class GenerateOverlapStats {
 				if (numFirstPairs == 0 || numSecondPairs == 0){
 					for (SamAlignment sam : al) {
 						numberAlignmentsMissingPair++;
-						samOut.println(sam);
 						numberPrintedAlignments++;
 					}
 					return;
@@ -419,8 +409,6 @@ public class GenerateOverlapStats {
 							}
 							//failed distance or strand so not a proper pair
 							else {
-								samOut.println(firsts[i]);
-								samOut.println(seconds[j]);
 								numberPrintedAlignments+=2;
 								numberPairsFailingChrDistStrand++;
 							}
@@ -438,14 +426,12 @@ public class GenerateOverlapStats {
 				for (SamAlignment s: firsts){
 					if (s !=null){
 						numberRepeatAlignmentsLackingMate++;
-						samOut.println(s);
 						numberPrintedAlignments++;
 					}
 				}
 				for (SamAlignment s: seconds){
 					if (s !=null){
 						numberRepeatAlignmentsLackingMate++;
-						samOut.println(s);
 						numberPrintedAlignments++;
 					}
 				}
@@ -477,8 +463,6 @@ public class GenerateOverlapStats {
 						mergeAndScorePair(first, second);
 					}
 					else {
-						samOut.println(first);
-						samOut.println(second);
 						numberPrintedAlignments+=2;
 						numberPairsFailingMateCrossCoordinateCheck++;
 					}
@@ -489,9 +473,6 @@ public class GenerateOverlapStats {
 				}
 			}
 			else {
-				
-				samOut.println(first);
-				samOut.println(second);
 				numberPrintedAlignments+=2;
 				numberPairsFailingChrDistStrand++;
 			}
@@ -506,8 +487,6 @@ public class GenerateOverlapStats {
 			
 			//do they want to skip
 			if (skipMergingPairs){
-				samOut.println(firstSamString);
-				samOut.println(secondSamString);
 				numberPrintedAlignments+=2;
 				return;
 			}

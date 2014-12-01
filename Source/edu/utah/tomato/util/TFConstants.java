@@ -79,8 +79,6 @@ public class TFConstants {
 	}
 
 	public static HashSet<String> validMenu = new HashSet<String>() {
-		private static final long serialVersionUID = 1L;
-
 	{
 		add(TFConstants.MENU_METRICS);
 		add(TFConstants.MENU_UGP_FULL);
@@ -92,26 +90,20 @@ public class TFConstants {
 	}};
 	
 	public static HashSet<String> alignOptions = new HashSet<String>() {
-		private static final long serialVersionUID = 1L;
-
 	{
 		add(TFConstants.MENU_CORE_FULL);
 		add(TFConstants.MENU_CORE_ALIGN);
 		add(TFConstants.MENU_UGP_FULL);
-		add(TFConstants.MENU_CORE_ALIGN);
+		add(TFConstants.MENU_UGP_ALIGN);
 	}};
 	
 	public static HashSet<String> variantOptions = new HashSet<String>() {
-		private static final long serialVersionUID = 1L;
-
 	{
 		add(TFConstants.MENU_UGP_FULL);
 		add(TFConstants.MENU_UGP_VARIANT);
 	}};
 	
 	public static HashSet<String> alignTypes = new HashSet<String>() {
-		private static final long serialVersionUID = 1L;
-
 	{
 		add("core_bwa");
 		add("core_nov");
@@ -120,15 +112,11 @@ public class TFConstants {
 	}};
 	
 	public static HashSet<String> metricsTypes = new HashSet<String>() {
-		private static final long serialVersionUID = 1L;
-
 	{
 		add("metrics");
 	}};
 	
 	public static HashSet<String> variantTypes = new HashSet<String>() {
-		private static final long serialVersionUID = 1L;
-
 	{
 		add("core_variant");
 		add("ugp_raw");
@@ -137,8 +125,6 @@ public class TFConstants {
 	
 	
 	public static HashSet<String> validTypes = new HashSet<String>() {
-		private static final long serialVersionUID = 1L;
-
 	{
 		add(TFConstants.ANALYSIS_CORE_FULL_NOV);
 		add(TFConstants.ANALYSIS_CORE_FULL_BWA);
@@ -159,8 +145,7 @@ public class TFConstants {
 	
 	
 	public static HashSet<String> validTargets = new HashSet<String>() {
-		private static final long serialVersionUID = 1L;
-
+	
 	{
 		add(TFConstants.TARGET_AGILENTV5UTR);
 		add(TFConstants.TARGET_AGILENTV5);

@@ -3,9 +3,14 @@ package edu.utah.seq.analysis;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
+
 import trans.main.WilcoxonRankSumTest;
 import trans.main.WilcoxonSignedRankTest;
+
+import org.apache.commons.math3.stat.inference.TTest;
+
 import trans.tpmap.WindowMaker;
+import util.bio.calc.Alignment;
 import util.gen.*;
 import edu.utah.seq.data.ComparatorPointAscendingScore;
 import edu.utah.seq.data.ComparatorPointPosition;
@@ -18,6 +23,8 @@ import edu.utah.seq.data.SmoothingWindow;
 import edu.utah.seq.data.SmoothingWindowInfo;
 import edu.utah.seq.parsers.BarParser;
 import edu.utah.seq.useq.apps.Bar2USeq;
+
+
 
 
 /** Application for looking for changes in methylation array data across a genome.  I've hacked in a non paired analysis on top of the original app.
@@ -63,6 +70,9 @@ public class MethylationArrayScanner {
 	private String controlPairedSamples;
 	private int numberMethylationArraySamplePairs;
 	private double numberRandomWindows;
+	
+	private TTest ttest = new TTest();
+	private boolean runT = false;
 
 
 	//constructor
@@ -291,11 +301,29 @@ public class MethylationArrayScanner {
 				double pseT = Num.pseudoMedian(treatment);
 				double pseC = Num.pseudoMedian(control);
 				pse = Num.log2(pseT/pseC);
-				//calc pval if more than 9 obs
-				if (treatment.length > 9 && control.length > 9){
-					WilcoxonRankSumTest w = new WilcoxonRankSumTest();
-					pvalue = w.test(treatment, control);
+				
+				if (this.runT) {
+					double[] treatD = new double[treatment.length];
+					double[] contD = new double[control.length];
+					for (int x=0; x<treatD.length; x++) {
+						treatD[x] = (double)treatment[x];
+					}
+					for (int x=0; x<contD.length; x++) {
+						contD[x] = (double)control[x];
+					}
+					
+					pvalue = this.ttest.tTest(treatD, contD);
+					pvalue = Alignment.transform10Log10(pvalue);
+					
+				} else {
+					//calc pval if more than 9 obs
+					if (treatment.length > 9 && control.length > 9){
+						WilcoxonRankSumTest w = new WilcoxonRankSumTest();
+						pvalue = w.test(treatment, control);
+					}
 				}
+				
+				
 			}
 			
 			//scores = pse, pvalFDR, permFDR, # obs   
@@ -358,10 +386,25 @@ public class MethylationArrayScanner {
 				double pseT = Num.pseudoMedian(treatment);
 				double pseC = Num.pseudoMedian(control);
 				if (Math.abs(Num.log2(pseT/pseC)) < minimumPseudoMedianRatio) continue;
-				//calc pval if more than 9 obs
-				if (treatment.length > 9 && control.length > 9){
-					WilcoxonRankSumTest w = new WilcoxonRankSumTest();
-					pvalue = w.test(treatment, control);
+				if (this.runT) {
+					double[] treatD = new double[treatment.length];
+					double[] contD = new double[control.length];
+					for (int x=0; x<treatD.length; x++) {
+						treatD[x] = (double)treatment[x];
+					}
+					for (int x=0; x<contD.length; x++) {
+						contD[x] = (double)control[x];
+					}
+					
+					pvalue = this.ttest.tTest(treatD, contD);
+					pvalue = Alignment.transform10Log10(pvalue);
+					
+				} else {
+					//calc pval if more than 9 obs
+					if (treatment.length > 9 && control.length > 9){
+						WilcoxonRankSumTest w = new WilcoxonRankSumTest();
+						pvalue = w.test(treatment, control);
+					}
 				}
 			}
 			randomPValues.add((float)pvalue);
@@ -400,8 +443,20 @@ public class MethylationArrayScanner {
 			for (String chrom: allChroms){
 				float[] tScores = null;
 				float[] cScores = null;
-				if (tPresent) tScores = pdT.get(chrom).getScores();
-				if (cPresent) cScores = pdC.get(chrom).getScores();
+				if (tPresent) {
+					if (!pdT.containsKey(chrom)) {
+						System.out.println("Chromosome " + chrom + " was found in " + controlNames[i] + ", but not in " + treatmentNames[i] + ", skipping");
+						continue;
+					}
+					tScores = pdT.get(chrom).getScores();
+				}
+				if (cPresent) {
+					if (!pdC.containsKey(chrom)) {
+						System.out.println("Chromosome " + chrom + " was found in " + treatmentNames[i] + ", but not in " + controlNames[i] + ", skipping");
+						continue;
+					}
+					cScores = pdC.get(chrom).getScores();
+				}
 				MethylationArraySamplePair sp = new MethylationArraySamplePair(tScores, cScores, performPairedAnalysis);
 				ArrayList<MethylationArraySamplePair> al = pairs.get(chrom);
 				if (al == null){
@@ -469,8 +524,10 @@ public class MethylationArrayScanner {
 		HashMap<String, PointData> pd = PointData.fetchPointData (f, null, false);
 		if (pd == null || pd.keySet().size() == 0) Misc.printErrAndExit("\nError: failed to load PointData from -> "+f);
 		
+		
 		//check and or set positions
 		for (String chrom: pd.keySet()){
+			
 			int[] existingPos = chromPositions.get(chrom);
 			PointData p = pd.get(chrom);
 			int[] pdPos = p.getPositions();
@@ -514,6 +571,7 @@ public class MethylationArrayScanner {
 					case 'r': numberRandomTrials = Integer.parseInt(args[++i]); break;
 					case 'p': minimumPseudoMedianRatio = Float.parseFloat(args[++i]); break;
 					case 'n': performPairedAnalysis = false; break;
+					case 'e': this.runT = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -535,31 +593,56 @@ public class MethylationArrayScanner {
 
 		pseDir = new File(saveDirectory, "WindowLog2Rto");
 		pseDir.mkdirs();
-		fdrDir = new File(saveDirectory, "WindowWilcoxFDR");
+		if (this.runT) {
+			fdrDir = new File(saveDirectory,"WindowTFDR");
+			scoreNames = new String[]{
+					"Log2Rto",
+					"T-TestFDR",
+					"PermFDR",
+					"#Obs",
+			};
+			scoreDescriptions = new String[]{
+					"Pseudomedian of log2(treatment/control) ratios",
+					"B&H Corrected p-value from two-sample, two-tailed t-test comparing the means of the input arrays",
+					"Permutation extimated FDR",
+					"Number paired observations",
+			};
+			scoreUnits = new String[]{
+					"pseudomedian(log2(treatment/control) ratios)",	
+					"-10Log10(T-TestFDR)",
+					"-10Log10(PermFDR)",
+					"count",
+			};
+		} else {
+			fdrDir = new File(saveDirectory, "WindowWilcoxFDR");
+			scoreNames = new String[]{
+					"Log2Rto",
+					"WilcoxFDR",
+					"PermFDR",
+					"#Obs",
+			};
+			scoreDescriptions = new String[]{
+					"Pseudomedian of log2(treatment/control) ratios",
+					"B&H Corrected Wilcoxon Signed Rank test p-value",
+					"Permutation extimated FDR",
+					"Number paired observations",
+			};
+			scoreUnits = new String[]{
+					"pseudomedian(log2(treatment/control) ratios)",	
+					"-10Log10(WilcoxFDR)",
+					"-10Log10(PermFDR)",
+					"count",
+			};
+		}
+		
 		fdrDir.mkdirs();
 		if (performPairedAnalysis){
 			baseRatioDir = new File(saveDirectory, "BPLog2Ratio");
 			baseRatioDir.mkdirs();
 		}
 
-		scoreNames = new String[]{
-				"Log2Rto",
-				"WilcoxFDR",
-				"PermFDR",
-				"#Obs",
-		};
-		scoreDescriptions = new String[]{
-				"Pseudomedian of log2(treatment/control) ratios",
-				"B&H Corrected Wilcoxon Signed Rank test p-value",
-				"Permutation extimated FDR",
-				"Number paired observations",
-		};
-		scoreUnits = new String[]{
-				"pseudomedian(log2(treatment/control) ratios)",	
-				"-10Log10(WilcoxFDR)",
-				"-10Log10(PermFDR)",
-				"count",
-		};
+		
+		
 		//change for non paired
 		if (performPairedAnalysis == false){
 			scoreDescriptions[0] = "log2( pseudomedian treatments/ pseudomedian controls) ratio";
@@ -599,6 +682,7 @@ public class MethylationArrayScanner {
 				"-o Minimum number observations in window, defaults to 10.\n" +
 				"-p Minimum pseudomedian log2 ratio for estimating the permutation FDR, defaults to 0.2\n" +
 				"-r Number permutations, defaults to 5\n"+
+				"-e Run T-Test instead of Wilcoxon rank sum test for non-paired samples.\n" +
 
 				"\n"+
 

@@ -329,6 +329,9 @@ public class ParseExonMetrics {
 			
 			while(!(temp = br.readLine()).equals("")) {
 				String[] items = temp.split("\t");
+				if (items[0].startsWith(">=")) {
+					break;
+				}
 				xaxis.add(Integer.parseInt(items[0]));
 				values.add(Float.parseFloat(items[1]));
 			}
