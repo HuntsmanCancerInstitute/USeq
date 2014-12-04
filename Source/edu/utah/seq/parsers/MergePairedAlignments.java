@@ -21,7 +21,7 @@ public class MergePairedAlignments{
 	//user defined fields
 	private File alignmentFile;
 	private File saveFile;
-	private float maximumAlignmentScore = 120;
+	private float maximumAlignmentScore = 240;
 	private float minimumMappingQualityScore = 13;
 	private boolean secondPairReverseStrand = false;
 	private boolean skipMergingPairs = false;
@@ -759,7 +759,7 @@ private HashSet<String> processed = new HashSet<String>();
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Merge Paired Alignments: Nov 2014                     **\n" +
+				"**                            Merge Paired Alignments: Dec 2014                     **\n" +
 				"**************************************************************************************\n" +
 				"Merges proper paired alignments that pass a variety of checks and thresholds. Only\n" +
 				"unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps\n" +
@@ -772,7 +772,7 @@ private HashSet<String> processed = new HashSet<String>();
 
 				"\nDefault Options:\n"+
 				"-s Path to a xxx.sam.gz file for saving results, defaults to that inferred by -f\n"+
-				"-a Maximum alignment score (AS:i: tag). Defaults to 120, smaller numbers are more\n" +
+				"-a Maximum alignment score (AS:i: tag). Defaults to 240, smaller numbers are more\n" +
 				"      stringent. Approx 30pts per mismatch for novoalignments.\n"+
 				"-q Minimum mapping quality score, defaults to 13, larger numbers are more stringent.\n" +
 				"      Set to 0 if processing splice junction indexed RNASeq data.\n"+

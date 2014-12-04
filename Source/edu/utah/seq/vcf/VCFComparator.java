@@ -785,7 +785,7 @@ public class VCFComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Comparator : August 2014                          **\n" +
+				"**                              VCF Comparator : Dec 2014                           **\n" +
 				"**************************************************************************************\n" +
 				"Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls\n" +
 				"that fall in the common interrogated regions are compared. WARNING tabix gzipped files\n" +
@@ -794,13 +794,14 @@ public class VCFComparator {
 
 				"Required Options:\n"+
 				"-a VCF file for the key dataset (xxx.vcf(.gz/.zip OK)).\n"+
-				"-k Or, bed file of approx key variants (chr start stop type[#alt_#ref_SNV/INS/DEL]\n"+
 				"-b Bed file of interrogated regions for the key dataset (xxx.bed(.gz/.zip OK)).\n"+
 				"-c VCF file for the test dataset (xxx.vcf(.gz/.zip OK)). May also provide a directory\n" +
 				"       containing xxx.vcf(.gz/.zip OK) files to compare.\n"+
 				"-d Bed file of interrogated regions for the test dataset (xxx.bed(.gz/.zip OK)).\n"+
 
 				"\nOptional Options:\n"+
+				"-k Use a bed file of approx key variants (chr start stop type[#alt_#ref_SNV/INS/DEL]\n"+
+				"       instead of a vcf key.\n"+
 				"-g Require the genotype to match, defaults to scoring a match when the alternate\n" +
 				"       allele is present.\n"+
 				"-f Only require the position to match, don't consider the alt base or genotype.\n"+

@@ -60,8 +60,6 @@ public class Sam2USeq {
 	private PrintWriter bedOut = null;
 	private boolean verbose = true;
 	private File useqOutputFile;
-	//private ArrayList<Short> baseCoverage = new ArrayList<Short>();
-	private Short zeroShort = new Short((short)0);
 	private Gzipper perRegionsGzipper = null;
 	private int maxNumberBases;
 	private HashMap<Long,Long> baseCoverageHist = new HashMap<Long,Long>();
@@ -77,10 +75,10 @@ public class Sam2USeq {
 		processArgs(args);
 
 		doWork();
-
+		
 		//finish and calc run time
-		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
-		if (verbose) System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
+		double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
+		System.out.println("\nDone! "+Math.round(diffTime)+" Min\n");
 	}
 
 	/**For integration with the RNASeq app*/
@@ -842,9 +840,10 @@ public class Sam2USeq {
 			//System.out.println("Mean Coverage\t"+mean+"\nMedian Coverage\t"+median+"\nMinimum\t"+min+"\nMaximum\t"+max);
 			System.out.println("Mean Coverage\t"+this.calcHistMean()+"\nMedian Coverage\t"+this.calcHistMedian()+"\nMinimum\t"+calcHistMin()+"\nMaximum\t"+calcHistMax());
 
-
-			System.out.close();
-			System.setOut(oldOut);
+			if (logFile != null){
+				System.out.close();
+				System.setOut(oldOut);
+			}
 		} catch (FileNotFoundException e) {
 			System.out.println("Could not open log file");
 			e.printStackTrace();
@@ -931,7 +930,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam 2 USeq : Nov 2014                             **\n" +
+				"**                                Sam 2 USeq : Dec 2014                             **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +

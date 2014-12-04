@@ -49,7 +49,7 @@ public class MultiSampleVCFFilter {
 		
 		File tempDir = null;
 		if (chunks > 1) {
-			System.out.println("File too big to intersect all in one go, splitting into " + chunks + " chunks\n");
+			System.out.println("\nFile too big to intersect all in one go, splitting into " + chunks + " chunks\n");
 			//make tempDirectory
 			tempDir = new File("tempVCF");
 			if (tempDir.exists()) {
@@ -60,7 +60,7 @@ public class MultiSampleVCFFilter {
 				
 
 		//for each file or file chunk
-		System.out.println("\nFile\tFilterType\tStarting#\tEnding#");
+		System.out.println("File\tFilterType\tStarting#\tEnding#");
 		for (int i=0;i<chunks;i++) {
 			
 			//create VCF parser
@@ -74,34 +74,37 @@ public class MultiSampleVCFFilter {
 			else parser = new VCFParser(vcfInFile,true, true, true);
 			parser.appendChrFixMT();
 			
+			String fileName = vcfInFile.getName();
+			if (chunks !=1) fileName = i+"_"+fileName;
+			
 			//set all to pass? or keep incoming status?
 			if (failNonPassRecords) {
 				parser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
 				int pass  = parser.countMatchingVCFRecords(VCFRecord.PASS);
 				int total = parser.getVcfRecords().length;
-				System.out.println(vcfInFile.getName()+ "\tPASSRecordFILTER\t"+total+"\t"+pass);
+				System.out.println(fileName+ "\tPASSRecordFILTER\t"+total+"\t"+pass);
 			}
 			else parser.setFilterFieldOnAllRecords(VCFRecord.PASS);
 
 			//filter on regions?
 			if (regions != null){			
 				int[] startEndCounts = parser.filterVCFRecords(regions);
-				System.out.println(vcfInFile.getName()+ "\tRegionFilter\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+				System.out.println(fileName+ "\tRegionFilter\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
 			}
 			
 			if (filterRecordQuality){
 				int[] startEndCounts = filterRecordQuality(parser);
-				System.out.println(vcfInFile.getName()+ "\tRecordQuality\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+				System.out.println(fileName+ "\tRecordQuality\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
 			}
 	
 			if (filterAnySample) {
 				int[] startEndCounts = filterAnySample(parser);
-				System.out.println(vcfInFile.getName()+ "\tAnySample\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
+				System.out.println(fileName+ "\tAnySample\t"+startEndCounts[0]+"\t"+startEndCounts[1]);
 			}
 			
 			if (filterByGenotype) {
 				int[] startEndCounts = filterByGenotype(parser);
-				System.out.println(vcfInFile.getName() + "\tGenotypeFilter\t" + startEndCounts[0]+"\t"+startEndCounts[1]);
+				System.out.println(fileName + "\tGenotypeFilter\t" + startEndCounts[0]+"\t"+startEndCounts[1]);
 			}
 	
 			//print good or bad records 
@@ -121,9 +124,7 @@ public class MultiSampleVCFFilter {
 			IO.deleteDirectory(tempDir);
 		}
 
-		if (compressOutput) {
-			VCFUtilities.createTabix(vcfOutFile, pathToTabix);
-		}
+		if (compressOutput) VCFUtilities.createTabix(vcfOutFile, pathToTabix);
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
@@ -132,7 +133,6 @@ public class MultiSampleVCFFilter {
 
 	private void printSampleNames() {
 		System.out.println("File\tSampleNames");
-
 		VCFParser parser = new VCFParser(vcfOutFile, false, false, false);
 		System.out.println(vcfOutFile.getName()+ "\t"+ Misc.stringArrayToString(parser.getSampleNames(), ","));
 	}
@@ -241,7 +241,7 @@ public class MultiSampleVCFFilter {
 				int dp = sample.getReadDepthDP();
 				int ad = 0;
 				String adString = sample.getAlleleCount();
-				if (adString != null) ad = Integer.parseInt(adString);
+				if (adString != null) ad = Integer.parseInt(sample.getAlternateCounts());
 				else {
 					//look for info DP4, from SamTools, 
 					//DP4=1,4,5,11 high-quality ref-forward bases, ref-reverse, alt-forward and alt-reverse bases
