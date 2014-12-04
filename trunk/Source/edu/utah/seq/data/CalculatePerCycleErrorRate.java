@@ -47,7 +47,6 @@ public class CalculatePerCycleErrorRate {
 	private boolean deleteTempFiles = true;
 	private Pattern headerLine = Pattern.compile("^@[HSRPC][DQGO]\\s.+");
 	private boolean mergeStrands = true;
-	private ArrayList<String> failingSampleNames = new ArrayList<String>();
 	private double[] numberFailingCycles;
 	private int totalCycles;
 
@@ -61,8 +60,8 @@ public class CalculatePerCycleErrorRate {
 		doWork();
 
 		//finish and calc run time
-		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
-		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
+		double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
+		System.out.println("\nDone! "+Num.formatNumber(diffTime, 2)+" min\n");
 	}
 
 	public void doWork(){
@@ -228,10 +227,13 @@ public class CalculatePerCycleErrorRate {
 			System.out.println("FractionWithSoftMasking\t"+Num.doubleArrayToString(numberAlignmentsWithSoftMasking, 4, "\t"));
 			System.out.println("FractionWithHardMasking\t"+Num.doubleArrayToString(numberAlignmentsWithHardMasking, 4, "\t"));
 			
+			
 			System.out.println("\nDatasets failing thresholds ("+Num.formatNumber(maximumFractionFailingCycles, 4)+
 					" maxFracFailingCycles, "+Num.formatNumber(firstReadMaximumError, 4)+
 					" maxFirstReadOrMergeError, "+Num.formatNumber(secondReadMaximumError, 4)+
-					" maxSecondReadError):\n"+ Misc.hashSetToString(badGuys, ", "));
+					" maxSecondReadError):");
+			if (badGuys.size() != 0) System.out.println(Misc.hashSetToString(badGuys, ", "));
+			else System.out.println("None");
 			
 			if (logFile != null) {
 				System.out.close();
@@ -555,7 +557,7 @@ public class CalculatePerCycleErrorRate {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Calculate Per Cycle Error Rate : Nov 2014                 **\n" +
+				"**                        Calculate Per Cycle Error Rate : Dec 2014                 **\n" +
 				"**************************************************************************************\n" +
 				"Calculates per cycle error rates provided a sorted indexed bam file and a fasta\n" +
 				"sequence file. Only checks CIGAR M bases not masked or INDEL bases.\n\n" +

@@ -87,7 +87,7 @@ public class VCFSpliceAnnotator {
 	private int numSpliceJunctionSJsGained = 0;
 	private int numSJsLost = 0;
 	
-	//for multiple testing correction, to do!
+	//for multiple testing correction, to do! not yet implemented for vcf file, just spreadsheet
 	private double num5GainedTested = 0;
 	private double num3GainedTested = 0;
 	private double num5LostTested = 0;
@@ -1032,7 +1032,6 @@ public class VCFSpliceAnnotator {
 		typeHist.put("D3S", spliceHistogram3);
 	}
 
-
 	private boolean checkCoverage(int position, String toLookFor, boolean leftRight){
 		SAMRecordIterator i = samSpliceReader.queryOverlapping(workingChromosomeName, position, position);
 		HashSet<String> names = new HashSet<String>();
@@ -1398,7 +1397,7 @@ public class VCFSpliceAnnotator {
 				"for gained exonic or intronic splices are estimated by generating null distibutions\n"+
 				"of masked sequence scores. Likewise, damaged splice pvalues are calculated using a\n"+
 				"score distribution from scoring high confidence splice junctions. A detailed spread-\n"+
-				"sheet and modified vcf file are generated. \n\n" +
+				"sheet and modified vcf file are produced. \n\n" +
 
 				"Required Options:\n"+
 				"-r Save directory for writing results files.\n"+
@@ -1412,7 +1411,8 @@ public class VCFSpliceAnnotator {
 				"-m Full path directory name containing the me2x3acc1-9, splice5sequences and me2x5\n"+
 				"       splice model files. See USeq/Documentation/ or \n"+
 				"       http://genes.mit.edu/burgelab/maxent/download/ \n"+
-				"-h Histogram object file for estimating pvalues or complete -j -t below. \n"+
+				"-h Histogram object file for estimating pvalues or complete -j -t below. Some can be\n"+
+				"       downloaded from http://tinyurl.com/mobfkjn \n"+
 				"\n"+
 				
 				"Optional options:\n"+

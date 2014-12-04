@@ -10,7 +10,9 @@ CalculatePerCycleErrorRate
 ReadCoverageParser
 * Parses output of Sam2USeq to plot many read coverage plots and flag samples that fail set thresholds for coverage
 MergePairedAlignments
-* New app focused on H1K QC.  Works with either queryname or coordinate sorted bams.  
+* New app focused on H1K QC.  Works with either queryname or coordinate sorted bams. 
+VCFComparator
+* Added option to use a bed file of key variants instead of a vcf file to allow wiggle in BamSurgeon generated variants 
 
 ----USeq_8.8.5----
 MultiSampleVCFFilter

@@ -66,7 +66,6 @@ public class VCFSample {
 					}
 					
 				}
-					
 				else if (format[i].equals("AD")) {
 					alleleCounts = data[i];
 					String[] multiple = data[i].split(",");
