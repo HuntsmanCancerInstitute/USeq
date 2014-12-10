@@ -1131,7 +1131,7 @@ public class DefinedRegionDifferentialSeq {
 			sb.append("cds = DESeq(cds)\n");
 			
 			sb.append("\n#get and save rlog transformed data\n");
-			sb.append("rld = rlog(cds)\n");
+			sb.append("rld = rlogTransformation(cds)\n");
 			sb.append("write.table(assay(rld), file = '"+rLogValues.getCanonicalPath()+"', quote=FALSE, sep ='\t')\n");
 			
 			sb.append("\n#make sample heat map\n");

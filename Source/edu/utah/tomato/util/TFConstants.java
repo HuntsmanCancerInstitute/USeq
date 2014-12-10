@@ -135,7 +135,7 @@ public class TFConstants {
 		add(TFConstants.ANALYSIS_UGP_FULL_BWA_VQSR);
 		add(TFConstants.ANALYSIS_UGP_FULL_BWA_RAW);
 		add(TFConstants.ANALYSIS_UGP_FULL_NOV_VQSR);
-		add(TFConstants.ANALYSIS_UGP_FULL_BWA_RAW);
+		add(TFConstants.ANALYSIS_UGP_FULL_NOV_RAW);
 		add(TFConstants.ANALYSIS_UGP_ALIGN_NOV);
 		add(TFConstants.ANALYSIS_UGP_ALIGN_BWA);
 		add(TFConstants.ANALYSIS_UGP_VARIANT_RAW);
