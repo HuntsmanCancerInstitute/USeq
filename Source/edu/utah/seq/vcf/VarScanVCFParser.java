@@ -1,6 +1,8 @@
 package edu.utah.seq.vcf;
 
 import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -9,47 +11,63 @@ import util.gen.Misc;
 
 /**Simple VarScan SOMATIC vcf formatter.*/
 public class VarScanVCFParser {
-	
+
 	private File[] vcfFiles;
-	
+
 	public VarScanVCFParser (String[] args) {
-		
+
 		processArgs(args);
-		
+
 		System.out.println("VCFFile\t#Somatic\t#NonSomatic");
 		for (File vcf: vcfFiles){
 			parse(vcf);
 		}
 	}
-	
+
 	public void parse(File vcf){
-		VCFParser parser = new VCFParser (vcf);
-		int numSomatic = 0;
-		int numNon = 0;
-		for (VCFRecord record: parser.getVcfRecords()){
-			int ssc = -1;
-			try {
+		try {
+			VCFParser parser = new VCFParser (vcf);
+			int numSomatic = 0;
+			int numNon = 0;
+			for (VCFRecord record: parser.getVcfRecords()){
+				int ssc = -1;
 				if (record.getInfoObject().doesInfoEntryExist("SOMATIC")){
 					ssc = record.getInfoObject().getInfoInt("SSC");
 				}
-			} catch (Exception e) {}
-			if (ssc != -1){
-				record.setFilter(VCFRecord.PASS);
-				record.setQuality((float)ssc);
-				numSomatic++;
+				if (ssc != -1){
+					record.setFilter(VCFRecord.PASS);
+					record.setQuality((float)ssc);
+					numSomatic++;
+				}
+				else {
+					record.setFilter(VCFRecord.FAIL);
+					numNon++;
+				}
 			}
-			else {
-				record.setFilter(VCFRecord.FAIL);
-				numNon++;
-			}
+			File out = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_Som.vcf");
+			printRecordsSSC(parser, out, VCFRecord.PASS);
+			out = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_NonSom.vcf");
+			parser.printFilteredRecords(out, VCFRecord.FAIL);
+			System.out.println(vcf.getName()+"\t"+numSomatic+"\t"+numNon);
+		} catch (Exception e) {
+			e.printStackTrace();
 		}
-		File out = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_Som.vcf");
-		parser.printFilteredRecords(out, VCFRecord.PASS);
-		out = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_NonSom.vcf");
-		parser.printFilteredRecords(out, VCFRecord.FAIL);
-		System.out.println(vcf.getName()+"\t"+numSomatic+"\t"+numNon);
 	}
 	
+	public void printRecordsSSC(VCFParser parser, File f, String passFail) throws Exception{
+		PrintWriter out = new PrintWriter (new FileWriter (f));
+		VCFRecord[] records = parser.getVcfRecords();
+		for (VCFRecord vcf: records){
+			if (vcf.getFilter().equals(passFail) == false) continue;
+			String orig = vcf.toString();
+			String[] fields = VCFParser.TAB.split(orig);
+			//reset score
+			fields[5] = Integer.toString((int)vcf.getQuality());
+			out.println(Misc.stringArrayToString(fields, "\t"));
+		}
+		out.close();
+	}
+
 	public static void main(String[] args) {
 		if (args.length ==0){
 			printDocs();
@@ -91,22 +109,22 @@ public class VarScanVCFParser {
 		if (vcfFiles == null || vcfFiles.length ==0 || vcfFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.vcf(.zip/.gz OK) file(s)!\n");
 
 	}	
-	
+
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             VarScan VCFParser: Oct 2014                          **\n" +
+				"**                             VarScan VCFParser: Dec 2014                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses and filters VarScan VCF files for those called SOMATIC.  Replaces the QUAl\n" +
 				"score with the ssc score.\n"+
 
 				"\nRequired Options:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s). Recursive!\n" +
-				
-				"\nExample: java -jar pathToUSeq/Apps/VarScanVCFParser -v /VarScan2/VCFFiles/\n\n" +
-				
 
-		"**************************************************************************************\n");
+				"\nExample: java -jar pathToUSeq/Apps/VarScanVCFParser -v /VarScan2/VCFFiles/\n\n" +
+
+
+				"**************************************************************************************\n");
 
 	}
 
