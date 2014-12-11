@@ -249,12 +249,12 @@ public class USeqUtilities {
 	}
 	/**Takes a file, capitalizes the text, strips off .gz or .zip and any other extension, then makes a directory of the file and returns it.*/
 	public static File makeDirectory (File file, String extension){
-		String name = capitalizeRemoveExtension(file, extension);
+		String name = capitalizeRemoveExtension(file);
 		File dir = new File (file.getParentFile(), name+ extension);
 		dir.mkdir();
 		return dir;
 	}
-	public static String capitalizeRemoveExtension(File file, String extension){
+	public static String capitalizeRemoveExtension(File file){
 		String name = file.getName();
 		name = capitalizeFirstLetter(name);
 		name = name.replace(".gz", "");

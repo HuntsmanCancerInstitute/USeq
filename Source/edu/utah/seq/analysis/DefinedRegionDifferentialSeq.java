@@ -1117,6 +1117,9 @@ public class DefinedRegionDifferentialSeq {
 			sb.append("library(RColorBrewer)\n");
 			sb.append("as.data.frame.DataFrame <- selectMethod('as.data.frame', signature='DataFrame')\n");
 			
+			//reset missing function for old versions
+			sb.append("rlog = rlogTransformation\n");
+			
 			sb.append("\n#load count table, replace rownames with first column\n");
 			sb.append("countTable = read.delim('"+geneCountTable.getCanonicalPath()+"', header=TRUE)\n");
 			sb.append("rownames(countTable) = countTable[,1]\n");
@@ -1157,8 +1160,6 @@ public class DefinedRegionDifferentialSeq {
 						sb.append("res = results(cds, independentFiltering=FALSE, contrast = c('condition', '"+conditions[i].getName()+"', '"+conditions[j].getName()+"'))\n");
 
 					}
-					
-					
 					sb.append("res[,6] = -10 * log10(res[,6])\n"); //transform pvals since java can't handle some of these big numbers
 					sb.append("write.table(res, file = '"+results.getCanonicalPath()+"', quote=FALSE, sep ='\t')\n");
 				}
@@ -1951,7 +1952,7 @@ public class DefinedRegionDifferentialSeq {
 		else if (printFirstLastCountTable == false) {
 			String errors = IO.runRCommandLookForError("library(DESeq2); library(gplots)", fullPathToR, saveDirectory);
 			if (errors == null || errors.length() !=0){
-				Misc.printErrAndExit("\nError: Cannot find the required R library.  Did you install DESeq2 " +
+				Misc.printErrAndExit("\nError: Cannot find the required R libraries (DESeq2 and gplots).  Did you install DESeq2 " +
 						"(http://www-huber.embl.de/users/anders/DESeq2/)?  See the author's websites for installation instructions. Once installed, " +
 						"launch an R terminal and type 'library(DESeq2)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
 			}
