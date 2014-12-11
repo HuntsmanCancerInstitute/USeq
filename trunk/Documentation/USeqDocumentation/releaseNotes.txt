@@ -1,3 +1,13 @@
+----USeq_8.8.7----
+ReadCoverageParser
+* Renamed to CollectBamStats
+* Added a bunch of functionality to collect both read coverage data and alignment stats from the MergePairedAlignments and Sam2USeq apps
+MergePairedAlignments
+* Threaded app, generates ChromData for direct import into Sam2USeq; 3x faster overall.
+DefinedRegionDifferentialSeq
+* Updated DESeq2 scripts to support latest rlog method names
+* Added option to disable independent filtering
+
 ----USeq_8.8.6----
 BisSeq
 * Added another catch for missing stranded datasets from targeted capture experiments that were throwing null pointer errors.

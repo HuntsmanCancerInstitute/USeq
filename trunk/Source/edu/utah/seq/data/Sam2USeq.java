@@ -10,9 +10,7 @@ import edu.utah.seq.parsers.BarParser;
 import edu.utah.seq.useq.ArchiveInfo;
 import edu.utah.seq.useq.SliceInfo;
 import edu.utah.seq.useq.USeqUtilities;
-import edu.utah.seq.useq.data.PositionScore;
-import edu.utah.seq.useq.data.PositionScoreData;
-import edu.utah.seq.useq.data.RegionScoreText;
+import edu.utah.seq.useq.data.*;
 import htsjdk.samtools.*;
 import htsjdk.samtools.SAMRecord.SAMTagAndValue;
 import util.bio.annotation.Bed;
@@ -61,10 +59,10 @@ public class Sam2USeq {
 	private boolean verbose = true;
 	private File useqOutputFile;
 	private Gzipper perRegionsGzipper = null;
-	private int maxNumberBases;
 	private HashMap<Long,Long> baseCoverageHist = new HashMap<Long,Long>();
 	private File barDirectory;
-	
+	private File chromDataFile = null;
+
 
 
 	/**For stand alone app.*/
@@ -75,7 +73,7 @@ public class Sam2USeq {
 		processArgs(args);
 
 		doWork();
-		
+
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" Min\n");
@@ -94,30 +92,37 @@ public class Sam2USeq {
 		doWork();
 	}
 
+	/**For integration with the MergePairedAlignments application.*/
+	public Sam2USeq (){
+
+	}
+
 	public void doWork(){
 		//make tempDir
-		tempDirectory = new File (samFiles[0].getParentFile(), "TempDir_"+Passwords.createRandowWord(8));
+		if (chromDataFile == null) tempDirectory = new File (samFiles[0].getParentFile(), "TempDir_"+Passwords.createRandowWord(8));
+		else tempDirectory = new File (chromDataFile.getParentFile(), "TempDir_"+Passwords.createRandowWord(8));
 		tempDirectory.mkdir();
 
-		//split sam files by chromosome
-		if (verbose) System.out.println("\nSplitting sam files by chromsome");
-		splitSamBamFiles();
-		double percent = (double)numberPassingAlignments/(double)numberAlignments;
-
-		if (verbose) {
-			System.out.println(numberAlignments+" Alignments");
-			System.out.println(numberPassingAlignments+" Alignments passing filters ("+Num.formatPercentOneFraction(percent)+")\n");
+		//break up sam files? or have these already been loaded from binaries
+		if (chromDataFile == null){
+			//split sam files by chromosome
+			if (verbose) System.out.println("\nSplitting sam files by chromsome");
+			splitSamBamFiles();
+			double percent = (double)numberPassingAlignments/(double)numberAlignments;
+			if (verbose) {
+				System.out.println(numberAlignments+" Alignments");
+				System.out.println(numberPassingAlignments+" Alignments passing filters ("+Num.formatPercentOneFraction(percent)+")");
+			}
 		}
 
 		//make coverage track
 		if (verbose) {
-			if (makeAveReadLengthGraph) System.out.print("Making average alignment lenght coverage tracks");
-			else System.out.print("Making depth coverage tracks");
+			if (makeAveReadLengthGraph) System.out.print("\nMaking average alignment lenght coverage tracks");
+			else System.out.print("\nMaking depth coverage tracks");
 		}
 		makeCoverageTracks();
 
 		if (minimumCounts !=0) bedOut.close();
-
 
 		//finish read depth coverage stats
 		finishReadDepthStats();
@@ -139,7 +144,6 @@ public class Sam2USeq {
 							baseCoverageHist.put((long)0,(long) 0);
 						}
 						baseCoverageHist.put((long)0,baseCoverageHist.get((long)0) + 1);
-						//baseCoverage.add(zeroShort);
 					}
 				}
 			}
@@ -179,8 +183,8 @@ public class Sam2USeq {
 
 					//does it pass the vendor qc?
 					if (sam.getReadFailsVendorQualityCheckFlag()) continue;
-					
-					//chromosome
+
+					//chromosome, converting to chr
 					String chromosome = sam.getReferenceName();
 					if (chromosome.startsWith("chr") == false){
 						chromosome = "chr"+chromosome;
@@ -250,7 +254,7 @@ public class Sam2USeq {
 						}
 						else {
 							//no thus make new and set
-							File f = new File(tempDirectory, currentChromStrand);
+							File f = new File(tempDirectory, currentChromStrand+"ChromData");
 							DataOutputStream dos = new DataOutputStream(new BufferedOutputStream (new FileOutputStream(f)));
 							data = new ChromData (start, end, chromosome, strand, f, dos);
 							chromDataHash.put(currentChromStrand, data);
@@ -279,26 +283,6 @@ public class Sam2USeq {
 
 		//set scalar
 		scalar = (float)(numberPassingAlignmentsForScaling/ 1000000.0);
-	}
-
-	private class ChromData{
-		//fields
-		int firstBase;
-		int lastBase;
-		DataOutputStream out;
-		File binaryFile;
-		String chromosome;
-		String strand;
-
-		//constructors
-		private ChromData (int firstBase, int lastBase, String chromosome, String strand, File binaryFile, DataOutputStream out){
-			this.firstBase = firstBase;
-			this.lastBase = lastBase;
-			this.chromosome = chromosome;
-			this.strand = strand;
-			this.binaryFile = binaryFile;
-			this.out = out;
-		}
 	}
 
 	/**Closes writers.*/
@@ -333,9 +317,22 @@ public class Sam2USeq {
 
 		if (useqOutputFile == null) {
 			String zipName = null;
-			if (samFiles.length == 1) zipName= USeqUtilities.capitalizeRemoveExtension(samFiles[0], "sam") +USeqUtilities.USEQ_EXTENSION_WITH_PERIOD;
-			else zipName = USeqUtilities.capitalizeRemoveExtension(samFiles[0].getParentFile(), "sam") +USeqUtilities.USEQ_EXTENSION_WITH_PERIOD;
-			useqOutputFile = new File (samFiles[0].getParentFile(), zipName);
+			File dir = null;
+			if (chromDataFile != null) {
+				dir = chromDataFile.getParentFile();
+				zipName = USeqUtilities.capitalizeRemoveExtension(dir) +USeqUtilities.USEQ_EXTENSION_WITH_PERIOD;
+			}
+			else {
+				if (samFiles.length == 1) {
+					zipName= USeqUtilities.capitalizeRemoveExtension(samFiles[0]) +USeqUtilities.USEQ_EXTENSION_WITH_PERIOD;
+					dir = samFiles[0].getParentFile();
+				}
+				else {
+					dir = samFiles[0].getParentFile();
+					zipName = USeqUtilities.capitalizeRemoveExtension(dir) +USeqUtilities.USEQ_EXTENSION_WITH_PERIOD;
+				}
+			}
+			useqOutputFile = new File (dir, zipName);
 		}
 
 		File[] files = new File[files2Zip.size()];
@@ -347,7 +344,7 @@ public class Sam2USeq {
 		}
 		USeqUtilities.deleteDirectory(tempDirectory);
 	}
-	
+
 	/**Sums M bases in cigar.*/
 	public int alignmentLength (String cigar){
 		//for each cigar block
@@ -404,7 +401,6 @@ public class Sam2USeq {
 							alignmnentLengths[start] += alignmentLength;
 							start++;
 						}
-						if (numberBases > maxNumberBases) maxNumberBases = numberBases;
 					}
 					//just advance for all but insertions which should be skipped via the failure to match
 					else start += numberBases;
@@ -474,7 +470,7 @@ public class Sam2USeq {
 			}
 			//write out bar point data?
 			if (barDirectory != null) saveBarPointData(firstBase, baseCounts);
-			
+
 			//make ave read length graph?
 			if (makeAveReadLengthGraph){
 				//make averages
@@ -487,7 +483,7 @@ public class Sam2USeq {
 				SliceInfo sliceInfo = new SliceInfo(chromData.chromosome, chromData.strand,0,0,0,null);
 				PositionScoreData psd = new PositionScoreData (positions, sliceInfo);
 				psd.sliceWritePositionScoreData(rowChunkSize, tempDirectory, files2Zip);
-				
+
 			}
 			//do they want relative read coverage graphs and good block counts?
 			else if (makeRelativeTracks && minimumCounts !=0){
@@ -515,8 +511,8 @@ public class Sam2USeq {
 				if (minimumCounts !=0) makeGoodBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
 			}
 
-			//delete file
-			chromData.binaryFile.delete();
+			//delete file if this was generated by splitting sams
+			if (samFiles.length != 0) chromData.binaryFile.delete();
 		}
 		catch (Exception e){
 			e.printStackTrace();
@@ -670,6 +666,7 @@ public class Sam2USeq {
 			//set text file source
 			String source = null;
 			if (samFiles.length == 1) source = samFiles[0].toString();
+			else if (samFiles.length == 0) source = chromDataFile.getParent();
 			else source = samFiles[0].getParent();
 			ai.setOriginatingDataSource(source);
 			//set color
@@ -727,9 +724,6 @@ public class Sam2USeq {
 				}
 			}
 		}
-		
-		//barDirectory for saving point data?
-		if (barDirectory!= null) barDirectory.mkdirs();
 
 		File[][] tot = new File[4][];
 		tot[0] = IO.extractFiles(forExtraction,".sam");
@@ -737,7 +731,18 @@ public class Sam2USeq {
 		tot[2] = IO.extractFiles(forExtraction,".sam.zip");
 		tot[3] = IO.extractFiles(forExtraction,".bam");
 		samFiles = IO.collapseFileArray(tot);
-		if (samFiles == null || samFiles.length ==0 || samFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.sam(.zip/.gz) file(s)!\n");
+		if (samFiles == null || samFiles.length ==0 || samFiles[0].canRead() == false) {
+			//look for chromData.obj
+			chromDataFile = new File (forExtraction, "chromData.obj");
+			if (chromDataFile.exists()) {
+				if (stranded || scaleRepeats) Misc.printErrAndExit("\nError: cannot perform a stranded or scaled repeat analysis with ChromData from MergePairedAlignments.  Aborting.\n");
+				loadChromData();
+			}
+			else Misc.printExit("\nError: cannot find your xxx.sam(.zip/.gz) file(s)!\n");
+		}
+
+		//barDirectory for saving point data?
+		if (barDirectory!= null) barDirectory.mkdirs();
 
 		//stranded and regionFile?
 		if (regionFile !=null){
@@ -766,10 +771,6 @@ public class Sam2USeq {
 
 		//genome version?
 		if (versionedGenome == null) Misc.printErrAndExit("\nPlease provide a versioned genome (e.g. H_sapiens_Mar_2006).\n");
-
-		//look for point directories
-		if (samFiles == null || samFiles.length == 0) Misc.printExit("\nError: cannot find your sam files?\n");
-
 
 		if (minimumCounts !=0){
 			String name = "regions";
@@ -807,6 +808,30 @@ public class Sam2USeq {
 
 	}	
 
+	private void loadChromData() {
+		ChromDataSave[] cds = (ChromDataSave[]) IO.fetchObject(chromDataFile);
+		ChromData[] cd = new ChromData[cds.length];
+
+		//load hash
+		for (int i=0; i< cds.length; i++){
+			cd[i] = cds[i].getChromData();
+			//check if data file is present
+			File dataFile = new File (chromDataFile.getParentFile(), cd[i].binaryFile.getName());
+			if (dataFile.exists() == false) Misc.printErrAndExit("Error: cannot find the binary data file for ChromData "+dataFile);
+			cd[i].binaryFile = dataFile;
+			chromDataHash.put(cd[i].chromosome+".", cd[i]);
+		}
+
+		//load counts
+		File countsFile = new File (chromDataFile.getParentFile(), "count.obj");
+		if (countsFile.exists() == false) Misc.printErrAndExit("Error: cannot find the binary count.obj file "+countsFile);
+		Long count = (Long) IO.fetchObject(countsFile);
+		numberPassingAlignmentsForScaling = count.longValue();
+		
+		//set scalar
+		scalar = (float)(((double)numberPassingAlignmentsForScaling)/ 1000000.0);
+	}
+
 	public void printStats(){
 		try {
 			PrintStream oldOut = System.out;
@@ -829,15 +854,6 @@ public class Sam2USeq {
 			System.out.println("\nTotal interrogated bases\t"+ total);
 
 			//print summary stats
-			//short[] c = Num.arrayListOfShortToArray(baseCoverage);
-			//Arrays.sort(c);
-			//calc mean
-			//double mean = Num.mean(c);
-			//short min = c[0];
-			//short max = c[c.length-1];
-			//calc median
-			//double median = Num.median(c);
-			//System.out.println("Mean Coverage\t"+mean+"\nMedian Coverage\t"+median+"\nMinimum\t"+min+"\nMaximum\t"+max);
 			System.out.println("Mean Coverage\t"+this.calcHistMean()+"\nMedian Coverage\t"+this.calcHistMedian()+"\nMinimum\t"+calcHistMin()+"\nMaximum\t"+calcHistMax());
 
 			if (logFile != null){
@@ -851,18 +867,18 @@ public class Sam2USeq {
 		}
 
 	}
-	
+
 	private long calcHistMin() {
 		return Collections.min(this.baseCoverageHist.keySet());
 	}
-	
+
 	private long calcHistMax() {
 		return Collections.max(this.baseCoverageHist.keySet());
 	}
-	
+
 	private double calcHistMean() {
 		long totalPositions = 0;
-		
+
 		long totalCoverage = 0;
 		for (long k: this.baseCoverageHist.keySet()) {
 			long count = this.baseCoverageHist.get(k);
@@ -872,22 +888,22 @@ public class Sam2USeq {
 		System.out.println("Total postitions: " + totalPositions);
 		double mean = (double)totalCoverage / totalPositions; 
 		return mean;
-		
+
 	}
-	
+
 	private double calcHistMedian() {
 		int totalPositions = 0;
 		for (long i: this.baseCoverageHist.values()) {
 			totalPositions += i;
 		}
 		int midPosition = totalPositions / 2; 
-		
+
 		ArrayList<Long> keySet = new ArrayList<Long>();
 		keySet.addAll(this.baseCoverageHist.keySet());
 		Collections.sort(keySet);
-		
+
 		double median = 0;
-		
+
 		if (totalPositions % 2 == 1) {
 			long count = 0;
 			for (Long key: keySet) {
@@ -914,13 +930,13 @@ public class Sam2USeq {
 					e2 = key;
 					e2found = true;
 				}
-				
+
 				if (e1found && e2found) {
 					break;
 				}
 				count += elements;
 			}
-			
+
 			median = (e1 + e2) / 2.0;
 		}
 		return median;
@@ -938,7 +954,8 @@ public class Sam2USeq {
 
 				"Required Options:\n"+
 				"-f Full path to a bam or a sam file (xxx.sam(.gz/.zip OK) or xxx.bam) or directory\n" +
-				"      containing such. Multiple files are merged.\n"+
+				"      containing such. Multiple files are merged. Also works with a directory of\n"+
+				"      ChromData from MergePairedAlignments.\n"+
 				"-v Versioned Genome (ie H_sapiens_Mar_2006, D_rerio_Jul_2010), see UCSC Browser,\n"+
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
 
