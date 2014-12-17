@@ -498,7 +498,15 @@ public class VCFComparator {
 
 		//parse key variants, either from a bed file or from a vcf file
 		if (vcfBedKey != null && keyBedCalls == null){
+			
+			/*  Parsing something like this:
+			15	76070871	76070873	54_30_SNV	0.642857143	.
+			16	19179925	19179928	54_87_INS_CTTTTG	0.382978723	.
+			3	141622491	141622496	54_25_DEL	0.683544304	.
+			*/
 			keyBedCalls = Bed.parseBedFile(vcfBedKey, true, true);
+			//remove snp or non snp?
+			if (removeSNPs || removeNonSNPs) removeSelectVariantTypeFromKeyBed();
 			//count unfiltered
 			for (RegionScoreText[] r : keyBedCalls.values()) numberUnfilteredKeyVariants+= r.length;
 			//filter
@@ -561,6 +569,33 @@ public class VCFComparator {
 		results.append(res);
 		results.append("\n");
 		
+	}
+
+	/**Removes SNV or DEL, INS keys.*/
+	private void removeSelectVariantTypeFromKeyBed() {
+		ArrayList<String> toRemove = new ArrayList<String>();
+		for (String chrom: keyBedCalls.keySet()){
+			ArrayList<RegionScoreText> good = new ArrayList<RegionScoreText>();
+			for (RegionScoreText var : keyBedCalls.get(chrom)){
+				boolean snp = var.getText().contains("SNV");
+				if (snp) {
+					if (removeSNPs == false) good.add(var);
+				}
+				else {
+					if (removeNonSNPs == false) good.add(var);
+				}
+			}
+			if (good.size() !=0){
+				RegionScoreText[] regions = new RegionScoreText[good.size()];
+				good.toArray(regions);
+				keyBedCalls.put(chrom, regions);
+			}
+			else toRemove.add(chrom);
+		}
+		//any to remove
+		if (toRemove.size() != 0) {
+			for (String chr: toRemove) keyBedCalls.remove(chr);
+		}
 	}
 
 	private void createIntervalTreesForBedCalls() {
