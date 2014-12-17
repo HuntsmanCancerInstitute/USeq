@@ -365,7 +365,9 @@ public class VCFParser {
 				if (vcfRecords[i].getPosition() < lastBase && coveredBases[vcfRecords[i].getPosition()] == true) {
 					vcfRecords[i].setFilter(VCFRecord.PASS);
 				}
-				else vcfRecords[i].setFilter(VCFRecord.FAIL);
+				else {
+					vcfRecords[i].setFilter(VCFRecord.FAIL);
+				}
 				vcfRecords[i].setScore(0f);
 			}
 		}
@@ -377,6 +379,10 @@ public class VCFParser {
 			}
 		}
 		int ending = countMatchingVCFRecords(VCFRecord.PASS);
+		
+		//remove non passing
+		filterVCFRecords(VCFRecord.PASS);
+		
 		return new int[]{starting,ending};
 	}
 
