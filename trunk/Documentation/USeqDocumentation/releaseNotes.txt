@@ -1,3 +1,7 @@
+----USeq_8.8.8----
+VCFComparator
+* Major bug! The filter for selecting vcf variants for those in common regions was inadvertently disabled. Ugg! To findout if your prior analysis as affected, look at the # of pre and post filtered variants these should differ, if not discard! Drat!
+
 ----USeq_8.8.7----
 ReadCoverageParser
 * Renamed to CollectBamStats
@@ -7,6 +11,10 @@ MergePairedAlignments
 DefinedRegionDifferentialSeq
 * Updated DESeq2 scripts to support latest rlog method names
 * Added option to disable independent filtering
+Several apps dependent on the POI Excel library
+* Updated the POI classes to work, was causing several apps to error out on launch.
+VarScanVCFParser
+* Fixed an issue where the ssc score wasn't getting copied into the QUAL field
 
 ----USeq_8.8.6----
 BisSeq

@@ -407,13 +407,13 @@ BaseCoverage	ObservedBasesWithGivenCoverage	FractionObserved	FractionObservedWit
 			//skip first
 			line = in.readLine();
 
-			//extract next 100
+			//extract upto 100
 			for (int i=0; i< fracCov.length; i++) {
 				line = in.readLine();
 				fields = Misc.TAB.split(line);
+				if (fields.length != 4) break;
 				fracCov[i] = Float.parseFloat(fields[3]);
 			}
-
 			in.close();
 		} catch (IOException e) {
 			System.err.println("\nError: problem parsing "+file);
@@ -423,7 +423,6 @@ BaseCoverage	ObservedBasesWithGivenCoverage	FractionObserved	FractionObservedWit
 	}
 
 	/*Parses the following from the file
-
 	 */
 	private float[] loadAlignmentStats(File file) {
 		float[] stats = new float[numberAlignmentStats];
@@ -554,7 +553,7 @@ BaseCoverage	ObservedBasesWithGivenCoverage	FractionObserved	FractionObservedWit
 				"-o Maximum fraction overlapping bps in paired alignments, defaults to 0.1\n"+
 				"\n"+
 
-				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/CollectBamStats -l /QC/Sam2USeqLogs/\n" +
+				"Example: java -Xmx1500M -jar pathToUSeq/Apps/CollectBamStats -l /QC/Sam2USeqLogs/\n" +
 				"     -x 15 -c 0.9  \n\n" +
 
 				"**************************************************************************************\n");

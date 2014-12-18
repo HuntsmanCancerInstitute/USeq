@@ -56,6 +56,8 @@ public class VarScanVCFParser {
 	
 	public void printRecordsSSC(VCFParser parser, File f, String passFail) throws Exception{
 		PrintWriter out = new PrintWriter (new FileWriter (f));
+		//write out header
+		for (String h : parser.getStringComments()) out.println(h);
 		VCFRecord[] records = parser.getVcfRecords();
 		for (VCFRecord vcf: records){
 			if (vcf.getFilter().equals(passFail) == false) continue;
