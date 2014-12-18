@@ -18,6 +18,12 @@ public class Email{
 	private String SMTP_AUTH_PWD  = "mypwd";
 	private String contentType = "text/plain"; //ie "text/html" or "text/plain"
 	
+	public static void main (String[] args){
+		Email e = new Email("smtp.gmail.com", "david.austin.nix", "Sahib2013", "text/plain");
+		System.out.println("Launching");
+		System.out.println(e.postMail(new String[]{"david.nix@hci.utah.edu"}, "Test", "Message", "david.austin.nix@gmail.com"));
+		System.out.println("Complete");
+	}
 	
 	public Email(String smtpHostName, String smtpUser, String smtpPassword, String MIMEContentType){
 		SMTP_HOST_NAME = smtpHostName;
@@ -41,7 +47,7 @@ public class Email{
 			else session = Session.getDefaultInstance(props, auth);
 			
 			//change to true and then print messages using a stream
-			session.setDebug(false);
+			session.setDebug(true);
 
 			// create a message
 			Message msg = new MimeMessage(session);

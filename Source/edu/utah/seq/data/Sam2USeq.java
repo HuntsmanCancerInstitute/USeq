@@ -63,8 +63,6 @@ public class Sam2USeq {
 	private File barDirectory;
 	private File chromDataFile = null;
 
-
-
 	/**For stand alone app.*/
 	public Sam2USeq(String[] args){
 		//start clock
@@ -746,7 +744,7 @@ public class Sam2USeq {
 
 		//stranded and regionFile?
 		if (regionFile !=null){
-			regions = Bed.parseBedFile(regionFile, stranded == false, true);			
+			regions = Bed.parseBedFile(regionFile, stranded == false, false);			
 			histogram = new Histogram(0, 101, 101);
 			//watch out for stranded analysis
 			if (stranded) {
@@ -818,8 +816,11 @@ public class Sam2USeq {
 			//check if data file is present
 			File dataFile = new File (chromDataFile.getParentFile(), cd[i].binaryFile.getName());
 			if (dataFile.exists() == false) Misc.printErrAndExit("Error: cannot find the binary data file for ChromData "+dataFile);
-			cd[i].binaryFile = dataFile;
-			chromDataHash.put(cd[i].chromosome+".", cd[i]);
+			//if (dataFile.exists()){
+				cd[i].binaryFile = dataFile;
+				chromDataHash.put(cd[i].chromosome+".", cd[i]);
+			//}
+			
 		}
 
 		//load counts
