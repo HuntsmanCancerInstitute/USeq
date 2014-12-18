@@ -329,7 +329,7 @@ public class VCFAnnotator {
     	ProcessBuilder pbRefseq = new ProcessBuilder(this.pathToAnnovar,"--geneanno","--buildver","hg19","-dbtype","gene",this.inputname,this.pathToRepository);
     	String il1Refseq = new String("##INFO=<ID=RefSeq,Number=1,Type=String,Description=\"Closest Refseq gene.  If the variant intersects multiple genes, "
     			+ "both will be listed.  If the variant doesn't intersect any gene, the closest upstream and downstream genes are listed with distances.\">");
-    	OutputParser op1Refseq = new OutputParser(new int[]{1},new String[]{"RefSeq"},new String[]{il1Refseq},1,"UNSORTED","variant_function");
+    	OutputParser op1Refseq = new OutputParser(new int[]{1},new String[]{"RefSeq"},new String[]{il1Refseq},2,"UNSORTED","variant_function");
     	OutputParser op2Refseq = new OutputParser("exonic_variant_function");
     	commandMap.get(cmdName).addCommand(pbRefseq);
     	commandMap.get(cmdName).addOutputParser(op1Refseq);
