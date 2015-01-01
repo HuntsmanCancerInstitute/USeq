@@ -38,6 +38,7 @@ public class PairedAlignmentChrParser extends Thread{
 	private boolean complete = false;
 	private boolean started = false;
 	private boolean saveSams = false;
+	private boolean removeDuplicates = false;
 
 	//local counters
 	private int numberAlignments = 0;
@@ -77,6 +78,7 @@ public class PairedAlignmentChrParser extends Thread{
 		maximumAlignmentScore = mpa.getMaximumAlignmentScore();
 		minimumMappingQualityScore = mpa.getMinimumMappingQualityScore();
 		saveSams = mpa.isSaveSams();
+		removeDuplicates = mpa.isRemoveDuplicates();
 	}
 
 	public void run(){
@@ -300,7 +302,7 @@ public class PairedAlignmentChrParser extends Thread{
 		//duplicate?
 		if (sa.isADuplicate()){
 			numberDuplicates++;
-			isGood = false;
+			if (removeDuplicates) isGood = false;
 		}
 
 		//did any fail?
