@@ -30,6 +30,7 @@ public class MergePairedAlignments {
 	private float minimumMappingQualityScore = 13;
 	private boolean secondPairReverseStrand = false;
 	private boolean skipMergingPairs = false;
+	private boolean removeDuplicates = false;
 	private int maximumProperPairDistanceForMerging = 5000;
 	private boolean printPairedStatsAndHistogram = true;
 	private boolean crossCheckMateCoordinates = true;
@@ -297,6 +298,7 @@ public class MergePairedAlignments {
 					case 'm': crossCheckMateCoordinates = false; break;
 					case 'r': secondPairReverseStrand = true; break;
 					case 'k': skipMergingPairs = true; break;
+					case 'u': removeDuplicates = true; break;
 					case 'p': printPairedStatsAndHistogram = false; break;
 					case 'i': maximumProperPairDistanceForMerging = Integer.parseInt(args[++i]); break;
 					case 't': numberConcurrentThreads = Integer.parseInt(args[++i]); break;
@@ -328,6 +330,7 @@ public class MergePairedAlignments {
 		//print info
 		System.out.println(maximumAlignmentScore+ "\tMaximum alignment score (AS).");
 		System.out.println(minimumMappingQualityScore+ "\tMinimum mapping quality score (MQ).");
+		System.out.println(removeDuplicates +"\tRemove all alignments marked duplicate.");
 		System.out.println(secondPairReverseStrand +"\tSecond read pair's strand has been reversed.");
 		System.out.println(crossCheckMateCoordinates +"\tCross check read mate coordinates.");
 		System.out.println(maximumProperPairDistanceForMerging +"\tMaximum bp distance for merging paired alignments.");
@@ -354,6 +357,7 @@ public class MergePairedAlignments {
 				"\nDefault Options:\n"+
 				"-s Save merged xxx.sam.gz alignments instead of binary ChromData. Either can be used\n"+
 				"      in Sam2USeq for read coverage analysis, the ChromData is much faster.\n"+
+				"-u Remove all alignments marked as duplicates, defaults to keeping.\n"+
 				"-a Maximum alignment score (AS:i: tag). Defaults to 240, smaller numbers are more\n" +
 				"      stringent. Approx 30pts per mismatch for novoalignments.\n"+
 				"-q Minimum mapping quality score, defaults to 13, larger numbers are more stringent.\n" +
@@ -414,5 +418,9 @@ public class MergePairedAlignments {
 
 	public boolean isSaveSams() {
 		return saveSams;
+	}
+
+	public boolean isRemoveDuplicates() {
+		return removeDuplicates;
 	}
 }
