@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.regex.Pattern;
 import java.util.regex.Matcher;
 
+import util.gen.IO;
+
 
 public class VCFUtilities {
 
@@ -106,7 +108,7 @@ public class VCFUtilities {
 		int recordCount=0;
 		boolean found = false;
 		try {
-			in = new BufferedReader(new FileReader(vcfFile));
+			in = IO.fetchBufferedReader(vcfFile);
 			while ((line=in.readLine()) != null) {
 				if (line.startsWith("#CHROM")) {
 					found = true;

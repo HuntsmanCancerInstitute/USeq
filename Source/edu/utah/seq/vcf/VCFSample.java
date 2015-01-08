@@ -22,6 +22,8 @@ public class VCFSample {
 	private String alleleCounts = null;
 	private String referenceCounts = null;
     private String alternateCounts = null;
+    private String[] data = null;
+    private String[] format = null;
     private boolean missingQual = false;
 	
 	private static final Pattern PIPE = Pattern.compile("\\|");
@@ -37,8 +39,8 @@ public class VCFSample {
 			noCall = true;
 		}
 		else {
-			String[] data = VCFParser.COLON.split(sample);
-			String[] format = VCFParser.COLON.split(sampleFormat);
+			data = VCFParser.COLON.split(sample);
+			format = VCFParser.COLON.split(sampleFormat);
 			if (data.length != format.length) throw new Exception("Incorrect number of fields in sample -> "+sample+" for indicated format -> "+sampleFormat);
 			//attempt to parse GT, DP, GQ
 			for (int i=0; i< format.length; i++){
@@ -129,5 +131,13 @@ public class VCFSample {
 	
 	public boolean isMissingQual() {
 		return this.missingQual;
+	}
+
+	public String[] getData() {
+		return data;
+	}
+
+	public String[] getFormat() {
+		return format;
 	}
 }
