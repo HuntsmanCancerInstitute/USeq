@@ -1,3 +1,11 @@
+----USeq_8.8.9----
+VCFComparator
+* More modifications to support bed format variant info for somatic key test analysis
+MultiSampleVCFFilter
+* Fixed issue with processing gzipped vcf files when a tabix exe isn't provided
+SomaticSniperVCFParser
+* New app for inserting quality score into QUAL field and option for score filtering
+
 ----USeq_8.8.8----
 VCFComparator
 * Major bug! The filter for selecting vcf variants for those in common regions was inadvertently disabled. Ugg! To findout if your prior analysis as affected, look at the # of pre and post filtered variants these should differ, if not discard! Drat!
