@@ -30,6 +30,7 @@ public class SamAlignmentExtractor {
 	private static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSDHN])");
 	private Gzipper samOut;
 	private HashSet<String> hits = null;
+	private boolean printCoverageStats = false;
 
 	//constructors
 	/**Stand alone.*/
@@ -77,14 +78,14 @@ public class SamAlignmentExtractor {
 			}
 
 			//for each chromosome of gene models
-			System.out.println("\nScanning regions by chromosome... ");
-			System.out.println("RegionCoordinates\t#Alignments");
+			System.out.println("Scanning regions by chromosome... ");
+			if (printCoverageStats) System.out.println("RegionCoordinates\t#Alignments");
 			Iterator<String> it = chromRegions.keySet().iterator();
 			while (it.hasNext()){
 				chromosome = it.next();
 				scanRegions();
 			}
-			System.out.println("\n");
+			if (printCoverageStats) System.out.println();
 			
 			//look for no hits?
 			if (hits != null){
@@ -194,7 +195,7 @@ public class SamAlignmentExtractor {
 					if (numAlignments > maximumReadDepth) continue;
 				}
 				//print em
-				System.out.println(chromosome+"\t"+regions[i].toString()+"\t"+alignments.size());
+				if (printCoverageStats) System.out.println(chromosome+"\t"+regions[i].toString()+"\t"+alignments.size());
 				//strip those already fetched to avoid repeat extraction!
 				ArrayList<String> toPrint = new ArrayList<String>(alignments.size());
 				for (String sam: alignments){
@@ -236,6 +237,7 @@ public class SamAlignmentExtractor {
 					case 'a': bamFiles = IO.extractFiles(args[++i], ".bam"); break;
 					case 'b': bedFile = new File(args[++i]); break;
 					case 's': saveFile = new File(args[++i]); break;
+					case 'p': printCoverageStats = true; break;
 					case 'n': hits = new HashSet<String>(); break;
 					case 'i': minimumReadDepth = Integer.parseInt(args[++i]); break;
 					case 'x': maximumReadDepth = Integer.parseInt(args[++i]); break;
@@ -259,8 +261,9 @@ public class SamAlignmentExtractor {
 		if (bedFile == null || bedFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your bed file?\n");
 		chromRegions = Bed.parseBedFile(bedFile, true, false);
 		
-		//look for bed
-		if (saveFile != null && saveFile.getName().endsWith(".sam") == false) Misc.printErrAndExit("\nError: Your indicated save file doesn't end in .sam !\n");
+		//look for save file, can be null
+		String name = saveFile.getName();
+		if (saveFile != null && (name.endsWith(".sam") == false && name.endsWith(".sam.gz") == false)) Misc.printErrAndExit("\nError: Your indicated save file doesn't end in .sam or .sam.gz!\n");
 
 	}	
 
@@ -281,7 +284,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Sam Alignment Extractor: Nov 2014                     **\n" +
+				"**                            Sam Alignment Extractor: Dec 2014                     **\n" +
 				"**************************************************************************************\n" +
 
 				"Given a bed file containing regions of interest, parses all of the intersecting sam\n" +
@@ -295,6 +298,7 @@ public class SamAlignmentExtractor {
 				"       http://genome.ucsc.edu/FAQ/FAQformat#format1\n"+
 				"-s Optional File for saving extracted alignments, must end in .sam. Defaults to a\n" +
 				"       permutation of the bed file.\n"+
+				"-p Print coverage stats to stdout.\n"+
 				"-i Minimum read depth, defaults to 1\n"+
 				"-x Maximum read depth, defaults to unlimited\n"+
 				"-n Save alignments that don't intersect the regions of interest. Memory intensive!\n"+

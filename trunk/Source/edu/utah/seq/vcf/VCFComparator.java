@@ -189,6 +189,9 @@ public class VCFComparator {
 
 		//intersect and split test into matching and non matching
 		intersectVCF();
+		
+		//printout scores for matches
+		saveMatchingScores();
 
 		//sort by score smallest to largest
 		Arrays.sort(testNonMatchingVCF, new ComparatorVCFRecordScore());
@@ -222,6 +225,26 @@ public class VCFComparator {
 		}
 
 		if (saveDirectory == null) System.out.println("\n"+results);
+	}
+
+	private void saveMatchingScores() {
+		try {
+			if (saveDirectory != null && vcfBedKey == null){
+				File matchingScores = new File (saveDirectory, "matchingQualScores"+Misc.removeExtension(vcfTest.getName())+".txt.gz");
+				Gzipper out = new Gzipper(matchingScores);
+				out.println("#KeyQual\t#TestQual\tKeyCoordinates");
+				for (int i=0; i< testMatchingVCF.length; i++){
+					out.print(testMatchingVCF[i].getKey().getQuality());
+					out.print("\t");
+					out.print(testMatchingVCF[i].getTest().getQuality());
+					out.print("\t");
+					out.println(testMatchingVCF[i].getKey().getChromosome()+":"+testMatchingVCF[i].getKey().getPosition());
+				}
+				out.close();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		} 
 	}
 
 	private int countNumberMatches(float score) {
@@ -514,7 +537,7 @@ public class VCFComparator {
 			//create interval trees
 			createIntervalTreesForBedCalls();
 		}
-		else if (keyParser == null){			
+		else if (keyParser == null && keyBedCalls == null){			
 			keyParser = new VCFParser(vcfKey, true, true, false);
 			if (removeNonPass){				
 				keyParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);

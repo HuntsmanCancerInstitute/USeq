@@ -455,6 +455,7 @@ public class MultiSampleVCFFilter {
 			this.vcfInFile = inputFile;
 		} else if (Pattern.matches(".+?.vcf.gz",inputFile.getName())) {
 			if (pathToTabix != null) vcfInFile = VCFUtilities.unzipTabix(inputFile,pathToTabix);
+			else vcfInFile = inputFile;
 		} else {
 			System.out.println("Input file does not appear to be a XXX.vcf/XXX.vcf.gz file.\n");
 			System.exit(1);
