@@ -653,7 +653,7 @@ public class VCFAnnotator {
 		}
 		
 		if (pathToAnnovarDir == null) {
-			System.out.println("The path to annovar (-d) must be specified. \n");
+			System.out.println("The path to annovar (-p) must be specified. \n");
 			System.exit(1);
 		}
 	

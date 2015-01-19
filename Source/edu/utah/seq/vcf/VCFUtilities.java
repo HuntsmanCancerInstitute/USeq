@@ -87,7 +87,7 @@ public class VCFUtilities {
 			while ((line=in.readLine()) != null) {
 				if (line.startsWith("#CHROM")) {
 					String[] header = line.split("\t");
-					int sampleCount = header.length - 10;
+					int sampleCount = header.length - 9; // <-- Tim stoopid
 					in.close();
 					return sampleCount;
 				}

@@ -72,6 +72,9 @@ public class ParseExonMetrics {
 	private File insertGraph = null;
 	private File errorGraph = null;
 	private File coverageGraph2 = null;
+	
+	//flags
+	private boolean coverageAvailable = true;
 
 	public ParseExonMetrics(String[] args) {
 		this.parseArgs(args);
@@ -155,6 +158,8 @@ public class ParseExonMetrics {
 				}
 			}
 			
+			
+			
 			//this.generateRBarplot(coverage, fraction, "PEM.cov.txt", "Coverage across CCDS Bases", "Depth of Coverage", "Fraction At Given Coverage", coverageGraph, "depth");
 			this.generateRBarplot(coverage, fractionOrGreater, "PEM.cov2.txt", "Coverage across " + this.name, "Depth of Coverage", "Fraction At Given Coverage or Greater", coverageGraph2,"depth");
 			
@@ -189,9 +194,13 @@ public class ParseExonMetrics {
 				values.add(Float.parseFloat(items[1]));
 			}
 			
-			this.meanErrorRate = Float.parseFloat(br.readLine().split("\t")[1]);
+			if (values.size() == 0) {
+				this.coverageAvailable = false;
+			} else {
+				this.generateRBarplot(xaxis, values, ".PEM.error.txt", "Per Base Error Rate (PhiX)", "Position", "Error Rate", errorGraph,"error");
+			}
 			
-			this.generateRBarplot(xaxis, values, ".PEM.error.txt", "Per Base Error Rate (PhiX)", "Position", "Error Rate", errorGraph,"error");
+			this.meanErrorRate = Float.parseFloat(br.readLine().split("\t")[1]);
 			
 			
 			br.close();
@@ -494,6 +503,7 @@ public class ParseExonMetrics {
 			bw.write(String.format("aSingleton\t%d\n",this.singletons));
 			bw.write(String.format("aSingleTonP\t%f\n",this.percentSingletons));
 			bw.write(String.format("aErrorRate\t%f\n",this.meanErrorRate));
+			bw.write(String.format("aCoverageAvailable\t%b",this.coverageAvailable));
 			bw.close();
 			
 		} catch (IOException ioex) {

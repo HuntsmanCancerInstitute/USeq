@@ -47,8 +47,6 @@ public class MergeExonMetrics {
 	private Workbook wb = null;
 	private Sheet sheet1 = null;
 	
-	
-
 	public MergeExonMetrics(String[] args) {
 		if (args.length == 0) {
 			printDocs();
@@ -366,13 +364,21 @@ public class MergeExonMetrics {
 		int currImagesRow = 0;
 		
 		for (int i=0; i<fileList.size();i++) {
+			
 			if (currImagesRow == maxImagesRow ) {
 				cIdx = 0;
 				rIdx += 21;
 				currImagesRow = 0;
 			}
 			
-			createImages(cIdx, rIdx, cIdx+5, rIdx+20,fileList.get(i).get(imageName)); 
+			if (fileList.get(i).containsKey(imageName)) {
+				createImages(cIdx, rIdx, cIdx+5, rIdx+20,fileList.get(i).get(imageName)); 
+			} else {
+				Row r = sheet1.createRow(rIdx);
+				Cell c = r.createCell(cIdx);
+				c.setCellValue("No error rate figure. Possibly due to no PhiX in sample");
+			}
+			
 			
 			cIdx += 6;
 			currImagesRow++;
