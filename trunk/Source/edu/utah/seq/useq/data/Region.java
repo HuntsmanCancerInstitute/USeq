@@ -133,13 +133,13 @@ public class Region implements Comparable<Region>, Serializable {
 					al = new ArrayList<Region>();
 					ss.put(tokens[0], al);
 				}
-				int start = Integer.parseInt(tokens[1]);
-				int stop = Integer.parseInt(tokens[2]);
+				int start = Integer.parseInt(tokens[1]) - subStart;
+				int stop = Integer.parseInt(tokens[2]) - subEnd;
 				if (start > stop) throw new Exception("\nFound a start that is greater than stop!  Cannot parse file "+bedFile+", bad line->\n\t"+line);
-				if (start < 0) throw new Exception("\nFound a start with a negative value!  Cannot parse file "+bedFile+", bad line->\n\t"+line);
+				if (start < 0) start = 0;
 				int length = stop-start;
 				if (length < minSize) continue;
-				al.add(new Region(start-subStart, stop- subEnd));
+				al.add(new Region(start, stop));
 			}
 		}catch (Exception e){
 			e.printStackTrace();

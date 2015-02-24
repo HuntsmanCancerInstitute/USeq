@@ -60,6 +60,29 @@ public class ExonIntron implements Comparable, Serializable {
 		return clones;
 	}
 	
+	/**Returns 0 no overlap, or a positive int for the # bases of overlap.
+	 * Assumes interbase coordinates and both have non zero lengths.*/
+	public static int bpsIntersection(ExonIntron first, ExonIntron second){
+
+		// is other left of this
+		if (first.getEnd() <= second.getStart()) return 0;
+		// is other right of this
+		if (first.getStart() >= second.getEnd() ) return 0;
+		// must overlap
+		//left side
+		if (second.getStart()>=first.getStart() && second.getStart()<first.getEnd() && second.getEnd()> first.getEnd() ) {
+			return first.getEnd() - second.getStart();
+		}
+		//right side
+		if (second.getEnd() > first.getStart() && second.getEnd() <= first.getEnd() && second.getStart() < first.getStart() ) {
+			return second.getEnd()-first.getStart();
+		}
+		//contained within so return smallest size
+		int size = first.getLength();
+		if (second.getLength() < size) size = second.getLength();
+		return size;
+	}
+	
 	/**This just fetches adjacent sequence to the request length.  No expansion into all permutations of downstream exons.
 	 * Use this to build known splice junctions from a transcript.*/
 	public ArrayList<SubSequence> fetch3PrimeSubSeqNoExpand (int numberBases){

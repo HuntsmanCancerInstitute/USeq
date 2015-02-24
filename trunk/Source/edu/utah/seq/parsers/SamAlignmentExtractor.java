@@ -1,4 +1,4 @@
-package edu.utah.seq.base;
+package edu.utah.seq.parsers;
 
 import java.io.*;
 import java.util.regex.*;
@@ -69,7 +69,7 @@ public class SamAlignmentExtractor {
 
 			//make output writer
 			if (saveFile != null) samOut = new Gzipper(saveFile);
-			else samOut = new Gzipper(new File (bedFile.getParentFile(), Misc.removeExtension(bedFile.getName())+".sam.gz"));
+			else samOut = new Gzipper(new File (bedFile.getParentFile(), Misc.removeExtension(bedFile.getName())+"ExtractedAlignments.sam.gz"));
 			
 			//add header from first reader
 			String header = samReaders[0].getFileHeader().getTextHeader();
@@ -262,8 +262,7 @@ public class SamAlignmentExtractor {
 		chromRegions = Bed.parseBedFile(bedFile, true, false);
 		
 		//look for save file, can be null
-		String name = saveFile.getName();
-		if (saveFile != null && (name.endsWith(".sam") == false && name.endsWith(".sam.gz") == false)) Misc.printErrAndExit("\nError: Your indicated save file doesn't end in .sam or .sam.gz!\n");
+		if (saveFile != null && saveFile.getName().endsWith(".sam.gz") == false) Misc.printErrAndExit("\nError: Your indicated save file must end in .sam.gz\n");
 
 	}	
 
@@ -284,7 +283,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Sam Alignment Extractor: Dec 2014                     **\n" +
+				"**                            Sam Alignment Extractor: Feb 2015                     **\n" +
 				"**************************************************************************************\n" +
 
 				"Given a bed file containing regions of interest, parses all of the intersecting sam\n" +
@@ -293,10 +292,10 @@ public class SamAlignmentExtractor {
 				"Options:\n"+
 
 				"-a Alignment directory containing one or more xxx.bam files with their associated\n" +
-				"       xxx.bai indexs sorted by coordinate.\n" +
+				"       xxx.bai indexs sorted by coordinate. Multiple files are merged.\n" +
 				"-b A bed file (chr, start, stop,...), full path, see,\n" +
 				"       http://genome.ucsc.edu/FAQ/FAQformat#format1\n"+
-				"-s Optional File for saving extracted alignments, must end in .sam. Defaults to a\n" +
+				"-s Optional file for saving extracted alignments, must end in .sam.gz Defaults to a\n" +
 				"       permutation of the bed file.\n"+
 				"-p Print coverage stats to stdout.\n"+
 				"-i Minimum read depth, defaults to 1\n"+
@@ -306,8 +305,7 @@ public class SamAlignmentExtractor {
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/SamAlignmentExtractor -a\n" +
-				"      /Data/ExonCaptureAlignmentsX1/ -b /Data/SNPCalls/9484X1Calls.bed.gz -x\n" +
-				"      /Data/9484X1Calls.sam\n\n" +
+				"      /Data/ExonCaptureAlignmentsX1/ -b /Data/SNPCalls/9484X1Calls.bed.gz\n\n" +
 
 		"**************************************************************************************\n");
 

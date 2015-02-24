@@ -281,6 +281,49 @@ public class UCSCGeneLine {
 		}
 		return sb.toString();
 	}
+	
+	/**Assumes correct matching chromosome*/
+	public int bpsExonicIntersection(UCSCGeneLine other){
+		//any chance of intersection?
+		if (this.intersects(other.getTxStart(), other.getTxEnd()) == false) return 0;
+		//ok possibility, compare exons
+		ExonIntron[] otherE = other.getExons();
+		int overlap = 0;
+		for (int i=0; i< exons.length; i++){
+			for (int j=0; j< otherE.length; j++){
+				overlap+= ExonIntron.bpsIntersection(exons[i], otherE[j]);
+			}
+		}
+		return overlap;
+	}
+	
+	public double getLargestFractionExonicBpIntersection(UCSCGeneLine other){
+		//any overlap?
+		double bpOverlap = this.bpsExonicIntersection(other);
+		if (bpOverlap == 0.0) return 0;
+		//yep, find smallest exonic sized gene
+		double minSize = this.getTotalExonicBasePairs();
+		double test = other.getTotalExonicBasePairs();
+		if (test < minSize) minSize = test;
+		//calc frac overlap, 
+		return bpOverlap/minSize;
+	}
+	
+	/**Merges exons, tx and cds start and stop, concats names with , seperator.*/
+	public void mergeWithOtherGene(UCSCGeneLine other){
+		//merge exons
+		ExonIntron[] merged = ExonIntron.merge(getExons(), other.getExons());
+		this.setExons(merged);
+		//reset tx start and stop
+		if (other.txStart < this.txStart) this.txStart = other.txStart;
+		if (other.txEnd > this.txEnd) this.txEnd = other.txEnd;
+		//reset cds start stop
+		if (other.cdsStart < this.cdsStart) this.cdsStart = other.cdsStart;
+		if (other.cdsEnd > this.cdsEnd) this.cdsEnd = other.cdsEnd;
+		//add on gene names
+		if (other.name != null && other.name.length() !=0) this.name = this.name+","+other.name;
+		if (other.displayName != null && other.displayName.length() !=0) this.displayName = this.displayName+","+other.displayName;
+	}
 
 	public String simpleToString(){
 		StringBuffer sb = new StringBuffer();

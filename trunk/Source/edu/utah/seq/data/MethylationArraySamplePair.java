@@ -44,4 +44,12 @@ public class MethylationArraySamplePair{
 			}
 		}
 	}
+
+	public float[] getTreatment() {
+		return treatment;
+	}
+
+	public float[] getControl() {
+		return control;
+	}
 }

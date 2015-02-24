@@ -2,6 +2,7 @@ package util.gen;
 import java.io.*;
 
 import javax.servlet.http.*;
+
 import java.nio.*;
 import java.nio.channels.*;
 import java.util.*;
@@ -10,7 +11,9 @@ import java.util.jar.Manifest;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.*;
+
 import org.apache.tools.bzip2.*;
+
 import java.net.*;
 
 
@@ -224,6 +227,12 @@ public class IO {
 			ioe.printStackTrace();
 		}
 		return false;
+	}
+	
+	/**Returns number of days its been since the file was last modified.*/
+	public static double numberDaysOld(File file){
+		double diff = (double) (new Date().getTime() - file.lastModified());
+		return diff/(24*60*60*1000);
 	}
 
 	/**Converts a String of "grp1=/my/Dir1,grp2=/my/Dir2, etc that contains 

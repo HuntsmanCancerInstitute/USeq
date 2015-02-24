@@ -644,8 +644,8 @@ public class SamTranscriptomeParser{
 		//remove = chromosomes
 		chromLength.remove("=");
 		for (String chromosome: chromLength.keySet()){
-			if (this.chromDict.containsKey(chromosome)) {
-				al.add(this.chromDict.get(chromosome));
+			if (chromDict.containsKey(chromosome)) {
+				al.add(chromDict.get(chromosome));
 			} else {
 				System.out.println(String.format("Expected chromosome: %s was not found in the header, guessing length using sam body",chromosome));
 				int length = chromLength.get(chromosome);

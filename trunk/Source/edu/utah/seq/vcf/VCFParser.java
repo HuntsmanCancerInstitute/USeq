@@ -174,6 +174,53 @@ public class VCFParser {
 			r.correctChrMTs();
 		}
 	}
+	
+	/**Call after initializeParser(). Returns a record or null.  If null also closes the BufferedReader.
+	 * No checking of position or chrom!*/
+	public VCFRecord fetchNext(BufferedReader in) throws Exception{
+		String line = in.readLine(); 
+		if (line == null) {
+			in.close();
+			return null;
+		}
+		VCFRecord vcf = new VCFRecord(line, this, loadSamples, loadInfo);
+		if (!missingQual && vcf.isMissingQual()) missingQual = true;
+		return vcf;
+	}
+	
+	/**Call first if you then want to load a vcf file record by record. Don't forget to close the BufferedReader when done!*/
+	public BufferedReader initializeParser() {
+		BufferedReader in = null;
+		String line = null;
+		try {
+			in  = IO.fetchBufferedReader(vcfFile);
+			ArrayList<String> commentsAL = new ArrayList<String>();
+
+			//find "#CHROM" line and parse sample names
+			while ((line=in.readLine()) != null){
+				//comments
+				if (line.startsWith("#")){
+					commentsAL.add(line);
+					if (line.startsWith("#CHROM")) {
+						String[] header = TAB.split(line);
+						sampleNames = new String[header.length - firstSampleIndex];
+						int index =0;
+						for (int i=firstSampleIndex; i< header.length; i++) sampleNames[index++] = header[i];
+						break;
+					}
+				}
+			}
+			if (sampleNames == null) throw new Exception("\nFailed to find the #CHROM header line.");
+			comments = new VCFComments(commentsAL);
+			return in;
+		}catch (Exception e) {
+			System.err.println("\nAborting, problem parsing vcf file -> "+vcfFile);
+			e.printStackTrace();
+			System.exit(1);
+		} 
+		return null;
+	}
+
 
 	/**Parses a sorted vcf file. Indicate whether you want to load the data and not just parse the header and #CHROM line.*/
 	public void parseVCF() {
