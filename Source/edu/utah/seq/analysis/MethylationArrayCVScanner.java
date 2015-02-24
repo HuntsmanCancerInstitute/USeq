@@ -27,7 +27,7 @@ import edu.utah.seq.useq.apps.Bar2USeq;
 /** Application for looking for changes in methylation array data across a genome.  I've hacked in a non paired analysis on top of the original app.
  * @author Nix
  * */
-public class MethylationArrayScanner {
+public class MethylationArrayCVScanner {
 
 	//fields
 	private int windowSize = 1000;
@@ -81,7 +81,7 @@ public class MethylationArrayScanner {
 
 	//constructor
 
-	public MethylationArrayScanner(String[] args){	
+	public MethylationArrayCVScanner(String[] args){	
 		long startTime = System.currentTimeMillis();
 		//set fields
 		processArgs(args);
@@ -652,7 +652,7 @@ public class MethylationArrayScanner {
 			printDocs();
 			System.exit(0);
 		}
-		new MethylationArrayScanner(args);
+		new MethylationArrayCVScanner(args);
 	}		
 
 	/**This method will process each argument and assign new variables*/

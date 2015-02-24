@@ -83,6 +83,16 @@ public class VCFSample {
 				} else if (format[i].equals("RD")) {
 					this.referenceCounts = data[i];
 				}
+				else if (format[i].equals("DP4")) {
+					//# high-quality ref-forward bases, ref-reverse, alt-forward and alt-reverse bases
+					String[] multiple = data[i].split(",");
+					int rf = Integer.parseInt(multiple[0]);
+					int rr = Integer.parseInt(multiple[1]);
+					int af = Integer.parseInt(multiple[2]);
+					int ar = Integer.parseInt(multiple[3]);
+					referenceCounts = (rf+rr)+"";
+					alternateCounts = (af+ar)+"";
+				}
 			}
 			//not all vcf records have counts! so don't require it
 			/*if (referenceCounts == null || alternateCounts == null) {
@@ -90,6 +100,22 @@ public class VCFSample {
 			}*/
 			
 		}
+	}
+	
+	/**Looks in the Format for the label and returns the Sample value.*/
+	public String getFormatData(String label){
+		for (int i=0; i< format.length; i++){
+			if (format[i].equals(label)) return data[i];
+		}
+		return null;
+	}
+	
+	/**Returns -1 if either ref or alt counts are null.*/
+	public double getAltRatio(){
+		if (referenceCounts == null || alternateCounts == null) return -1;
+		double ref = Double.parseDouble(referenceCounts);
+		double alt = Double.parseDouble(alternateCounts);
+		return alt/(alt+ref);
 	}
 	
 	public String getReferenceCount() {
@@ -139,5 +165,13 @@ public class VCFSample {
 
 	public String[] getFormat() {
 		return format;
+	}
+
+	public void setReferenceCounts(String referenceCounts) {
+		this.referenceCounts = referenceCounts;
+	}
+
+	public void setAlternateCounts(String alternateCounts) {
+		this.alternateCounts = alternateCounts;
 	}
 }

@@ -1173,6 +1173,7 @@ public class ScanSeqs {
 			//for each chromosome
 			for (int i=0; i< smoothingWindowInfo.length; i++){
 				Info info = smoothingWindowInfo[i].getInfo();
+				info.getChromosome();
 				SmoothingWindow[] sm = smoothingWindowInfo[i].getSm();
 				saveSmoothedHeatMapData (0, sm, info, pVal, "#FFFFFF", upDown); //white
 				saveSmoothedHeatMapData (1, sm, info, qValFDR, "#FF0000", upDown); //red
