@@ -372,7 +372,7 @@ public class Misc {
 	/**Prints message to screen, then exits.*/
 	public static void printErrAndExit (String message){
 		System.err.println (message);
-		System.exit(0);
+		System.exit(1);
 	}
 	/**Prints message to screen, then exits.*/
 	public static void printExit (String message){
@@ -565,6 +565,7 @@ public class Misc {
 			for (int j=0; j< len2; j++){
 				System.out.println(array[i][j].toString());
 			}
+			System.out.println();
 		}
 	}
 	
@@ -666,6 +667,38 @@ public class Misc {
 		int len = array.length;
 		for (int i=0; i<len; i++) System.out.print(array[i]+"\t");
 		System.out.println();
+	}
+
+	/**Splits an object[] into chunks containing the minNumEach. Any remainder is evenly distributed over the prior.
+	 * Note this is by reference, the array is not copied. */
+	public static Object[][] chunk (Object[] s, int minNumEach){
+		//watch out for cases where the min can't be met
+		int numChunks = s.length/minNumEach;
+		if (numChunks == 0) return new Object[][]{s};
+		
+		double numLeftOver = (double)s.length % (double)minNumEach;
+		
+		int[] numInEach = new int[numChunks];
+		for (int i=0; i< numChunks; i++) numInEach[i] = minNumEach;
+		
+		while (numLeftOver > 0){
+			for (int i=0; i< numChunks; i++) {
+				numInEach[i]++;
+				numLeftOver--;
+				if (numLeftOver == 0) break;
+			}
+		}
+		//build chunk array
+		Object[][] chunks = new Object[numChunks][];
+		int index = 0;
+		//for each chunk
+		for (int i=0; i< numChunks; i++){
+			//create container and fill it
+			Object[] sub = new Object[numInEach[i]];
+			for (int j=0; j< sub.length; j++) sub[j] = s[index++];
+			chunks[i] = sub;
+		}
+		return chunks;
 	}
 
 

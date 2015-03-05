@@ -18,11 +18,12 @@ import edu.utah.seq.data.Info;
 import edu.utah.seq.data.PointData;
 import edu.utah.seq.data.SmoothingWindow;
 import edu.utah.seq.parsers.BarParser;
+import edu.utah.seq.parsers.PairedAlignmentChrParser;
 import edu.utah.seq.useq.apps.Bar2USeq;
 import edu.utah.seq.useq.data.PositionScore;
 
 
-/** App to detect CNV's in case and tumor-normal datasets.  Wrapps Alun Thomas's algorithm.
+/** App to detect CNV's in normal datasets.  Wraps Alun Thomas's algorithm.
  * @author Nix
  * */
 public class PoisRegCNV {
@@ -37,11 +38,13 @@ public class PoisRegCNV {
 	private int minimumCounts = 20;
 	private int maxAlignmentsDepth = 50000;
 	private File alunRScript = null;
-	private boolean deleteTempFiles = false;
+	private boolean deleteTempFiles = true;
 	private String genomeVersion;
-	private float minimumLog2Ratio = 1;
+	private float minimumLog2Ratio = 0.585f;
 	private float minimumAdjPVal = 0.01f;
-	private int numberChunks = 20;
+	private int minNumInEachChunk = 2000;
+	private int numberConcurrentThreads = 0;
+	private boolean mergeExonCounts = false;
 
 	//internal fields
 	private File graphDirectory;
@@ -54,6 +57,7 @@ public class PoisRegCNV {
 	private String[] geneNamesToAnalyze = null;
 	private Replica[] cases = null;
 	private Replica[] controls = null;
+	private PRDataChunk[] chunkThreads;
 
 	//container for cases and their exons that pass the minimumCounts threshold
 	private GeneExonSample[] ges = null;
@@ -62,9 +66,6 @@ public class PoisRegCNV {
 	private int numberPassingExons = 0;
 
 	//from R
-	private File residualsFile = null;
-	private File obsExpLg2RtosFile = null;
-	private File sigLevelFile = null;
 	private float significanceThreshold;
 
 	//for loading data
@@ -87,8 +88,6 @@ public class PoisRegCNV {
 
 
 	public void run(){
-		//run in non X11 mode
-		System.setProperty("java.awt.headless", "true");
 
 		//load gene models
 		System.out.println("Loading regions/ gene models...");
@@ -100,113 +99,168 @@ public class PoisRegCNV {
 		//write out count table of genes passing minimum counts
 		if (controls != null) writeCountTableMatrix();
 		else {
-			System.out.println("Writing count table and executing cnv analysis in R...");
-			writeCaseCountTable();
-			
-			//execute Alun's RScript
-			executeCaseAnalysisScript();
-			
-			//load results int0 GeneExonSample[]
-			System.out.println("Loading results...");
-			loadCaseAnalysisResults();
-			
+			makeGeneExonSamples();
+
+			chunkGeneExonSamples();
+
+			System.out.println("\nProcessing data chunks...");
+			boolean ok = runThreads();
+			if (ok == false) {
+				System.err.println("\nError processing chunks, check logs and temp files. Aborting.\n");
+				return;
+			}
+			//set sig threshold
+			setSignificanceThreshold();
+
 			//write out graph files for each sample
-			System.out.println("Saving graphs and spreadsheets...");
+			System.out.println("\nSaving graphs and spreadsheets...");
 			exportCaseSampleGraphs();
-			
+
 			//write out spreadsheet
 			exportGeneExonSpreadSheets();
-			
-			System.out.println("\n"+numExonsProcessed+" Processed exons, "+numberPassingExons+" passed thresholds ("+minimumLog2Ratio+" Lg2Rto, "+minimumAdjPVal+" AdjPVal)\n");
+
+			System.out.println("\n"+numExonsProcessed+" Processed exons/genes, "+numberPassingExons+" passed thresholds ("+minimumLog2Ratio+" Lg2Rto, "+minimumAdjPVal+" AdjPVal)\n");
 		}
-		
+
 		//convert graphs to useq format
 		new Bar2USeq(graphDirectory, true);
 	}
 
+	private void setSignificanceThreshold() {
+		float[] sigs = new float[chunkThreads.length];
+		for (int i=0; i< sigs.length; i++) sigs[i] = chunkThreads[i].getSignificanceThreshold();
+		//System.out.println("\nSignificance thresholds for each data chunk:\n"+ Misc.floatArrayToString(sigs, ", "));
+		this.significanceThreshold = Num.mean(sigs);
+
+	}
+
+
+	/**Runs each in its own thread to max threads defined by user. Returns whether all completed without issue.*/
+	private boolean runThreads() {
+		ArrayList<PRDataChunk> waitingJobs = new ArrayList<PRDataChunk>();
+		String old = "";
+		while (true){ 
+			try {
+				//check status
+				int waiting = 0;
+				int running = 0;
+				int complete = 0;
+				int error = 0;
+				waitingJobs.clear();
+				for (PRDataChunk c: chunkThreads) {
+					int status = c.getStatus();
+					if (status == 0) waitingJobs.add(c);
+					else if (status == 1) running++;
+					else if (status == 2) complete++;
+					else error++;
+				}
+				waiting = waitingJobs.size();
+				String currentStatus = "\tW:"+waiting+" R:"+running+" C:"+complete+" E:"+error;
+				if (currentStatus.equals(old) == false) {
+					System.out.println(currentStatus);
+					old = currentStatus;
+				}
+
+				//all complete?
+				if (waiting == 0 && running == 0) return (error == 0);
+				//start jobs?
+				if (waiting !=0){
+					int toStart = numberConcurrentThreads - running;
+					if (toStart > waiting) toStart = waiting;
+					for (int i=0; i< toStart; i++) waitingJobs.get(i).start();
+				}
+				
+				//sleep 2 seconds
+				Thread.sleep(4000);
+			} catch (InterruptedException ie) {
+				ie.printStackTrace();
+				return false;
+			}
+		}
+	}
+
 	private void exportGeneExonSpreadSheets() {
 		try {
-		//collect all samples by gene
-		String currGeneName = ges[0].getGene().getDisplayName();
-		ArrayList<GeneExonSample> al = new ArrayList<GeneExonSample>();
-		al.add(ges[0]);
-		
-		Gzipper outAll = new Gzipper(new File(saveDirectory, "resultsAll.xls.gz"));
-		Gzipper outPass = new Gzipper(new File(saveDirectory, "resultsPass.xls.gz"));
-		
-		//print headers
-		String gn = "Gene Name";
-		if (ges[0].getGene().getName() != null) gn = gn+"\tDescription";
-		StringBuilder sb = new StringBuilder(gn+"\tExon Coordinates\tExon Index\tIGB Link\tIGV Link\tPassing Samples");
-		for (int i=0; i< cases.length; i++){
-			String name = cases[i].getNameNumber();
-			sb.append("\t"+name+" Lg2(Ob/Ex)\t"+name+" Res\t"+name+" Counts");
-		}
-		sb.append("\tLog2Rto "+minimumLog2Ratio);
-		sb.append("\tResidual "+minimumAdjPVal+" sig threshold +/- "+significanceThreshold);
-		
-		outAll.println(sb);
-		outPass.println(sb);
-		
-		for (int i=1; i< ges.length; i++){
-			String nextName = ges[i].getGene().getDisplayNameThenName();
-			if (nextName.equals(currGeneName) == false){
-				printGeneSamples(outAll, outPass, al);
-				currGeneName = nextName;
-				al.clear();
+			//collect all samples by gene
+			String currGeneName = ges[0].getGene().getDisplayName();
+			ArrayList<GeneExonSample> al = new ArrayList<GeneExonSample>();
+			al.add(ges[0]);
+
+			Gzipper outAll = new Gzipper(new File(saveDirectory, "resultsAll.xls.gz"));
+			Gzipper outPass = new Gzipper(new File(saveDirectory, "resultsPass.xls.gz"));
+
+			//print headers
+			String gn = "Gene Name";
+			if (ges[0].getGene().getName() != null) gn = gn+"\tDescription";
+			StringBuilder sb = new StringBuilder(gn+"\tCoordinates\tExon Index\tIGB Link\tIGV Link\tPassing Samples");
+			for (int i=0; i< cases.length; i++){
+				String name = cases[i].getNameNumber();
+				sb.append("\t"+name+" Lg2(Ob/Ex)\t"+name+" Res\t"+name+" Counts");
 			}
-			al.add(ges[i]);
-		}
-		
-		outAll.close();
-		outPass.close();
+			sb.append("\tLog2Rto "+minimumLog2Ratio);
+			sb.append("\tResidual "+minimumAdjPVal+" sig threshold +/- "+significanceThreshold);
+
+			outAll.println(sb);
+			outPass.println(sb);
+
+			for (int i=1; i< ges.length; i++){
+				String nextName = ges[i].getGene().getDisplayNameThenName();
+				if (nextName.equals(currGeneName) == false){
+					printGeneSamples(outAll, outPass, al);
+					currGeneName = nextName;
+					al.clear();
+				}
+				al.add(ges[i]);
+			}
+
+			outAll.close();
+			outPass.close();
 		} catch (Exception e){
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError printing spreadsheets.\n");
 		}
 	}
 
-
 	private void printGeneSamples(Gzipper outAll, Gzipper outPass, ArrayList<GeneExonSample> al) throws IOException {
-		//print geneName, exon coordinates, exon index, igb, igv, passsingSampleNames, sample1_Lg2Rt, sample1_Res, sample1_counts, sample2_.....
+		//print geneName, coordinates, exon index, igb, igv, passsingSampleNames, sample1_Lg2Rt, sample1_Res, sample1_counts, sample2_.....
 		GeneExonSample g = al.get(0);
 		int exonIndex = g.getExonIndex();
-		
+
 		StringBuilder sb = new StringBuilder (fetchGeneInfo(g));
 		//any samples that pass?
 		String passingSamples = exonPassThresholds(exonIndex, al);
 		if (passingSamples != null) sb.append (passingSamples+"\t");
 		else sb.append("\t");
-		
+
 		//add first sample
 		sb.append(g.getDataString());
-		
+
 		//for each subsequent sample
 		for (int i=1; i< al.size(); i++){
 			GeneExonSample t = al.get(i);
-			
+
 			//different exon index?
 			if (t.getExonIndex() != exonIndex){
 				//print out old
 				outAll.println(sb);
 				if (passingSamples != null) outPass.println(sb);
-				
+
 				//reset for new
 				exonIndex = t.getExonIndex();
 				sb = new StringBuilder (fetchGeneInfo(t));
 				passingSamples = exonPassThresholds(exonIndex, al);
 				if (passingSamples != null) sb.append (passingSamples);
 			}
-			
+
 			sb.append("\t");
 			sb.append(t.getDataString());
 		}
-		
+
 		//print last
 		outAll.println(sb);
 		if (passingSamples != null) outPass.println(sb);
 	}
-	
+
 	/**Returns null if no sample exon passes filters, otherwise comma delimited sample name list of those that pass.*/
 	public String exonPassThresholds(int exonIndex, ArrayList<GeneExonSample> al){
 		ArrayList<String> sampPass = new ArrayList<String>();
@@ -223,7 +277,7 @@ public class PoisRegCNV {
 		}
 		return null;
 	}
-	
+
 	public String fetchGeneInfo(GeneExonSample g){
 		UCSCGeneLine gene = g.getGene();
 		ExonIntron[] exons = gene.getExons();
@@ -236,28 +290,41 @@ public class PoisRegCNV {
 		//exon coordinates
 		sb.append(chr);
 		sb.append(":");
-		sb.append(exons[exonIndex].getStartStopString()); sb.append("\t");
+		int start;
+		int stop;
+		if (mergeExonCounts) {
+			start = gene.getTxStart();
+			stop = gene.getTxEnd();
+		}
+		else {
+			start = exons[exonIndex].getStart();
+			stop = exons[exonIndex].getEnd();
+		}
+		sb.append(start);
+		sb.append("-");
+		sb.append(stop);
+		sb.append("\t");
 		//exon index
 		sb.append(exonIndex); sb.append("\t");
 		//igb link
-		sb.append(fetchIGBLink(chr, exons[exonIndex])); sb.append("\t");
+		sb.append(fetchIGBLink(chr, start, stop)); sb.append("\t");
 		//igv link
-		sb.append(fetchIGVLink(chr, exons[exonIndex])); sb.append("\t");
-		
+		sb.append(fetchIGVLink(chr, start, stop)); sb.append("\t");
+
 		return sb.toString();
 	}
 
-	public static String fetchIGVLink(String chr, ExonIntron exon){
-		int start = exon.getStart()-5000;
+	public static String fetchIGVLink(String chr, int begin, int stop){
+		int start = begin-5000;
 		if (start < 0) start = 0;
-		int end = exon.getEnd()+5000;
+		int end = stop+5000;
 		return "=HYPERLINK(\"http://localhost:60151/goto?locus="+chr+":"+start+ "-" + end+"\",\"IGV\")";
 	}
-	
-	public String fetchIGBLink(String chr, ExonIntron exon){
-		int start = exon.getStart()-5000;
+
+	public String fetchIGBLink(String chr, int begin, int stop){
+		int start = begin-5000;
 		if (start < 0) start = 0;
-		int end = exon.getEnd()+5000;
+		int end = stop+5000;
 		return "=HYPERLINK(\"http://localhost:7085/UnibrowControl?version="+genomeVersion+"&seqid="+chr+"&start="+start+"&end="+end+ "\",\"IGB\")";
 	}
 
@@ -265,7 +332,6 @@ public class PoisRegCNV {
 		if (Math.abs(g.getObsExpLgRto()) < minimumLog2Ratio || Math.abs(g.getResidual()) < significanceThreshold ) return false;
 		return true;
 	}
-
 
 	private void exportCaseSampleGraphs() {
 		//split ges by sample
@@ -281,15 +347,34 @@ public class PoisRegCNV {
 		File rtoDir = new File (graphDirectory, "ObsExpLog2Rto");
 		rtoDir.mkdir();
 		
+		double[] cv = new double[cases.length];
+		
 		//for each write files
 		for (int i=0; i< sampleGES.length; i++){
 			//make sample specific dirs
 			File resSampDir = new File (resDir, "res_"+cases[i].getNameNumber());
 			resSampDir.mkdir();
-			File rtoSampDir = new File (rtoDir, "eo_"+cases[i].getNameNumber());
+			File rtoSampDir = new File (rtoDir, "oe_"+cases[i].getNameNumber());
 			rtoSampDir.mkdir();
 			saveGraphs(cases[i].getNameNumber(), sampleGES[i], resSampDir, rtoSampDir);
+			//calc CVs
+			cv[i] = calculateResidualCV (sampleGES[i]);
 		}
+		
+		double meanCV = Num.mean(cv);
+		System.out.println("\nCoefficient of variation for sample residuals:\n\tMean\t"+meanCV);
+		for (int i=0; i< sampleGES.length; i++){
+			System.out.println(caseSampleFileNames[i]+"\t"+cv[i]);
+		}
+		
+	}
+
+	private double calculateResidualCV(GeneExonSample[] ges) {
+		float[] residuals = new float[ges.length];
+		for (int i=0; i< ges.length; i++) residuals[i] = ges[i].getResidual();
+		double mean = Num.mean(residuals);
+		double std = Num.standardDeviation(residuals, mean);
+		return std/mean;
 	}
 
 
@@ -299,9 +384,21 @@ public class PoisRegCNV {
 		ArrayList<SmoothingWindow> smAL = new ArrayList<SmoothingWindow>();
 		for (int i=0; i< ges.length; i++){
 			//make an sm
-			ExonIntron exon = ges[i].getGene().getExons()[ges[i].getExonIndex()];
-			SmoothingWindow sm = new SmoothingWindow(exon.getStart(), exon.getEnd(), new float[]{ges[i].getResidual(), ges[i].getObsExpLgRto()});
-			
+			int start;
+			int stop;
+			UCSCGeneLine gene = ges[i].getGene();
+			if (mergeExonCounts){
+				start = gene.getTxStart();
+				stop = gene.getTxEnd();
+			}
+			else {
+				ExonIntron exon = gene.getExons()[ges[i].getExonIndex()];
+				start = exon.getStart();
+				stop = exon.getEnd();
+			}
+
+			SmoothingWindow sm = new SmoothingWindow(start, stop, new float[]{ges[i].getResidual(), ges[i].getObsExpLgRto()});
+
 			//diff chrom?
 			if (ges[i].getGene().getChrom().equals(currChr) == false) {
 				//diff chrom, write out old
@@ -310,12 +407,12 @@ public class PoisRegCNV {
 				smAL.toArray(sms);
 				saveStairStepGraph(0, sms, info, resDir, "#FF0000", true); //red
 				saveStairStepGraph(1, sms, info, rtoDir, "#FFFF00", true); //yellow
-				
+
 				//reset and set new
 				currChr = ges[i].getGene().getChrom();
 				smAL.clear();
 			}
-			
+
 			smAL.add(sm);
 		}
 		//process last!
@@ -325,7 +422,7 @@ public class PoisRegCNV {
 		saveStairStepGraph(0, sms, info, resDir, "#FF0000", true); //red
 		saveStairStepGraph(1, sms, info, rtoDir, "#FFFF00", true); //yellow
 	}
-	
+
 	/**Saves bar heatmap/ stairstep graph files*/
 	public void saveStairStepGraph (int scoreIndex, SmoothingWindow[] sm, Info info, File dir, String color, boolean posNeg){
 		//add info to hashmap for writing to bar file
@@ -352,106 +449,41 @@ public class PoisRegCNV {
 		pd.nullPositionScoreArrays();
 	}
 
-
-
-	private void loadCaseAnalysisResults() {
-		//load data
-		float[] residuals = Num.loadFloats(residualsFile);
-		float[] obsExpRtos = Num.loadFloats(obsExpLg2RtosFile);
-		float[] sigLevelArray = Num.loadFloats(sigLevelFile);
-		//check
-		if (residuals == null || residuals.length != ges.length || obsExpRtos == null || obsExpRtos.length != ges.length || sigLevelArray == null || sigLevelArray.length !=1){
-			Misc.printErrAndExit("\nError: cannot load appropriate data from R results, check logs.\n");
-		}
-		//load em
-		for (int i=0; i< ges.length; i++){
-			ges[i].setResidual(residuals[i]);
-			ges[i].setObsExpLgRto(obsExpRtos[i]);
-		}
-		significanceThreshold = sigLevelArray[0];
-		
-		//clean up
-		if (deleteTempFiles){
-			residualsFile.deleteOnExit();
-			obsExpLg2RtosFile.deleteOnExit();
-			sigLevelFile.deleteOnExit();
-		}
-	}
-
-
-	private void executeCaseAnalysisScript() {
-		try {
-			//make R script
-			StringBuilder sb = new StringBuilder();
-			sb.append("source('"+ alunRScript+ "')\n");
-			sb.append("x = readdata('"+countTableFile+"',3,3)\n");
-			sb.append("x = fitmodel(x)\n");
-			sb.append("exportCNVData(x, '"+saveDirectory +"', testsig="+minimumAdjPVal+" )\n");
-
-			//write script to file
-			File scriptFile = new File (saveDirectory,"cnv_RScript.R");
-			File rOut = new File(saveDirectory, "cnv_RScript.Rout");
-			IO.writeString(sb.toString(), scriptFile);
-
-			//make command
-			String[] command = new String[] {
-					fullPathToR.getCanonicalPath(),
-					"CMD",
-					"BATCH",
-					"--no-save",
-					"--no-restore",
-					scriptFile.getCanonicalPath(),
-					rOut.getCanonicalPath()};
-
-			//execute command
-			IO.executeCommandLine(command);
-
-			//look for results files
-			residualsFile = new File (saveDirectory, "residuals.txt");
-			obsExpLg2RtosFile = new File (saveDirectory, "obsExpLg2Rtos.txt");
-			sigLevelFile = new File (saveDirectory, "sigLevel.txt");
-			if (residualsFile.exists() == false || obsExpLg2RtosFile.exists() == false || sigLevelFile.exists() == false){
-				Misc.printErrAndExit("\nError: cannot find the R results files? Check the cnv_RScript.Rout log file for errors.\n");
-			}
-
-			//cleanup
-			if (deleteTempFiles) {
-				countTableFile.deleteOnExit();
-				rOut.deleteOnExit();
-				scriptFile.deleteOnExit();
-			}
-
-		} catch (IOException e) {
-			e.printStackTrace();
-			Misc.printErrAndExit("Error: failed to execute case only cnv analysis in R.\n");
-		}
-
-
-	}
-
-
 	private void loadSamples(){
 
 		//load cases
 		System.out.println("\nLoading case samples...");
-		cases = new Replica[caseSampleFileNames.length];
-		String[] shortNames = new String[cases.length];
-		for (int i=0; i< caseSampleFileNames.length; i++){
-			File bam = new File(bamDirectory, caseSampleFileNames[i]);
-			String name = Misc.removeExtension(caseSampleFileNames[i]);
-			shortNames[i] = name;
-			cases[i] = new Replica(name, bam);
-			System.out.print("\t"+caseSampleFileNames[i]);
-			loadReplica(cases[i]);
-			System.out.println("\t"+cases[i].getTotalCounts());
+		//serialized version present?
+		File serCases = new File (saveDirectory, "cases.ser");
+		File serGenes = new File (saveDirectory, "genes.ser");
+		if (serCases.exists() && serGenes.exists()) {
+			cases = (Replica[]) IO.fetchObject(serCases);
+			System.out.println("\tWARNING: loading case count data from prior run.  Delete "+serCases+" and restart to load from alignment files.");
+			if (cases.length != caseSampleFileNames.length) Misc.printErrAndExit("\nError: the number of cases and case file names differ.  Delete "+serCases+" and restart.\n");
+			geneNamesWithMinimumCounts = (LinkedHashSet<String>) IO.fetchObject(serGenes);
 		}
-		shortNames = Misc.trimCommon(shortNames);
-		for (int i=0; i< cases.length; i++) cases[i].setNameNumber(shortNames[i]);
+		else {
+			cases = new Replica[caseSampleFileNames.length];
+			String[] shortNames = new String[cases.length];
+			for (int i=0; i< caseSampleFileNames.length; i++){
+				File bam = new File(bamDirectory, caseSampleFileNames[i]);
+				String name = Misc.removeExtension(caseSampleFileNames[i]);
+				shortNames[i] = name;
+				cases[i] = new Replica(name, bam);
+				System.out.print("\t"+caseSampleFileNames[i]);
+				loadReplica(cases[i]);
+				System.out.println("\t"+cases[i].getTotalCounts());
+			}
+			shortNames = Misc.trimCommon(shortNames);
+			for (int i=0; i< cases.length; i++) cases[i].setNameNumber(shortNames[i]);
+			IO.saveObject(serCases, cases);
+			IO.saveObject(serGenes, geneNamesWithMinimumCounts);
+		}
 
 		//load controls
 		if (controlSampleFileNames != null){
 			System.out.println("Loading control samples...");
-			shortNames = new String[controls.length];
+			String[]  shortNames = new String[controls.length];
 			controls = new Replica[this.controlSampleFileNames.length];
 			for (int i=0; i< controlSampleFileNames.length; i++){
 				File bam = new File(bamDirectory, controlSampleFileNames[i]);
@@ -515,7 +547,6 @@ public class PoisRegCNV {
 			}
 		}
 	}
-
 
 	/**Fetches an old or makes a new Integer to represent the sam read name (e.g. fragment name)*/
 	public NameInteger fetchFragmentNameIndex(SAMRecord sam){
@@ -738,7 +769,7 @@ public class PoisRegCNV {
 					for (int j=0; j<caseExonCounts.length; j++) total += caseExonCounts[j][i];
 					if (total < minimumCounts) continue;
 					numExonsProcessed++;
-					
+
 					//for each sample
 					for (int j=0; j<caseExonCounts.length; j++){
 						GeneExonSample g = new GeneExonSample(gene, globalExonIndex-1, (short)i, (short)j, caseExonCounts[j][i]);
@@ -756,77 +787,107 @@ public class PoisRegCNV {
 			Misc.printErrAndExit("\nProblem writing out count table.");
 		}
 	}
-	
+
 	public void chunkGeneExonSamples(){
 		//group by global exon index
 		ArrayList<GeneExonSample>[] byGlobal = new ArrayList[numExonsProcessed];
-		//for ()
-		for (int i=0; i< ges.length; i++){
-			
+		for (int i=0; i< numExonsProcessed; i++) byGlobal[i] = new ArrayList<GeneExonSample>();
+		for (int i=0; i< ges.length; i++) byGlobal[ges[i].getGlobalExonIndex()].add(ges[i]);
+
+		//randomize
+		//Misc.randomize(byGlobal, 0l);
+
+		//chunk
+		ArrayList<GeneExonSample>[][] chunks = chunk(byGlobal, minNumInEachChunk);
+
+		//make objects to run on independant threads
+		chunkThreads = new PRDataChunk[chunks.length];
+		for (int i=0; i< chunks.length; i++){
+			chunkThreads[i] = new PRDataChunk("batch"+i, chunks[i], this);
 		}
 	}
+
+	/**Splits an object[] into chunks containing the minNumEach. Any remainder is evenly distributed over the prior.
+	 * Note this is by reference, the array is not copied. */
+	public static ArrayList<GeneExonSample>[][] chunk (ArrayList<GeneExonSample>[] s, int minNumEach){
+		//watch out for cases where the min can't be met
+		int numChunks = s.length/minNumEach;
+		if (numChunks == 0) return new ArrayList[][]{s};
+
+		double numLeftOver = (double)s.length % (double)minNumEach;
+
+		int[] numInEach = new int[numChunks];
+		for (int i=0; i< numChunks; i++) numInEach[i] = minNumEach;
+
+		while (numLeftOver > 0){
+			for (int i=0; i< numChunks; i++) {
+				numInEach[i]++;
+				numLeftOver--;
+				if (numLeftOver == 0) break;
+			}
+		}
+		//build chunk array
+		ArrayList<GeneExonSample>[][] chunks = new ArrayList[numChunks][];
+		int index = 0;
+		//for each chunk
+		for (int i=0; i< numChunks; i++){
+			//create container and fill it
+			ArrayList<GeneExonSample>[] sub = new ArrayList[numInEach[i]];
+			for (int j=0; j< sub.length; j++) sub[j] = s[index++];
+			chunks[i] = sub;
+		}
+		return chunks;
+	}
+
+
+
+
+
 
 
 	/**Just for cases*/
-	public void writeCaseCountTable(){
-		countTableFile = new File(saveDirectory, "countTable.txt");
+	public void makeGeneExonSamples(){
+		//start counter for all exons to match Alun's code, starts with 1
+		int globalExonIndex = 1;
+		ArrayList<GeneExonSample> gesAL = new ArrayList<GeneExonSample>();
 
-		try {
-			PrintWriter out = new PrintWriter( new FileWriter(countTableFile));
-
-			//start counter for all exons to match Alun's code, starts with 1
-			int globalExonIndex = 1;
-			ArrayList<GeneExonSample> gesAL = new ArrayList<GeneExonSample>();
-
-			//for genes with minimal counts 
-			for (String geneName: geneNamesToAnalyze){
-				UCSCGeneLine gene = name2Gene.get(geneName);
-				int numExons = gene.getExons().length;
-
-				//collect exon counts int[sample][exon]
-				int[][] caseExonCounts = fetchExonCounts(geneName, numExons, cases);
-
-				//for each exon
-				for (int i=0; i< numExons; i++){
-
-					//count total for this exon across all the cases, skip if too few
-					int total = 0;
-					for (int j=0; j<caseExonCounts.length; j++) total += caseExonCounts[j][i];
-					if (total < minimumCounts) continue;
-					numExonsProcessed++;
-					
-					//for each sample
-					StringBuilder sb = new StringBuilder(); 
-					for (int j=0; j<caseExonCounts.length; j++){
-						//add exon index, 1 based, global
-						sb.append(globalExonIndex);  
-						sb.append("\t"); 
-						//add sample index, 1 based
-						sb.append(j+1);
-						sb.append("\t");
-						//add counts
-						sb.append(caseExonCounts[j][i]);
-						sb.append("\n");
-						//save GES
-						GeneExonSample g = new GeneExonSample(gene, globalExonIndex-1, (short)i, (short)j, caseExonCounts[j][i]);
-						gesAL.add(g);
-					}
-					out.print(sb);
-					globalExonIndex++;
-				}
+		//for genes with minimal counts 
+		for (String geneName: geneNamesToAnalyze){
+			UCSCGeneLine gene = name2Gene.get(geneName);
+			//merging exon counts?
+			int numExons;
+			int[][] caseExonCounts;
+			if (mergeExonCounts){
+				numExons = 1;
+				caseExonCounts = fetchMergedExonCounts(geneName, cases);
 			}
-			out.close();
-			//save GES
-			ges = new GeneExonSample[gesAL.size()];
-			gesAL.toArray(ges);
+			else {
+				numExons = gene.getExons().length;
+				caseExonCounts = fetchExonCounts(geneName, numExons, cases);
+			}
+
+			//for each exon
+			for (int i=0; i< numExons; i++){
+				//count total for this exon across all the cases, skip if too few
+				int total = 0;
+				for (int j=0; j<caseExonCounts.length; j++) total += caseExonCounts[j][i];
+				if (total < minimumCounts) continue;
+				numExonsProcessed++;
+				//for each sample
+				for (int j=0; j<caseExonCounts.length; j++){
+					GeneExonSample g = new GeneExonSample(gene, globalExonIndex-1, (short)i, (short)j, caseExonCounts[j][i]);
+					gesAL.add(g);
+				}
+				globalExonIndex++;
+			}
 		}
-		catch (Exception e){
-			e.printStackTrace();
-			Misc.printErrAndExit("\nProblem writing out count table.");
-		}
+		//save GES
+		ges = new GeneExonSample[gesAL.size()];
+		gesAL.toArray(ges);
 	}
 
-	
+
+	/**For case controls*/
 	public void writeCountTableMatrix(){
 		countTableFile = new File(saveDirectory, "countTable.txt");
 
@@ -886,6 +947,8 @@ public class PoisRegCNV {
 		}
 	}
 
+
+
 	private int[][] fetchExonCounts(String geneName, int numExons, Replica[] samples) {
 		int[][] exonCounts = new int[samples.length][];
 		int[] zero = new int[numExons];
@@ -893,6 +956,18 @@ public class PoisRegCNV {
 			GeneCount gc = samples[i].getGeneCounts().get(geneName);
 			if (gc == null) exonCounts[i] = zero;
 			else exonCounts[i] = gc.getExonCounts();
+		}
+		return exonCounts;
+	}
+
+	/**Returns total gene count.*/
+	private int[][] fetchMergedExonCounts(String geneName, Replica[] samples) {
+		int[][] exonCounts = new int[samples.length][];
+		int[] zero = new int[1];
+		for (int i=0; i< samples.length; i++){
+			GeneCount gc = samples[i].getGeneCounts().get(geneName);
+			if (gc == null) exonCounts[i] = zero;
+			else exonCounts[i] = new int[]{gc.getCount()};
 		}
 		return exonCounts;
 	}
@@ -942,8 +1017,13 @@ public class PoisRegCNV {
 					case 'a': alunRScript = new File(args[++i]); break;
 					case 'u': refSeqFile = new File(args[++i]); break;
 					case 'g': genomeVersion = args[++i]; break;
+					case 'w': mergeExonCounts = true; break;
+					case 'm': minNumInEachChunk = Integer.parseInt(args[++i]); break;
 					case 'e': minimumCounts = Integer.parseInt(args[++i]); break;
 					case 'x': maxAlignmentsDepth = Integer.parseInt(args[++i]); break;
+					case 'l': minimumLog2Ratio = Float.parseFloat(args[++i]); break;
+					case 'p': minimumAdjPVal = Float.parseFloat(args[++i]); break;
+					case 't': numberConcurrentThreads = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -1000,17 +1080,25 @@ public class PoisRegCNV {
 			Misc.printErrAndExit("\nError: Cannot find or read Alun's RScript? -> "+alunRScript+"\n");
 		}
 
+		//number of threads to use?
+		
+		if (numberConcurrentThreads == 0) {
+			numberConcurrentThreads = Runtime.getRuntime().availableProcessors();
+
+		}
+
+
 	}	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              Pois Reg CNV:   Feb 2015                            **\n" +
+				"**                              Pois Reg CNV:   March 2015                          **\n" +
 				"**************************************************************************************\n" +
-				"Uses poisson regression and Pearson residuals to identify exons whose counts differ\n"+
-				"significantly from the fitted value base on all the exon sample counts. This app wraps\n"+
-				"an algorithm developed by Alun Thomas.  Data tracks are generated for the residuals\n"+
-				"and log2(observed/ fitted counts) as well as detailed spreadsheets.\n"+
+				"Uses poisson regression and Pearson residuals to identify exons or genes whose counts\n"+
+				"differ significantly from the fitted value base on all the exon sample counts. This\n"+
+				"app wraps an algorithm developed by Alun Thomas.  Data tracks are generated for the\n"+
+				"residuals and log2(observed/ fitted counts) as well as detailed spreadsheets.\n"+
 
 				"\nRequired Options:\n"+
 				"-s Save directory.\n"+
@@ -1019,21 +1107,23 @@ public class PoisRegCNV {
 				"       http://genome.ucsc.edu/cgi-bin/hgTables, (uniqueName1 name2(optional) chrom\n" +
 				"       strand txStart txEnd cdsStart cdsEnd exonCount (commaDelimited)exonStarts\n" +
 				"       (commaDelimited)exonEnds). Example: ENSG00000183888 C1orf64 chr1 + 16203317\n" +
-				"       16207889 16203385 16205428 2 16203317,16205000 16203467,16207889 . NOTE:\n" +
-				"       this table should contain only ONE composite transcript per gene (e.g. use\n" +
-				"       Ensembl genes NOT transcripts). Use the MergeUCSCGeneTable app to collapse\n" +
-				"       transcripts. See http://useq.sourceforge.net/usageRNASeq.html for details.\n"+
+				"       16207889 16203385 16205428 2 16203317,16205000 16203467,16207889\n"+
 				"-a Alun Thomas R script file.\n"+
 				"-g Genome Version  (ie H_sapiens_Mar_2006), see UCSC Browser,\n"+
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
 
 				"\nDefault Options:\n"+
-				"-c BAM file names for cases to process, comma delimited, no spaces, defaults to all.\n"+
+				"-c BAM file names for samples to process, comma delimited, no spaces, defaults to all.\n"+
 				"-r Full path to R, defaults to /usr/bin/R\n"+
+				"-l Minimum log2(obs/exp) for inclusion in the pass spreadsheet, defaults to 0.585\n"+
+				"-p Minimum adjusted p-value for inclusion in the pass spreadsheet, defaults to 0.01\n"+
 				"-e Minimum all sample exon count for inclusion in analysis, defaults to 20.\n"+
 				"-x Max per sample exon alignment depth, defaults to 50000. Exons containing higher\n"+
 				"       densities are ignored.\n"+
-				
+				"-t Number concurrent threads to run, defaults to the max available to the jvm.\n"+
+				"-m Minimum number exons per data chunk, defaults to 2000.\n"+
+				"-w Examine whole gene counts for copy number variation, defaults to exons.\n"+
+
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/PoisRegCNV -s PRCnvResults/ \n" +
@@ -1041,5 +1131,40 @@ public class PoisRegCNV {
 
 				"**************************************************************************************\n");
 
+	}
+
+
+	public File getSaveDirectory() {
+		return saveDirectory;
+	}
+
+
+	public boolean isDeleteTempFiles() {
+		return deleteTempFiles;
+	}
+
+
+	public File getFullPathToR() {
+		return fullPathToR;
+	}
+
+
+	public File getAlunRScript() {
+		return alunRScript;
+	}
+
+
+	public float getMinimumLog2Ratio() {
+		return minimumLog2Ratio;
+	}
+
+
+	public float getMinimumAdjPVal() {
+		return minimumAdjPVal;
+	}
+
+
+	public int getNumExonsProcessed() {
+		return numExonsProcessed;
 	}
 }
