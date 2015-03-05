@@ -213,7 +213,7 @@ public class MergeOverlappingGenes {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'u': ucscGeneFiles = IO.extractFiles(args[++i]); break;
+					case 'u': ucscGeneFiles = IO.extractFiles(new File (args[++i])); break;
 					case 'r': resultsFile = new File (args[++i]); break;
 					case 'm': minimumFractionOverlap = Double.parseDouble(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);

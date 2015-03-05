@@ -760,7 +760,7 @@ public class MethylationArrayScanner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Methylation Array Scanner: May 2014                       **\n" +
+				"**                        Methylation Array Scanner: March 2014                     **\n" +
 				"**************************************************************************************\n" +
 				"MAS takes paired or non-paired sample PointData representing beta values (0-1) from\n" +
 				"arrays and scores regions with enriched/ reduced signal using a sliding window\n" +
