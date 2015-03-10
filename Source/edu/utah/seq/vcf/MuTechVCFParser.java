@@ -78,13 +78,33 @@ public class MuTechVCFParser {
 		int numFail = 0;
 		int numPass = 0;
 		//write out header
-		for (String h : parser.getStringComments()) out.println(h);
+		boolean flipSamples = false;
+		for (String h : parser.getStringComments()) {
+			//look for #CHROM line
+			if (h.startsWith("#CHROM")) {
+				if (h.contains("\tNORMAL\tTUMOR") == false){
+					flipSamples = true;
+					h = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNORMAL\tTUMOR";
+				}
+			}
+			out.println(h);
+		}
 		VCFRecord[] records = parser.getVcfRecords();
 		for (VCFRecord vcf: records){
 			if (vcf.getFilter().equals(VCFRecord.FAIL)) numFail++;
 			else {
 				numPass++;
-				out.println(vcf.getOriginalRecord());
+				String orig = vcf.getOriginalRecord();
+				String[] fields = VCFParser.TAB.split(orig);
+				//reset ID
+				fields[2] = "MuTech"+numPass;
+				//flip samples so it is Normal Tumor
+				if (flipSamples){
+					String flip = fields[10];
+					fields[10] = fields[9];
+					fields[9] = flip;
+				}
+				out.println(Misc.stringArrayToString(fields, "\t"));
 			}
 		}
 		out.close();
@@ -142,7 +162,8 @@ public class MuTechVCFParser {
 				"**                               MuTech VCF Parser: Jan 2015                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses MuTech VCF files, filtering for minimum tumor normal read depth, difference\n" +
-				"in alt allelic ratios, and normal alt allelic fraction.\n"+
+				"in alt allelic ratios, and normal alt allelic fraction. NOTE, sample order is switched\n"+
+				"in output to normal tumor.\n"+
 
 				"\nRequired Options:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).\n" +

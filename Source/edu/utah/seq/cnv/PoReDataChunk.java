@@ -10,11 +10,11 @@ import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
-public class PRDataChunk extends Thread{
+public class PoReDataChunk extends Thread{
 
 	//fields
 	private GeneExonSample[] exonSample;
-	private PoisRegCNV poisRegCNV;
+	private PoReCNV poisRegCNV;
 	private float significanceThreshold;
 	private String name;
 	
@@ -30,7 +30,7 @@ public class PRDataChunk extends Thread{
 	private File sigLevelFile;
 	
 	//constructor
-	public PRDataChunk (String name, ArrayList<GeneExonSample>[] s, PoisRegCNV poisRegCNV){
+	public PoReDataChunk (String name, ArrayList<GeneExonSample>[] s, PoReCNV poisRegCNV){
 		//get total counts
 		int num = 0;
 		for (int i=0; i< s.length; i++) num+= s[i].size();
@@ -118,6 +118,7 @@ public class PRDataChunk extends Thread{
 			e.printStackTrace();
 			System.err.println("Error: failed to execute case only cnv analysis in R for "+name+"\n");
 			status = 3;
+			System.exit(1);
 		}
 	}
 

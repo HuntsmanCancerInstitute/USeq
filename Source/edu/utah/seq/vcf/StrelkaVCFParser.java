@@ -53,8 +53,9 @@ public class StrelkaVCFParser {
 		try {
 			VCFParser parser = new VCFParser (vcf);
 			if (parser.getSampleNames()[1].equals("TUMOR") == false) Misc.printErrAndExit("Error: TUMOR doesn't appear to be the second sample in the VCF file?! "+vcf.getName());
+			int counter = 1;
 			for (VCFRecord r: parser.getVcfRecords()){
-//System.out.println("\n"+r.getOriginalRecord());				
+//System.out.println("\n"+r.getOriginalRecord());		
 				VCFSample[] normTum = r.getSample();
 				//check depth
 				int normDepth = normTum[0].getReadDepthDP();
@@ -117,6 +118,8 @@ public class StrelkaVCFParser {
 				String[] fields = VCFParser.TAB.split(orig);
 				//reset score
 				fields[5] = Integer.toString((int)vcf.getQuality());
+				//reset ID
+				fields[2] = "Strelka"+numPass;
 				out.println(Misc.stringArrayToString(fields, "\t"));
 			}
 		}
@@ -167,13 +170,12 @@ public class StrelkaVCFParser {
 		tot[2] = IO.extractFiles(forExtraction,".vcf.zip");
 		vcfFiles = IO.collapseFileArray(tot);
 		if (vcfFiles == null || vcfFiles.length ==0 || vcfFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.vcf(.zip/.gz OK) file(s)!\n");
-
 	}	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Strelka VCF Parser: Jan 2015                  **\n" +
+				"**                             Strelka VCF Parser: March 2015                       **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL files, replacing the QUAl score with the QSI score. Also \n"+
 				"filters for minimum tumor normal read depth, difference in alt allelic ratios, and on\n"+
@@ -185,9 +187,10 @@ public class StrelkaVCFParser {
 				"-a Minimum alignment depth for both tumor and normal samples, defaults to 0.\n"+
 				"-r Minimum absolute difference in alt allelic ratios, defaults to 0.\n"+
 				"-n Maximum normal alt allelic fraction, defaults to 1.\n"+
+				"-s Sample names for tumor and normal, comma delimited no spaces.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -a 15\n"+
-				"      -r 0.25 -n 0.02\n\n" +
+				"      -r 0.25 -n 0.02 -s tumor7,normal7 \n\n" +
 
 
 				"**************************************************************************************\n");
