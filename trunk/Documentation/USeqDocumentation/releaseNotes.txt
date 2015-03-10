@@ -1,3 +1,8 @@
+----USeq_8.9.0----
+MethylationArrayScanner
+* Added option to generate coefficient of variation bar files for both visualization and analysis.  Use them in second run to find windows with significant extra variation. Note, use the PermFDR, not the Wilcoxon since the latter needs many data points.
+
+
 ----USeq_8.8.9----
 FilterIntersectingRegions
 * Added a max gap option and support for splitting ucsc ref flat files.

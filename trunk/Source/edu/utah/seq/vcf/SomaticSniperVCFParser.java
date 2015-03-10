@@ -95,6 +95,8 @@ public class SomaticSniperVCFParser {
 				numPass++;
 				String orig = vcf.toString();
 				String[] fields = VCFParser.TAB.split(orig);
+				//reset ID
+				fields[2] = "SomSni"+numPass;
 				//reset score
 				fields[5] = Integer.toString((int)vcf.getQuality());
 				out.println(Misc.stringArrayToString(fields, "\t"));

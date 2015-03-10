@@ -9,6 +9,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import edu.utah.seq.useq.data.RegionScoreText;
@@ -100,6 +102,7 @@ public class VCFParser {
 	public static final Pattern COLON = Pattern.compile(":");
 	public static final Pattern COMMA = Pattern.compile(",");
 	public static final Pattern SLASH = Pattern.compile("/");
+	public static final Pattern ID = Pattern.compile(".+=<ID=(\\w+),.+");
 	private ArrayList<String> badVcfRecords = new ArrayList<String>();
 	private HashMap<String, VCFLookUp> chromosomeVCFRecords = null;
 	private boolean loadRecords = true;
@@ -319,6 +322,65 @@ public class VCFParser {
 				in.close();
 			} catch (IOException e) {}
 		}
+	}
+	
+	/**Merges headers eliminating duplicate lines.  Does a bad ID name collision checking, silently keeps first one.*/
+	public static String[] mergeHeaders(VCFParser[] parsers) {
+		LinkedHashSet<String> other = new LinkedHashSet<String>();
+		LinkedHashSet<String> contig = new LinkedHashSet<String>();
+		LinkedHashSet<String> info = new LinkedHashSet<String>();
+		LinkedHashSet<String> filter = new LinkedHashSet<String>();
+		LinkedHashSet<String> format = new LinkedHashSet<String>();
+		
+		//for each header line, load hash
+		for (VCFParser p : parsers){
+			String[] header = p.getStringComments();
+			for (String h: header){
+				if (h.startsWith("##contig") && contig.contains(h) == false) contig.add(h);
+				else if (h.startsWith("##INFO") && info.contains(h) == false) info.add(h);
+				else if (h.startsWith("##FILTER") && filter.contains(h) == false) filter.add(h);
+				else if (h.startsWith("##FORMAT") && format.contains(h) == false) format.add(h);
+				else if (other.contains(h) == false) other.add(h);
+			}
+		}
+		//remove ID dups from contig, filter, format, info
+		ArrayList<String> contigAL = mergeHeaderIds(contig);
+		ArrayList<String> filterAL = mergeHeaderIds(filter);
+		ArrayList<String> formatAL = mergeHeaderIds(format);
+		ArrayList<String> infoAL = mergeHeaderIds(info);
+		
+		int num = other.size();
+		num+= contigAL.size();
+		num+= infoAL.size();
+		num+= filterAL.size();
+		num+= formatAL.size();
+		
+		String[] merge = new String[num];
+		int counter = 0;
+		for (String s : other) merge[counter++] = s;
+		for (String s : contigAL) merge[counter++] = s;
+		for (String s : filterAL) merge[counter++] = s;
+		for (String s : infoAL) merge[counter++] = s;
+		for (String s : formatAL) merge[counter++] = s;
+		return merge;
+	}
+	
+	/*Parses ID, keeps first one if dups found.*/
+	private static ArrayList<String> mergeHeaderIds(LinkedHashSet<String> comments){
+		ArrayList<String> toReturn = new ArrayList<String>();
+		HashSet<String> ids = new HashSet<String>();
+		//hash on =<ID=xxxx, if collision keeps first one
+		for (String s : comments){
+			Matcher mat = ID.matcher(s);
+			if (mat.matches()){
+				if (ids.contains(mat.group(1)) == false){
+					toReturn.add(s);
+					ids.add(mat.group(1));
+				}
+			}
+			else Misc.printErrAndExit("\nError: failed to find a match to '<ID=xxxx,' in this  VCF header line:\n"+s+"\n");
+		}
+		return toReturn;
 	}
 
 	public double calculateTiTvRatio(){

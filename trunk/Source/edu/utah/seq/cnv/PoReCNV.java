@@ -3,7 +3,6 @@ package edu.utah.seq.cnv;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
-
 import htsjdk.samtools.*;
 import util.bio.annotation.ExonIntron;
 import util.bio.parsers.*;
@@ -18,15 +17,13 @@ import edu.utah.seq.data.Info;
 import edu.utah.seq.data.PointData;
 import edu.utah.seq.data.SmoothingWindow;
 import edu.utah.seq.parsers.BarParser;
-import edu.utah.seq.parsers.PairedAlignmentChrParser;
 import edu.utah.seq.useq.apps.Bar2USeq;
-import edu.utah.seq.useq.data.PositionScore;
 
 
 /** App to detect CNV's in normal datasets.  Wraps Alun Thomas's algorithm.
  * @author Nix
  * */
-public class PoisRegCNV {
+public class PoReCNV {
 
 	//user defined fields
 	private File saveDirectory;
@@ -42,9 +39,10 @@ public class PoisRegCNV {
 	private String genomeVersion;
 	private float minimumLog2Ratio = 0.585f;
 	private float minimumAdjPVal = 0.01f;
-	private int minNumInEachChunk = 2000;
+	private int minNumInEachChunk = 1500;
 	private int numberConcurrentThreads = 0;
 	private boolean mergeExonCounts = false;
+	private String annoType = "Exon";
 
 	//internal fields
 	private File graphDirectory;
@@ -57,13 +55,14 @@ public class PoisRegCNV {
 	private String[] geneNamesToAnalyze = null;
 	private Replica[] cases = null;
 	private Replica[] controls = null;
-	private PRDataChunk[] chunkThreads;
+	private PoReDataChunk[] chunkThreads;
 
 	//container for cases and their exons that pass the minimumCounts threshold
 	private GeneExonSample[] ges = null;
 	private File countTableFile;
 	private int numExonsProcessed = 0;
 	private int numberPassingExons = 0;
+	private int[] passingExonsByCase = null;
 
 	//from R
 	private float significanceThreshold;
@@ -75,7 +74,7 @@ public class PoisRegCNV {
 
 	//constructors
 	/**Stand alone.*/
-	public PoisRegCNV(String[] args){	
+	public PoReCNV(String[] args){	
 		long startTime = System.currentTimeMillis();
 		//set fields
 		processArgs(args);
@@ -114,12 +113,12 @@ public class PoisRegCNV {
 
 			//write out graph files for each sample
 			System.out.println("\nSaving graphs and spreadsheets...");
+			exportGeneExonSpreadSheets();
 			exportCaseSampleGraphs();
 
-			//write out spreadsheet
-			exportGeneExonSpreadSheets();
+			
 
-			System.out.println("\n"+numExonsProcessed+" Processed exons/genes, "+numberPassingExons+" passed thresholds ("+minimumLog2Ratio+" Lg2Rto, "+minimumAdjPVal+" AdjPVal)\n");
+			System.out.println("\n"+numExonsProcessed+" "+annoType+"s processed, "+numberPassingExons+" passed thresholds ("+minimumLog2Ratio+" Lg2Rto, "+minimumAdjPVal+" AdjPVal)\n");
 		}
 
 		//convert graphs to useq format
@@ -137,7 +136,7 @@ public class PoisRegCNV {
 
 	/**Runs each in its own thread to max threads defined by user. Returns whether all completed without issue.*/
 	private boolean runThreads() {
-		ArrayList<PRDataChunk> waitingJobs = new ArrayList<PRDataChunk>();
+		ArrayList<PoReDataChunk> waitingJobs = new ArrayList<PoReDataChunk>();
 		String old = "";
 		while (true){ 
 			try {
@@ -147,7 +146,7 @@ public class PoisRegCNV {
 				int complete = 0;
 				int error = 0;
 				waitingJobs.clear();
-				for (PRDataChunk c: chunkThreads) {
+				for (PoReDataChunk c: chunkThreads) {
 					int status = c.getStatus();
 					if (status == 0) waitingJobs.add(c);
 					else if (status == 1) running++;
@@ -167,7 +166,14 @@ public class PoisRegCNV {
 				if (waiting !=0){
 					int toStart = numberConcurrentThreads - running;
 					if (toStart > waiting) toStart = waiting;
-					for (int i=0; i< toStart; i++) waitingJobs.get(i).start();
+					if (toStart >0){
+						for (int i=0; i< toStart; i++) {
+							PoReDataChunk c = waitingJobs.get(i);
+							if (c.isAlive() == false && c.isInterrupted() == false) c.start();
+							else System.out.println("\nWARNING, already started ("+c.isAlive()+
+									") or interrupted ("+c.isInterrupted()+"). Skipping -> "+c.getRealName()+"\n");
+						}
+					}
 				}
 				
 				//sleep 2 seconds
@@ -181,13 +187,12 @@ public class PoisRegCNV {
 
 	private void exportGeneExonSpreadSheets() {
 		try {
-			//collect all samples by gene
 			String currGeneName = ges[0].getGene().getDisplayName();
 			ArrayList<GeneExonSample> al = new ArrayList<GeneExonSample>();
 			al.add(ges[0]);
 
-			Gzipper outAll = new Gzipper(new File(saveDirectory, "resultsAll.xls.gz"));
-			Gzipper outPass = new Gzipper(new File(saveDirectory, "resultsPass.xls.gz"));
+			Gzipper outAll = new Gzipper(new File(saveDirectory, "results"+annoType+"All.xls.gz"));
+			Gzipper outPass = new Gzipper(new File(saveDirectory, "results"+annoType+"Pass.xls.gz"));
 
 			//print headers
 			String gn = "Gene Name";
@@ -268,7 +273,10 @@ public class PoisRegCNV {
 			GeneExonSample g = al.get(i);
 			//correct index?
 			if (g.getExonIndex() == exonIndex){
-				if (passesThresholds(g)) sampPass.add(cases[g.getSampleIndex()].getNameNumber());
+				if (passesThresholds(g)) {
+					sampPass.add(cases[g.getSampleIndex()].getNameNumber());
+					passingExonsByCase[g.getSampleIndex()]++;
+				}
 			}
 		}
 		if (sampPass.size() !=0) {
@@ -342,14 +350,15 @@ public class PoisRegCNV {
 		//make dirs
 		graphDirectory = new File (saveDirectory, "DataTracks");
 		graphDirectory.mkdir();
-		File resDir = new File (graphDirectory, "Residual");
+		File resDir = new File (graphDirectory, annoType+"Residual");
 		resDir.mkdir();
-		File rtoDir = new File (graphDirectory, "ObsExpLog2Rto");
+		File rtoDir = new File (graphDirectory, annoType+"ObsExpLog2Rto");
 		rtoDir.mkdir();
 		
-		double[] cv = new double[cases.length];
+		//double[] cv = new double[cases.length];
 		
 		//for each write files
+		System.out.println("\nResidual stats:\nDataset\t"+annoType+"sPass\tMean\tMedian\tStdDev\tMin\tMax\t10th\t90th");
 		for (int i=0; i< sampleGES.length; i++){
 			//make sample specific dirs
 			File resSampDir = new File (resDir, "res_"+cases[i].getNameNumber());
@@ -357,15 +366,18 @@ public class PoisRegCNV {
 			File rtoSampDir = new File (rtoDir, "oe_"+cases[i].getNameNumber());
 			rtoSampDir.mkdir();
 			saveGraphs(cases[i].getNameNumber(), sampleGES[i], resSampDir, rtoSampDir);
-			//calc CVs
-			cv[i] = calculateResidualCV (sampleGES[i]);
+			//calc residual stats
+			float[] res = getResiduals(sampleGES[i]);
+			Arrays.sort(res);
+			String stats = Num.statFloatArray(res);
+			System.out.println(caseSampleFileNames[i]+ "\t"+passingExonsByCase[i]+ "\t"+ stats);
 		}
 		
-		double meanCV = Num.mean(cv);
-		System.out.println("\nCoefficient of variation for sample residuals:\n\tMean\t"+meanCV);
-		for (int i=0; i< sampleGES.length; i++){
-			System.out.println(caseSampleFileNames[i]+"\t"+cv[i]);
-		}
+		//double meanCV = Num.mean(cv);
+		//System.out.println("\nCoefficient of variation for sample residuals:\n\tMean\t"+meanCV);
+		//for (int i=0; i< sampleGES.length; i++){
+			//System.out.println(caseSampleFileNames[i]+"\t"+cv[i]);
+		//}
 		
 	}
 
@@ -375,6 +387,12 @@ public class PoisRegCNV {
 		double mean = Num.mean(residuals);
 		double std = Num.standardDeviation(residuals, mean);
 		return std/mean;
+	}
+	
+	private float[] getResiduals(GeneExonSample[] ges) {
+		float[] residuals = new float[ges.length];
+		for (int i=0; i< ges.length; i++) residuals[i] = ges[i].getResidual();
+		return residuals;
 	}
 
 
@@ -795,15 +813,15 @@ public class PoisRegCNV {
 		for (int i=0; i< ges.length; i++) byGlobal[ges[i].getGlobalExonIndex()].add(ges[i]);
 
 		//randomize
-		//Misc.randomize(byGlobal, 0l);
+		Misc.randomize(byGlobal, 0l);
 
 		//chunk
 		ArrayList<GeneExonSample>[][] chunks = chunk(byGlobal, minNumInEachChunk);
 
 		//make objects to run on independant threads
-		chunkThreads = new PRDataChunk[chunks.length];
+		chunkThreads = new PoReDataChunk[chunks.length];
 		for (int i=0; i< chunks.length; i++){
-			chunkThreads[i] = new PRDataChunk("batch"+i, chunks[i], this);
+			chunkThreads[i] = new PoReDataChunk("batch"+i, chunks[i], this);
 		}
 	}
 
@@ -838,12 +856,6 @@ public class PoisRegCNV {
 		}
 		return chunks;
 	}
-
-
-
-
-
-
 
 	/**Just for cases*/
 	public void makeGeneExonSamples(){
@@ -995,7 +1007,7 @@ public class PoisRegCNV {
 			printDocs();
 			System.exit(0);
 		}
-		new PoisRegCNV(args);
+		new PoReCNV(args);
 	}		
 
 	/**This method will process each argument and assign new variables*/
@@ -1017,7 +1029,7 @@ public class PoisRegCNV {
 					case 'a': alunRScript = new File(args[++i]); break;
 					case 'u': refSeqFile = new File(args[++i]); break;
 					case 'g': genomeVersion = args[++i]; break;
-					case 'w': mergeExonCounts = true; break;
+					case 'w': mergeExonCounts = true; annoType = "Gene"; break;
 					case 'm': minNumInEachChunk = Integer.parseInt(args[++i]); break;
 					case 'e': minimumCounts = Integer.parseInt(args[++i]); break;
 					case 'x': maxAlignmentsDepth = Integer.parseInt(args[++i]); break;
@@ -1056,6 +1068,7 @@ public class PoisRegCNV {
 				if (bam.exists() == false) Misc.printErrAndExit("Error: cannot find the "+caseSampleFileNames[i]+" in the bam directory?!\n");
 			}
 		}
+		passingExonsByCase = new int[caseSampleFileNames.length];
 
 		//check controls
 		if (controlSampleFileNames != null){
@@ -1075,30 +1088,47 @@ public class PoisRegCNV {
 		if (fullPathToR == null || fullPathToR.canExecute()== false) {
 			Misc.printErrAndExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
 		}
-
+		//find Alun's script
 		if (alunRScript == null || alunRScript.canRead()== false) {
 			Misc.printErrAndExit("\nError: Cannot find or read Alun's RScript? -> "+alunRScript+"\n");
 		}
 
 		//number of threads to use?
-		
 		if (numberConcurrentThreads == 0) {
 			numberConcurrentThreads = Runtime.getRuntime().availableProcessors();
-
 		}
-
+		
+		printParams();
 
 	}	
+	
+	public void printParams(){
+		StringBuilder sb = new StringBuilder("Run parameters:\n");
+		sb.append("Results dir\t"); sb.append(saveDirectory); sb.append("\n");
+		sb.append("Bam dir    \t"); sb.append(bamDirectory); sb.append("\n");
+		sb.append("Annotation \t"); sb.append(refSeqFile); sb.append("\n");
+		sb.append("RScript    \t"); sb.append(alunRScript); sb.append("\n");
+		sb.append("Genome build\t"); sb.append(genomeVersion); sb.append("\n");
+		sb.append("Anno type\t"); sb.append(annoType); sb.append("\n");
+		sb.append("Min counts\t"); sb.append(minimumCounts); sb.append("\n");
+		sb.append("Max counts\t"); sb.append(maxAlignmentsDepth); sb.append("\n");
+		sb.append("Min log2Rto\t"); sb.append(minimumLog2Ratio); sb.append("\n");
+		sb.append("Max adjPVal\t"); sb.append(minimumAdjPVal); sb.append("\n");
+		sb.append("Num per batch\t"); sb.append(minNumInEachChunk); sb.append("\n");
+		sb.append("Num threads\t"); sb.append(numberConcurrentThreads); sb.append("\n");
+		System.out.println(sb);
+	}
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              Pois Reg CNV:   March 2015                          **\n" +
+				"**                              Po Re CNV:   March 2015                             **\n" +
 				"**************************************************************************************\n" +
 				"Uses poisson regression and Pearson residuals to identify exons or genes whose counts\n"+
 				"differ significantly from the fitted value base on all the exon sample counts. This\n"+
 				"app wraps an algorithm developed by Alun Thomas.  Data tracks are generated for the\n"+
-				"residuals and log2(observed/ fitted counts) as well as detailed spreadsheets.\n"+
+				"residuals and log2(observed/ fitted counts) as well as detailed spreadsheets. Use for\n"+
+				"identifying CNVs in next gen seq datasets with > 10 normal samples.\n"+
 
 				"\nRequired Options:\n"+
 				"-s Save directory.\n"+
@@ -1116,18 +1146,18 @@ public class PoisRegCNV {
 				"-c BAM file names for samples to process, comma delimited, no spaces, defaults to all.\n"+
 				"-r Full path to R, defaults to /usr/bin/R\n"+
 				"-l Minimum log2(obs/exp) for inclusion in the pass spreadsheet, defaults to 0.585\n"+
-				"-p Minimum adjusted p-value for inclusion in the pass spreadsheet, defaults to 0.01\n"+
+				"-p Maximum adjusted p-value for inclusion in the pass spreadsheet, defaults to 0.01\n"+
 				"-e Minimum all sample exon count for inclusion in analysis, defaults to 20.\n"+
 				"-x Max per sample exon alignment depth, defaults to 50000. Exons containing higher\n"+
-				"       densities are ignored.\n"+
+				"       counts are ignored.\n"+
 				"-t Number concurrent threads to run, defaults to the max available to the jvm.\n"+
-				"-m Minimum number exons per data chunk, defaults to 2000.\n"+
-				"-w Examine whole gene counts for copy number variation, defaults to exons.\n"+
+				"-m Minimum number exons per data chunk, defaults to 1500.\n"+
+				"-w Examine whole gene counts for CNVs, defaults to exons.\n"+
 
 				"\n"+
 
-				"Example: java -Xmx4G -jar pathTo/USeq/Apps/PoisRegCNV -s PRCnvResults/ \n" +
-				"      -b BamFiles -u hg19EnsGenes.ucsc.gz -a RBambedSource.R  -g H_sapiens_Feb_2009\n\n" +
+				"Example: java -Xmx4G -jar pathTo/USeq/Apps/PoReCNV -s PRCnvResults/  -b BamFiles\n"+
+				"       -u hg19EnsGenes.ucsc.gz -a RBambedSource.R  -g H_sapiens_Feb_2009\n\n" +
 
 				"**************************************************************************************\n");
 
