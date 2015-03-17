@@ -159,7 +159,7 @@ public class MuTechVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               MuTech VCF Parser: Jan 2015                        **\n" +
+				"**                               MuTech VCF Parser: March 2015                      **\n" +
 				"**************************************************************************************\n" +
 				"Parses MuTech VCF files, filtering for minimum tumor normal read depth, difference\n" +
 				"in alt allelic ratios, and normal alt allelic fraction. NOTE, sample order is switched\n"+

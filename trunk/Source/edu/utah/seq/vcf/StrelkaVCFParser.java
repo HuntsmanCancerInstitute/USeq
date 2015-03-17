@@ -187,7 +187,6 @@ public class StrelkaVCFParser {
 				"-a Minimum alignment depth for both tumor and normal samples, defaults to 0.\n"+
 				"-r Minimum absolute difference in alt allelic ratios, defaults to 0.\n"+
 				"-n Maximum normal alt allelic fraction, defaults to 1.\n"+
-				"-s Sample names for tumor and normal, comma delimited no spaces.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -a 15\n"+
 				"      -r 0.25 -n 0.02 -s tumor7,normal7 \n\n" +

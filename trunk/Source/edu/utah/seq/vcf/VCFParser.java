@@ -102,7 +102,7 @@ public class VCFParser {
 	public static final Pattern COLON = Pattern.compile(":");
 	public static final Pattern COMMA = Pattern.compile(",");
 	public static final Pattern SLASH = Pattern.compile("/");
-	public static final Pattern ID = Pattern.compile(".+=<ID=(\\w+),.+");
+	public static final Pattern ID = Pattern.compile(".+=<ID=([/.\\w]+),.+");
 	private ArrayList<String> badVcfRecords = new ArrayList<String>();
 	private HashMap<String, VCFLookUp> chromosomeVCFRecords = null;
 	private boolean loadRecords = true;
@@ -324,23 +324,40 @@ public class VCFParser {
 		}
 	}
 	
-	/**Merges headers eliminating duplicate lines.  Does a bad ID name collision checking, silently keeps first one.*/
+	/**Merges headers eliminating duplicate lines.  Does a bad ID name collision checking, silently keeps first one.
+	 * Returns null if CHROM lines differ. */
 	public static String[] mergeHeaders(VCFParser[] parsers) {
 		LinkedHashSet<String> other = new LinkedHashSet<String>();
 		LinkedHashSet<String> contig = new LinkedHashSet<String>();
 		LinkedHashSet<String> info = new LinkedHashSet<String>();
 		LinkedHashSet<String> filter = new LinkedHashSet<String>();
 		LinkedHashSet<String> format = new LinkedHashSet<String>();
+		String chromLine = null;
 		
 		//for each header line, load hash
 		for (VCFParser p : parsers){
 			String[] header = p.getStringComments();
 			for (String h: header){
-				if (h.startsWith("##contig") && contig.contains(h) == false) contig.add(h);
-				else if (h.startsWith("##INFO") && info.contains(h) == false) info.add(h);
-				else if (h.startsWith("##FILTER") && filter.contains(h) == false) filter.add(h);
-				else if (h.startsWith("##FORMAT") && format.contains(h) == false) format.add(h);
-				else if (other.contains(h) == false) other.add(h);
+				h=h.trim();
+				if (h.startsWith("##contig")){
+					if (contig.contains(h) == false) contig.add(h);
+				}
+				else if (h.startsWith("##INFO")){
+					if (info.contains(h) == false) info.add(h);
+				}
+				else if (h.startsWith("##FILTER")){
+					if (filter.contains(h) == false) filter.add(h);
+				}
+				else if (h.startsWith("##FORMAT")){
+					if (format.contains(h) == false) format.add(h);
+				}
+				else if (h.startsWith("#CHROM")) {
+					if (chromLine == null) chromLine = h;
+					else if (chromLine.equals(h) == false) return null;
+				}
+				else if (other.contains(h) == false) {
+					other.add(h);
+				}
 			}
 		}
 		//remove ID dups from contig, filter, format, info
@@ -348,12 +365,13 @@ public class VCFParser {
 		ArrayList<String> filterAL = mergeHeaderIds(filter);
 		ArrayList<String> formatAL = mergeHeaderIds(format);
 		ArrayList<String> infoAL = mergeHeaderIds(info);
-		
+
 		int num = other.size();
 		num+= contigAL.size();
 		num+= infoAL.size();
 		num+= filterAL.size();
 		num+= formatAL.size();
+		if (chromLine != null) num++;
 		
 		String[] merge = new String[num];
 		int counter = 0;
@@ -362,6 +380,10 @@ public class VCFParser {
 		for (String s : filterAL) merge[counter++] = s;
 		for (String s : infoAL) merge[counter++] = s;
 		for (String s : formatAL) merge[counter++] = s;
+		if (chromLine != null) merge[num-1] = chromLine;
+		
+		//Misc.printArray(merge);
+		
 		return merge;
 	}
 	
