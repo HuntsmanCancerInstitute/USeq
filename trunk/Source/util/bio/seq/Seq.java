@@ -108,7 +108,8 @@ public class Seq {
 		for (int i=0; i< seqQual.length(); i++){
 			String sub = seqQual.substring(i, i+1);
 			Integer val = asci2FastQScore.get(sub);
-			if (val == null || val > 41) {
+			//if (val == null || val > 41) { //allowing it to return higher values due to recalibration!
+			if (val == null) {
 				System.err.println("\nError converting seq quality character -> "+sub+" from "+seqQual);
 				return null;
 			}
