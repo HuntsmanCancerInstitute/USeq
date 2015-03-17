@@ -1,7 +1,16 @@
+----USeq_8.9.1----
+CollectBamStats
+* Fixed an issue with setting thresholds for flagging datasets. 
+MergePairedAlignments
+* Fixed an issue when merging bam files with recalibrated base scores. GATK is boosting their base score values past spec.
+
 ----USeq_8.9.0----
 MethylationArrayScanner
 * Added option to generate coefficient of variation bar files for both visualization and analysis.  Use them in second run to find windows with significant extra variation. Note, use the PermFDR, not the Wilcoxon since the latter needs many data points.
-
+VCFMerger
+* New app for merging VCF files with same sample names into one.  Hashes header to collapse. Those with the same ID are also dropped. Will not work with downstream apps that cannot process mixed INFO and FORMAT records.
+MuTechVCFParser
+* Reversing the parsed output Tumor Normal columns for compatibility with SomaticSniper and Strelka
 
 ----USeq_8.8.9----
 FilterIntersectingRegions

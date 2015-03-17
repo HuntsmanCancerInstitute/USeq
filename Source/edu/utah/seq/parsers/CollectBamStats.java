@@ -59,14 +59,14 @@ public class CollectBamStats {
 	private int duplicateIndex;
 	private int passAllFiltersIndex;
 	private int overlappingBasesIndex;
-	private float maximumUnmapped;
-	private float maximumDuplicate;
-	private float minimumPassAll;
-	private float maximumOverlappingBases;
+	private float maximumUnmapped = 0.01f;
+	private float maximumDuplicate = 0.15f;
+	private float minimumPassAll = 0.8f;
+	private float maximumOverlappingBases = 0.1f;
 
 	//read coverage
-	private int coverageThreshold;
-	private float minimumCoverage;
+	private int coverageThreshold = 10;
+	private float minimumCoverage = 0.95f;
 
 	//constructors
 	public CollectBamStats(String[] args){
@@ -175,7 +175,7 @@ public class CollectBamStats {
 				"Duplicate",
 				"Passing all filters",
 				"Overlapping bases",
-				"Exonic Coverage"
+				"Median Exonic BP Cov"
 		};
 
 		//indexes for the scores;
@@ -183,17 +183,6 @@ public class CollectBamStats {
 		duplicateIndex = 6;
 		passAllFiltersIndex = 7;
 		overlappingBasesIndex = 8;
-
-		//thresholds for alignment stats
-		maximumUnmapped = 0.01f;
-		maximumDuplicate = 0.15f;
-		minimumPassAll = 0.8f;
-		maximumOverlappingBases = 0.1f;
-
-		//read coverage thresholds
-		coverageThreshold = 10;
-		minimumCoverage = 0.95f;
-
 	}
 
 
@@ -522,7 +511,7 @@ BaseCoverage	ObservedBasesWithGivenCoverage	FractionObserved	FractionObservedWit
 		if (dir == null || dir.isDirectory() == false || dir.canRead() == false) Misc.printExit("\nError: cannot find your log directory?\n");
 
 		//check save file
-		if (saveFile == null) saveFile = new File (dir,"readCoverageReport.xlsx");
+		if (saveFile == null) saveFile = new File (dir,"colBamStats.xls");
 		if (saveFile.exists()) saveFile.delete();
 
 		dataFiles = IO.extractOnlyFiles(dir); 

@@ -74,7 +74,7 @@ public class SomaticSniperVCFParser {
 				if (format[format.length-1].equals("SSC") == false) Misc.printErrAndExit("SSC isn't the last FORMAT in record "+r.getOriginalRecord());
 				r.setQuality(Float.parseFloat(tumor.getData()[format.length-1]));
 			}
-			File out = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_SSC.vcf");
+			File out = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_Filtered.vcf");
 			printRecords(parser, out);
 
 		} catch (Exception e) {
@@ -155,7 +155,7 @@ public class SomaticSniperVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Somatic Sniper VCF Parser: Jan 2015                  **\n" +
+				"**                           Somatic Sniper VCF Parser: March 2015                  **\n" +
 				"**************************************************************************************\n" +
 				"Parses Somatic Sniper VCF files, replacing the QUAl score with the SSC score. Also \n"+
 				"filters for minimum tumor normal read depth, difference in alt allelic ratios, and on\n"+

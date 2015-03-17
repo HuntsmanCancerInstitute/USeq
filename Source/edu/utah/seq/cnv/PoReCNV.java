@@ -43,6 +43,7 @@ public class PoReCNV {
 	private int numberConcurrentThreads = 0;
 	private boolean mergeExonCounts = false;
 	private String annoType = "Exon";
+	private boolean excludeSexChromosomes = true;
 
 	//internal fields
 	private File graphDirectory;
@@ -995,10 +996,21 @@ public class PoReCNV {
 		//check gene name is unique
 		if (reader.uniqueGeneNames() == false) Misc.printExit("\nDuplicate gene names were found in your gene / bed file, these must be unique.\n");
 		chromGenes = reader.getChromSpecificGeneLines();
+		//exclude sex chromosomes?
+		if (excludeSexChromosomes){
+			System.out.println("\tExcluding sex chromosomes");
+			chromGenes.remove("chrY");
+			chromGenes.remove("Y");
+			chromGenes.remove("chrX");
+			chromGenes.remove("X");
+		}
+		//load name2Gene
 		name2Gene = new HashMap<String, UCSCGeneLine>();
-		for (UCSCGeneLine gl: genes) {
-			String name = gl.getDisplayNameThenName();
-			name2Gene.put(name, gl);
+		for (String chr: chromGenes.keySet()){
+			for (UCSCGeneLine gl: chromGenes.get(chr)) {
+				String name = gl.getDisplayNameThenName();
+				name2Gene.put(name, gl);
+			}
 		}
 	}
 
@@ -1030,9 +1042,10 @@ public class PoReCNV {
 					case 'u': refSeqFile = new File(args[++i]); break;
 					case 'g': genomeVersion = args[++i]; break;
 					case 'w': mergeExonCounts = true; annoType = "Gene"; break;
+					case 'x': excludeSexChromosomes = false; break;
 					case 'm': minNumInEachChunk = Integer.parseInt(args[++i]); break;
 					case 'e': minimumCounts = Integer.parseInt(args[++i]); break;
-					case 'x': maxAlignmentsDepth = Integer.parseInt(args[++i]); break;
+					case 'd': maxAlignmentsDepth = Integer.parseInt(args[++i]); break;
 					case 'l': minimumLog2Ratio = Float.parseFloat(args[++i]); break;
 					case 'p': minimumAdjPVal = Float.parseFloat(args[++i]); break;
 					case 't': numberConcurrentThreads = Integer.parseInt(args[++i]); break;
@@ -1110,6 +1123,7 @@ public class PoReCNV {
 		sb.append("RScript    \t"); sb.append(alunRScript); sb.append("\n");
 		sb.append("Genome build\t"); sb.append(genomeVersion); sb.append("\n");
 		sb.append("Anno type\t"); sb.append(annoType); sb.append("\n");
+		sb.append("Excld sex chrs\t"); sb.append(excludeSexChromosomes); sb.append("\n");
 		sb.append("Min counts\t"); sb.append(minimumCounts); sb.append("\n");
 		sb.append("Max counts\t"); sb.append(maxAlignmentsDepth); sb.append("\n");
 		sb.append("Min log2Rto\t"); sb.append(minimumLog2Ratio); sb.append("\n");
@@ -1148,16 +1162,17 @@ public class PoReCNV {
 				"-l Minimum log2(obs/exp) for inclusion in the pass spreadsheet, defaults to 0.585\n"+
 				"-p Maximum adjusted p-value for inclusion in the pass spreadsheet, defaults to 0.01\n"+
 				"-e Minimum all sample exon count for inclusion in analysis, defaults to 20.\n"+
-				"-x Max per sample exon alignment depth, defaults to 50000. Exons containing higher\n"+
+				"-d Max per sample exon alignment depth, defaults to 50000. Exons containing higher\n"+
 				"       counts are ignored.\n"+
 				"-t Number concurrent threads to run, defaults to the max available to the jvm.\n"+
 				"-m Minimum number exons per data chunk, defaults to 1500.\n"+
 				"-w Examine whole gene counts for CNVs, defaults to exons.\n"+
+				"-x Keep sex chromosomes (X,Y), defaults to removing.\n"+
 
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/PoReCNV -s PRCnvResults/  -b BamFiles\n"+
-				"       -u hg19EnsGenes.ucsc.gz -a RBambedSource.R  -g H_sapiens_Feb_2009\n\n" +
+				"       -u hg19EnsGenes.ucsc.gz -a RBambedSource.R  -g H_sapiens_Feb_2009 -d\n\n" +
 
 				"**************************************************************************************\n");
 

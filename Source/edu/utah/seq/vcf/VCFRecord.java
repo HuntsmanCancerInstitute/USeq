@@ -9,7 +9,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	//fields
 	private String chromosome;
 	private int position; //interbase coordinates! not 1 based
-	private String rsNumber;
+	private String rsNumber; //id
 	private String reference;
 	private String[] alternate;
 	private float quality;
