@@ -251,16 +251,19 @@ public class CalculatePerCycleErrorRate {
 
 
 	public void scanBamFile(File bamFile){
-		numberCycles = estimateNumberOfCyclesBam(bamFile);
-
-		SAMFileReader samReader = null;
+		
+		SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+		SamReader samReader = factory.open(bamFile);
 
 		try {
-			samReader = new SAMFileReader(bamFile);
-
-			SAMRecordIterator it;
-			if (samReader.hasIndex()) it = samReader.queryOverlapping(chromName, 0, chromLength);
-			else it = samReader.iterator();
+			//look for chrom to scan
+			if (samReader.getFileHeader().getSequence(chromName) == null) {
+				System.err.println ("\nError: failed to find any alignments for '"+chromName+"' in "+bamFile.getName()+", aborting!\n");
+				System.exit(0); //don't want to exit with 1 or tomato will crash out.
+			}
+			numberCycles = estimateNumberOfCyclesBam(bamFile);
+			
+			SAMRecordIterator it = samReader.queryOverlapping(chromName, 0, chromLength);
 
 			while (it.hasNext()) {
 				SAMRecord sam = it.next();
@@ -278,7 +281,6 @@ public class CalculatePerCycleErrorRate {
 					if (sam.getReadName().startsWith(readNamePrefix) == false) continue;
 				}
 				scoreAlignment(sam);
-					
 			}
 			samReader.close();
 		} catch (Exception e){
@@ -354,14 +356,12 @@ public class CalculatePerCycleErrorRate {
 		return samOutFile;
 	}
 
-
-	private int[] estimateNumberOfCyclesBam(File bamFile) {
-		SAMFileReader.setDefaultValidationStringency(ValidationStringency.SILENT);
-		SAMFileReader samReader = new SAMFileReader(bamFile);
-		//samReader.setValidationStringency(ValidationStringency.SILENT);
-		SAMRecordIterator it;
-		if (samReader.hasIndex()) it = samReader.queryOverlapping(chromName, 0, chromLength);
-		else it = samReader.iterator();
+	/**Returns null if the chromName doesn't exist or no records were found.
+	 * @throws Exception */
+	private int[] estimateNumberOfCyclesBam(File bamFile) throws Exception {
+		SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+		SamReader samReader = factory.open(bamFile);
+		SAMRecordIterator it = samReader.queryOverlapping(chromName, 0, chromLength);
 		int counter1 = 0;
 		int counter2 = 0;
 		int maxFirstPair = 0;
@@ -397,6 +397,7 @@ public class CalculatePerCycleErrorRate {
 
 		}
 		it.close();
+		samReader.close();
 		//need to subtract one to keep in frame
 		return new int[]{maxFirstPair-1, maxSecondPair-1};
 	}
@@ -505,7 +506,6 @@ public class CalculatePerCycleErrorRate {
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z12]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
-		File forExtraction = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -513,7 +513,7 @@ public class CalculatePerCycleErrorRate {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'b': forExtraction = new File(args[i+1]); i++; break;
+					case 'b': alignmentFiles = IO.extractFiles(new File(args[++i]),".bam"); break;
 					case 'f': fastaFile = new File (args[++i]); break;
 					case 't': deleteTempFiles = false; break;
 					case 's': mergeStrands = false; break;
@@ -532,17 +532,10 @@ public class CalculatePerCycleErrorRate {
 			}
 		}
 		//pull files
-		if (forExtraction == null ) Misc.printExit("\nError: cannot find your xxx.bam file(s) or xxx.sam(.zip/.gz)!\n");
-		File[][] tot = new File[4][];
-		tot[0] = IO.extractFiles(forExtraction,".sam");
-		tot[1] = IO.extractFiles(forExtraction,".sam.gz");
-		tot[2] = IO.extractFiles(forExtraction,".sam.zip");
-		tot[3] = IO.extractFiles(forExtraction,".bam");
-
-		alignmentFiles = IO.collapseFileArray(tot);
-		if (alignmentFiles == null || alignmentFiles.length==0) alignmentFiles = IO.extractFiles(forExtraction);
-		if (alignmentFiles == null || alignmentFiles.length ==0 || alignmentFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.bam file(s) or xxx.sam(.zip/.gz)!\n");
-
+		if (alignmentFiles == null || alignmentFiles.length == 0) Misc.printExit("\nError: cannot find your xxx.bam file(s)!\n");
+		//look for indexes
+		OverdispersedRegionScanSeqs.lookForBaiIndexes(alignmentFiles, false);
+		
 		//check fasta
 		if (fastaFile == null || fastaFile.canRead() == false) Misc.printExit("\nError: cannot find or read your fasta file!\n");
 		if (fastaFile.isDirectory()) Misc.printExit("\nError: please provide a single fasta file for scoring. Not a directory.\n");
@@ -557,7 +550,7 @@ public class CalculatePerCycleErrorRate {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Calculate Per Cycle Error Rate : Dec 2014                 **\n" +
+				"**                        Calculate Per Cycle Error Rate : March 2015                **\n" +
 				"**************************************************************************************\n" +
 				"Calculates per cycle error rates provided a sorted indexed bam file and a fasta\n" +
 				"sequence file. Only checks CIGAR M bases not masked or INDEL bases.\n\n" +
@@ -565,7 +558,6 @@ public class CalculatePerCycleErrorRate {
 				"Required Options:\n"+
 				"-b Full path to a coordinate sorted bam file (xxx.bam) with its associated (xxx.bai)\n" +
 				"      index or directory containing such. Multiple files are processed independently.\n" +
-				"      Unsorted xxx.sam(.gz/.zip OK) files also work but are processed rather slowly.\n"+
 				"-f Full path to the single fasta file you wish to use in calculating the error rate.\n" +
 				"-n Require read names to begin with indicated text, defaults to accepting everything.\n"+
 				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
