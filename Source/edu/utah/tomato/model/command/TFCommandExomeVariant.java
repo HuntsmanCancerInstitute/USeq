@@ -530,20 +530,19 @@ public class TFCommandExomeVariant extends TFCommand {
 			if (workingDir.exists()) {
 				this.deleteFolder(workingDir);
 			}
+			runDirectoryList.add(workingDir);
 			workingDir.mkdir();
 			//Only iterate over one
 			for (String sampleName: samples.keySet()) {
 				TFSampleInfo tfsi = samples.get(sampleName).get(0);
 				TFFileObject sampleGvcf = tfsi.getFileObject(TFConstants.FILE_GVCF);
 				TFFileObject sampleGvcfIdx = tfsi.getFileObject(TFConstants.FILE_GVCF_IDX);
-				TFFileObject studyGvcf = tfsi.getFileObject(TFConstants.FILE_GVCF_STUDY);
-				TFFileObject studyGvcfIdx = tfsi.getFileObject(TFConstants.FILE_GVCF_STUDY_IDX);
 				
-				this.moveFile(sampleGvcf.getFinalPath(), studyGvcf.getWorkingPath());
-				this.moveFile(sampleGvcfIdx.getFinalPath(), studyGvcfIdx.getWorkingPath());
+				
+				this.moveFile(sampleGvcf.getFinalPath(), tfoGvcfStudy.getWorkingPath());
+				this.moveFile(sampleGvcfIdx.getFinalPath(), tfoGvcfStudyIdx.getWorkingPath());
 			}
 			
-			workingDir.delete();
 		}
 		
 		

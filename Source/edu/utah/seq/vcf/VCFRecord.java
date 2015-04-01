@@ -72,7 +72,8 @@ public class VCFRecord implements Comparable<VCFRecord> {
 			ArrayList<VCFSample> al = new ArrayList<VCFSample>();
 			//must watch out for blank samples
 			for (int i=vcfParser.firstSampleIndex; i< fields.length; i++) {
-				if (fields[i].equals(".") == false) al.add(new VCFSample(fields[i], format));
+//				if (fields[i].equals(".") == false) 
+				al.add(new VCFSample(fields[i], format));
 			}
 			if (al.size()!= 0){
 				sample = new VCFSample[al.size()];
@@ -81,7 +82,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 				//Check for missing qualities.  This is valid for things like varscan, so simply store the fact that there were missing quals.
 				for (VCFSample s: sample) {
 					if (s.isMissingQual()) {
-						this.missingQual = true;
+						missingQual = true;
 					}
 				}
 			}
@@ -95,17 +96,17 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	public String getModifiedRecord(ArrayList<String> infoToUse, String style) {
 		String infoLine;
 		
-		infoLine = this.getModifiedInfoString(infoToUse,style);
+		infoLine = getModifiedInfoString(infoToUse,style);
 		
 		String altString = "";
-		for (String alt: this.alternate) {
+		for (String alt: alternate) {
 			altString += "," + alt;
 		}
 		altString = altString.substring(1);
 		
-		String modifiedRecord = String.format("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",this.chromosome,String.valueOf(this.position+1),
-				this.rsNumber,this.reference,altString,String.valueOf(this.quality),this.filter,infoLine,this.format);
-		for (VCFSample s: this.sample) {
+		String modifiedRecord = String.format("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s",chromosome,String.valueOf(position+1),
+				rsNumber,reference,altString,String.valueOf(quality),filter,infoLine,format);
+		for (VCFSample s: sample) {
 			modifiedRecord += "\t" + s.getUnmodifiedSampleString();
 		}
 		return modifiedRecord;
@@ -199,7 +200,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	}
 	
 	public VCFInfo getInfoObject() {
-		return this.info;
+		return info;
 	}
 
 	public VCFSample[] getSample() {
@@ -296,11 +297,11 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	
 	public int compareTo(VCFRecord other) {
 		//sort by chromosome
-		int x = this.chromosome.compareTo(other.chromosome);
+		int x = chromosome.compareTo(other.chromosome);
 		if (x !=0) return x;
 		//sort by position
-		if (this.position < other.position) return -1;
-		if (this.position > other.position) return 1;
+		if (position < other.position) return -1;
+		if (position > other.position) return 1;
 		return 0;
 	}
 	
@@ -313,16 +314,51 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	}
 	
 	public String getSpreadsheetOutput(ArrayList<String> infoToAdd, String style, VCFComments comments) {
-		String endPos = String.valueOf(this.getPosition() + 1 + this.maxInt(this.getReference().length()-1,0));
-		StringBuffer full = new StringBuffer(this.getChromosome() + "\t" + this.getPosition() + "\t" + endPos + "\t" + this.getReference() + "\t" + 
-							this.getAlternate()[0] + "\t" + String.valueOf(this.getQuality()));
-		full.append("\t" + this.info.buildInfoForTable(infoToAdd, style, comments));
-		for (VCFSample sample: this.sample) {
+		String endPos = String.valueOf(getPosition() + 1 + maxInt(getReference().length()-1,0));
+		StringBuffer altSb = new StringBuffer("");
+		for (String alt: alternate) {
+			altSb.append(","+alt);
+		}
+		String altS = altSb.toString().substring(1, altSb.length());
+		StringBuffer full = new StringBuffer(getChromosome() + "\t" + getPosition() + "\t" + endPos + "\t" + getReference() + "\t" + 
+							altS + "\t" + String.valueOf(getQuality()));
+		full.append("\t" + info.buildInfoForTable(infoToAdd, style, comments));
+		for (VCFSample sample: sample) {
 			String genotype = sample.getGenotypeGT();
 			if (sample.isNoCall()) {
 				full.append("\tNA");
 			} else {
-				full.append("\tGT:" + genotype + ":" + sample.getReferenceCount() + "," + sample.getAlternateCounts());
+				//Create an array list of all observed alleles.  This is used to create
+				//a string-based genotype
+				ArrayList<String> bases = new ArrayList<String>();
+				bases.add(reference);
+				for (String alt: alternate) {
+					bases.add(alt);
+				}
+				
+				//use the number-based genotype to look up the bases
+				String[] genotypes = genotype.split("/");
+				StringBuilder gtString = new StringBuilder("");
+				for (String g: genotypes) {
+					int index = Integer.parseInt(g);
+					gtString.append("/"+bases.get(index));
+				}
+				
+				//Create count string.  This contains the reference count + all alternate allele counts.
+				//Some VCFs have RD and AD (alternate counts) columns, some just AD (all allele counts). 
+				//If AD+1 = ref base + obs alt bases, add ref counts to string.
+				String[] counts = sample.getAlleleCount().split(",");
+				StringBuilder sb = new StringBuilder("");
+				if (counts.length+1 == bases.size()) {
+					sb.append("," + sample.getReferenceCount());
+				}
+				
+				for (String c: counts) {
+					sb.append(","+c);
+				}
+				
+				full.append("\t" + gtString.toString().substring(1, gtString.length()) + ":" + genotype + ":" + sb.toString().substring(1, sb.length()));	
+							
 			}
 		}
 		full.append("\n");

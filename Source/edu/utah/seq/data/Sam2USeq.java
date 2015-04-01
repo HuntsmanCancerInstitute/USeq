@@ -744,7 +744,18 @@ public class Sam2USeq {
 
 		//stranded and regionFile?
 		if (regionFile !=null){
-			regions = Bed.parseBedFile(regionFile, stranded == false, false);			
+			HashMap<String,RegionScoreText[]> tempRegions = Bed.parseBedFile(regionFile, stranded == false, false);
+			regions = new HashMap<String,RegionScoreText[]>();
+			
+			for (String chrom: tempRegions.keySet()) {
+				if (!chrom.startsWith("chr")) {
+					String modChrom = "chr" + chrom;
+					regions.put(modChrom, tempRegions.get(chrom));
+				} else {
+					regions.put(chrom,tempRegions.get(chrom));
+				}
+			}
+			
 			histogram = new Histogram(0, 101, 101);
 			//watch out for stranded analysis
 			if (stranded) {

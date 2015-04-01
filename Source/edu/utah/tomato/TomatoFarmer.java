@@ -113,10 +113,10 @@ public class TomatoFarmer {
 		properties.add("TARGET_DEFAULT");
 		
 		properties.add("SCRATCH_PATH");
-		properties.add("JAVA_MEM");
+		//properties.add("JAVA_MEM");
 		properties.add("JAVA_PATH");
-		properties.add("NCTHREAD");
-		properties.add("NTHREAD");
+		//properties.add("NCTHREAD");
+		//properties.add("NTHREAD");
 		
 		try {
 			BufferedReader br = new BufferedReader(new FileReader(propertiesFile));
@@ -623,7 +623,7 @@ public class TomatoFarmer {
 				"      users!\n" +
 				"-s Study name.  Set this if you want your VCF files to have a prefix other than \n" +
 				"      'STUDY'. Example: '-s DEMO'.\n" +
-				"-v Validate fastq files.  TomatoFarmer will validate your fastq files before running" +
+				"-v Validate fastq files.  TomatoFarmer will validate your fastq files before running \n" +
 				"      This is required if any of your samples are ASCII-64\n" +
 				"-c Cluster. Specify cluster, defaults to all available clusters\n" +
 			

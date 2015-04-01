@@ -196,11 +196,11 @@ public class VCFReporter {
 					
 				}
 				bwKey.write(String.valueOf(++keyIndex) + ". Genotype/Coverage data:  The remaining columns contain genotype and coverage data for the samples in the multi-sample VCF file. "
-						+ "The format of the genotype/coverage string is GT:genotype:coverage, so in the case of: 'GT:0/1:4,5', 0/1 would be the genotype and 4,5 would be the coverage. "
+						+ "The format of the genotype/coverage string is observed_bases:genotype:coverage, so in the case of: 'GT:0/1:4,5', 0/1 would be the genotype and 4,5 would be the coverage. "
 						+ "A zero in the genotype field signifies the reference base and 1 through N represent alternate alleles.  0/1 would be heterozygous for first alternate allele, 0/0 homozygous for the reference, "
 						+ "and 1/1 homozygous for the first alternate. A genotype of 0/2 would mean the sample was heterozygous for the second alternate allele.  The coverage field contains the "
-						+ "number of reads representing each allele, separated by commas.  The first value is the number of observed reference bases, the second value is the number of observed "
-						+ "first alternate bases.  The counts for additional alternate alleles are not reported.");
+						+ "number of reads representing each allele, separated by commas.  The first value is the number of observed reference base, the second value is the number of observed "
+						+ "first alternate bases.  If there is more than one alternate allele, the counts will be listed after the counts of the first alternate allele.");
 				
 				bwKey.close();
 			}
@@ -294,6 +294,8 @@ public class VCFReporter {
 			this.columnsToUse.add("NCI60");
 			this.columnsToUse.add("SIFT");
 			this.columnsToUse.add("SIFT_P");
+			this.columnsToUse.add("CADD");
+			this.columnsToUse.add("CADD_P");
 			this.columnsToUse.add("PP2_HVAR");
 			this.columnsToUse.add("PP2_HVAR_P");
 			this.columnsToUse.add("PP2_HDIV");

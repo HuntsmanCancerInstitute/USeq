@@ -35,7 +35,7 @@ public class VCFSample {
 		this.originalRecord = sample;
 		this.originalFormat = sampleFormat;
 		//is it a no call?
-		if (sample.substring(0,3).startsWith("./.")){
+		if (sample.equals(".") || sample.substring(0,3).startsWith("./.") ){
 			noCall = true;
 		}
 		else {
@@ -72,7 +72,9 @@ public class VCFSample {
 					alleleCounts = data[i];
 					String[] multiple = data[i].split(",");
 					if (multiple.length > 1) {
-						this.referenceCounts = multiple[0];
+						if (referenceCounts == null) {
+							this.referenceCounts = multiple[0];
+						}
 						this.alternateCounts = multiple[1];
 					} else if (multiple.length ==  1) {
 						this.alternateCounts = multiple[0];

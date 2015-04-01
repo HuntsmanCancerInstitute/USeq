@@ -37,7 +37,7 @@ public class VCFAnnotator {
 	//private String espFile = "esp6500_all";
 	//private String cosmicFile= "cosmic63";
 	private boolean compressOutput = false;
-	private Long genotypesPerChunk = (long)25000000;
+	private Long genotypesPerChunk = (long)10000000;
 	
 	private HashMap<String,String> annovarCallHash = new HashMap<String,String>();
 	
@@ -418,10 +418,12 @@ public class VCFAnnotator {
     			+ "The larger the score, the more conserved the site\">");
     	String il1Siphy = new String("##INFO=<ID=SIPHY,Number=1,Type=Float,Description=\"Siphy score. The SiPhy score is based on multiple alignments of 29 mammalian genomes. "
     			+ "The larger the score, the more conserved the site\">");
-    	int[] colLocs = new int[]{0,1,4,5,2,3,6,7,8,9,10,11,22,24};
-    	String[] colNames = new String[]{"SIFT","SIFT_P","PP2_HVAR","PP2_HVAR_P","PP2_HDIV","PP2_HDIV_P","LRT","LRT_P","MT","MT_P","MA","MA_P","PHYLOP","SIPHY"};
-    	String[] colDesc = new String[]{il1Sift,il1PolyHvar,il1PolyHvarP,il1PolyHidv,il1PolyHidvP,il1Lrt,il1LrtP,il1Mt,il1MtP,il1Mt,il1MtP,il1Ma,il1MaP,il1Fathmm,il1Gerp,
-    			il1Phylop,il1Siphy};
+    	String il1Cadd = new String("##INFO=<ID=CADD,Number=1,Type=Float,Description=\"CADD (Combined Annotation Dependent Depletion) is a score that is based on SVM on multiple other scores. Standard format.\">");
+    	String il1CaddP = new String("##INFO=<ID=CADD_P,Number=1,Type=Float,Description=\"CADD (Combined Annotation Dependent Depletion) is a score that is based on SVM on multiple other scores. Phred style score.\">");
+    	
+    	int[] colLocs = new int[]{0,1,4,5,2,3,6,7,8,9,10,11,22,24,19,20};
+    	String[] colNames = new String[]{"SIFT","SIFT_P","PP2_HVAR","PP2_HVAR_P","PP2_HDIV","PP2_HDIV_P","LRT","LRT_P","MT","MT_P","MA","MA_P","PHYLOP","SIPHY","CADD","CADD_P"};
+    	String[] colDesc = new String[]{il1Sift,il1SiftP,il1PolyHvar,il1PolyHvarP,il1PolyHidv,il1PolyHidvP,il1Lrt,il1LrtP,il1Mt,il1MtP,il1Mt,il1MtP,il1Ma,il1MaP,il1Phylop,il1Siphy, il1Cadd, il1CaddP};
     	
     	OutputParser opScore1 = new OutputParser(colLocs,colNames,colDesc,2,"hg19_" + annovarCall + "_dropped",1);
     	OutputParser opScore2 = new OutputParser("hg19_" + annovarCall + "_filtered");
@@ -606,7 +608,7 @@ public class VCFAnnotator {
 				"-t Path to tabix directory.\n" +
 				"-c Number of genotypes to process per chunk.  The total number of genotypes is the \n" +
 				"      number of records in the VCF * the number of samples in the VCF.  By default \n" +
-				"      the file is split into 25M genotypes, which uses about 30GB of memory.\n" +
+				"      the file is split into 10M genotypes.  Can take 20GB or more to run.\n" +
 				"\n\n"+
 
 				"Example: java -Xmx20G -jar pathTo/USeq/Apps/VCFAnnotator -v 9908R.vcf \n" + 
