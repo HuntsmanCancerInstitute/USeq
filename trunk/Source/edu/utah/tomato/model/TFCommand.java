@@ -679,8 +679,26 @@ public abstract class TFCommand {
 			}
 			
 			bw.write("\n\n");
-		
 			
+			//Determine node metrics
+			bw.write("MEMTOTAL=`free | grep Mem | awk '{ print $2 }'`\n");
+			bw.write("MEMGB=`expr $MEMTOTAL / 1048576`\n");
+			bw.write("SMGB=`expr $MEMGB - 2`\n");
+			bw.write("NCPU=`nproc`\n");
+			bw.write("GCT=$NCPU\n");
+			bw.write("if [ $NCPU -gt 8 ]\n");
+			bw.write("then\n");
+			bw.write("   GCT=`expr $NCPU \\* 5 / 8 + 3`\n");
+			bw.write("fi\n");
+			bw.write("HOST=`hostname`\n");
+			bw.write("echo \"Hostname: \" $HOST\n");
+			bw.write("echo \"Total cpu: \" $NCPU\n");
+			bw.write("echo \"GC threads: \" $GCT\n");
+			bw.write("echo \"Total memory: \" $MEMGB\n");
+			bw.write("echo \"Java memory: \" $SMGB\n");
+			bw.write("\n\n");
+			
+		
 			//Write command file
 			String line = null;
 
