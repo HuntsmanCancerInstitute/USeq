@@ -686,6 +686,8 @@ public abstract class TFCommand {
 			bw.write("SMGB=`expr $MEMGB - 2`\n");
 			bw.write("NCPU=`nproc`\n");
 			bw.write("GCT=$NCPU\n");
+			bw.write("DISKAVAIL=`df -hP . | tail -n 1 | awk '{print $4}'`\n");
+			
 			bw.write("if [ $NCPU -gt 8 ]\n");
 			bw.write("then\n");
 			bw.write("   GCT=`expr $NCPU \\* 5 / 8 + 3`\n");
@@ -696,6 +698,7 @@ public abstract class TFCommand {
 			bw.write("echo \"GC threads: \" $GCT\n");
 			bw.write("echo \"Total memory: \" $MEMGB\n");
 			bw.write("echo \"Java memory: \" $SMGB\n");
+			bw.write("echo \"Disk available: \" $DISKAVAIL\n");
 			bw.write("\n\n");
 			
 		
