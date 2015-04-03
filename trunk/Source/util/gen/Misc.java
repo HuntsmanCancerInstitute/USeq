@@ -163,6 +163,17 @@ public class Misc {
 		return s;
 	}
 	
+	/**Converts a linked hash to a String[]. Not sure if this is necessary?*/
+	public static String[] linkedHashSetToStringArray(LinkedHashSet<String> hash){
+		Iterator<String> it = hash.iterator();
+		String[] s = new String[hash.size()];
+		int counter =0;
+		while (it.hasNext()){
+			s[counter++] = it.next();
+		}
+		return s;
+	}
+	
 	/**Converts a hash to a String using the delimiter to join.*/
 	public static String hashSetToString(HashSet hash, String delimiter){
 		if (hash.size() == 0) return "";

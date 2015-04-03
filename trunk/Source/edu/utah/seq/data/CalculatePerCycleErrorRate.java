@@ -43,7 +43,6 @@ public class CalculatePerCycleErrorRate {
 	private double[][] incorrectBases;
 	private int fileIndex;
 	private int index;
-	private boolean isBam;
 	private boolean deleteTempFiles = true;
 	private Pattern headerLine = Pattern.compile("^@[HSRPC][DQGO]\\s.+");
 	private boolean mergeStrands = true;
@@ -84,7 +83,6 @@ public class CalculatePerCycleErrorRate {
 			incorrectBases[i] = new double[1000];
 		}
 		numberAlignments = new double[numberDatasets];
-		numberAlignments = new double[numberDatasets];
 		numberAlignmentsWithInsertions = new double[numberDatasets];
 		numberAlignmentsWithDeletions = new double[numberDatasets];
 		numberAlignmentsWithSoftMasking = new double[numberDatasets];
@@ -97,37 +95,11 @@ public class CalculatePerCycleErrorRate {
 			if (mergeStrands == false) index = i*2;
 			else index = fileIndex;
 			System.out.println("\t"+ alignmentFiles[fileIndex].getName());
-			isBam = alignmentFiles[fileIndex].getName().endsWith(".bam");
-			if (isBam) {
-				scanBamFile(alignmentFiles[fileIndex]);
-			}
-			else {
-				File tempSam = parseSamFile();
-				if (tempSam == null) {
-					System.out.println("\t\tError! No "+chromName+" matching alignments? Skipping.");
-				}
-				else {
-					try {
-						String name = Misc.removeExtension(tempSam.getCanonicalPath());
-						File tempBam = new File (name+".bam");
-						File tempBai = new File (name+".bai");
-						if (deleteTempFiles) {
-							tempBam.deleteOnExit();
-							tempBai.deleteOnExit();
-						}
-						//sort and convert to BAM
-						new PicardSortSam (tempSam, tempBam);
-						//scan it!
-						scanBamFile(tempBam);
-
-					} catch (IOException e) {
-						System.out.println("\nProblem sorting temp sam file "+tempSam);
-						e.printStackTrace();
-					}
-				}
-			}
+			scanBamFile(alignmentFiles[fileIndex]);
 		}
-		printReport();
+		double totalAlignments = Num.sumArray(numberAlignments);
+		if (totalAlignments == 0.0) System.out.println("\nNo "+chromName+" alignments found for analysis?!");
+		else printReport();
 	}
 
 	private void printReport() {
@@ -559,12 +531,12 @@ public class CalculatePerCycleErrorRate {
 				"-b Full path to a coordinate sorted bam file (xxx.bam) with its associated (xxx.bai)\n" +
 				"      index or directory containing such. Multiple files are processed independently.\n" +
 				"-f Full path to the single fasta file you wish to use in calculating the error rate.\n" +
-				"-n Require read names to begin with indicated text, defaults to accepting everything.\n"+
-				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
 				"-s Perform separate first read second read analysis, defaults to merging.\n"+
 				"-c Maximum fraction failing cycles, defaults to 0.1\n"+
 				"-1 Maximum first read or merged read error rate, defaults to 0.01\n"+
 				"-2 Maximum second read error rate, defaults to 0.0175\n"+
+				"-n Require read names to begin with indicated text, defaults to accepting everything.\n"+
+				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
 
 				"\n"+
 

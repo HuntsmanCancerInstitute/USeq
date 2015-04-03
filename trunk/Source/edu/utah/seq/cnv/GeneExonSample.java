@@ -12,6 +12,7 @@ public class GeneExonSample {
 	private int count;
 	private float residual;
 	private float obsExpLgRto;
+	private String genotypePosition;
 
 	public GeneExonSample(UCSCGeneLine gene, int globalExonIndex, short exonIndex, short sampleIndex, int count){
 		this.gene = gene;
@@ -75,5 +76,13 @@ public class GeneExonSample {
 	public String getDataString() {
 		
 		return obsExpLgRto+"\t"+residual+"\t"+count;
+	}
+
+	public String getGenotypePosition() {
+		return genotypePosition;
+	}
+
+	public void setGenotypePosition(String genotypePosition) {
+		this.genotypePosition = genotypePosition;
 	}
 }
