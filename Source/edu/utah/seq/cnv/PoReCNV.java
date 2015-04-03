@@ -3,7 +3,9 @@ package edu.utah.seq.cnv;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
+
 import htsjdk.samtools.*;
+import htsjdk.samtools.util.CloseableIterator;
 import util.bio.annotation.ExonIntron;
 import util.bio.parsers.*;
 import util.gen.*;
@@ -18,6 +20,14 @@ import edu.utah.seq.data.PointData;
 import edu.utah.seq.data.SmoothingWindow;
 import edu.utah.seq.parsers.BarParser;
 import edu.utah.seq.useq.apps.Bar2USeq;
+import htsjdk.variant.variantcontext.Genotype;
+import htsjdk.variant.variantcontext.GenotypesContext;
+import htsjdk.variant.variantcontext.VariantContext;
+import htsjdk.variant.variantcontext.writer.Options;
+import htsjdk.variant.variantcontext.writer.VariantContextWriter;
+import htsjdk.variant.variantcontext.writer.VariantContextWriterFactory;
+import htsjdk.variant.vcf.VCFFileReader;
+import htsjdk.variant.vcf.VCFHeader;
 
 
 /** App to detect CNV's in normal datasets.  Wraps Alun Thomas's algorithm.
@@ -28,6 +38,7 @@ public class PoReCNV {
 	//user defined fields
 	private File saveDirectory;
 	private File bamDirectory;
+	private File vcfDirectory;
 	private String[] caseSampleFileNames;
 	private String[] controlSampleFileNames;
 	private File fullPathToR = new File ("/usr/bin/R");
@@ -44,6 +55,7 @@ public class PoReCNV {
 	private boolean mergeExonCounts = false;
 	private String annoType = "Exon";
 	private boolean excludeSexChromosomes = true;
+	private int minimumGenotypeQuality = 20;
 
 	//internal fields
 	private File graphDirectory;
@@ -53,7 +65,6 @@ public class PoReCNV {
 	public static final Pattern BAD_NAME = Pattern.compile("(.+)/[12]$");
 	private HashSet<String> flaggedGeneNames = new HashSet<String>();
 	private LinkedHashSet<String> geneNamesWithMinimumCounts = new LinkedHashSet<String>();
-	private String[] geneNamesToAnalyze = null;
 	private Replica[] cases = null;
 	private Replica[] controls = null;
 	private PoReDataChunk[] chunkThreads;
@@ -73,6 +84,7 @@ public class PoReCNV {
 	private int workingFragmentNameIndexMinus = -1;
 	private HashMap<String, Integer> workingFragNameIndex = new HashMap<String, Integer>(10000);
 
+
 	//constructors
 	/**Stand alone.*/
 	public PoReCNV(String[] args){	
@@ -86,12 +98,12 @@ public class PoReCNV {
 		System.out.println("\nDone! "+Math.round(diffTime)+" minutes\n");
 	}
 
-
+	//methods
 	public void run(){
 
 		//load gene models
 		System.out.println("Loading regions/ gene models...");
-		loadGeneModels();
+		loadGeneModels();		
 
 		//load samples 
 		loadSamples();
@@ -116,9 +128,7 @@ public class PoReCNV {
 			System.out.println("\nSaving graphs and spreadsheets...");
 			exportGeneExonSpreadSheets();
 			exportCaseSampleGraphs();
-
 			
-
 			System.out.println("\n"+numExonsProcessed+" "+annoType+"s processed, "+numberPassingExons+" passed thresholds ("+minimumLog2Ratio+" Lg2Rto, "+minimumAdjPVal+" AdjPVal)\n");
 		}
 
@@ -218,7 +228,9 @@ public class PoReCNV {
 				}
 				al.add(ges[i]);
 			}
-
+			//print out last!
+			printGeneSamples(outAll, outPass, al);
+			
 			outAll.close();
 			outPass.close();
 		} catch (Exception e){
@@ -272,6 +284,7 @@ public class PoReCNV {
 		ArrayList<String> sampPass = new ArrayList<String>();
 		for (int i=0; i<al.size(); i++){
 			GeneExonSample g = al.get(i);
+			
 			//correct index?
 			if (g.getExonIndex() == exonIndex){
 				if (passesThresholds(g)) {
@@ -341,6 +354,67 @@ public class PoReCNV {
 		if (Math.abs(g.getObsExpLgRto()) < minimumLog2Ratio || Math.abs(g.getResidual()) < significanceThreshold ) return false;
 		return true;
 	}
+	
+	private void searchForHetSNPs(){
+		//split ges by sample
+		GeneExonSample[][] sampleGES = new GeneExonSample[cases.length][numExonsProcessed];
+		for (int i=0; i< ges.length; i++){
+				sampleGES[ges[i].getSampleIndex()][ges[i].getGlobalExonIndex()] = ges[i];
+		}
+		//for each sample
+		for (int i=0; i< sampleGES.length; i++){
+			
+			//make a VCF reader
+			String name = Misc.removeExtension(caseSampleFileNames[i]) + ".vcf.gz";
+			File vcf = new File(vcfDirectory, name);
+			VCFFileReader vr = new VCFFileReader(vcf);
+			
+			GeneExonSample[] sGes = sampleGES[i];
+			//for each exon
+			for (int j=0; j< sGes.length; j++){
+				//only do for deletions
+				if (sGes[j].getResidual() > 0) continue;
+				
+				//define start and stop to search
+				int start;
+				int stop;
+				UCSCGeneLine gene = sGes[j].getGene();
+				if (mergeExonCounts){
+					start = gene.getTxStart();
+					stop = gene.getTxEnd();
+				}
+				else {
+					ExonIntron exon = gene.getExons()[sGes[j].getExonIndex()];
+					start = exon.getStart();
+					stop = exon.getEnd();
+				}
+				
+				//fetch vcf records
+				CloseableIterator<VariantContext> vcfs = vr.query(ges[j].getGene().getChrom(), start, stop);
+				StringBuilder sb = new StringBuilder();
+				while (vcfs.hasNext()){
+					VariantContext vc = vcfs.next();
+					if (vc.isFiltered()) continue;
+					int position = vc.getStart();
+					GenotypesContext gc = vc.getGenotypes();
+					Iterator<Genotype> gci = gc.iterator();
+					while (gci.hasNext()){
+						Genotype g = gci.next();
+						if (g.hasGQ() && g.getGQ() < minimumGenotypeQuality) continue;
+						sb.append(g.getGenotypeString());
+						sb.append("_");
+						sb.append(position);
+						sb.append(";");
+					}
+				}
+				if (sb.length() !=0) {
+					sGes[j].setGenotypePosition(sb.toString().substring(0, sb.length()-1));
+System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
+				}
+			}
+			vr.close();
+		}
+	}
 
 	private void exportCaseSampleGraphs() {
 		//split ges by sample
@@ -364,8 +438,10 @@ public class PoReCNV {
 			//make sample specific dirs
 			File resSampDir = new File (resDir, "res_"+cases[i].getNameNumber());
 			resSampDir.mkdir();
+			resSampDir.deleteOnExit();
 			File rtoSampDir = new File (rtoDir, "oe_"+cases[i].getNameNumber());
 			rtoSampDir.mkdir();
+			rtoSampDir.deleteOnExit();
 			saveGraphs(cases[i].getNameNumber(), sampleGES[i], resSampDir, rtoSampDir);
 			//calc residual stats
 			float[] res = getResiduals(sampleGES[i]);
@@ -396,11 +472,11 @@ public class PoReCNV {
 		return residuals;
 	}
 
-
 	private void saveGraphs(String sampleName, GeneExonSample[] ges, File resDir, File rtoDir) {
 		//walk through data and make a SmoothingWindow[] for each chrom
 		String currChr = ges[0].getGene().getChrom();
 		ArrayList<SmoothingWindow> smAL = new ArrayList<SmoothingWindow>();
+
 		for (int i=0; i< ges.length; i++){
 			//make an sm
 			int start;
@@ -437,7 +513,7 @@ public class PoReCNV {
 		//process last!
 		Info info = new Info(sampleName, genomeVersion, currChr, ".", 0, null);
 		SmoothingWindow[] sms = new SmoothingWindow[smAL.size()];
-		smAL.toArray(sms);
+		smAL.toArray(sms);		
 		saveStairStepGraph(0, sms, info, resDir, "#FF0000", true); //red
 		saveStairStepGraph(1, sms, info, rtoDir, "#FFFF00", true); //yellow
 	}
@@ -483,18 +559,18 @@ public class PoReCNV {
 		}
 		else {
 			cases = new Replica[caseSampleFileNames.length];
-			String[] shortNames = new String[cases.length];
+			//String[] shortNames = new String[cases.length];
 			for (int i=0; i< caseSampleFileNames.length; i++){
 				File bam = new File(bamDirectory, caseSampleFileNames[i]);
 				String name = Misc.removeExtension(caseSampleFileNames[i]);
-				shortNames[i] = name;
+				//shortNames[i] = name;
 				cases[i] = new Replica(name, bam);
 				System.out.print("\t"+caseSampleFileNames[i]);
 				loadReplica(cases[i]);
 				System.out.println("\t"+cases[i].getTotalCounts());
 			}
-			shortNames = Misc.trimCommon(shortNames);
-			for (int i=0; i< cases.length; i++) cases[i].setNameNumber(shortNames[i]);
+			//shortNames = Misc.trimCommon(shortNames);
+			//for (int i=0; i< cases.length; i++) cases[i].setNameNumber(shortNames[i]);
 			IO.saveObject(serCases, cases);
 			IO.saveObject(serGenes, geneNamesWithMinimumCounts);
 		}
@@ -529,7 +605,6 @@ public class PoReCNV {
 		System.out.println();
 		System.out.println(geneNamesWithMinimumCounts.size()+" genes, with >= "+minimumCounts+" and < "+maxAlignmentsDepth+" counts, will be examined for copy number alterations.\n ");
 		System.out.println("Skipped genes: "+flaggedGeneNames);
-		geneNamesToAnalyze = Misc.hashSetToStringArray(geneNamesWithMinimumCounts);
 	}
 
 	public void loadBlocks(SAMRecord sam, int chrStartBp, ArrayList<Integer>[] bpNames, boolean[] badBases){
@@ -703,7 +778,6 @@ public class PoReCNV {
 
 		if (chromGenes.containsKey(chrom)) loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases);
 
-
 		reader.close();
 		bpNames = null;
 		iterator = null;
@@ -758,7 +832,7 @@ public class PoReCNV {
 				GeneCount tcg = new GeneCount(numCounts, exonCounts);
 				geneCounts.put(geneName, tcg);
 				replica.setTotalCounts(replica.getTotalCounts() + numCounts);
-				if (numCounts >= minimumCounts) geneNamesWithMinimumCounts.add(geneName);
+				if (numCounts >= minimumCounts && geneNamesWithMinimumCounts.contains(geneName) == false) geneNamesWithMinimumCounts.add(geneName);
 			}
 		}	
 		//clean up
@@ -773,9 +847,11 @@ public class PoReCNV {
 			int globalExonIndex = 1;
 			ArrayList<GeneExonSample> gesAL = new ArrayList<GeneExonSample>();
 
-			//for genes with minimal counts 
-			for (String geneName: geneNamesToAnalyze){
-				UCSCGeneLine gene = name2Gene.get(geneName);
+			//for each gene, must walk through so that these are sorted by chrom
+			for (UCSCGeneLine gene: genes){
+				//one to analyze?
+				String geneName = gene.getDisplayNameThenName();
+				if (geneNamesWithMinimumCounts.contains(geneName) == false) continue;
 				int numExons = gene.getExons().length;
 
 				//collect exon counts int[sample][exon]
@@ -819,7 +895,7 @@ public class PoReCNV {
 		//chunk
 		ArrayList<GeneExonSample>[][] chunks = chunk(byGlobal, minNumInEachChunk);
 
-		//make objects to run on independant threads
+		//make objects to run on independent threads
 		chunkThreads = new PoReDataChunk[chunks.length];
 		for (int i=0; i< chunks.length; i++){
 			chunkThreads[i] = new PoReDataChunk("batch"+i, chunks[i], this);
@@ -863,10 +939,13 @@ public class PoReCNV {
 		//start counter for all exons to match Alun's code, starts with 1
 		int globalExonIndex = 1;
 		ArrayList<GeneExonSample> gesAL = new ArrayList<GeneExonSample>();
-
-		//for genes with minimal counts 
-		for (String geneName: geneNamesToAnalyze){
-			UCSCGeneLine gene = name2Gene.get(geneName);
+		
+		//for each gene, must walk through so that these are sorted by chrom
+		for (UCSCGeneLine gene: genes){
+			//one to analyze?
+			String geneName = gene.getDisplayNameThenName();
+			if (geneNamesWithMinimumCounts.contains(geneName) == false) continue;
+			
 			//merging exon counts?
 			int numExons;
 			int[][] caseExonCounts;
@@ -920,10 +999,13 @@ public class PoReCNV {
 				}
 			}
 			out.println();
+			
+			//for each gene, must walk through so that these are sorted by chrom
+			for (UCSCGeneLine gene: genes){
+				//one to analyze?
+				String geneName = gene.getDisplayNameThenName();
+				if (geneNamesWithMinimumCounts.contains(geneName) == false) continue;
 
-			//print counts for genes with minimal counts in any replica
-			for (String geneName: geneNamesToAnalyze){
-				UCSCGeneLine gene = name2Gene.get(geneName);
 				ExonIntron[] exons = gene.getExons();
 				int numExons = gene.getExons().length;
 				String chr= gene.getChrom();
@@ -960,8 +1042,6 @@ public class PoReCNV {
 		}
 	}
 
-
-
 	private int[][] fetchExonCounts(String geneName, int numExons, Replica[] samples) {
 		int[][] exonCounts = new int[samples.length][];
 		int[] zero = new int[numExons];
@@ -987,9 +1067,11 @@ public class PoReCNV {
 
 
 	public void loadGeneModels(){
-		//load gene models from refFlat for refSeq UCSC gene table
+		//load gene models from refFlat for refSeq UCSC gene table, sort by chromosome and position
 		UCSCGeneModelTableReader reader = new UCSCGeneModelTableReader(refSeqFile, 0);
 		genes = reader.getGeneLines();
+		Arrays.sort(genes, new UCSCGeneLineChromComparator());
+		
 		if (genes == null || genes.length == 0) Misc.printExit("\nProblem loading your USCS gene model table or bed file? No genes/ regions?\n");
 		//check ordering
 		if (reader.checkStartStopOrder() == false) Misc.printExit("\nOne of your regions's coordinates are reversed. Check that each start is less than the stop.\n");
@@ -1035,6 +1117,7 @@ public class PoReCNV {
 					switch (test){
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'b': bamDirectory = new File(args[++i]); break;
+					case 'v': vcfDirectory = new File(args[++i]); break;
 					case 'c': caseSampleFileNames = Misc.COMMA.split(args[++i]); break;
 					case 'n': controlSampleFileNames = Misc.COMMA.split(args[++i]); break;
 					case 'r': fullPathToR = new File(args[++i]); break;
@@ -1082,16 +1165,29 @@ public class PoReCNV {
 			}
 		}
 		passingExonsByCase = new int[caseSampleFileNames.length];
+		
+		//parse vcf file names?
+		if (vcfDirectory != null){
+			//parse corresponding vcf files
+			for (int i=0; i< caseSampleFileNames.length; i++){
+				String name = Misc.removeExtension(caseSampleFileNames[i]) + ".vcf.gz";
+				File vcf = new File(vcfDirectory, name);
+				if (vcf.exists() == false) Misc.printErrAndExit("Error: cannot find "+name+" in the vcf directory?!\n");
+				//look for index
+				File index = new File(vcfDirectory, name+".tbi");
+				if (index.exists() == false) Misc.printErrAndExit("Error: cannot find "+name+".tbi in the vcf directory?!\n");
+			}
+		}
 
 		//check controls
-		if (controlSampleFileNames != null){
+		/*if (controlSampleFileNames != null){
 			//same number?
 			if (controlSampleFileNames.length != caseSampleFileNames.length) Misc.printErrAndExit("\nError: the number of case and control sample file names differ?\n");
 			for (int i=0; i< controlSampleFileNames.length; i++){
 				File bam = new File(bamDirectory, controlSampleFileNames[i]);
 				if (bam.exists() == false) Misc.printErrAndExit("Error: cannot find the "+controlSampleFileNames[i]+" in the bam directory?!\n");
 			}
-		}
+		}*/
 
 		//look for and or create the save directory
 		if (saveDirectory == null) Misc.printErrAndExit("\nError: enter a directory text to save results.\n");
@@ -1136,7 +1232,7 @@ public class PoReCNV {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              Po Re CNV:   March 2015                             **\n" +
+				"**                                Po Re CNV: April 2015                             **\n" +
 				"**************************************************************************************\n" +
 				"Uses poisson regression and Pearson residuals to identify exons or genes whose counts\n"+
 				"differ significantly from the fitted value base on all the exon sample counts. This\n"+
@@ -1168,6 +1264,8 @@ public class PoReCNV {
 				"-m Minimum number exons per data chunk, defaults to 1500.\n"+
 				"-w Examine whole gene counts for CNVs, defaults to exons.\n"+
 				"-x Keep sex chromosomes (X,Y), defaults to removing.\n"+
+				//"-v VCF file directory, sorted and indexed. Name.vcf.gz must correspond with Name.bam\n"+
+				//"     for matching samples. Use to annotate deletions for possible heterozygous snps. \n"+
 
 				"\n"+
 

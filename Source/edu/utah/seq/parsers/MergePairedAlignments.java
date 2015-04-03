@@ -8,9 +8,7 @@ import util.gen.*;
 import java.util.*;
 
 import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
-import edu.utah.seq.data.ChromData;
 import edu.utah.seq.data.ChromDataSave;
-import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SAMSequenceRecord;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;

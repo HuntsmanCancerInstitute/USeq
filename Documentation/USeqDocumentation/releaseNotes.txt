@@ -3,6 +3,8 @@ CollectBamStats
 * Fixed an issue with setting thresholds for flagging datasets. 
 MergePairedAlignments
 * Fixed an issue when merging bam files with recalibrated base scores. GATK is boosting their base score values past spec.
+CalculatePerCycleErrorRate
+* Dropped support for unsorted sam.gz files, this was causing issues with files that had no phiX.
 
 ----USeq_8.9.0----
 MethylationArrayScanner
