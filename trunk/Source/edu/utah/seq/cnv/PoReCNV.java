@@ -56,8 +56,11 @@ public class PoReCNV {
 	private String annoType = "Exon";
 	private boolean excludeSexChromosomes = true;
 	private int minimumGenotypeQuality = 20;
+	private int maxGap = 25000;
 
 	//internal fields
+	private int numberAdjacentExonsToScan = 15;
+	private Gzipper outPassBed = null;
 	private File graphDirectory;
 	private UCSCGeneLine[] genes;
 	private HashMap<String,UCSCGeneLine[]> chromGenes;
@@ -68,6 +71,7 @@ public class PoReCNV {
 	private Replica[] cases = null;
 	private Replica[] controls = null;
 	private PoReDataChunk[] chunkThreads;
+	private GeneExonSample[][] sampleGES = null;
 
 	//container for cases and their exons that pass the minimumCounts threshold
 	private GeneExonSample[] ges = null;
@@ -77,13 +81,13 @@ public class PoReCNV {
 	private int[] passingExonsByCase = null;
 
 	//from R
-	private float significanceThreshold;
+	private float[] significanceThresholds = null;
+	private float minimumSignificanceThreshold;
 
 	//for loading data
 	private int workingFragmentNameIndexPlus = 1;
 	private int workingFragmentNameIndexMinus = -1;
 	private HashMap<String, Integer> workingFragNameIndex = new HashMap<String, Integer>(10000);
-
 
 	//constructors
 	/**Stand alone.*/
@@ -123,13 +127,19 @@ public class PoReCNV {
 			}
 			//set sig threshold
 			setSignificanceThreshold();
+			
+			//find overlapping variants in exons with a deletion?
+			//if (vcfDirectory != null) searchForHetSNPs();
+			
+			//search for adjacent high scoring exons/ genes
+			searchForAdjacents();
 
 			//write out graph files for each sample
-			System.out.println("\nSaving graphs and spreadsheets...");
+			System.out.println("Saving graphs and spreadsheets...");
 			exportGeneExonSpreadSheets();
 			exportCaseSampleGraphs();
 			
-			System.out.println("\n"+numExonsProcessed+" "+annoType+"s processed, "+numberPassingExons+" passed thresholds ("+minimumLog2Ratio+" Lg2Rto, "+minimumAdjPVal+" AdjPVal)\n");
+			System.out.println("\n"+numExonsProcessed+" "+annoType+"s processed, "+numberPassingExons+" passed thresholds ("+minimumLog2Ratio+" Lg2Rto, "+minimumAdjPVal+" AdjPVal)");
 		}
 
 		//convert graphs to useq format
@@ -137,13 +147,11 @@ public class PoReCNV {
 	}
 
 	private void setSignificanceThreshold() {
-		float[] sigs = new float[chunkThreads.length];
-		for (int i=0; i< sigs.length; i++) sigs[i] = chunkThreads[i].getSignificanceThreshold();
-		//System.out.println("\nSignificance thresholds for each data chunk:\n"+ Misc.floatArrayToString(sigs, ", "));
-		this.significanceThreshold = Num.mean(sigs);
-
+		significanceThresholds = chunkThreads[0].getSignificanceThresholds();
+		System.out.println("\nSignificance thresholds for adjacent "+annoType+"s:\n"+ Misc.floatArrayToString(significanceThresholds, ", ")+"\n");
+		if (significanceThresholds == null) Misc.printErrAndExit("\nError: did not find significance thresholds for the data trunks?\n");
+		minimumSignificanceThreshold = significanceThresholds[significanceThresholds.length-1];
 	}
-
 
 	/**Runs each in its own thread to max threads defined by user. Returns whether all completed without issue.*/
 	private boolean runThreads() {
@@ -214,7 +222,7 @@ public class PoReCNV {
 				sb.append("\t"+name+" Lg2(Ob/Ex)\t"+name+" Res\t"+name+" Counts");
 			}
 			sb.append("\tLog2Rto "+minimumLog2Ratio);
-			sb.append("\tResidual "+minimumAdjPVal+" sig threshold +/- "+significanceThreshold);
+			sb.append("\tResidual "+minimumAdjPVal+" sig threshold +/- for sequential occurances "+Misc.floatArrayToString(significanceThresholds, ","));
 
 			outAll.println(sb);
 			outPass.println(sb);
@@ -287,7 +295,8 @@ public class PoReCNV {
 			
 			//correct index?
 			if (g.getExonIndex() == exonIndex){
-				if (passesThresholds(g)) {
+				//if (passesThresholds(g)) {
+				if (g.isPassedThresholds()){
 					sampPass.add(cases[g.getSampleIndex()].getNameNumber());
 					passingExonsByCase[g.getSampleIndex()]++;
 				}
@@ -351,16 +360,293 @@ public class PoReCNV {
 	}
 
 	private boolean passesThresholds(GeneExonSample g) {
-		if (Math.abs(g.getObsExpLgRto()) < minimumLog2Ratio || Math.abs(g.getResidual()) < significanceThreshold ) return false;
+		if (Math.abs(g.getObsExpLgRto()) < minimumLog2Ratio || Math.abs(g.getResidual()) < significanceThresholds[0] ) return false;
 		return true;
 	}
 	
-	private void searchForHetSNPs(){
-		//split ges by sample
-		GeneExonSample[][] sampleGES = new GeneExonSample[cases.length][numExonsProcessed];
-		for (int i=0; i< ges.length; i++){
-				sampleGES[ges[i].getSampleIndex()][ges[i].getGlobalExonIndex()] = ges[i];
+	private boolean passesThresholds(GeneExonSample first, GeneExonSample second){
+		//check obs/exp 
+		if ( Math.abs(first.getObsExpLgRto()) < minimumLog2Ratio || Math.abs(second.getObsExpLgRto()) < minimumLog2Ratio) return false;
+		
+		//check minimum residual
+		if ( Math.abs(first.getResidual()) < minimumSignificanceThreshold || Math.abs(second.getResidual()) < minimumSignificanceThreshold) return false;
+		
+		//check sign
+		boolean firstIsPositive = first.getResidual() > 0;
+		boolean secondIsPositive = second.getResidual() > 0;
+		if (firstIsPositive != secondIsPositive) return false;
+		
+		//check distance
+		int[] firstStartStop = getStartStop(first);
+		int[] secondStartStop = getStartStop(second);
+		int da = distanceApart(firstStartStop, secondStartStop);
+		if (da > maxGap) return false; 
+		
+		return true;
+	}
+	
+	private boolean passesMinimumThresholds(GeneExonSample first){
+		//check obs/exp 
+		if ( Math.abs(first.getObsExpLgRto()) < minimumLog2Ratio) return false;
+		//check minimum residual
+		if ( Math.abs(first.getResidual()) < minimumSignificanceThreshold) return false;
+		return true;
+	}
+	
+	private int distanceApart(int[] f, int[] s) {
+			//s is left of f
+			if (s[1] < f[0]) return f[0] - s[1];
+			else if (s[0] > f[1]) return s[0] - f[1];
+			//overlap
+			return -1;
+	}
+
+	private int[] getStartStop(GeneExonSample g){
+		UCSCGeneLine gene = g.getGene();
+		ExonIntron[] exons = gene.getExons();
+		int exonIndex = g.getExonIndex();
+		int start;
+		int stop;
+		if (mergeExonCounts) {
+			start = gene.getTxStart();
+			stop = gene.getTxEnd();
 		}
+		else {
+			start = exons[exonIndex].getStart();
+			stop = exons[exonIndex].getEnd();
+		}
+		return new int[]{start, stop};
+	}
+	
+	private void searchForAdjacents() {
+
+		try{
+			outPassBed = new Gzipper(new File(saveDirectory, "results"+annoType+"Pass.bed.gz"));
+			outPassBed.println("#Chr\tStart\tStop\tSampleName:lg2Rto(Obs/Exp)_res_count;\tNumInGroup\tStrand");
+
+			//for each sample
+			for (GeneExonSample[] ges : sampleGES){
+
+				//walk ges and process for each chromosome 
+				String currChr = ges[0].getGene().getChrom();
+				String sampleName = cases[ges[0].getSampleIndex()].getNameNumber();
+				ArrayList<GeneExonSample> chrGes = new ArrayList<GeneExonSample>();
+
+				for (int i=0; i< ges.length; i++){
+					//diff chrom?
+					if (ges[i].getGene().getChrom().equals(currChr) == false) {
+						//diff chrom, write out old
+						searchChromAdjacents(sampleName, currChr, chrGes);
+						//reset and set new
+						currChr = ges[i].getGene().getChrom();
+						chrGes.clear();
+					}
+					chrGes.add(ges[i]);
+				}
+				//process last!
+				searchChromAdjacents(sampleName, currChr, chrGes);
+			}
+			outPassBed.close();
+
+		} catch (Exception e){
+			System.err.println("\nERROR: problem finding and writing bed file of adjacent passing CNVs.\n");
+			e.printStackTrace();
+		}
+	}
+	
+	private void searchChromAdjacents(String sampleName, String chromosome, ArrayList<GeneExonSample> chrGes) throws IOException {
+		//walk through ges looking for adjacent exons/genes that exceed threholds
+		int size = chrGes.size();
+		//build block of passing obs/exp, dist, and minimum sig threshold
+		ArrayList<GeneExonSample> block = new ArrayList<GeneExonSample>();
+		
+		//find first with passing obs/exp,
+		GeneExonSample prior = null;
+		int i=0;
+		for (; i<size; i++){
+			prior = chrGes.get(i);
+			//pass?
+			if (passesMinimumThresholds(prior)){
+				block.add(prior);
+				break;
+			}
+		}
+		//advance
+		i++;
+		 
+		//scan remainder
+		for (; i<size; i++){
+			GeneExonSample next = chrGes.get(i);
+			//fails thresholds?
+			if (passesThresholds(prior, next) == false) {
+				//process and clear
+				ArrayList<int[]> adjClustIndex = processAdjacentBlock(block);
+				if (adjClustIndex != null) printClusters(sampleName, chromosome, block, adjClustIndex);
+				//make method
+				block.clear();
+				//look for next that passes
+				//does next pass single thresholds?
+				if (passesMinimumThresholds(next)){
+					block.add(next);
+					prior = next;
+				}
+				//nope look for it
+				else{
+					i++;
+					for (; i<size; i++){
+						prior = chrGes.get(i);
+						//pass?
+						if (passesMinimumThresholds(prior)){
+							block.add(prior);
+							break;
+						}
+					}
+				}
+			}
+			else {
+				block.add(next);
+				prior = next;
+			}
+		}
+		//process last!
+		ArrayList<int[]> adjClustIndex = processAdjacentBlock(block);
+		if (adjClustIndex != null) printClusters(sampleName, chromosome, block, adjClustIndex);
+	}
+
+	/*This is specific to a particular sample and chromosome*/
+	private void printClusters(String sampleName, String chromosome, ArrayList<GeneExonSample> block, ArrayList<int[]> adjClustIndex) throws IOException {
+		
+		//for each cluster in a sample
+		for (int[] indexes : adjClustIndex){
+			
+			//get first and last for positions
+			GeneExonSample first = block.get(indexes[0]);
+			GeneExonSample last = block.get(indexes[indexes.length-1]);
+			int start = first.getGene().getExons()[first.getExonIndex()].getStart();
+			int stop = last.getGene().getExons()[last.getExonIndex()].getEnd();
+
+			//set first
+			StringBuilder rtoResCnts = new StringBuilder();
+			rtoResCnts.append(first.getDataStringUnderscore());
+			first.setPassedThresholds(true);
+			//System.out.println("NewCluster\n\t"+fetchGeneInfo(first) + first.getDataString());
+			
+			//for subsequent
+			for (int i=1; i< indexes.length; i++){
+				GeneExonSample g = block.get(indexes[i]);
+				rtoResCnts.append(";");
+				rtoResCnts.append(g.getDataStringUnderscore());
+				g.setPassedThresholds(true);
+				//System.out.println("\t"+fetchGeneInfo(g) + g.getDataString());
+			}
+			
+			//print out bed line of chrom start stop sampleName;rto_res_cnts;rto_res_cnts..., # adjacent, .
+			//System.out.println(chromosome+"\t"+start+"\t"+stop+"\t"+sampleName+ "-"+rtoResCnts+"\t"+indexes.length+"\t.");
+			outPassBed.println(chromosome+"\t"+start+"\t"+stop+"\t"+sampleName+ ":"+rtoResCnts+"\t"+indexes.length+"\t.");
+			
+		}
+		
+	}
+
+	/**Returns null if none found passing thresholds. Otherwise int[]s of adjacent indexes where all pass thresholds.*/
+	private ArrayList<int[]> processAdjacentBlock(ArrayList<GeneExonSample> block) {
+		int size = block.size();
+		if (size == 0) return null;
+		
+		ArrayList<int[]> clusteredIndexes = null;
+		//OK all of these have passed the distance, obs/exp ratio, and minimum residual
+		//just one?
+		if (size == 1){
+			if (Math.abs(block.get(0).getResidual()) < significanceThresholds[0]) return null;
+			clusteredIndexes = new ArrayList<int[]>();
+			clusteredIndexes.add(new int[]{0});
+		}
+		//nope more than one so have to do heavy weight scan
+		else {
+			//get residual scores
+			float[] residuals = new float[block.size()];
+			for (int i=0; i< residuals.length; i++) residuals[i] = Math.abs(block.get(i).getResidual());
+			//make clusters, returns clusters of one
+			clusteredIndexes = findLargestPassingAdjacentBlocks(residuals);
+			if (clusteredIndexes.size() == 0) return null;
+		}
+		return clusteredIndexes;
+	}
+	
+	/**Finds the largest cluster of adjacent residuals.*/
+	public ArrayList<int[]> findLargestPassingAdjacentBlocks(float[] residuals){
+		int index = significanceThresholds.length - 1;
+		if ((residuals.length -1) < index) index = residuals.length-1;
+		ArrayList<LinkedHashSet<Integer>> passingHashes = new ArrayList<LinkedHashSet<Integer>>();
+		while (true){
+			//scan and make runs
+			float threshold = significanceThresholds[index];
+			int numInARow = index+1;
+			//System.out.println("Thres "+threshold+", numInRow "+numInARow);
+			//for each position, try to make numInARow
+			for (int i=0; i< residuals.length; i++){
+				boolean pass = true;
+				LinkedHashSet<Integer> passingIndexes = new LinkedHashSet<Integer>();
+				for (int j=0; j<numInARow; j++){
+					int testingIndex = i+j;
+					//too far?
+					if (testingIndex>= residuals.length) {
+						pass = false;
+						break;
+					}
+					//pass threshold?
+					if (residuals[testingIndex] < threshold){
+						pass = false;
+						break;
+					}
+					passingIndexes.add(new Integer(testingIndex));
+				}
+				if (pass){
+					//String x = "nada";
+					//if (passingIndexes.size() !=0) x= passingIndexes.toString();
+					//System.out.println("\t"+i+" "+pass+" "+ x);
+					if (passingIndexes.size() > 0) passingHashes.add(passingIndexes);
+				}
+			}
+			index--;
+			if (index < 0) break;
+		}
+		//System.out.println("\nBiggest clusters");
+
+		//need to find the biggest cluster for each index
+		HashMap<Integer, HashSet<Integer>> biggestClusters = new HashMap<Integer, HashSet<Integer>>();
+		
+		//for each cluster
+		for (int i=0; i< passingHashes.size(); i++){
+			//get the test cluster
+			HashSet<Integer> cluster = passingHashes.get(i);
+			//for each index
+			for (int j=0; j< residuals.length; j++){
+				Integer test = new Integer(j);
+				//index already found? 
+				if (biggestClusters.containsKey(test)) continue;
+				//contained in the test cluster?
+				if (cluster.contains(test)) biggestClusters.put(test, cluster);
+			}
+		}
+		
+		//collapse em
+		HashSet<String> collapsedClusterNames = new HashSet<String>();
+		ArrayList<int[]> collapsedClusters = new ArrayList<int[]>();
+		for (Integer i : biggestClusters.keySet()){
+			HashSet<Integer> cluster = biggestClusters.get(i);
+			String stringRep = cluster.toString();
+			//System.out.println(i+" -> "+biggestClusters.get(i));
+			if (collapsedClusterNames.contains(stringRep) == false){
+				collapsedClusterNames.add(stringRep);
+				collapsedClusters.add(Num.hashSetToInt(cluster));
+			}
+		}
+		return collapsedClusters;
+	}
+	
+	private void searchForHetSNPs(){
+		
 		//for each sample
 		for (int i=0; i< sampleGES.length; i++){
 			
@@ -398,6 +684,7 @@ public class PoReCNV {
 					int position = vc.getStart();
 					GenotypesContext gc = vc.getGenotypes();
 					Iterator<Genotype> gci = gc.iterator();
+					//should be just one for most cases
 					while (gci.hasNext()){
 						Genotype g = gci.next();
 						if (g.hasGQ() && g.getGQ() < minimumGenotypeQuality) continue;
@@ -417,11 +704,6 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 	}
 
 	private void exportCaseSampleGraphs() {
-		//split ges by sample
-		GeneExonSample[][] sampleGES = new GeneExonSample[cases.length][numExonsProcessed];
-		for (int i=0; i< ges.length; i++){
-			sampleGES[ges[i].getSampleIndex()][ges[i].getGlobalExonIndex()] = ges[i];
-		}
 		//make dirs
 		graphDirectory = new File (saveDirectory, "DataTracks");
 		graphDirectory.mkdir();
@@ -559,18 +841,19 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		}
 		else {
 			cases = new Replica[caseSampleFileNames.length];
-			//String[] shortNames = new String[cases.length];
+			String[] shortNames = new String[cases.length];
 			for (int i=0; i< caseSampleFileNames.length; i++){
 				File bam = new File(bamDirectory, caseSampleFileNames[i]);
-				String name = Misc.removeExtension(caseSampleFileNames[i]);
-				//shortNames[i] = name;
-				cases[i] = new Replica(name, bam);
+				shortNames[i] = caseSampleFileNames[i];
+				cases[i] = new Replica(shortNames[i], bam);
 				System.out.print("\t"+caseSampleFileNames[i]);
 				loadReplica(cases[i]);
 				System.out.println("\t"+cases[i].getTotalCounts());
 			}
-			//shortNames = Misc.trimCommon(shortNames);
-			//for (int i=0; i< cases.length; i++) cases[i].setNameNumber(shortNames[i]);
+			//trim ends of names and set
+			shortNames = Misc.trimCommonEnd(shortNames);
+			for (int i=0; i< cases.length; i++) cases[i].setNameNumber(shortNames[i]);
+			
 			IO.saveObject(serCases, cases);
 			IO.saveObject(serGenes, geneNamesWithMinimumCounts);
 		}
@@ -898,7 +1181,8 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		//make objects to run on independent threads
 		chunkThreads = new PoReDataChunk[chunks.length];
 		for (int i=0; i< chunks.length; i++){
-			chunkThreads[i] = new PoReDataChunk("batch"+i, chunks[i], this);
+			boolean outputSigLevels = (i == 0);
+			chunkThreads[i] = new PoReDataChunk("batch"+i, chunks[i], this, outputSigLevels);
 		}
 	}
 
@@ -976,6 +1260,12 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		//save GES
 		ges = new GeneExonSample[gesAL.size()];
 		gesAL.toArray(ges);
+		
+		//split ges by sample for later use
+		sampleGES = new GeneExonSample[cases.length][numExonsProcessed];
+		for (int i=0; i< ges.length; i++){
+			sampleGES[ges[i].getSampleIndex()][ges[i].getGlobalExonIndex()] = ges[i];
+		}
 	}
 
 
@@ -1165,6 +1455,8 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 			}
 		}
 		passingExonsByCase = new int[caseSampleFileNames.length];
+		//check number
+		if (caseSampleFileNames.length < 10) System.out.println("WARNING: less than 10 samples found! This application performs best with > 10 to fit the glm.\n");
 		
 		//parse vcf file names?
 		if (vcfDirectory != null){
@@ -1224,6 +1516,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		sb.append("Max counts\t"); sb.append(maxAlignmentsDepth); sb.append("\n");
 		sb.append("Min log2Rto\t"); sb.append(minimumLog2Ratio); sb.append("\n");
 		sb.append("Max adjPVal\t"); sb.append(minimumAdjPVal); sb.append("\n");
+		sb.append("Max gap adj\t"); sb.append(maxGap); sb.append("\n");
 		sb.append("Num per batch\t"); sb.append(minNumInEachChunk); sb.append("\n");
 		sb.append("Num threads\t"); sb.append(numberConcurrentThreads); sb.append("\n");
 		System.out.println(sb);
@@ -1234,15 +1527,16 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 				"**************************************************************************************\n" +
 				"**                                Po Re CNV: April 2015                             **\n" +
 				"**************************************************************************************\n" +
-				"Uses poisson regression and Pearson residuals to identify exons or genes whose counts\n"+
+				"Uses Poisson regression and Pearson residuals to identify exons or genes whose counts\n"+
 				"differ significantly from the fitted value base on all the exon sample counts. This\n"+
 				"app wraps an algorithm developed by Alun Thomas.  Data tracks are generated for the\n"+
-				"residuals and log2(observed/ fitted counts) as well as detailed spreadsheets. Use for\n"+
-				"identifying CNVs in next gen seq datasets with > 10 normal samples.\n"+
+				"residuals and log2(observed/ fitted counts) as well as detailed spreadsheets. A bed\n"+
+				"regions file of merged adjacent exons passing thresholds is also created. Use this\n"+
+				"app for identifying CNVs in next gen seq datasets with > 10 normal samples.\n"+
 
 				"\nRequired Options:\n"+
 				"-s Save directory.\n"+
-				"-b BAM file directory, sorted and indexed by coordinate.\n"+
+				"-b BAM file directory, sorted and indexed by coordinate. One bam per sample. \n"+
 				"-u UCSC RefFlat or RefSeq gene table file, full path. Tab delimited, see RefSeq Genes\n"+
 				"       http://genome.ucsc.edu/cgi-bin/hgTables, (uniqueName1 name2(optional) chrom\n" +
 				"       strand txStart txEnd cdsStart cdsEnd exonCount (commaDelimited)exonStarts\n" +
@@ -1255,7 +1549,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 				"\nDefault Options:\n"+
 				"-c BAM file names for samples to process, comma delimited, no spaces, defaults to all.\n"+
 				"-r Full path to R, defaults to /usr/bin/R\n"+
-				"-l Minimum log2(obs/exp) for inclusion in the pass spreadsheet, defaults to 0.585\n"+
+				"-l Minimum abs(log2(obs/exp)) for inclusion in the pass spreadsheet, defaults to 0.585\n"+
 				"-p Maximum adjusted p-value for inclusion in the pass spreadsheet, defaults to 0.01\n"+
 				"-e Minimum all sample exon count for inclusion in analysis, defaults to 20.\n"+
 				"-d Max per sample exon alignment depth, defaults to 50000. Exons containing higher\n"+
@@ -1270,7 +1564,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/PoReCNV -s PRCnvResults/  -b BamFiles\n"+
-				"       -u hg19EnsGenes.ucsc.gz -a RBambedSource.R  -g H_sapiens_Feb_2009 -d\n\n" +
+				"       -u hg19EnsGenes.ucsc.gz -a RBambedSource.R  -g H_sapiens_Feb_2009 \n\n" +
 
 				"**************************************************************************************\n");
 
@@ -1309,5 +1603,9 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 
 	public int getNumExonsProcessed() {
 		return numExonsProcessed;
+	}
+
+	public int getNumberAdjacentExonsToScan() {
+		return numberAdjacentExonsToScan;
 	}
 }

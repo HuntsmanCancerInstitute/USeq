@@ -13,6 +13,7 @@ public class GeneExonSample {
 	private float residual;
 	private float obsExpLgRto;
 	private String genotypePosition;
+	private boolean passedThresholds = false;
 
 	public GeneExonSample(UCSCGeneLine gene, int globalExonIndex, short exonIndex, short sampleIndex, int count){
 		this.gene = gene;
@@ -74,8 +75,11 @@ public class GeneExonSample {
 
 	/**Tab delim: log2(obs/exp), residual, count*/
 	public String getDataString() {
-		
 		return obsExpLgRto+"\t"+residual+"\t"+count;
+	}
+	/**_ delim: log2(obs/exp)_residual_count*/
+	public String getDataStringUnderscore() {
+		return obsExpLgRto+"_"+residual+"_"+count;
 	}
 
 	public String getGenotypePosition() {
@@ -84,5 +88,13 @@ public class GeneExonSample {
 
 	public void setGenotypePosition(String genotypePosition) {
 		this.genotypePosition = genotypePosition;
+	}
+
+	public boolean isPassedThresholds() {
+		return passedThresholds;
+	}
+
+	public void setPassedThresholds(boolean passedThresholds) {
+		this.passedThresholds = passedThresholds;
 	}
 }

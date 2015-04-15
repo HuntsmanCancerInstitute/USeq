@@ -338,6 +338,25 @@ public class Misc {
 		return trimmed;
 	}
 	
+	/**Trims the comon chars from the back of each line, won't entirely delete line.*/
+	public static String[] trimCommonEnd(String[] lines){
+		//this is sort of lazy Nix! :)
+		//reverse
+		String[] trimmed = new String[lines.length];
+		for (int i=0; i< lines.length; i++){
+			trimmed[i] = new StringBuffer(lines[i]).reverse().toString();
+		}
+		//trim start of reversed lines
+		trimmed = trimCommonStart(trimmed);
+		//reverse lines
+		for (int i=0; i< lines.length; i++){
+			trimmed[i] = new StringBuffer(trimmed[i]).reverse().toString();
+		}
+		return trimmed;
+	}
+	
+
+	
 	/**Given a String of 'treat1=/file1,treat2=/file3, etc', no spaces,
 	 * returns a LinkedHashMap of keys=values.
 	 * Returns null if an error is found.*/
