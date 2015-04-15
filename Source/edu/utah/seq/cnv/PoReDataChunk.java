@@ -15,8 +15,9 @@ public class PoReDataChunk extends Thread{
 	//fields
 	private GeneExonSample[] exonSample;
 	private PoReCNV poisRegCNV;
-	private float significanceThreshold;
+	private float[] significanceThresholds;
 	private String name;
+	private boolean outputSigLevels;
 	
 	//0 waiting to start, 1 running, 2 complete w/o errors, 3 errors
 	private int status = 0;
@@ -30,7 +31,7 @@ public class PoReDataChunk extends Thread{
 	private File sigLevelFile;
 	
 	//constructor
-	public PoReDataChunk (String name, ArrayList<GeneExonSample>[] s, PoReCNV poisRegCNV){
+	public PoReDataChunk (String name, ArrayList<GeneExonSample>[] s, PoReCNV poisRegCNV, boolean outputSigLevels){
 		//get total counts
 		int num = 0;
 		for (int i=0; i< s.length; i++) num+= s[i].size();
@@ -42,6 +43,7 @@ public class PoReDataChunk extends Thread{
 		}
 		this.poisRegCNV = poisRegCNV;
 		this.name = name;
+		this.outputSigLevels = outputSigLevels;
 	}
 
 	//methods
@@ -58,7 +60,7 @@ public class PoReDataChunk extends Thread{
 				scriptFile.delete();
 				residualsFile.delete();
 				obsExpLg2RtosFile.delete();
-				sigLevelFile.delete();
+				if (sigLevelFile != null) sigLevelFile.delete();
 			}
 			status = 2;
 		}
@@ -86,8 +88,10 @@ public class PoReDataChunk extends Thread{
 			sb.append("x = readdata('"+countTableFile+"',3,3)\n");
 			sb.append("x = fitmodel(x)\n");
 			sb.append("exportCNVData(x, '"+poisRegCNV.getSaveDirectory() 
-					+"', '"+name+"', testsig="+poisRegCNV.getMinimumAdjPVal()
-					+", ntests="+poisRegCNV.getNumExonsProcessed()+" )\n");
+					+"', '"+name+"' )\n");
+			if (outputSigLevels) sb.append("exportSigThresholds(x, '"+poisRegCNV.getSaveDirectory() 
+					+"', '"+name+"', "+poisRegCNV.getMinimumAdjPVal()
+					+", "+poisRegCNV.getNumExonsProcessed()+", "+poisRegCNV.getNumberAdjacentExonsToScan()+" )\n");
 
 			//write script to file
 			scriptFile = new File (poisRegCNV.getSaveDirectory(), name+"Cnv_RScript.R");
@@ -110,8 +114,8 @@ public class PoReDataChunk extends Thread{
 			//look for results files
 			residualsFile = new File (poisRegCNV.getSaveDirectory(), name+"Residuals.txt");
 			obsExpLg2RtosFile = new File (poisRegCNV.getSaveDirectory(), name+"ObsExpLg2Rtos.txt");
-			sigLevelFile = new File (poisRegCNV.getSaveDirectory(), name+"SigLevel.txt");
-			if (residualsFile.exists() == false || obsExpLg2RtosFile.exists() == false || sigLevelFile.exists() == false){
+			if (outputSigLevels) sigLevelFile = new File (poisRegCNV.getSaveDirectory(), name+"SigLevel.txt");
+			if (residualsFile.exists() == false || obsExpLg2RtosFile.exists() == false || (outputSigLevels == true && sigLevelFile.exists() == false) ){
 				throw new IOException("\nError: cannot find the R results files? Check the "+rOut.getName()+" log file for errors.\n");
 			}
 		} catch (IOException e) {
@@ -127,9 +131,9 @@ public class PoReDataChunk extends Thread{
 			//load data
 			float[] residuals = Num.loadFloats(residualsFile);
 			float[] obsExpRtos = Num.loadFloats(obsExpLg2RtosFile);
-			float[] sigLevelArray = Num.loadFloats(sigLevelFile);
+			if (outputSigLevels) significanceThresholds = Num.loadFloats(sigLevelFile);
 			//check
-			if (residuals == null || residuals.length != exonSample.length || obsExpRtos == null || obsExpRtos.length != exonSample.length || sigLevelArray == null || sigLevelArray.length !=1){
+			if (residuals == null || residuals.length != exonSample.length || obsExpRtos == null || obsExpRtos.length != exonSample.length || (outputSigLevels == true && significanceThresholds == null) ){
 				throw new Exception("\nError: cannot load appropriate data from R results, check logs.\n");
 			}
 			//load em
@@ -137,7 +141,6 @@ public class PoReDataChunk extends Thread{
 				exonSample[i].setResidual(residuals[i]);
 				exonSample[i].setObsExpLgRto(obsExpRtos[i]);
 			}
-			significanceThreshold = sigLevelArray[0];
 
 		} catch (Exception e){
 			e.printStackTrace();
@@ -147,8 +150,8 @@ public class PoReDataChunk extends Thread{
 	}
 
 	//getters and setters
-	public float getSignificanceThreshold() {
-		return significanceThreshold;
+	public float[] getSignificanceThresholds() {
+		return significanceThresholds;
 	}
 	public int getStatus() {
 		return status;

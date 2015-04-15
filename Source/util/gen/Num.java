@@ -2852,11 +2852,14 @@ public class Num {
 			while((line= in.readLine()) != null){
 				line = line.trim();
 				if (line.length() == 0) continue;
-				if (line.contains("Inf")) al.add(defaultValue);
-				else {
-					Float val = Float.valueOf(line);
-					if (val.floatValue() > maxValue) maxValue = val.floatValue();
-					al.add(val);
+				String[] tokens = Misc.TAB.split(line);
+				for (String t : tokens){
+					if (t.contains("Inf"))al.add(defaultValue);
+					else {
+						Float val = Float.valueOf(t);
+						if (val.floatValue() > maxValue) maxValue = val.floatValue();
+						al.add(val);
+					}
 				}
 			}
 			values = Num.arrayListOfFloatToArray(al);

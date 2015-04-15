@@ -323,7 +323,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		StringBuffer full = new StringBuffer(getChromosome() + "\t" + getPosition() + "\t" + endPos + "\t" + getReference() + "\t" + 
 							altS + "\t" + String.valueOf(getQuality()));
 		full.append("\t" + info.buildInfoForTable(infoToAdd, style, comments));
-		for (VCFSample sample: sample) {
+		for (VCFSample sample: this.sample) {
 			String genotype = sample.getGenotypeGT();
 			if (sample.isNoCall()) {
 				full.append("\tNA");

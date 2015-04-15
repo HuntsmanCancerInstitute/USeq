@@ -1,3 +1,7 @@
+----USeq_8.9.2----
+PoReCNV
+* New app for detecting CNV variants in large sets of exon or gene capture panels.  Wraps an algorithm by Alun Thomas.  
+
 ----USeq_8.9.1----
 CollectBamStats
 * Fixed an issue with setting thresholds for flagging datasets. 

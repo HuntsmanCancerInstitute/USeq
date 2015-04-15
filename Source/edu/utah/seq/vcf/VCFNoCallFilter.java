@@ -35,6 +35,7 @@ public class VCFNoCallFilter {
 			BufferedReader in = parser.initializeParser();
 			
 			String[] sampleNames = parser.getSampleNames();
+			if (stopIndex==0) stopIndex = sampleNames.length;
 			System.out.print("\t"+ sampleNames[startIndex]+"-"+sampleNames[stopIndex-1]);
 			
 			String name = Misc.removeExtension(vcf.getName());
@@ -136,17 +137,17 @@ public class VCFNoCallFilter {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCFNoCallFilter: Jan 2015                           **\n" +
+				"**                             VCFNoCallFilter: April 2015                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses multi sample VCF records for too many no call or low Genotype Quality records.\n"+
-				"Good for removing records where the background is poorly called. Run on bk and sub.\n"+
+				"Good for removing records where the background is poorly called.\n"+
 
 				"\nRequired Options:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).\n" +
-				"-m Maximum number no call or low GQ samples to pass a record.\n"+
-				"-b Beginning sample index, zero based, included.\n"+
-				"-e Ending sample index, not included.\n"+
-				"-g Minimum Genotype Quality GQ, defaults to 13.\n"+
+				"-m Maximum number no call or low GQ samples to pass a record\n"+
+				"-b Beginning sample index, zero based, included, defaults to 0\n"+
+				"-e Ending sample index, not included, defaults to last\n"+
+				"-g Minimum Genotype Quality GQ, defaults to 13\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/VCFNoCallFilter -v /VCFFiles/ -m 5 -b 15 -e 83 \n\n" +
 				"**************************************************************************************\n");
