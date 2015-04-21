@@ -338,7 +338,7 @@ public class CalculatePerCycleErrorRate {
 		int counter2 = 0;
 		int maxFirstPair = 0;
 		int maxSecondPair = 0;
-		Pattern pat = Pattern.compile("(\\d+)M");
+		//Pattern pat = Pattern.compile("(\\d+)M");
 		while (it.hasNext()) {
 			SAMRecord sam = it.next();
 		
@@ -348,21 +348,18 @@ public class CalculatePerCycleErrorRate {
 			//does it pass the vendor qc?
 			if (sam.getReadFailsVendorQualityCheckFlag()) continue;
 
-			Matcher mat = pat.matcher(sam.getCigarString());
-			if (mat.matches()){
-				int cycles = Integer.parseInt(mat.group(1));
-				if (sam.getReadNegativeStrandFlag()) {
-					if (maxSecondPair < cycles) {
-						maxSecondPair = cycles;
-						counter1++;
-					}
-
+			//Matcher mat = pat.matcher(sam.getCigarString());
+			int cycles = sam.getReadString().length();
+			if (sam.getReadNegativeStrandFlag()) {
+				if (maxSecondPair < cycles) {
+					maxSecondPair = cycles;
+					counter1++;
 				}
-				else if (maxFirstPair < cycles) {
-					maxFirstPair = cycles;
-					counter2++;
-				}
+			} else if (maxFirstPair < cycles) {
+				maxFirstPair = cycles;
+				counter2++;
 			}
+			
 			//Removing exit condition.  There are instances were the first 10000 reads are read1 and when a read2 is encountered, the program crashes.
 			if (counter1 > 10000 && counter2 > 10000) break;
 			
@@ -414,6 +411,7 @@ public class CalculatePerCycleErrorRate {
 			//a match
 			if (call.equals("M")) {
 				for (int i = 0; i< numberBases; i++) {
+				
 					if (chromSeq[start] == seq[seqIndex]) {
 						if (cycleSubtractor !=0) correctBases[localIndex][cycleSubtractor - seqIndex]++;
 						else correctBases[localIndex][seqIndex]++;
