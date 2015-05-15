@@ -46,5 +46,6 @@
 	<classpathentry kind="lib" path="LibraryJars/servlet-api.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/TableLayout.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/samtools-htsjdk"/>
 	<classpathentry kind="output" path="Classes"/>
 </classpath>
