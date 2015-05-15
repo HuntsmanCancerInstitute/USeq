@@ -30,6 +30,10 @@ public class SamAlignment {
 	private boolean spliceJunction = false;
 	private boolean convertedJunctionCoordinates = false;
 	private int misc;
+	private int FM = Integer.MIN_VALUE; //Family Members
+	private int[] PV = null;
+	private String SVTagString = null;
+	private Boolean PassesBarcodeQC = null;
 
 	//static patterns
 	private static final Pattern TAB = Pattern.compile("\t");
@@ -54,7 +58,7 @@ public class SamAlignment {
 	public static final Pattern CIGAR_STARTING_HARD_MASK = Pattern.compile("^(\\d+)[H].+");
 	public static final Pattern CIGAR_STOP_HARD_MASK= Pattern.compile(".+\\D(\\d+)[H]$");
 	public static final Pattern BAD_NAME = Pattern.compile("(.+)/([12])$");
-	
+
 	//private boolean debug = true;
 
 
@@ -80,7 +84,7 @@ public class SamAlignment {
 		//note subtracting 1 to put into interbase coordinates
 		position = Integer.parseInt(tokens[3])-1;
 		mappingQuality = Integer.parseInt(tokens[4]);
-		cigar = tokens[5];		
+		cigar = tokens[5];	
 		mateReferenceSequence = tokens[6];
 		if (fixNonChrChroms) mateReferenceSequence = fixChromosomeName(mateReferenceSequence);
 		matePosition = Integer.parseInt(tokens[7])-1;
@@ -99,7 +103,7 @@ public class SamAlignment {
 	}
 
 	//methods
-	
+
 	/**Takes the original fastq sequence and formats it to match this cigar and orientation.*/
 	public String processOriginalSequence(String originalSequence){
 		String fixedSeq = new String (originalSequence);
@@ -125,7 +129,7 @@ public class SamAlignment {
 		}
 		return fixedSeq;
 	}
-	
+
 	/**For reads with H or S masking, strips off these notations from the CIGAR and for S trims the read sequence and base qualities. H's are already trimmed.*/
 	public void trimMaskingOfReadToFitAlignment(){
 		//remove hard masking references in cigar
@@ -138,7 +142,7 @@ public class SamAlignment {
 			}
 			cigar = sb.toString();
 		}
-		
+	
 		//look for soft masking
 		if (cigar.contains("S")){
 			//at beginning? ^(\\d+)[SH].+
@@ -149,7 +153,7 @@ public class SamAlignment {
 				qualities = qualities.substring(basesToTrim);
 				cigar = cigar.substring(mat.group(1).length()+1);
 			}
-			
+		
 			//at end?  .+\\D(\\d+)[SH]$
 			mat = CIGAR_STOP_MASKED.matcher(cigar);
 			if (mat.matches()){
@@ -288,8 +292,8 @@ public class SamAlignment {
 		inferredInsertSize = 0;
 	}
 
-	public boolean convertTranscriptomeAlignment(boolean tossMDAndRGTags) throws MalformedSamAlignmentException{	
-		
+	public boolean convertTranscriptomeAlignment(boolean tossMDAndRGTags) throws MalformedSamAlignmentException{
+	
 		//split on :
 		String[] segments = COLON.split(referenceSequence);
 		String coordinatesString = null;
@@ -352,7 +356,7 @@ public class SamAlignment {
 
 		return true;
 	}
-	
+
 	/**Replaces or adds an NH:i tag denoting the number of times this read is aligned in the sam file, 1 = unique;
 	 * NH:i:1 or more.*/
 	public void addAlignmentCountTag (int numberAlignmentsForThisRead){
@@ -366,7 +370,167 @@ public class SamAlignment {
 		tags = new String[tagsAL.size()];
 		tagsAL.toArray(tags);
 	}
+
+	/**Gets a PV:Z: tag denoting the summed phred score for a base call
+	 * from the full Barcoded Molecular Families tags.*/
+	public String getSummedPhredTag (){
+		//remove existing
+		for (String tag : tags){
+			if (tag.startsWith("PV:Z:")){
+				return tag.split(":")[2];
+			}
+		}
+		return null;
+	}
+
+	/**Gets a PV:Z: tag denoting the summed phred score for a given base call
+	 * from the full Barcoded Molecular Families tags, then parses that into
+	 * an array of ints.*/
+	public int[] getSummedPhredArray (){
+		if(PV == null){
+			setSummedPhredArray();
+		}
+		return PV;
+	}
 	
+	public void setSummedPhredArray (){
+		for (String tag : tags){
+			if (tag.startsWith("PV:Z:")){
+				String[] PVEntries = tag.split(":")[2].split(".");
+				int[] PhredValues = new int[PVEntries.length];
+				for (int i=0; i < PVEntries.length; i++){
+					PhredValues[i] = Integer.parseInt(PVEntries[i]);
+				}
+				PV = PhredValues;
+			}
+		}
+	}
+	
+	/**Gets an SV:Z: tag denoting a list of features considered relevant to
+	 * structural variants, returning a String.*/
+	public void setSVTag (){
+		for (String tag : tags){
+			if (tag.startsWith("SV:Z:")){
+				SVTagString = tag.split(":")[2];
+				}
+			}
+	}
+	
+	/**Gets an SV:Z: tag denoting a list of features considered relevant to
+	 * structural variants, returning a String.*/
+	public String getSVTag (){
+		if(SVTagString == null){
+			setSVTag();
+		}
+		return SVTagString;
+	}
+	
+	/**Gets an SV:Z: tag denoting a list of features considered relevant to
+	 * structural variants, returning a String.*/
+	public String[] getSVTagArray (){
+		for (String tag : tags){
+			if (tag.startsWith("SV:Z:")){
+				return tag.split(":")[2].split(",");
+				}
+			}
+	return null;
+	}
+
+	/**Gets a FA:Z: tag denoting the number of agreed reads for a given base
+	 * case from the full Barcoded Molecular Families tags.*/
+	public String getFamilyAgreementTag (){
+		for (String tag : tags){
+			if (tag.startsWith("FA:Z:")){
+				return tag.split(":")[2];
+				}
+			}
+	return null;
+	}
+
+	/**Gets a FA:Z: tag denoting the number of agreed reads for a given 
+	 * base call given the full Barcoded Molecular Families tags and
+	 * parses it into an array of ints.*/
+	public int[] getFamilyAgreementArray (){
+		for (String tag : tags){
+			if (tag.startsWith("FA:Z:")){
+				String[] FAEntries = tag.split(":")[2].split(".");
+				int[] FAValues = new int[FAEntries.length];
+				for (int i=0; i < FAEntries.length; i++){
+					FAValues[i] = Integer.parseInt(FAEntries[i]);
+				}
+				return FAValues;
+			}
+		}
+	return null;
+	}
+
+	/**Gets a NF:f: tag denoting the number members in a molecular family.*/
+	public float getNumberOfDifferencesPerFMTag (){
+		for (String tag : tags){
+			if (tag.startsWith("NF:f:")){
+				return Float.parseFloat(tag.split(":")[2]);
+			}
+		}
+		return Float.MIN_VALUE;
+	}
+
+	/**Gets a ND:i: tag denoting the number members in a molecular family.*/
+	public int getNumberOfDifferencesTag (){
+		for (String tag : tags){
+			if (tag.startsWith("ND:i:")){
+				return Integer.parseInt(tag.split(":")[2]);
+			}
+		}
+		return Integer.MIN_VALUE;
+	}
+
+
+	/**Gets a FM:i: tag denoting the number members in a molecular family.*/
+	public int getFamilySizeTag (){
+		if(FM != Integer.MIN_VALUE)
+			return FM;
+		setFamilySizeTag();
+		return FM;
+	}
+
+	public void setFamilySizeTag (){
+		for (String tag : tags){
+		    if (tag.startsWith("FM:i:"))
+			    FM = Integer.parseInt(tag.split(":")[2]);
+		}		
+	}
+
+	/**Gets a AF:f: tag denoting the fraction of bases aligned to the
+	 * reference (M in cigar string).*/
+	public float getAlignedFraction(){
+		for (String tag : tags){
+			if (tag.startsWith("AF:f:")){
+				return Float.parseFloat(tag.split(":")[2]);
+			}
+		}
+		return Float.MIN_VALUE;
+	}
+
+	/**Gets a FP:Z: tag denoting whether the flattened read passed
+	 * bmftools dmp QC.
+	 * If tag is not present, return False.*/
+	public void setBarcodeQCTag(){
+		for (String tag : tags){
+			if (tag.startsWith("FP:Z:")){
+				PassesBarcodeQC = Boolean.parseBoolean(tag.split(":")[2]);
+			}
+		}
+		PassesBarcodeQC = false;
+	}
+
+	public boolean getBarcodeQCTag(){
+		if(PassesBarcodeQC == null){
+			setBarcodeQCTag();
+		}
+		return PassesBarcodeQC;
+	}
+
+
 	/**Replaces or adds a MP:A: tag denoting whether it was merged T or failed merging F.*/
 	public void addMergeTag (boolean successfullyMerged){
 		ArrayList<String> tagsAL = new ArrayList<String>();
@@ -389,7 +553,7 @@ public class SamAlignment {
 		}
 		return 0;
 	}
-	
+
 	/**Looks for the splice junction alignment tag SJ:Z:xxxxxx returns null if not found or the associated splice junction info, e.g. chr20:744550-744647_745851-745948 */
 	public String getSJTagValue (){
 		for (String tag : tags){
@@ -397,7 +561,7 @@ public class SamAlignment {
 		}
 		return null;
 	}
-	
+
 	/**Looks for the polyA tag At:i:### returns null if not found or the length of polyA from the tag, e.g. At:i:9 will return 9 for the length of the polyA tag */
 	public Integer getAtPolyATagValue (){
 		Integer pALength;
@@ -410,7 +574,7 @@ public class SamAlignment {
 		}
 		return null;
 	}
-	
+
 	/**remove polyA tag from rest of tags*/
 	public void removePolyAtag(){
 		ArrayList<String> tempTags = new ArrayList<String>();
@@ -493,7 +657,7 @@ public class SamAlignment {
 				//add Ns for cases where the I occurred in the gap
 				for (int i=0; i< startStop.length; i++){
 					if (startPosition == startStop[i][0]){
-						int len = startStop[i][0] - startStop[i-1][1];				
+						int len = startStop[i][0] - startStop[i-1][1];			
 						cigarSB.append(len);
 						cigarSB.append("N");
 						break;
@@ -501,17 +665,17 @@ public class SamAlignment {
 				}
 			}
 			//a deletion
-			else if (call.equals("D")) {	
+			else if (call.equals("D")) {
 				//add Ns for cases where D occurs on 1st base of next exon
 				for (int i=0; i< startStop.length; i++){
 					if (startPosition == startStop[i][0]){
-						int len = startStop[i][0] - startStop[i-1][1];					
+						int len = startStop[i][0] - startStop[i-1][1];				
 						cigarSB.append(len);
 						cigarSB.append("N");
 						break;
 					}
 				}
-				
+			
 				cigarSB.append(mat.group());
 				//fetch the ss
 				int[] ss = null;
@@ -557,7 +721,7 @@ public class SamAlignment {
 
 		//find starting chunk
 		for (int i=0; i< startStop.length; i++){
-			
+		
 			if (startStop[i][0]<= startPosition && startStop[i][1] > startPosition){
 
 				//calc remaining bases in this ss
@@ -688,7 +852,7 @@ public class SamAlignment {
 		return thisX.hashCode();
 	}
 
-	
+
 	/**Counts the number of genomic bps covered by the cigar string. Only counts M D and N.*/
 	public int countLengthOfAlignment (){
 		return countLengthOfAlignment(cigar);
@@ -704,7 +868,7 @@ public class SamAlignment {
 		}
 		return length;
 	}
-	
+
 	/**Counts the number of things in CIGAR, H,S,M,D,I,N .*/
 	public static int countLengthOfCIGAR (String cigar){
 		int length = 0;
@@ -712,7 +876,7 @@ public class SamAlignment {
 		while (mat.find()) length += Integer.parseInt(mat.group(1));
 		return length;
 	}
-	
+
 	/**Counts the number of MIN bases in the cigar string. This is the length of the insert for merged pairs.*/
 	public static int countLengthOfCigarMIN (String cigar){
 		int length = 0;
@@ -723,7 +887,7 @@ public class SamAlignment {
 		}
 		return length;
 	}
-	
+
 	/**Counts the number of soft masked bases in CIGAR.*/
 	public int countLengthOfSoftMaskedBases (){
 		int length = 0;
@@ -734,7 +898,7 @@ public class SamAlignment {
 		}
 		return length;
 	}
-	
+
 	/**Counts the number of soft masked bases in CIGAR either at the start/left or the end/right.*/
 	public int countLengthOfSidedSoftMaskedBases (boolean countLeft){
 		int length = 0;
@@ -745,7 +909,7 @@ public class SamAlignment {
 		if (mat.matches()) length = Integer.parseInt(mat.group(1));
 		return length;
 	}
-	
+
 	/**Replaces soft masked bases with matches for display in IGB*/
 	public void deSoftMaskCigar() {
 		StringBuffer cigarSB = new StringBuffer();
@@ -765,9 +929,9 @@ public class SamAlignment {
 
 		//assign
 		cigar = cigarSB.toString();
-		
-	}
 	
+	}
+
 	/**Assumes interbase coordinates for start and returned blocks.*/
 	public static ArrayList<int[]> fetchAlignmentBlocks(String cigar, int start){
 		//for each cigar block
@@ -785,7 +949,7 @@ public class SamAlignment {
 		}
 		return blocks;
 	}
-	
+
 	/**If cigar starts with a hard or soft mask, the number bases masked is subtracted from the position, otherwise just returns the position.*/
 	public int getUnclippedStart() {
 		Matcher m = CIGAR_STARTING_MASK.matcher(cigar);
@@ -793,7 +957,7 @@ public class SamAlignment {
 		int num = Integer.parseInt(m.group(1));
 		return position - num;
 	}
-	
+
 
 	/**
 	 * Index	Index^2	MethodName	Flag	DescriptionFromSamSpec
@@ -902,7 +1066,7 @@ public class SamAlignment {
 	public int getMappingQuality() {
 		return mappingQuality;
 	}
-	
+
 	/**Looks for the MD:Z: field in the tags. Returns null if not found.*/
 	public String getMD(){
 		if (md == null) {
@@ -916,7 +1080,7 @@ public class SamAlignment {
 		}
 		return md;
 	}
-	
+
 	public void removeMD(){
 		ArrayList<String> goodTags = new ArrayList<String>();
 		for (String tag : tags){
@@ -998,7 +1162,7 @@ public class SamAlignment {
 		this.misc = misc;
 	}
 
-	
+
 
 
 }
