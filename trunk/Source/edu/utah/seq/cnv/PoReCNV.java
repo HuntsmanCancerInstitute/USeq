@@ -72,6 +72,7 @@ public class PoReCNV {
 	private Replica[] controls = null;
 	private PoReDataChunk[] chunkThreads;
 	private GeneExonSample[][] sampleGES = null;
+	private double[] caseTotalCounts = null;
 
 	//container for cases and their exons that pass the minimumCounts threshold
 	private GeneExonSample[] ges = null;
@@ -131,11 +132,16 @@ public class PoReCNV {
 			//find overlapping variants in exons with a deletion?
 			//if (vcfDirectory != null) searchForHetSNPs();
 			
+			//calculate count zscores
+			System.out.println("On target counts:");
+			calculateZScores();
+			
 			//search for adjacent high scoring exons/ genes
 			searchForAdjacents();
+			
 
 			//write out graph files for each sample
-			System.out.println("Saving graphs and spreadsheets...");
+			System.out.println("\nSaving graphs and spreadsheets...");
 			exportGeneExonSpreadSheets();
 			exportCaseSampleGraphs();
 			
@@ -219,7 +225,7 @@ public class PoReCNV {
 			StringBuilder sb = new StringBuilder(gn+"\tCoordinates\tExon Index\tIGB Link\tIGV Link\tPassing Samples");
 			for (int i=0; i< cases.length; i++){
 				String name = cases[i].getNameNumber();
-				sb.append("\t"+name+" Lg2(Ob/Ex)\t"+name+" Res\t"+name+" Counts");
+				sb.append("\t"+name+" Lg2(Ob/Ex)\t"+name+" Res\t"+name+" Z\t"+name+" Counts");
 			}
 			sb.append("\tLog2Rto "+minimumLog2Ratio);
 			sb.append("\tResidual "+minimumAdjPVal+" sig threshold +/- for sequential occurances "+Misc.floatArrayToString(significanceThresholds, ","));
@@ -422,7 +428,7 @@ public class PoReCNV {
 
 		try{
 			outPassBed = new Gzipper(new File(saveDirectory, "results"+annoType+"Pass.bed.gz"));
-			outPassBed.println("#Chr\tStart\tStop\tSampleName:lg2Rto(Obs/Exp)_res_count;\tNumInGroup\tStrand");
+			outPassBed.println("#Chr\tStart\tStop\tSampleName:lg2Rto(Obs/Exp)_res_z_count;\tNumInGroup\tStrand");
 
 			//for each sample
 			for (GeneExonSample[] ges : sampleGES){
@@ -711,6 +717,9 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		resDir.mkdir();
 		File rtoDir = new File (graphDirectory, annoType+"ObsExpLog2Rto");
 		rtoDir.mkdir();
+		File zDir = new File (graphDirectory, annoType+"ZScores");
+		zDir.mkdir();
+		
 		
 		//double[] cv = new double[cases.length];
 		
@@ -724,7 +733,10 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 			File rtoSampDir = new File (rtoDir, "oe_"+cases[i].getNameNumber());
 			rtoSampDir.mkdir();
 			rtoSampDir.deleteOnExit();
-			saveGraphs(cases[i].getNameNumber(), sampleGES[i], resSampDir, rtoSampDir);
+			File zSampDir = new File (zDir, "z_"+cases[i].getNameNumber());
+			zSampDir.mkdir();
+			zSampDir.deleteOnExit();
+			saveGraphs(cases[i].getNameNumber(), sampleGES[i], resSampDir, rtoSampDir, zSampDir);
 			//calc residual stats
 			float[] res = getResiduals(sampleGES[i]);
 			Arrays.sort(res);
@@ -737,6 +749,40 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		//for (int i=0; i< sampleGES.length; i++){
 			//System.out.println(caseSampleFileNames[i]+"\t"+cv[i]);
 		//}
+		
+	}
+	
+	private void calculateZScores(){
+		//container for every exon
+		StandardDeviation[] sd = new StandardDeviation[sampleGES[0].length];
+		for (int i=0; i< sd.length; i++) sd[i] = new StandardDeviation();
+		
+		//for each sample
+		for (int i=0; i< sampleGES.length; i++){
+			//calc residual stats
+			double[] rawCounts = getCounts(sampleGES[i]);
+			//normalize
+			double total = caseTotalCounts[i];
+			for (int j=0; j< rawCounts.length; j++) {
+				double normCount = rawCounts[j]/total;
+				sd[j].count(normCount);
+			}
+			
+			System.out.println(Misc.removeExtension(caseSampleFileNames[i])+"\t"+(int)caseTotalCounts[i]);
+		}
+		
+		//now calc and set z-score for each exon
+		//for each sample
+		for (int i=0; i< sampleGES.length; i++){
+			double total = caseTotalCounts[i];
+			//for each exon
+			for (int j=0; j< sd.length; j++){
+				double count = sampleGES[i][j].getCount()/total;
+				double z = sd[j].getZScore(count);
+				sampleGES[i][j].setZscore((float)z);
+			}
+		}
+		
 		
 	}
 
@@ -753,8 +799,14 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		for (int i=0; i< ges.length; i++) residuals[i] = ges[i].getResidual();
 		return residuals;
 	}
+	
+	private double[] getCounts(GeneExonSample[] ges) {
+		double[] c = new double[ges.length];
+		for (int i=0; i< ges.length; i++) c[i] = ges[i].getCount();
+		return c;
+	}
 
-	private void saveGraphs(String sampleName, GeneExonSample[] ges, File resDir, File rtoDir) {
+	private void saveGraphs(String sampleName, GeneExonSample[] ges, File resDir, File rtoDir, File zDir) {
 		//walk through data and make a SmoothingWindow[] for each chrom
 		String currChr = ges[0].getGene().getChrom();
 		ArrayList<SmoothingWindow> smAL = new ArrayList<SmoothingWindow>();
@@ -774,7 +826,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 				stop = exon.getEnd();
 			}
 
-			SmoothingWindow sm = new SmoothingWindow(start, stop, new float[]{ges[i].getResidual(), ges[i].getObsExpLgRto()});
+			SmoothingWindow sm = new SmoothingWindow(start, stop, new float[]{ges[i].getResidual(), ges[i].getObsExpLgRto(), ges[i].getZscore()});
 
 			//diff chrom?
 			if (ges[i].getGene().getChrom().equals(currChr) == false) {
@@ -783,7 +835,8 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 				SmoothingWindow[] sms = new SmoothingWindow[smAL.size()];
 				smAL.toArray(sms);
 				saveStairStepGraph(0, sms, info, resDir, "#FF0000", true); //red
-				saveStairStepGraph(1, sms, info, rtoDir, "#FFFF00", true); //yellow
+				saveStairStepGraph(1, sms, info, rtoDir, "#0000FF", true); //blue
+				saveStairStepGraph(2, sms, info, zDir, "#00FF00", true); //green
 
 				//reset and set new
 				currChr = ges[i].getGene().getChrom();
@@ -797,7 +850,8 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		SmoothingWindow[] sms = new SmoothingWindow[smAL.size()];
 		smAL.toArray(sms);		
 		saveStairStepGraph(0, sms, info, resDir, "#FF0000", true); //red
-		saveStairStepGraph(1, sms, info, rtoDir, "#FFFF00", true); //yellow
+		saveStairStepGraph(1, sms, info, rtoDir, "#0000FF", true); //blue
+		saveStairStepGraph(2, sms, info, zDir, "#00FF00", true); //green
 	}
 
 	/**Saves bar heatmap/ stairstep graph files*/
@@ -888,6 +942,9 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		System.out.println();
 		System.out.println(geneNamesWithMinimumCounts.size()+" genes, with >= "+minimumCounts+" and < "+maxAlignmentsDepth+" counts, will be examined for copy number alterations.\n ");
 		System.out.println("Skipped genes: "+flaggedGeneNames);
+		
+		//container for total counts that hit genes of interest
+		caseTotalCounts = new double[cases.length];
 	}
 
 	public void loadBlocks(SAMRecord sam, int chrStartBp, ArrayList<Integer>[] bpNames, boolean[] badBases){
@@ -1233,14 +1290,21 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 			//merging exon counts?
 			int numExons;
 			int[][] caseExonCounts;
+			int[][] sampleGeneCounts;
 			if (mergeExonCounts){
 				numExons = 1;
 				caseExonCounts = fetchMergedExonCounts(geneName, cases);
+				sampleGeneCounts = caseExonCounts;
 			}
 			else {
 				numExons = gene.getExons().length;
 				caseExonCounts = fetchExonCounts(geneName, numExons, cases);
+				//still need to get gene counts
+				sampleGeneCounts = fetchMergedExonCounts(geneName, cases);
 			}
+			
+			//add gene counts to each sample
+			for (int x = 0; x< caseTotalCounts.length; x++) caseTotalCounts[x] += sampleGeneCounts[x][0];
 
 			//for each exon
 			for (int i=0; i< numExons; i++){
@@ -1343,7 +1407,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		return exonCounts;
 	}
 
-	/**Returns total gene count.*/
+	/**Returns total gene count. int[sampleIndex][count but just one value]*/
 	private int[][] fetchMergedExonCounts(String geneName, Replica[] samples) {
 		int[][] exonCounts = new int[samples.length][];
 		int[] zero = new int[1];
@@ -1438,7 +1502,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		//look for bam files
 		if (bamDirectory == null) Misc.printErrAndExit("\nError: cannot find your directory of bam files?\n");
 		File[] bamFiles = IO.extractFiles(bamDirectory, ".bam");
-		if (bamFiles.length == 0) Misc.printErrAndExit("\nError: cannot find any bam files?\n");
+		if (bamFiles == null || bamFiles.length == 0) Misc.printErrAndExit("\nError: cannot find any bam files in "+bamDirectory);
 		OverdispersedRegionScanSeqs.lookForBaiIndexes(bamFiles, false);
 
 		//check for case names
