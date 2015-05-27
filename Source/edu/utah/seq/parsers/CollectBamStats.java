@@ -76,14 +76,17 @@ public class CollectBamStats {
 		loadNames();
 		loadAlignmentStatArrays();
 		
-
-		loadAlignmentStatMatrix();
-		flagAlignmentStatDatasets();
-		printAlignmentStats();
-
-		loadReadCoverageMatrix();
-		flagReadCoverageDatasets();
-		printReadCoverageMatrix();
+		//Did they run the MergePairedAlignments app?
+		if (loadAlignmentStatMatrix()){
+			flagAlignmentStatDatasets();
+			printAlignmentStats();
+		}
+		
+		//Did they run the Sam2USeq app with a target region file?
+		if (loadReadCoverageMatrix()){
+			flagReadCoverageDatasets();
+			printReadCoverageMatrix();
+		}
 
 		printThresholds();
 		
@@ -256,18 +259,22 @@ public class CollectBamStats {
 		}
 	}
 
-	private void loadReadCoverageMatrix() {
+	private boolean loadReadCoverageMatrix() {
 		readCoverageMatrix = new float[names.length][100];
 		for (int i=0; i< dataFiles.length; i++){
 			readCoverageMatrix[i] = loadReadCoverage(dataFiles[i]);
+			if (readCoverageMatrix[i] == null) return false;
 		}
+		return true;
 	}
 
-	private void loadAlignmentStatMatrix() {
+	private boolean loadAlignmentStatMatrix() {
 		alignmentStatMatrix = new float[names.length][numberAlignmentStats];
 		for (int i=0; i< dataFiles.length; i++){
 			alignmentStatMatrix[i] = loadAlignmentStats(dataFiles[i]);
+			if (alignmentStatMatrix[i] == null) return false;
 		}
+		return true;
 	}
 
 	private void makeExcelDoc() {
@@ -391,7 +398,10 @@ BaseCoverage	ObservedBasesWithGivenCoverage	FractionObserved	FractionObservedWit
 					break;
 				}
 			}
-			if (failed) Misc.printErrAndExit("\nError: failed to find header in "+file.getName()+". Is this a read coverage output file?\n");
+			if (failed) {
+				System.err.println("\nError: failed to find header in "+file.getName()+". Does this file contain Sam2USeq with -b output file?\n");
+				return null;
+			}
 
 			//skip first
 			line = in.readLine();
@@ -427,7 +437,10 @@ BaseCoverage	ObservedBasesWithGivenCoverage	FractionObserved	FractionObservedWit
 					break;
 				}
 			}
-			if (failed) Misc.printErrAndExit("\nError: failed to find header in "+file.getName()+". Does this contain a MergePairedAlignment log output?\n");
+			if (failed) {
+				System.err.println("\nError: failed to find header in "+file.getName()+". Does this contain a MergePairedAlignment log output? Aborting this step\n");
+				return null;
+			}
 
 			//parse out remainder
 			boolean lastNotFound = true;

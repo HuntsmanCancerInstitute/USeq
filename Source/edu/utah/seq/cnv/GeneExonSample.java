@@ -10,6 +10,7 @@ public class GeneExonSample {
 	private short sampleIndex;
 	//data
 	private int count;
+	private float zscore;
 	private float residual;
 	private float obsExpLgRto;
 	private String genotypePosition;
@@ -75,11 +76,11 @@ public class GeneExonSample {
 
 	/**Tab delim: log2(obs/exp), residual, count*/
 	public String getDataString() {
-		return obsExpLgRto+"\t"+residual+"\t"+count;
+		return obsExpLgRto+"\t"+residual+"\t"+zscore+"\t"+count;
 	}
 	/**_ delim: log2(obs/exp)_residual_count*/
 	public String getDataStringUnderscore() {
-		return obsExpLgRto+"_"+residual+"_"+count;
+		return obsExpLgRto+"_"+residual+"_"+zscore+"_"+count;
 	}
 
 	public String getGenotypePosition() {
@@ -96,5 +97,13 @@ public class GeneExonSample {
 
 	public void setPassedThresholds(boolean passedThresholds) {
 		this.passedThresholds = passedThresholds;
+	}
+
+	public float getZscore() {
+		return zscore;
+	}
+
+	public void setZscore(float zscore) {
+		this.zscore = zscore;
 	}
 }

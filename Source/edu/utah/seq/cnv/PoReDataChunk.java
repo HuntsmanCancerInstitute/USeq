@@ -84,7 +84,7 @@ public class PoReDataChunk extends Thread{
 		try {
 			//make R script
 			StringBuilder sb = new StringBuilder();
-			sb.append("source('"+ poisRegCNV.getAlunRScript()+ "')\n");
+			sb.append("source('"+ poisRegCNV.getAlunRScript().getCanonicalPath()+ "')\n");
 			sb.append("x = readdata('"+countTableFile+"',3,3)\n");
 			sb.append("x = fitmodel(x)\n");
 			sb.append("exportCNVData(x, '"+poisRegCNV.getSaveDirectory() 
