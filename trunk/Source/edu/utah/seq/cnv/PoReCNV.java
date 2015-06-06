@@ -3,7 +3,6 @@ package edu.utah.seq.cnv;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
-
 import htsjdk.samtools.*;
 import htsjdk.samtools.util.CloseableIterator;
 import util.bio.annotation.ExonIntron;
@@ -23,14 +22,9 @@ import edu.utah.seq.useq.apps.Bar2USeq;
 import htsjdk.variant.variantcontext.Genotype;
 import htsjdk.variant.variantcontext.GenotypesContext;
 import htsjdk.variant.variantcontext.VariantContext;
-import htsjdk.variant.variantcontext.writer.Options;
-import htsjdk.variant.variantcontext.writer.VariantContextWriter;
-import htsjdk.variant.variantcontext.writer.VariantContextWriterFactory;
 import htsjdk.variant.vcf.VCFFileReader;
-import htsjdk.variant.vcf.VCFHeader;
 
-
-/** App to detect CNV's in normal datasets.  Wraps Alun Thomas's algorithm.
+/** App to detect CNV's in datasets containing mostly normal genomes.  Wraps Alun Thomas's algorithm.
  * @author Nix
  * */
 public class PoReCNV {
@@ -39,12 +33,10 @@ public class PoReCNV {
 	private File saveDirectory;
 	private File bamDirectory;
 	private File vcfDirectory;
-	private String[] caseSampleFileNames;
-	private String[] controlSampleFileNames;
+	private String[] sampleFileNames;
 	private File fullPathToR = new File ("/usr/bin/R");
 	private File refSeqFile;
 	private int minimumCounts = 20;
-	private int maxAlignmentsDepth = 50000;
 	private File alunRScript = null;
 	private boolean deleteTempFiles = true;
 	private String genomeVersion;
@@ -66,20 +58,18 @@ public class PoReCNV {
 	private HashMap<String,UCSCGeneLine[]> chromGenes;
 	private HashMap<String, UCSCGeneLine> name2Gene;
 	public static final Pattern BAD_NAME = Pattern.compile("(.+)/[12]$");
-	private HashSet<String> flaggedGeneNames = new HashSet<String>();
 	private LinkedHashSet<String> geneNamesWithMinimumCounts = new LinkedHashSet<String>();
-	private Replica[] cases = null;
-	private Replica[] controls = null;
+	private Replica[] sampleReplicas = null;
 	private PoReDataChunk[] chunkThreads;
 	private GeneExonSample[][] sampleGES = null;
-	private double[] caseTotalCounts = null;
+	private double[] totalCounts = null;
+	private SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
 
-	//container for cases and their exons that pass the minimumCounts threshold
+	//container for samples and their exons that pass the minimumCounts threshold
 	private GeneExonSample[] ges = null;
-	private File countTableFile;
 	private int numExonsProcessed = 0;
 	private int numberPassingExons = 0;
-	private int[] passingExonsByCase = null;
+	private int[] passingExonsBySample = null;
 
 	//from R
 	private float[] significanceThresholds = null;
@@ -114,39 +104,35 @@ public class PoReCNV {
 		loadSamples();
 
 		//write out count table of genes passing minimum counts
-		if (controls != null) writeCountTableMatrix();
-		else {
-			makeGeneExonSamples();
+		makeGeneExonSamples();
 
-			chunkGeneExonSamples();
+		chunkGeneExonSamples();
 
-			System.out.println("\nProcessing data chunks...");
-			boolean ok = runThreads();
-			if (ok == false) {
-				System.err.println("\nError processing chunks, check logs and temp files. Aborting.\n");
-				return;
-			}
-			//set sig threshold
-			setSignificanceThreshold();
-			
-			//find overlapping variants in exons with a deletion?
-			//if (vcfDirectory != null) searchForHetSNPs();
-			
-			//calculate count zscores
-			System.out.println("On target counts:");
-			calculateZScores();
-			
-			//search for adjacent high scoring exons/ genes
-			searchForAdjacents();
-			
-
-			//write out graph files for each sample
-			System.out.println("\nSaving graphs and spreadsheets...");
-			exportGeneExonSpreadSheets();
-			exportCaseSampleGraphs();
-			
-			System.out.println("\n"+numExonsProcessed+" "+annoType+"s processed, "+numberPassingExons+" passed thresholds ("+minimumLog2Ratio+" Lg2Rto, "+minimumAdjPVal+" AdjPVal)");
+		System.out.println("\nProcessing data chunks...");
+		boolean ok = runThreads();
+		if (ok == false) {
+			System.err.println("\nError processing chunks, check logs and temp files. Aborting.\n");
+			return;
 		}
+		//set sig threshold
+		setSignificanceThreshold();
+
+		//find overlapping variants in exons with a deletion?
+		//if (vcfDirectory != null) searchForHetSNPs();
+
+		//calculate count zscores
+		System.out.println("On target fragment counts:");
+		calculateZScores();
+
+		//search for adjacent high scoring exons/ genes
+		searchForAdjacents();
+
+		//write out graph files for each sample
+		System.out.println("\nSaving graphs and spreadsheets...");
+		exportGeneExonSpreadSheets();
+		exportSampleGraphs();
+
+		System.out.println("\n"+numExonsProcessed+" "+annoType+"s processed, "+numberPassingExons+" passed thresholds ("+minimumLog2Ratio+" Lg2Rto, "+minimumAdjPVal+" AdjPVal)");
 
 		//convert graphs to useq format
 		new Bar2USeq(graphDirectory, true);
@@ -223,8 +209,8 @@ public class PoReCNV {
 			String gn = "Gene Name";
 			if (ges[0].getGene().getName() != null) gn = gn+"\tDescription";
 			StringBuilder sb = new StringBuilder(gn+"\tCoordinates\tExon Index\tIGB Link\tIGV Link\tPassing Samples");
-			for (int i=0; i< cases.length; i++){
-				String name = cases[i].getNameNumber();
+			for (int i=0; i< sampleReplicas.length; i++){
+				String name = sampleReplicas[i].getNameNumber();
 				sb.append("\t"+name+" Lg2(Ob/Ex)\t"+name+" Res\t"+name+" Z\t"+name+" Counts");
 			}
 			sb.append("\tLog2Rto "+minimumLog2Ratio);
@@ -303,8 +289,8 @@ public class PoReCNV {
 			if (g.getExonIndex() == exonIndex){
 				//if (passesThresholds(g)) {
 				if (g.isPassedThresholds()){
-					sampPass.add(cases[g.getSampleIndex()].getNameNumber());
-					passingExonsByCase[g.getSampleIndex()]++;
+					sampPass.add(sampleReplicas[g.getSampleIndex()].getNameNumber());
+					passingExonsBySample[g.getSampleIndex()]++;
 				}
 			}
 		}
@@ -435,7 +421,7 @@ public class PoReCNV {
 
 				//walk ges and process for each chromosome 
 				String currChr = ges[0].getGene().getChrom();
-				String sampleName = cases[ges[0].getSampleIndex()].getNameNumber();
+				String sampleName = sampleReplicas[ges[0].getSampleIndex()].getNameNumber();
 				ArrayList<GeneExonSample> chrGes = new ArrayList<GeneExonSample>();
 
 				for (int i=0; i< ges.length; i++){
@@ -651,13 +637,13 @@ public class PoReCNV {
 		return collapsedClusters;
 	}
 	
-	private void searchForHetSNPs(){
+	/*private void searchForHetSNPs(){
 		
 		//for each sample
 		for (int i=0; i< sampleGES.length; i++){
 			
 			//make a VCF reader
-			String name = Misc.removeExtension(caseSampleFileNames[i]) + ".vcf.gz";
+			String name = Misc.removeExtension(sampleFileNames[i]) + ".vcf.gz";
 			File vcf = new File(vcfDirectory, name);
 			VCFFileReader vr = new VCFFileReader(vcf);
 			
@@ -690,7 +676,7 @@ public class PoReCNV {
 					int position = vc.getStart();
 					GenotypesContext gc = vc.getGenotypes();
 					Iterator<Genotype> gci = gc.iterator();
-					//should be just one for most cases
+					//should be just one for most samples
 					while (gci.hasNext()){
 						Genotype g = gci.next();
 						if (g.hasGQ() && g.getGQ() < minimumGenotypeQuality) continue;
@@ -702,14 +688,14 @@ public class PoReCNV {
 				}
 				if (sb.length() !=0) {
 					sGes[j].setGenotypePosition(sb.toString().substring(0, sb.length()-1));
-System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
+					//System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 				}
 			}
 			vr.close();
 		}
-	}
+	}*/
 
-	private void exportCaseSampleGraphs() {
+	private void exportSampleGraphs() {
 		//make dirs
 		graphDirectory = new File (saveDirectory, "DataTracks");
 		graphDirectory.mkdir();
@@ -720,36 +706,26 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		File zDir = new File (graphDirectory, annoType+"ZScores");
 		zDir.mkdir();
 		
-		
-		//double[] cv = new double[cases.length];
-		
 		//for each write files
 		System.out.println("\nResidual stats:\nDataset\t"+annoType+"sPass\tMean\tMedian\tStdDev\tMin\tMax\t10th\t90th");
 		for (int i=0; i< sampleGES.length; i++){
 			//make sample specific dirs
-			File resSampDir = new File (resDir, "res_"+cases[i].getNameNumber());
+			File resSampDir = new File (resDir, "res_"+sampleReplicas[i].getNameNumber());
 			resSampDir.mkdir();
 			resSampDir.deleteOnExit();
-			File rtoSampDir = new File (rtoDir, "oe_"+cases[i].getNameNumber());
+			File rtoSampDir = new File (rtoDir, "oe_"+sampleReplicas[i].getNameNumber());
 			rtoSampDir.mkdir();
 			rtoSampDir.deleteOnExit();
-			File zSampDir = new File (zDir, "z_"+cases[i].getNameNumber());
+			File zSampDir = new File (zDir, "z_"+sampleReplicas[i].getNameNumber());
 			zSampDir.mkdir();
 			zSampDir.deleteOnExit();
-			saveGraphs(cases[i].getNameNumber(), sampleGES[i], resSampDir, rtoSampDir, zSampDir);
+			saveGraphs(sampleReplicas[i].getNameNumber(), sampleGES[i], resSampDir, rtoSampDir, zSampDir);
 			//calc residual stats
 			float[] res = getResiduals(sampleGES[i]);
 			Arrays.sort(res);
 			String stats = Num.statFloatArray(res);
-			System.out.println(caseSampleFileNames[i]+ "\t"+passingExonsByCase[i]+ "\t"+ stats);
+			System.out.println(sampleFileNames[i]+ "\t"+passingExonsBySample[i]+ "\t"+ stats);
 		}
-		
-		//double meanCV = Num.mean(cv);
-		//System.out.println("\nCoefficient of variation for sample residuals:\n\tMean\t"+meanCV);
-		//for (int i=0; i< sampleGES.length; i++){
-			//System.out.println(caseSampleFileNames[i]+"\t"+cv[i]);
-		//}
-		
 	}
 	
 	private void calculateZScores(){
@@ -762,19 +738,18 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 			//calc residual stats
 			double[] rawCounts = getCounts(sampleGES[i]);
 			//normalize
-			double total = caseTotalCounts[i];
+			double total = totalCounts[i];
 			for (int j=0; j< rawCounts.length; j++) {
 				double normCount = rawCounts[j]/total;
 				sd[j].count(normCount);
 			}
-			
-			System.out.println(Misc.removeExtension(caseSampleFileNames[i])+"\t"+(int)caseTotalCounts[i]);
+			System.out.println(Misc.removeExtension("\t"+sampleFileNames[i])+"\t"+(int)totalCounts[i]);
 		}
 		
 		//now calc and set z-score for each exon
 		//for each sample
 		for (int i=0; i< sampleGES.length; i++){
-			double total = caseTotalCounts[i];
+			double total = totalCounts[i];
 			//for each exon
 			for (int j=0; j< sd.length; j++){
 				double count = sampleGES[i][j].getCount()/total;
@@ -882,102 +857,85 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 
 	private void loadSamples(){
 
-		//load cases
-		System.out.println("\nLoading case samples...");
+		//load samples
+		System.out.println("\nLoading samples...");
 		//serialized version present?
-		File serCases = new File (saveDirectory, "cases.ser");
-		File serGenes = new File (saveDirectory, "genes.ser");
-		if (serCases.exists() && serGenes.exists()) {
-			cases = (Replica[]) IO.fetchObject(serCases);
-			System.out.println("\tWARNING: loading case count data from prior run.  Delete "+serCases+" and restart to load from alignment files.");
-			if (cases.length != caseSampleFileNames.length) Misc.printErrAndExit("\nError: the number of cases and case file names differ.  Delete "+serCases+" and restart.\n");
-			geneNamesWithMinimumCounts = (LinkedHashSet<String>) IO.fetchObject(serGenes);
+		File serDir = new File (saveDirectory, "Ser");
+		File geneTableInfo = new File (serDir, "geneInfo");
+
+		if (serDir.exists()) {
+			System.out.println("\tWARNING: possibly loading sample count data from prior run. This is likely a good thing. If in doubt, delete "+serDir+" and restart to reload from bam files.");
+			//check gene table name and number
+			if (geneTableInfo.exists() == false) Misc.printErrAndExit("\nError: the geneInfo file does not exist in the Ser directory.  Delete "+serDir+" and restart.\n");
+			String[] info = IO.loadFile(geneTableInfo);
+			if (info[0].equals(refSeqFile.getName()) == false || Integer.parseInt(info[1])!= genes.length) Misc.printErrAndExit("\nError: the saved gene table name ("+
+					info[0]+" vs "+refSeqFile.getName()+") or gene number ("+info[1]+" vs "+genes.length+") don't match.  Delete "+serDir+" and restart.\n");
 		}
 		else {
-			cases = new Replica[caseSampleFileNames.length];
-			String[] shortNames = new String[cases.length];
-			for (int i=0; i< caseSampleFileNames.length; i++){
-				File bam = new File(bamDirectory, caseSampleFileNames[i]);
-				shortNames[i] = caseSampleFileNames[i];
-				cases[i] = new Replica(shortNames[i], bam);
-				System.out.print("\t"+caseSampleFileNames[i]);
-				loadReplica(cases[i]);
-				System.out.println("\t"+cases[i].getTotalCounts());
+			serDir.mkdirs();
+			String gi = refSeqFile.getName() +"\n"+genes.length;
+			IO.writeString(gi, geneTableInfo);
+		}
+
+		sampleReplicas = new Replica[sampleFileNames.length];
+		for (int i=0; i< sampleFileNames.length; i++){
+			System.out.print("\t"+sampleFileNames[i]);
+			//look for saved replica
+			File serRep = new File (serDir, sampleFileNames[i]+".ser");
+			if (serRep.exists()) {
+				sampleReplicas[i] = (Replica)IO.fetchObject(serRep);
+				System.out.print("\tser\t");
 			}
-			//trim ends of names and set
-			shortNames = Misc.trimCommonEnd(shortNames);
-			for (int i=0; i< cases.length; i++) cases[i].setNameNumber(shortNames[i]);
-			
-			IO.saveObject(serCases, cases);
-			IO.saveObject(serGenes, geneNamesWithMinimumCounts);
-		}
-
-		//load controls
-		if (controlSampleFileNames != null){
-			System.out.println("Loading control samples...");
-			String[]  shortNames = new String[controls.length];
-			controls = new Replica[this.controlSampleFileNames.length];
-			for (int i=0; i< controlSampleFileNames.length; i++){
-				File bam = new File(bamDirectory, controlSampleFileNames[i]);
-				String name = Misc.removeExtension(controlSampleFileNames[i]);
-				shortNames[i] = name;
-				controls[i] = new Replica(name, bam);
-				System.out.print("\t"+controlSampleFileNames[i]);
-				loadReplica(controls[i]);
-				System.out.println("\t"+controls[i].getTotalCounts());
+			else {
+				//load from bam
+				File bam = new File(bamDirectory, sampleFileNames[i]);
+				if (bam.exists() == false) Misc.printErrAndExit("\nCannot find the associated bam file for "+sampleFileNames[i]);
+				sampleReplicas[i] = new Replica(Misc.removeExtension(sampleFileNames[i]), bam);
+				loadReplica(sampleReplicas[i]);
+				//save it
+				IO.saveObject(serRep, sampleReplicas[i]);
+				System.out.print("\tbam\t");
 			}
-			shortNames = Misc.trimCommon(shortNames);
-			for (int i=0; i< cases.length; i++) controls[i].setNameNumber(shortNames[i]);
+			System.out.println(sampleReplicas[i].getTotalCounts());
 		}
 
-		//any genes with too many reads that were excluded?
-		if (flaggedGeneNames.size() !=0) {
-			String[] badGeneNames = Misc.hashSetToStringArray(flaggedGeneNames);			
-			for (Replica replica: cases) replica.removeFlaggedGenes(badGeneNames);
-			if (controlSampleFileNames != null) for (Replica replica: controls) replica.removeFlaggedGenes(badGeneNames);
-			//remove them from geneNamesWithMinimumCounts
-			for (String baddie: badGeneNames) geneNamesWithMinimumCounts.remove(baddie);
-		}
-
+		findGeneNamesWithMinimumCounts();
+		
 		System.out.println();
-		System.out.println(geneNamesWithMinimumCounts.size()+" genes, with >= "+minimumCounts+" and < "+maxAlignmentsDepth+" counts, will be examined for copy number alterations.\n ");
-		System.out.println("Skipped genes: "+flaggedGeneNames);
+		System.out.println(geneNamesWithMinimumCounts.size()+" genes, with >= "+minimumCounts+" counts, will be examined for copy number alterations.");
 		
 		//container for total counts that hit genes of interest
-		caseTotalCounts = new double[cases.length];
+		totalCounts = new double[sampleReplicas.length];
 	}
 
-	public void loadBlocks(SAMRecord sam, int chrStartBp, ArrayList<Integer>[] bpNames, boolean[] badBases){
+	private void findGeneNamesWithMinimumCounts() {
+		//for each gene, does any sample have enough counts?
+		for (UCSCGeneLine gene: genes){
+			String geneName = gene.getDisplayNameThenName();
+			for (Replica r: sampleReplicas){
+				GeneCount sc = r.getGeneCounts().get(geneName);
+				if (sc!= null && sc.getCount() >= minimumCounts) {
+					geneNamesWithMinimumCounts.add(geneName);
+					break;
+				}
+			}
+		}
+	}
 
+	public void loadBlocks(SAMRecord sam, int chrStartBp, ArrayList<Integer>[] bpNames){
 		NameInteger nameIndex = null;
-		boolean addIt;
 		ArrayList<int[]> blocks = DefinedRegionDifferentialSeq.fetchAlignmentBlocks(sam.getCigarString(), sam.getUnclippedStart()-1);
 		//add name to each bp
 		for (int[] b : blocks){
 			int start = b[0] - chrStartBp;
 			int stop = b[1] - chrStartBp;
 			//need to watch for out of bounds issues, sometimes the length of the chromosome is incorrect in the bam header.
-			if (stop > badBases.length) stop = badBases.length;
+			if (stop > bpNames.length) stop = bpNames.length;
 			for (int i=start; i < stop; i++){
-				//bad base?
-				if (badBases[i]) continue;
-				addIt = true;
-
 				//never seen before?
 				if (bpNames[i] == null) bpNames[i] = new ArrayList<Integer>();
-				//old so check size
-				else if (bpNames[i].size() == maxAlignmentsDepth) {
-					badBases[i] = true;
-					addIt = false;
-					bpNames[i] = null;	
-					if (nameIndex !=null) workingFragNameIndex.remove(nameIndex.name);
-				}
-
-				// add it?
-				if (addIt) {
-					if (nameIndex == null) nameIndex = fetchFragmentNameIndex(sam);
-					bpNames[i].add(nameIndex.index);
-				}
+				if (nameIndex == null) nameIndex = fetchFragmentNameIndex(sam);
+				bpNames[i].add(nameIndex.index);
 			}
 		}
 	}
@@ -1011,121 +969,116 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 	}
 
 	public void loadReplica(Replica replica){
-		//the idea here is to take a sorted bam file and add the reads to an ArrayList, basically every base should have a ArrayList of reads that overlap that base
-		//one can then count the number of overlapping fragments for an exon or a collection of exons by hashing the ArrayList
-		//assumes each read (first or second) has the same name
+		try {
+			//the idea here is to take a sorted bam file and add the reads to an ArrayList, basically every base should have a ArrayList of reads that overlap that base
+			//one can then count the number of overlapping fragments for an exon or a collection of exons by hashing the ArrayList
+			//assumes each read (first or second) has the same name
 
-		//make reader
-		SAMFileReader reader = new SAMFileReader(replica.getBamFile());	
-		reader.setValidationStringency(ValidationStringency.SILENT);
+			//make reader
+			SamReader reader = factory.open(replica.getBamFile());
 
+			//fetch chromName: length for all chroms
+			HashMap<String, Integer> chromLength = new HashMap<String, Integer>();
+			List<SAMSequenceRecord> seqs =  reader.getFileHeader().getSequenceDictionary().getSequences();
+			for (SAMSequenceRecord sr: seqs) chromLength.put(sr.getSequenceName(), sr.getSequenceLength()+1000);
 
-		//fetch chromName: length for all chroms
-		HashMap<String, Integer> chromLength = new HashMap<String, Integer>();
-		List<SAMSequenceRecord> seqs =  reader.getFileHeader().getSequenceDictionary().getSequences();
-		for (SAMSequenceRecord sr: seqs) chromLength.put(sr.getSequenceName(), sr.getSequenceLength()+1000);
+			SAMRecordIterator iterator = reader.iterator();
 
-		SAMRecordIterator iterator = reader.iterator();
+			HashSet<String> priorChroms = new HashSet<String>();
+			String chrom = null;
 
-		HashSet<String> priorChroms = new HashSet<String>();
-		String chrom = null;
+			//make first chromosome
+			SAMRecord sam = null;
+			int chrStartBp = -1;
+			ArrayList<Integer>[] bpNames = null;
+			while (iterator.hasNext()){
+				sam = iterator.next();
+				//unaligned? 
+				if (sam.getReadUnmappedFlag()) continue;
+				chrom = sam.getReferenceName();
 
-		//make first chromosome
-		SAMRecord sam = null;
-		int chrStartBp = -1;
-		ArrayList<Integer>[] bpNames = null;
-		boolean[] badBases = null;
-		while (iterator.hasNext()){
-			sam = iterator.next();
-
-			//unaligned? 
-			if (sam.getReadUnmappedFlag()) continue;
-			chrom = sam.getReferenceName();
-
-			if (chromGenes.containsKey(chrom) == false) {
-				continue;
-			}		
-			priorChroms.add(chrom);
-			chrStartBp = sam.getUnclippedStart()-1;
-			badBases = new boolean[chromLength.get(chrom) - chrStartBp];
-			bpNames = new ArrayList[badBases.length];
-			break;
-		}
-		//any data found?
-		if (bpNames == null) {
-			reader.close();
-			return;
-		} 
-
-		//reset working fields
-		workingFragNameIndex.clear();
-		workingFragmentNameIndexPlus = 1;
-		workingFragmentNameIndexMinus = -1;
-
-		//load first alignment into bpNames
-		loadBlocks (sam, chrStartBp, bpNames, badBases);
-
-		//for each record
-		while (iterator.hasNext()){
-			sam = iterator.next();
-
-			//unaligned? 
-			if (sam.getReadUnmappedFlag()) continue;
-
-			//same chrom?
-			if (sam.getReferenceName().equals(chrom)){
-				loadBlocks (sam, chrStartBp, bpNames, badBases);
+				if (chromGenes.containsKey(chrom) == false) continue;		
+				priorChroms.add(chrom);
+				chrStartBp = sam.getUnclippedStart()-1;
+				bpNames = new ArrayList[chromLength.get(chrom) - chrStartBp];
+				break;
 			}
-			else {
-				//different chrom so time to scan
-				loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases);
+			//any data found?
+			if (bpNames == null) {
+				reader.close();
+				return;
+			} 
 
-				//check that new chrom from SAM is something interrogated by their gene list
-				boolean reset = false;
-				if (chromGenes.containsKey(sam.getReferenceName()) == false) {
-					//advance until it does
-					while (iterator.hasNext()){
-						sam = iterator.next();
-						if (chromGenes.containsKey(sam.getReferenceName())) {
-							reset = true;
-							break;
+			//reset working fields
+			workingFragNameIndex.clear();
+			workingFragmentNameIndexPlus = 1;
+			workingFragmentNameIndexMinus = -1;
+
+			//load first alignment into bpNames
+			loadBlocks (sam, chrStartBp, bpNames);
+
+			//for each record
+			while (iterator.hasNext()){
+				sam = iterator.next();
+
+				//unaligned? 
+				if (sam.getReadUnmappedFlag()) continue;
+
+				//same chrom?
+				if (sam.getReferenceName().equals(chrom)) loadBlocks (sam, chrStartBp, bpNames);
+				else {
+					//different chrom so time to scan
+					loadGeneCounts(replica, bpNames, chrStartBp, chrom);
+
+					//check that new chrom from SAM is something interrogated by their gene list
+					boolean reset = false;
+					if (chromGenes.containsKey(sam.getReferenceName()) == false) {
+						//advance until it does
+						while (iterator.hasNext()){
+							sam = iterator.next();
+							if (chromGenes.containsKey(sam.getReferenceName())) {
+								reset = true;
+								break;
+							}
 						}
 					}
-				}
-				else reset = true;
+					else reset = true;
 
-				//reset
-				if (reset){
-					//reset working fields
-					workingFragNameIndex.clear();
-					workingFragmentNameIndexPlus = 1;
-					workingFragmentNameIndexMinus = -1;
+					//reset
+					if (reset){
+						//reset working fields
+						workingFragNameIndex.clear();
+						workingFragmentNameIndexPlus = 1;
+						workingFragmentNameIndexMinus = -1;
 
-					chrom = sam.getReferenceName();
-					if (priorChroms.contains(chrom)) Misc.printErrAndExit("\nError: your sam file isn't sorted by chromosome! Aborting.\n");
-					priorChroms.add(chrom);
-					chrStartBp = sam.getUnclippedStart()-1;
-					badBases = new boolean[chromLength.get(chrom) - chrStartBp];
-					bpNames = new ArrayList[badBases.length];
+						chrom = sam.getReferenceName();
+						if (priorChroms.contains(chrom)) Misc.printErrAndExit("\nError: your sam file isn't sorted by chromosome! Aborting.\n");
+						priorChroms.add(chrom);
+						chrStartBp = sam.getUnclippedStart()-1;
+						bpNames = new ArrayList[chromLength.get(chrom) - chrStartBp];
+						//load
+						loadBlocks (sam, chrStartBp, bpNames);
+					}
 
-					//load
-					loadBlocks (sam, chrStartBp, bpNames, badBases);
 				}
 
 			}
 
+			if (chromGenes.containsKey(chrom)) loadGeneCounts(replica, bpNames, chrStartBp, chrom);
+
+			reader.close();
+			bpNames = null;
+			iterator = null;
+			seqs = null;
+			chromLength = null;
+
+		} catch (IOException e) {
+			System.err.println("Problem loading replica "+replica.getBamFile());
+			e.printStackTrace();
 		}
-
-		if (chromGenes.containsKey(chrom)) loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases);
-
-		reader.close();
-		bpNames = null;
-		iterator = null;
-		seqs = null;
-		chromLength = null;
 	}
 
-	private void loadGeneCounts(Replica replica, ArrayList<Integer>[] bpNames, int chrStartBp, String chromosome, boolean[] badBases){
+	private void loadGeneCounts(Replica replica, ArrayList<Integer>[] bpNames, int chrStartBp, String chromosome){
 		HashMap<String, GeneCount> geneCounts = replica.getGeneCounts();
 		HashSet<Integer> allReads = new HashSet<Integer>();
 		HashSet<Integer> exonReads = new HashSet<Integer>();
@@ -1146,33 +1099,24 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 			int[] exonCounts = new int[exons.length];
 
 			//for each exon
-			exonLoop:
-				for (int x=0; x< exons.length; x++){
-					exonReads.clear();
-					int start = exons[x].getStart() - chrStartBp;
-					if (start < 0) start = 0;
-					int end = exons[x].getEnd() - chrStartBp;
-					if (end > lengthBpNames) end = lengthBpNames;
-					//for each base in the exon, see if there is a read
-					for (int y=start; y< end; y++){
-						//bad base? if so then flag entire gene
-						if (badBases[y]) {
-							chrGenes[i].setFlagged(true);
-							flaggedGeneNames.add(geneName);
-							allReads.clear();
-							break exonLoop;
-						}
-						if (bpNames[y] != null) exonReads.addAll(bpNames[y]);
-					}
-					exonCounts[x] = exonReads.size();
-					allReads.addAll(exonReads);
+			for (int x=0; x< exons.length; x++){
+				exonReads.clear();
+				int start = exons[x].getStart() - chrStartBp;
+				if (start < 0) start = 0;
+				int end = exons[x].getEnd() - chrStartBp;
+				if (end > lengthBpNames) end = lengthBpNames;
+				//for each base in the exon, see if there is a read
+				for (int y=start; y< end; y++){
+					if (bpNames[y] != null) exonReads.addAll(bpNames[y]);
 				}
+				exonCounts[x] = exonReads.size();
+				allReads.addAll(exonReads);
+			}
 			int numCounts = allReads.size();
 			if (numCounts !=0){
 				GeneCount tcg = new GeneCount(numCounts, exonCounts);
 				geneCounts.put(geneName, tcg);
 				replica.setTotalCounts(replica.getTotalCounts() + numCounts);
-				if (numCounts >= minimumCounts && geneNamesWithMinimumCounts.contains(geneName) == false) geneNamesWithMinimumCounts.add(geneName);
 			}
 		}	
 		//clean up
@@ -1180,8 +1124,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		exonReads = null;
 	}
 
-	/**Just for cases*/
-	public void buildCaseGeneExonSamples(){
+	public void buildGeneExonSamples(){
 		try {
 			//start counter for all exons to match Alun's code, starts with 1
 			int globalExonIndex = 1;
@@ -1195,19 +1138,19 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 				int numExons = gene.getExons().length;
 
 				//collect exon counts int[sample][exon]
-				int[][] caseExonCounts = fetchExonCounts(geneName, numExons, cases);
+				int[][] exonCounts = fetchExonCounts(geneName, numExons, sampleReplicas);
 
 				//for each exon
 				for (int i=0; i< numExons; i++){
-					//count total for this exon across all the cases, skip if too few
+					//count total for this exon across all the samples, skip if too few
 					int total = 0;
-					for (int j=0; j<caseExonCounts.length; j++) total += caseExonCounts[j][i];
+					for (int j=0; j<exonCounts.length; j++) total += exonCounts[j][i];
 					if (total < minimumCounts) continue;
 					numExonsProcessed++;
 
 					//for each sample
-					for (int j=0; j<caseExonCounts.length; j++){
-						GeneExonSample g = new GeneExonSample(gene, globalExonIndex-1, (short)i, (short)j, caseExonCounts[j][i]);
+					for (int j=0; j<exonCounts.length; j++){
+						GeneExonSample g = new GeneExonSample(gene, globalExonIndex-1, (short)i, (short)j, exonCounts[j][i]);
 						gesAL.add(g);
 					}
 					globalExonIndex++;
@@ -1246,7 +1189,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 	/**Splits an object[] into chunks containing the minNumEach. Any remainder is evenly distributed over the prior.
 	 * Note this is by reference, the array is not copied. */
 	public static ArrayList<GeneExonSample>[][] chunk (ArrayList<GeneExonSample>[] s, int minNumEach){
-		//watch out for cases where the min can't be met
+		//watch out for samples where the min can't be met
 		int numChunks = s.length/minNumEach;
 		if (numChunks == 0) return new ArrayList[][]{s};
 
@@ -1275,7 +1218,6 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		return chunks;
 	}
 
-	/**Just for cases*/
 	public void makeGeneExonSamples(){
 		//start counter for all exons to match Alun's code, starts with 1
 		int globalExonIndex = 1;
@@ -1289,33 +1231,33 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 			
 			//merging exon counts?
 			int numExons;
-			int[][] caseExonCounts;
+			int[][] sampleExonCounts;
 			int[][] sampleGeneCounts;
 			if (mergeExonCounts){
 				numExons = 1;
-				caseExonCounts = fetchMergedExonCounts(geneName, cases);
-				sampleGeneCounts = caseExonCounts;
+				sampleExonCounts = fetchMergedExonCounts(geneName, sampleReplicas);
+				sampleGeneCounts = sampleExonCounts;
 			}
 			else {
 				numExons = gene.getExons().length;
-				caseExonCounts = fetchExonCounts(geneName, numExons, cases);
+				sampleExonCounts = fetchExonCounts(geneName, numExons, sampleReplicas);
 				//still need to get gene counts
-				sampleGeneCounts = fetchMergedExonCounts(geneName, cases);
+				sampleGeneCounts = fetchMergedExonCounts(geneName, sampleReplicas);
 			}
 			
 			//add gene counts to each sample
-			for (int x = 0; x< caseTotalCounts.length; x++) caseTotalCounts[x] += sampleGeneCounts[x][0];
+			for (int x = 0; x< totalCounts.length; x++) totalCounts[x] += sampleGeneCounts[x][0];
 
 			//for each exon
 			for (int i=0; i< numExons; i++){
-				//count total for this exon across all the cases, skip if too few
+				//count total for this exon across all the samples, skip if too few
 				int total = 0;
-				for (int j=0; j<caseExonCounts.length; j++) total += caseExonCounts[j][i];
+				for (int j=0; j<sampleExonCounts.length; j++) total += sampleExonCounts[j][i];
 				if (total < minimumCounts) continue;
 				numExonsProcessed++;
 				//for each sample
-				for (int j=0; j<caseExonCounts.length; j++){
-					GeneExonSample g = new GeneExonSample(gene, globalExonIndex-1, (short)i, (short)j, caseExonCounts[j][i]);
+				for (int j=0; j<sampleExonCounts.length; j++){
+					GeneExonSample g = new GeneExonSample(gene, globalExonIndex-1, (short)i, (short)j, sampleExonCounts[j][i]);
 					gesAL.add(g);
 				}
 				globalExonIndex++;
@@ -1326,14 +1268,14 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		gesAL.toArray(ges);
 		
 		//split ges by sample for later use
-		sampleGES = new GeneExonSample[cases.length][numExonsProcessed];
+		sampleGES = new GeneExonSample[sampleReplicas.length][numExonsProcessed];
 		for (int i=0; i< ges.length; i++){
 			sampleGES[ges[i].getSampleIndex()][ges[i].getGlobalExonIndex()] = ges[i];
 		}
 	}
 
 
-	/**For case controls*/
+	/**For case controls
 	public void writeCountTableMatrix(){
 		countTableFile = new File(saveDirectory, "countTable.txt");
 
@@ -1344,13 +1286,9 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 			//print header
 			out.print("#GeneName\tExonIndex\tCoordinates");
 			//for each sample
-			for (int i=0; i<caseSampleFileNames.length; i++){
+			for (int i=0; i<sampleFileNames.length; i++){
 				out.print("\t");
-				out.print(Misc.removeExtension(caseSampleFileNames[i]));
-				if (controls != null){
-					out.print("\t");
-					out.print(Misc.removeExtension(controlSampleFileNames[i]));
-				}
+				out.print(Misc.removeExtension(sampleFileNames[i]));
 			}
 			out.println();
 			
@@ -1365,9 +1303,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 				String chr= gene.getChrom();
 
 				//collect exon counts int[sample][exon
-				int[][] caseExonCounts = fetchExonCounts(geneName, numExons, cases);
-				int[][] controlExonCounts = null;
-				if (controls != null) controlExonCounts = fetchExonCounts(geneName, numExons, controls);
+				int[][] caseExonCounts = fetchExonCounts(geneName, numExons, sampleReplicas);
 
 				//for each exon
 				for (int i=0; i< numExons; i++){
@@ -1379,11 +1315,6 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 						sb.append("\t");
 						sb.append(caseExonCounts[j][i]);
 						total += caseExonCounts[j][i];
-						if (controls != null){
-							sb.append("\t");
-							sb.append(controlExonCounts[j][i]);
-							total += controlExonCounts[j][i];
-						}
 					}
 					if (total >= minimumCounts) out.println(sb);
 				}
@@ -1394,7 +1325,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 			System.err.println("\nProblem writing out count table.");
 			e.printStackTrace();
 		}
-	}
+	}*/
 
 	private int[][] fetchExonCounts(String geneName, int numExons, Replica[] samples) {
 		int[][] exonCounts = new int[samples.length][];
@@ -1442,7 +1373,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		}
 		//load name2Gene
 		name2Gene = new HashMap<String, UCSCGeneLine>();
-		for (String chr: chromGenes.keySet()){
+		for (String chr: chromGenes.keySet()){			
 			for (UCSCGeneLine gl: chromGenes.get(chr)) {
 				String name = gl.getDisplayNameThenName();
 				name2Gene.put(name, gl);
@@ -1472,8 +1403,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'b': bamDirectory = new File(args[++i]); break;
 					case 'v': vcfDirectory = new File(args[++i]); break;
-					case 'c': caseSampleFileNames = Misc.COMMA.split(args[++i]); break;
-					case 'n': controlSampleFileNames = Misc.COMMA.split(args[++i]); break;
+					case 'c': sampleFileNames = Misc.COMMA.split(args[++i]); break;
 					case 'r': fullPathToR = new File(args[++i]); break;
 					case 'a': alunRScript = new File(args[++i]); break;
 					case 'u': refSeqFile = new File(args[++i]); break;
@@ -1482,7 +1412,6 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 					case 'x': excludeSexChromosomes = false; break;
 					case 'm': minNumInEachChunk = Integer.parseInt(args[++i]); break;
 					case 'e': minimumCounts = Integer.parseInt(args[++i]); break;
-					case 'd': maxAlignmentsDepth = Integer.parseInt(args[++i]); break;
 					case 'l': minimumLog2Ratio = Float.parseFloat(args[++i]); break;
 					case 'p': minimumAdjPVal = Float.parseFloat(args[++i]); break;
 					case 't': numberConcurrentThreads = Integer.parseInt(args[++i]); break;
@@ -1504,52 +1433,42 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		File[] bamFiles = IO.extractFiles(bamDirectory, ".bam");
 		if (bamFiles == null || bamFiles.length == 0) Misc.printErrAndExit("\nError: cannot find any bam files in "+bamDirectory);
 		OverdispersedRegionScanSeqs.lookForBaiIndexes(bamFiles, false);
-
-		//check for case names
-		if (caseSampleFileNames == null ) {
+		
+		//check for  names
+		File serDir = new File (saveDirectory, "Ser");
+		if (sampleFileNames == null ) {
+			//look for bams
 			File[] bams = IO.fetchFilesRecursively(bamDirectory, ".bam");
-			if (bams == null || bams.length == 0) Misc.printErrAndExit("\nError: cannot find any xxx.bam files to process?!\n");
-			caseSampleFileNames = new String[bams.length];
-			for (int i=0; i< bams.length; i++) caseSampleFileNames[i] = bams[i].getName();
+			HashSet<String> bamNames = new HashSet<String>();
+			if (bams != null) for (File f: bams) bamNames.add(f.getName());
+			//look for serialized
+			if (serDir.exists()){
+				File[] serBams = IO.extractFiles(serDir, ".bam.ser");
+				if (serBams != null ) for (File f: serBams) bamNames.add(f.getName().replace(".bam.ser", ".bam"));
+			}
+			//any found?
+			if (bamNames.size() == 0) Misc.printErrAndExit("\nError: cannot find any xxx.bam files to process?!\n");
+			sampleFileNames = new String[bamNames.size()];
+			bamNames.toArray(sampleFileNames);
 		}
 		else {
-			for (int i=0; i< caseSampleFileNames.length; i++){
-				File bam = new File(bamDirectory, caseSampleFileNames[i]);
-				if (bam.exists() == false) Misc.printErrAndExit("Error: cannot find the "+caseSampleFileNames[i]+" in the bam directory?!\n");
+			for (int i=0; i< sampleFileNames.length; i++){
+				File bam = new File(bamDirectory, sampleFileNames[i]);
+				File serBam = new File(serDir, sampleFileNames[i]+".ser");
+				if (bam.exists() == false && serBam.exists() == false) Misc.printErrAndExit("Error: cannot find the "+sampleFileNames[i]+" in the bam or ser directories?!\n");
 			}
 		}
-		passingExonsByCase = new int[caseSampleFileNames.length];
-		//check number
-		if (caseSampleFileNames.length < 10) System.out.println("WARNING: less than 10 samples found! This application performs best with > 10 to fit the glm.\n");
 		
-		//parse vcf file names?
-		if (vcfDirectory != null){
-			//parse corresponding vcf files
-			for (int i=0; i< caseSampleFileNames.length; i++){
-				String name = Misc.removeExtension(caseSampleFileNames[i]) + ".vcf.gz";
-				File vcf = new File(vcfDirectory, name);
-				if (vcf.exists() == false) Misc.printErrAndExit("Error: cannot find "+name+" in the vcf directory?!\n");
-				//look for index
-				File index = new File(vcfDirectory, name+".tbi");
-				if (index.exists() == false) Misc.printErrAndExit("Error: cannot find "+name+".tbi in the vcf directory?!\n");
-			}
-		}
-
-		//check controls
-		/*if (controlSampleFileNames != null){
-			//same number?
-			if (controlSampleFileNames.length != caseSampleFileNames.length) Misc.printErrAndExit("\nError: the number of case and control sample file names differ?\n");
-			for (int i=0; i< controlSampleFileNames.length; i++){
-				File bam = new File(bamDirectory, controlSampleFileNames[i]);
-				if (bam.exists() == false) Misc.printErrAndExit("Error: cannot find the "+controlSampleFileNames[i]+" in the bam directory?!\n");
-			}
-		}*/
+		passingExonsBySample = new int[sampleFileNames.length];
+		
+		//check number
+		if (sampleFileNames.length < 10) System.out.println("WARNING: less than 10 samples found! This application performs best with > 10 to fit the glm.\n");
 
 		//look for and or create the save directory
 		if (saveDirectory == null) Misc.printErrAndExit("\nError: enter a directory text to save results.\n");
 		saveDirectory.mkdirs();
 
-		//check for R and required libraries, don't need it if they just want the first and last 1/3 count table
+		//check for R 
 		if (fullPathToR == null || fullPathToR.canExecute()== false) {
 			Misc.printErrAndExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
 		}
@@ -1577,7 +1496,6 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 		sb.append("Anno type\t"); sb.append(annoType); sb.append("\n");
 		sb.append("Excld sex chrs\t"); sb.append(excludeSexChromosomes); sb.append("\n");
 		sb.append("Min counts\t"); sb.append(minimumCounts); sb.append("\n");
-		sb.append("Max counts\t"); sb.append(maxAlignmentsDepth); sb.append("\n");
 		sb.append("Min log2Rto\t"); sb.append(minimumLog2Ratio); sb.append("\n");
 		sb.append("Max adjPVal\t"); sb.append(minimumAdjPVal); sb.append("\n");
 		sb.append("Max gap adj\t"); sb.append(maxGap); sb.append("\n");
@@ -1589,7 +1507,7 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Po Re CNV: April 2015                             **\n" +
+				"**                                Po Re CNV: June 2015                              **\n" +
 				"**************************************************************************************\n" +
 				"Uses Poisson regression and Pearson residuals to identify exons or genes whose counts\n"+
 				"differ significantly from the fitted value base on all the exon sample counts. This\n"+
@@ -1621,10 +1539,8 @@ System.out.println(sGes[j].toString()+"\t"+sGes[j].getGenotypePosition());
 				"-t Number concurrent threads to run, defaults to the max available to the jvm.\n"+
 				"-m Minimum number exons per data chunk, defaults to 1500.\n"+
 				"-w Examine whole gene counts for CNVs, defaults to exons.\n"+
-				"-x Keep sex chromosomes (X,Y), defaults to removing.\n"+
-				//"-v VCF file directory, sorted and indexed. Name.vcf.gz must correspond with Name.bam\n"+
-				//"     for matching samples. Use to annotate deletions for possible heterozygous snps. \n"+
-
+				"-x Keep sex chromosomes (X,Y), defaults to removing. Don't mix sexes!\n"+
+				
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/PoReCNV -s PRCnvResults/  -b BamFiles\n"+

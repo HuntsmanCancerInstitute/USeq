@@ -1,3 +1,9 @@
+----USeq_8.9.3----
+Bed2UCSCRefFlat
+* New app for converting a bed file to a multi exonic UCSC RefFlat file.
+Sam2USeq
+* Fixed an issue where chromData from the MergePairedAlignments app fail to cal read coverage with b37 no "chr" data.  Now must match the bed file with the alignments.
+
 ----USeq_8.9.2----
 PoReCNV
 * New app for detecting CNV variants in large sets of exon or gene capture panels.  Wraps an algorithm by Alun Thomas.  

@@ -37,6 +37,7 @@ public class Sam2USeq {
 	private boolean makeAveReadLengthGraph = false;
 	private float minimumCounts = 0;
 	private int minimumLength = 0;
+	private double maximumCoverageCalculated = 101;
 
 	//internal
 	private ChromData chromData;
@@ -62,6 +63,7 @@ public class Sam2USeq {
 	private HashMap<Long,Long> baseCoverageHist = new HashMap<Long,Long>();
 	private File barDirectory;
 	private File chromDataFile = null;
+	
 
 	/**For stand alone app.*/
 	public Sam2USeq(String[] args){
@@ -154,16 +156,16 @@ public class Sam2USeq {
 
 
 	public void splitSamBamFiles(){
+		SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+		
 		for (File samFile: samFiles){
 			if (verbose) System.out.print("\t"+samFile.getName());
 
-			SAMFileReader samReader = null;
 			int counter =0;
 			String currentChromStrand = "";
 			ChromData data = null;
 			try {
-				samReader = new SAMFileReader(samFile);
-				samReader.setValidationStringency(ValidationStringency.SILENT);
+				SamReader samReader = factory.open(samFile);
 				SAMRecordIterator it = samReader.iterator();
 
 				while (it.hasNext()) {
@@ -184,9 +186,10 @@ public class Sam2USeq {
 
 					//chromosome, converting to chr
 					String chromosome = sam.getReferenceName();
-					if (chromosome.startsWith("chr") == false){
-						chromosome = "chr"+chromosome;
-					}
+					
+					/*Don't do this its causing issues with b37
+					if (chromosome.startsWith("chr") == false) chromosome = "chr"+chromosome;
+					*/
 
 					//skip phiX and adapter
 					if (chromosome.startsWith(phiX) || chromosome.startsWith(adapter)) continue;
@@ -267,6 +270,7 @@ public class Sam2USeq {
 					data.out.writeInt(start);
 					data.out.writeUTF(cigar);
 				}
+				samReader.close();
 				if (verbose) System.out.println();
 			} catch (Exception e){
 				System.err.println("\nError parsing sam file or writing split binary chromosome files.\n\nToo many open files exception? Too many chromosomes? " +
@@ -711,6 +715,7 @@ public class Sam2USeq {
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'c': minimumCounts  = Float.parseFloat(args[++i]); break;
 					case 'l': minimumLength  = Integer.parseInt(args[++i]); break;
+					case 'x': maximumCoverageCalculated  = (Double.parseDouble(args[++i]) + 1.0); break;
 					case 'b': regionFile = new File(args[i+1]); i++; break;
 					case 'o': logFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
@@ -744,9 +749,11 @@ public class Sam2USeq {
 
 		//stranded and regionFile?
 		if (regionFile !=null){
-			HashMap<String,RegionScoreText[]> tempRegions = Bed.parseBedFile(regionFile, stranded == false, false);
-			regions = new HashMap<String,RegionScoreText[]>();
+			regions = Bed.parseBedFile(regionFile, stranded == false, false);
 			
+			/*Don't do this, it breaks b37 stuff!
+			 * HashMap<String,RegionScoreText[]> tempRegions = Bed.parseBedFile(regionFile, stranded == false, false);
+			regions = new HashMap<String,RegionScoreText[]>();
 			for (String chrom: tempRegions.keySet()) {
 				if (!chrom.startsWith("chr")) {
 					String modChrom = "chr" + chrom;
@@ -754,9 +761,9 @@ public class Sam2USeq {
 				} else {
 					regions.put(chrom,tempRegions.get(chrom));
 				}
-			}
+			}*/
 			
-			histogram = new Histogram(0, 101, 101);
+			histogram = new Histogram(0, maximumCoverageCalculated, (int)maximumCoverageCalculated);
 			//watch out for stranded analysis
 			if (stranded) {
 				for (String s : regions.keySet()){ 
@@ -958,7 +965,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam 2 USeq : Dec 2014                             **\n" +
+				"**                                Sam 2 USeq : June 2015                            **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
@@ -985,6 +992,7 @@ public class Sam2USeq {
 				"-b Path to a region bed file (tab delim: chr start stop ...) to use in calculating\n" +
 				"      read coverage statistics.  Be sure these do not overlap! Run the MergeRegions app\n" +
 				"      if in doubt.\n"+ 
+				"-x Maximum read coverage stats calculated, defaults to 100, for use with -b.\n"+
 				"-p Path to a file for saving per region coverage stats. Defaults to variant of -b.\n"+
 				"-c Print regions that meet a minimum # counts, defaults to 0, don't print.\n"+
 				"-l Print regions that also meet a minimum length, defaults to 0.\n"+

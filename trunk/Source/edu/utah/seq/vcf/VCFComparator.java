@@ -538,7 +538,7 @@ public class VCFComparator {
 			createIntervalTreesForBedCalls();
 		}
 		else if (keyParser == null && keyBedCalls == null){			
-			keyParser = new VCFParser(vcfKey, true, true, false);
+			keyParser = new VCFParser(vcfKey, true, requireGenotypeMatch, false);		
 			if (removeNonPass){				
 				keyParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
 				keyParser.filterVCFRecords(VCFRecord.PASS);
@@ -567,7 +567,8 @@ public class VCFComparator {
 		results.append(res);
 		
 		//parse test variants!
-		testParser = new VCFParser(vcfTest, true, true, useVQSLOD);
+		testParser = new VCFParser(vcfTest, true, requireGenotypeMatch, useVQSLOD);
+		
 		if (removeNonPass){
 			testParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
 			testParser.filterVCFRecords(VCFRecord.PASS);
@@ -739,6 +740,7 @@ public class VCFComparator {
 			//vcf Test
 			File matchingTest = new File (saveDirectory, "match_"+filter+testName+"_"+keyName+".vcf.gz");
 			File noMatchingTest = new File (saveDirectory, "noMatch_"+filter+testName+"_"+keyName+".vcf.gz");
+			
 			testParser.printRecords(keyTestMatches[1],matchingTest);
 			testParser.printRecords(testNonMatchingVCF,noMatchingTest);
 
@@ -843,7 +845,7 @@ public class VCFComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Comparator : Dec 2014                           **\n" +
+				"**                              VCF Comparator : June 2015                          **\n" +
 				"**************************************************************************************\n" +
 				"Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls\n" +
 				"that fall in the common interrogated regions are compared. WARNING tabix gzipped files\n" +

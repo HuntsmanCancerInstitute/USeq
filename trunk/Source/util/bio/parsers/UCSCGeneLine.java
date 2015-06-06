@@ -1,7 +1,9 @@
 package util.bio.parsers;
 import util.bio.annotation.*;
 import util.gen.*;
+
 import java.util.*;
+
 import edu.utah.seq.analysis.*;
 
 public class UCSCGeneLine {
@@ -152,6 +154,24 @@ public class UCSCGeneLine {
 			System.out.println("\nError parsing UCSCGeneLine "+Misc.stringArrayToString(tokens, " "));
 			e.printStackTrace();
 		}
+	}
+	
+	public UCSCGeneLine(String name, String strand, ArrayList<Coordinate> bedRegions) {
+		//make exons
+		exons = new ExonIntron[bedRegions.size()];
+		for (int i=0; i< exons.length; i++){
+			Coordinate c = bedRegions.get(i);
+			exons[i] = new ExonIntron(c.getStart(), c.getStop());
+		}
+		Arrays.sort(exons);
+		//set fields
+		this.name = name;
+		chrom = bedRegions.get(0).getChromosome();
+		txStart = exons[0].getStart();
+		txEnd = exons[exons.length-1].getEnd();
+		cdsStart =txStart;
+		cdsEnd = txEnd;
+		this.strand = strand;
 	}
 	
 	public static int[] findMinMax (UCSCGeneLine[] genes){
@@ -538,6 +558,13 @@ public class UCSCGeneLine {
 			totalExonicBP+= (stop - start);
 		}
 		return totalExonicBP;
+	}
+	
+	public boolean intersectsAnExon(int start, int stop) {
+		for (ExonIntron e: exons){
+			if (e.intersects(start, stop)) return true;
+		}
+		return false;
 	}
 	
 	public int getLength(){

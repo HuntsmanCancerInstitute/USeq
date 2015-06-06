@@ -200,20 +200,26 @@ public class VCFParser {
 			ArrayList<String> commentsAL = new ArrayList<String>();
 
 			//find "#CHROM" line and parse sample names
+			boolean notFound = true;
 			while ((line=in.readLine()) != null){
 				//comments
 				if (line.startsWith("#")){
 					commentsAL.add(line);
 					if (line.startsWith("#CHROM")) {
+						notFound = false;
 						String[] header = TAB.split(line);
-						sampleNames = new String[header.length - firstSampleIndex];
-						int index =0;
-						for (int i=firstSampleIndex; i< header.length; i++) sampleNames[index++] = header[i];
+						int numSampleNames = header.length - firstSampleIndex;
+						if (numSampleNames < 1) sampleNames = null;
+						else {
+							sampleNames = new String[numSampleNames];
+							int index =0;
+							for (int i=firstSampleIndex; i< header.length; i++) sampleNames[index++] = header[i];
+						}
 						break;
 					}
 				}
 			}
-			if (sampleNames == null) throw new Exception("\nFailed to find the #CHROM header line.");
+			if (notFound) throw new Exception("\nFailed to find the #CHROM header line.");
 			comments = new VCFComments(commentsAL);
 			return in;
 		}catch (Exception e) {
@@ -236,20 +242,26 @@ public class VCFParser {
 			ArrayList<String> commentsAL = new ArrayList<String>();
 
 			//find "#CHROM" line and parse sample names
+			boolean notFound = true;
 			while ((line=in.readLine()) != null){
 				//comments
 				if (line.startsWith("#")){
 					commentsAL.add(line);
 					if (line.startsWith("#CHROM")) {
+						notFound = false;
 						String[] header = TAB.split(line);
-						sampleNames = new String[header.length - firstSampleIndex];
-						int index =0;
-						for (int i=firstSampleIndex; i< header.length; i++) sampleNames[index++] = header[i];
+						int numSampleNames = header.length - firstSampleIndex;
+						if (numSampleNames < 1) sampleNames = null;
+						else {
+							sampleNames = new String[numSampleNames];
+							int index =0;
+							for (int i=firstSampleIndex; i< header.length; i++) sampleNames[index++] = header[i];
+						}
 						break;
 					}
 				}
 			}
-			if (sampleNames == null) throw new Exception("\nFailed to find the #CHROM header line.");
+			if (notFound) throw new Exception("\nFailed to find the #CHROM header line.");
 			comments = new VCFComments(commentsAL);
 
 			//load data?
@@ -263,8 +275,8 @@ public class VCFParser {
 			//Setup chunking variables
 			int minRecord = this.chunkSize * this.chunkNumber;
 			int maxRecord = this.chunkSize * this.chunkNumber + this.chunkSize;
-			int recordCount = 0;
-
+			int recordCount = 0;			
+			
 			while ((line=in.readLine()) != null){
 				if (recordCount < minRecord) { //Ignore records less than starting point
 					//pass
@@ -273,13 +285,13 @@ public class VCFParser {
 				} else { //Juuust right.
 					try {					
 						VCFRecord vcf = new VCFRecord(line, this, loadSamples, loadInfo);
+						
 						if (!missingQual && vcf.isMissingQual()) {
 							//this is a bothersome warning that disrupts alot of apps that work with NIST and VarScan vcf files so I'm Nixing it. 
 							//System.out.println("\n\nWARNING: Sample variant quality (GQ) is missing from record: " + line + ".\n\nMissing sample qualities are set to zero.  Missing quality information is normal "
 									//+ "when parsing VCF files from tumor/normal varscan, but not VCF files from GATK.  This error is only reported once to reduce "
 									//+ "on-screen messages, so there may be other variants throughout the file with missing qualities.\n\n");
 							missingQual = true;
-
 						}
 						//old chrom
 						if (vcf.getChromosome().equals(oldChrom)){
@@ -294,7 +306,7 @@ public class VCFParser {
 							chromNames.add(oldChrom);
 						}
 						//add record and set position
-						records.add(vcf);
+						records.add(vcf);	
 						oldPosition = vcf.getPosition();
 
 					} catch (Exception e) {
@@ -304,7 +316,7 @@ public class VCFParser {
 							throw new Exception("\nToo many malformed VCF Records.\n");
 						}
 						badVcfRecords.add(line);
-					}
+					}					
 				}
 				recordCount++;
 			}
@@ -668,7 +680,7 @@ public class VCFParser {
 		try {
 			Gzipper out = new Gzipper(file);
 			//print header
-			for (String c: comments.getComments()) out.println(c);
+			for (String c: comments.getOriginalComments()) out.println(c);
 			//print records
 			for (VCFRecord r: sortedRecords) out.println(r);
 			out.close();
@@ -686,9 +698,7 @@ public class VCFParser {
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(records));
 
-			String[] comments = this.getStringComments();
-
-			for (String comment: comments) {
+			for (String comment: this.comments.getOriginalComments()) {
 				bw.write(comment + "\n");
 			}
 
@@ -734,7 +744,9 @@ public class VCFParser {
 	}
 
 	public String[] getStringComments() {
-		return comments.getComments();
+		String[] c= new String[comments.getOriginalComments().size()];
+		comments.getOriginalComments().toArray(c);
+		return c;
 	}
 
 	public VCFComments getVcfComments() {
