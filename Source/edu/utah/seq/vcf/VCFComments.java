@@ -35,7 +35,10 @@ public class VCFComments {
 	private String style = null;
 	private Pattern stylePattern = Pattern.compile("##annotationStyle=(.+?)");
 	
+	private ArrayList<String> originalComments = null;
+	
 	public VCFComments(ArrayList<String> comments) {
+		this.originalComments = comments;
 		setComments(comments.toArray(new String[0]));
 	}
 	
@@ -138,6 +141,10 @@ public class VCFComments {
 	
 	public ArrayList<String> getSampleList() {
 		return this.sampleList;
+	}
+
+	public ArrayList<String> getOriginalComments() {
+		return originalComments;
 	}
 	
 	
