@@ -198,6 +198,8 @@ public class MergeBarcodedPairedAlignments {
 				numberPairsFailingChrDistStrand += parser.getNumberPairsFailingChrDistStrand() ;
 				numberPairsFailingMateCrossCoordinateCheck += parser.getNumberPairsFailingMateCrossCoordinateCheck() ;
 				numberRepeatAlignmentsLackingMate += parser.getNumberRepeatAlignmentsLackingMate() ;
+				numberFailingMolecularBarcodeQC = parser.getNumberFailingMolecularBarcodeQC();
+				numberFailingFamilySize = parser.getNumberFailingFamilySize();
 				insertSize.addCounts(parser.getInsertSize());
 			};
 		} catch (Exception e) {
@@ -229,6 +231,8 @@ public class MergeBarcodedPairedAlignments {
 			System.out.println("Paired alignments failing mate pair cross coordinate check\t"+numberPairsFailingMateCrossCoordinateCheck);
 			System.out.println("Repeat alignments lacking a mate\t"+numberRepeatAlignmentsLackingMate);
 			System.out.println("Proper paired alignments that could not be unambiguously merged\t"+(int)numberFailedMergedPairs);
+			System.out.println("Alignments failing minimum family size\t" + numberFailingFamilySize);
+			System.out.println("Alignments failing molecular barcode QC\t" + numberFailingMolecularBarcodeQC);
 		}
 		System.out.println("Proper paired alignments that were merged\t"+format(numberMergedPairs, (numberMergedPairs+numberFailedMergedPairs)));
 		double totalBases = numberNonOverlappingBases + numberOverlappingBases;
@@ -372,7 +376,7 @@ public class MergeBarcodedPairedAlignments {
 				"-p Don't print paired alignment statistics and insert size histogram.\n"+
 				"-t Number concurrent threads to run, defaults to the max available to the jvm.\n"+
 
-				"\nExample: java -Xmx20G -jar pathToUSeq/Apps/MergePairedBamAlignments -f /Bams/ms.bam\n" +
+				"\nExample: java -Xmx20G -jar pathToUSeq/Apps/MergeBarcodedPairedBamAlignments -f /Bams/ms.bam\n" +
 				"     -p -s /Bams/MergedPairs/ms.mergedPairs.sam.gz -d 10000 \n\n" +
 
 				"**************************************************************************************\n");

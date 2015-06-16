@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 8.9.2
+			<html><head><title>USeq Command Line Menus 8.9.3.beta
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -43,6 +43,8 @@
 				
 					<a href="#BedStats">BedStats</a><br>
 				
+					<a href="#Bed2UCSCRefFlat">Bed2UCSCRefFlat</a><br>
+				
 					<a href="#BisSeq">BisSeq</a><br>
 				
 					<a href="#BisSeqAggregatePlotter">BisSeqAggregatePlotter</a><br>
@@ -54,6 +56,8 @@
 					<a href="#BisStatRegionMaker">BisStatRegionMaker</a><br>
 				
 					<a href="#CalculatePerCycleErrorRate">CalculatePerCycleErrorRate</a><br>
+				
+					<a href="#CalculatePerCyclePerNucleotideErrorRate">CalculatePerCyclePerNucleotideErrorRate</a><br>
 				
 					<a href="#ChIPSeq">ChIPSeq</a><br>
 				
@@ -706,6 +710,28 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/BedStats -b /Res/ex1.bed.gz -s 9 -t
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="Bed2UCSCRefFlat"><pre>**************************************************************************************
+**                            Bed 2 UCSC RefFlat   June 2015                        **
+**************************************************************************************
+Takes a bed file and a UCSC gene table, intersects them and assigns each bed region
+to a gene, then builds a new gene table using the bed region coordinates. Note, each
+bed region must intersect only one gene. Modify the input gene table
+(MergeUCSCGeneTable and manually trim) based on the errors. Lastly, all bed regions
+must be assigned to genes.
+
+Parameters:
+-u UCSC RefFlat or RefSeq gene table file, full path. See,
+       http://genome.ucsc.edu/cgi-bin/hgTables, (geneName name2(optional) chrom strand
+       txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds). 
+-b Bed file of regions to intersect with the gene table.
+-t Don't remove UTRs if present, from the gene table.
+-r Results file.
+
+Example: java -Xmx2G -jar pathTo/USeq/Apps/Bed2UCSCRefFlat -u refSeqJun2015.ucsc
+      -b targetRegionsFat.bed -r targetRegionsFat.ucsc
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="BisSeq"><pre>**************************************************************************************
 **                                   BisSeq: Nov 2014                               **
 **************************************************************************************
@@ -895,6 +921,8 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate -b /Dat
 
 **************************************************************************************
 </pre><br><p>
+				
+					<a name="CalculatePerCyclePerNucleotideErrorRate"><pre></pre><br><p>
 				
 					<a name="ChIPSeq"><pre>**************************************************************************************
 **                                   ChIPSeq: May 2014                              **
@@ -2877,7 +2905,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/PointDataManipulator -p
 </pre><br><p>
 				
 					<a name="PoReCNV"><pre>**************************************************************************************
-**                                Po Re CNV: April 2015                             **
+**                                Po Re CNV: June 2015                              **
 **************************************************************************************
 Uses Poisson regression and Pearson residuals to identify exons or genes whose counts
 differ significantly from the fitted value base on all the exon sample counts. This
@@ -2909,7 +2937,7 @@ Default Options:
 -t Number concurrent threads to run, defaults to the max available to the jvm.
 -m Minimum number exons per data chunk, defaults to 1500.
 -w Examine whole gene counts for CNVs, defaults to exons.
--x Keep sex chromosomes (X,Y), defaults to removing.
+-x Keep sex chromosomes (X,Y), defaults to removing. Don't mix sexes!
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/PoReCNV -s PRCnvResults/  -b BamFiles
        -u hg19EnsGenes.ucsc.gz -a RBambedSource.R  -g H_sapiens_Feb_2009 
@@ -3267,7 +3295,7 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/Sam2Fastq -a /SAM/unaligned.sam.gz -f
 </pre><br><p>
 				
 					<a name="Sam2USeq"><pre>**************************************************************************************
-**                                Sam 2 USeq : Dec 2014                             **
+**                                Sam 2 USeq : June 2015                            **
 **************************************************************************************
 Generates per base read depth stair-step graph files for genome browser visualization.
 By default, values are scaled per million mapped reads with no score thresholding. Can
@@ -3294,6 +3322,7 @@ Default Options:
 -b Path to a region bed file (tab delim: chr start stop ...) to use in calculating
       read coverage statistics.  Be sure these do not overlap! Run the MergeRegions app
       if in doubt.
+-x Maximum read coverage stats calculated, defaults to 100, for use with -b.
 -p Path to a file for saving per region coverage stats. Defaults to variant of -b.
 -c Print regions that meet a minimum # counts, defaults to 0, don't print.
 -l Print regions that also meet a minimum length, defaults to 0.
@@ -4163,7 +4192,7 @@ Example: java -Xmx20G -jar pathTo/USeq/Apps/VCFAnnotator -v 9908R.vcf
 </pre><br><p>
 				
 					<a name="VCFComparator"><pre>**************************************************************************************
-**                              VCF Comparator : Dec 2014                           **
+**                              VCF Comparator : June 2015                          **
 **************************************************************************************
 Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls
 that fall in the common interrogated regions are compared. WARNING tabix gzipped files
