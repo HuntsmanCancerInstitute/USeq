@@ -40,12 +40,16 @@
 	<classpathentry kind="lib" path="LibraryJars/naming-factory.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/naming-java.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/naming-resources.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/picard-1.65.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/protobuf-java-2.2.0.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/sam-1.65.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/servlet-api.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/TableLayout.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry combineaccessrules="false" kind="src" path="/samtools-htsjdk"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/J2SE-1.5"/>
+	<classpathentry kind="lib" path="poi-3.12/poi-3.12-20150511.jar"/>
+	<classpathentry kind="lib" path="poi-3.12/poi-examples-3.12-20150511.jar"/>
+	<classpathentry kind="lib" path="poi-3.12/poi-excelant-3.12-20150511.jar"/>
+	<classpathentry kind="lib" path="poi-3.12/poi-ooxml-3.12-20150511.jar"/>
+	<classpathentry kind="lib" path="poi-3.12/poi-ooxml-schemas-3.12-20150511.jar"/>
+	<classpathentry kind="lib" path="poi-3.12/poi-scratchpad-3.12-20150511.jar"/>
 	<classpathentry kind="output" path="Classes"/>
 </classpath>
