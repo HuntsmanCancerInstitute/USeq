@@ -233,15 +233,15 @@
 	
 	<target name="nix-release" depends="build-release">
 		<!-- Nix Specific configurations -->
-		<symlink action="delete" link="/Users/u0028003/AppsUSeq"/>
+		<symlink action="delete" link="/Users/u0028003/USeqApps"/>
 		<echo>Creating Symlink to the applications in home</echo>
-		<symlink link="/Users/u0028003/AppsUSeq" resource="/Users/u0028003/Code/USeq/Releases/${release.name}/Apps/"/>
-		<echo>Copying applications to server</echo>
+		<symlink link="/Users/u0028003/USeqApps" resource="/Users/u0028003/Code/USeq/Releases/${release.name}/Apps/"/>
+		<!--<echo>Copying applications to server</echo>
 		<exec executable="rsync" dir="/Users/u0028003/Code/USeq/Releases/${release.name}/">
 			<arg value="-r"/>
 			<arg value="."/>
 			<arg value="hci_u0028003@hci-moab.hci.utah.edu:/home/BioApps/USeq/"/>
-		</exec>
+		</exec> -->
 	</target>
 	
 	

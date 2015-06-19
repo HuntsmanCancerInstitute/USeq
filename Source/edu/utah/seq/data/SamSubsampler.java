@@ -30,13 +30,14 @@ public class SamSubsampler{
 	private String lambda = "chrLamb";
 	private int numberOfAlignmentsToPrint = 0;
 	private boolean sortFinal = false;
-	
+	private boolean applyFilters = true;
+
 	//internal fields
 	private Gzipper[] gzippers = null;
 	private Random random = new Random();
 	private int numberChunks = 100;
 	private String samHeader;
-	
+
 	//alignment counts for sam files
 	private long numberAlignmentsFailingQualityScore = 0;
 	private long numberAlignmentsFailingAlignmentScore = 0;
@@ -52,41 +53,41 @@ public class SamSubsampler{
 		processArgs(args);
 		System.out.println("Filtering and splitting alignments into "+numberChunks+" chunks...");
 
-			//make Gzippers
-			makeGzippers();
-		
-			//for each file, filter, split into numberChunks chunks
-			for (int i=0; i< samFiles.length; i++){
-				System.out.print("\t"+samFiles[i]);
-				if (parseWorkingSAMFile(samFiles[i]) == false) Misc.printExit("\n\tError: failed to parse, aborting.\n");
-			}
-			
-			//close Gzippers
-			closeGzippers();
-				
-			//Alignment filtering stats
-			double total = numberAlignmentsFailingQualityScore + numberAlignmentsFailingAlignmentScore + numberControlAlignments + numberAlignmentsFailingQC + numberAlignmentsUnmapped + numberPassingAlignments;
-			System.out.println("\nFiltering statistics for "+(int)total+" alignments:");
-			System.out.println(numberAlignmentsFailingQualityScore +"\tFailed mapping quality score ("+minimumPosteriorProbability+")");
-			System.out.println(numberAlignmentsFailingAlignmentScore +"\tFailed alignment score ("+maximumAlignmentScore+")");
-			System.out.println(numberControlAlignments +"\tAligned to chrPhiX*, chrAdapt*, or chrLamb*");
-			System.out.println(numberAlignmentsFailingQC +"\tFailed vendor QC");
-			System.out.println(numberAlignmentsUnmapped +"\tAre unmapped\n");
-			
-			System.out.println(numberPassingAlignments +"\tPassed filters ("+Num.formatPercentOneFraction(((double)numberPassingAlignments)/ total)+")");
-			
-			//randomize each
-			randomizeChunks();
-			
-			//add header and merge
-			printFinal();
+		//make Gzippers
+		makeGzippers();
 
-		
+		//for each file, filter, split into numberChunks chunks
+		for (int i=0; i< samFiles.length; i++){
+			System.out.print("\t"+samFiles[i]);
+			if (parseWorkingSAMFile(samFiles[i]) == false) Misc.printExit("\n\tError: failed to parse, aborting.\n");
+		}
+
+		//close Gzippers
+		closeGzippers();
+
+		//Alignment filtering stats
+		double total = numberAlignmentsFailingQualityScore + numberAlignmentsFailingAlignmentScore + numberControlAlignments + numberAlignmentsFailingQC + numberAlignmentsUnmapped + numberPassingAlignments;
+		System.out.println("\nFiltering statistics for "+(int)total+" alignments:");
+		System.out.println(numberAlignmentsFailingQualityScore +"\tFailed mapping quality score ("+minimumPosteriorProbability+")");
+		System.out.println(numberAlignmentsFailingAlignmentScore +"\tFailed alignment score ("+maximumAlignmentScore+")");
+		System.out.println(numberControlAlignments +"\tAligned to chrPhiX*, chrAdapt*, or chrLamb*");
+		System.out.println(numberAlignmentsFailingQC +"\tFailed vendor QC");
+		System.out.println(numberAlignmentsUnmapped +"\tAre unmapped\n");
+
+		System.out.println(numberPassingAlignments +"\tPassed filters ("+Num.formatPercentOneFraction(((double)numberPassingAlignments)/ total)+")");
+
+		//randomize each
+		randomizeChunks();
+
+		//add header and merge
+		printFinal();
+
+
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/(1000*60);
 		System.out.println("\nDone! "+Math.round(diffTime)+" min\n");
 	}
-	
+
 
 
 
@@ -112,7 +113,7 @@ public class SamSubsampler{
 
 			Gzipper out = new Gzipper(f);
 			out.println(samHeader);
-			
+
 			int numSaved = 0;
 			for (int i=0; i< toSave; i++){
 				//pick random reader
@@ -135,15 +136,15 @@ public class SamSubsampler{
 						break;
 					}
 				}
-				
+
 			}
-			
+
 			//close final sam
 			out.close();
 
 			//close readers
 			for (int i=0; i<readers.length; i++) if (readers[i]!= null) readers[i].close();
-			
+
 			//sort and write bam?
 			if (sortFinal){
 				System.out.println("Sorting and indexing...");
@@ -166,23 +167,23 @@ public class SamSubsampler{
 
 	private void randomizeChunks() {
 		try {
-		System.out.print("\nRandomizing chunks");
-		for (int i=0; i< numberChunks; i++){
-			System.out.print(".");
-			//load chunk
-			File ori = gzippers[i].getGzipFile();
-			String[] lines = IO.loadFile(ori);
-			//randomize and print
-			Misc.randomize(lines, System.currentTimeMillis());
-			File rnd = new File(ori.getParentFile(), i+"rand.sam.gz");
-			rnd.deleteOnExit();
-			gzippers[i] = new Gzipper(rnd);
-			gzippers[i].println(lines);
-			gzippers[i].close();
-			//delete temp file
-			ori.delete();
-		}
-		System.out.println();
+			System.out.print("\nRandomizing chunks");
+			for (int i=0; i< numberChunks; i++){
+				System.out.print(".");
+				//load chunk
+				File ori = gzippers[i].getGzipFile();
+				String[] lines = IO.loadFile(ori);
+				//randomize and print
+				Misc.randomize(lines, System.currentTimeMillis());
+				File rnd = new File(ori.getParentFile(), i+"rand.sam.gz");
+				rnd.deleteOnExit();
+				gzippers[i] = new Gzipper(rnd);
+				gzippers[i].println(lines);
+				gzippers[i].close();
+				//delete temp file
+				ori.delete();
+			}
+			System.out.println();
 		} catch (Exception e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError writting randomized chunk.\n");
@@ -209,7 +210,7 @@ public class SamSubsampler{
 			Misc.printErrAndExit("\nProblem making temporary gzippers\n");
 		} 
 	}
-	
+
 	private void closeGzippers() {
 		try {
 			for (int i=0; i< gzippers.length; i++) gzippers[i].close();
@@ -218,7 +219,7 @@ public class SamSubsampler{
 			Misc.printErrAndExit("\nProblem closing temporary gzippers\n");
 		} 
 	}
-	
+
 	private Gzipper fetchRandomGzipper(){
 		int randInt = random.nextInt(numberChunks);
 		return gzippers[randInt];
@@ -235,13 +236,13 @@ public class SamSubsampler{
 			reader.setValidationStringency(ValidationStringency.SILENT);
 			SAMRecordIterator iterator = reader.iterator();
 			if (samHeader == null) samHeader = reader.getFileHeader().getTextHeader().trim();
-			
+
 			int counter =0;
 			int numBadLines = 0;
 			//for each record
 			while (iterator.hasNext()){
 				SAMRecord samRecord = iterator.next();
-				
+
 				//print status blip
 				if (++counter == 1000000){
 					System.out.print(".");
@@ -258,48 +259,50 @@ public class SamSubsampler{
 					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
 					continue;
 				}
-				
-				//is it aligned?
-				if (sa.isUnmapped()) {
-					numberAlignmentsUnmapped++;
-					continue;
-				}
-				
-				//does it pass the vendor qc?
-				if (sa.failedQC()) {
-					numberAlignmentsFailingQC++;
-					continue;
-				}
-				
-				//skip phiX, adapter, lambda
-				String chr = sa.getReferenceSequence();
-				if (chr.startsWith(phiX) || chr.startsWith(adapter) || chr.startsWith(lambda)) {
-					numberControlAlignments++;
-					continue;
-				}
 
-				//does it pass the scores threshold?
-				if (sa.getAlignmentScore() > maximumAlignmentScore) {
-					numberAlignmentsFailingAlignmentScore++;
-					continue;
-				}
-				if (sa.getMappingQuality() < minimumPosteriorProbability) {
-					numberAlignmentsFailingQualityScore++;
-					continue;
+				if (applyFilters){
+					//is it aligned?
+					if (sa.isUnmapped()) {
+						numberAlignmentsUnmapped++;
+						continue;
+					}
+
+					//does it pass the vendor qc?
+					if (sa.failedQC()) {
+						numberAlignmentsFailingQC++;
+						continue;
+					}
+
+					//skip phiX, adapter, lambda
+					String chr = sa.getReferenceSequence();
+					if (chr.startsWith(phiX) || chr.startsWith(adapter) || chr.startsWith(lambda)) {
+						numberControlAlignments++;
+						continue;
+					}
+
+					//does it pass the scores threshold?
+					if (sa.getAlignmentScore() > maximumAlignmentScore) {
+						numberAlignmentsFailingAlignmentScore++;
+						continue;
+					}
+					if (sa.getMappingQuality() < minimumPosteriorProbability) {
+						numberAlignmentsFailingQualityScore++;
+						continue;
+					}
 				}
 
 				//increment counter
 				numberPassingAlignments++;
-				
+
 				//save it to a random gzipper
 				fetchRandomGzipper().println(samLine);
-				
+
 			}
 			reader.close();
 			System.out.println();
 		} catch (Exception e){
 			System.err.println("\nError parsing Novoalign file or writing split binary chromosome files.\nToo many open files? Too many chromosomes? " +
-			"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
+					"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
 			e.printStackTrace();
 			return false;
 		}
@@ -337,6 +340,7 @@ public class SamSubsampler{
 					case 'q': minimumPosteriorProbability = Float.parseFloat(args[++i]); break;
 					case 'n': numberOfAlignmentsToPrint = Integer.parseInt(args[++i]); break;
 					case 's': sortFinal = true; break;
+					case 'b': applyFilters = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -361,7 +365,7 @@ public class SamSubsampler{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              SamSubsampler: July 2013                            **\n" +
+				"**                              SamSubsampler: June 2015                            **\n" +
 				"**************************************************************************************\n" +
 				"Filters, randomizes, subsamples and sorts sam/bam alignment files.\n" +
 
@@ -376,12 +380,13 @@ public class SamSubsampler{
 				"-x Maximum alignment score. Defaults to 300, smaller numbers are more stringent.\n"+
 				"-q Minimum mapping quality score. Defaults to 13, bigger numbers are more stringent.\n" +
 				"      For RNASeq data, set this to 0.\n" +
+				"-b Bypass all filters and thresholds.\n"+
 
 				"\nExample: java -Xmx25G -jar pathToUSeq/Apps/SamSubsampler -x 240 -q 20 -a\n" +
 				"      /Novo/Run7/ -s /Novo/Run7/SR -n 10000000 \n\n" +
 
 
-		"**************************************************************************************\n");
+				"**************************************************************************************\n");
 
 	}
 

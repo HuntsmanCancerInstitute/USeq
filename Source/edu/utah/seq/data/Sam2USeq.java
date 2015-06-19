@@ -792,7 +792,7 @@ public class Sam2USeq {
 			String name = "regions";
 			if (samFiles.length == 1) name = Misc.removeExtension(samFiles[0].getName())+"_Regions";
 			name = name+minimumCounts+"C"+minimumLength+"L.bed";
-			File bed = new File (samFiles[0].getParentFile(), name);
+			File bed = new File (forExtraction.getParentFile(), name);
 			try {
 				bedOut = new PrintWriter (new FileWriter (bed));
 			} catch (IOException e) {

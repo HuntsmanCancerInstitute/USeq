@@ -244,6 +244,30 @@ public class Misc {
 		return added;
 	}
 	
+	/**Concatinates the toRepeat together with a StringBuilder.*/
+	public static String concatinateRepeats(String toRepeat, int numberOfRepeats){
+		StringBuilder sb = new StringBuilder();
+		for (int i=0; i< numberOfRepeats; i++) sb.append(toRepeat);
+		return sb.toString();
+	}
+	
+	/**Inserts the String into the char[].*/
+	public static char[] insertString (char[] seq, String toInsert, int indexToInsert){
+		int altSize = toInsert.length();
+		int seqSize = seq.length;
+		int nSize = seqSize + altSize;
+		char[] nSeq = new char[nSize];
+		//Arrays.fill(nSeq, 'x');
+		//copy left side
+		System.arraycopy(seq, 0, nSeq, 0, indexToInsert);
+		//add middle
+		int counter = indexToInsert;
+		for (int i=0; i < altSize; i++) nSeq[counter++] = toInsert.charAt(i);
+		//copy right side
+		System.arraycopy(seq, indexToInsert, nSeq, indexToInsert+altSize, seqSize-indexToInsert);
+		return nSeq;
+	}
+	
 	/**Capitalizes the first letter in a String.*/
 	public static String capitalizeFirstLetter(String s){
 		char[] first = s.toCharArray();		
