@@ -23,7 +23,6 @@ public class CalculatePerCycleErrorRate {
 	private File[] alignmentFiles;
 	private File fastaFile;
 	private File logFile;
-	private String readNamePrefix = null;
 	private double firstReadMaximumError = 0.01;
 	private double secondReadMaximumError = 0.0175;
 	private double maximumFractionFailingCycles = 0.1;
@@ -43,8 +42,6 @@ public class CalculatePerCycleErrorRate {
 	private double[][] incorrectBases;
 	private int fileIndex;
 	private int index;
-	private boolean deleteTempFiles = true;
-	private Pattern headerLine = Pattern.compile("^@[HSRPC][DQGO]\\s.+");
 	private boolean mergeStrands = true;
 	private double[] numberFailingCycles;
 	private int totalCycles;
@@ -154,10 +151,12 @@ public class CalculatePerCycleErrorRate {
 					double error = incorrectBases[j][i]/ (incorrectBases[j][i] + correctBases[j][i]);
 					sb.append(error);
 					fractionError[j].add(error);
-					/*sb.append("\t");
+					/*
+					sb.append("\t");
 					sb.append(incorrectBases[j][i]);
 					sb.append("\t");
-					sb.append(correctBases[j][i]);*/
+					sb.append(correctBases[j][i]);
+					*/
 					
 					//increment failed cycles?
 					boolean isEven = Num.isEven(j);
@@ -236,9 +235,9 @@ public class CalculatePerCycleErrorRate {
 			numberCycles = estimateNumberOfCyclesBam(bamFile);
 			
 			SAMRecordIterator it = samReader.queryOverlapping(chromName, 0, chromLength);
-
 			while (it.hasNext()) {
-				SAMRecord sam = it.next();
+
+				SAMRecord sam = it.next();				
 
 				//is it aligned?
 				if (sam.getReadUnmappedFlag()) continue;
@@ -248,10 +247,6 @@ public class CalculatePerCycleErrorRate {
 				//does it pass the vendor qc?
 				if (sam.getReadFailsVendorQualityCheckFlag()) continue;
 				
-				//prefix?
-				if (readNamePrefix != null) {
-					if (sam.getReadName().startsWith(readNamePrefix) == false) continue;
-				}
 				scoreAlignment(sam);
 			}
 			samReader.close();
@@ -263,70 +258,6 @@ public class CalculatePerCycleErrorRate {
 		}
 	}
 
-	public File parseSamFile(){
-		BufferedReader in = null;
-		PrintWriter samOut = null;
-		int numBadLines = 0;
-		File samOutFile = null;
-		int numberAlignments = 0;
-		try {
-			//make print writer
-			samOutFile = new File(Misc.removeExtension(alignmentFiles[fileIndex].getCanonicalPath())+"_temp.sam");
-			if (deleteTempFiles) samOutFile.deleteOnExit();
-			samOut = new PrintWriter( new FileWriter (samOutFile));
-			in = IO.fetchBufferedReader(alignmentFiles[fileIndex]);
-			String line;
-			String sqMatcher = "SN:"+chromName;
-			while ((line=in.readLine())!= null) {
-				line = line.trim();
-				if (line.length() == 0) continue;
-				//is it a header line?
-				if (headerLine.matcher(line).matches()){
-					//an SQ?
-					if (line.startsWith("@SQ")){
-						if (line.contains(sqMatcher)) samOut.println(line);
-					}
-					else samOut.println(line);
-					continue;
-				}
-
-				SamAlignment sa;
-				try {
-					sa = new SamAlignment(line, true);
-				} catch (Exception e) {
-					System.err.println("Skipping malformed sam alignment -> "+e.getMessage());
-					if (numBadLines++ > 1000) Misc.printErrAndExit("Aboring: too many malformed SAM alignments");
-					continue;
-				}
-
-				//is it aligned? failed QC?
-				if (sa.isUnmapped() || sa.failedQC()) continue;
-
-				//map to fasta
-				if (sa.getReferenceSequence().equals(chromName) == false) continue;
-				
-				//prefix?
-				if (readNamePrefix != null) {
-					if (sa.getName().startsWith(readNamePrefix) == false) continue;
-				}
-
-				samOut.println(line);
-				numberAlignments++;
-
-			}
-		} catch (Exception e) {
-			System.err.println("\nError parsing SAM file.\n");
-			e.printStackTrace();
-		} finally {
-			try {
-				if (in != null) in.close();
-				if (samOut != null) samOut.close();
-			} catch (IOException e) {}
-		}
-		//any alignments?
-		if (numberAlignments == 0) return null;
-		return samOutFile;
-	}
 
 	/**Returns null if the chromName doesn't exist or no records were found.
 	 * @throws Exception */
@@ -362,8 +293,6 @@ public class CalculatePerCycleErrorRate {
 			
 			//Removing exit condition.  There are instances were the first 10000 reads are read1 and when a read2 is encountered, the program crashes.
 			if (counter1 > 10000 && counter2 > 10000) break;
-			
-
 		}
 		it.close();
 		samReader.close();
@@ -372,14 +301,18 @@ public class CalculatePerCycleErrorRate {
 	}
 
 	private int scoreAlignment(SAMRecord sam) {
+		
 		int localIndex = index;
 		if (mergeStrands == false && sam.getReadPairedFlag() == true && sam.getSecondOfPairFlag() == true) localIndex++;
-
 		//get start and end, watch out for those that are off ends
 		int start = sam.getUnclippedStart() -1;
-		if (start < 0) return -1;
+		if (start < 0) {
+			return -1;
+		}
 		int end = sam.getAlignmentEnd();
-		if (end >= chromLength) return -2;
+		if (end >= chromLength) {
+			return -2;
+		}
 
 		numberAlignments[localIndex]++;
 
@@ -387,7 +320,7 @@ public class CalculatePerCycleErrorRate {
 		int cycleSubtractor = 0;
 		if (sam.getReadNegativeStrandFlag()){
 			if (sam.getReadPairedFlag() == false || sam.getFirstOfPairFlag()) cycleSubtractor = numberCycles[0];
-			else cycleSubtractor = numberCycles[1];
+			else cycleSubtractor = numberCycles[1];			
 		}
 
 		//walk through Ms
@@ -400,26 +333,25 @@ public class CalculatePerCycleErrorRate {
 		boolean softMaskingFound = false;
 		boolean hardMaskingFound = false;
 		int numberMismatches = 0;
-		
-		
 
 		while (mat.find()){
 			String call = mat.group(2);
 			int numberBases = Integer.parseInt(mat.group(1));
-			
-			
 			//a match
 			if (call.equals("M")) {
 				for (int i = 0; i< numberBases; i++) {
-				
-					if (chromSeq[start] == seq[seqIndex]) {
-						if (cycleSubtractor !=0) correctBases[localIndex][cycleSubtractor - seqIndex]++;
-						else correctBases[localIndex][seqIndex]++;
-					}
-					else if (seq[seqIndex] != 'N') {
-						if (cycleSubtractor !=0) incorrectBases[localIndex][cycleSubtractor - seqIndex]++;
-						else incorrectBases[localIndex][seqIndex]++;
-						numberMismatches++;
+					//an N in reference?
+					if (chromSeq[start] != 'N'){
+						if (chromSeq[start] == seq[seqIndex]) {
+							if (cycleSubtractor !=0) correctBases[localIndex][cycleSubtractor - seqIndex]++;
+							else correctBases[localIndex][seqIndex]++;
+						}
+						//else if (seq[seqIndex] != 'N') {, count N's as an error.
+						else {
+							if (cycleSubtractor !=0) incorrectBases[localIndex][cycleSubtractor - seqIndex]++;
+							else incorrectBases[localIndex][seqIndex]++;
+							numberMismatches++;
+						}
 					}
 					start++;
 					seqIndex++;
@@ -485,9 +417,7 @@ public class CalculatePerCycleErrorRate {
 					switch (test){
 					case 'b': alignmentFiles = IO.extractFiles(new File(args[++i]),".bam"); break;
 					case 'f': fastaFile = new File (args[++i]); break;
-					case 't': deleteTempFiles = false; break;
 					case 's': mergeStrands = false; break;
-					case 'n': readNamePrefix = args[++i]; break;
 					case 'o': logFile = new File(args[++i]); break;
 					case '1': firstReadMaximumError = Double.parseDouble(args[++i]); break;
 					case '2': secondReadMaximumError = Double.parseDouble(args[++i]); break;
@@ -520,9 +450,9 @@ public class CalculatePerCycleErrorRate {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Calculate Per Cycle Error Rate : March 2015                **\n" +
+				"**                        Calculate Per Cycle Error Rate : June 2015                **\n" +
 				"**************************************************************************************\n" +
-				"Calculates per cycle error rates provided a sorted indexed bam file and a fasta\n" +
+				"Calculates per cycle snv error rate provided a sorted indexed bam file and a fasta\n" +
 				"sequence file. Only checks CIGAR M bases not masked or INDEL bases.\n\n" +
 
 				"Required Options:\n"+
@@ -533,13 +463,12 @@ public class CalculatePerCycleErrorRate {
 				"-c Maximum fraction failing cycles, defaults to 0.1\n"+
 				"-1 Maximum first read or merged read error rate, defaults to 0.01\n"+
 				"-2 Maximum second read error rate, defaults to 0.0175\n"+
-				"-n Require read names to begin with indicated text, defaults to accepting everything.\n"+
 				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
 
 				"\n"+
 
 				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate -b /Data/Bam/\n"+
-				"     -f /Fastas/chrPhiX_Illumina.fasta.gz -n HWI\n\n"+
+				"     -f /Fastas/chrPhiX_Illumina.fasta.gz \n\n"+
 
 		"**************************************************************************************\n");
 

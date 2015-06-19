@@ -307,7 +307,8 @@ public class PoReCNV {
 		String chr = gene.getChrom();
 		int exonIndex = g.getExonIndex();
 		//name
-		StringBuilder sb = new StringBuilder (g.getGene().getDisplayName()); sb.append("\t");
+		
+		StringBuilder sb = new StringBuilder (g.getGene().getDisplayNameThenName()); sb.append("\t");
 		//description
 		if (g.getGene().getName() != null) sb.append(g.getGene().getName()); sb.append("\t");
 		//exon coordinates

@@ -60,28 +60,25 @@ public class BamSurgeonMutator {
 		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
 	}
 
+	/*Start and stop are the same.*/
 	private void mutateSNV(Bed region) throws Exception{
-		int size = region.getLength();
-		int pos = random.nextInt(size);
-		int start = region.getStart()+pos;
+		int start = region.getMiddle();
 		region.setStart(start);
 		if (allelicRatio == 0) region.setScore(getRandomAllelicRatio());
 		else region.setScore(allelicRatio);
-		region.setStop(start+1);
+		region.setStop(start);
 		mutSNVs.println(region.toStringNoStrandNoName());
 		
 	}
 	
 	private void mutateINDEL(Bed region) throws Exception{
-		int size = region.getLength();
-		int pos = random.nextInt(size);
-		int start = region.getStart()+pos;
+		int start = region.getMiddle();
 		region.setStart(start);
 		if (allelicRatio == 0) region.setScore(getRandomAllelicRatio());
 		else region.setScore(allelicRatio);
 		int lengthOfIndel = random.nextInt(maxIndelSize) + 1;
 
-		//insertion 
+		//insertion, start and stop 1bp apart
 		if (random.nextBoolean()){
 			String seq = this.fetchRandomSeq(lengthOfIndel);
 			region.setStop(start+1);
@@ -159,7 +156,7 @@ public class BamSurgeonMutator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             BamSurgeon Mutator  : Oct 2014                       **\n" +
+				"**                             BamSurgeon Mutator  : June 2015                      **\n" +
 				"**************************************************************************************\n" +
 				"Generates bed files of random SNVs and INDELs for BamSurgeon. Only one variant is made\n"+
 				"per input region.\n\n" +

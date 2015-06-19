@@ -19,6 +19,8 @@ public class SamSplitter{
 	//fields
 	private File samFile;
 	private String samHeader = null;
+	private boolean splitByPairs = false;
+	private boolean bypassThresholds = false;
 	private float maximumAlignmentScore = 240;
 	private float minimumMappingQualityScore = 0;
 	private int numberAlignments = 0;
@@ -38,7 +40,7 @@ public class SamSplitter{
 	private Random random = new Random();
 	private int numberOne = 0;
 	private int numberTwo = 0;
-	
+
 	//constructors
 	public SamSplitter(String[] args){
 		try {
@@ -60,20 +62,24 @@ public class SamSplitter{
 		File saveDir = samFile.getParentFile();
 		String samName = Misc.removeExtension(samFile.getName());
 		//make print writer
-		File temp1 = new File(saveDir, samName+"_1.sam.gz");
-		samOut1 = new Gzipper(temp1);
-		File temp2 = new File(saveDir, samName+"_2.sam.gz");
-		samOut2 = new Gzipper(temp2);
-		
+		if (splitByPairs){
+			samOut1 = new Gzipper(new File(saveDir, samName+"_single.sam.gz"));
+			samOut2 = new Gzipper(new File(saveDir, samName+"_paired.sam.gz"));
+		}
+		else {
+			samOut1 = new Gzipper(new File(saveDir, samName+"_1.sam.gz"));
+			samOut2 = new Gzipper(new File(saveDir, samName+"_2.sam.gz"));
+		}
+
 		//add header
 		SamReader sr = factory.open(samFile);
 		samHeader = sr.getFileHeader().getTextHeader().trim();
 		samHeader = samHeader+"\n"+ "@PG\tID:SplitSam\tCL: args "+programArguments;
 		samOut1.println(samHeader);
 		samOut2.println(samHeader);
-		
+
 		parseSam(sr);
-		
+
 		sr.close();
 		samOut1.close();
 		samOut2.close();
@@ -108,9 +114,9 @@ public class SamSplitter{
 					System.out.print(".");
 					dotCounter = 0;
 				}
-					sam = it.next();
-					numberAlignments++;
-
+				sam = it.next();
+				numberAlignments++;
+				if (bypassThresholds == false){
 					//is it aligned?
 					if (sam.getReadUnmappedFlag()){
 						numberUnmapped++;
@@ -152,28 +158,28 @@ public class SamSplitter{
 						numberFailingMappingQualityScore++;
 						continue;
 					}
+				}
+				//OK, it passes, increment counter
+				numberPassingAlignments++;
 
-					//OK, it passes, increment counter
-					numberPassingAlignments++;
-					
-					//first passing record?
-					if (lastName == null) lastName = sam.getReadName();
-					
-					//same as last name
-					String currName = sam.getReadName();
-					if (currName.equals(lastName)) al.add(sam);
-					else {
-						//print old
-						print(al);
-						//reset for new
-						lastName = currName;
-						al.clear();
-						al.add(sam);
-					}
+				//first passing record?
+				if (lastName == null) lastName = sam.getReadName();
+
+				//same as last name
+				String currName = sam.getReadName();
+				if (currName.equals(lastName)) al.add(sam);
+				else {
+					//print old
+					print(al);
+					//reset for new
+					lastName = currName;
+					al.clear();
+					al.add(sam);
+				}
 			}
 			//print last
 			print(al);
-			
+
 			sr.close();
 
 		} catch (Exception e) {
@@ -185,18 +191,31 @@ public class SamSplitter{
 		return true;
 	}
 
-	
+
 
 	private void print(ArrayList<SAMRecord> al) throws IOException{
-		if (random.nextBoolean()) {
-			for (SAMRecord sam : al) samOut1.println(sam.getSAMString().trim());
-			numberOne+= al.size();
+		//split by pairs?
+		if (splitByPairs){
+			if (al.size() == 1) {
+				samOut1.println(al.get(0).getSAMString().trim());
+				numberOne++;
+			}
+			else {
+				for (SAMRecord sam : al) samOut2.println(sam.getSAMString().trim());
+				numberTwo+= al.size();
+			}
 		}
+		//nope random
 		else {
-			for (SAMRecord sam : al) samOut2.println(sam.getSAMString().trim());
-			numberTwo+= al.size();
+			if (random.nextBoolean()) {
+				for (SAMRecord sam : al) samOut1.println(sam.getSAMString().trim());
+				numberOne+= al.size();
+			}
+			else {
+				for (SAMRecord sam : al) samOut2.println(sam.getSAMString().trim());
+				numberTwo+= al.size();
+			}
 		}
-		
 	}
 
 	public static void main(String[] args) {
@@ -224,6 +243,8 @@ public class SamSplitter{
 					case 's': samFile = new File(args[++i]); break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'm': minimumMappingQualityScore = Float.parseFloat(args[++i]); break;
+					case 'p': splitByPairs = true; break;
+					case 'b': bypassThresholds = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -248,7 +269,8 @@ public class SamSplitter{
 				"**************************************************************************************\n" +
 				"**                                SamSplitter: Oct 2014                             **\n" +
 				"**************************************************************************************\n" +
-				"Randomly splits a sam or bam file in ~1/2. To maintain pairs, sort by queryname.\n"+
+				"Randomly splits a sam or bam file in ~1/2. To maintain pairs, sort by queryname! Can\n"+
+				"also split by paired and unpaired.\n"+
 
 				"\nOptions:\n"+
 				"-s The full path to a queryname sorted xxx.bam or xxx.sam (.gz OK) file.\n" +
@@ -259,6 +281,8 @@ public class SamSplitter{
 				"-m Minimum mapping quality score, defaults to 0 (no filtering), larger numbers are\n" +
 				"      more stringent. Set to 13 or more to require near unique alignments. DO NOT set\n"+
 				"      for alignments parsed by the SamTranscriptomeParser!\n"+
+				"-b Bypass all filters and thresholds.\n"+
+				"-p Split into paired alignments and unpaired alignments.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/SamSplitter -f /Novo/Run7/exome.bam\n" +
 				"     -m 20 -a 120  \n\n" +

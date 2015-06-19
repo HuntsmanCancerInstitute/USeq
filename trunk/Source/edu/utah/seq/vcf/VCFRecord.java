@@ -91,6 +91,13 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	}
 	
 	public VCFRecord() {}
+	
+	/**Returns the position + longest alt or ref, interbase coor.*/
+	public int getMaxEndPosition(){
+		int max = reference.length();
+		for (String a: alternate) if (a.length() > max) max = a.length();
+		return max+ position;
+	}
 
 	/**Return modified record line.*/
 	public String getModifiedRecord(ArrayList<String> infoToUse, String style) {
@@ -251,7 +258,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		return this.missingQual;
 	}
 	
-	/**Checks that there is only one alternate. Otherwise false.*/
+	/**Checks that all alternates are a snv.  TT->CC is an insertion, not a double snv.*/
 	public boolean isSNP() {
 		if (reference.length() != 1) return false;
 		//check each alternate for non snp
@@ -260,17 +267,18 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		}
 		return true;
 	}
-	/**Checks that there is only one alternate. Otherwise false.*/
+	/**Checks that each alternate is an insertion.
+	 * TT -> CC is considered a balanced deletion/insertion and returns true here.*/
 	public boolean isInsertion(){
-		if (alternate.length != 1) return false;
-		if (alternate[0].length() > reference.length()) return true;
-		return false;
+		//check each alternate for non insertion
+		for (int i=0; i< alternate.length; i++) if (alternate[i].length() < reference.length()) return false;
+		return true;
 	}
-	/**Checks that there is only one alternate. Otherwise false.*/
+	/**Checks that each alternate is a deletion, smaller than ref.
+	 * TT -> CC is considered an insertion and returns false here.*/
 	public boolean isDeletion(){
-		if (alternate.length != 1) return false;
-		if (alternate[0].length() < reference.length()) return true;
-		return false;
+		for (int i=0; i< alternate.length; i++) if (alternate[i].length() >= reference.length()) return false;
+		return true;
 	}
 	
 	/**Checks to see if any of the alternates matches the type (0 SNV, 1 INS, 2 DEL)*/

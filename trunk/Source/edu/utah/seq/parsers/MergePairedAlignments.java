@@ -364,7 +364,7 @@ public class MergePairedAlignments {
 				"-i Maximum acceptible base pair distance for merging, defaults to 5000.\n"+
 				"-m Don't cross check read mate coordinates, needed for merging repeat matches. Defaults\n" +
 				"      to checking.\n"+
-				"-p Don't print paired alignment statistics and insert size histogram.\n"+
+				"-p Don't print detailed paired alignment statistics and insert size histogram.\n"+
 				"-t Number concurrent threads to run, defaults to the max available to the jvm.\n"+
 
 				"\nExample: java -Xmx20G -jar pathToUSeq/Apps/MergePairedBamAlignments -f /Bams/ms.bam\n" +

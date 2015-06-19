@@ -101,7 +101,7 @@ public class Seq {
 		return map;
 	}
 	
-	/**Converts the ascii quality scores to numeric scores. Returns null if not Sanger or Illumina 1.8+
+	/**Converts the ascii quality scores to numeric scores. Sanger fastq and illumina 1.8+
 	 * See http://onetipperday.blogspot.com/2012/10/code-snip-to-decide-phred-encoding-of.html */
 	public static int[] convertSangerQualityScores(String seqQual){
 		int[] scores = new int[seqQual.length()];
@@ -116,6 +116,33 @@ public class Seq {
 			scores[i] = val.intValue();
 		}
 		return scores;
+	}
+	
+	/**Counts the number of q scores that pass the threshold.  Good for sanger fastq and illumina 1.8+.*/
+	public static int countNumberOfPassingQualityScores(String seqQual, int minThreshold){
+		int numPassing = 0;
+		int[] scores = convertSangerQualityScores(seqQual);
+		if (scores == null) return -1;
+		for (int i: scores){
+			if (i>=minThreshold) numPassing++;
+		}
+		return numPassing;
+	}
+	
+	public static char[] nonGBase = {'A','T','C'};
+	public static char[] nonABase = {'G','T','C'};
+	public static char[] nonTBase = {'G','A','C'};
+	public static char[] nonCBase = {'G','A','T'};
+	public static Random random = new Random(0);
+	/**Only for GATC, returns random base not the provided base. Returns 'X' for non base input.
+	 * Note uses a fixed seed so always the same.*/
+	public static char pickRandomBase(char base){
+		int r = random.nextInt(3);
+		if (base == 'G') return nonGBase[r];
+		if (base == 'A') return nonABase[r];
+		if (base == 'T') return nonTBase[r];
+		if (base == 'C') return nonCBase[r];
+		return 'X';
 	}
 	
 	/**Attempts to extract chr1,2,3...22 or chrX,Y,M,MT from the String.

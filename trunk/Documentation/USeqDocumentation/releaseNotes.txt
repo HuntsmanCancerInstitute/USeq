@@ -1,3 +1,10 @@
+----USeq_8.9.4----
+SamAlignmentExtractor
+* Added options to sort on MQ and AS scores
+* Added a variety of QC metrics related to fraction on target and base quality
+BamBlaster
+* New app for injecting snv and indel variants from a vcf file into a bam file
+
 ----USeq_8.9.3----
 Bed2UCSCRefFlat
 * New app for converting a bed file to a multi exonic UCSC RefFlat file.
