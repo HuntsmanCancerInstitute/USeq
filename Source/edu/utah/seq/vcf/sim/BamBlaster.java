@@ -16,7 +16,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.data.sam.SamLayoutLite;
 import edu.utah.seq.parsers.SamAlignmentExtractor;
 import edu.utah.seq.vcf.VCFLookUp;
@@ -27,7 +26,9 @@ import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 
-/**Given a vcf file of snv and indels, introduces the variants into the overlapping bam record and outputs fastq for realignment.
+/**Given a vcf file of snv and indels, introduces the variants into the overlapping bam record and 
+ * outputs fastq for realignment as well as two bam files, a variants hit stats file, and variants 
+ * that were skipped (too close, not snv/indel).
  * @author Nix
  * */
 public class BamBlaster {
@@ -43,6 +44,7 @@ public class BamBlaster {
 	private SamReaderFactory readerFactory;
 	private SAMFileWriter tempBamWriter;
 	private SAMFileWriter finalBamWriter;
+	private SAMFileWriter unmodifiedFastqBamWriter;
 	private SamReader bamReader;
 	private HashMap<String, VCFLookUp> chromVariant;
 	private HashSet<String> modifiedNames = new HashSet<String>();
@@ -58,7 +60,7 @@ public class BamBlaster {
 	private Gzipper excludedVCF;
 	private int numberExcludedVcf = 0;
 	private int numberProcessedVcf = 0;
-
+	
 	public BamBlaster (String[] args){
 		long startTime = System.currentTimeMillis();
 
@@ -85,7 +87,7 @@ public class BamBlaster {
 		tempBamWriter.close();
 		
 		//find mates
-		System.out.print("Finding mates, extracting fastq, and saving alignments (slow)...");
+		System.out.print("\nFinding mates, extracting fastq, and saving alignments (slow)...");
 		matchMates();
 		
 		//cleanup
@@ -97,6 +99,7 @@ public class BamBlaster {
 			fastqUnpairedOut.close();
 			excludedVCF.close();
 			varReportOut.close();
+			unmodifiedFastqBamWriter.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nERROR closing readers, writers, or gzippers?\n");
@@ -148,8 +151,11 @@ public class BamBlaster {
 			}
 			//is it present in the modified hash, skip secondary and unmapped reads
 			if (sam.isSecondaryOrSupplementary() == false && sam.getReadUnmappedFlag() == false && readName2Pairs.containsKey(sam.getReadName())){
+				//write unmodified
+				unmodifiedFastqBamWriter.addAlignment(sam);
+				
 				SAMRecord saved = readName2Pairs.get(sam.getReadName());
-				//is this the dummy? skip if so
+				//is this the dummy?
 				if (saved != dummy){
 					//is it the mate?
 					if (areMates(sam, saved)) {
@@ -193,138 +199,6 @@ public class BamBlaster {
 		if (numUnpaired == 0) fastqUnpairedOut.getGzipFile().deleteOnExit();
 		
 	}
-
-	/*private void matchMates() {
-		int numPaired = 0;
-		int numUnpaired = 0;
-		
-		//load hash of readName: SAMRecord from modified bam file
-		HashMap<String, SAMRecord> readName2Pairs = new HashMap<String, SAMRecord>();
-		SAMRecordIterator i = readerFactory.open(tempSortedBam).iterator();
-		SAMRecord dummy = new SAMRecord(null);
-		
-		while (i.hasNext()){
-			SAMRecord sam = i.next();
-			SAMRecord r = readName2Pairs.get(sam.getReadName());
-			//null so add first
-			if (r == null) readName2Pairs.put(sam.getReadName(), sam);
-			//already paired?
-			else if (r!= null && r == dummy) Misc.printErrAndExit("\nERROR: more than two alignments were found for "+sam.getReadName());
-			//must be a pair so print
-			else {
-				//print pair and set dummy
-				printPairedFastq(sam, r);
-				numPaired++;
-				readName2Pairs.put(sam.getReadName(), dummy);
-			}
-		}
-		i.close();
-		
-		int counter = 0;
-		//for each non dummy look for mate in original bam
-		for (SAMRecord sam: readName2Pairs.values()){
-			if (counter++ > 10000){
-				System.out.print(".");
-				counter = 0;
-			}
-			//dummy?
-			if (sam == dummy) continue;
-			//is it paired?
-			if (sam.getReadPairedFlag()){
-				//look in original first
-				SAMRecord mate = bamReader.queryMate(sam);
-				//anything?
-				if (mate != null) {
-					//print pair
-					printPairedFastq(sam, mate);
-					numPaired++;
-				}
-				else {
-					String name = sam.getReadName()+":BB-"+sam.getAttribute("BB");
-					if (sam.getFirstOfPairFlag()) name = name +"_1";
-					else name = name+"_2";
-					printFastq(sam, fastqUnpairedOut, name);
-					numUnpaired++;
-				}
-			}
-			//nope, print as single
-			else {
-				printFastq(sam, fastqUnpairedOut, sam.getReadName()+":BB-"+sam.getAttribute("BB")+"_0");
-				numUnpaired++;
-			}
-		}
-
-		
-		//get iterator on second reader, can't use same reader
-		
-		SAMRecordIterator i = readerFactory.open(tempSortedBam).iterator();
-		int counter = 0;
-		while (i.hasNext()) {
-			SAMRecord sam = i.next();
-			if (counter++ > 10000){
-				System.out.print(".");
-				counter = 0;
-			}
-			//already added? if not add to fragNames
-			if (modifiedNames.contains(sam.getReadName())) continue;
-			modifiedNames.add(sam.getReadName());
-			
-			//is it paired?
-			if (sam.getReadPairedFlag()){
-				//look in modified first
-				SAMRecord mate = modifiedReader.queryMate(sam);
-				//look in original reader?
-				if (mate == null) mate = bamReader.queryMate(sam);
-				//anything?
-				if (mate != null) {
-					//print pair
-					printPairedFastq(sam, mate);
-					numPaired++;
-				}
-				else {
-					String name = sam.getReadName()+":BB-"+sam.getAttribute("BB");
-					if (sam.getFirstOfPairFlag()) name = name +"_1";
-					else name = name+"_2";
-					printFastq(sam, fastqUnpairedOut, name);
-					numUnpaired++;
-				}
-			}
-			//nope, print as single
-			else {
-				printFastq(sam, fastqUnpairedOut, sam.getReadName()+":BB-"+sam.getAttribute("BB")+"_0");
-				numUnpaired++;
-			}
-			
-		}
-		//clean up
-		i.close();
-		modifiedNames = null;
-		
-		
-		//delete any of the gzippers?
-		if (numPaired == 0) {
-			fastqFirstOut.getGzipFile().deleteOnExit();
-			fastqSecondOut.getGzipFile().deleteOnExit();
-		}
-		if (numUnpaired == 0) fastqUnpairedOut.getGzipFile().deleteOnExit();
-		
-		System.out.println("\n\t"+ numPaired+"\t# Paired fastq reads for realignment");
-		System.out.println("\t"+ numUnpaired+"\t# Unpaired fastq reads for realignment");
-		
-		//close remaining readers and writers
-		try {
-			fastqFirstOut.close();
-			fastqSecondOut.close();
-			fastqUnpairedOut.close();
-			excludedVCF.close();
-			varReportOut.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-			Misc.printErrAndExit("\nERROR closing readers, writers, or gzippers?\n");
-		}
-		
-	}*/
-
 
 	private void printFastq(SAMRecord sam, Gzipper out, String name) {
 		try {
@@ -377,7 +251,7 @@ public class BamBlaster {
 			if (bb1.equals(bb2)) name= name+":BB-"+bb1+"_12";
 			else{
 				//diff mods
-				name = name+":BB"+bb1+"_1"+":BB-"+bb2+"_2";
+				name = name+":BB-"+bb1+"_1"+":BB-"+bb2+"_2";
 			}
 		}
 		//nope just one
@@ -699,6 +573,7 @@ public class BamBlaster {
 		tempBam = new File (saveDirectory, name+"_temp.bam");
 		tempBam.deleteOnExit();
 		File finalBam = new File (saveDirectory, name+"_filtered.bam");
+		File unmodifiedFastqBam = new File (saveDirectory, name+"_unmodified.bam");
 		
 		//make File just to delete it, this is created by Picard's sort sam
 		File tempSortedBai = new File (saveDirectory, name+"_temp_sorted.bai");
@@ -709,6 +584,7 @@ public class BamBlaster {
 		tempBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), false, tempBam);
 		writerFactory.setCreateIndex(true);
 		finalBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), true, finalBam);
+		unmodifiedFastqBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), true, unmodifiedFastqBam);
 		
 		//make gzippers and log writer
 		try {
@@ -738,7 +614,9 @@ public class BamBlaster {
 				"reference and have a CIGAR of M are modified. Not all alignments can be modified.\n"+
 				"Secondary/supplemental are skipped. Only one variant per alignment. Variants within a\n"+
 				"read length distance of prior are ignored and saved to file for iterative processing.\n"+
-				"Be sure to normalize and decompose your vcf data (e.g.https://github.com/atks/vt).\n\n" +
+				"Be sure to normalize and decompose your vcf file (e.g.https://github.com/atks/vt).\n" +
+				"Use the BamMixer to add proportions of your realignments (e.g. 10%) with the\n"+
+				"unmodified.bams (e.g. 90%). Use the VCFVariantMaker to generate random vcf variants.\n\n"+
 
 				"Required:\n"+
 				"-b Path to a coordinate sorted bam file with index.\n"+

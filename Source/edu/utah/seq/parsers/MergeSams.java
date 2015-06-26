@@ -22,7 +22,7 @@ public class MergeSams{
 	private File outputFile;
 	private String samHeader = null;
 	private boolean deleteTempSamFile = true;
-	private float maximumAlignmentScore = 240;
+	private float maximumAlignmentScore = 300;
 	private float minimumMappingQualityScore = 0;
 	private int numberAlignments = 0;
 	private int numberUnmapped = 0;
@@ -33,7 +33,8 @@ public class MergeSams{
 	private int numberFailingMappingQualityScore = 0;
 	private int numberAdapter = 0;
 	private int numberPhiX = 0;
-
+	private boolean verbose = true;
+	
 	private Gzipper samOut;
 	private boolean saveBadReads = false;
 	private HashMap <String, Integer> chromLength = new HashMap <String, Integer>();
@@ -41,7 +42,8 @@ public class MergeSams{
 	private static final Pattern TAB = Pattern.compile("\\t");
 	private String genomeVersion = null;
 	private SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
-
+	
+	
 	//constructors
 	public MergeSams(String[] args){
 		try {
@@ -52,8 +54,19 @@ public class MergeSams{
 
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
-			System.out.println("\nDone! "+Math.round(diffTime)+" Min\n");
+			if (verbose) System.out.println("\nDone! "+Math.round(diffTime)+" Min\n");
 
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public MergeSams(File[] samBam, File mergedBam, boolean verbose){
+		try {
+			dataFiles = samBam;
+			saveFile = mergedBam;
+			this.verbose = verbose;
+			doWork();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -77,33 +90,35 @@ public class MergeSams{
 		samOut.println(samHeader);
 
 		//for each file, parse and save to disk	
-		System.out.println("\nParsing, filtering, and merging SAM files...");
+		if (verbose) System.out.println("\nParsing, filtering, and merging SAM files...");
 		for (int i=0; i< dataFiles.length; i++){
-			System.out.print("\t"+dataFiles[i].getName());
+			if (verbose) System.out.print("\t"+dataFiles[i].getName());
 			parseSam(dataFiles[i]); 
-			System.out.println();
+			if (verbose) System.out.println();
 		}
 
 		//close the writers
 		samOut.close();
 		
-		System.out.println("\nSorting and writing bam output with Picard's SortSam...");
+		if (verbose) System.out.println("\nSorting and writing bam output with Picard's SortSam...");
 		new PicardSortSam (outputFile, saveFile);
 
 
 		//stats
 		double fractionPassing = ((double)numberPassingAlignments)/((double)numberAlignments);
-		System.out.println("\nStats:\n");
-		System.out.println("\t"+numberAlignments+"\tTotal # Alignments from raw sam file");
-		System.out.println("\t"+numberPassingAlignments+"\tAlignments passing filters ("+Num.formatPercentOneFraction(fractionPassing)+")");
-		System.out.println("\t\t"+numberUnmapped+"\t# Unmapped Reads");
-		System.out.println("\t\t"+numberFailingVendorQC+"\t# Alignments failing vendor/ platform QC and or malformed");
-		System.out.println("\t\t"+numberFailingAlignmentScore+"\t# Alignments failing alignment score");
-		System.out.println("\t\t"+numberFailingMappingQualityScore+"\t# Alignments failing mapping quality score");
-		System.out.println("\t\t"+numberExceedingEnd+"\t# Alignments exceeding the length of the chromosome in the header");
-		System.out.println("\t\t"+numberAdapter+"\t# Adapter alignments");
-		System.out.println("\t\t"+numberPhiX+"\t# PhiX alignments");
-		System.out.println();
+		if (verbose) { 
+			System.out.println("\nStats:\n");
+			System.out.println("\t"+numberAlignments+"\tTotal # Alignments from raw sam file");
+			System.out.println("\t"+numberPassingAlignments+"\tAlignments passing filters ("+Num.formatPercentOneFraction(fractionPassing)+")");
+			System.out.println("\t\t"+numberUnmapped+"\t# Unmapped Reads");
+			System.out.println("\t\t"+numberFailingVendorQC+"\t# Alignments failing vendor/ platform QC and or malformed");
+			System.out.println("\t\t"+numberFailingAlignmentScore+"\t# Alignments failing alignment score");
+			System.out.println("\t\t"+numberFailingMappingQualityScore+"\t# Alignments failing mapping quality score");
+			System.out.println("\t\t"+numberExceedingEnd+"\t# Alignments exceeding the length of the chromosome in the header");
+			System.out.println("\t\t"+numberAdapter+"\t# Adapter alignments");
+			System.out.println("\t\t"+numberPhiX+"\t# PhiX alignments");
+			System.out.println();
+		}
 
 	}
 
@@ -140,7 +155,7 @@ public class MergeSams{
 			SAMRecordIterator it = sr.iterator();
 			int dotCounter = 0;
 			while (it.hasNext()) {
-				if (++dotCounter > 1000000){
+				if (verbose && ++dotCounter > 1000000){
 					System.out.print(".");
 					dotCounter = 0;
 				}
@@ -275,6 +290,7 @@ public class MergeSams{
 					switch (test){
 					case 'd': forExtraction = new File(args[++i]); break;
 					case 'f': saveBadReads = true; break;
+					case 'v': verbose = false; break;
 					case 's': saveFile = new File(args[++i]); break;
 					case 't': deleteTempSamFile = false; break;
 					case 'h': replacementHeaderFile = new File(args[++i]); break;
@@ -329,7 +345,7 @@ public class MergeSams{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 Merge Sams: Oct 2014                             **\n" +
+				"**                                 Merge Sams: June 2015                            **\n" +
 				"**************************************************************************************\n" +
 				"Merges sam and bam files. Adds a stripped header if one is not provided. This most\n"+
 				"likely will not play nicely with GATK or Picard downstream apps, good for USeq.\n"+
@@ -339,7 +355,7 @@ public class MergeSams{
 
 				"\nDefault Options:\n"+
 				"-s Save file, must end in xxx.bam, defaults merge.bam in -d.\n"+
-				"-a Maximum alignment score. Defaults to 240, smaller numbers are more stringent.\n" +
+				"-a Maximum alignment score. Defaults to 300, smaller numbers are more stringent.\n" +
 				"      Approx 30pts per mismatch.\n"+
 				"-m Minimum mapping quality score, defaults to 0 (no filtering), larger numbers are\n" +
 				"      more stringent. Set to 13 or more to require near unique alignments. DO NOT set\n"+
@@ -348,11 +364,16 @@ public class MergeSams{
 				"-h Full path to a txt file containing a sam header, defaults to autogenerating the\n"+
 				"      header from the sam/bam headers.\n"+
 				"-t Don't delete temp xxx.sam.gz file.\n"+
+				"-q Quiet, print only errors.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/MergeSams -f /Novo/Run7/\n" +
 				"     -m 20 -a 120  \n\n" +
 
 				"**************************************************************************************\n");
 
+	}
+
+	public int getNumberPassingAlignments() {
+		return numberPassingAlignments;
 	}	
 }

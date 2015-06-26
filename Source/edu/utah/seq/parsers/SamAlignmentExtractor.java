@@ -80,7 +80,7 @@ public class SamAlignmentExtractor {
 			if (header != null){
 				samOut.println(header.trim());
 				//add program args
-				samOut.println("@PG\tID:USeq SamAlignmentExtractor\tCL:"+useqArguments);
+				samOut.println("@PG\tID:USeq SamAlignmentExtractor "+Misc.getDateTime()+"\tCL:"+useqArguments);
 			}
 			
 			//calc extra stats?
