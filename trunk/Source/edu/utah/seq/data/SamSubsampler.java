@@ -2,6 +2,7 @@ package edu.utah.seq.data;
 
 import java.io.*;
 import java.util.regex.*;
+
 import util.bio.parsers.MultiFastaParser;
 import util.bio.seq.Seq;
 import util.gen.*;
@@ -31,6 +32,7 @@ public class SamSubsampler{
 	private int numberOfAlignmentsToPrint = 0;
 	private boolean sortFinal = false;
 	private boolean applyFilters = true;
+	private boolean verbose = true;
 
 	//internal fields
 	private Gzipper[] gzippers = null;
@@ -50,15 +52,33 @@ public class SamSubsampler{
 	//constructors
 	public SamSubsampler(String[] args){
 		long startTime = System.currentTimeMillis();
+		
 		processArgs(args);
-		System.out.println("Filtering and splitting alignments into "+numberChunks+" chunks...");
+		doWork();
+		
+		//write out final
+		long toSave = numberPassingAlignments;
+		File f = new File (saveDirectory, "randomized"+toSave+".sam.gz");
+		printRandomAlignments(toSave, f);
+
+		//finish and calc run time
+		double diffTime = ((double)(System.currentTimeMillis() -startTime))/(1000*60);
+		if (verbose) System.out.println("\nDone! "+Math.round(diffTime)+" min\n");
+	}
+
+
+
+
+
+	private void doWork() {
+		if (verbose) System.out.println("Filtering and splitting alignments into "+numberChunks+" chunks...");
 
 		//make Gzippers
 		makeGzippers();
 
 		//for each file, filter, split into numberChunks chunks
 		for (int i=0; i< samFiles.length; i++){
-			System.out.print("\t"+samFiles[i]);
+			if (verbose) System.out.print("\t"+samFiles[i]);
 			if (parseWorkingSAMFile(samFiles[i]) == false) Misc.printExit("\n\tError: failed to parse, aborting.\n");
 		}
 
@@ -66,55 +86,60 @@ public class SamSubsampler{
 		closeGzippers();
 
 		//Alignment filtering stats
-		double total = numberAlignmentsFailingQualityScore + numberAlignmentsFailingAlignmentScore + numberControlAlignments + numberAlignmentsFailingQC + numberAlignmentsUnmapped + numberPassingAlignments;
-		System.out.println("\nFiltering statistics for "+(int)total+" alignments:");
-		System.out.println(numberAlignmentsFailingQualityScore +"\tFailed mapping quality score ("+minimumPosteriorProbability+")");
-		System.out.println(numberAlignmentsFailingAlignmentScore +"\tFailed alignment score ("+maximumAlignmentScore+")");
-		System.out.println(numberControlAlignments +"\tAligned to chrPhiX*, chrAdapt*, or chrLamb*");
-		System.out.println(numberAlignmentsFailingQC +"\tFailed vendor QC");
-		System.out.println(numberAlignmentsUnmapped +"\tAre unmapped\n");
-
-		System.out.println(numberPassingAlignments +"\tPassed filters ("+Num.formatPercentOneFraction(((double)numberPassingAlignments)/ total)+")");
-
+		if (verbose){
+			double total = numberAlignmentsFailingQualityScore + numberAlignmentsFailingAlignmentScore + numberControlAlignments + numberAlignmentsFailingQC + numberAlignmentsUnmapped + numberPassingAlignments;
+			System.out.println("\nFiltering statistics for "+(int)total+" alignments:");
+			System.out.println(numberAlignmentsFailingQualityScore +"\tFailed mapping quality score ("+minimumPosteriorProbability+")");
+			System.out.println(numberAlignmentsFailingAlignmentScore +"\tFailed alignment score ("+maximumAlignmentScore+")");
+			System.out.println(numberControlAlignments +"\tAligned to chrPhiX*, chrAdapt*, or chrLamb*");
+			System.out.println(numberAlignmentsFailingQC +"\tFailed vendor QC");
+			System.out.println(numberAlignmentsUnmapped +"\tAre unmapped\n");
+			System.out.println(numberPassingAlignments +"\tPassed filters ("+Num.formatPercentOneFraction(((double)numberPassingAlignments)/ total)+")");
+		}
+		
 		//randomize each
 		randomizeChunks();
 
-		//add header and merge
-		printFinal();
-
-
-		//finish and calc run time
-		double diffTime = ((double)(System.currentTimeMillis() -startTime))/(1000*60);
-		System.out.println("\nDone! "+Math.round(diffTime)+" min\n");
+		//ok now ready to write out
 	}
 
 
 
 
 
-	private void printFinal() {
+	public SamSubsampler(File bam, boolean verbose) {
+		this.verbose = verbose;
+		applyFilters = false;
+		sortFinal = false;
+		samFiles = new File[]{bam};
+		doWork();
+		//now call printRandomAlignments()
+	}
+
+
+
+	
+
+	public void printRandomAlignments(long toSave, File outputGzSamFile) {
 		try {
-			long toSave = numberPassingAlignments;
 			//do they want a diff number than all?
 			if (numberOfAlignmentsToPrint != 0){
 				//too many requested
 				if (numberOfAlignmentsToPrint> numberPassingAlignments){
-					System.out.println("\nWARNING: The number of passing alignments is less than the requested number to save!  Saving only "+numberPassingAlignments+" alignments.\n");
+					Misc.printErrAndExit("\nERROR: The number of passing alignments is less than the requested number to save!  Saving only "+numberPassingAlignments+" alignments.\n");
 				}
 				else toSave = numberOfAlignmentsToPrint;
 			}
-
 			//make readers
 			BufferedReader[] readers = new BufferedReader[numberChunks];
 			for (int i=0; i<readers.length; i++) readers[i] = IO.fetchBufferedReader(gzippers[i].getGzipFile());
 
-			System.out.println("Writing randomized alignments...");
-			File f = new File (saveDirectory, "randomized"+toSave+".sam.gz");
+			if (verbose) System.out.println("Writing randomized alignments...");
+			
 
-			Gzipper out = new Gzipper(f);
+			Gzipper out = new Gzipper(outputGzSamFile);
 			out.println(samHeader);
 
-			int numSaved = 0;
 			for (int i=0; i< toSave; i++){
 				//pick random reader
 				while (true){
@@ -132,11 +157,9 @@ public class SamSubsampler{
 					}
 					else {
 						out.println(line);
-						numSaved++;
 						break;
 					}
 				}
-
 			}
 
 			//close final sam
@@ -147,18 +170,17 @@ public class SamSubsampler{
 
 			//sort and write bam?
 			if (sortFinal){
-				System.out.println("Sorting and indexing...");
+				if (verbose) System.out.println("Sorting and indexing...");
 				File bam = new File (saveDirectory, "randomized"+toSave+".bam");
 				//sort and convert to BAM
-				new PicardSortSam (f, bam);
-				f.delete();
+				new PicardSortSam (outputGzSamFile, bam);
+				outputGzSamFile.delete();
 			}
 
 		} catch (Exception e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError: problem writing final merged sam file\n");
 		} 
-
 	}
 
 
@@ -167,9 +189,9 @@ public class SamSubsampler{
 
 	private void randomizeChunks() {
 		try {
-			System.out.print("\nRandomizing chunks");
+			if (verbose) System.out.print("\nRandomizing chunks");
 			for (int i=0; i< numberChunks; i++){
-				System.out.print(".");
+				if (verbose) System.out.print(".");
 				//load chunk
 				File ori = gzippers[i].getGzipFile();
 				String[] lines = IO.loadFile(ori);
@@ -183,7 +205,7 @@ public class SamSubsampler{
 				//delete temp file
 				ori.delete();
 			}
-			System.out.println();
+			if (verbose) System.out.println();
 		} catch (Exception e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError writting randomized chunk.\n");
@@ -245,7 +267,7 @@ public class SamSubsampler{
 
 				//print status blip
 				if (++counter == 1000000){
-					System.out.print(".");
+					if (verbose) System.out.print(".");
 					counter = 0;
 				}
 
@@ -255,7 +277,7 @@ public class SamSubsampler{
 				try {
 					sa = new SamAlignment(samLine, false);
 				} catch (Exception e) {
-					System.out.println("\nSkipping malformed sam alignment ->\n"+samRecord.getSAMString()+"\n"+e.getMessage());
+					if (verbose) System.out.println("\nSkipping malformed sam alignment ->\n"+samRecord.getSAMString()+"\n"+e.getMessage());
 					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
 					continue;
 				}
@@ -299,7 +321,7 @@ public class SamSubsampler{
 
 			}
 			reader.close();
-			System.out.println();
+			if (verbose) System.out.println();
 		} catch (Exception e){
 			System.err.println("\nError parsing Novoalign file or writing split binary chromosome files.\nToo many open files? Too many chromosomes? " +
 					"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
@@ -326,7 +348,7 @@ public class SamSubsampler{
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		File forExtraction = null;
-		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
+		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);

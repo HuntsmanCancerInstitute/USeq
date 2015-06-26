@@ -6,6 +6,8 @@ import java.util.regex.*;
 
 import edu.utah.seq.useq.data.Region;
 import edu.utah.seq.useq.data.RegionScoreText;
+import edu.utah.seq.vcf.VCFLookUp;
+import edu.utah.seq.vcf.VCFRecord;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
@@ -142,6 +144,44 @@ public class Bed extends Coordinate implements Serializable{
 
 		return splitData;
 
+	}
+	
+	/**Splits the Bed[] by chrom, does not add strand onto the chrom name.
+	 * Be sure to sort before calling! */
+	public static HashMap<String, Bed[]> splitBedByChrom(Bed[] sortedBed) {
+		HashMap<String, Bed[]> chromRegions = new HashMap<String, Bed[]>();
+		ArrayList<Bed> recordsAL = new ArrayList<Bed>();
+
+		//set first
+		String oldChrom = sortedBed[0].getChromosome();
+		recordsAL.add(sortedBed[0]);
+
+		//for each region
+		for (int i=1; i< sortedBed.length; i++){
+			String testChrom = sortedBed[i].getChromosome();
+
+			//is it the same chrom?
+			if (oldChrom.equals(testChrom) == false){
+				//close old
+				Bed[] v = new Bed[recordsAL.size()];
+				recordsAL.toArray(v);
+				recordsAL.clear();
+				chromRegions.put(oldChrom, v);
+				oldChrom = testChrom;
+				if (chromRegions.containsKey(oldChrom)) {
+					System.err.println("ERROR: problem with spliting Bed by chrom, looks like the array wasn't sorted!\n");
+					return null;
+				}
+			}
+			//save info
+			recordsAL.add(sortedBed[i]);
+		}
+		//set last
+		Bed[] v = new Bed[recordsAL.size()];
+		recordsAL.toArray(v);
+		chromRegions.put(oldChrom, v);
+
+		return chromRegions;
 	}
 
 	/**Split a bed file by chromosome and strand into a HashMap of chromosomeStrand 
