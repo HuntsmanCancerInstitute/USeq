@@ -49,7 +49,8 @@ public class BamBlaster {
 	private HashMap<String, VCFLookUp> chromVariant;
 	private HashSet<String> modifiedNames = new HashSet<String>();
 	private PrintWriter varReportOut = null;
-	private int readLength = 0;
+	private int readLength = -1;
+	private static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSDHN])");
 	
 	//per chrom fields
 	private String workingChrom;
@@ -477,7 +478,7 @@ public class BamBlaster {
 			//unmapped? not primary?
 			if (sam.getReadUnmappedFlag() || sam.isSecondaryOrSupplementary()) continue;
 			//fetch blocks of actual alignment
-			ArrayList<int[]> blocks = SamAlignmentExtractor.fetchAlignmentBlocks(sam.getCigarString(), sam.getUnclippedStart()-1);
+			ArrayList<int[]> blocks = fetchAlignmentBlocks(sam.getCigarString(), sam.getUnclippedStart()-1);
 			//check to see if any intersect the region, needed since the queryOverlap returns spanners
 			for (int[] b : blocks){
 				if (end < b[0] || start > b[1]) continue;
@@ -487,12 +488,6 @@ public class BamBlaster {
 		}
 		i.close();
 		return al;
-	}
-	
-	/**Assumes coordinates are inclusive.*/
-	public boolean intersects (int beginning, int end){
-		
-		return true;
 	}
 	
 	private String getQualifiedName(SAMRecord sam){
@@ -581,6 +576,7 @@ public class BamBlaster {
 		
 		//make writers
 		SAMFileWriterFactory writerFactory = new SAMFileWriterFactory();
+		writerFactory.setTempDirectory(saveDirectory);
 		tempBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), false, tempBam);
 		writerFactory.setCreateIndex(true);
 		finalBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), true, finalBam);
@@ -603,7 +599,25 @@ public class BamBlaster {
 		}
 	}	
 	
+	/**Assumes interbase coordinates for start and returned blocks.*/
+	public static ArrayList<int[]> fetchAlignmentBlocks(String cigar, int start){
+		//for each cigar block
+		Matcher mat = CIGAR_SUB.matcher(cigar);
+		ArrayList<int[]> blocks = new ArrayList<int[]>();
+		while (mat.find()){
+			String call = mat.group(2);
+			int numberBases = Integer.parseInt(mat.group(1));
+			//a match
+			if (call.equals("M")) {
+				blocks.add(new int[]{start, start+numberBases});
+			}
+			//just advance for all but insertions which should be skipped via the failure to match
+			start += numberBases;
+		}
+		return blocks;
+	}
 
+	
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +

@@ -904,7 +904,7 @@ public class Sam2USeq {
 			totalPositions += count;
 			totalCoverage += (count * k);
 		}
-		System.out.println("Total postitions: " + totalPositions);
+		System.out.println("Total postitions\t" + totalPositions);
 		double mean = (double)totalCoverage / totalPositions; 
 		return mean;
 

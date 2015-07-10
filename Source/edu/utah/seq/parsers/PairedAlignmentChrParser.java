@@ -39,6 +39,7 @@ public class PairedAlignmentChrParser extends Thread{
 	private boolean started = false;
 	private boolean saveSams = false;
 	private boolean removeDuplicates = false;
+	private boolean onlyMergeOverlappingAlignments = true;
 
 	//local counters
 	private int numberAlignments = 0;
@@ -79,6 +80,7 @@ public class PairedAlignmentChrParser extends Thread{
 		minimumMappingQualityScore = mpa.getMinimumMappingQualityScore();
 		saveSams = mpa.isSaveSams();
 		removeDuplicates = mpa.isRemoveDuplicates();
+		onlyMergeOverlappingAlignments = mpa.isOnlyMergeOverlappingAlignments();
 	}
 
 	public void run(){
@@ -238,6 +240,9 @@ public class PairedAlignmentChrParser extends Thread{
 		numberNonOverlappingBases+= (double)overNonOver[1];
 		//set insert length
 		insertSize.count(overNonOver[2]);
+		
+		//skip merging non overlapping alignments?
+		if (onlyMergeOverlappingAlignments && overNonOver[0] == 0) return null;
 
 		//merge layouts, modifies original layouts so print first if you want to see em before mods.
 		SamLayout mergedSamLayout = SamLayout.mergeLayouts(leftLayout, rightLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);

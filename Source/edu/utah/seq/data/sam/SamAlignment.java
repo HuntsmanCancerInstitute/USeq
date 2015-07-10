@@ -48,6 +48,7 @@ public class SamAlignment {
 	private static final Pattern MINUS = Pattern.compile("-");
 	public static final Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSNIDH])");
 	private static final Pattern CIGAR_COUNTS = Pattern.compile("(\\d+)[MDN]");
+	private static final Pattern CIGAR_M = Pattern.compile("(\\d+)M");
 	private static final Pattern CIGAR_SOFT = Pattern.compile("(\\d+)S");
 	private static final Pattern CIGAR_SOFT_RIGHT = Pattern.compile(".+M(\\d+)S$");
 	private static final Pattern CIGAR_SOFT_LEFT = Pattern.compile("^(\\d+)S.+");
@@ -863,6 +864,17 @@ public class SamAlignment {
 		int length = 0;
 		//for each M D or N block
 		Matcher mat = CIGAR_COUNTS.matcher(cigar);
+		while (mat.find()){
+			length += Integer.parseInt(mat.group(1));
+		}
+		return length;
+	}
+	
+	/**Counts the number of bps covered by the cigar string. Only counts M.*/
+	public static int countLengthOfM (String cigar){
+		int length = 0;
+		//for each M block
+		Matcher mat = CIGAR_M.matcher(cigar);
 		while (mat.find()){
 			length += Integer.parseInt(mat.group(1));
 		}

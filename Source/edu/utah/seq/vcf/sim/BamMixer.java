@@ -135,6 +135,7 @@ public class BamMixer {
 		int numNotAligned = 0;
 		SamReader reader = readerFactory.open(pairedVariantBamFile);
 		SAMFileWriterFactory writerFactory = new SAMFileWriterFactory();
+		writerFactory.setTempDirectory(saveDirectory);
 		modifiedPairedVariantBamFile = new File (saveDirectory, "modPair.temp.bam");
 		modifiedPairedVariantBamFile.deleteOnExit();
 		SAMFileWriter modWriter = writerFactory.makeBAMWriter(reader.getFileHeader(), false, modifiedPairedVariantBamFile);

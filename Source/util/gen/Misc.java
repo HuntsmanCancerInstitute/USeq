@@ -17,6 +17,7 @@ public class Misc {
 	public static final Pattern PATTERN_SEMICOLON = Pattern.compile(";");
 	public static final Pattern PATTERN_EQUALS = Pattern.compile("=");
 	public static final Pattern TAB = Pattern.compile("\t");
+	public static final Pattern WHITESPACE = Pattern.compile("\\s+");
 	public static final Pattern UNDERSCORE = Pattern.compile("_");
 	public static final Pattern COLON = Pattern.compile(":");
 	public static final Pattern COMMA = Pattern.compile(",");
