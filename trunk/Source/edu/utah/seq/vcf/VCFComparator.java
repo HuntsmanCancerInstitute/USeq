@@ -32,6 +32,7 @@ public class VCFComparator {
 	private boolean useVQSLOD = false;
 	private boolean requireAltMatch = true;
 
+
 	private HashMap<String,RegionScoreText[]> keyBedCalls = null;
 	private HashMap<String,IntervalTree<RegionScoreText>> keyIntervalTrees = null;
 	private HashMap<String,RegionScoreText[]> keyRegions = null;

@@ -8,7 +8,7 @@ import htsjdk.samtools.*;
 import util.bio.annotation.Bed;
 import util.bio.seq.Seq;
 import util.gen.*;
-import edu.utah.seq.data.sam.PicardSortSam;
+import edu.utah.seq.data.sam.SamAlignment;
 import edu.utah.seq.useq.data.RegionScoreText;
 
 
@@ -18,35 +18,33 @@ import edu.utah.seq.useq.data.RegionScoreText;
 public class SamAlignmentExtractor {
 
 	//user defined fields
-	private File[] bamFiles;
+	private File bamFile;
 	private File bedFile;
-	private File saveFile;
-	private int minimumReadDepth = 1;
-	private int maximumReadDepth = -1;
+	private File saveDirectory;
 	private int minimumMappingQuality = -1;
-	private int alignmentScoreThreshold = -1;
+	private double alignmentScoreThreshold = -1.0;
 	private boolean biggerASIsBetter = true;
-	private boolean calcExtraStats = false;
-	private int minimumBaseQuality = 20;
+	private boolean divideAlignmentScoreByCigarM = false;
 
 	//internal fields
-	private SamReader[] samReaders;
 	private HashMap<String,RegionScoreText[]> chromRegions;
-	private String chromosome;
 	private static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSDHN])");
-	private Gzipper samOut;
-	private HashSet<String> hits = null;
-	private boolean printCoverageStats = false;
-	private SamReaderFactory readerFactory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
-	private int numDroppedAlignments = 0;
-	private int numFetchedAlignments = 0;
-	private int numPrintedAlignments = 0;
-	private String useqArguments;
-	
-	//only for extra stats
-	private int numberPassingAlignments = 0;
-	private double numberPassingBaseScores = 0.0;
-	private double numberTotalBaseScores = 0.0;
+	private SamReader bamReader;
+	private SAMFileWriter passingBamWriter;
+	private SAMFileWriter failingBamWriter;
+	private int numAlignments = 0;
+	private int numFailingMQ = 0;
+	private int numFailingAS = 0;
+	private double numBaseScores = 0;
+	private double numBaseScores20 = 0;
+	private double numBaseScores30 = 0;
+	private String workingChromosome;
+	private boolean[] workingCoveredBases;
+	private RegionScoreText[] workingRegions;
+	private int numOnTarget;
+	private int numFailingBasic;
+	private int numPassing;
+	private int numDuplicates;
 	
 	//constructors
 	/**Stand alone.*/
@@ -67,258 +65,216 @@ public class SamAlignmentExtractor {
 
 	public void run(){
 		try {
-			//make readers on each bam file
-			makeSamReaders();
-
-			//make output writer
-			File tempSam = new File(saveFile + ".temp.sam.gz");
-			tempSam.deleteOnExit();
-			samOut = new Gzipper(tempSam);
 			
-			//add header from first reader
-			String header = samReaders[0].getFileHeader().getTextHeader();
-			if (header != null){
-				samOut.println(header.trim());
-				//add program args
-				samOut.println("@PG\tID:USeq SamAlignmentExtractor "+Misc.getDateTime()+"\tCL:"+useqArguments);
-			}
-			
-			//calc extra stats?
-			if (calcExtraStats){
-				System.out.println("Calculating extra coverage statistics...");
-				for (int i=0; i< samReaders.length; i++) numberPassingAlignments += statAllAlignments(samReaders[i]);
-			}
+			//fetch chroms to scan from bam header
+			List<SAMSequenceRecord> chrList = bamReader.getFileHeader().getSequenceDictionary().getSequences();
 
-			//for each chromosome of gene models
-			System.out.println("Scanning regions by chromosome...\n");
-			if (printCoverageStats) System.out.println("RegionCoordinates\t#Alignments");
-			Iterator<String> it = chromRegions.keySet().iterator();
+			//for each
+			//TODO: thread this! would need to write out individual them merge... might be slow.. the bottleneck is the io not the compute so parallel won't gain much
+			System.out.print("Walking bam alignments");
+			Iterator<SAMSequenceRecord> it = chrList.iterator();
 			while (it.hasNext()){
-				chromosome = it.next();
-				scanRegions();
-			}
-			if (printCoverageStats) System.out.println();
-			
-			//look for no hits?
-			if (hits != null){
-				System.out.println("Scanning for alignments that don't intersect...");
-				System.out.println("#Ints\t"+hits.size());
-				printNoHits();
-				System.out.println("#NonInts\t"+numPrintedAlignments);
-			}
-			else {
-				String passed = Num.formatNumber((double)numPrintedAlignments/(double)numFetchedAlignments, 4);
-				System.out.println(numFetchedAlignments +"\t#Intersecting alignments");
-				System.out.println(numDroppedAlignments +"\t#Failed flags or filters (MQ:"+minimumMappingQuality+" AS:"+alignmentScoreThreshold+" BIB:"+biggerASIsBetter+")");
-				System.out.println(numPrintedAlignments +"\t#Saved to sam file ("+passed+")");
-				if (calcExtraStats){
-					String onTarget = Num.formatNumber((double)numPrintedAlignments/(double)numberPassingAlignments, 4);
-					System.out.println(onTarget +"\tFraction on target");
-					String passBases = Num.formatNumber(numberPassingBaseScores/numberTotalBaseScores, 4);
-					System.out.println(passBases +"\tFraction on target base quality scores >= "+minimumBaseQuality);
+				SAMSequenceRecord ssr = it.next();
+				workingChromosome = ssr.getSequenceName();
+				//any regions?
+				workingRegions = chromRegions.get(workingChromosome);
+				if (workingRegions == null) printAllToFail();
+				else {
+					makeMask();
+					walkChromAlignments();
 				}
+				System.out.print(".");
 			}
+			
+			//save all unmapped to fail
+			printUnmapped();
+			
+			//print stats
+			System.out.println("\n\nSAE statistics:");
+			printStatLine(numFailingBasic, numAlignments, "Unmapped, failing vendor QC, secondary");
+			printStatLine(numOnTarget, (numAlignments-numFailingBasic), "On target regions");
+			printStatLine(numFailingMQ, numOnTarget, "Failing MQ score ("+minimumMappingQuality+")");
+			String dir = "<";
+			if (biggerASIsBetter == false) dir = ">";
+			printStatLine(numFailingAS, numOnTarget, "Failing AS score ("+dir+alignmentScoreThreshold+")");
+			printStatLine(numDuplicates, numPassing, "Duplicates");
+			printStatLine(numPassing, numAlignments, "Passing all filters");
+			printStatLine(numBaseScores20, numBaseScores, "Passing alignment Q20 bases");
+			printStatLine(numBaseScores30, numBaseScores, "Passing alignment Q30 bases");
 
 			//close readers
-			closeSamReaders();
-			samOut.close();
-			
-			//sort?
-			System.out.println("\nSorting...");
-			new PicardSortSam(samOut.getGzipFile(), saveFile);
+			closeIO();
 
 		} catch (Exception e) {
 			e.printStackTrace();
 		} 
 	}
-
-	private void printNoHits() throws Exception{
-		//for each sam reader
-		for (int i=0; i< samReaders.length; i++) {
-			//make gzipper
-			Gzipper samOutNoHit = new Gzipper(new File (bamFiles[i].getParentFile(), Misc.removeExtension(bamFiles[i].getName())+"NoInt.sam.gz"));
-			//add header
-			String header = samReaders[i].getFileHeader().getTextHeader();
-			samOutNoHit.println(header.trim());
-			//get iterator
-			SAMRecordIterator it = samReaders[i].iterator();
-			while (it.hasNext()) {
-				SAMRecord sam = it.next();
-				if (passThresholds(sam, false) == false) continue;
-				String samString = sam.getSAMString().trim();
-				if (hits.contains(samString) == false) {
-					samOutNoHit.println(samString);
-					numPrintedAlignments++;
-				}
-			}
-			it.close();
-			samOutNoHit.close();
-		}
-		
-	}
-
-	/**Checks that the alignment actually touches down on at least one base of the region to avoid spanners.*/
-	public ArrayList<String> fetchAlignments (RegionScoreText ei, SamReader reader){
-		ArrayList<String> al = new ArrayList<String>();
-		SAMRecordIterator i = reader.queryOverlapping(chromosome, (ei.getStart()+1), ei.getStop());
-		while (i.hasNext()) {
-			SAMRecord sam = i.next();
-			if (passThresholds(sam, true) == false) continue;
-			//fetch blocks of actual alignment
-			ArrayList<int[]> blocks = fetchAlignmentBlocks(sam.getCigarString(), sam.getUnclippedStart()-1);
-			//check to see if any intersect the exon
-			for (int[] b : blocks){
-				if (ei.intersects(b[0], b[1])){
-					al.add(sam.getSAMString().trim());
-					break;
-				}
-			}
-		}
-		i.close();
-		i = null;
-		return al;
+	
+	public static void printStatLine(double numerator, double denomenator, String name){
+		double fraction = numerator/ denomenator;
+		if (denomenator == 0) fraction = 0;
+		System.out.println(Num.formatNumber(fraction, 3)+"\t("+(long)numerator+"/"+(long)denomenator+")\t"+name);
 	}
 	
-	/**Counts the number of alignments that pass thresholds.*/
-	public int statAllAlignments (SamReader reader){
-		int numPassingAlignments = 0;
-		SAMRecordIterator i = reader.iterator();
-		while (i.hasNext()) {
-			SAMRecord sam = i.next();
-			if (passThresholds(sam, false) == false) continue;
-			numPassingAlignments++;
+	private void printAllToFail() {
+		SAMRecordIterator it = bamReader.queryOverlapping(workingChromosome, 0, 0);
+		while (it.hasNext()) {
+			SAMRecord sam = it.next();
+			failingBamWriter.addAlignment(sam);
+			numAlignments++;
+			//fail basic?
+			if (passBasic(sam) == false) numFailingBasic++;
+			
+			
 		}
-		i.close();
-		i = null;
-		return numPassingAlignments;
+		it.close();
 	}
 	
-	public boolean passThresholds(SAMRecord sam, boolean incrementCounters){
-		if (incrementCounters) numFetchedAlignments++;
-		//any problematic flags?
-		if (sam.getReadUnmappedFlag() || sam.getNotPrimaryAlignmentFlag() || sam.getReadFailsVendorQualityCheckFlag()) {
-			if (incrementCounters) numDroppedAlignments++;
-			return false;
+	private void printUnmapped() {
+		SAMRecordIterator it = bamReader.queryUnmapped();
+		while (it.hasNext()) {
+			failingBamWriter.addAlignment(it.next());
+			numAlignments++;
+			numFailingBasic++;
 		}
-		//pass mapping quality?
-		if (minimumMappingQuality != -1 && sam.getMappingQuality() < minimumMappingQuality) {		
-			if (incrementCounters) numDroppedAlignments++;
-			return false;
-		}
-		//pass alignment score? with novoalignments (~30 pt penalty per mismatch) smaller AS is better 
-		//with bwa bigger scores are better (readLength - #SNV*5 + #INDEL*7)
-		if (alignmentScoreThreshold != -1){
-			Object obj = sam.getAttribute("AS");
-			if (obj != null){
-				Integer as = (Integer)obj;
-				if (biggerASIsBetter){ 
-					if (as.intValue() < alignmentScoreThreshold) {
-						if (incrementCounters) numDroppedAlignments++;
-						return false;
-					}
-				}
-				else {
-					if (as.intValue() > alignmentScoreThreshold) {
-						if (incrementCounters) numDroppedAlignments++;
-						return false;
-					}
-				}
-			}
-		}
-		return true;
+		it.close();
 	}
 
-	/**Assumes interbase coordinates for start and returned blocks.*/
-	public static ArrayList<int[]> fetchAlignmentBlocks(String cigar, int start){
+
+	public void makeMask (){
+		//find max base
+		int maxBase = findMaxBase();
+		//make boolean array to hold whether it's flagged, initially they are all false
+		workingCoveredBases = new boolean[maxBase+10000];
+		//for each RegionScoreText[] scan and throw booleans to true
+		for (int i=0; i<workingRegions.length; i++){
+			int start = workingRegions[i].getStart();
+			int end = workingRegions[i].getStop();
+			for (int j=start; j< end; j++) workingCoveredBases[j] = true;
+		}
+	}
+
+	public int findMaxBase (){
+		int max = workingRegions[workingRegions.length-1].getStop();
+		for (int i=0; i< workingRegions.length; i++){
+			if (workingRegions[i].getStop()> max) max = workingRegions[i].getStop();
+		}
+		return max;
+	}
+	
+	
+	/**Assumes interbase coordinates, looking to see if just one M base hits a region.*/
+	public boolean intersect(SAMRecord sam) throws Exception{
+		//past the boolean[]?
+		if (sam.getAlignmentEnd() >= workingCoveredBases.length) return false;
+		int start = sam.getUnclippedStart()-1;
 		//for each cigar block
-		Matcher mat = CIGAR_SUB.matcher(cigar);
-		ArrayList<int[]> blocks = new ArrayList<int[]>();
+		Matcher mat = CIGAR_SUB.matcher(sam.getCigarString());
 		while (mat.find()){
 			String call = mat.group(2);
 			int numberBases = Integer.parseInt(mat.group(1));
 			//a match
 			if (call.equals("M")) {
-				blocks.add(new int[]{start, start+numberBases});
+				int end = start+ numberBases;
+				for (int i=start; i< end; i++){
+					if (workingCoveredBases[i]) return true;
+				}
 			}
-			//just advance for all but insertions which should be skipped via the failure to match
+			//advance for all but insertions which should be skipped via the failure to match
 			start += numberBases;
 		}
-		return blocks;
+		return false;
 	}
-
-	/**For each sam file, fetches all sam alignments.*/
-	public ArrayList<String> fetchOverlappingAlignments (RegionScoreText ei){
-		ArrayList<String> ohMy = new ArrayList<String>();
-		for (int i=0; i< samReaders.length; i++) {
-			ohMy.addAll(fetchAlignments(ei, samReaders[i]));
-		}
-		return ohMy;
+	
+	private boolean passBasic(SAMRecord sam){
+		if (sam.getReadUnmappedFlag() || sam.isSecondaryOrSupplementary() || sam.getReadFailsVendorQualityCheckFlag()) return false;
+		return true;
 	}
+	
+	private void walkChromAlignments() {
+		try {
+			SAMRecordIterator it = bamReader.queryOverlapping(workingChromosome, 0, 0);
+			while (it.hasNext()) {
+				SAMRecord sam = it.next();
+				numAlignments++;
 
-	private void scanRegions() throws IOException{
-		RegionScoreText[] regions = chromRegions.get(chromosome);
-		HashSet<String> uniqueAlignments = new HashSet<String>();
-		//for each region in a particular chromosome
-		for (int i=0; i< regions.length; i++){
-			//fetch the overlapping alignments
-			ArrayList<String> alignments = fetchOverlappingAlignments (regions[i]);
-			
-			//pass min and max?
-			int numAlignments = alignments.size();
-			if (numAlignments >= minimumReadDepth){
-				//check max?
-				if (maximumReadDepth != -1){
-					if (numAlignments > maximumReadDepth) continue;
+				//fail basic flags?
+				if (passBasic(sam) == false){
+					failingBamWriter.addAlignment(sam);
+					numFailingBasic++;
+					continue;
 				}
-				//print em
-				if (printCoverageStats) System.out.println(chromosome+"\t"+regions[i].toString()+"\t"+alignments.size());
-				//strip those already fetched to avoid repeat extraction!
-				ArrayList<String> toPrint = new ArrayList<String>(alignments.size());
-				for (String sam: alignments){
-					if (uniqueAlignments.contains(sam) == false){
-						uniqueAlignments.add(sam);
-						toPrint.add(sam);
+				
+				//does it intersect?
+				if (intersect(sam) == false) {
+					failingBamWriter.addAlignment(sam);
+					continue;
+				}
+
+				//check both scores
+				numOnTarget++;
+				boolean passScores = true;
+				//pass mapping quality?
+				if (minimumMappingQuality != -1) {		
+					if (sam.getMappingQuality() < minimumMappingQuality) {
+						numFailingMQ++;
+						passScores = false;
 					}
 				}
-				samOut.println(toPrint);
-				numPrintedAlignments+=toPrint.size();
-				if (calcExtraStats) incrementBaseQualities(toPrint);
+				//pass alignment score? with novoalignments (~30 pt penalty per mismatch) smaller AS is better 
+				//with bwa bigger scores are better (readLength - #SNV*5 + #INDEL*7)
+				if (alignmentScoreThreshold != -1.0){
+					Object obj = sam.getAttribute("AS");
+					if (obj != null){
+						Integer as = (Integer)obj;
+						double asScore = as.doubleValue();
+						
+						//scale the score?
+						if (divideAlignmentScoreByCigarM){
+							double numM = SamAlignment.countLengthOfM(sam.getCigarString());
+							asScore = asScore/numM;
+						}
+						if (biggerASIsBetter){ 
+							if (asScore < alignmentScoreThreshold) {
+								numFailingAS++;
+								passScores = false;
+							}
+						}
+						else {
+							if (asScore > alignmentScoreThreshold) {
+								numFailingAS++;
+								passScores = false;
+							}
+						}
+					}
+				}
+				//pass? or fail? scores
+				if (passScores) {
+					numPassing++;
+					passingBamWriter.addAlignment(sam);
+					incrementBaseQualities(sam);
+					if (sam.getDuplicateReadFlag()) numDuplicates++;
+				}
+				else failingBamWriter.addAlignment(sam);
+
 			}
-		}
-		//save hits?
-		if (hits != null) hits.addAll(uniqueAlignments);
-	}
-
-	private void incrementBaseQualities(ArrayList<String> toPrint) {
-		//parse base qualities
-		for (String sam : toPrint){
-			String[] fields = Misc.TAB.split(sam);
-			int passingBases = Seq.countNumberOfPassingQualityScores(fields[10], minimumBaseQuality);
-			if (passingBases == -1) Misc.printErrAndExit("\nERROR: problem fetching base qualities for "+sam+"\n");
-			numberPassingBaseScores+= passingBases;
-			numberTotalBaseScores+= fields[10].length();
-		}
-	}
-
-
-	public void makeSamReaders(){
-		samReaders = new SamReader[bamFiles.length];
-		for (int i=0; i< samReaders.length; i++) {
-			samReaders[i] = readerFactory.open(bamFiles[i]);
-		}
-	}
-
-	public void closeSamReaders(){
-		try {
-			for (int i=0; i< samReaders.length; i++) samReaders[i].close();
-		} catch (IOException e) {
+			it.close();
+		} catch (Exception e){
 			e.printStackTrace();
+			Misc.printErrAndExit("\nError: problem walking chromosome "+workingChromosome);
 		}
 	}
-
-
-
-
+	
+	private void incrementBaseQualities(SAMRecord sam) {
+		int[] scores = Seq.convertSangerQualityScores(sam.getBaseQualityString());
+		numBaseScores+= scores.length;
+		for (int i=0; i< scores.length; i++){
+			if (scores[i] >= 20){
+				numBaseScores20++;
+				if (scores[i] >= 30) numBaseScores30++;
+			}
+		}	
+	}
 
 	public static void main(String[] args) {
 		if (args.length ==0){
@@ -331,7 +287,6 @@ public class SamAlignmentExtractor {
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
-		useqArguments = IO.fetchUSeqVersion()+" "+Misc.stringArrayToString(args, " ");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -340,20 +295,15 @@ public class SamAlignmentExtractor {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'a': bamFiles = IO.extractFiles(args[++i], ".bam"); break;
+					case 'b': bamFile = new File(args[++i]); break;
 					case 'r': bedFile = new File(args[++i]); break;
-					case 'b': saveFile = new File(args[++i]); break;
-					case 'p': printCoverageStats = true; break;
+					case 's': saveDirectory = new File(args[++i]); break;
 					case 'q': minimumMappingQuality = Integer.parseInt(args[++i]); break;
-					case 'l': alignmentScoreThreshold = Integer.parseInt(args[++i]); break;
-					case 'm': biggerASIsBetter = false; break;
-					case 'c': calcExtraStats = true; break;
-					case 'u': minimumBaseQuality = Integer.parseInt(args[++i]); calcExtraStats = true; break;
-					case 'n': hits = new HashSet<String>(); break;
-					case 'i': minimumReadDepth = Integer.parseInt(args[++i]); break;
-					case 'x': maximumReadDepth = Integer.parseInt(args[++i]); break;
+					case 'a': alignmentScoreThreshold = Double.parseDouble(args[++i]); break;
+					case 'n': biggerASIsBetter = false; break;
+					case 'd': divideAlignmentScoreByCigarM = true; break;
 					case 'h': printDocs(); System.exit(0);
-					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
+					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group()+", Try -h");
 					}
 				}
 				catch (Exception e){
@@ -363,20 +313,55 @@ public class SamAlignmentExtractor {
 		}
 
 		//look for bam files
-		if (bamFiles == null || bamFiles.length == 0) Misc.printErrAndExit("\nError: cannot find any treatment xxx.bam files?\n");
-
-		//look for bai index files
-		lookForBaiIndexes(bamFiles, false);
-
+		if (bamFile == null || bamFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your xxx.bam file?\n"+bamFile);
+		lookForBaiIndexes(new File[]{bamFile}, false);
+		
 		//look for bed
-		if (bedFile == null || bedFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your bed file?\n");
+		if (bedFile == null || bedFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your region bed file?\n"+bedFile);
 		chromRegions = Bed.parseBedFile(bedFile, true, false);
 		
 		//look for save file, can be null
-		if (saveFile == null || saveFile.getName().endsWith(".bam") == false) Misc.printErrAndExit("\nError: Cannot find your save file or it doesn't end in .bam\n");
+		if (saveDirectory == null ) Misc.printErrAndExit("\nError: please provide a directory to save the passing and failing bam alignments.\n");
+		saveDirectory.mkdirs();
 
+		//make IO
+		makeIO();
+		
 	}	
 
+	private void makeIO() {
+		try {
+			SamReaderFactory readerFactory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+			bamReader = readerFactory.open(bamFile);
+			if (bamReader.hasIndex() == false) {
+				bamReader.close();
+				Misc.printErrAndExit("\nError: cannot find an index for your bam file?\n"+bamFile);
+			}
+			String rootName = Misc.removeExtension(bamFile.getName());
+			File pass = new File(saveDirectory, rootName+"_passSAE.bam");
+			File fail = new File(saveDirectory, rootName+"_failSAE.bam");
+			SAMFileWriterFactory writerFactory = new SAMFileWriterFactory();
+			writerFactory.setCreateIndex(true);
+			writerFactory.setTempDirectory(saveDirectory);
+			passingBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), true, pass);
+			failingBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), true, fail);
+		} catch (IOException e) {
+			e.printStackTrace();
+			Misc.printErrAndExit("\nError: problem closing the bam reader for "+bamFile);
+		}
+	}
+	
+	private void closeIO() {
+		try {
+			bamReader.close();
+			passingBamWriter.close();
+			failingBamWriter.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			Misc.printErrAndExit("\nError: critical, problem closing the bam IO \n");
+		}
+	}
+	
 	/**Looks for xxx.bam.bai and xxx.bai for each bamFile, prints error and exits if missing.*/
 	public static void lookForBaiIndexes (File[] bamFiles, boolean onlyResetLastModifiedDate){
 		for (File f: bamFiles){
@@ -391,38 +376,32 @@ public class SamAlignmentExtractor {
 		}
 	}
 
+
+
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Sam Alignment Extractor: June 2015                    **\n" +
+				"**                            Sam Alignment Extractor: July 2015                    **\n" +
 				"**************************************************************************************\n" +
-				"Given a bed file containing regions of interest, parses the intersecting alignments.\n"+
-				"Provides a variety of options for filtering the alignments and calculating QC\n"+
-				"statistics.\n"+
+				"Splits an alignment file into those that pass or fail thresholds and intersects\n"+
+				"regions of interest. Calculates a variety of QC statistics.\n"+
 
-				"Required Options:\n"+
-				"-a Alignment file or directory containing xxx.bam files with their associated\n" +
-				"       xxx.bai indexs sorted by coordinate. Multiple files are merged.\n" +
-				"-r A bed file (chr, start, stop,...) of regions to intersect, full path, see,\n" +
-				"       http://genome.ucsc.edu/FAQ/FAQformat#format1\n"+
-				"-b Provide a bam file path for saving extracted alignments, must end in .bam\n"+
+				"\nRequired Options:\n"+
+				"-b Bam alignment file with its associated xxx.bai index, sorted by coordinate. \n"+
+				"-r A regions bed file (chr, start, stop,...) to intersect, full path, see,\n" +
+				"       http://genome.ucsc.edu/FAQ/FAQformat#format1 , gz/zip OK.\n"+
+				"-s Provide a directory path for saving the filtered alignments\n"+
 				
 				"\nDefault Options:\n"+
-				"-p Print per region coverage stats to stdout.\n"+
-				"-i Minimum read depth, defaults to 1\n"+
-				"-x Maximum read depth, defaults to unlimited\n"+
-				"-q Miminum mapping quality, defaults to 0, no filtering, recommend 13.\n"+
-				"-l Alignment score threshold, defaults to no filtering. \n"+
-				"-m Smaller alignment scores are better (novo), defaults to bigger are better (bwa).\n"+
-				"-n Save alignments that don't intersect the regions of interest. Memory intensive!\n"+
-				"-c Calculate extra aligment statistics (frac on target, QS>=20), time intensive.\n"+
-				"-u Minimum base quality score for extra alignment calculations, defaults to 20.\n"+
+				"-q Miminum mapping quality, defaults to no filtering, recommend 13.\n"+
+				"-a Alignment score threshold, defaults to no filtering. \n"+
+				"-n Smaller alignment scores are better (novo), defaults to bigger are better (bwa).\n"+
+				"-d Divide alignment score by the number of CIGAR M bases.\n"+
 
 				"\n"+
 
-				"Example: java -Xmx4G -jar pathTo/USeq/Apps/SamAlignmentExtractor -q 13 -l 128 -a\n" +
-				"      /Data/ExonCaptureAlignmentsX1/ -r /Data/SNPCalls/9484X1Calls.bed.gz \n"+
-				"      -b /Data/Extracted/onTarget.bam -c -u 30\n" +
+				"Example: java -Xmx4G -jar pathTo/USeq/Apps/SamAlignmentExtractor -q 20 -a 0.75 -d -b\n" +
+				"      /Data/raw.bwaMem.bam -r /Data/targetsPad25bp.bed.gz -s/Data/SAE/ \n\n"+
 
 		"**************************************************************************************\n");
 

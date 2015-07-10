@@ -7,7 +7,9 @@ import java.util.regex.*;
 import edu.utah.seq.useq.data.Region;
 import edu.utah.seq.useq.data.RegionScoreText;
 import edu.utah.seq.vcf.VCFLookUp;
+import edu.utah.seq.vcf.VCFParser;
 import edu.utah.seq.vcf.VCFRecord;
+import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
@@ -79,6 +81,64 @@ public class Bed extends Coordinate implements Serializable{
 		}
 		return bed;
 	}
+	
+	/**Chunks the Bed[] by number of bp, then sorts each.*/
+	public static ArrayList<Bed[]> splitByBp(Bed[] regions, int numBpsPerSplit) {
+		ArrayList<Bed[]> split = new ArrayList<Bed[]>();
+		int bpCount = 0;
+		ArrayList<Bed> workingRegions = new ArrayList<Bed>();
+		for (int i=0; i< regions.length; i++){
+			int len = regions[i].getLength();
+			if ((bpCount+len) > numBpsPerSplit){
+				//close and save
+				Bed[] set = new Bed[workingRegions.size()];
+				workingRegions.toArray(set);
+				split.add(set);
+				workingRegions.clear();
+				bpCount = 0;
+			}
+			//add region
+			workingRegions.add(regions[i]);
+			bpCount += len;
+		}
+		//save last?
+		if (workingRegions.size() !=0){
+			Bed[] set = new Bed[workingRegions.size()];
+			workingRegions.toArray(set);
+			Arrays.sort(set);
+			split.add(set);
+		}
+		return split;
+	}
+	
+	/**Chunks the Bed[] by number of regions, then sorts each.*/
+	public static ArrayList<Bed[]> splitByNumber(Bed[] regions, int numRegionsPerChunk) {
+		ArrayList<Bed[]> split = new ArrayList<Bed[]>();
+		int count = 0;
+		ArrayList<Bed> workingRegions = new ArrayList<Bed>();
+		for (int i=0; i< regions.length; i++){
+			if ((count+1) > numRegionsPerChunk){
+				//close and save
+				Bed[] set = new Bed[workingRegions.size()];
+				workingRegions.toArray(set);
+				split.add(set);
+				workingRegions.clear();
+				count = 0;
+			}
+			//add region
+			workingRegions.add(regions[i]);
+			count ++;
+		}
+		//save last?
+		if (workingRegions.size() !=0){
+			Bed[] set = new Bed[workingRegions.size()];
+			workingRegions.toArray(set);
+			Arrays.sort(set);
+			split.add(set);
+		}
+		return split;
+	}
+
 
 	/**Splits a bed file by chromosome and strand writing the data in binary form into the temp directory.
 	 * Assumes a 6 column tab delimited bed file of chrom, start, stop, text, score, strand.
@@ -316,6 +376,72 @@ public class Bed extends Coordinate implements Serializable{
 		}
 		return chrSpec;
 	}
+	
+	/**Splits a vcf file by chromosome into a HashMap of RegionScoreText[]. Use the padding to expand the 
+	 * size of the variant. SNV, INS, or DEL is assigned to the name field, QUAL to the score field.*/
+	public static HashMap<String,RegionScoreText[]> parseVcfFile(File vcfFile, int padding, boolean appendChrFixMT){
+		HashMap<String,ArrayList<RegionScoreText>> chrAls = new HashMap<String,ArrayList<RegionScoreText>>();
+		String line = null;
+		try{
+			VCFParser vp = new VCFParser();
+			BufferedReader in = IO.fetchBufferedReader(vcfFile);
+			ArrayList<RegionScoreText> al = new ArrayList<RegionScoreText>(); 
+			String currChrom = "";
+			while ((line = in.readLine()) !=null) {
+				line = line.trim();
+				if (line.length() ==0 || line.startsWith("#")) continue;
+				VCFRecord vcf = new VCFRecord(line, vp, false, false);
+				if (appendChrFixMT) {
+					vcf.appendChr();
+					vcf.correctChrMTs();
+				}
+				
+				//fetch ArrayList
+				if (currChrom != vcf.getChromosome()){
+					currChrom = vcf.getChromosome();
+					if (chrAls.containsKey(currChrom)) al = chrAls.get(currChrom);
+					else {
+						al = new ArrayList<RegionScoreText>(); 
+						chrAls.put(currChrom, al);
+					}
+				}
+				
+				//positions
+				int start = vcf.getPosition() - padding;
+				if (start<0) start = 0;
+				int stop;
+				String type;
+				if (vcf.isDeletion()){
+					stop = vcf.getPosition() + vcf.getReference().length() + 1 + padding;
+					type = "DEL";
+				}
+				else {
+					stop = vcf.getPosition() + vcf.getReference().length() + padding;
+					if (vcf.isSNP()) type = "SNV";
+					else type = "INS";
+				}
+				RegionScoreText n = new RegionScoreText(start, stop, vcf.getQuality(), type);
+				al.add(n);
+			}
+		}catch (Exception e){
+			e.printStackTrace();
+			Misc.printErrAndExit("\nMalformed vcf line? -> "+line+"\n Aborting!");
+		}
+		//sort and load hash
+		HashMap<String,RegionScoreText[]> chrSpec = new HashMap<String,RegionScoreText[]>();
+		Iterator<String> it = chrAls.keySet().iterator();
+		ArrayList<RegionScoreText> al = null;
+		while (it.hasNext()){
+			String cs = it.next();
+			al = chrAls.get(cs);
+			RegionScoreText[] nsss = new RegionScoreText[al.size()];
+			al.toArray(nsss);
+			Arrays.sort(nsss);
+			chrSpec.put(cs, nsss);
+		}
+		return chrSpec;
+	}
+
 
 	public String toStringNoStrand(){
 		return chromosome+"\t"+start+"\t"+stop+"\t"+name+"\t"+score;
@@ -353,27 +479,26 @@ public class Bed extends Coordinate implements Serializable{
 	}
 	/*Quickie method to stat a bed file.*/
 	public static void main (String[] args){
-		File[] files = IO.extractFiles(new File(args[0]));
-		for (File f : files){
-			HashMap<String,Region[]> chromRegions = Bed.parseRegions(f, true);
-			long totalBases = 0;
-			long numberRegions = 0;
-			ArrayList<Float> lengthsAL = new ArrayList<Float>();
-			for (String chrom: chromRegions.keySet()){
-				Region[] regions = chromRegions.get(chrom);
-				numberRegions += regions.length;
-				for (Region r : regions){
-					int len = r.getLength();
-					totalBases += len;
-					lengthsAL.add(new Float(len));
+		if (args.length ==0 ) Misc.printErrAndExit("\nEnter a vcf file to convert to 2bp padded bed");
+		File vcf = new File (args[0]);
+		File bed = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"Pad2bp.bed.gz");
+		try {
+			Gzipper out = new Gzipper(bed);
+			HashMap<String,RegionScoreText[]> chrReg = Bed.parseVcfFile(vcf, 2, false);
+			for (String chr: chrReg.keySet()){
+				RegionScoreText[] regions = chrReg.get(chr);
+				for (RegionScoreText r: regions){
+					out.println(r.getBedLine(chr));
 				}
 			}
-			float[] lengths = Num.arrayListOfFloatToArray(lengthsAL);
-			System.out.println("\n"+f.getName()+"\t"+numberRegions+"\t"+totalBases);
-			Num.statFloatArray(lengths, false);
-			
+			out.close();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
 	}
-
 
 }

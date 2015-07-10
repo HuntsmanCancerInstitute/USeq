@@ -40,6 +40,7 @@ public class SamSplitter{
 	private Random random = new Random();
 	private int numberOne = 0;
 	private int numberTwo = 0;
+	private boolean addPG = true;
 
 	//constructors
 	public SamSplitter(String[] args){
@@ -74,7 +75,7 @@ public class SamSplitter{
 		//add header
 		SamReader sr = factory.open(samFile);
 		samHeader = sr.getFileHeader().getTextHeader().trim();
-		samHeader = samHeader+"\n"+ "@PG\tID:SplitSam\tCL: args "+programArguments;
+		if (addPG) samHeader = samHeader+"\n"+ "@PG\tID:SplitSam\tCL: args "+programArguments;
 		samOut1.println(samHeader);
 		samOut2.println(samHeader);
 
@@ -244,6 +245,7 @@ public class SamSplitter{
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'm': minimumMappingQualityScore = Float.parseFloat(args[++i]); break;
 					case 'p': splitByPairs = true; break;
+					case 'd': addPG = false; break;
 					case 'b': bypassThresholds = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -267,7 +269,7 @@ public class SamSplitter{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                SamSplitter: Oct 2014                             **\n" +
+				"**                                SamSplitter: July 2015                            **\n" +
 				"**************************************************************************************\n" +
 				"Randomly splits a sam or bam file in ~1/2. To maintain pairs, sort by queryname! Can\n"+
 				"also split by paired and unpaired.\n"+
@@ -283,6 +285,7 @@ public class SamSplitter{
 				"      for alignments parsed by the SamTranscriptomeParser!\n"+
 				"-b Bypass all filters and thresholds.\n"+
 				"-p Split into paired alignments and unpaired alignments.\n"+
+				"-d Don't add PG line to sam header.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/SamSplitter -f /Novo/Run7/exome.bam\n" +
 				"     -m 20 -a 120  \n\n" +

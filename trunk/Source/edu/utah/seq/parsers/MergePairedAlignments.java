@@ -34,6 +34,7 @@ public class MergePairedAlignments {
 	private boolean crossCheckMateCoordinates = true;
 	private int numberConcurrentThreads = 0;
 	private boolean saveSams = false;
+	private boolean onlyMergeOverlappingAlignments = true;
 
 	//counters for initial filtering
 	private int numberAlignments = 0;
@@ -69,6 +70,7 @@ public class MergePairedAlignments {
 	private ArrayList<String> chromosomes = null;
 	private String samHeader;
 	private ArrayList<PairedAlignmentChrParser> parsers;
+	
 
 	//constructors
 	public MergePairedAlignments(String[] args){
@@ -126,7 +128,6 @@ public class MergePairedAlignments {
 			File countsFile = new File (saveDirectory, "count.obj");
 			IO.saveObject(countsFile, new Long(numberPrintedAlignments));
 		}
-		
 		printStats();
 	}
 
@@ -163,6 +164,7 @@ public class MergePairedAlignments {
 				Thread.sleep(60000);
 			} catch (InterruptedException ie) {
 				ie.printStackTrace();
+				Misc.printErrAndExit("\nProblem running threads!");
 			}
 		}
 	}
@@ -300,6 +302,7 @@ public class MergePairedAlignments {
 					case 'p': printPairedStatsAndHistogram = false; break;
 					case 'i': maximumProperPairDistanceForMerging = Integer.parseInt(args[++i]); break;
 					case 't': numberConcurrentThreads = Integer.parseInt(args[++i]); break;
+					case 'o': onlyMergeOverlappingAlignments = false; break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'q': minimumMappingQualityScore = Float.parseFloat(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
@@ -318,9 +321,6 @@ public class MergePairedAlignments {
 		if (saveDirectory == null) Misc.printErrAndExit("\nError: cannot find your save output directory!\n");
 		saveDirectory.mkdirs();
 		if (saveDirectory.isDirectory() == false) Misc.printErrAndExit("\nError: your save output directory does not appear to be a directory?\n");
-		//delete any files in save dir
-		File[] toDelete = IO.fetchFilesRecursively(saveDirectory);
-		IO.deleteFiles(toDelete);
 
 		//number of threads to use?
 		if (numberConcurrentThreads == 0) numberConcurrentThreads = Runtime.getRuntime().availableProcessors();
@@ -335,12 +335,13 @@ public class MergePairedAlignments {
 		if (skipMergingPairs) System.out.println(skipMergingPairs +"\tSkip merging paired alignments, useful for testing effect of merging on downstream analysis.");
 		System.out.println(numberConcurrentThreads +"\tNumber concurrent threads.");
 		System.out.println(saveSams +"\tSave sam alignments.");
+		System.out.println(onlyMergeOverlappingAlignments +"\tOnly merge overlapping alignments.");
 	}	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Merge Paired Alignments: Dec 2014                     **\n" +
+				"**                            Merge Paired Alignments: July 2015                    **\n" +
 				"**************************************************************************************\n" +
 				"Merges proper paired alignments that pass a variety of checks and thresholds. Only\n" +
 				"unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps\n" +
@@ -364,6 +365,7 @@ public class MergePairedAlignments {
 				"-i Maximum acceptible base pair distance for merging, defaults to 5000.\n"+
 				"-m Don't cross check read mate coordinates, needed for merging repeat matches. Defaults\n" +
 				"      to checking.\n"+
+				"-o Merge all proper paired alignments. Defaults to only merging those that overlap.\n"+
 				"-p Don't print detailed paired alignment statistics and insert size histogram.\n"+
 				"-t Number concurrent threads to run, defaults to the max available to the jvm.\n"+
 
@@ -420,5 +422,9 @@ public class MergePairedAlignments {
 
 	public boolean isRemoveDuplicates() {
 		return removeDuplicates;
+	}
+
+	public boolean isOnlyMergeOverlappingAlignments() {
+		return onlyMergeOverlappingAlignments;
 	}
 }
