@@ -46,6 +46,8 @@ public class Histogram implements Serializable {
 		numLessThanMin += h.getNumLessThanMin();
 		//more than
 		numMoreThanMax += h.getNumMoreThanMax();
+		//increment standardDeviation object
+		standardDeviation.count(h.getStandardDeviation());
 	}
 
 	/**Given an array of scores, creates a histogram of set number of bins, trims tails by a set fraction of the data.
@@ -243,7 +245,7 @@ public class Histogram implements Serializable {
 	}
 
 	/**Given a value, finds the corresponding bin and returns the number of hits to that bin.*/
-	public int findBinHits(double value){
+	public long findBinHits(double value){
 		int index = findBinIndex(value);
 		if (index == -1) return -1;
 		return bins[index].getHits();
@@ -252,10 +254,10 @@ public class Histogram implements Serializable {
 	/**Prints scaled histogram.*/
 	public void printScaledHistogram(){
 		//extract counts and labels from bins
-		int[] counts = getBinCounts();
+		long[] counts = getBinCounts();
 		String[] binLabels = getBinLabels();
 		//scale
-		double maxCount = Num.findHighestInt(counts);
+		double maxCount = Num.findHighestLong(counts);
 		double scalar = 100.0/maxCount;
 
 		if (numLessThanMin !=0) System.out.println("<  "+Num.formatNumber(minimum,3)+"\t\t"+numLessThanMin);
@@ -271,17 +273,17 @@ public class Histogram implements Serializable {
 	/**Prints scaled histogram.*/
 	public void printScaledHistogram(PrintWriter out){
 		//extract counts and labels from bins
-		int[] counts = getBinCounts();
+		long[] counts = getBinCounts();
 		String[] binLabels = getBinLabels();
 		//scale
-		double maxCount = Num.findHighestInt(counts);
+		double maxCount = Num.findHighestLong(counts);
 		double scalar = 100.0/maxCount;
 
 		if (numLessThanMin !=0) out.println("<  "+Num.formatNumber(minimum,3)+"\t\t"+numLessThanMin);
 		//multiply counts by scalar
-		int[] scaledCounts = new int[counts.length];
+		long[] scaledCounts = new long[counts.length];
 		for (int i=0; i<scaledCounts.length; i++){
-			scaledCounts[i] = (int)Math.round((double)counts[i] * scalar);
+			scaledCounts[i] = Math.round((double)counts[i] * scalar);
 		}
 		printHistogram(counts, scaledCounts, binLabels, skipZeroBins, out);
 		if (numMoreThanMax !=0) out.println(">= "+(Num.formatNumber(maximum,3) )+ "\t\t"+ numMoreThanMax);
@@ -290,7 +292,7 @@ public class Histogram implements Serializable {
 	/**Prints histogram.*/
 	public void printHistogram(PrintWriter out){
 		//extract counts and labels from bins
-		int[] counts = getBinCounts();
+		long[] counts = getBinCounts();
 		String[] binLabels = getBinLabels();
 		
 		if (numLessThanMin !=0) out.println("<  "+Num.formatNumber(minimum,3)+"\t\t"+numLessThanMin);
@@ -329,7 +331,7 @@ public class Histogram implements Serializable {
 	}
 
 	/**Prints a simple histogram scaled using stars but real counts shown.*/
-	public static long printHistogram(int[] realCounts, int[] stars, String[] binLabels, boolean skipZeroBins){
+	public static long printHistogram(long[] realCounts, int[] stars, String[] binLabels, boolean skipZeroBins){
 		int num = stars.length;
 		StringBuffer sb;
 		long total =0;
@@ -368,7 +370,7 @@ public class Histogram implements Serializable {
 	}
 	
 	/**Prints a simple histogram scaled using stars but real counts shown.*/
-	public static long printHistogram(int[] realCounts, int[] stars, String[] binLabels, boolean skipZeroBins, PrintWriter out){
+	public static long printHistogram(long[] realCounts, long[] stars, String[] binLabels, boolean skipZeroBins, PrintWriter out){
 		int num = stars.length;
 		StringBuffer sb;
 		long total =0;
@@ -436,8 +438,8 @@ public class Histogram implements Serializable {
 		out.println("Total: "+total);
 	}
 
-	public int[] getReversedBinCounts() {
-		int[] rev = new int[numberOfBins];
+	public long[] getReversedBinCounts() {
+		long[] rev = new long[numberOfBins];
 		int counter = 0;
 		for (int i=numberOfBins-1; i>=0; i--){
 			rev[counter++] = bins[i].getHits();
@@ -466,8 +468,8 @@ public class Histogram implements Serializable {
 		return totalBinHits;
 	}
 
-	public int[] getBinCounts(){
-		int[] counts = new int[numberOfBins];
+	public long[] getBinCounts(){
+		long[] counts = new long[numberOfBins];
 		for (int i=0; i< numberOfBins; i++){
 			counts[i] = bins[i].getHits();
 		}
@@ -493,14 +495,14 @@ public class Histogram implements Serializable {
 
 
 	/**Returns two columns as int[columns][counts] centered on max value with zeros as filler.*/
-	public int[][] fetchCenteredFowardAndReverseCounts(){
-		int[] revCounts = getReversedBinCounts();
-		int[] counts = getBinCounts();
-		int maxIndexReverse = Num.findMaxIntIndex(revCounts);
-		int maxIndexForward = Num.findMaxIntIndex(counts);
+	public long[][] fetchCenteredFowardAndReverseCounts(){
+		long[] revCounts = getReversedBinCounts();
+		long[] counts = getBinCounts();
+		int maxIndexReverse = Num.findMaxLongIndex(revCounts);
+		int maxIndexForward = Num.findMaxLongIndex(counts);
 		int diff = Math.abs(maxIndexReverse - maxIndexForward);
-		int[] f = new int[counts.length+diff];
-		int[] r = new int[f.length];
+		long[] f = new long[counts.length+diff];
+		long[] r = new long[f.length];
 		int counter = 0;
 		if (maxIndexForward< maxIndexReverse){
 			for (int i=diff; i<f.length; i++){
@@ -520,14 +522,14 @@ public class Histogram implements Serializable {
 			f= counts;
 			r= revCounts;
 		}
-		int[][] x = new int[2][];
+		long[][] x = new long[2][];
 		x[0] = f;
 		x[1] =r;
 		return x;
 	}
 	/**Prints two columns, forward counts and reversed counts centered on max value with zeros as filler.*/
 	public void printCenteredForwardAndReverseCounts(){
-		int[][] x = fetchCenteredFowardAndReverseCounts();
+		long[][] x = fetchCenteredFowardAndReverseCounts();
 		System.out.println("Forward\tReverse");
 		for (int i=0; i<x[0].length; i++) System.out.println(x[0][i]+"\t"+ x[1][i]);
 	}

@@ -21,6 +21,14 @@ public class StandardDeviation implements Serializable {
 		//watch out for negative values indicating that they have exceeded the size 
 		if (sumSquares < 0) System.err.println("You have exceeded the size of the StandardDeviation counters with value "+number);
 	}
+	
+	public void count(StandardDeviation other){
+		numberObservations+= other.numberObservations;
+		sum+= other.sum;
+		sumSquares+= other.sumSquares;
+		//watch out for negative values indicating that they have exceeded the size 
+		if (sumSquares < 0) System.err.println("You have exceeded the size of the StandardDeviation counter!");
+	}
 
 	public double getMean() {
 		if (mean == Double.MIN_NORMAL) mean = sum/numberObservations;

@@ -9,6 +9,7 @@ public class Gzipper {
 	//fields
 	private GZIPOutputStream out;
 	private static final byte[] rtn = "\n".getBytes();
+	private static final byte[] rtnComma = ",\n".getBytes();
 	private File gzipFile;
 	
 	//constructor
@@ -46,6 +47,12 @@ public class Gzipper {
 		out.write(rtn);
 	}
 	
+	/**Adds a comma and return onto the line*/
+	public void printcln(Object line) throws IOException{
+		out.write(line.toString().getBytes());
+		out.write(rtnComma);
+	}
+	
 	/**Adds a return onto each objects toString()*/
 	public void println(Object[] obj) throws IOException{
 		for (Object o: obj){
@@ -74,6 +81,98 @@ public class Gzipper {
 		out.write(rtn);
 	}
 	
+	//a bunch of methods for writing jsonified key value pairs
+	public void printJson(String key, double[] values, boolean addComma) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		sb.append("\"");
+		sb.append(key);
+		sb.append("\"");
+		sb.append(": [");
+		sb.append(values[0]);
+		for (int i=1; i< values.length; i++){
+			sb.append(", ");
+			sb.append(values[i]);
+		}
+		sb.append("]");
+		out.write(sb.toString().getBytes());
+		if (addComma) out.write(rtnComma);
+		else out.write(rtn);
+	}
+	public void printJson(String key, double value, boolean addComma) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		sb.append("\"");
+		sb.append(key);
+		sb.append("\"");
+		sb.append(": ");
+		sb.append(value);
+		out.write(sb.toString().getBytes());
+		if (addComma) out.write(rtnComma);
+		else out.write(rtn);
+	}
+	public void printJson(String key, boolean value, boolean addComma) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		sb.append("\"");
+		sb.append(key);
+		sb.append("\"");
+		sb.append(": ");
+		sb.append(value);
+		out.write(sb.toString().getBytes());
+		if (addComma) out.write(rtnComma);
+		else out.write(rtn);
+	}
+	public void printJson(String key, long value, boolean addComma) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		sb.append("\"");
+		sb.append(key);
+		sb.append("\"");
+		sb.append(": ");
+		sb.append(value);
+		out.write(sb.toString().getBytes());
+		if (addComma) out.write(rtnComma);
+		else out.write(rtn);
+	}
+	public void printJson(String key, String value, boolean addComma) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		sb.append("\"");
+		sb.append(key);
+		sb.append("\"");
+		sb.append(": ");
+		sb.append("\"");
+		sb.append(value);
+		sb.append("\"");
+		out.write(sb.toString().getBytes());
+		if (addComma) out.write(rtnComma);
+		else out.write(rtn);
+	}
+	public void printJson(String key, int value, boolean addComma) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		sb.append("\"");
+		sb.append(key);
+		sb.append("\"");
+		sb.append(": ");
+		sb.append(value);
+		out.write(sb.toString().getBytes());
+		if (addComma) out.write(rtnComma);
+		else out.write(rtn);
+	}
+	public void printJson(String key, ArrayList<String> values, boolean addComma) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		sb.append("\"");
+		sb.append(key);
+		sb.append("\"");
+		sb.append(": [\"");
+		sb.append(values.get(0).toString());
+		int len = values.size();
+		for (int i=1; i< len; i++){
+			sb.append("\", \"");
+			sb.append(values.get(i).toString());
+		}
+		sb.append("\"]");
+		out.write(sb.toString().getBytes());
+		if (addComma) out.write(rtnComma);
+		else out.write(rtn);
+	}
+	
 	/**Adds a return onto each line*/
 	public void println(ArrayList<String> lines) throws IOException{
 		for (String line: lines){
@@ -96,4 +195,7 @@ public class Gzipper {
 	public File getGzipFile() {
 		return gzipFile;
 	}
+
+	
+
 }

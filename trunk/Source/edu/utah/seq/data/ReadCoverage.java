@@ -155,7 +155,7 @@ public class ReadCoverage {
 			System.out.println("\nHistogram of the number of interrogated bps with a given read depth:");
 			histogram.printScaledHistogram();
 
-			int[] counts = histogram.getBinCounts();
+			long[] counts = histogram.getBinCounts();
 			double total = histogram.getTotalBinCounts();
 			System.out.println("\n"+(int)total+"\tTotal interrogated bps\n");
 

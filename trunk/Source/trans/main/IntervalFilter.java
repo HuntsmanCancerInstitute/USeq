@@ -115,7 +115,7 @@ public class IntervalFilter {
 		//load regions to use in intersection, sort, split by chromosome
 		HashMap[] flagRegions = new HashMap[intersectingRegionFilesToFlag.length];
 		String[] fileNames = new String[flagRegions.length];
-		RegionComparator comp= new RegionComparator();
+		GenomicRegionComparator comp= new GenomicRegionComparator();
 		for (int i=0; i< intersectingRegionFilesToFlag.length; i++){
 			GenomicRegion[] toSort = GenomicRegion.loadWriteBinaryRegions(intersectingRegionFilesToFlag[i]); 
 			Arrays.sort(toSort, comp);

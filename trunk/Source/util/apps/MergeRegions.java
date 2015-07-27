@@ -2,7 +2,7 @@ package util.apps;
 import java.io.*;
 
 import trans.anno.GenomicRegion;
-import trans.anno.RegionComparator;
+import trans.anno.GenomicRegionComparator;
 import util.bio.seq.OligoTiler;
 import util.bio.seq.Seq;
 import util.gen.*;
@@ -27,7 +27,7 @@ public class MergeRegions {
 
 		//load and sort regions
 		GenomicRegion[][] regions = new GenomicRegion[regionFiles.length][];
-		RegionComparator comp = new RegionComparator();
+		GenomicRegionComparator comp = new GenomicRegionComparator();
 		for (int i=0; i<regionFiles.length; i++) {
 			regions[i] = GenomicRegion.parseRegions(regionFiles[i]);
 			Arrays.sort(regions[i], comp);

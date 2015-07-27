@@ -1,9 +1,25 @@
+----USeq_8.9.5----
+Sam2USeq
+* Added a failed bed region output for those target bases with less than the indicated depth.  Good for identifying holes in particular locations, and deletions.
+Sam2USeq, CalculatePerCycleErrorRate, SamAlignmentExtractor, MergePairedAlignments
+* Added option to export key QC metrics in json format
+* Moved base summary stats to MergePairedAlignments to get a more accurate uniOb count for total, Q20, and Q30 
+MergeRegions
+* Fixed issue of running this on java 1.7+ with contract sort violation
+MpileupParser
+* New App for parsing a SAMTools mpileup output file for non reference bases generating PointData for the reference, non reference, and fraction non reference for bases that pass the minimum read coverage filter.
+Histogram
+* Changed counters to use long instead of int to avoid overflow, this affects ~10 apps
+
 ----USeq_8.9.4----
 SamAlignmentExtractor
-* Added options to sort on MQ and AS scores
-* Added a variety of QC metrics related to fraction on target and base quality
+* Rewrote the app to enable processing deep coverage datasets without exceeding memory requirements. Added lots of QC metrics.
 BamBlaster
 * New app for injecting snv and indel variants from a vcf file into a bam file
+BamMixer
+* New app for mixing BamBlaster alignments into different frequency tumor samples
+VCFMutationMaker
+* New app to generate vcf files with random snvs and indels over target regions for BamBlaster
 
 ----USeq_8.9.3----
 Bed2UCSCRefFlat

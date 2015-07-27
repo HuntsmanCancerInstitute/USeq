@@ -479,12 +479,13 @@ public class Bed extends Coordinate implements Serializable{
 	}
 	/*Quickie method to stat a bed file.*/
 	public static void main (String[] args){
-		if (args.length ==0 ) Misc.printErrAndExit("\nEnter a vcf file to convert to 2bp padded bed");
+		if (args.length ==0 ) Misc.printErrAndExit("\nEnter a vcf file and bp to pad.");
+		int padding = Integer.parseInt(args[1]);
 		File vcf = new File (args[0]);
-		File bed = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"Pad2bp.bed.gz");
+		File bed = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"Pad"+ padding +"bp.bed.gz");
 		try {
 			Gzipper out = new Gzipper(bed);
-			HashMap<String,RegionScoreText[]> chrReg = Bed.parseVcfFile(vcf, 2, false);
+			HashMap<String,RegionScoreText[]> chrReg = Bed.parseVcfFile(vcf, padding, false);
 			for (String chr: chrReg.keySet()){
 				RegionScoreText[] regions = chrReg.get(chr);
 				for (RegionScoreText r: regions){
@@ -492,13 +493,10 @@ public class Bed extends Coordinate implements Serializable{
 				}
 			}
 			out.close();
-		} catch (FileNotFoundException e) {
+		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		} 
 	}
 
 }

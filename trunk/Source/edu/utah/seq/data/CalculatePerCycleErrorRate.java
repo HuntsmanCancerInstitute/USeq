@@ -5,11 +5,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
-import edu.utah.seq.data.sam.MalformedSamAlignmentException;
-import edu.utah.seq.data.sam.PicardSortSam;
-import edu.utah.seq.data.sam.SamAlignment;
 import htsjdk.samtools.*;
 import util.bio.parsers.MultiFastaParser;
 import util.gen.*;
@@ -26,6 +22,7 @@ public class CalculatePerCycleErrorRate {
 	private double firstReadMaximumError = 0.01;
 	private double secondReadMaximumError = 0.0175;
 	private double maximumFractionFailingCycles = 0.1;
+	private File jsonOutputFile = null;
 
 	//internal
 	private String chromName;
@@ -40,10 +37,10 @@ public class CalculatePerCycleErrorRate {
 	private double[] numberAlignmentsWithHardMasking;
 	private double[][] correctBases;
 	private double[][] incorrectBases;
+	private double[][] perCycleErrorRatePerDataset;
 	private int fileIndex;
 	private int index;
 	private boolean mergeStrands = true;
-	private double[] numberFailingCycles;
 	private int totalCycles;
 
 	/**For stand alone app.*/
@@ -97,14 +94,15 @@ public class CalculatePerCycleErrorRate {
 		double totalAlignments = Num.sumArray(numberAlignments);
 		if (totalAlignments == 0.0) System.out.println("\nNo "+chromName+" alignments found for analysis?!");
 		else printReport();
+		
+		if (jsonOutputFile != null) saveJson();
 	}
 
 	private void printReport() {
 		PrintStream oldStream = System.out;
 		try {
-			if (logFile != null) {
-				System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream(logFile))));
-			}
+			if (logFile != null)  System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream(logFile))));
+			
 			int numberDatasets = alignmentFiles.length;
 			if (mergeStrands == false) numberDatasets = numberDatasets*2;
 	
@@ -130,7 +128,7 @@ public class CalculatePerCycleErrorRate {
 			//make array lists to hold errors
 			ArrayList<Double>[] fractionError = new ArrayList[numberDatasets];
 			for (int i=0; i< numberDatasets; i++) fractionError[i] = new ArrayList<Double>();
-			numberFailingCycles = new double[numberDatasets];
+			double[] numberFailingCycles = new double[numberDatasets];
 			totalCycles = 0;
 			//for each row that contains any data correctBases[fileIndex][0-1000]
 			for (int i=0; i< correctBases[0].length; i++){
@@ -144,6 +142,7 @@ public class CalculatePerCycleErrorRate {
 				totalCycles++;
 				
 				StringBuilder sb = new StringBuilder();
+				//cycle #
 				sb.append(i+1);
 				//for each dataset
 				for (int j=0; j< numberDatasets; j++){
@@ -171,12 +170,13 @@ public class CalculatePerCycleErrorRate {
 			}
 	
 			//calculate average error
-			double[] averageError = new double[numberDatasets];
+			double[] averageErrorPerDataset = new double[numberDatasets];
+			perCycleErrorRatePerDataset = new double[numberDatasets][];
 			for (int i=0; i< numberDatasets; i++) {
-				double[] err = Num.arrayListOfDoubleToArray(fractionError[i]);
-				averageError[i] = Num.mean(err);
+				perCycleErrorRatePerDataset[i] = Num.arrayListOfDoubleToArray(fractionError[i]);
+				averageErrorPerDataset[i] = Num.mean(perCycleErrorRatePerDataset[i]);
 			}
-			System.out.println("\nMean\t"+Num.doubleArrayToString(averageError, "\t"));
+			System.out.println("\nMean\t"+Num.doubleArrayToString(averageErrorPerDataset, "\t"));
 			
 			//calc failing 
 			LinkedHashSet<String> badGuys = new LinkedHashSet<String>();
@@ -216,10 +216,64 @@ public class CalculatePerCycleErrorRate {
 			ex.printStackTrace();
 			System.exit(1);
 		}
-
-
 	}
 
+	@SuppressWarnings("unchecked")
+	private void saveJson() {
+		try {
+			//calc stats just for first two datasets, read one and read two
+			double[] perCycleErrorRatesReadOne = perCycleErrorRatePerDataset[0];
+			double[] perCycleErrorRatesReadTwo = perCycleErrorRatePerDataset[1];
+			int stop = perCycleErrorRatesReadOne.length-1;
+			
+			//zero first and last to skip first and last cycles, these are likely artifacts of the alignment process
+			perCycleErrorRatesReadOne[0] = 0;
+			perCycleErrorRatesReadOne[stop] = 0;
+			perCycleErrorRatesReadTwo[0] = 0;
+			perCycleErrorRatesReadTwo[stop] = 0;
+			
+			double totalOne = 0;
+			double totalTwo = 0;
+			double onePerOne = 0;
+			double onePerTwo = 0;
+			for (int i=1; i< stop; i++){
+				totalOne+= perCycleErrorRatesReadOne[i];
+				totalTwo+= perCycleErrorRatesReadTwo[i];
+				if (perCycleErrorRatesReadOne[i]>=0.01) onePerOne++;
+				if (perCycleErrorRatesReadTwo[i]>=0.01) onePerTwo++;
+			}
+			double numCyclesMinFirstLast = stop-1;
+			double meanPerCycleErrorReadOne = totalOne/numCyclesMinFirstLast;
+			double fractionCyclesWithOnePercentErrorReadOne = onePerOne/numCyclesMinFirstLast;
+			double meanPerCycleErrorReadTwo = totalTwo/numCyclesMinFirstLast;
+			double fractionCyclesWithOnePercentErrorReadTwo = onePerTwo/numCyclesMinFirstLast;
+
+			int numberAlignmentsReadOne = (int)numberAlignments[0];
+			double fractionAlignmentsWithINDELsReadOne = (numberAlignmentsWithInsertions[0]+numberAlignmentsWithDeletions[0])/ numberAlignments[0];
+			int numberAlignmentsReadTwo = (int)numberAlignments[1];
+			double fractionAlignmentsWithINDELsReadTwo = (numberAlignmentsWithInsertions[1]+numberAlignmentsWithDeletions[1])/ numberAlignments[1];
+			
+			//save json, DO NOT change the key names without updated downstream apps that read this file!
+			Gzipper gz = new Gzipper(jsonOutputFile);
+			gz.println("{");
+			gz.printJson("numberAlignmentsReadOne", numberAlignmentsReadOne, true);
+			gz.printJson("numberAlignmentsReadTwo", numberAlignmentsReadTwo, true);
+			gz.printJson("fractionAlignmentsWithINDELsReadOne", fractionAlignmentsWithINDELsReadOne, true);
+			gz.printJson("fractionAlignmentsWithINDELsReadTwo", fractionAlignmentsWithINDELsReadTwo, true);
+			gz.printJson("meanPerCycleErrorReadOne", meanPerCycleErrorReadOne, true);
+			gz.printJson("meanPerCycleErrorReadTwo", meanPerCycleErrorReadTwo, true);
+			gz.printJson("fractionCyclesWithOnePercentErrorReadOne", fractionCyclesWithOnePercentErrorReadOne, true);
+			gz.printJson("fractionCyclesWithOnePercentErrorReadTwo", fractionCyclesWithOnePercentErrorReadTwo, true);
+			gz.printJson("perCycleErrorRatesReadOne", perCycleErrorRatesReadOne, true);
+			gz.printJson("perCycleErrorRatesReadTwo", perCycleErrorRatesReadTwo, false);
+			gz.println("}");
+			gz.close();
+			
+		} catch (Exception e){
+			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem writing json file! "+jsonOutputFile);
+		}
+	}
 
 	public void scanBamFile(File bamFile){
 		
@@ -422,6 +476,7 @@ public class CalculatePerCycleErrorRate {
 					case '1': firstReadMaximumError = Double.parseDouble(args[++i]); break;
 					case '2': secondReadMaximumError = Double.parseDouble(args[++i]); break;
 					case 'c': maximumFractionFailingCycles = Double.parseDouble(args[++i]); break;
+					case 'j': jsonOutputFile = new File(args[++i]); mergeStrands = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -442,6 +497,8 @@ public class CalculatePerCycleErrorRate {
 
 		//check results
 		if (fastaFile == null ) Misc.printExit("\nError: please enter a file for saving the results!\n");
+		
+		if (mergeStrands && jsonOutputFile != null) Misc.printErrAndExit("\nError: a merged strand analysis isn't permitted when exporting json statistics. Include -s or drop -j.\n");
 
 	}	
 
@@ -450,7 +507,7 @@ public class CalculatePerCycleErrorRate {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Calculate Per Cycle Error Rate : June 2015                **\n" +
+				"**                        Calculate Per Cycle Error Rate : July 2015                **\n" +
 				"**************************************************************************************\n" +
 				"Calculates per cycle snv error rate provided a sorted indexed bam file and a fasta\n" +
 				"sequence file. Only checks CIGAR M bases not masked or INDEL bases.\n\n" +
@@ -459,16 +516,18 @@ public class CalculatePerCycleErrorRate {
 				"-b Full path to a coordinate sorted bam file (xxx.bam) with its associated (xxx.bai)\n" +
 				"      index or directory containing such. Multiple files are processed independently.\n" +
 				"-f Full path to the single fasta file you wish to use in calculating the error rate.\n" +
+				
+				"\nDefault Options:\n"+
 				"-s Perform separate first read second read analysis, defaults to merging.\n"+
 				"-c Maximum fraction failing cycles, defaults to 0.1\n"+
 				"-1 Maximum first read or merged read error rate, defaults to 0.01\n"+
 				"-2 Maximum second read error rate, defaults to 0.0175\n"+
-				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
+				"-o Write coverage statistics to this log file instead of stdout.\n" +
+				"-j Write summary stats in json format to this file. Only stats for the first bam file\n"+ 
+				"      are saved. Only separate strand analysis permitted.\n"+
 
-				"\n"+
-
-				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate -b /Data/Bam/\n"+
-				"     -f /Fastas/chrPhiX_Illumina.fasta.gz \n\n"+
+				"\nExample: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate\n"+
+				"     -b /Data/Bam/ -f /Fastas/chrPhiX_Illumina.fasta.gz \n\n"+
 
 		"**************************************************************************************\n");
 

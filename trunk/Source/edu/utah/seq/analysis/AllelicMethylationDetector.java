@@ -394,7 +394,7 @@ public class AllelicMethylationDetector {
 
 	/**Returns the fraction found*/
 	public float[] calculateSplits(Histogram h){
-		int[] counts = h.getBinCounts();
+		long[] counts = h.getBinCounts();
 		//sum first 7
 		float first = 0;
 		for (int i=0; i<7; i++) first+= counts[i];

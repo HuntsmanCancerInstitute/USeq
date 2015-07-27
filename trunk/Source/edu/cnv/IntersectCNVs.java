@@ -307,7 +307,7 @@ public class IntersectCNVs {
 		//make regions
 		ArrayList<GenomicRegion[]> upAL = new ArrayList<GenomicRegion[]>();
 		ArrayList<GenomicRegion[]> downAL = new ArrayList<GenomicRegion[]>();
-		RegionComparator comp = new RegionComparator();
+		GenomicRegionComparator comp = new GenomicRegionComparator();
 		for (int i=0; i< cnvGroups.length; i++){
 			//up regions
 			CNV[] up = cnvGroups[i].getUpCNVs();

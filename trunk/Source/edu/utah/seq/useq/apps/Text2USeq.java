@@ -1041,7 +1041,7 @@ public class Text2USeq {
 				"-r For graphs, select a style, defaults to 0\n"+ sb+
 				"-h Color, hexadecimal (e.g. #6633FF), enclose in quotations\n"+
 				"-d Description, enclose in quotations \n"+
-				"-p Prepend chr onto chromosome name.\n"+
+				"-p Prepend chr onto chromosome name. Required for UCSC bb or bw formats.\n"+
 				"-l Minus 10 Log10 transform values. Requires setting -v .\n"+
 				"-m Convert chromosome names containing M to chrM .\n"+
 				"-o Subtract one from beginning position.\n"+
