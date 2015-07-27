@@ -9,7 +9,7 @@ public class Bin implements Serializable{
 	private double start;
 	private double stop;
 	private double middle;
-	private int hits =0;
+	private long hits =0;
 	private float hitsFloat = 0;
 	private ArrayList scores = new ArrayList();
 	private Histogram histogram;
@@ -48,7 +48,7 @@ public class Bin implements Serializable{
 		return false;
 	}
 	
-	public void addCountToHits(int counts){
+	public void addCountToHits(long counts){
 		hits += counts;
 	}
 	
@@ -81,8 +81,8 @@ public class Bin implements Serializable{
 	}
 	
 
-	public int getHits() {
-		return (int)hits;
+	public long getHits() {
+		return hits;
 	}
 	
 	public float getHitsFloat() {

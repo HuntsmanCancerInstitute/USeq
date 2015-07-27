@@ -1302,6 +1302,20 @@ public class Num {
 		}
 		return maxIndex;
 	}
+	
+	/**Returns the first index containing the maximum value. */
+	public static int findMaxLongIndex(long[] ints) {
+		int len = ints.length;
+		long max = ints[0];
+		int maxIndex = 0;
+		for (int i = 1; i < len; i++) {
+			if (ints[i]>max) {
+				max=ints[i];
+				maxIndex = i;
+			}
+		}
+		return maxIndex;
+	}
 
 	/**Log2s every number in the array replacing the original values.*/
 	public static void log2(float[][] f){
@@ -4819,6 +4833,15 @@ public class Num {
 	public static int findHighestInt(int[] ints) {
 		int len = ints.length;
 		int max = ints[0];
+		for (int i = 1; i < len; i++) {
+			if (ints[i]>max) max=ints[i];
+		}
+		return max;
+	}
+	/**Finds and returns the biggest long in a long[].*/
+	public static long findHighestLong(long[] ints) {
+		int len = ints.length;
+		long max = ints[0];
 		for (int i = 1; i < len; i++) {
 			if (ints[i]>max) max=ints[i];
 		}

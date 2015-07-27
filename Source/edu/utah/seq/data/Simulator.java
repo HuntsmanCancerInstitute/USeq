@@ -2,7 +2,7 @@ package edu.utah.seq.data;
 import java.io.*;
 
 import trans.anno.GenomicRegion;
-import trans.anno.RegionComparator;
+import trans.anno.GenomicRegionComparator;
 import trans.main.Interval;
 import trans.misc.Util;
 import util.gen.*;
@@ -171,7 +171,7 @@ public class Simulator {
 		if (repeatFile != null) {
 			repeatRegions = GenomicRegion.parseRegions(repeatFile);
 			//sort by position
-			Arrays.sort(repeatRegions, new RegionComparator());
+			Arrays.sort(repeatRegions, new GenomicRegionComparator());
 		}
 		else repeatRegions = null;
 	

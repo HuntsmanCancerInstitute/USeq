@@ -955,7 +955,7 @@ public class Misc {
 		int len = i.length;
 		if (len==1) return i[0]+"";
 		if (len==0) return "";
-		StringBuffer sb = new StringBuffer(i[0]+"");
+		StringBuilder sb = new StringBuilder(i[0]+"");
 		for (int j=1; j<len; j++){
 			sb.append(separator);
 			sb.append(i[j]);

@@ -22,6 +22,7 @@ public class VCFMerger {
 	private File[] vcfFiles;
 	private VCFParser[] vcfParsers;
 	private Gzipper out;
+	private File mergedVcfFile;
 
 	public VCFMerger(String[] args){
 		try {	
@@ -65,7 +66,7 @@ public class VCFMerger {
 			Arrays.sort(mergedRecords);
 
 			//print header and records
-			out = new Gzipper(new File(vcfFiles[0].getParentFile(), "merged.vcf.gz"));
+			out = new Gzipper(mergedVcfFile);
 			for (String l : mergedHeader) out.println(l);
 			for (VCFRecord v: mergedRecords) out.println(v.getOriginalRecord());
 
@@ -105,6 +106,7 @@ public class VCFMerger {
 				try{
 					switch (test){
 					case 'v': forExtraction = new File(args[++i]); break;
+					case 'o': mergedVcfFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -124,6 +126,8 @@ public class VCFMerger {
 		vcfFiles = IO.collapseFileArray(tot);
 		if (vcfFiles == null || vcfFiles.length ==0 || vcfFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.vcf(.zip/.gz) file(s)!\n");
 
+		//final file
+		if (mergedVcfFile == null) mergedVcfFile = new File (vcfFiles[0].getParentFile(), "merged.vcf.gz");
 	}	
 
 
@@ -131,7 +135,7 @@ public class VCFMerger {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Merger : March 2015                             **\n" +
+				"**                              VCF Merger : July 2015                              **\n" +
 				"**************************************************************************************\n" +
 				"Merges VCF files with the same samples. Collapses the headers with a simple hash. Will\n"+
 				"not work well with downstream apps that cannot process mixed INFO and FORMAT records.\n" +
@@ -141,7 +145,7 @@ public class VCFMerger {
 				"       Java often fails to parse tabix compressed vcf files.  Best to uncompress.\n\n"+
 								
 				"Optional:\n" +
-				"-o Full path to an output vcf file, defaults to merged.vcf.gz\n" +
+				"-o Full path to an output vcf file, defaults to merged.vcf.gz in parent -v dir.\n" +
 
 				"\n"+
 

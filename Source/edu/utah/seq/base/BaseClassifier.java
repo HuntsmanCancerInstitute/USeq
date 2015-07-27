@@ -10,6 +10,7 @@ import org.apache.commons.math3.stat.inference.ChiSquareTest;
 import org.apache.commons.math3.util.FastMath;
 
 import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
+import edu.utah.seq.data.sam.SamAlignment;
 import edu.utah.seq.parsers.SamAlignmentExtractor;
 import htsjdk.samtools.*;
 import htsjdk.samtools.SAMRecord.SAMTagAndValue;
@@ -729,7 +730,7 @@ public class BaseClassifier {
 		while (i.hasNext()) {
 			SAMRecord sam = i.next();
 			//fetch blocks of actual alignment
-			ArrayList<int[]> blocks = SamAlignmentExtractor.fetchAlignmentBlocks(sam.getCigarString(), sam.getUnclippedStart()-1);
+			ArrayList<int[]> blocks = SamAlignment.fetchAlignmentBlocks(sam.getCigarString(), sam.getUnclippedStart()-1);
 			//check to see if any actual touch down and intersect the region
 			for (int[] b : blocks){
 				if (ei.intersects(b[0], b[1])){

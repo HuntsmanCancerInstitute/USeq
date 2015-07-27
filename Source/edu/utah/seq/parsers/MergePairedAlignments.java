@@ -2,11 +2,8 @@ package edu.utah.seq.parsers;
 
 import java.io.*;
 import java.util.regex.*;
-
 import util.gen.*;
-
 import java.util.*;
-
 import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
 import edu.utah.seq.data.ChromDataSave;
 import htsjdk.samtools.SAMSequenceRecord;
@@ -24,8 +21,8 @@ public class MergePairedAlignments {
 	//user defined fields
 	private File bamFile;
 	private File saveDirectory;
-	private float maximumAlignmentScore = 240;
-	private float minimumMappingQualityScore = 13;
+	private float maximumAlignmentScore = 300;
+	private float minimumMappingQualityScore = 0;
 	private boolean secondPairReverseStrand = false;
 	private boolean skipMergingPairs = false;
 	private boolean removeDuplicates = false;
@@ -35,6 +32,7 @@ public class MergePairedAlignments {
 	private int numberConcurrentThreads = 0;
 	private boolean saveSams = false;
 	private boolean onlyMergeOverlappingAlignments = true;
+	private File jsonOutputFile = null;
 
 	//counters for initial filtering
 	private int numberAlignments = 0;
@@ -60,6 +58,12 @@ public class MergePairedAlignments {
 	private int numberPairsFailingChrDistStrand = 0;
 	private int numberPairsFailingMateCrossCoordinateCheck = 0;
 	private int numberRepeatAlignmentsLackingMate = 0;
+	
+	//base scores
+	private boolean calculateBaseQualities = true;
+	private double numberPassingBases = 0;
+	private double numberPassingQ20Bases = 0;
+	private double numberPassingQ30Bases = 0;
 
 	//internal fields
 	private int numberAlignmentsToLoad = 100000;
@@ -70,7 +74,6 @@ public class MergePairedAlignments {
 	private ArrayList<String> chromosomes = null;
 	private String samHeader;
 	private ArrayList<PairedAlignmentChrParser> parsers;
-	
 
 	//constructors
 	public MergePairedAlignments(String[] args){
@@ -129,6 +132,7 @@ public class MergePairedAlignments {
 			IO.saveObject(countsFile, new Long(numberPrintedAlignments));
 		}
 		printStats();
+		if (jsonOutputFile != null) saveJson();
 	}
 
 	/**Runs each parser in its own thread to max threads defined by user.*/
@@ -197,6 +201,9 @@ public class MergePairedAlignments {
 				numberPairsFailingMateCrossCoordinateCheck += parser.getNumberPairsFailingMateCrossCoordinateCheck() ;
 				numberRepeatAlignmentsLackingMate += parser.getNumberRepeatAlignmentsLackingMate() ;
 				insertSize.addCounts(parser.getInsertSize());
+				numberPassingBases += parser.getNumberPassingBases();
+				numberPassingQ20Bases += parser.getNumberPassingQ20Bases();
+				numberPassingQ30Bases += parser.getNumberPassingQ30Bases();
 			};
 		} catch (Exception e) {
 			System.err.println("Problem collecting stats!");
@@ -217,6 +224,13 @@ public class MergePairedAlignments {
 		System.out.println("Duplicate alignments\t"+format(numberDuplicates,numberAlignments));
 		System.out.println("Alignments passing all filters\t"+format(numberPassingAlignments,numberAlignments));
 		System.out.println();
+		if (calculateBaseQualities){
+			System.out.println("Base stats for passing alignments:");
+			System.out.println("Total # aligned non-overlapping bps\t"+(long)numberPassingBases);
+			System.out.println("Q20 bps\t"+format(numberPassingQ20Bases, numberPassingBases));
+			System.out.println("Q30 bps\t"+format(numberPassingQ30Bases, numberPassingBases));
+			System.out.println();
+		}
 		System.out.println("Paired alignment stats:");  
 		if (printPairedStatsAndHistogram){
 			System.out.println("Non paired alignments\t"+numberNonPairedAlignments);
@@ -239,13 +253,36 @@ public class MergePairedAlignments {
 			insertSize.setSkipZeroBins(true);
 			insertSize.setTrimLabelsToSingleInteger(true);
 			insertSize.printScaledHistogram();
+			System.out.println();
 		}
-		System.out.println("\nAlignments written to SAM/BAM file\t"+format(numberPrintedAlignments,numberAlignments));
+		double mean = insertSize.getStandardDeviation().getMean();
+		System.out.println("Mean insert size\t"+Num.formatNumber(mean, 1));
+		System.out.println("Alignments written to file\t"+format(numberPrintedAlignments,numberAlignments));
+	}
+	
+	@SuppressWarnings("unchecked")
+	private void saveJson() {
+		try {
+			//save json obj, DO NOT change the key names without updated downstream apps that read this file!
+			Gzipper gz = new Gzipper(jsonOutputFile);
+			gz.println("{");
+			gz.printJson("fractionOverlappingBpsInPairedReads", numberOverlappingBases/(numberNonOverlappingBases + numberOverlappingBases), true);
+			gz.printJson("meanInsertSize", insertSize.getStandardDeviation().getMean(), true);
+			gz.printJson("numberPassingBps", (long)numberPassingBases, true);
+			gz.printJson("fractionPassingQ20bps", numberPassingQ20Bases/numberPassingBases, true);
+			gz.printJson("fractionPassingQ30bps", numberPassingQ30Bases/numberPassingBases, false);
+			gz.println("}");
+			gz.close();
+			
+		} catch (Exception e){
+			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem writing json file! "+jsonOutputFile);
+		}
 	}
 
 	public static String format (double stat, double total){
 		double frac = stat/total;
-		return (int)stat +"\t"+Num.formatNumber(frac, 4);
+		return (long)stat +"\t"+Num.formatNumber(frac, 4);
 	}
 
 	public void fetchChromosomesAndHeader(){
@@ -262,6 +299,8 @@ public class MergePairedAlignments {
 			List<SAMSequenceRecord> chrs = samReader.getFileHeader().getSequenceDictionary().getSequences();
 			chromosomes = new ArrayList<String>();
 			for (SAMSequenceRecord r : chrs) chromosomes.add(r.getSequenceName());
+			//chromosomes.add("22");
+			//chromosomes.add("21");
 
 			samReader.close();
 		} catch (Exception e) {
@@ -303,6 +342,7 @@ public class MergePairedAlignments {
 					case 'i': maximumProperPairDistanceForMerging = Integer.parseInt(args[++i]); break;
 					case 't': numberConcurrentThreads = Integer.parseInt(args[++i]); break;
 					case 'o': onlyMergeOverlappingAlignments = false; break;
+					case 'j': jsonOutputFile = new File(args[++i]); break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'q': minimumMappingQualityScore = Float.parseFloat(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
@@ -326,6 +366,7 @@ public class MergePairedAlignments {
 		if (numberConcurrentThreads == 0) numberConcurrentThreads = Runtime.getRuntime().availableProcessors();
 		
 		//print info
+		System.out.println("Settings:");
 		System.out.println(maximumAlignmentScore+ "\tMaximum alignment score (AS).");
 		System.out.println(minimumMappingQualityScore+ "\tMinimum mapping quality score (MQ).");
 		System.out.println(removeDuplicates +"\tRemove all alignments marked duplicate.");
@@ -357,10 +398,9 @@ public class MergePairedAlignments {
 				"-s Save merged xxx.sam.gz alignments instead of binary ChromData. Either can be used\n"+
 				"      in Sam2USeq for read coverage analysis, the ChromData is much faster.\n"+
 				"-u Remove all alignments marked as duplicates, defaults to keeping.\n"+
-				"-a Maximum alignment score (AS:i: tag). Defaults to 240, smaller numbers are more\n" +
-				"      stringent. Approx 30pts per mismatch for novoalignments.\n"+
-				"-q Minimum mapping quality score, defaults to 13, larger numbers are more stringent.\n" +
-				"      Set to 0 if processing splice junction indexed RNASeq data.\n"+
+				"-a Maximum alignment score (AS:i: tag). Defaults to 300, smaller numbers are more\n" +
+				"      stringent for novoalign where each mismatch is ~30pts.\n"+
+				"-q Minimum mapping quality score, defaults to 0, larger numbers are more stringent.\n" + 
 				"-r The second paired alignment's strand has been reversed. Defaults to not reversed.\n" +
 				"-i Maximum acceptible base pair distance for merging, defaults to 5000.\n"+
 				"-m Don't cross check read mate coordinates, needed for merging repeat matches. Defaults\n" +
@@ -368,6 +408,7 @@ public class MergePairedAlignments {
 				"-o Merge all proper paired alignments. Defaults to only merging those that overlap.\n"+
 				"-p Don't print detailed paired alignment statistics and insert size histogram.\n"+
 				"-t Number concurrent threads to run, defaults to the max available to the jvm.\n"+
+				"-j Write summary stats in json format to this file.\n"+
 
 				"\nExample: java -Xmx20G -jar pathToUSeq/Apps/MergePairedBamAlignments -f /Bams/ms.bam\n" +
 				"     -p -s /Bams/MergedPairs/ms.mergedPairs.sam.gz -d 10000 \n\n" +
@@ -426,5 +467,9 @@ public class MergePairedAlignments {
 
 	public boolean isOnlyMergeOverlappingAlignments() {
 		return onlyMergeOverlappingAlignments;
+	}
+
+	public boolean isCalculateBaseQualities() {
+		return calculateBaseQualities;
 	}
 }

@@ -3,10 +3,8 @@ package edu.utah.seq.parsers;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
-
 import htsjdk.samtools.*;
 import util.bio.annotation.Bed;
-import util.bio.seq.Seq;
 import util.gen.*;
 import edu.utah.seq.data.sam.SamAlignment;
 import edu.utah.seq.useq.data.RegionScoreText;
@@ -14,6 +12,8 @@ import edu.utah.seq.useq.data.RegionScoreText;
 
 /**
  * @author Nix
+ * App for extracting sam alignments that are on target and pass basic QC flags and MQ and AS scores.
+ * Writes summary stats to file in json format as well as detailed QC to stdout
  * */
 public class SamAlignmentExtractor {
 
@@ -32,19 +32,17 @@ public class SamAlignmentExtractor {
 	private SamReader bamReader;
 	private SAMFileWriter passingBamWriter;
 	private SAMFileWriter failingBamWriter;
-	private int numAlignments = 0;
-	private int numFailingMQ = 0;
-	private int numFailingAS = 0;
-	private double numBaseScores = 0;
-	private double numBaseScores20 = 0;
-	private double numBaseScores30 = 0;
 	private String workingChromosome;
 	private boolean[] workingCoveredBases;
 	private RegionScoreText[] workingRegions;
-	private int numOnTarget;
+	private int numRawAlignments = 0;
+	private int numPassingBasicOnTargetYetFailingMQ = 0;
+	private int numPassingBasicOnTargetYetFailingAS = 0;
+	private int numPassingBasicAndOnTarget;
 	private int numFailingBasic;
-	private int numPassing;
-	private int numDuplicates;
+	private int numPassingBasicOnTargetAndScores;
+	private int numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate;
+	private File jsonOutputFile;
 	
 	//constructors
 	/**Stand alone.*/
@@ -91,25 +89,55 @@ public class SamAlignmentExtractor {
 			
 			//print stats
 			System.out.println("\n\nSAE statistics:");
-			printStatLine(numFailingBasic, numAlignments, "Unmapped, failing vendor QC, secondary");
-			printStatLine(numOnTarget, (numAlignments-numFailingBasic), "On target regions");
-			printStatLine(numFailingMQ, numOnTarget, "Failing MQ score ("+minimumMappingQuality+")");
+			printStatLine(numFailingBasic, numRawAlignments, "Unmapped, failing vendor QC, secondary");
+			printStatLine(numPassingBasicAndOnTarget, (numRawAlignments-numFailingBasic), "On target regions");
+			printStatLine(numPassingBasicOnTargetYetFailingMQ, numPassingBasicAndOnTarget, "Failing MQ score ("+minimumMappingQuality+")");
 			String dir = "<";
 			if (biggerASIsBetter == false) dir = ">";
-			printStatLine(numFailingAS, numOnTarget, "Failing AS score ("+dir+alignmentScoreThreshold+")");
-			printStatLine(numDuplicates, numPassing, "Duplicates");
-			printStatLine(numPassing, numAlignments, "Passing all filters");
-			printStatLine(numBaseScores20, numBaseScores, "Passing alignment Q20 bases");
-			printStatLine(numBaseScores30, numBaseScores, "Passing alignment Q30 bases");
+			printStatLine(numPassingBasicOnTargetYetFailingAS, numPassingBasicAndOnTarget, "Failing AS score ("+dir+alignmentScoreThreshold+")");
+			printStatLine(numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate, numPassingBasicOnTargetAndScores, "Duplicates (not filtered)");
+			printStatLine(numPassingBasicOnTargetAndScores, numRawAlignments, "Passing all filters");
 
 			//close readers
 			closeIO();
+			
+			if (jsonOutputFile !=null) saveJson();
 
 		} catch (Exception e) {
 			e.printStackTrace();
 		} 
 	}
 	
+	@SuppressWarnings("unchecked")
+	private void saveJson() {
+		try {
+			//calc stats
+			Integer numberUnfilteredAlignments = new Integer(numRawAlignments);
+			Double fractionAlignmentsOnTarget = new Double((double)numPassingBasicAndOnTarget/(double)(numRawAlignments-numFailingBasic));
+			Double fractionOnTargetAndPassQCScoreFilters = new Double((double)numPassingBasicOnTargetAndScores/(double)numRawAlignments);
+			Double estimatedFractionDuplicateAlignments = new Double( (double)numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate/ (double) numPassingBasicOnTargetAndScores  );
+			
+			//output simple json, DO NOT change the key names without updated downstream apps that read this file!
+			Gzipper gz = new Gzipper(jsonOutputFile);
+			gz.println("{");
+			gz.printJson("numberUnfilteredAlignments", numberUnfilteredAlignments, true);
+			gz.printJson("fractionAlignmentsOnTarget", fractionAlignmentsOnTarget, true);
+			gz.printJson("fractionOnTargetAndPassQCScoreFilters", fractionOnTargetAndPassQCScoreFilters, true);
+			gz.printJson("estimatedFractionDuplicateAlignments", estimatedFractionDuplicateAlignments, true);
+			gz.printJson("targetRegionsFileName", bedFile.getName(), true);
+			gz.printJson("mappingQualityThreshold", minimumMappingQuality, true);
+			gz.printJson("alignmentScoreThreshold", alignmentScoreThreshold, true);
+			gz.printJson("divideAlignmentScoreByCigarM", divideAlignmentScoreByCigarM, false);
+			gz.println("}");
+			gz.close();
+			
+		} catch (Exception e){
+			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem writing json file! "+jsonOutputFile);
+		}
+	}
+
+
 	public static void printStatLine(double numerator, double denomenator, String name){
 		double fraction = numerator/ denomenator;
 		if (denomenator == 0) fraction = 0;
@@ -121,7 +149,7 @@ public class SamAlignmentExtractor {
 		while (it.hasNext()) {
 			SAMRecord sam = it.next();
 			failingBamWriter.addAlignment(sam);
-			numAlignments++;
+			numRawAlignments++;
 			//fail basic?
 			if (passBasic(sam) == false) numFailingBasic++;
 			
@@ -134,7 +162,7 @@ public class SamAlignmentExtractor {
 		SAMRecordIterator it = bamReader.queryUnmapped();
 		while (it.hasNext()) {
 			failingBamWriter.addAlignment(it.next());
-			numAlignments++;
+			numRawAlignments++;
 			numFailingBasic++;
 		}
 		it.close();
@@ -196,7 +224,7 @@ public class SamAlignmentExtractor {
 			SAMRecordIterator it = bamReader.queryOverlapping(workingChromosome, 0, 0);
 			while (it.hasNext()) {
 				SAMRecord sam = it.next();
-				numAlignments++;
+				numRawAlignments++;
 
 				//fail basic flags?
 				if (passBasic(sam) == false){
@@ -212,12 +240,12 @@ public class SamAlignmentExtractor {
 				}
 
 				//check both scores
-				numOnTarget++;
+				numPassingBasicAndOnTarget++;
 				boolean passScores = true;
 				//pass mapping quality?
 				if (minimumMappingQuality != -1) {		
 					if (sam.getMappingQuality() < minimumMappingQuality) {
-						numFailingMQ++;
+						numPassingBasicOnTargetYetFailingMQ++;
 						passScores = false;
 					}
 				}
@@ -236,13 +264,13 @@ public class SamAlignmentExtractor {
 						}
 						if (biggerASIsBetter){ 
 							if (asScore < alignmentScoreThreshold) {
-								numFailingAS++;
+								numPassingBasicOnTargetYetFailingAS++;
 								passScores = false;
 							}
 						}
 						else {
 							if (asScore > alignmentScoreThreshold) {
-								numFailingAS++;
+								numPassingBasicOnTargetYetFailingAS++;
 								passScores = false;
 							}
 						}
@@ -250,10 +278,9 @@ public class SamAlignmentExtractor {
 				}
 				//pass? or fail? scores
 				if (passScores) {
-					numPassing++;
+					numPassingBasicOnTargetAndScores++;
 					passingBamWriter.addAlignment(sam);
-					incrementBaseQualities(sam);
-					if (sam.getDuplicateReadFlag()) numDuplicates++;
+					if (sam.getDuplicateReadFlag()) numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate++;
 				}
 				else failingBamWriter.addAlignment(sam);
 
@@ -263,17 +290,6 @@ public class SamAlignmentExtractor {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError: problem walking chromosome "+workingChromosome);
 		}
-	}
-	
-	private void incrementBaseQualities(SAMRecord sam) {
-		int[] scores = Seq.convertSangerQualityScores(sam.getBaseQualityString());
-		numBaseScores+= scores.length;
-		for (int i=0; i< scores.length; i++){
-			if (scores[i] >= 20){
-				numBaseScores20++;
-				if (scores[i] >= 30) numBaseScores30++;
-			}
-		}	
 	}
 
 	public static void main(String[] args) {
@@ -302,6 +318,7 @@ public class SamAlignmentExtractor {
 					case 'a': alignmentScoreThreshold = Double.parseDouble(args[++i]); break;
 					case 'n': biggerASIsBetter = false; break;
 					case 'd': divideAlignmentScoreByCigarM = true; break;
+					case 'j': jsonOutputFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group()+", Try -h");
 					}
@@ -397,6 +414,7 @@ public class SamAlignmentExtractor {
 				"-a Alignment score threshold, defaults to no filtering. \n"+
 				"-n Smaller alignment scores are better (novo), defaults to bigger are better (bwa).\n"+
 				"-d Divide alignment score by the number of CIGAR M bases.\n"+
+				"-j Write summary stats in json format to this file.\n"+
 
 				"\n"+
 

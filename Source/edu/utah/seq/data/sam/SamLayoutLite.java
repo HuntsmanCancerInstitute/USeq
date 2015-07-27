@@ -1,13 +1,7 @@
 package edu.utah.seq.data.sam;
 
 import htsjdk.samtools.SAMRecord;
-
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.regex.Matcher;
-
-import com.sun.tools.javac.code.Attribute.Array;
-
 import util.gen.Misc;
 import util.gen.Num;
 
@@ -275,6 +269,16 @@ public class SamLayoutLite{
 			}
 		}
 		return new String[]{s.toString(), q.toString()};
+	}
+	
+	/**Returns qualities where the CIGAR is M or I*/
+	public String getMIQualities(){
+		StringBuilder q = new StringBuilder();
+		//walk and add in M I but not D H N S
+		for (int i=0; i< call.length; i++){
+			if (call[i]=='M' || call[i]=='I') q.append(qual[i]);
+		}
+		return q.toString();
 	}
 	
 	public String getSequence(){

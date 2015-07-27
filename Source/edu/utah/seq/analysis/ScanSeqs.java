@@ -30,6 +30,7 @@ public class ScanSeqs {
 	private boolean filterWindowsViaQValue = true;
 	private boolean plusStrand = true;
 	private boolean minusStrand =  true;
+	private boolean bypassFDR = false;
 
 	//internal fields
 	private int halfPeakShift = 0;
@@ -557,8 +558,18 @@ public class ScanSeqs {
 		down[smoothingWindow.length] = maxPValDown;
 
 		//calc qvals
-		float[] upQVals = Num.qValueFDR(saveDirectory, up, fullPathToR, true, true);
-		float[] downQVals = Num.qValueFDR(saveDirectory, down, fullPathToR, true, true);
+		float[] upQVals;
+		float[] downQVals;
+		
+		if (bypassFDR) {
+			upQVals = up;
+			downQVals = down;
+			System.out.println("\nBypassing QVal fdr calculations!!!!\n");
+		}
+		else {
+			upQVals = Num.qValueFDR(saveDirectory, up, fullPathToR, true, true);
+			downQVals = Num.qValueFDR(saveDirectory, down, fullPathToR, true, true);
+		}
 
 		//transform total
 		float transTotal = (float)Num.minus10log10(smoothingWindow.length);
@@ -845,111 +856,7 @@ public class ScanSeqs {
 		}
 	}
 
-	/**Uses weighted reads in window scanning to generate binomial p-values.*/
-	/*
-	private void calculateWeightedReadBinomialPValues(){
-		//internal fields
-		BinomialDistributionImpl b;
-		float numTObs = (float)numberTreatmentObservations;
-		float numCObs = (float)numberControlObservations;
-
-		//make arrays to calculate binomial p-vals with R
-		ArrayList<SmoothingWindow> forBinom = new ArrayList<SmoothingWindow>();
-		//for each window 
-		for (int i=0; i< windows.length; i++){
-			//fetch float[]{numReads, sumScores}
-			float[] tPlus = null; 
-			float[] tMinus = null;
-			float[] cPlus = null;
-			float[] cMinus = null;
-			//summary stats
-			float tNumReads = 0;
-			float cNumReads = 0;
-			float tSumScores = 0;
-			float cSumScores = 0;
-			//might be null due to strandedness
-			if (treatPlusPD != null) {
-				tPlus = treatPlusPD.sumScoresPositionsBP(windows[i][0], windows[i][1]);
-				tNumReads += tPlus[0];
-				tSumScores += tPlus[1];
-			}
-			if (treatMinusPD != null) {
-				tMinus = treatMinusPD.sumScoresPositionsBP(windows[i][0], windows[i][1]);
-				tNumReads += tMinus[0];
-				tSumScores += tMinus[1];
-			}
-			if (ctrlPlusPD != null) {
-				cPlus = ctrlPlusPD.sumScoresPositionsBP(windows[i][0], windows[i][1]);
-				cNumReads += cPlus[0];
-				cSumScores += cPlus[1];
-			}
-			if (ctrlMinusPD != null) {
-				cMinus = ctrlMinusPD.sumScoresPositionsBP(windows[i][0], windows[i][1]);
-				cNumReads += cMinus[0];
-				cSumScores += cMinus[1];
-			}
-			//calc binomial pvalue 
-			float tProportion = defaultProportionT;
-			float cProportion = defaultProportionC;
-			if (tNumReads !=0) tProportion = tSumScores/tNumReads;
-			if (cNumReads !=0) cProportion = cSumScores/cNumReads;
-
-			float cProbNumT = cProportion * numTObs;
-			float probOfSuccess = cProbNumT / (cProbNumT  + (tProportion * numCObs));
-			int numTrials = (int) (tNumReads + cNumReads);
-			b = new BinomialDistributionImpl(numTrials, probOfSuccess);
-			double pvalUp = 0;
-
-			try {
-				pvalUp = 1-b.cumulativeProbability(tNumReads-1);
-			} catch (MathException e){
-				e.printStackTrace();
-			}
-			if (pvalUp==0) pvalUp = 300;
-			else pvalUp = Num.minus10log10(pvalUp);
-			float[] scores = new float[]{(float) pvalUp};
-
-			 //if (verbose) System.out.println(tNumReads +"\t"+ tSumScores +"\t"+ tProportion +"\t"+ cNumReads +"\t"+ cSumScores +"\t"+ cProportion +"\t"+ numTrials +"\t"+ probOfSuccess+"\t"+pvalUp);
-
-			//scores =                 pVal,upPVal,downPVal,skew,tSumPlus,tSumMinus,cSumPlus,cSumMinus, realND,mockND,upEmpFDR
-			//float[] scores = new float[]{0,   0,     0,       0, tSumPlus,tSumMinus,cSumPlus, cSumMinus,  0,     0,      0,       0};
-
-			//make window
-			smoothingWindow[i] = new SmoothingWindow (windows[i][0], windows[i][1], scores);
-			allSmoothingWindowAL.add(smoothingWindow[i]);
-			//calc diff binomial from cache?
-			/*
-			float max = tSum;
-			if (max < cSum) max = cSum;
-			//yes
-			if (max < numberCachedBinPVals){
-				//calc pvals
-				int t = Math.round(tSum);
-				int c = Math.round(cSum);
-				float up = pValsDataUp[t][c];
-				float down = pValsDataDown[c][t];
-				//only test for skew in one direction, that minus is way less than plus
-				float skew = pValsSkew[Math.round(tSumPlus)][Math.round(tSumMinus)];
-				//set scores
-				//scores = pVal,upPVal,downPVal,skew,tSumPlus,tSumMinus,cSum
-				if (up > down) scores[0] = up;
-				else scores[0] = -1* down;
-				scores[1] = up;
-				scores[2] = down;
-				scores[3] = skew;
-				smoothingWindow[i].setScores(scores);
-			}
-			//no
-			else forBinom.add(smoothingWindow[i]);
-	 */
-	/*
-		}
-		//calc binom from R
-		if (forBinom.size()!=0) calculateBinomialsFromR(forBinom);
-
-
-	}*/
-
+	
 	/**Collects and calculates a bunch of stats re the PointData.*/
 	private void calculateReadCountStatistics(){
 		//fetch treatment PointData and calculate total observations
@@ -1383,6 +1290,7 @@ public class ScanSeqs {
 					case 'e': findReducedRegions = true; break;
 					case 'u': useWeightedReads = true; break;
 					case 'j': strand = args[++i]; break;
+					case 'y': bypassFDR = true; break;
 					case 'a': numberTreatmentObservations = Double.parseDouble(args[++i]); break;
 					case 'b': numberControlObservations = Double.parseDouble(args[++i]); break;
 					case 'g': numberStandardDeviations = Float.parseFloat(args[++i]); stripHotWindows = true; break;
@@ -1471,7 +1379,7 @@ public class ScanSeqs {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  Scan Seqs: Feb 2012                             **\n" +
+				"**                                  Scan Seqs: July 2015                            **\n" +
 				"**************************************************************************************\n" +
 				"Takes unshifted stranded chromosome specific PointData and uses a sliding window to\n" +
 				"calculate several smoothed window statistics. These include a binomial p-value, a\n" +

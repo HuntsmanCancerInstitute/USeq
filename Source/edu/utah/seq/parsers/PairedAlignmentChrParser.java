@@ -2,6 +2,7 @@ package edu.utah.seq.parsers;
 
 import java.io.*;
 
+import util.bio.seq.Seq;
 import util.gen.*;
 
 import java.util.*;
@@ -67,6 +68,10 @@ public class PairedAlignmentChrParser extends Thread{
 	private ChromData chromData;
 	private DataOutputStream chromDataOut;
 	private boolean queryUnMapped = false;
+	private boolean calculateBaseQualities = false;
+	private double numberPassingBases = 0;
+	private double numberPassingQ20Bases = 0;
+	private double numberPassingQ30Bases = 0;
 
 	public PairedAlignmentChrParser (String chromosome, MergePairedAlignments mpa){
 		//set params
@@ -81,6 +86,7 @@ public class PairedAlignmentChrParser extends Thread{
 		saveSams = mpa.isSaveSams();
 		removeDuplicates = mpa.isRemoveDuplicates();
 		onlyMergeOverlappingAlignments = mpa.isOnlyMergeOverlappingAlignments();
+		calculateBaseQualities = mpa.isCalculateBaseQualities();
 	}
 
 	public void run(){
@@ -656,6 +662,22 @@ public class PairedAlignmentChrParser extends Thread{
 			chromDataOut.writeUTF(sam.getCigar());
 		}
 		numberPrintedAlignments++;
+		
+		//calculate base level quality stats? this is slow!
+		if (calculateBaseQualities) incrementBaseQualities(sam);
+	}
+	
+	private void incrementBaseQualities(SamAlignment sam){
+		SamLayoutLite sll = new SamLayoutLite(sam);
+		String qual = sll.getMIQualities();
+		int[] values = Seq.convertSangerQualityScores(qual);
+		numberPassingBases+= values.length;
+		for (int i=0; i< values.length; i++){
+			if (values[i] > 19) {
+				numberPassingQ20Bases++;
+				if (values[i] > 29) numberPassingQ30Bases++;
+			}
+		}
 	}
 
 	public boolean isComplete() {
@@ -760,6 +782,18 @@ public class PairedAlignmentChrParser extends Thread{
 
 	public ChromData getChromData() {
 		return chromData;
+	}
+
+	public double getNumberPassingBases() {
+		return numberPassingBases;
+	}
+
+	public double getNumberPassingQ20Bases() {
+		return numberPassingQ20Bases;
+	}
+
+	public double getNumberPassingQ30Bases() {
+		return numberPassingQ30Bases;
 	}
 
 
