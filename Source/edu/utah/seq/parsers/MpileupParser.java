@@ -32,12 +32,9 @@ public class MpileupParser {
 	private int minObs;
 	
 	//internal fields
-	private Pattern space = Pattern.compile("\\t");
 	private Pattern rBase = Pattern.compile("[\\.,]");
 	private int chromIndex = 0;
 	private int positionIndex = 1;
-	private int readDepthIndex = 3;
-	private int baseCallIndex = 4;
 	private ArrayList<Integer> positions = new ArrayList<Integer>();
 	private ArrayList<Float> reference = new ArrayList<Float>();
 	private ArrayList<Float> nonReference = new ArrayList<Float>();
@@ -59,7 +56,7 @@ public class MpileupParser {
 		System.out.println(maxFailing + "\tMax fraction bp in win failing max error");
 		System.out.println(minObs+"\tMinimum obs in window");
 		
-		System.out.println("\nProcessing pileup file");
+		System.out.println("\nProcessing chr");
 		parseFile(pileupFile);
 		try {
 			failingBasesBed.close();
@@ -88,63 +85,6 @@ public class MpileupParser {
 		nonReference.clear(); 
 	}
 	
-	public void old(File pileupFile){
-		try {
-			//input streams
-			BufferedReader in = IO.fetchBufferedReader(pileupFile);
-			
-			//data output streams
-			String chromosome = null;
-
-			//for each line in the file
-			String line;
-			int badLines = 0;
-			while ((line = in.readLine()) != null){
-				if (line.length() == 0 || line.startsWith("#")) continue;
-				String[] tokens = space.split(line);
-				if (tokens.length < 4){
-					if (badLines++ < 20) System.err.println("\nMalformed pileup line, skipping -> "+line+"\n\t"+tokens.length+" Tokens");
-					continue;
-				}
-				//fetch num bases
-				float numBases = Float.parseFloat(tokens[readDepthIndex]);
-				if (numBases == 0.0) continue; 
-				
-				//set first chrom?
-				if (chromosome == null) chromosome = tokens[chromIndex];
-				
-				//new chromosome?
-				else if (tokens[chromIndex].equals(chromosome) == false){
-					System.out.print(" "+chromosome);
-					//process old
-					processParsedData(positions, reference, nonReference, chromosome);
-					//clear old
-					clearArrayLists();
-					chromosome = tokens[chromIndex];
-				}
-				
-				//position
-				Integer position = Integer.parseInt(tokens[positionIndex]) -1;
-
-				//count ref bases in baseCalls
-				float numRef = countRefs(tokens[baseCallIndex]);
-				
-				//save em
-				positions.add(position);
-				reference.add(numRef);
-				nonReference.add(numBases-numRef);
-			}
-			//process final
-			System.out.print(" "+chromosome);
-			processParsedData(positions, reference, nonReference, chromosome);
-			clearArrayLists();
-			in.close();
-			System.out.println();
-			
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
 	
 	public void parseFile(File pileupFile){
 		String line = null;
@@ -154,7 +94,7 @@ public class MpileupParser {
 
 			//for each line in the file
 			while ((line = in.readLine()) != null){
-				String[] tokens = space.split(line);
+				String[] tokens = Misc.TAB.split(line);
 				if (tokens.length < 4) Misc.printErrAndExit("\nMalformed pileup line, skipping -> "+line+"\n\t"+tokens.length+" Tokens");
 				
 				//set first chrom?
@@ -173,14 +113,16 @@ public class MpileupParser {
 				Integer position = Integer.parseInt(tokens[positionIndex]) -1;
 				
 				//split by sample, first three indexes are chr, pos, refBase; then sets three for each bam: readDepth, baseString, baseQualString
-				
 				float numBases = 0f;
 				float numRef = 0f;
 				for (int i=3; i< tokens.length; i+=3){
-					//fetch num bases
-					numBases+= Float.parseFloat(tokens[i]);
-					//count ref bases in baseCalls
-					numRef+= countRefs(tokens[i+1]);
+					//check that there are three
+					if ((i+2) < tokens.length){
+						//fetch num bases
+						numBases+= Float.parseFloat(tokens[i]);
+						//count ref bases in baseCalls
+						numRef+= countRefs(tokens[i+1]);
+					}
 				}
 				//save em
 				positions.add(position);
@@ -194,14 +136,11 @@ public class MpileupParser {
 			in.close();
 			System.out.println();
 			
-		} catch (IOException e) {
+		} catch (Exception e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nProblem parsing "+ line);
 		}
 	}
-	
-
-
 	
 	private void processParsedData(ArrayList<Integer> positions, ArrayList<Float> refAL, ArrayList<Float> nonRefAL, String chromosome) throws IOException {
 		String chr = chromosome;
@@ -346,10 +285,10 @@ public class MpileupParser {
 				"**                              MpileUp Parser: July 2015                           **\n" +
 				"**************************************************************************************\n" +
 				"Parses a SAMTools mpileup output file for non reference bases generating bed files and\n" +
-				"data tracks with information related to error prone bases.\n\n"+
+				"data tracks with information related to error prone bases. Multiple samples are merged.\n\n"+
 
 				"Options:\n"+
-				"-p Path to a mpileup file (.gz or.zip OK, use 'samtools mpileup -Q 20 -A -B' params).\n"+
+				"-p Path to a mpileup file (.gz or.zip OK, use 'samtools mpileup -Q 20 -A -B *bam').\n"+
 				"-v Versioned Genome (ie H_sapiens_Mar_2006), see UCSC Browser,\n"+
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
 				"-s Save directory, full path, defaults to pileup file directory.\n"+

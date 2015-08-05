@@ -10,6 +10,10 @@ MpileupParser
 * New App for parsing a SAMTools mpileup output file for non reference bases generating PointData for the reference, non reference, and fraction non reference for bases that pass the minimum read coverage filter.
 Histogram
 * Changed counters to use long instead of int to avoid overflow, this affects ~10 apps
+MultiSampleVCFFilter
+* Fixed an issue with filtering records that contain no genotype quality GQ field. These were being failed and removed.
+FastqBarcodeTagger
+* New app for adding barcode reads from a third fastq file to paired fastq file headers, supports interlaced output for direct piping into downstream apps (recommended).
 
 ----USeq_8.9.4----
 SamAlignmentExtractor

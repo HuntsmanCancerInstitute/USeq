@@ -15,7 +15,7 @@ public class VCFSample {
 	//fields, default to null or -1
 	private String genotypeGT = null;
 	private int readDepthDP = -1;
-	private float genotypeQualityGQ = -1;
+	private float genotypeQualityGQ = 0;
 	private boolean noCall = false;
 	private String originalRecord = null;
 	private String originalFormat = null;
@@ -61,7 +61,6 @@ public class VCFSample {
 				}
 				else if (format[i].equals("GQ")) {
 					if (data[i].equals(".")) {
-						genotypeQualityGQ = 0;
 						missingQual = true;
 					} else {
 						genotypeQualityGQ = Float.parseFloat(data[i]);
