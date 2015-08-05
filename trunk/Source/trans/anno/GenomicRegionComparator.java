@@ -7,10 +7,11 @@ public class GenomicRegionComparator  implements Comparator<GenomicRegion> {
 			int i = first.getChromosome().compareTo(second.getChromosome());
 			if (i !=0 ) return i;
 			if (first.getStart()< second.getStart()) return -1;
-			if (first.getEnd()> second.getEnd()) return 1;
+			if (first.getStart()> second.getStart()) return 1;
+			//ok same start now check length
 			if ( (first.getEnd() - first.getStart()) < 
 					(second.getEnd() - second.getStart()) ) return -1;
-			if ( (first.getEnd() - first.getStart()) < 
+			if ( (first.getEnd() - first.getStart()) > 
 					(second.getEnd() - second.getStart()) ) return 1;
 			return 0;
 		}

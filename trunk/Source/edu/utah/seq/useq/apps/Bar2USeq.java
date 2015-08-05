@@ -4,7 +4,6 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import util.gen.IO;
-import util.gen.Misc;
 import edu.utah.seq.useq.*;
 import edu.utah.seq.useq.data.*;
 import edu.utah.seq.parsers.*;

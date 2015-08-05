@@ -13,6 +13,7 @@ import util.gen.Misc;
  */
 public class GenomicRegion implements Serializable{
 
+	
 	//fields
 	private String chromosome;
 	private int start;
@@ -20,7 +21,7 @@ public class GenomicRegion implements Serializable{
 	private String notes;
 	private HashSet hits;
 	private boolean[] gcContent;	//one per base, true = g or c, false = a or t
-	
+	private static final long serialVersionUID = 1L;
 	
 	//constructors
 	public GenomicRegion(String chromosome, int start, int end, String notes){
@@ -76,9 +77,9 @@ public class GenomicRegion implements Serializable{
 	
 	/**Given a chromosome SORTED array of Regions returns a HashMap 
 	 * containing chromosome: sorted chromo specific GenomicRegion[]*/
-	public static HashMap splitByChromosome(GenomicRegion[] sorted){
-		ArrayList al = new ArrayList();
-		HashMap map = new HashMap();
+	public static HashMap<String, GenomicRegion[]> splitByChromosome(GenomicRegion[] sorted){
+		ArrayList<GenomicRegion> al = new ArrayList<GenomicRegion>();
+		HashMap<String, GenomicRegion[]> map = new HashMap<String, GenomicRegion[]>();
 		String chromosome = sorted[0].getChromosome();
 		//for each GenomicRegion
 		for (int i=0; i< sorted.length; i++){
@@ -93,7 +94,7 @@ public class GenomicRegion implements Serializable{
 				al.toArray(regions);
 				map.put(chromosome, regions);
 				//reset params
-				al = new ArrayList();
+				al = new ArrayList<GenomicRegion>();
 				al.add(sorted[i]);
 				chromosome = sorted[i].getChromosome();
 			}

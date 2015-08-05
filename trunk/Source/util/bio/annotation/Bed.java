@@ -420,7 +420,7 @@ public class Bed extends Coordinate implements Serializable{
 					if (vcf.isSNP()) type = "SNV";
 					else type = "INS";
 				}
-				RegionScoreText n = new RegionScoreText(start, stop, vcf.getQuality(), type);
+				RegionScoreText n = new RegionScoreText(start, stop, vcf.getQuality(), type+"_"+ vcf.getReference() +"_"+Misc.stringArrayToString(vcf.getAlternate(), ","));
 				al.add(n);
 			}
 		}catch (Exception e){

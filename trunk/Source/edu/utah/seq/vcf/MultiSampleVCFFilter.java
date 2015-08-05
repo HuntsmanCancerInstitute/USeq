@@ -238,7 +238,7 @@ public class MultiSampleVCFFilter {
 			boolean passes = false;
 			for (VCFSample sample: test.getSample()){
 				//is it a passing record?
-				int dp = sample.getReadDepthDP();
+				int dp = sample.getReadDepthDP();				
 				int ad = 0;
 				String adString = sample.getAlleleCount();
 				if (adString != null) ad = Integer.parseInt(sample.getAlternateCounts());
@@ -254,12 +254,13 @@ public class MultiSampleVCFFilter {
 						}
 					}
 				}
+
 				if (sample.isNoCall() == false && 
 						dp >= sampleMinimumReadDepthDP && 
 						dp <= sampleMaximumReadDepthDP &&
 						sample.getGenotypeQualityGQ() >= sampleMinimumGenotypeQualityGQ &&
 						ad >= sampleMinimumReadDepthAD) {
-					passes = true;
+					passes = true;				
 					break;
 				}
 			}
@@ -493,7 +494,7 @@ public class MultiSampleVCFFilter {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Multi Sample VCF Filter  : Nov 2014                   **\n" +
+				"**                            Multi Sample VCF Filter  : July 2015                  **\n" +
 				"**************************************************************************************\n" +
 				"Filters a vcf file containing multiple sample records into those that pass or fail the\n" +
 				"tests below. This works with VCFv4.1 files created by the GATK package. Note, the \n" +

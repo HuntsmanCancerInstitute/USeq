@@ -321,15 +321,14 @@ public class Sam2USeq {
 				}
 			}
 			//Write out json, DO NOT change the key names without updated downstream apps that read this file!
-			
 			Gzipper gz = new Gzipper(jsonOutputFile);
 			gz.println("{");
-			gz.printJson("fractionTargetBpsWithIndexedCoverage", Num.arrayListToDoubles(fractionTargetBpsAL), true);
 			gz.printJson("meanOnTargetCoverage", histogram.getStandardDeviation().getMean(), true);
-			gz.printJson("lowCoverageRegions", lowCoverageRegionsAL, true);
 			gz.printJson("minimumCoverageThreshold", (int)minimumCounts, true);
 			gz.printJson("targetRegionsFileName", regionFile.getName(), true);
-			gz.printJson("coverageAt0.95OfTargetBps", coverageAt95, false);
+			gz.printJson("coverageAt0.95OfTargetBps", coverageAt95, true);
+			gz.printJson("fractionTargetBpsWithIndexedCoverage", Num.arrayListToDoubles(fractionTargetBpsAL), true);
+			gz.printJson("lowCoverageRegions", lowCoverageRegionsAL, false);
 			gz.println("}");
 			gz.close();
 			
