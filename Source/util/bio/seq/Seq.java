@@ -23,6 +23,18 @@ public class Seq {
 		"O", "P", "Q", "R", "S", "T", "U", "V", "W", "X", "Y", "Z", "[", "\\", "]", "^", "_", "`", "a", "b", "c", "d", "e", "f", "g", 
 		"h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z", "{", "|", "}", "~"};	
 	
+	public static final char[] ORDERED_ASCII_CHAR = new char[]{'!', '\'', '#', '$', '%', '&', '\'', '(', ')', '*', '+', ',', '-', '.', '/', '0', '1', '2', '3', '4', '5', 
+		'6', '7', '8', '9', ':', ';', '<', '=', '>', '?', '@', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 
+		'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z', '[', '\\', ']', '^', '_', '`', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 
+		'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', '{', '|', '}', '~'};	
+	
+	
+	public static char[] convertSangerQualityScoresToAscii(int[] qual) throws IndexOutOfBoundsException {
+		char[] q = new char[qual.length];
+		for (int i=0; i< qual.length; i++) q[i] = ORDERED_ASCII_CHAR[qual[i]];
+		return q;
+	}
+	
 	/**Returns a vertebrate codon:aa HashMap, all capitals, single letter aa's.*/
 	public static HashMap<String,String> fetchCodonAAHashMap(){
 		String[] x = {"GCT","A","GCC","A","GCA","A","GCG","A","CGT","R","CGC","R","CGA","R","CGG","R","AGA","R","AGG","R","AAT",
@@ -108,7 +120,6 @@ public class Seq {
 		for (int i=0; i< seqQual.length(); i++){
 			String sub = seqQual.substring(i, i+1);
 			Integer val = asci2FastQScore.get(sub);
-			//if (val == null || val > 41) { //allowing it to return higher values due to recalibration!
 			if (val == null) {
 				System.err.println("\nError converting seq quality character -> "+sub+" from "+seqQual);
 				return null;

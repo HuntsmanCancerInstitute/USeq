@@ -3,7 +3,9 @@ package edu.utah.seq.parsers;
 import java.io.*;
 import java.util.regex.*;
 import java.util.*;
+
 import htsjdk.samtools.*;
+import htsjdk.samtools.SAMFileHeader.SortOrder;
 import util.bio.annotation.Bed;
 import util.gen.*;
 import edu.utah.seq.data.sam.SamAlignment;
@@ -360,6 +362,8 @@ public class SamAlignmentExtractor {
 			SAMFileWriterFactory writerFactory = new SAMFileWriterFactory();
 			writerFactory.setCreateIndex(true);
 			writerFactory.setTempDirectory(saveDirectory);
+			//must explicit set into the header that it is sorted for samtools proc alignments
+			bamReader.getFileHeader().setSortOrder(SortOrder.coordinate);
 			passingBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), true, pass);
 			failingBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), true, fail);
 		} catch (IOException e) {

@@ -1,5 +1,5 @@
 
-package edu.utah.seq.parsers;
+package edu.utah.seq.barcodes;
 
 import java.io.*;
 import java.util.regex.*;

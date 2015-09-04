@@ -165,7 +165,7 @@ public class MergePairedAlignments {
 				}
 				if (allComplete) break;
 				//sleep
-				Thread.sleep(60000);
+				Thread.sleep(1000);
 			} catch (InterruptedException ie) {
 				ie.printStackTrace();
 				Misc.printErrAndExit("\nProblem running threads!");
