@@ -1,3 +1,12 @@
+----USeq_8.9.6----
+Sam2USeq
+* Modified the per region spreadsheet to show the FracBPs>= xxx to be defined by the users minimum coverage setting.
+* Now gzipping pass and fail bed file outputs 
+MatchMates
+* New app for joining second of pair alignments to their first of pair attributes fields.  Use with FastqBarcodeTagger and Consensus. 
+Consensus
+* New app that clusters alignments by position and molecular barcode then calls consensus on the clustered alignments outputing fastq for realignment.
+
 ----USeq_8.9.5----
 Sam2USeq
 * Added a failed bed region output for those target bases with less than the indicated depth.  Good for identifying holes in particular locations, and deletions.

@@ -2,6 +2,7 @@ package edu.utah.seq.barcodes;
 
 
 import htsjdk.samtools.SAMRecord;
+
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -36,6 +37,12 @@ public class BarcodeClusterEngine {
 	 * It'll return a SAMRecord[cluster number][SAMRecords in a given cluster].
 	 * Records with barcodes failing the minNumBases with minBaseQuality are dumped into the skippedRecords obj and ignored.*/
 	public SAMRecord[][] cluster(ArrayList<SAMRecord> records){
+		
+		/*for (SAMRecord sam: records){
+			if (sam.getReadName().equals("NS500690:33:H5W2KBGXX:4:12606:23383:4972:BMF:TGGATAGACTGCGATC@CC645F3@@F@F3C/")) {
+				System.out.println("Found it in cluster() !\n"+sam.getSAMString());
+			}
+		}*/
 		
 		//load the HashMap<String, ArrayList<SAMRecord> of N'ed barcodes, this will collapse based on exact identity
 		loadHash(records);

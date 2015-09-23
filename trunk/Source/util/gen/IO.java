@@ -78,6 +78,31 @@ public class IO {
 		}
 		return names;
 	}
+	
+	/**Concatinates files regardless of type.  Good for gz!
+	 * @throws IOException */
+	public static void concatinateFiles(ArrayList<File> filesToConcatinate, File destination) throws IOException{
+
+			Vector<InputStream> inputStreams = new Vector<InputStream>();
+			int num = filesToConcatinate.size();
+			for (int i=0; i< num; i++){
+				FileInputStream fis = new FileInputStream(filesToConcatinate.get(i));
+				inputStreams.add(fis);
+			}
+
+			Enumeration<InputStream> enu = inputStreams.elements();
+			SequenceInputStream sis = new SequenceInputStream(enu);
+
+			OutputStream bos = new FileOutputStream(destination);
+
+			byte[] buffer = new byte[8192];
+			int intsRead;
+			while ((intsRead = sis.read(buffer)) != -1) {
+				bos.write(buffer, 0, intsRead);
+			}
+			bos.close();
+			sis.close();
+	}
 
 	/**Returns the amount of memory being used.*/
 	public static String memoryUsed(){
