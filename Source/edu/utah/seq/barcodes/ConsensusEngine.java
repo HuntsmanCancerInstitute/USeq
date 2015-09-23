@@ -74,7 +74,7 @@ public class ConsensusEngine {
 	private String[] buildFastq(SAMRecord sam) {
 		String[] fastqRecord = new String[4];
 		//names
-		fastqRecord[0] = sam.getReadName();
+		fastqRecord[0] = "@"+sam.getReadName();
 		fastqRecord[2] = "+";
 		
 		String seq = new String(consensusSeq);
@@ -94,7 +94,7 @@ public class ConsensusEngine {
 	public static String[] exportFastq(SAMRecord sam) {
 		String[] fastq = new String[4];
 		//names
-		fastq[0] = sam.getReadName();
+		fastq[0] = "@"+sam.getReadName();
 		fastq[2] = "+";
 		
 		String seq = new String(sam.getReadString());

@@ -4,6 +4,7 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
 import edu.utah.seq.data.sam.SamAlignment;
 import edu.utah.seq.parsers.BarParser;
 import edu.utah.seq.useq.ArchiveInfo;
@@ -57,8 +58,8 @@ public class Sam2USeq {
 	private double numberPassingAlignmentsForScaling = 0;
 	private long numberAlignments = 0;
 	private int rowChunkSize = 10000;
-	private PrintWriter bedOutPass = null;
-	private PrintWriter bedOutFail = null;
+	private Gzipper bedOutPass = null;
+	private Gzipper bedOutFail = null;
 	private boolean verbose = true;
 	private File useqOutputFile;
 	private Gzipper perRegionsGzipper = null;
@@ -68,7 +69,7 @@ public class Sam2USeq {
 	//for json
 	private ArrayList<Double> fractionTargetBpsAL = new ArrayList<Double>();
 	private ArrayList<String> lowCoverageRegionsAL = new ArrayList<String>();
-	
+
 
 	/**For stand alone app.*/
 	public Sam2USeq(String[] args){
@@ -128,15 +129,15 @@ public class Sam2USeq {
 		makeCoverageTracks();
 
 		if (minimumCounts !=0) {
-			bedOutPass.close();
-			if (regions != null) bedOutFail.close();
+			bedOutPass.closeNoException();
+			if (regions != null) bedOutFail.closeNoException();
 		}
 
 		//finish read depth coverage stats
 		finishReadDepthStats();
 
 		if (perRegionsGzipper != null) perRegionsGzipper.closeNoException();
-		
+
 		if (jsonOutputFile != null) saveJson();
 
 	}
@@ -167,7 +168,7 @@ public class Sam2USeq {
 
 	public void splitSamBamFiles(){
 		SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
-		
+
 		for (File samFile: samFiles){
 			if (verbose) System.out.print("\t"+samFile.getName());
 
@@ -196,10 +197,10 @@ public class Sam2USeq {
 
 					//chromosome, converting to chr
 					String chromosome = sam.getReferenceName();
-					
+
 					/*Don't do this its causing issues with b37
 					if (chromosome.startsWith("chr") == false) chromosome = "chr"+chromosome;
-					*/
+					 */
 
 					//skip phiX and adapter
 					if (chromosome.startsWith(phiX) || chromosome.startsWith(adapter)) continue;
@@ -306,12 +307,10 @@ public class Sam2USeq {
 			e.printStackTrace();
 		}
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	private void saveJson() {
 		try {
-			//calc stats
-			Double meanOnTargetCoverage= histogram.getStandardDeviation().getMean();
 			//find max coverage just at or over 0.95
 			int coverageAt95 = 0;
 			for (int i=fractionTargetBpsAL.size()-1; i >=0; i--){
@@ -331,56 +330,56 @@ public class Sam2USeq {
 			gz.printJson("lowCoverageRegions", lowCoverageRegionsAL, false);
 			gz.println("}");
 			gz.close();
-			
+
 		} catch (Exception e){
 			e.printStackTrace();
 			Misc.printErrAndExit("\nProblem writing json file! "+jsonOutputFile);
 		}
 	}
-	
 
 
-/**
-*
-* @author Elad Tabak
-* @since 28-Nov-2011
-* @version 0.1
-*
-*/
+
+	/**
+	 *
+	 * @author Elad Tabak
+	 * @since 28-Nov-2011
+	 * @version 0.1
+	 *
+	 */
 	class JSonWriter extends StringWriter {
 
-	    private int indent = 0;
+		private int indent = 0;
 
-	    @Override
-	    public void write(int c) {
-	        if (((char)c) == '[' || ((char)c) == '{') {
-	            super.write(c);
-	            super.write('\n');
-	            indent++;
-	            writeIndentation();
-	        } else if (((char)c) == ',') {
-	            super.write(c);
-	            super.write('\n');
-	            writeIndentation();
-	        } else if (((char)c) == ']' || ((char)c) == '}') {
-	            super.write('\n');
-	            indent--;
-	            writeIndentation();
-	            super.write(c);
-	        } else {
-	            super.write(c);
-	        }
+		@Override
+		public void write(int c) {
+			if (((char)c) == '[' || ((char)c) == '{') {
+				super.write(c);
+				super.write('\n');
+				indent++;
+				writeIndentation();
+			} else if (((char)c) == ',') {
+				super.write(c);
+				super.write('\n');
+				writeIndentation();
+			} else if (((char)c) == ']' || ((char)c) == '}') {
+				super.write('\n');
+				indent--;
+				writeIndentation();
+				super.write(c);
+			} else {
+				super.write(c);
+			}
 
-	    }
+		}
 
-	    private void writeIndentation() {
-	        for (int i = 0; i < indent; i++) {
-	            super.write("   ");
-	        }
-	    }
+		private void writeIndentation() {
+			for (int i = 0; i < indent; i++) {
+				super.write("   ");
+			}
+		}
 	}
 
-	
+
 	public void checkCigar(String cigar, SamAlignment sam){
 		Matcher mat = supportedCigars.matcher(cigar);
 		if (mat.matches()) Misc.printErrAndExit("\nUnsupported cigar string in -> \n"+sam.toString());
@@ -509,7 +508,7 @@ public class Sam2USeq {
 							int start = r.getStart() - firstBase;
 							int stop = r.getStop() - firstBase;
 							float[] counts = new float[r.getLength()];
-							double num10 = 0;
+							double numPass = 0;
 							double num20 = 0;
 							int index = 0;
 							//before counted bases? past end? Add zeros to all bases
@@ -534,71 +533,67 @@ public class Sam2USeq {
 									baseCoverageHist.put(bc,baseCoverageHist.get(bc) + 1);
 									//baseCoverage.add((short)baseCounts[i]);
 									counts[index++] = baseCounts[i];
-									if (baseCounts[i] >= 20){
-										num10++;
-										num20++;
-									}
-									else if (baseCounts[i] >= 10) num10++;
+									if (baseCounts[i] >= minimumCounts) numPass++;
 								}
 							}
 							double total = (double) counts.length;
-							String fraction10 = Num.formatNumber(num10/total, 2);
-							String fraction20 = Num.formatNumber(num20/total, 2);
+							String fracPass = Num.formatNumber(numPass/total, 2);
 							Arrays.sort(counts);
 							perRegionsGzipper.println(chromData.chromosome+"\t"+chromData.strand+"\t"+r.getStart()+"\t"+r.getStop()+"\t"+
-									r.getText()+"\t"+fraction10+"\t"+fraction20+"\t"+Num.statFloatArrayWithSizeChecks(counts)); 
+									r.getText()+"\t"+fracPass+"\t"+Num.statFloatArrayWithSizeChecks(counts)); 
 						}
+					}
+				}
+
+				//write out bar point data?
+				if (barDirectory != null) saveBarPointData(firstBase, baseCounts);
+
+				//make ave read length graph?
+				if (makeAveReadLengthGraph){
+					//make averages
+					for (int i=0; i< baseCounts.length; i++) {
+						if (baseCounts[i] != 0 ) alignmnentLengths[i] = alignmnentLengths[i] / baseCounts[i];
+					}
+					//make PositionScore[]
+					positions = makeStairStepGraph(firstBase, alignmnentLengths, false);
+					//write data to disk
+					SliceInfo sliceInfo = new SliceInfo(chromData.chromosome, chromData.strand,0,0,0,null);
+					PositionScoreData psd = new PositionScoreData (positions, sliceInfo);
+					psd.sliceWritePositionScoreData(rowChunkSize, tempDirectory, files2Zip);
+
+				}
+				//do they want relative read coverage graphs and good block counts?
+				else if (makeRelativeTracks && minimumCounts !=0){
+					//first make positions without scaling
+					positions = makeStairStepGraph(firstBase, baseCounts, false);
+					//make blocks 
+					makeGoodBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
+					makeBadBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
+					//now make positions with scaling, this will alter the baseCounts
+					positions = makeStairStepGraph(firstBase, baseCounts, true);
+					//write data to disk
+					SliceInfo sliceInfo = new SliceInfo(chromData.chromosome, chromData.strand,0,0,0,null);
+					PositionScoreData psd = new PositionScoreData (positions, sliceInfo);
+					psd.sliceWritePositionScoreData(rowChunkSize, tempDirectory, files2Zip);
+				}
+
+				else {
+					//make PositionScore[]
+					positions = makeStairStepGraph(firstBase, baseCounts, makeRelativeTracks);
+
+					//write data to disk
+					SliceInfo sliceInfo = new SliceInfo(chromData.chromosome, chromData.strand,0,0,0,null);
+					PositionScoreData psd = new PositionScoreData (positions, sliceInfo);
+					psd.sliceWritePositionScoreData(rowChunkSize, tempDirectory, files2Zip);
+
+					if (minimumCounts !=0) {
+						makeGoodBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
+						makeBadBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
 					}
 				}
 			} catch (IOException e){
 				e.printStackTrace();
 				Misc.printErrAndExit("\nError writing data to gzipper for per region coverage stats.\n");
-			}
-			//write out bar point data?
-			if (barDirectory != null) saveBarPointData(firstBase, baseCounts);
-
-			//make ave read length graph?
-			if (makeAveReadLengthGraph){
-				//make averages
-				for (int i=0; i< baseCounts.length; i++) {
-					if (baseCounts[i] != 0 ) alignmnentLengths[i] = alignmnentLengths[i] / baseCounts[i];
-				}
-				//make PositionScore[]
-				positions = makeStairStepGraph(firstBase, alignmnentLengths, false);
-				//write data to disk
-				SliceInfo sliceInfo = new SliceInfo(chromData.chromosome, chromData.strand,0,0,0,null);
-				PositionScoreData psd = new PositionScoreData (positions, sliceInfo);
-				psd.sliceWritePositionScoreData(rowChunkSize, tempDirectory, files2Zip);
-
-			}
-			//do they want relative read coverage graphs and good block counts?
-			else if (makeRelativeTracks && minimumCounts !=0){
-				//first make positions without scaling
-				positions = makeStairStepGraph(firstBase, baseCounts, false);
-				//make blocks 
-				makeGoodBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
-				makeBadBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
-				//now make positions with scaling, this will alter the baseCounts
-				positions = makeStairStepGraph(firstBase, baseCounts, true);
-				//write data to disk
-				SliceInfo sliceInfo = new SliceInfo(chromData.chromosome, chromData.strand,0,0,0,null);
-				PositionScoreData psd = new PositionScoreData (positions, sliceInfo);
-				psd.sliceWritePositionScoreData(rowChunkSize, tempDirectory, files2Zip);
-			}
-
-			else {
-				//make PositionScore[]
-				positions = makeStairStepGraph(firstBase, baseCounts, makeRelativeTracks);
-
-				//write data to disk
-				SliceInfo sliceInfo = new SliceInfo(chromData.chromosome, chromData.strand,0,0,0,null);
-				PositionScoreData psd = new PositionScoreData (positions, sliceInfo);
-				psd.sliceWritePositionScoreData(rowChunkSize, tempDirectory, files2Zip);
-
-				if (minimumCounts !=0) {
-					makeGoodBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
-					makeBadBlocks(firstBase, baseCounts, chromData.chromosome, chromData.strand);
-				}
 			}
 
 			//delete file if this was generated by splitting sams
@@ -647,7 +642,7 @@ public class Sam2USeq {
 		hitTrack.writePointData(barDirectory);	
 	}
 
-	public void makeGoodBlocks(int firstBase, float[] baseCount, String chromosome, String strand){
+	public void makeGoodBlocks(int firstBase, float[] baseCount, String chromosome, String strand) throws IOException{
 		String nameScoreStrand = "\t.\t0\t"+strand;
 		boolean[] falseMask = new boolean[baseCount.length];
 		Arrays.fill(falseMask, true);
@@ -660,8 +655,8 @@ public class Sam2USeq {
 			if (length >= minimumLength) bedOutPass.println(chromosome+"\t"+(blocks[j][0]+ firstBase)+"\t"+(blocks[j][1]+ firstBase +1) + nameScoreStrand);
 		}
 	}
-	
-	public void makeBadBlocks(int firstBase, float[] baseCount, String chromosome, String strand){
+
+	public void makeBadBlocks(int firstBase, float[] baseCount, String chromosome, String strand) throws IOException{
 
 		//any targets?
 		RegionScoreText[] targets = regions.get(chromosome);
@@ -680,7 +675,7 @@ public class Sam2USeq {
 		}
 		//now turn bp with good coverage true
 		for (int i=0; i< baseCount.length; i++) if (baseCount[i] >= minimumCounts) falseMask[i] = true;
-		
+
 		//now fetch those false blocks
 		int[][] blocks = ExportIntergenicRegions.fetchFalseBlocks(falseMask, 0, 0);
 		for (int j=0; j< blocks.length; j++){
@@ -870,7 +865,7 @@ public class Sam2USeq {
 		//stranded and regionFile?
 		if (regionFile !=null){
 			regions = Bed.parseBedFile(regionFile, stranded == false, false);
-			
+
 			/*Don't do this, it breaks b37 stuff!
 			 * HashMap<String,RegionScoreText[]> tempRegions = Bed.parseBedFile(regionFile, stranded == false, false);
 			regions = new HashMap<String,RegionScoreText[]>();
@@ -882,7 +877,7 @@ public class Sam2USeq {
 					regions.put(chrom,tempRegions.get(chrom));
 				}
 			}*/
-			
+
 			histogram = new Histogram(0, maximumCoverageCalculated, (int)maximumCoverageCalculated);
 			//watch out for stranded analysis
 			if (stranded) {
@@ -897,10 +892,10 @@ public class Sam2USeq {
 			}
 			try {
 				perRegionsGzipper = new Gzipper(perRegionCoverageStats);
-				perRegionsGzipper.println("Chr\tStrand\tStart\tStop\tInfo\tFracBPs>=10\tFracBPs>=20\tMean\tMedian\tStdDev\tMin\tMax\t10th\t90th");
+				perRegionsGzipper.println("Chr\tStrand\tStart\tStop\tInfo\tFracBPs>="+minimumCounts+"\tMean\tMedian\tStdDev\tMin\tMax\t10th\t90th");
 			} catch (Exception e) {
 				e.printStackTrace();
-				Misc.printErrAndExit("Failed instantiating a gziper for saving the individual read coverage stats.");
+				Misc.printErrAndExit("Failed instantiating a gzipper for saving the individual read coverage stats.");
 			} 
 
 		}
@@ -914,14 +909,14 @@ public class Sam2USeq {
 			name = name+minimumCounts+"C"+minimumLength+"L";
 			File bed = new File (forExtraction.getParentFile(), name);
 			try {
-				bedOutPass = new PrintWriter (new FileWriter (bed+"_Pass.bed"));
-				if (regions != null) bedOutFail = new PrintWriter (new FileWriter (bed+"_Fail.bed"));
+				bedOutPass = new Gzipper (new File (bed+"_Pass.bed.gz"));
+				if (regions != null) bedOutFail = new Gzipper (new File (bed+"_Fail.bed.gz"));
 			} catch (IOException e) {
 				e.printStackTrace();
 				Misc.printErrAndExit("\nProblem making PrintWriter!\n");
 			}
 		}
-		
+
 		if (jsonOutputFile != null){
 			if (regions == null || minimumCounts == 0) Misc.printErrAndExit("\nJson output requires regions to examine (-b) and a minimum count (-c)\n");
 		}
@@ -960,10 +955,10 @@ public class Sam2USeq {
 			File dataFile = new File (chromDataFile.getParentFile(), cd[i].binaryFile.getName());
 			if (dataFile.exists() == false) Misc.printErrAndExit("Error: cannot find the binary data file for ChromData "+dataFile);
 			//if (dataFile.exists()){
-				cd[i].binaryFile = dataFile;
-				chromDataHash.put(cd[i].chromosome+".", cd[i]);
+			cd[i].binaryFile = dataFile;
+			chromDataHash.put(cd[i].chromosome+".", cd[i]);
 			//}
-			
+
 		}
 
 		//load counts
@@ -971,7 +966,7 @@ public class Sam2USeq {
 		if (countsFile.exists() == false) Misc.printErrAndExit("Error: cannot find the binary count.obj file "+countsFile);
 		Long count = (Long) IO.fetchObject(countsFile);
 		numberPassingAlignmentsForScaling = count.longValue();
-		
+
 		//set scalar
 		scalar = (float)(((double)numberPassingAlignmentsForScaling)/ 1000000.0);
 	}
@@ -1028,13 +1023,10 @@ public class Sam2USeq {
 			totalPositions += i;
 		}
 		int midPosition = totalPositions / 2; 
-
 		ArrayList<Long> keySet = new ArrayList<Long>();
 		keySet.addAll(this.baseCoverageHist.keySet());
 		Collections.sort(keySet);
-
 		double median = 0;
-
 		if (totalPositions % 2 == 1) {
 			long count = 0;
 			for (Long key: keySet) {
@@ -1061,13 +1053,11 @@ public class Sam2USeq {
 					e2 = key;
 					e2found = true;
 				}
-
 				if (e1found && e2found) {
 					break;
 				}
 				count += elements;
 			}
-
 			median = (e1 + e2) / 2.0;
 		}
 		return median;
@@ -1077,7 +1067,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam 2 USeq : July 2015                            **\n" +
+				"**                                Sam 2 USeq : Aug 2015                             **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
@@ -1107,7 +1097,7 @@ public class Sam2USeq {
 				"-x Maximum read coverage stats calculated, defaults to 100, for use with -b.\n"+
 				"-p Path to a file for saving per region coverage stats. Defaults to variant of -b.\n"+
 				"-c Print regions that meet a minimum # counts, defaults to 0, don't print. If -b is\n"+
-				       "provided, a bed file of regions failing the minimum count is also created.\n"+
+				"      provided, a bed file of regions failing the minimum count is also created.\n"+
 				"-l Print regions that also meet a minimum length, defaults to 0.\n"+
 				"-o Path to log file.  Write coverage statistics to a log file instead of stdout.\n" +
 				"-k Make average alignment length graph instead of read depth.\n"+
