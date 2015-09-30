@@ -160,7 +160,7 @@ public class MpileupParser {
 			if (total < minimumReadCoverage) continue;
 			float fraction = nonRefCount[i]/ total;
 			if (fraction !=0) nonRefFreqHistogram.count(fraction);
-			if (fraction >= maxError) failingBasesBed.println(chr+"\t"+pos[i]+"\t"+(pos[i]+1)+"\t"+fraction+"\t.");
+			if (fraction >= maxError) failingBasesBed.println(chr+"\t"+pos[i]+"\t"+(pos[i]+1)+"\t"+(int)nonRefCount[i]+"/"+(int)total+"\t"+fraction+"\t.");
 			pts.add(new Point(pos[i], fraction));
 		}
 		
@@ -282,7 +282,7 @@ public class MpileupParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              MpileUp Parser: July 2015                           **\n" +
+				"**                              MpileUp Parser: Sept 2015                           **\n" +
 				"**************************************************************************************\n" +
 				"Parses a SAMTools mpileup output file for non reference bases generating bed files and\n" +
 				"data tracks with information related to error prone bases. Multiple samples are merged.\n\n"+
