@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 8.9.3.beta
+			<html><head><title>USeq Command Line Menus 8.9.6
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -33,6 +33,10 @@
 				
 					<a href="#BamSurgeonMutator">BamSurgeonMutator</a><br>
 				
+					<a href="#BamBlaster">BamBlaster</a><br>
+				
+					<a href="#BamMixer">BamMixer</a><br>
+				
 					<a href="#Bar2Gr">Bar2Gr</a><br>
 				
 					<a href="#Bar2USeq">Bar2USeq</a><br>
@@ -57,8 +61,6 @@
 				
 					<a href="#CalculatePerCycleErrorRate">CalculatePerCycleErrorRate</a><br>
 				
-					<a href="#CalculatePerCyclePerNucleotideErrorRate">CalculatePerCyclePerNucleotideErrorRate</a><br>
-				
 					<a href="#ChIPSeq">ChIPSeq</a><br>
 				
 					<a href="#CHPCAligner">CHPCAligner</a><br>
@@ -78,6 +80,8 @@
 					<a href="#CountChromosomes">CountChromosomes</a><br>
 				
 					<a href="#BisulfiteConvertFastas">BisulfiteConvertFastas</a><br>
+				
+					<a href="#Consensus">Consensus</a><br>
 				
 					<a href="#CorrelationMaps">CorrelationMaps</a><br>
 				
@@ -114,6 +118,8 @@
 					<a href="#ExportIntronicRegions">ExportIntronicRegions</a><br>
 				
 					<a href="#ExportTrimmedGenes">ExportTrimmedGenes</a><br>
+				
+					<a href="#FastqBarcodeTagger">FastqBarcodeTagger</a><br>
 				
 					<a href="#FetchGenomicSequences">FetchGenomicSequences</a><br>
 				
@@ -163,6 +169,8 @@
 				
 					<a href="#MaskRegionsInFastaFiles">MaskRegionsInFastaFiles</a><br>
 				
+					<a href="#MatchMates">MatchMates</a><br>
+				
 					<a href="#MaxEntScanScore3">MaxEntScanScore3</a><br>
 				
 					<a href="#MaxEntScanScore5">MaxEntScanScore5</a><br>
@@ -188,6 +196,8 @@
 					<a href="#MicrosatelliteCounter">MicrosatelliteCounter</a><br>
 				
 					<a href="#MiRNACorrelator">MiRNACorrelator</a><br>
+				
+					<a href="#MpileupParser">MpileupParser</a><br>
 				
 					<a href="#MultipleReplicaScanSeqs">MultipleReplicaScanSeqs</a><br>
 				
@@ -305,11 +315,15 @@
 				
 					<a href="#VarScanVCFParser">VarScanVCFParser</a><br>
 				
+					<a href="#VCF2Bed">VCF2Bed</a><br>
+				
 					<a href="#VCFAnnotator">VCFAnnotator</a><br>
 				
 					<a href="#VCFComparator">VCFComparator</a><br>
 				
 					<a href="#VCFMerger">VCFMerger</a><br>
+				
+					<a href="#VCFVariantMaker">VCFVariantMaker</a><br>
 				
 					<a href="#VCFNoCallFilter">VCFNoCallFilter</a><br>
 				
@@ -596,7 +610,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/BamIntensityParser -f /Data/BamFil
 </pre><br><p>
 				
 					<a name="BamSurgeonMutator"><pre>**************************************************************************************
-**                             BamSurgeon Mutator  : Oct 2014                       **
+**                             BamSurgeon Mutator  : June 2015                      **
 **************************************************************************************
 Generates bed files of random SNVs and INDELs for BamSurgeon. Only one variant is made
 per input region.
@@ -612,6 +626,52 @@ Optional:
 -a Allelic ratio, defaults to 0.5. Set to zero for random from 0.1 - 1
 
 Example: java -Xmx10G -jar pathTo/USeq/Apps/RandomMutationGenerator 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="BamBlaster"><pre>**************************************************************************************
+**                               Bam Blaster : June 2014                            **
+**************************************************************************************
+Injects SNVs and INDELs from a vcf file into bam alignments. These and their mates are
+extracted as fastq for realignment. For SNVs, only alignment bases that match the
+reference and have a CIGAR of M are modified. Not all alignments can be modified.
+Secondary/supplemental are skipped. Only one variant per alignment. Variants within a
+read length distance of prior are ignored and saved to file for iterative processing.
+Be sure to normalize and decompose your vcf file (e.g.https://github.com/atks/vt).
+Use the BamMixer to add proportions of your realignments (e.g. 10%) with the
+unmodified.bams (e.g. 90%). Use the VCFVariantMaker to generate random vcf variants.
+
+Required:
+-b Path to a coordinate sorted bam file with index.
+-v Path to a trimmed, normalized, decomposed vcf variant file, zip/gz OK.
+-r Full path to a directory to save the results.
+Example: java -Xmx10G -jar pathTo/USeq/Apps/BamBlaster -b ~/BMData/na12878.bam
+    -r ~/BMData/BB1 -v ~/BMData/clinvar.pathogenic.SnvIndel.vcf.gz 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="BamMixer"><pre>**************************************************************************************
+**                               Bam Mixer : June 2014                              **
+**************************************************************************************
+Combines bam alignment files in different fractions to simulate multiple variant
+frequencies. Run BamBlaster first.
+
+Required:
+-r Path to a directory to save the results
+-u Path to the xxx_unmodified.bam from your BamBlaster run
+-f Path to the xxx_filtered.bam from your BamBlaster run
+-p Path to your realigned paired end bam
+-s Path to your realigned single end bam
+
+Optional:
+-m Fractions to mix in the variant alignments, comma delimited, no spaces, defaults to
+     0.025,0.05,0.1,0.2
+-v Verbose output.
+
+Example: java -Xmx10G -jar pathTo/USeq/Apps/BamMixer -r ~/TumorSim/
+    -u ~/bb_unmodified.bam -f ~/bb_filtered.bam -p ~/bb_paired.bam -s ~/bb_single.bam 
 
 **************************************************************************************
 </pre><br><p>
@@ -900,29 +960,30 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/BisStatRegionMaker -m 0.8 -x 1.0 -g 1
 </pre><br><p>
 				
 					<a name="CalculatePerCycleErrorRate"><pre>**************************************************************************************
-**                        Calculate Per Cycle Error Rate : March 2015                **
+**                        Calculate Per Cycle Error Rate : July 2015                **
 **************************************************************************************
-Calculates per cycle error rates provided a sorted indexed bam file and a fasta
+Calculates per cycle snv error rate provided a sorted indexed bam file and a fasta
 sequence file. Only checks CIGAR M bases not masked or INDEL bases.
 
 Required Options:
 -b Full path to a coordinate sorted bam file (xxx.bam) with its associated (xxx.bai)
       index or directory containing such. Multiple files are processed independently.
 -f Full path to the single fasta file you wish to use in calculating the error rate.
+
+Default Options:
 -s Perform separate first read second read analysis, defaults to merging.
 -c Maximum fraction failing cycles, defaults to 0.1
 -1 Maximum first read or merged read error rate, defaults to 0.01
 -2 Maximum second read error rate, defaults to 0.0175
--n Require read names to begin with indicated text, defaults to accepting everything.
--o Path to log file.  Write coverage statistics to a log file instead of stdout.
+-o Write coverage statistics to this log file instead of stdout.
+-j Write summary stats in json format to this file. Only stats for the first bam file
+      are saved. Only separate strand analysis permitted.
 
-Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate -b /Data/Bam/
-     -f /Fastas/chrPhiX_Illumina.fasta.gz -n HWI
+Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate
+     -b /Data/Bam/ -f /Fastas/chrPhiX_Illumina.fasta.gz 
 
 **************************************************************************************
 </pre><br><p>
-				
-					<a name="CalculatePerCyclePerNucleotideErrorRate"><pre></pre><br><p>
 				
 					<a name="ChIPSeq"><pre>**************************************************************************************
 **                                   ChIPSeq: May 2014                              **
@@ -1162,6 +1223,37 @@ Required Parameters:
 -f Full path text for the xxx.fasta file or directory containing such.
 
 Example: java -Xmx2000M -jar pathTo/Apps/BisulfiteConvertFastas -f /affy/Fastas/
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="Consensus"><pre>**************************************************************************************
+**                                  Consensus : Sept 2015                           **
+**************************************************************************************
+Consensus clusters alignments sharing the same unclipped start position and molecular
+barcode. It then calls consensus on the clustered alignments outputing fastq for
+realignment and unmodified bam records. After running, align the fastq files and merge
+the new bams with those in the save directory. 
+
+ Required arguments:
+-b Path to the mate matched bam file created by FastqBarcodeTagger | cutadapt | bwa |
+     MatchMates.  See FBT and MM for details. 
+
+Optional Arguments:
+-s Path to a directory to save the results, defaults to a derivative of the
+     bam file.
+-t Number concurrent threads to run, defaults to the max available to the jvm / 2.
+-c Number of alignments to process in one chunk, defaults to 1,000,000. Adjust for the
+     availible RAM.
+-x Maximum number of alignments to cluster before subsampling, defaults to 10000.
+-q Minimum barcode base quality, defaults to 13, anything less is assigned an N.
+-n Minimum number of non N barcode bases, defaults to 6, anything less is tossed.
+-f Minimum fraction barcode identity for inclusion in a cluster, defaults to 0.75 .
+-u Minimum read base quality for inclusion in consensus calling, defaults to 13.
+-r Minimum read base fraction identity to call a consensus base, defaults to 0.66 .
+     Anything less is assigned an N.
+
+Example: java -Xmx100G -jar pathTo/USeq/Apps/Consensus -b MM/passingMM.sorted.bam 
 
 **************************************************************************************
 </pre><br><p>
@@ -1650,6 +1742,25 @@ Parameters:
 
 Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportTrimmedGenes -u -g 
       /user/Jib/ucscPombe.txt
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="FastqBarcodeTagger"><pre>**************************************************************************************
+**                           Fastq Barcode Tagger: Aug 2015                         **
+**************************************************************************************
+Takes three fastq files (paired end reads and a third containing barcodes), appends
+the barcode and quality to the fastq header, and writes out the modified records. 
+
+Options:
+-f First fastq file, .gz/.zip OK.
+-s Second fastq file, .gz/.zip OK.
+-b Barcode fastq file, .gz/.zip OK.
+-i (Optional) Write interlaced fastq to stdout for direct piping to other apps
+-r (Optional) Directory to save the modified fastqs, defaults to the parent of -f
+
+Example: java -Xmx1G -jar pathToUSeq/Apps/FastqBarcodeTagger -f lob_1.fastq.gz
+     -s lob_2.fastq.gz -b lob_barcode.fastq.gz -i | bwa mem -p /ref/hg19.fa 
+
 **************************************************************************************
 </pre><br><p>
 				
@@ -2172,6 +2283,23 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MaskRegionsInFastaFiles -f
 ************************************************************************************
 </pre><br><p>
 				
+					<a name="MatchMates"><pre>**************************************************************************************
+**                                 MatchMates: Sept 2015                            **
+**************************************************************************************
+This app attaches mates of aligned first of pair reads to the attributes and modifies
+the start position to enable sorting by unclipped start. Call Consensus to cluster and
+collapse alignments with related molecular barcodes.
+
+Options:
+-s (Required) Provide a directory path for saving the modified alignments.
+-b Path to a query name sorted bam/sam alignment file, defaults to reading from STDIN. 
+-j Write summary stats in json format to this file, defaults to save directory.
+
+Example: myAligner | java -Xmx2G -jar pathTo/USeq/Apps/MatchMates -s ReadyForConsensus
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="MaxEntScanScore3"><pre>**************************************************************************************
 **                               MaxEntScanScore3: Nov 2013                         **
 **************************************************************************************
@@ -2240,7 +2368,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MergeOverlappingGenes -d
 </pre><br><p>
 				
 					<a name="MergePairedAlignments"><pre>**************************************************************************************
-**                            Merge Paired Alignments: Dec 2014                     **
+**                            Merge Paired Alignments: July 2015                    **
 **************************************************************************************
 Merges proper paired alignments that pass a variety of checks and thresholds. Only
 unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps
@@ -2256,16 +2384,17 @@ Default Options:
 -s Save merged xxx.sam.gz alignments instead of binary ChromData. Either can be used
       in Sam2USeq for read coverage analysis, the ChromData is much faster.
 -u Remove all alignments marked as duplicates, defaults to keeping.
--a Maximum alignment score (AS:i: tag). Defaults to 240, smaller numbers are more
-      stringent. Approx 30pts per mismatch for novoalignments.
--q Minimum mapping quality score, defaults to 13, larger numbers are more stringent.
-      Set to 0 if processing splice junction indexed RNASeq data.
+-a Maximum alignment score (AS:i: tag). Defaults to 300, smaller numbers are more
+      stringent for novoalign where each mismatch is ~30pts.
+-q Minimum mapping quality score, defaults to 0, larger numbers are more stringent.
 -r The second paired alignment's strand has been reversed. Defaults to not reversed.
 -i Maximum acceptible base pair distance for merging, defaults to 5000.
 -m Don't cross check read mate coordinates, needed for merging repeat matches. Defaults
       to checking.
--p Don't print paired alignment statistics and insert size histogram.
+-o Merge all proper paired alignments. Defaults to only merging those that overlap.
+-p Don't print detailed paired alignment statistics and insert size histogram.
 -t Number concurrent threads to run, defaults to the max available to the jvm.
+-j Write summary stats in json format to this file.
 
 Example: java -Xmx20G -jar pathToUSeq/Apps/MergePairedBamAlignments -f /Bams/ms.bam
      -p -s /Bams/MergedPairs/ms.mergedPairs.sam.gz -d 10000 
@@ -2309,7 +2438,7 @@ Example: java -Xmx4000M -jar pathTo/Apps/MergeRegions -d /Anno/TilingDesign/
 </pre><br><p>
 				
 					<a name="MergeSams"><pre>**************************************************************************************
-**                                 Merge Sams: Oct 2014                             **
+**                                 Merge Sams: June 2015                            **
 **************************************************************************************
 Merges sam and bam files. Adds a stripped header if one is not provided. This most
 likely will not play nicely with GATK or Picard downstream apps, good for USeq.
@@ -2319,7 +2448,7 @@ Options:
 
 Default Options:
 -s Save file, must end in xxx.bam, defaults merge.bam in -d.
--a Maximum alignment score. Defaults to 240, smaller numbers are more stringent.
+-a Maximum alignment score. Defaults to 300, smaller numbers are more stringent.
       Approx 30pts per mismatch.
 -m Minimum mapping quality score, defaults to 0 (no filtering), larger numbers are
       more stringent. Set to 13 or more to require near unique alignments. DO NOT set
@@ -2328,6 +2457,7 @@ Default Options:
 -h Full path to a txt file containing a sam header, defaults to autogenerating the
       header from the sam/bam headers.
 -t Don't delete temp xxx.sam.gz file.
+-q Quiet, print only errors.
 
 Example: java -Xmx1500M -jar pathToUSeq/Apps/MergeSams -f /Novo/Run7/
      -m 20 -a 120  
@@ -2471,6 +2601,28 @@ allMiRNANamesNoPs.txt -t targetGene2MiRNA.txt -e geneExp_CLvsMOR.txt -r results.
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="MpileupParser"><pre>**************************************************************************************
+**                              MpileUp Parser: Sept 2015                           **
+**************************************************************************************
+Parses a SAMTools mpileup output file for non reference bases generating bed files and
+data tracks with information related to error prone bases. Multiple samples are merged.
+
+Options:
+-p Path to a mpileup file (.gz or.zip OK, use 'samtools mpileup -Q 20 -A -B *bam').
+-v Versioned Genome (ie H_sapiens_Mar_2006), see UCSC Browser,
+      http://genome.ucsc.edu/FAQ/FAQreleases.
+-s Save directory, full path, defaults to pileup file directory.
+-r Minimum read coverage, defaults to 15.
+-e Max nonRef base fraction, defaults to 0.05
+-w Window size, defaults to 50
+-f Max fraction failing bp in window, defaults to 0.05
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/MpileupParser -p /Pileups/N2.mpileup.gz -v
+      H_sapiens_Feb_2009 -e 0.1 -w 25
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="MultipleReplicaScanSeqs"><pre>**************************************************************************************
 **                        Multiple Replica Scan Seqs: May 2014                      **
 **************************************************************************************
@@ -2513,7 +2665,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MultipleReplicaScanSeqs -t
 </pre><br><p>
 				
 					<a name="MultiSampleVCFFilter"><pre>**************************************************************************************
-**                            Multi Sample VCF Filter  : Nov 2014                   **
+**                            Multi Sample VCF Filter  : July 2015                  **
 **************************************************************************************
 Filters a vcf file containing multiple sample records into those that pass or fail the
 tests below. This works with VCFv4.1 files created by the GATK package. Note, the 
@@ -3295,16 +3447,16 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/Sam2Fastq -a /SAM/unaligned.sam.gz -f
 </pre><br><p>
 				
 					<a name="Sam2USeq"><pre>**************************************************************************************
-**                                Sam 2 USeq : June 2015                            **
+**                                Sam 2 USeq : Aug 2015                             **
 **************************************************************************************
 Generates per base read depth stair-step graph files for genome browser visualization.
 By default, values are scaled per million mapped reads with no score thresholding. Can
-also generate a list of regions that pass a minimum coverage depth.
+also generate a list of regions that pass and fail a minimum coverage depth.
 
 Required Options:
 -f Full path to a bam or a sam file (xxx.sam(.gz/.zip OK) or xxx.bam) or directory
       containing such. Multiple files are merged. Also works with a directory of
-      ChromData from MergePairedAlignments.
+      ChromData from MergePairedAlignments (faster and no overlap double counting).
 -v Versioned Genome (ie H_sapiens_Mar_2006, D_rerio_Jul_2010), see UCSC Browser,
       http://genome.ucsc.edu/FAQ/FAQreleases.
 
@@ -3324,11 +3476,13 @@ Default Options:
       if in doubt.
 -x Maximum read coverage stats calculated, defaults to 100, for use with -b.
 -p Path to a file for saving per region coverage stats. Defaults to variant of -b.
--c Print regions that meet a minimum # counts, defaults to 0, don't print.
+-c Print regions that meet a minimum # counts, defaults to 0, don't print. If -b is
+      provided, a bed file of regions failing the minimum count is also created.
 -l Print regions that also meet a minimum length, defaults to 0.
 -o Path to log file.  Write coverage statistics to a log file instead of stdout.
 -k Make average alignment length graph instead of read depth.
 -d Full path to a directory for saving bar binary PointData, defaults to not saving.
+-j Write summary stats in json format to this file, requires -b and -c.
 
 Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r
      -v H_sapiens_Feb_2009 -b ccdsExons.bed.gz 
@@ -3337,25 +3491,26 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r
 </pre><br><p>
 				
 					<a name="SamAlignmentExtractor"><pre>**************************************************************************************
-**                            Sam Alignment Extractor: Feb 2015                     **
+**                            Sam Alignment Extractor: July 2015                    **
 **************************************************************************************
-Given a bed file containing regions of interest, parses all of the intersecting sam
-alignments.
+Splits an alignment file into those that pass or fail thresholds and intersects
+regions of interest. Calculates a variety of QC statistics.
 
-Options:
--a Alignment directory containing one or more xxx.bam files with their associated
-       xxx.bai indexs sorted by coordinate. Multiple files are merged.
--b A bed file (chr, start, stop,...), full path, see,
-       http://genome.ucsc.edu/FAQ/FAQformat#format1
--s Optional file for saving extracted alignments, must end in .sam.gz Defaults to a
-       permutation of the bed file.
--p Print coverage stats to stdout.
--i Minimum read depth, defaults to 1
--x Maximum read depth, defaults to unlimited
--n Save alignments that don't intersect the regions of interest. Memory intensive!
+Required Options:
+-b Bam alignment file with its associated xxx.bai index, sorted by coordinate. 
+-r A regions bed file (chr, start, stop,...) to intersect, full path, see,
+       http://genome.ucsc.edu/FAQ/FAQformat#format1 , gz/zip OK.
+-s Provide a directory path for saving the filtered alignments
 
-Example: java -Xmx4G -jar pathTo/USeq/Apps/SamAlignmentExtractor -a
-      /Data/ExonCaptureAlignmentsX1/ -b /Data/SNPCalls/9484X1Calls.bed.gz
+Default Options:
+-q Miminum mapping quality, defaults to no filtering, recommend 13.
+-a Alignment score threshold, defaults to no filtering. 
+-n Smaller alignment scores are better (novo), defaults to bigger are better (bwa).
+-d Divide alignment score by the number of CIGAR M bases.
+-j Write summary stats in json format to this file.
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/SamAlignmentExtractor -q 20 -a 0.75 -d -b
+      /Data/raw.bwaMem.bam -r /Data/targetsPad25bp.bed.gz -s/Data/SAE/ 
 
 **************************************************************************************
 </pre><br><p>
@@ -3480,9 +3635,10 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/SamParser -f /Novo/Run7/
 </pre><br><p>
 				
 					<a name="SamSplitter"><pre>**************************************************************************************
-**                                SamSplitter: Oct 2014                             **
+**                                SamSplitter: July 2015                            **
 **************************************************************************************
-Randomly splits a sam or bam file in ~1/2. To maintain pairs, sort by queryname.
+Randomly splits a sam or bam file in ~1/2. To maintain pairs, sort by queryname! Can
+also split by paired and unpaired.
 
 Options:
 -s The full path to a queryname sorted xxx.bam or xxx.sam (.gz OK) file.
@@ -3493,6 +3649,9 @@ Default Options:
 -m Minimum mapping quality score, defaults to 0 (no filtering), larger numbers are
       more stringent. Set to 13 or more to require near unique alignments. DO NOT set
       for alignments parsed by the SamTranscriptomeParser!
+-b Bypass all filters and thresholds.
+-p Split into paired alignments and unpaired alignments.
+-d Don't add PG line to sam header.
 
 Example: java -Xmx1500M -jar pathToUSeq/Apps/SamSplitter -f /Novo/Run7/exome.bam
      -m 20 -a 120  
@@ -3527,10 +3686,10 @@ Example: java -Xmx25G -jar pathToUSeq/Apps/SamReadDepthSubSampler -x 240 -q 20 -
 **                               Sam SV Filter: March 2014                          **
 **************************************************************************************
 Filters SAM records based on their intersection with a list of target regions for
-structural variation analysis. Paired alignments are kept if they align to at least
-one target region. These are split into those that align to different targets (span),
-the same target with sufficient softmasking (soft), or one target and somewhere else
-(single).
+structural variation analysis. Both mates of a paired alignment are kept if they align to
+at least one target region. These are split into those that align to different targets,
+(span) the same target with sufficient softmasking on either the left or right side of the
+mate pair (soft), or to one target and somewhere else outside of the bed file (single).
 
 Options:
 -a Alignment file or directory containing NAME sorted SAM/BAM files. Multiple files
@@ -3546,8 +3705,8 @@ Default Options:
 -q Minimum mapping quality score. Defaults to 5, bigger numbers are more stringent.
 -c Chromosomes to skip, defaults to 'chrAdap,chrPhi,chrM,random,chrUn'. Any SAM
        record chromosome name that contains one will be failed.
--m Minimum soft masked bases for keeping paired alignments intersecting the same
-       target, defaults to 10
+-m Minimum number of soft masked bases needed to keep paired alignments. Both must intersect
+       a target region in the bed file, defaults to 10
 
 Example: java -Xmx25G -jar pathTo/USeq_xxx/Apps/SamSVFilter -x 150 -q 13 -a
       /Novo/Run7/ -s /Novo/Run7/SSVF/ -c 'chrPhi,_random,chrUn_' 
@@ -3556,7 +3715,7 @@ Example: java -Xmx25G -jar pathTo/USeq_xxx/Apps/SamSVFilter -x 150 -q 13 -a
 </pre><br><p>
 				
 					<a name="SamSubsampler"><pre>**************************************************************************************
-**                              SamSubsampler: July 2013                            **
+**                              SamSubsampler: June 2015                            **
 **************************************************************************************
 Filters, randomizes, subsamples and sorts sam/bam alignment files.
 
@@ -3571,6 +3730,7 @@ Default Options:
 -x Maximum alignment score. Defaults to 300, smaller numbers are more stringent.
 -q Minimum mapping quality score. Defaults to 13, bigger numbers are more stringent.
       For RNASeq data, set this to 0.
+-b Bypass all filters and thresholds.
 
 Example: java -Xmx25G -jar pathToUSeq/Apps/SamSubsampler -x 240 -q 20 -a
       /Novo/Run7/ -s /Novo/Run7/SR -n 10000000 
@@ -3579,7 +3739,7 @@ Example: java -Xmx25G -jar pathToUSeq/Apps/SamSubsampler -x 240 -q 20 -a
 </pre><br><p>
 				
 					<a name="ScanSeqs"><pre>**************************************************************************************
-**                                  Scan Seqs: Feb 2012                             **
+**                                  Scan Seqs: July 2015                            **
 **************************************************************************************
 Takes unshifted stranded chromosome specific PointData and uses a sliding window to
 calculate several smoothed window statistics. These include a binomial p-value, a
@@ -3930,7 +4090,7 @@ Optional Parameters:
       3	Line
 -h Color, hexadecimal (e.g. #6633FF), enclose in quotations
 -d Description, enclose in quotations 
--p Prepend chr onto chromosome name.
+-p Prepend chr onto chromosome name. Required for UCSC bb or bw formats.
 -l Minus 10 Log10 transform values. Requires setting -v .
 -m Convert chromosome names containing M to chrM .
 -o Subtract one from beginning position.
@@ -4137,6 +4297,21 @@ Example: java -jar pathToUSeq/Apps/VarScanVCFParser -v /VarScan2/VCFFiles/
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="VCF2Bed"><pre>**************************************************************************************
+**                                  VCF 2 Bed: July 2015                            **
+**************************************************************************************
+Converts a vcf file to bed format.
+
+Required Options:
+-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
+-p Padding to expand each variants size, defaults to 0
+-s Directory to save the bed files, defaults to the parent of the vcf
+
+Example: java -jar pathToUSeq/Apps/VCF2Bed -v /VCFFiles/ -p 25 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="VCFAnnotator"><pre>**************************************************************************************
 **                              VCF Annotator : November 2014                       **
 **************************************************************************************
@@ -4227,7 +4402,7 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFComparator -a /NIST/NA12878/key.v
 </pre><br><p>
 				
 					<a name="VCFMerger"><pre>**************************************************************************************
-**                              VCF Merger : March 2015                             **
+**                              VCF Merger : July 2015                              **
 **************************************************************************************
 Merges VCF files with the same samples. Collapses the headers with a simple hash. Will
 not work well with downstream apps that cannot process mixed INFO and FORMAT records.
@@ -4237,9 +4412,33 @@ Required:
        Java often fails to parse tabix compressed vcf files.  Best to uncompress.
 
 Optional:
--o Full path to an output vcf file, defaults to merged.vcf.gz
+-o Full path to an output vcf file, defaults to merged.vcf.gz in parent -v dir.
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFMerger -v /CancerSamples/
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCFVariantMaker"><pre>**************************************************************************************
+**                           Vcf Mutant Maker  : June 2015                          **
+**************************************************************************************
+Generates a VCF file of random SNVs and INDELs for BamBlaster. Only one variant is
+made per input region. Be sure to left align this vcf file before using, see
+https://github.com/atks/vt .
+
+Required:
+-b Full path bed file containing regions in which to create mutations.
+-f Path to a directory of chrom specific reference fasta files (gzip/zip OK, 
+      e.g. 1.fa.gz, 2.fa.gz, X.fa.gz...)
+
+Optional:
+-s Number of SNVs to make, defaults to 1/2 the number of regions.
+-i Number of INDELs to make, ditto.
+-m Max indel size, defaults to 10.
+-v VCF results file, defaults to a permutation of the bed file.
+
+Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFMutantMaker -b ~/Sim/highCov.bed 
+     -f ~/Sim/human_g1k_v37.fasta.gz -m 12 -v ~/Sim/unNormalizedVMM.vcf
 
 **************************************************************************************
 </pre><br><p>
