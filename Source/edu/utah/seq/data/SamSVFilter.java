@@ -22,7 +22,7 @@ import edu.utah.seq.useq.data.IntersectingRegions;
 import edu.utah.seq.useq.data.Region;
 
 /**
- * @author david.nix@hci.utah.edu 
+ * @author david.nix@hci.utah.edu/elainegee 
  **/
 public class SamSVFilter{
 	//user defined fields
@@ -164,7 +164,7 @@ public class SamSVFilter{
 			SAMFileHeader sfh = reader.getFileHeader();
 			SortOrder so = sfh.getSortOrder();
 			if (so.equals(SortOrder.coordinate)) {
-				System.err.println("\n\tSAM file appears to be sorted by coordinate.");
+				System.err.println("\n\tSAM file appears to be sorted by coordinate. Analysis requires file to be sorted by name.");
 				reader.close();
 				return false;
 			}
@@ -236,9 +236,9 @@ public class SamSVFilter{
 					continue;
 				}
 				
-				//is it an old alignment?
+				//process if the current SAM record is a new alignment pair as now both pairs are loaded into samAL
 				if (name.equals(sa.getName()) == false){
-					processBlock(samAL);
+					processBlock(samAL); 
 					name = sa.getName();
 					samAL.clear();
 				}
@@ -288,7 +288,7 @@ public class SamSVFilter{
 			else if (regionOne != null && regionTwo != null) {
 				//same region? check if pass soft masking
 				if (regionOne.equals(regionTwo)) {
-					if (failsSoftMasking (one, two)) {
+					if (failsMinSoftMasking (one, two)) {
 						print = false;
 						numberFailingSoftMaskThreshold+=2;
 					}
@@ -317,8 +317,11 @@ public class SamSVFilter{
 				two.deSoftMaskCigar();
 			}
 			
-			if (regionOne != null) out.println(one.getUnmodifiedSamRecord());
-			if (regionTwo != null) out.println(two.getUnmodifiedSamRecord());
+			// Write to file only if a minimum of one read is in the bed file
+			if (!(regionOne == null && regionTwo == null)) {
+				out.println(one.getUnmodifiedSamRecord());
+				out.println(two.getUnmodifiedSamRecord());
+			}
 			
 			
 			//make link
@@ -345,24 +348,26 @@ public class SamSVFilter{
 		
 	}
 
-	private boolean failsSoftMasking(SamAlignment one, SamAlignment two) {
-		//which is left?
+	private boolean failsMinSoftMasking(SamAlignment one, SamAlignment two) {
+		//which is left? (lower chr position)
 		SamAlignment left;
 		SamAlignment right;
-		if (one.getPosition() < two.getPosition()) {
+		if (one.getPosition() <= two.getPosition()) {
 			left = one;
 			right = two;
 		}
-		else if (one.getPosition()> two.getPosition()){
+		else {
 			left = two;
 			right = one;
 		}
-		else return true;
-		//check left
-		int num = left.countLengthOfSidedSoftMaskedBases(true);
-		if (num >= minimumSoftMaskedBases) return false;
-		num = right.countLengthOfSidedSoftMaskedBases(false);
-		if (num >= minimumSoftMaskedBases) return false;
+		//Check softclipping on left of pair
+		int num_left = left.countLengthOfSidedSoftMaskedBases(true); //if true, count soft clipping on left (else right)
+		int num_right = right.countLengthOfSidedSoftMaskedBases(false);
+		if (num_left >= minimumSoftMaskedBases || num_right >= minimumSoftMaskedBases) return false;
+		// Check softclipping on right of pair
+		num_left = left.countLengthOfSidedSoftMaskedBases(false); 
+		num_right = right.countLengthOfSidedSoftMaskedBases(true);
+		if (num_left >= minimumSoftMaskedBases || num_right >= minimumSoftMaskedBases) return false;
 		return true;
 	}
 
@@ -425,6 +430,24 @@ public class SamSVFilter{
 			printDocs();
 			System.exit(0);
 		}
+		System.out.println("##### JVM Heap statistics [GB] #####");
+		int gb = 1024*1024*1024;
+		Runtime runtime = Runtime.getRuntime(); 
+        //Print used memory
+        System.out.println("Used Memory: "
+            + (runtime.totalMemory() - runtime.freeMemory()) / gb);
+	 
+        //Print free memory
+        System.out.println("Free Memory: "
+            + runtime.freeMemory() / gb);
+	         
+        //Print total available memory
+        System.out.println("Total Available Memory: " + runtime.totalMemory() / gb);
+	 
+        //Print Maximum available memory
+        System.out.println("Max Available Memory: " + runtime.maxMemory() / gb);
+		System.out.println("####################################");
+
 		new SamSVFilter(args);
 	}		
 
@@ -483,11 +506,11 @@ public class SamSVFilter{
 				"**************************************************************************************\n" +
 				"**                               Sam SV Filter: March 2014                          **\n" +
 				"**************************************************************************************\n" +
-				"Filters SAM records based on their intersection with a list of target regions for\n"+
-				"structural variation analysis. Paired alignments are kept if they align to at least\n"+
-				"one target region. These are split into those that align to different targets (span),\n"+
-				"the same target with sufficient softmasking (soft), or one target and somewhere else\n"+
-				"(single).\n"+
+				"Filters SAM records based on their intersection with a list of target regions for\n" +
+				"structural variation analysis. Both mates of a paired alignment are kept if they align to\n" + 
+				"at least one target region. These are split into those that align to different targets,\n" +
+				"(span) the same target with sufficient softmasking on either the left or right side of the\n" +
+				"mate pair (soft), or to one target and somewhere else outside of the bed file (single).\n"+
 
 				"\nOptions:\n"+
 				"-a Alignment file or directory containing NAME sorted SAM/BAM files. Multiple files\n"+
@@ -503,8 +526,8 @@ public class SamSVFilter{
 				"-q Minimum mapping quality score. Defaults to 5, bigger numbers are more stringent.\n" +
 				"-c Chromosomes to skip, defaults to 'chrAdap,chrPhi,chrM,random,chrUn'. Any SAM\n"+
 				"       record chromosome name that contains one will be failed.\n"+ 
-				"-m Minimum soft masked bases for keeping paired alignments intersecting the same\n"+
-				"       target, defaults to 10\n"+
+				"-m Minimum number of soft masked bases needed to keep paired alignments. Both must intersect\n"+
+				"       a target region in the bed file, defaults to 10\n"+
 				//"-e Replace S in cigar with M, only for visualization in IGB, not for downstream use.\n"+
 
 				"\nExample: java -Xmx25G -jar pathTo/"+version+"/Apps/SamSVFilter -x 150 -q 13 -a\n" +
