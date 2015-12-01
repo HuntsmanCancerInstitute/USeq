@@ -16,6 +16,7 @@ public class FastqBarcodeTagger{
 	private File barcodeFastq;
 	private File resultsDirectory;
 	private boolean interlace = false;
+	private int maxLengthBarcode = 0;
 	
 	//internal fields
 	private BufferedReader firstFastqIn;
@@ -110,6 +111,12 @@ public class FastqBarcodeTagger{
 		if (f[0].equals(s[0]) == false) Misc.printErrAndExit("\nError, looks like your first and second fastq names differ? \nFirst\t"+f[0]+"\nSecond\t"+s[0]);
 		if (f[0].equals(b[0]) == false) Misc.printErrAndExit("\nError, looks like your first and barcode fastq names differ? \nFirst\t"+f[0]+"\nBarcode\t"+b[0]);
 		
+		//trim 3' end of barcode?
+		if (maxLengthBarcode !=0){
+			barcode[1] = barcode[1].substring(0, maxLengthBarcode);
+			barcode[3] = barcode[3].substring(0, maxLengthBarcode);
+		}
+		
 		//make new frag name with appended barcode
 		String fragmentName = f[0]+":BMF:"+barcode[1]+barcode[3];
 		
@@ -189,6 +196,7 @@ public class FastqBarcodeTagger{
 					case 'b': barcodeFastq = new File(args[++i]); break;
 					case 'r': resultsDirectory = new File(args[++i]); break;
 					case 'i': interlace = true; break;
+					case 'l': maxLengthBarcode = Integer.parseInt(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -221,7 +229,7 @@ public class FastqBarcodeTagger{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Fastq Barcode Tagger: Aug 2015                         **\n" +
+				"**                           Fastq Barcode Tagger: Dec 2015                         **\n" +
 				"**************************************************************************************\n" +
 				"Takes three fastq files (paired end reads and a third containing barcodes), appends\n"+
 				"the barcode and quality to the fastq header, and writes out the modified records. \n"+
@@ -232,6 +240,7 @@ public class FastqBarcodeTagger{
 				"-b Barcode fastq file, .gz/.zip OK.\n" + 
 				"-i (Optional) Write interlaced fastq to stdout for direct piping to other apps\n"+
 				"-r (Optional) Directory to save the modified fastqs, defaults to the parent of -f\n"+
+				"-l (Optional) Max length of barcode, defaults to all. Use to trim 3' end.\n"+
 
 				"\nExample: java -Xmx1G -jar pathToUSeq/Apps/FastqBarcodeTagger -f lob_1.fastq.gz\n" +
 				"     -s lob_2.fastq.gz -b lob_barcode.fastq.gz -i | bwa mem -p /ref/hg19.fa \n\n" +

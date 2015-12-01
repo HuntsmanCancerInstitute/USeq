@@ -27,7 +27,7 @@ public class Consensus {
 	private int minBarcodeBaseQuality = 13;
 	private double minNumPassingBarcodeBases = 6;
 	private double minFractionBarcodeIdentity = 0.75; 
-	private int maxAlignmentsToCluster = 10000;
+	private int maxAlignmentsToCluster = 20000;
 	
 	//for the ConsensusEngine for collapsing clustered reads
 	private int minReadBaseQuality = 13;
@@ -199,7 +199,7 @@ public class Consensus {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  Consensus : Sept 2015                           **\n" +
+				"**                                  Consensus : Nov 2015                            **\n" +
 				"**************************************************************************************\n" +
 				"Consensus clusters alignments sharing the same unclipped start position and molecular\n"+
 				"barcode. It then calls consensus on the clustered alignments outputing fastq for\n"+
@@ -216,7 +216,7 @@ public class Consensus {
 				"-t Number concurrent threads to run, defaults to the max available to the jvm / 2.\n"+
 				"-c Number of alignments to process in one chunk, defaults to 1,000,000. Adjust for the\n"+
 				"     availible RAM.\n"+
-				"-x Maximum number of alignments to cluster before subsampling, defaults to 10000.\n"+
+				"-x Maximum number of alignments to cluster before subsampling, defaults to 20000.\n"+
 				"-q Minimum barcode base quality, defaults to 13, anything less is assigned an N.\n"+
 				"-n Minimum number of non N barcode bases, defaults to 6, anything less is tossed.\n"+
 				"-f Minimum fraction barcode identity for inclusion in a cluster, defaults to 0.75 .\n"+
