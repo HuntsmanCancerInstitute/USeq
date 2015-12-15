@@ -222,7 +222,7 @@
 		<echo>Building Source Code</echo>
 		<zip destfile="${release.base.dir}/SourceCode.zip" basedir="${src.dir}"/>
 		<echo>Creating Symlink to the applications in home</echo>
-		<symlink link="/Users/timmosbruger/AppsUSeq" resource="/Users/timmosbruger/Documents/eclipse4.3/USeq/Releases/${release.name}/Apps/"/>
+		<symlink link="/Users/timmosbruger/AppsUSeq" resource="/Users/timmosbruger/Documents/eclipse4.3/USeqGH/Releases/${release.name}/Apps/"/>
 		<echo>Copying applications to server</echo>
 <!--		<exec executable="rsync" dir="/Users/timmosbruger/Documents/eclipse4.3/USeq/Releases/">
 			<arg value="-r"/>

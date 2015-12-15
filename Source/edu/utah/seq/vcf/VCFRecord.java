@@ -263,7 +263,8 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		if (reference.length() != 1) return false;
 		//check each alternate for non snp
 		for (int i=0; i< alternate.length; i++){
-			if (alternate[i].length() != 1 || alternate[i].equals(".") == true) return false;
+			if (alternate[i].length() != 1) return false;
+			// old way,  if (alternate[i].length() != 1 || alternate[i].equals(".") == true) return false;
 		}
 		return true;
 	}

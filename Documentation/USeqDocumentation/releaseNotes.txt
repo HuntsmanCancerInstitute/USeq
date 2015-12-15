@@ -1,3 +1,19 @@
+----USeq_8.9.7----
+SamSVFilter
+* Corrected a bug where paired end reads that aligned to one target region but their mate aligned elsewhere were not being saved to the single bam file
+SamAlignmentExtractor
+* Added an option to write off target reads to the pass bam file. Needed for translocation detection.
+VCFRegionMarker
+* New app for intersecting a vcf records with regions and add the bed text to the vcf filter field.  Good for flagging variants by position.
+StrelkaVCFParser
+* Lots of mods to calculate allelic ratios for INDELS and SNVs
+LofreqVCFParser
+* New app for modifying Lofreq output, primarily as a means to join with Strelka
+SamComparator
+* Added option to process just the first chromosome of data
+Sam2USeq
+* Modified the pass/fail file naming to better integrate with Snakemake
+
 ----USeq_8.9.6----
 Sam2USeq
 * Modified the per region spreadsheet to show the FracBPs>= xxx to be defined by the users minimum coverage setting.

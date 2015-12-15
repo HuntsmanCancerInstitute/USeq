@@ -51,7 +51,7 @@ public class VCFMerger {
 				System.out.println("\t"+num);
 			}
 			
-			System.out.println("Merging headers, skips those with the same ID...");
+			System.out.println("\nMerging headers, skips those with the same ID...");
 			String[] mergedHeader = VCFParser.mergeHeaders(vcfParsers);
 			if (mergedHeader == null) Misc.printErrAndExit("\nError: hmm something is wrong when merging headers, are the #CHROM lines different?\n");
 			

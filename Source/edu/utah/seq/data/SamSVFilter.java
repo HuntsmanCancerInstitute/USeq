@@ -430,6 +430,7 @@ public class SamSVFilter{
 			printDocs();
 			System.exit(0);
 		}
+		/*
 		System.out.println("##### JVM Heap statistics [GB] #####");
 		int gb = 1024*1024*1024;
 		Runtime runtime = Runtime.getRuntime(); 
@@ -447,7 +448,8 @@ public class SamSVFilter{
         //Print Maximum available memory
         System.out.println("Max Available Memory: " + runtime.maxMemory() / gb);
 		System.out.println("####################################");
-
+		*/
+		
 		new SamSVFilter(args);
 	}		
 
@@ -504,7 +506,7 @@ public class SamSVFilter{
 		if (version.length() == 0) version = "USeq_xxx";
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Sam SV Filter: March 2014                          **\n" +
+				"**                               Sam SV Filter: Oct 2015                            **\n" +
 				"**************************************************************************************\n" +
 				"Filters SAM records based on their intersection with a list of target regions for\n" +
 				"structural variation analysis. Both mates of a paired alignment are kept if they align to\n" + 

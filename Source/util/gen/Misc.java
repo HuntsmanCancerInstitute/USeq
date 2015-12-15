@@ -21,6 +21,7 @@ public class Misc {
 	public static final Pattern UNDERSCORE = Pattern.compile("_");
 	public static final Pattern COLON = Pattern.compile(":");
 	public static final Pattern COMMA = Pattern.compile(",");
+	public static final Pattern SEMI_COLON = Pattern.compile(";");
 	public static final Pattern GREATER_THAN = Pattern.compile(">");
 	
 	/**Calls garbage collection then returns total - free.*/

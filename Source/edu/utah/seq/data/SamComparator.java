@@ -42,6 +42,7 @@ public class SamComparator {
 	private SamReader samReaderSecond;
 	private String firstFlag="f";
 	private String secondFlag ="s";
+	private boolean processFirstChrom = false;
 
 	//current chrom
 	private String workingChrom;
@@ -179,6 +180,9 @@ public class SamComparator {
 				numberMisMatchesFirst++;
 			}
 		}
+		
+		//stop?
+		if (processFirstChrom) return;
 	}
 	
 	
@@ -288,6 +292,7 @@ public class SamComparator {
 					case 'b': secondSamFile = new File(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'p': printMisMatches = true; break;
+					case 'f': processFirstChrom = true; break;
 					case 'e': checkSequence = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
@@ -308,7 +313,7 @@ public class SamComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Sam Comparator  : Nov 2014                           **\n" +
+				"**                             Sam Comparator  : Dec 2015                           **\n" +
 				"**************************************************************************************\n" +
 				"Compares coordinate sorted, unique, alignment sam/bam files.  Splits alignments into\n"+
 				"those that match or mismatch chrom and position (or sequence).\n\n"+
@@ -318,6 +323,7 @@ public class SamComparator {
 				"-b Full path sam/bam file name. zip/gz OK.\n"+
 				"-s Full path to a directory to save the results.\n" +
 				"-p Print paired mismatches to screen.\n" +
+				"-f Only process first chrom, defaults to all.\n"+
 				"-e Check sequence of pairs.\n\n"+
 
 				"Example: java -Xmx10G -jar pathTo/USeq/Apps/SamComparator -a /hg19/ref.sam.gz\n" +

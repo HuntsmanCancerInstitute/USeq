@@ -14,9 +14,10 @@ public class Gzipper {
 	
 	//constructor
 	public Gzipper (File gzipFile) throws FileNotFoundException, IOException{
-		if (gzipFile.getName().endsWith(".gz") == false) gzipFile = new File (gzipFile+".gz");
-		out = new GZIPOutputStream(new FileOutputStream(gzipFile));
-		this.gzipFile = gzipFile;
+		if (gzipFile.getName().endsWith(".gz") == false) this.gzipFile = new File (gzipFile+".gz");
+		else this.gzipFile = gzipFile;
+		out = new GZIPOutputStream(new FileOutputStream(this.gzipFile));
+		
 	}
 	
 	public Gzipper(OutputStream gzipFile) throws IOException {
@@ -161,11 +162,13 @@ public class Gzipper {
 		sb.append(key);
 		sb.append("\"");
 		sb.append(": [\"");
-		sb.append(values.get(0).toString());
-		int len = values.size();
-		for (int i=1; i< len; i++){
-			sb.append("\", \"");
-			sb.append(values.get(i).toString());
+		if (values.size() !=0){
+			sb.append(values.get(0).toString());
+			int len = values.size();
+			for (int i=1; i< len; i++){
+				sb.append("\", \"");
+				sb.append(values.get(i).toString());
+			}
 		}
 		sb.append("\"]");
 		out.write(sb.toString().getBytes());

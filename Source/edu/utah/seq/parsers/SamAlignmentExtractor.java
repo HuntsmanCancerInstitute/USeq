@@ -27,6 +27,7 @@ public class SamAlignmentExtractor {
 	private double alignmentScoreThreshold = -1.0;
 	private boolean biggerASIsBetter = true;
 	private boolean divideAlignmentScoreByCigarM = false;
+	private boolean writeOffTargetToPass = false;
 
 	//internal fields
 	private HashMap<String,RegionScoreText[]> chromRegions;
@@ -71,7 +72,8 @@ public class SamAlignmentExtractor {
 
 			//for each
 			//TODO: thread this! would need to write out individual them merge... might be slow.. the bottleneck is the io not the compute so parallel won't gain much
-			System.out.print("Walking bam alignments");
+			if (writeOffTargetToPass) System.out.println("Walking bam alignments, saving off target to pass file");
+			else System.out.print("Walking bam alignments");
 			Iterator<SAMSequenceRecord> it = chrList.iterator();
 			while (it.hasNext()){
 				SAMSequenceRecord ssr = it.next();
@@ -220,7 +222,7 @@ public class SamAlignmentExtractor {
 		if (sam.getReadUnmappedFlag() || sam.isSecondaryOrSupplementary() || sam.getReadFailsVendorQualityCheckFlag()) return false;
 		return true;
 	}
-	
+	/*
 	private void walkChromAlignments() {
 		try {
 			SAMRecordIterator it = bamReader.queryOverlapping(workingChromosome, 0, 0);
@@ -292,7 +294,85 @@ public class SamAlignmentExtractor {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError: problem walking chromosome "+workingChromosome);
 		}
+	}*/
+	
+	private void walkChromAlignments() {
+		try {
+			SAMRecordIterator it = bamReader.queryOverlapping(workingChromosome, 0, 0);
+			while (it.hasNext()) {
+				SAMRecord sam = it.next();
+				numRawAlignments++;
+
+				//fail basic flags?
+				if (passBasic(sam) == false){
+					failingBamWriter.addAlignment(sam);
+					numFailingBasic++;
+					continue;
+				}
+				
+				//does it intersect?
+				boolean onTarget = intersect(sam);
+				if (onTarget == false) {
+					if (writeOffTargetToPass == false){
+						failingBamWriter.addAlignment(sam);
+						continue;
+					}
+				}
+				else numPassingBasicAndOnTarget++;
+
+				//check both scores
+				boolean passScores = true;
+				//pass mapping quality?
+				if (minimumMappingQuality != -1) {		
+					if (sam.getMappingQuality() < minimumMappingQuality) {
+						if (onTarget) numPassingBasicOnTargetYetFailingMQ++;
+						passScores = false;
+					}
+				}
+				//pass alignment score? with novoalignments (~30 pt penalty per mismatch) smaller AS is better 
+				//with bwa bigger scores are better (readLength - #SNV*5 + #INDEL*7)
+				if (alignmentScoreThreshold != -1.0){
+					Object obj = sam.getAttribute("AS");
+					if (obj != null){
+						Integer as = (Integer)obj;
+						double asScore = as.doubleValue();
+						
+						//scale the score?
+						if (divideAlignmentScoreByCigarM){
+							double numM = SamAlignment.countLengthOfM(sam.getCigarString());
+							asScore = asScore/numM;
+						}
+						if (biggerASIsBetter){ 
+							if (asScore < alignmentScoreThreshold) {
+								if (onTarget) numPassingBasicOnTargetYetFailingAS++;
+								passScores = false;
+							}
+						}
+						else {
+							if (asScore > alignmentScoreThreshold) {
+								if (onTarget) numPassingBasicOnTargetYetFailingAS++;
+								passScores = false;
+							}
+						}
+					}
+				}
+				//pass? or fail? scores
+				if (passScores) {
+					passingBamWriter.addAlignment(sam);
+					if (onTarget) {
+						numPassingBasicOnTargetAndScores++;
+						if (sam.getDuplicateReadFlag()) numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate++;
+					}
+				}
+				else failingBamWriter.addAlignment(sam);
+			}
+			it.close();
+		} catch (Exception e){
+			e.printStackTrace();
+			Misc.printErrAndExit("\nError: problem walking chromosome "+workingChromosome);
+		}
 	}
+
 
 	public static void main(String[] args) {
 		if (args.length ==0){
@@ -320,6 +400,7 @@ public class SamAlignmentExtractor {
 					case 'a': alignmentScoreThreshold = Double.parseDouble(args[++i]); break;
 					case 'n': biggerASIsBetter = false; break;
 					case 'd': divideAlignmentScoreByCigarM = true; break;
+					case 'f': writeOffTargetToPass = true; break;
 					case 'j': jsonOutputFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group()+", Try -h");
@@ -402,7 +483,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Sam Alignment Extractor: July 2015                    **\n" +
+				"**                            Sam Alignment Extractor: Oct 2015                     **\n" +
 				"**************************************************************************************\n" +
 				"Splits an alignment file into those that pass or fail thresholds and intersects\n"+
 				"regions of interest. Calculates a variety of QC statistics.\n"+
@@ -419,6 +500,7 @@ public class SamAlignmentExtractor {
 				"-n Smaller alignment scores are better (novo), defaults to bigger are better (bwa).\n"+
 				"-d Divide alignment score by the number of CIGAR M bases.\n"+
 				"-j Write summary stats in json format to this file.\n"+
+				"-f Save off target alignments that meet thresholds to the pass file, defaults to fail.\n"+
 
 				"\n"+
 
