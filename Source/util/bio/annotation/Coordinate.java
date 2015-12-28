@@ -136,7 +136,7 @@ public class Coordinate implements Comparable, Serializable{
 			BufferedReader in = IO.fetchBufferedReader(picksFile);
 			String line;
 			String[] tokens;
-			ArrayList al = new ArrayList();
+			ArrayList<Coordinate> al = new ArrayList<Coordinate>();
 			//chrom, start, stop
 			//0 1 2
 			while ((line = in.readLine()) !=null) {
@@ -159,7 +159,7 @@ public class Coordinate implements Comparable, Serializable{
 	 * Don't forget to sort!*/
 	public static HashMap<String,Coordinate[]> splitByChromosome(Coordinate[] sortedCoordinates){
 		HashMap<String,Coordinate[]> chrSpec = new HashMap();
-		ArrayList al = new ArrayList();
+		ArrayList<Coordinate> al = new ArrayList<Coordinate>();
 		String currChrom = sortedCoordinates[0].getChromosome();
 		for (int i=0; i< sortedCoordinates.length; i++){
 			if (sortedCoordinates[i].getChromosome().equals(currChrom) == false){

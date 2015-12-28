@@ -1,3 +1,7 @@
+----USeq_8.9.8----
+VCFRegionFilter
+* Simple app for rapidly splitting vcf files into those that intersect a bed file. Uses IntervalTrees.
+
 ----USeq_8.9.7----
 SamSVFilter
 * Corrected a bug where paired end reads that aligned to one target region but their mate aligned elsewhere were not being saved to the single bam file

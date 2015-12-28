@@ -168,6 +168,17 @@ public class BarcodeClusterEngine {
 			int halfLen = seqQual.length()/2;
 			char[] seq = seqQual.substring(0, halfLen).toCharArray();
 			int[] qualScores = BarcodeClusterEngine.convertSangerQualityScores(seqQual.substring(halfLen));
+			
+			//hack to cut to first 8
+			//char[] seq8 = new char[8];
+			//int[] qual8 = new int[8];
+			//for (int i=0; i< seq8.length; i++){
+				//seq8[i] = seq[i];
+				//qual8[i] = qualScores[i];
+			//}
+			//seq = seq8;
+			//qualScores = qual8;
+			
 			int numGoodBases = 0;
 			for (int i=0; i< qualScores.length; i++){
 				if (qualScores[i]< minBaseQuality) seq[i] = 'N';
