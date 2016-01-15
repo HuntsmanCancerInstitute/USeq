@@ -42,6 +42,8 @@ public class CalculatePerCycleErrorRate {
 	private int index;
 	private boolean mergeStrands = true;
 	private int totalCycles;
+	private int minMQ = 0;
+	private int flagInt = (4 | 256 | 512); // Unmapped, secondary, vendor QC
 
 	/**For stand alone app.*/
 	public CalculatePerCycleErrorRate(String[] args){
@@ -55,6 +57,10 @@ public class CalculatePerCycleErrorRate {
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
 		System.out.println("\nDone! "+Num.formatNumber(diffTime, 2)+" min\n");
+	}
+
+	public void set_minMQ(int _minMQ) {
+		minMQ = _minMQ;
 	}
 
 	public void doWork(){
@@ -113,8 +119,8 @@ public class CalculatePerCycleErrorRate {
 			System.out.print("Cycle#");
 			for (int i=0; i< alignmentFiles.length; i++) {
 				String name = Misc.removeExtension(alignmentFiles[i].getName());
-                String name1 = name + "_1";
-                String name2 = name + "_2";
+				String name1 = name + "_1";
+				String name2 = name + "_2";
 				if (mergeStrands) {
 					System.out.print("\t"+name);
 					names[nameIndex++] = name;
@@ -151,10 +157,10 @@ public class CalculatePerCycleErrorRate {
 					sb.append("\t");
 					double error = incorrectBases[j][i]/ (incorrectBases[j][i] + correctBases[j][i]);
 					sb.append(error);
-                    sb.append('\t');
-                    sb.append((int)incorrectBases[j][i]);
-                    sb.append('\t');
-                    sb.append((int)correctBases[j][i] + incorrectBases[j][i]);
+					sb.append('\t');
+					sb.append((int)incorrectBases[j][i]);
+					sb.append('\t');
+					sb.append((int)correctBases[j][i] + incorrectBases[j][i]);
 					fractionError[j].add(error);
 					/*
 					sb.append("\t");
@@ -299,13 +305,12 @@ public class CalculatePerCycleErrorRate {
 
 				SAMRecord sam = it.next();				
 
-				//is it aligned?
-				if (sam.getReadUnmappedFlag()) continue;
-				
-				if (sam.getNotPrimaryAlignmentFlag()) continue;
-
-				//does it pass the vendor qc?
-				if (sam.getReadFailsVendorQualityCheckFlag()) continue;
+				//is it aligned? (4)
+				//is it primary? (256)
+				//does it pass the vendor qc? (512)
+				//does it pass minMQ?
+				if((sam.getFlags() & (flagInt)) != 0 || (sam.getMappingQuality() < minMQ))
+					continue;
 				
 				scoreAlignment(sam);
 			}
@@ -484,6 +489,8 @@ public class CalculatePerCycleErrorRate {
 					case 'c': maximumFractionFailingCycles = Double.parseDouble(args[++i]); break;
 					case 'j': jsonOutputFile = new File(args[++i]); mergeStrands = false; break;
 					case 'h': printDocs(); System.exit(0);
+					case 'm': set_minMQ(Integer.parseInt(args[++i])); break;
+					case 'p': flagInt |= 2; break; // Require proper pair (BAM_FPROPER_PAIR)
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -513,7 +520,7 @@ public class CalculatePerCycleErrorRate {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Calculate Per Cycle Error Rate : July 2015                **\n" +
+				"**	                    Calculate Per Cycle Error Rate : July 2015                **\n" +
 				"**************************************************************************************\n" +
 				"Calculates per cycle snv error rate provided a sorted indexed bam file and a fasta\n" +
 				"sequence file. Only checks CIGAR M bases not masked or INDEL bases.\n\n" +
@@ -528,9 +535,11 @@ public class CalculatePerCycleErrorRate {
 				"-c Maximum fraction failing cycles, defaults to 0.1\n"+
 				"-1 Maximum first read or merged read error rate, defaults to 0.01\n"+
 				"-2 Maximum second read error rate, defaults to 0.0175\n"+
-				"-o Write coverage statistics to this log file instead of stdout.\n" +
+				"-o Write coverage statistics to this log file instead of stdout.\n"+
 				"-j Write summary stats in json format to this file. Only stats for the first bam file\n"+ 
 				"      are saved. Only separate strand analysis permitted.\n"+
+				"-m Set minimum mapping quality for inclusion. Default: 0.\n"+
+				"-p Require that a read be mapped in a proper pair for inclusion in error rate calculations.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate\n"+
 				"     -b /Data/Bam/ -f /Fastas/chrPhiX_Illumina.fasta.gz \n\n"+
