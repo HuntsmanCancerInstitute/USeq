@@ -44,6 +44,7 @@ public class CalculatePerCycleErrorRate {
 	private int totalCycles;
 	private int minMQ = 0;
 	private int flagInt = (4 | 256 | 512); // Unmapped, secondary, vendor QC
+	private boolean requireProperPair = false;
 
 	/**For stand alone app.*/
 	public CalculatePerCycleErrorRate(String[] args){
@@ -287,6 +288,17 @@ public class CalculatePerCycleErrorRate {
 		}
 	}
 
+	public boolean failRead(SAMRecord sam) {
+				//is it aligned?
+				//is it primary? (256)
+				//does it pass the vendor qc? (512)
+				//does it pass minMQ?
+		return ((sam.getFlags() & (flagInt)) != 0 || // Fail the read if unmapped, secondary, or fails vendor qc.
+				(sam.getMappingQuality() < minMQ) || // insufficient mapping quality
+				(requireProperPair && ((sam.getFlags() & 2) == 0)) // Fails improper pairs if requireProperPair true.
+				);
+	}
+
 	public void scanBamFile(File bamFile){
 		
 		SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
@@ -305,12 +317,7 @@ public class CalculatePerCycleErrorRate {
 
 				SAMRecord sam = it.next();				
 
-				//is it aligned? (4)
-				//is it primary? (256)
-				//does it pass the vendor qc? (512)
-				//does it pass minMQ?
-				if((sam.getFlags() & (flagInt)) != 0 || (sam.getMappingQuality() < minMQ))
-					continue;
+				if(failRead(sam)) continue;
 				
 				scoreAlignment(sam);
 			}
@@ -490,7 +497,7 @@ public class CalculatePerCycleErrorRate {
 					case 'j': jsonOutputFile = new File(args[++i]); mergeStrands = false; break;
 					case 'h': printDocs(); System.exit(0);
 					case 'm': set_minMQ(Integer.parseInt(args[++i])); break;
-					case 'p': flagInt |= 2; break; // Require proper pair (BAM_FPROPER_PAIR)
+					case 'p': requireProperPair = true; break;
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
