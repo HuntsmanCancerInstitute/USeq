@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 8.9.6
+			<html><head><title>USeq Command Line Menus 8.9.7
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -158,6 +158,8 @@
 					<a href="#IntersectRegions">IntersectRegions</a><br>
 				
 					<a href="#KeggPathwayEnrichment">KeggPathwayEnrichment</a><br>
+				
+					<a href="#LofreqVCFParser">LofreqVCFParser</a><br>
 				
 					<a href="#MaqSnps2Bed">MaqSnps2Bed</a><br>
 				
@@ -326,6 +328,10 @@
 					<a href="#VCFVariantMaker">VCFVariantMaker</a><br>
 				
 					<a href="#VCFNoCallFilter">VCFNoCallFilter</a><br>
+				
+					<a href="#VCFRegionFilter">VCFRegionFilter</a><br>
+				
+					<a href="#VCFRegionMarker">VCFRegionMarker</a><br>
 				
 					<a href="#VCFReporter">VCFReporter</a><br>
 				
@@ -1228,7 +1234,7 @@ Example: java -Xmx2000M -jar pathTo/Apps/BisulfiteConvertFastas -f /affy/Fastas/
 </pre><br><p>
 				
 					<a name="Consensus"><pre>**************************************************************************************
-**                                  Consensus : Sept 2015                           **
+**                                  Consensus : Nov 2015                            **
 **************************************************************************************
 Consensus clusters alignments sharing the same unclipped start position and molecular
 barcode. It then calls consensus on the clustered alignments outputing fastq for
@@ -1245,7 +1251,7 @@ Optional Arguments:
 -t Number concurrent threads to run, defaults to the max available to the jvm / 2.
 -c Number of alignments to process in one chunk, defaults to 1,000,000. Adjust for the
      availible RAM.
--x Maximum number of alignments to cluster before subsampling, defaults to 10000.
+-x Maximum number of alignments to cluster before subsampling, defaults to 20000.
 -q Minimum barcode base quality, defaults to 13, anything less is assigned an N.
 -n Minimum number of non N barcode bases, defaults to 6, anything less is tossed.
 -f Minimum fraction barcode identity for inclusion in a cluster, defaults to 0.75 .
@@ -1746,7 +1752,7 @@ Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportTrimmedGenes -u -g
 </pre><br><p>
 				
 					<a name="FastqBarcodeTagger"><pre>**************************************************************************************
-**                           Fastq Barcode Tagger: Aug 2015                         **
+**                           Fastq Barcode Tagger: Dec 2015                         **
 **************************************************************************************
 Takes three fastq files (paired end reads and a third containing barcodes), appends
 the barcode and quality to the fastq header, and writes out the modified records. 
@@ -1757,6 +1763,7 @@ Options:
 -b Barcode fastq file, .gz/.zip OK.
 -i (Optional) Write interlaced fastq to stdout for direct piping to other apps
 -r (Optional) Directory to save the modified fastqs, defaults to the parent of -f
+-l (Optional) Max length of barcode, defaults to all. Use to trim 3' end.
 
 Example: java -Xmx1G -jar pathToUSeq/Apps/FastqBarcodeTagger -f lob_1.fastq.gz
      -s lob_2.fastq.gz -b lob_barcode.fastq.gz -i | bwa mem -p /ref/hg19.fa 
@@ -2164,6 +2171,30 @@ Options:
 Example: java -Xmx1500M -jar pathTo/USeq/Apps/KeggPathwayEnrichment -e 
       /Kegg/hsa_ensembl-hsa.list -p /Kegg/map_title.tab -g /Kegg/hsa_gene_map.tab
       -a /HCV/ensemblGenesWith20OrMoreReads.txt -s /HCV/upRegInHCV_Norm.txt
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="LofreqVCFParser"><pre>**************************************************************************************
+**                             Lofreq VCF Parser: Dec 2015                          **
+**************************************************************************************
+Parses Lofreq vcf files with options for filtering for minimum QUAL, modifying the
+FILTER field, removing non SNVs, and appending FORMAT info for downstream merging.
+
+Required Params:
+-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s)
+
+Optional Params:
+-s File path to a directory for saving the modified vcfs
+-m Minimum QUAL score, defaults to 0
+-d Minimum DP read depth, defaults to 0
+-t Minimum AF allele freq, defaults to 0
+-i Remove non SNV records
+-f Replace the FILTER field with '.'
+-a Append FORMAT NORMAL TUMOR to #CHROM line and add empty columns to records
+
+Example: java -jar pathToUSeq/Apps/LofreqVCFParser -v VCFFiles/ -m 32 -i -f -a
+      -s FilteredLofreqVcfs/ 
 
 **************************************************************************************
 </pre><br><p>
@@ -3447,7 +3478,7 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/Sam2Fastq -a /SAM/unaligned.sam.gz -f
 </pre><br><p>
 				
 					<a name="Sam2USeq"><pre>**************************************************************************************
-**                                Sam 2 USeq : Aug 2015                             **
+**                                Sam 2 USeq : Dec 2015                             **
 **************************************************************************************
 Generates per base read depth stair-step graph files for genome browser visualization.
 By default, values are scaled per million mapped reads with no score thresholding. Can
@@ -3479,6 +3510,7 @@ Default Options:
 -c Print regions that meet a minimum # counts, defaults to 0, don't print. If -b is
       provided, a bed file of regions failing the minimum count is also created.
 -l Print regions that also meet a minimum length, defaults to 0.
+-n Root name for the pass and fail coverage bed files generated by -b and -c
 -o Path to log file.  Write coverage statistics to a log file instead of stdout.
 -k Make average alignment length graph instead of read depth.
 -d Full path to a directory for saving bar binary PointData, defaults to not saving.
@@ -3491,7 +3523,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r
 </pre><br><p>
 				
 					<a name="SamAlignmentExtractor"><pre>**************************************************************************************
-**                            Sam Alignment Extractor: July 2015                    **
+**                            Sam Alignment Extractor: Oct 2015                     **
 **************************************************************************************
 Splits an alignment file into those that pass or fail thresholds and intersects
 regions of interest. Calculates a variety of QC statistics.
@@ -3508,6 +3540,7 @@ Default Options:
 -n Smaller alignment scores are better (novo), defaults to bigger are better (bwa).
 -d Divide alignment score by the number of CIGAR M bases.
 -j Write summary stats in json format to this file.
+-f Save off target alignments that meet thresholds to the pass file, defaults to fail.
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/SamAlignmentExtractor -q 20 -a 0.75 -d -b
       /Data/raw.bwaMem.bam -r /Data/targetsPad25bp.bed.gz -s/Data/SAE/ 
@@ -3516,7 +3549,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/SamAlignmentExtractor -q 20 -a 0.75 -
 </pre><br><p>
 				
 					<a name="SamComparator"><pre>**************************************************************************************
-**                             Sam Comparator  : Nov 2014                           **
+**                             Sam Comparator  : Dec 2015                           **
 **************************************************************************************
 Compares coordinate sorted, unique, alignment sam/bam files.  Splits alignments into
 those that match or mismatch chrom and position (or sequence).
@@ -3526,6 +3559,7 @@ Required:
 -b Full path sam/bam file name. zip/gz OK.
 -s Full path to a directory to save the results.
 -p Print paired mismatches to screen.
+-f Only process first chrom, defaults to all.
 -e Check sequence of pairs.
 
 Example: java -Xmx10G -jar pathTo/USeq/Apps/SamComparator -a /hg19/ref.sam.gz
@@ -3683,7 +3717,7 @@ Example: java -Xmx25G -jar pathToUSeq/Apps/SamReadDepthSubSampler -x 240 -q 20 -
 </pre><br><p>
 				
 					<a name="SamSVFilter"><pre>**************************************************************************************
-**                               Sam SV Filter: March 2014                          **
+**                               Sam SV Filter: Oct 2015                            **
 **************************************************************************************
 Filters SAM records based on their intersection with a list of target regions for
 structural variation analysis. Both mates of a paired alignment are kept if they align to
@@ -4461,6 +4495,50 @@ Example: java -jar pathToUSeq/Apps/VCFNoCallFilter -v /VCFFiles/ -m 5 -b 15 -e 8
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="VCFRegionFilter"><pre>**************************************************************************************
+**                              VCF Region Filter : Dec 2015                        **
+**************************************************************************************
+Sorts each vcf record (based on its position and max length of the alt or ref)
+by intersection with a chr start stop....bed file.
+
+Required Params:
+-v VCF file or directory containing such (xxx.vcf(.gz/.zip OK)) to parse
+-b Bed file of regions (chr start stop ...), interbase coordinates 
+       (xxx.bed(.gz/.zip OK)) to intersect
+
+Optional Params:
+-s Save directory for the modified vcfs
+-p Pad bed start stop by this # bps, defaults to 0
+
+Example: java -Xmx9G -jar pathTo/USeq/Apps/VCFRegionFilter -v Vcfs/ 
+       -b /Anno/offTargetRegions.bed.gz -p 10 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCFRegionMarker"><pre>**************************************************************************************
+**                              VCF Region Marker : Nov 2015                        **
+**************************************************************************************
+Intersects each vcf record (based on its position and max length of the alt or ref)
+with a chr start stop text.... bed file. For those that intersect, the bed text is 
+added to the vcf FILTER field. Multiple hits are concatinated.
+
+Required Params:
+-v VCF file or directory containing such (xxx.vcf(.gz/.zip OK)) to parse
+-b Bed file of regions (minimum chr start stop text), interbase coordinates 
+       (xxx.bed(.gz/.zip OK)) to intersect
+
+Optional Params:
+-s Save directory for the modified vcfs
+-p Pad bed start stop by this # bps, defaults to 0
+-c Clear starting FILTER field
+
+Example: java -Xmx9G -jar pathTo/USeq/Apps/VCFRegionMarker -v testHaploCaller.vcf.zip
+       -b /Anno/offTargetRegions.bed.gz -p 10 -s MarkedVcfs -c 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="VCFReporter"><pre>**************************************************************************************
 **                            VCF Reporter: April 2013                              **
 **************************************************************************************
@@ -4715,21 +4793,23 @@ Example: java -jar pathToUSeq/Apps/SomaticSniperVCFParser -v /VCFFiles/ -m 32 -a
 </pre><br><p>
 				
 					<a name="StrelkaVCFParser"><pre>**************************************************************************************
-**                             Strelka VCF Parser: March 2015                       **
+**                             Strelka VCF Parser: Dec 2015                         **
 **************************************************************************************
-Parses Strelka VCF INDEL files, replacing the QUAl score with the QSI score. Also 
-filters for minimum tumor normal read depth, difference in alt allelic ratios, and on
-normal alt allelic rations.
+Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS
+score. Also filters for minimum tumor normal read depth, T/N alt allelic ratio,
+and tumor and normal alt allelic ratios. Lastly, it sets the FILTER field to '.' and
+inserts the AF allele frequency.
 
-Required Options:
+Required Params:
 -v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
--m Minimum QSI score, defaults to 0.
+-m Minimum QSI or QSS score, defaults to 0.
 -a Minimum alignment depth for both tumor and normal samples, defaults to 0.
--r Minimum absolute difference in alt allelic ratios, defaults to 0.
+-r Minimum alt Tum/Norm allelic ratio, defaults to 0.
+-t Minimum tumor alt allelic fraction, defaults to 0.
 -n Maximum normal alt allelic fraction, defaults to 1.
 
-Example: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -a 15
-      -r 0.25 -n 0.02 -s tumor7,normal7 
+Example: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -a 150
+      -r 2 -n 0.6 -t 0.025  
 
 **************************************************************************************
 </pre><br><p>

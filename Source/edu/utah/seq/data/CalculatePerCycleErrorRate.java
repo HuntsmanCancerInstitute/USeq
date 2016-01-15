@@ -113,12 +113,14 @@ public class CalculatePerCycleErrorRate {
 			System.out.print("Cycle#");
 			for (int i=0; i< alignmentFiles.length; i++) {
 				String name = Misc.removeExtension(alignmentFiles[i].getName());
+                String name1 = name + "_1";
+                String name2 = name + "_2";
 				if (mergeStrands) {
 					System.out.print("\t"+name);
 					names[nameIndex++] = name;
 				}
 				else {
-					System.out.print("\t"+name+"_1\t"+name+"_2");
+					System.out.print("\t"+name1+"\t"+name1+"_err\t"+name1+"_obs\t"+name2+"_err\t"+name2+"_obs");
 					names[nameIndex++] = name;
 					names[nameIndex++] = name;
 				}
@@ -149,6 +151,10 @@ public class CalculatePerCycleErrorRate {
 					sb.append("\t");
 					double error = incorrectBases[j][i]/ (incorrectBases[j][i] + correctBases[j][i]);
 					sb.append(error);
+                    sb.append('\t');
+                    sb.append((int)incorrectBases[j][i]);
+                    sb.append('\t');
+                    sb.append((int)correctBases[j][i] + incorrectBases[j][i]);
 					fractionError[j].add(error);
 					/*
 					sb.append("\t");
