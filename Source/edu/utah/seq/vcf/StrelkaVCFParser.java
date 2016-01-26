@@ -23,10 +23,12 @@ public class StrelkaVCFParser {
 	private double minimumAltTNRatio = 0;
 	private double maximumNormalAltFraction = 1;
 	private Pattern qsiOrs = Pattern.compile(".+;QS[IS]=(\\d+);.+");
-	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency\">";
+	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
+	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
+	private String afFormat = "##FORMAT=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency\">";
 	private double minimumTumorAltFraction = 0;
 	
-	public StrelkaVCFParser (String[] args) {
+	public StrelkaVCFParser (String[] args) { 
 
 		processArgs(args);
 		
@@ -167,7 +169,7 @@ public class StrelkaVCFParser {
 		Gzipper out = new Gzipper (f);
 		
 		//write out header inserting AF
-		writeHeaderWithAF(out, parser);
+		writeHeaderWithExtraInfo(out, parser);
 		
 		int numFail = 0;
 		int numPass = 0;
@@ -191,7 +193,10 @@ public class StrelkaVCFParser {
 				fields[8] = fields[8]+ ":AF";
 				//add af to Norm and Tum
 				fields[9] = fields[9]+ formatAf (vcf.getSample()[0].getAltRatio());
-				fields[10] = fields[10]+ formatAf (vcf.getSample()[1].getAltRatio());
+				String tumorAf = formatAf (vcf.getSample()[1].getAltRatio());
+				fields[10] = fields[10]+ tumorAf;
+				//add DP and AF for tumor to INFO
+				fields[7] = "DP=" + vcf.getSample()[1].getReadDepthDP()+ ";AF=" + tumorAf + ";"+ fields[7] ;
 				
 				out.println(Misc.stringArrayToString(fields, "\t"));
 			}
@@ -202,13 +207,15 @@ public class StrelkaVCFParser {
 	
 	private String formatAf(double af){
 		if (af == 0.0) return ":0";
-		return ":" + Num.formatNumber(af, 3);
+		return ":" + Num.formatNumber(af, 4);
 	}
 
-	private void writeHeaderWithAF(Gzipper out, VCFParser parser) throws IOException {
+	private void writeHeaderWithExtraInfo(Gzipper out, VCFParser parser) throws IOException {
 		for (String h : parser.getStringComments()) {
-			if (afInfo != null && h.startsWith("##INFO")) {
+			if (afInfo != null && h.startsWith("##FORMAT")) {
 				out.println(afInfo);
+				out.println(dpInfo);
+				out.println(afFormat);
 				afInfo = null;
 			}
 			out.println(h);
@@ -264,12 +271,12 @@ public class StrelkaVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Strelka VCF Parser: Dec 2015                         **\n" +
+				"**                             Strelka VCF Parser: Jan 2015                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS\n"+
 				"score. Also filters for minimum tumor normal read depth, T/N alt allelic ratio,\n"+
 				"and tumor and normal alt allelic ratios. Lastly, it sets the FILTER field to '.' and\n"+
-				"inserts the AF allele frequency.\n"+
+				"inserts the tumor DP and AF info.\n"+
 
 				"\nRequired Params:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).\n" +
