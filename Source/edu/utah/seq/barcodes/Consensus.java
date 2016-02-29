@@ -25,8 +25,8 @@ public class Consensus {
 	
 	//for the BarcodeClusterEngine for clustering reads based on their barcode
 	private int minBarcodeBaseQuality = 13;
-	private double minNumPassingBarcodeBases = 6;
-	private double minFractionBarcodeIdentity = 0.75; 
+	private double minNumPassingBarcodeBases = 7;
+	private double minFractionBarcodeIdentity = 0.875; 
 	private int maxAlignmentsToCluster = 20000;
 	
 	//for the ConsensusEngine for collapsing clustered reads
@@ -199,7 +199,7 @@ public class Consensus {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  Consensus : Nov 2015                            **\n" +
+				"**                                  Consensus : Dec 2015                            **\n" +
 				"**************************************************************************************\n" +
 				"Consensus clusters alignments sharing the same unclipped start position and molecular\n"+
 				"barcode. It then calls consensus on the clustered alignments outputing fastq for\n"+
@@ -218,8 +218,8 @@ public class Consensus {
 				"     availible RAM.\n"+
 				"-x Maximum number of alignments to cluster before subsampling, defaults to 20000.\n"+
 				"-q Minimum barcode base quality, defaults to 13, anything less is assigned an N.\n"+
-				"-n Minimum number of non N barcode bases, defaults to 6, anything less is tossed.\n"+
-				"-f Minimum fraction barcode identity for inclusion in a cluster, defaults to 0.75 .\n"+
+				"-n Minimum number of non N barcode bases, defaults to 7, anything less is tossed.\n"+
+				"-f Minimum fraction barcode identity for inclusion in a cluster, defaults to 0.875 .\n"+
 				"-u Minimum read base quality for inclusion in consensus calling, defaults to 13.\n"+
 				"-r Minimum read base fraction identity to call a consensus base, defaults to 0.66 .\n"+
 				"     Anything less is assigned an N.\n"+

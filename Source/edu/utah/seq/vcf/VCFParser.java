@@ -9,7 +9,9 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashSet;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -336,7 +338,7 @@ public class VCFParser {
 		}
 	}
 	
-	/**Merges headers eliminating duplicate lines.  Does a bad ID name collision checking, silently keeps first one.
+	/**Merges headers eliminating duplicate lines.  Does a bad ID name collision checking, silently keeps first one. Source's are concatinated with a _.
 	 * Returns null if CHROM lines differ. */
 	public static String[] mergeHeaders(VCFParser[] parsers) {
 		LinkedHashSet<String> other = new LinkedHashSet<String>();
@@ -344,6 +346,7 @@ public class VCFParser {
 		LinkedHashSet<String> info = new LinkedHashSet<String>();
 		LinkedHashSet<String> filter = new LinkedHashSet<String>();
 		LinkedHashSet<String> format = new LinkedHashSet<String>();
+		TreeSet<String> source = new TreeSet<String>();
 		String chromLine = null;
 		
 		//for each header line, load hash
@@ -363,6 +366,13 @@ public class VCFParser {
 				else if (h.startsWith("##FORMAT")){
 					if (format.contains(h) == false) format.add(h);
 				}
+				else if (h.startsWith("##source=")){
+					//split on =
+					String[] s = Misc.PATTERN_EQUALS.split(h);
+					//split on whitespace
+					String[] realS = Misc.WHITESPACE.split(s[1]);
+					source.add(realS[0]);
+				}
 				else if (h.startsWith("#CHROM")) {
 					if (chromLine == null) chromLine = h;
 					else if (chromLine.equals(h) == false) return null;
@@ -377,17 +387,35 @@ public class VCFParser {
 		ArrayList<String> filterAL = mergeHeaderIds(filter);
 		ArrayList<String> formatAL = mergeHeaderIds(format);
 		ArrayList<String> infoAL = mergeHeaderIds(info);
-
+		
+		//Concatenate sources
+		String concatSource = null;
+		int numS = source.size();
+System.out.println("\nNNNNNNNNumS "+numS);		
+		if (numS>0){
+			StringBuilder sb = new StringBuilder("##source=");
+			Iterator<String> it = source.iterator();
+			while (it.hasNext()){
+				sb.append(it.next());
+				if (numS>1) sb.append("_");
+			}
+			if (numS>1) sb.append("USeqMerged");
+			concatSource = sb.toString();
+			System.out.println("\n"+concatSource);
+		}
+		
 		int num = other.size();
 		num+= contigAL.size();
 		num+= infoAL.size();
 		num+= filterAL.size();
 		num+= formatAL.size();
 		if (chromLine != null) num++;
+		if (concatSource != null) num++;
 		
 		String[] merge = new String[num];
 		int counter = 0;
 		for (String s : other) merge[counter++] = s;
+		if (concatSource != null) merge[counter++] = concatSource;
 		for (String s : contigAL) merge[counter++] = s;
 		for (String s : filterAL) merge[counter++] = s;
 		for (String s : infoAL) merge[counter++] = s;

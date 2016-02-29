@@ -9,6 +9,7 @@ import trans.anno.GenomicRegion;
 import util.bio.parsers.MultiFastaParser;
 import util.gen.IO;
 import util.gen.Misc;
+import util.gen.Num;
 
 /**
  * For manipulating nucleic acid sequences.
@@ -111,6 +112,38 @@ public class Seq {
 		HashMap<String,Integer> map = new HashMap<String,Integer>();
 		for (int i=0; i< acii.length; i++) map.put(acii[i], new Integer(i));
 		return map;
+	}
+	
+	/**Takes 1 2 20 10 3 4 Y X M, return 1 2 3 4 10 20 M X Y*/
+	public static String[] sortChromosomeNames(String[] unsorted){
+		
+		//split by numbers and letters
+		ArrayList<Integer> iAL = new ArrayList<Integer>();
+		ArrayList<String> sAL = new ArrayList<String>();
+		Pattern num = Pattern.compile("\\d+");
+		for (int i=0; i< unsorted.length; i++){
+			Matcher mat = num.matcher(unsorted[i]);
+			if (mat.matches()) iAL.add(new Integer (unsorted[i]));
+			else sAL.add(unsorted[i]);
+		}
+		//sort em
+		int[] intArray = Num.arrayListOfIntegerToInts(iAL);
+		Arrays.sort(intArray);
+		String[] stringArray = Misc.stringArrayListToStringArray(sAL);
+		Arrays.sort(stringArray);
+		
+		//assemble final
+		String[] sortedChrs = new String[unsorted.length];
+		int index = 0;
+		
+		for (int i=0; i< intArray.length; i++) {
+			sortedChrs[index++] = intArray[i]+"";
+		}
+		
+		for (int i=0; i< intArray.length; i++) {
+			sortedChrs[index++] = stringArray[i];
+		}
+		return sortedChrs;
 	}
 	
 	/**Converts the ascii quality scores to numeric scores. Sanger fastq and illumina 1.8+

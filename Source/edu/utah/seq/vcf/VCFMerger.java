@@ -135,7 +135,7 @@ public class VCFMerger {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Merger : July 2015                              **\n" +
+				"**                              VCF Merger : Feb 2016                               **\n" +
 				"**************************************************************************************\n" +
 				"Merges VCF files with the same samples. Collapses the headers with a simple hash. Will\n"+
 				"not work well with downstream apps that cannot process mixed INFO and FORMAT records.\n" +

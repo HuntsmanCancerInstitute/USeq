@@ -192,9 +192,9 @@ public class StrelkaVCFParser {
 				//add af to format
 				fields[8] = fields[8]+ ":AF";
 				//add af to Norm and Tum
-				fields[9] = fields[9]+ formatAf (vcf.getSample()[0].getAltRatio());
+				fields[9] = fields[9]+ ":"+ formatAf (vcf.getSample()[0].getAltRatio());
 				String tumorAf = formatAf (vcf.getSample()[1].getAltRatio());
-				fields[10] = fields[10]+ tumorAf;
+				fields[10] = fields[10]+ ":"+ tumorAf;
 				//add DP and AF for tumor to INFO
 				fields[7] = "DP=" + vcf.getSample()[1].getReadDepthDP()+ ";AF=" + tumorAf + ";"+ fields[7] ;
 				
@@ -206,8 +206,8 @@ public class StrelkaVCFParser {
 	}
 	
 	private String formatAf(double af){
-		if (af == 0.0) return ":0";
-		return ":" + Num.formatNumber(af, 4);
+		if (af == 0.0) return "0";
+		return Num.formatNumberJustMax(af, 4);
 	}
 
 	private void writeHeaderWithExtraInfo(Gzipper out, VCFParser parser) throws IOException {
@@ -271,7 +271,7 @@ public class StrelkaVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Strelka VCF Parser: Jan 2015                         **\n" +
+				"**                             Strelka VCF Parser: Feb 2015                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS\n"+
 				"score. Also filters for minimum tumor normal read depth, T/N alt allelic ratio,\n"+

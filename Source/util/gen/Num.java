@@ -4548,6 +4548,13 @@ public class Num {
 		f.setMinimumFractionDigits(numberOfDecimalPlaces);
 		return f.format(num);
 	}
+	
+	/**Converts a double ddd.dddddddd to a user determined number of decimal places right of the .  */
+	public static String formatNumberJustMax(double num, int numberOfDecimalPlaces){
+		NumberFormat f = NumberFormat.getNumberInstance();
+		f.setMaximumFractionDigits(numberOfDecimalPlaces);
+		return f.format(num);
+	}
 
 	/**Converts a double[] to int[] using Math.round()*/
 	public static int[] doubleArrayToIntArray(double[] d){

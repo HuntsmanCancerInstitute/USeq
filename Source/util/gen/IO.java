@@ -863,6 +863,35 @@ public class IO {
 		al.toArray(res);
 		return res;
 	}	
+	
+	/**Executes tokenized params on command line, use full paths.
+	 * Put each param in its own String.  
+	 * Returns the output, starting with ERROR if it encountered an issue
+	 * Returns both error and data from execution.
+	 */
+	public static String executeCommandReturnError(String[] command){
+		ArrayList<String> al = new ArrayList<String>();		
+		try {
+			Runtime rt = Runtime.getRuntime();
+			rt.traceInstructions(true);
+			rt.traceMethodCalls(true); 
+			Process p = rt.exec(command);
+			BufferedReader data = new BufferedReader(new InputStreamReader(p.getInputStream()));
+			BufferedReader error = new BufferedReader(new InputStreamReader(p.getErrorStream())); 
+			String line;
+			while ((line = data.readLine()) != null) al.add(line);
+			while ((line = error.readLine()) != null) al.add(line);
+			data.close();
+			error.close();
+		} catch (Exception e) {
+			System.err.println("Problem executing -> "+Misc.stringArrayToString(command," ")+" "+e.getLocalizedMessage());
+			e.printStackTrace();
+			al.add(0, "ERROR");
+		}
+		
+		String res = Misc.stringArrayListToString(al, "\n");
+		return res;
+	}	
 
 	/**Executes a String of shell script commands via a temp file.  Only good for Unix.*/
 	public static String[] executeShellScript (String shellScript, File tempDirectory){
@@ -1084,6 +1113,26 @@ public class IO {
 			finalFiles[i]= new File(files[i]);
 		}
 		return finalFiles;
+	}
+	
+	/**Extracts the full path file names of all the files in a given directory with a given extension.
+	 * If the directory is file and starts with the correct word then it is returned.*/
+	public static File[] extractFilesStartingWith(File directory, String startingWith){
+		File[] files = null;			
+		ArrayList<File> filesAL = new ArrayList<File>();
+		if (directory.isDirectory()){
+			File[] toExamine = directory.listFiles();
+			
+
+			for (File f: toExamine){
+				if (f.getName().startsWith(startingWith)) filesAL.add(f);
+			}
+			files = new File[filesAL.size()];
+			filesAL.toArray(files);
+		}
+		else if (directory.getName().startsWith(startingWith)) files = new File[]{directory};
+		
+		return files;
 	}
 
 	/**Extracts the full path file names of all the files in a given directory with a given extension.*/

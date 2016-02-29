@@ -222,79 +222,7 @@ public class SamAlignmentExtractor {
 		if (sam.getReadUnmappedFlag() || sam.isSecondaryOrSupplementary() || sam.getReadFailsVendorQualityCheckFlag()) return false;
 		return true;
 	}
-	/*
-	private void walkChromAlignments() {
-		try {
-			SAMRecordIterator it = bamReader.queryOverlapping(workingChromosome, 0, 0);
-			while (it.hasNext()) {
-				SAMRecord sam = it.next();
-				numRawAlignments++;
 
-				//fail basic flags?
-				if (passBasic(sam) == false){
-					failingBamWriter.addAlignment(sam);
-					numFailingBasic++;
-					continue;
-				}
-				
-				//does it intersect?
-				if (intersect(sam) == false) {
-					failingBamWriter.addAlignment(sam);
-					continue;
-				}
-
-				//check both scores
-				numPassingBasicAndOnTarget++;
-				boolean passScores = true;
-				//pass mapping quality?
-				if (minimumMappingQuality != -1) {		
-					if (sam.getMappingQuality() < minimumMappingQuality) {
-						numPassingBasicOnTargetYetFailingMQ++;
-						passScores = false;
-					}
-				}
-				//pass alignment score? with novoalignments (~30 pt penalty per mismatch) smaller AS is better 
-				//with bwa bigger scores are better (readLength - #SNV*5 + #INDEL*7)
-				if (alignmentScoreThreshold != -1.0){
-					Object obj = sam.getAttribute("AS");
-					if (obj != null){
-						Integer as = (Integer)obj;
-						double asScore = as.doubleValue();
-						
-						//scale the score?
-						if (divideAlignmentScoreByCigarM){
-							double numM = SamAlignment.countLengthOfM(sam.getCigarString());
-							asScore = asScore/numM;
-						}
-						if (biggerASIsBetter){ 
-							if (asScore < alignmentScoreThreshold) {
-								numPassingBasicOnTargetYetFailingAS++;
-								passScores = false;
-							}
-						}
-						else {
-							if (asScore > alignmentScoreThreshold) {
-								numPassingBasicOnTargetYetFailingAS++;
-								passScores = false;
-							}
-						}
-					}
-				}
-				//pass? or fail? scores
-				if (passScores) {
-					numPassingBasicOnTargetAndScores++;
-					passingBamWriter.addAlignment(sam);
-					if (sam.getDuplicateReadFlag()) numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate++;
-				}
-				else failingBamWriter.addAlignment(sam);
-
-			}
-			it.close();
-		} catch (Exception e){
-			e.printStackTrace();
-			Misc.printErrAndExit("\nError: problem walking chromosome "+workingChromosome);
-		}
-	}*/
 	
 	private void walkChromAlignments() {
 		try {
