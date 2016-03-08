@@ -69,6 +69,7 @@ public class Sam2USeq {
 	//for json
 	private ArrayList<Double> fractionTargetBpsAL = new ArrayList<Double>();
 	private ArrayList<String> lowCoverageRegionsAL = new ArrayList<String>();
+	private ArrayList<String> exonicMedianPerBpCoverageAL = new ArrayList<String>();
 
 
 	/**For stand alone app.*/
@@ -327,7 +328,8 @@ public class Sam2USeq {
 			gz.printJson("targetRegionsFileName", regionFile.getName(), true);
 			gz.printJson("coverageAt0.95OfTargetBps", coverageAt95, true);
 			gz.printJson("fractionTargetBpsWithIndexedCoverage", Num.arrayListToDoubles(fractionTargetBpsAL), true);
-			gz.printJson("lowCoverageRegions", lowCoverageRegionsAL, false);
+			gz.printJson("lowCoverageRegions", lowCoverageRegionsAL, false);  
+			gz.printJson("exonicMedianPerBpCoverage", exonicMedianPerBpCoverageAL, false);  
 			gz.println("}");
 			gz.close();
 
@@ -502,6 +504,15 @@ public class Sam2USeq {
 							Arrays.sort(counts);
 							perRegionsGzipper.println(chromData.chromosome+"\t"+chromData.strand+"\t"+r.getStart()+"\t"+r.getStop()+"\t"+
 									r.getText()+"\t"+fracPass+"\t"+Num.statFloatArrayWithSizeChecks(counts)); 
+							
+							//save mean count?
+							if (jsonOutputFile != null){
+								double median = Num.median(counts); 
+								String res = chromData.chromosome+":"+ r.getStart()+"-"+r.getStop()+" "+median;
+								exonicMedianPerBpCoverageAL.add(res);
+							}
+							
+							
 						}
 					}
 				}
@@ -1036,7 +1047,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam 2 USeq : Dec 2015                             **\n" +
+				"**                                Sam 2 USeq : March 2016                           **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
