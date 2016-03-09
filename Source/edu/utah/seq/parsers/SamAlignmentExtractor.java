@@ -28,6 +28,7 @@ public class SamAlignmentExtractor {
 	private boolean biggerASIsBetter = true;
 	private boolean divideAlignmentScoreByCigarM = false;
 	private boolean writeOffTargetToPass = false;
+	private boolean removeSecSupNotPrim = true;
 
 	//internal fields
 	private HashMap<String,RegionScoreText[]> chromRegions;
@@ -47,6 +48,7 @@ public class SamAlignmentExtractor {
 	private int numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate;
 	private File jsonOutputFile;
 	
+	
 	//constructors
 	/**Stand alone.*/
 	public SamAlignmentExtractor(String[] args){
@@ -54,6 +56,8 @@ public class SamAlignmentExtractor {
 		
 		//set fields
 		processArgs(args);
+		
+		printSettings();
 		
 		//launch
 		run();
@@ -63,7 +67,19 @@ public class SamAlignmentExtractor {
 		System.out.println("\nDone! "+Math.round(diffTime)+" minutes\n");
 	}
 
-
+	public void printSettings(){
+		System.out.println("Settings:");
+		System.out.println("Bam\t"+bamFile);
+		System.out.println("Bed\t"+bedFile);
+		System.out.println("Save dir\t"+saveDirectory);
+		System.out.println("Min Map Qual\t"+minimumMappingQuality);
+		System.out.println("Align Score\t"+alignmentScoreThreshold);
+		System.out.println("Bigger AS is better\t"+biggerASIsBetter);
+		System.out.println("Divide AS by cigar M\t"+divideAlignmentScoreByCigarM);
+		System.out.println("Pass off target align\t"+writeOffTargetToPass);
+		System.out.println("Fail Sec, Sup, Non Prim align\t"+removeSecSupNotPrim);
+	}
+	
 	public void run(){
 		try {
 			
@@ -72,8 +88,7 @@ public class SamAlignmentExtractor {
 
 			//for each
 			//TODO: thread this! would need to write out individual them merge... might be slow.. the bottleneck is the io not the compute so parallel won't gain much
-			if (writeOffTargetToPass) System.out.println("Walking bam alignments, saving off target to pass file");
-			else System.out.print("Walking bam alignments");
+			System.out.print("\nWalking bam alignments");
 			Iterator<SAMSequenceRecord> it = chrList.iterator();
 			while (it.hasNext()){
 				SAMSequenceRecord ssr = it.next();
@@ -93,7 +108,7 @@ public class SamAlignmentExtractor {
 			
 			//print stats
 			System.out.println("\n\nSAE statistics:");
-			printStatLine(numFailingBasic, numRawAlignments, "Unmapped, failing vendor QC, secondary");
+			printStatLine(numFailingBasic, numRawAlignments, "Unmapped, failing vendor QC, possibly secondary/ non prim");
 			printStatLine(numPassingBasicAndOnTarget, (numRawAlignments-numFailingBasic), "On target regions");
 			printStatLine(numPassingBasicOnTargetYetFailingMQ, numPassingBasicAndOnTarget, "Failing MQ score ("+minimumMappingQuality+")");
 			String dir = "<";
@@ -219,7 +234,10 @@ public class SamAlignmentExtractor {
 	}
 	
 	private boolean passBasic(SAMRecord sam){
-		if (sam.getReadUnmappedFlag() || sam.isSecondaryOrSupplementary() || sam.getReadFailsVendorQualityCheckFlag()) return false;
+		if (sam.getReadUnmappedFlag() || sam.getReadFailsVendorQualityCheckFlag()) return false;
+		else if (removeSecSupNotPrim ){
+			if (sam.isSecondaryOrSupplementary() || sam.getNotPrimaryAlignmentFlag()) return false;
+		}
 		return true;
 	}
 
@@ -329,6 +347,7 @@ public class SamAlignmentExtractor {
 					case 'n': biggerASIsBetter = false; break;
 					case 'd': divideAlignmentScoreByCigarM = true; break;
 					case 'f': writeOffTargetToPass = true; break;
+					case 'x': removeSecSupNotPrim = false; break;
 					case 'j': jsonOutputFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group()+", Try -h");
@@ -411,7 +430,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Sam Alignment Extractor: Oct 2015                     **\n" +
+				"**                          Sam Alignment Extractor: March 2016                     **\n" +
 				"**************************************************************************************\n" +
 				"Splits an alignment file into those that pass or fail thresholds and intersects\n"+
 				"regions of interest. Calculates a variety of QC statistics.\n"+
@@ -429,6 +448,8 @@ public class SamAlignmentExtractor {
 				"-d Divide alignment score by the number of CIGAR M bases.\n"+
 				"-j Write summary stats in json format to this file.\n"+
 				"-f Save off target alignments that meet thresholds to the pass file, defaults to fail.\n"+
+				"-x Save secondary, supplemental, and non primary alignments, that pass the thresholds\n"+
+				"       defaults to fail.\n"+
 
 				"\n"+
 
