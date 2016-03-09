@@ -24,7 +24,7 @@ public class MatchMates {
 	//internal fields
 	private SamReader bamReader;
 	private SAMFileWriter passingBamWriter;
-	private SAMFileWriter failingBamWriter;
+	private Gzipper failingSam;
 	private File jsonOutputFile;
 
 	//counters
@@ -63,7 +63,7 @@ public class MatchMates {
 			//print stats
 			System.out.println("MM statistics:");
 			System.out.println(numRawAlignments+"\tNum input alignments");
-			System.out.println(numFailingAlignments+"\tNum non primary or vendor failing QC alignments");
+			System.out.println(numFailingAlignments+"\tNum non primary, secondary, supplemental or vendor failing QC alignments failed");
 			System.out.println(numPaired+"\tNum alignment pairs joined and saved");
 			System.out.println(numUnpaired+"\tNum unpaired alignments passing filters and saved");
 			System.out.println(numUnalignedPairs+"\tNum unaligned pairs failed");
@@ -119,7 +119,7 @@ public class MatchMates {
 			//remove any that are secondary or fail vendor QC, want to keep unmapped incase their mate is mapped
 			//calling all of the methods since these are not getting into the failed file for some reason
 			if (sam.getSupplementaryAlignmentFlag() || sam.isSecondaryOrSupplementary() || sam.getReadFailsVendorQualityCheckFlag() || sam.getNotPrimaryAlignmentFlag()){
-				failingBamWriter.addAlignment(sam);
+				failingSam.println(sam.getSAMString().trim());
 				numFailingAlignments++;
 				continue;
 			}
@@ -158,8 +158,8 @@ public class MatchMates {
 			else if (sop.getReadUnmappedFlag() == false) printPair(sop, fop);
 			//ugg both unaligned so fail em
 			else {
-				failingBamWriter.addAlignment(sop);
-				failingBamWriter.addAlignment(fop);
+				failingSam.println(sop.getSAMString().trim());
+				failingSam.println(fop.getSAMString().trim());
 				numUnalignedPairs++;
 			}
 		}
@@ -168,7 +168,7 @@ public class MatchMates {
 			SAMRecord s = sameNameSams.get(0);
 			if (s.getReadUnmappedFlag() == false) printUnpaired(sameNameSams.get(0));
 			else {
-				failingBamWriter.addAlignment(s);
+				failingSam.println(s.getSAMString().trim());
 				numUnalignedSingles++;
 			}
 		}
@@ -296,14 +296,14 @@ public class MatchMates {
 
 			passingBamFile = new File(saveDirectory, "passMM.bam");
 			passingBamFile.deleteOnExit();
-			File fail = new File(saveDirectory, "failMM.bam");
+			File fail = new File(saveDirectory, "failMM.sam.gz");
 			SAMFileWriterFactory writerFactory = new SAMFileWriterFactory();
 			writerFactory.setCreateIndex(false);
 			writerFactory.setTempDirectory(saveDirectory);
 
 			//must explicit set into the header that it is sorted for samtools proc alignments
 			passingBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), false, passingBamFile);
-			failingBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), false, fail);
+			failingSam = new Gzipper(fail); 
 
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -315,7 +315,7 @@ public class MatchMates {
 		try {
 			bamReader.close();
 			passingBamWriter.close();
-			failingBamWriter.close();
+			failingSam.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError: critical, problem closing the bam IO \n");
@@ -325,7 +325,7 @@ public class MatchMates {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 MatchMates: Sept 2015                            **\n" +
+				"**                                 MatchMates: March 2016                           **\n" +
 				"**************************************************************************************\n" +
 				"This app attaches mates of aligned first of pair reads to the attributes and modifies\n"+
 				"the start position to enable sorting by unclipped start. Call Consensus to cluster and\n"+
