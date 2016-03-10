@@ -26,7 +26,6 @@ public class ArupPipelineWrapper {
 	private File pProperties = null;
 	private File bedForCoverageQC = null;
 	private File bedForVarCalling = null;
-	private File bedForBadRegions = null;
 	private File fastaReference = null;
 	private File unfilteredBam = null;
 	private File finalBam = null;
@@ -122,7 +121,6 @@ public class ArupPipelineWrapper {
 		String s = 
 			"<bedForCoverageQC class='buffer.BEDFile' filename='"+bedForCoverageQC+"' />\n" +
 			"<bedForVars class='buffer.BEDFile' filename='"+ bedForVarCalling +"' />\n" +
-			"<bedForBadRegions class='buffer.BEDFile' filename='"+ bedForBadRegions +"' />\n" +
 			"<reference class='buffer.ReferenceFile' filename='"+ fastaReference +"' />\n" +
 			"<finalBAM class='buffer.BAMFile' filename='"+ finalBam +"' />\n" +
 			"<unfilteredBAM class='buffer.BAMFile' filename='"+ unfilteredBam +"' />\n" +
@@ -195,10 +193,13 @@ public class ArupPipelineWrapper {
 				"	<VariantPool /> \n"+
 				"</dbNSFPAnnotate> \n"+
 				
-				"<BadRegions class='plugins.annotators.regions.BadRegionAnnotator'> \n"+
-				"	<VariantPool /> \n"+
-				"	<bedForBadRegions /> \n"+
-				"</BadRegions> \n"+
+				//not needed anymore, run the USeq VCFRegionMarker to modify the FILTER column in the vcf
+				//this info will be propagated into the csv and json.gz variant files.
+				
+				//"<BadRegions class='plugins.annotators.regions.BadRegionAnnotator'> \n"+
+				//"	<VariantPool /> \n"+
+				//"	<bedForBadRegions /> \n"+
+				//"</BadRegions> \n"+
 				
 				//Gene annotators
 				"<HGMDGene class='operator.gene.HGMDAnnotator'> \n"+
@@ -312,8 +313,9 @@ public class ArupPipelineWrapper {
 	public String fetchVariantOutputXml(){
 		String s =
 				
-		//Write variants to csv file and include bad.region 
-		"<ViewerFile class='plugins.writers.varviewer.VarViewerWriter' anno.keys='bad.region'> \n"+
+		//Write variants to csv file no need for including bad.region, use the USeq VCFRegionMarker instead 
+		//"<ViewerFile class='plugins.writers.varviewer.VarViewerWriter' anno.keys='bad.region'> \n"+
+		"<ViewerFile class='plugins.writers.varviewer.VarViewerWriter'> \n"+
 		"	<VariantPool /> \n"+
 		"	<Genes /> \n"+
 		"	<ViewerCSV class='buffer.CSVFile' filename='"+ outputDirectory.getName()+"_annotated.csv' /> \n"+
@@ -420,7 +422,6 @@ public class ArupPipelineWrapper {
 					case 'p': pProperties = new File(args[++i]); break;
 					case 'q': bedForCoverageQC = new File(args[++i]); break;
 					case 'b': bedForVarCalling = new File(args[++i]); break;
-					case 'a': bedForBadRegions = new File(args[++i]); break;
 					case 'r': fastaReference = new File(args[++i]); break;
 					case 'u': unfilteredBam = new File(args[++i]); break;
 					case 'f': finalBam = new File(args[++i]); break;
@@ -492,7 +493,6 @@ public class ArupPipelineWrapper {
 				"  -p Path to the pipeline properties file\n"+
 				"  -q Path to the bed file for coverage QC\n"+
 				"  -b Path to the bed file for variant calling\n"+
-				"  -a Path to the bed file for flagging poor quality regions\n"+
 				"  -r Path to the fasta reference file w/ index and dict\n"+
 				"  -u Path to the unfiltered bam file\n"+
 				"  -f Path to the filtered bam file\n"+
@@ -504,7 +504,7 @@ public class ArupPipelineWrapper {
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/ArupPipelineWrapper -o MyJobNix3 -m DNix \n"+
 				"    -j ~/BioApps/Pipeline-1.0-SNAPSHOT-jar-with-dependencies.jar -y TestAnaly -w \n"+
 				"    ~/WebLinks -t 300 -d Results -p small_pipeline_properties.xml -q \n"+
-				"    0758221_compPad25bp_v1.bed -b 0758221_v1.bed -a probBps0.05Pad1bp.bed -r \n"+
+				"    0758221_compPad25bp_v1.bed -b 0758221_v1.bed -r \n"+
 				"    ~/HCIAtlatl/data/Human/B37/human_g1k_v37_decoy.fasta -u CNV36B_unfiltered.bam -f \n"+
 				"    CNV36B_final.bam -v CNV36B_snvIndel.vcf\n\n" +
 
@@ -539,7 +539,6 @@ public class ArupPipelineWrapper {
 		nameFile.put("Pipeline properties", pProperties);
 		nameFile.put("Coverage QC bed", bedForCoverageQC);
 		nameFile.put("Variant calling bed", bedForVarCalling);
-		nameFile.put("Poor quality region bed", bedForBadRegions);
 		nameFile.put("Fasta genome reference", fastaReference);
 		nameFile.put("Unfiltered bam", unfilteredBam);
 		nameFile.put("Final bam", finalBam);
