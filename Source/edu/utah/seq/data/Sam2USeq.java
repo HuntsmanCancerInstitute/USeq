@@ -328,7 +328,7 @@ public class Sam2USeq {
 			gz.printJson("targetRegionsFileName", regionFile.getName(), true);
 			gz.printJson("coverageAt0.95OfTargetBps", coverageAt95, true);
 			gz.printJson("fractionTargetBpsWithIndexedCoverage", Num.arrayListToDoubles(fractionTargetBpsAL), true);
-			gz.printJson("lowCoverageRegions", lowCoverageRegionsAL, false);  
+			gz.printJson("lowCoverageRegions", lowCoverageRegionsAL, true);  
 			gz.printJson("exonicMedianPerBpCoverage", exonicMedianPerBpCoverageAL, false);  
 			gz.println("}");
 			gz.close();
