@@ -49,7 +49,11 @@ public class LofreqVCFParser {
 				line = line.trim();
 				//header? just print out
 				if (line.startsWith("#")) {
-					if (appendFNT && line.startsWith("#CHROM")) modVcf.println(line+"\tFORMAT\tNORMAL\tTUMOR");
+					if (appendFNT && line.startsWith("#CHROM")) {
+						//add GT line, then concluding comment line
+						modVcf.println("##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">");
+						modVcf.println(line+"\tFORMAT\tNORMAL\tTUMOR");
+					}
 					else modVcf.println(line);
 				}
 				//data line
@@ -94,7 +98,7 @@ public class LofreqVCFParser {
 					line = Misc.stringArrayToString(tokens, "\t");
 					
 					//print
-					if (appendFNT) modVcf.println(line+"\t.\t.\t.");
+					if (appendFNT) modVcf.println(line+"\tGT\t./.\t./.");
 					else modVcf.println(line);
 					
 				}
@@ -180,7 +184,7 @@ public class LofreqVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Lofreq VCF Parser: Dec 2015                          **\n" +
+				"**                             Lofreq VCF Parser: April 2016                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses Lofreq vcf files with options for filtering for minimum QUAL, modifying the\n"+
 				"FILTER field, removing non SNVs, and appending FORMAT info for downstream merging.\n"+

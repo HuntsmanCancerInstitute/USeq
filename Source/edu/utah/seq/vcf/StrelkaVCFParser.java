@@ -26,6 +26,7 @@ public class StrelkaVCFParser {
 	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
 	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
 	private String afFormat = "##FORMAT=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency\">";
+	private String gtFormat = "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">";
 	private double minimumTumorAltFraction = 0;
 	
 	public StrelkaVCFParser (String[] args) { 
@@ -191,10 +192,12 @@ public class StrelkaVCFParser {
 				fields[6] = ".";
 				//add af to format
 				fields[8] = fields[8]+ ":AF";
+				//add GT to format, igv is now requiring this to be first
+				fields[8] = "GT:"+fields[8]+ ":AF";
 				//add af to Norm and Tum
-				fields[9] = fields[9]+ ":"+ formatAf (vcf.getSample()[0].getAltRatio());
+				fields[9] = "./.:"+ fields[9]+ ":"+ formatAf (vcf.getSample()[0].getAltRatio());
 				String tumorAf = formatAf (vcf.getSample()[1].getAltRatio());
-				fields[10] = fields[10]+ ":"+ tumorAf;
+				fields[10] = "./.:"+ fields[10]+ ":"+ tumorAf;
 				//add DP and AF for tumor to INFO
 				fields[7] = "DP=" + vcf.getSample()[1].getReadDepthDP()+ ";AF=" + tumorAf + ";"+ fields[7] ;
 				
@@ -215,6 +218,7 @@ public class StrelkaVCFParser {
 			if (afInfo != null && h.startsWith("##FORMAT")) {
 				out.println(afInfo);
 				out.println(dpInfo);
+				out.println(this.gtFormat);
 				out.println(afFormat);
 				afInfo = null;
 			}
@@ -271,7 +275,7 @@ public class StrelkaVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Strelka VCF Parser: Feb 2015                         **\n" +
+				"**                            Strelka VCF Parser: April 2016                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS\n"+
 				"score. Also filters for minimum tumor normal read depth, T/N alt allelic ratio,\n"+

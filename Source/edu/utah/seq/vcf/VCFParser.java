@@ -390,8 +390,7 @@ public class VCFParser {
 		
 		//Concatenate sources
 		String concatSource = null;
-		int numS = source.size();
-System.out.println("\nNNNNNNNNumS "+numS);		
+		int numS = source.size();	
 		if (numS>0){
 			StringBuilder sb = new StringBuilder("##source=");
 			Iterator<String> it = source.iterator();
@@ -401,7 +400,6 @@ System.out.println("\nNNNNNNNNumS "+numS);
 			}
 			if (numS>1) sb.append("USeqMerged");
 			concatSource = sb.toString();
-			System.out.println("\n"+concatSource);
 		}
 		
 		int num = other.size();
