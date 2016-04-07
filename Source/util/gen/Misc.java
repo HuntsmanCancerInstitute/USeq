@@ -16,6 +16,7 @@ public class Misc {
 	
 	public static final Pattern PATTERN_SEMICOLON = Pattern.compile(";");
 	public static final Pattern PATTERN_EQUALS = Pattern.compile("=");
+	public static final Pattern FORWARD_SLASH = Pattern.compile("/");
 	public static final Pattern TAB = Pattern.compile("\t");
 	public static final Pattern WHITESPACE = Pattern.compile("\\s+");
 	public static final Pattern UNDERSCORE = Pattern.compile("_");
@@ -32,6 +33,15 @@ public class Misc {
 	    System.gc(); System.gc(); System.gc(); System.gc();
 	    return Runtime.getRuntime().totalMemory() -
 	      Runtime.getRuntime().freeMemory();
+	}
+	
+	/**If present removes a leading or trailing /   /results/go/ -> results/go */
+	public static String removeLeadingTrailingForwardSlashes(String toTrim){
+		int beginningIndex = 0;
+		int endingIndex = toTrim.length();
+		if (toTrim.startsWith("/")) beginningIndex++;
+		if (toTrim.endsWith("/")) endingIndex--;
+		return toTrim.substring(beginningIndex, endingIndex);
 	}
 	
 	/**Finds Strings common to all, any zero sized or null members will cause a return of a zero sized AL.*/

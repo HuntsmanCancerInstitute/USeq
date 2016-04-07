@@ -23,6 +23,14 @@ public class Num {
 		return false;
 	}
 	
+	/**Formats bytes to B, KB, MG, GB, TB, PB, EB. copied from icza at 
+	 * http://stackoverflow.com/questions/3758606/how-to-convert-byte-size-into-human-readable-format-in-java */
+	public static String formatBytesToHumanReadableSize(long v) {
+	    if (v < 1024) return v + " B";
+	    int z = (63 - Long.numberOfLeadingZeros(v)) / 10;
+	    return String.format("%.1f %sB", (double)v / (1L << (z*10)), " KMGTPE".charAt(z));
+	}
+	
 	/**Does a linear regression type interpolation, assumes 2's are > 1's.*/
 	public static float interpolateY(float x1, float y1, float x2, float y2, float fixedX){
 		float diffX = x2-x1;

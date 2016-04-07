@@ -367,11 +367,7 @@ public class VCFParser {
 					if (format.contains(h) == false) format.add(h);
 				}
 				else if (h.startsWith("##source=")){
-					//split on =
-					String[] s = Misc.PATTERN_EQUALS.split(h);
-					//split on whitespace
-					String[] realS = Misc.WHITESPACE.split(s[1]);
-					source.add(realS[0]);
+					source.add(parseSourceName(h));
 				}
 				else if (h.startsWith("#CHROM")) {
 					if (chromLine == null) chromLine = h;
@@ -423,6 +419,23 @@ public class VCFParser {
 		//Misc.printArray(merge);
 		
 		return merge;
+	}
+	
+	/**Parses the name of the app used to create the vcf from it's ##source= header, tested with strelka and lofreq.*/
+	public static String parseSourceName(String h){
+		//examples
+		//##source=strelka
+		//##source=/uufs/chpc.utah.edu/common/home/arup-storage3/Reference/Apps/LoFreq/lofreq_star-2.1.2/bin/lofreq call -m 20 -q 13 -Q 13 -f /uufs/chpc.utah.edu/common/home/arup-storage3/Reference/Data/B37/BWA/APCompCanPseudoMaskedv3/mod_3_human_g1k_v37_decoy.fasta -o 11054N_Lofreq/lofreq.snv.vcf -s -S /uufs/chpc.utah.edu/common/home/arup-storage3/Reference/Data/B37/DbSNP/dbSNP_146_20151104/All_20151104.vcf.gz -l /uufs/chpc.utah.edu/common/home/arup-storage3/Reference/Bed/B37/Somatic/APCompCancer/V3/A3370/compcancer_321transcripts_118gene_cds_v2_bed3.bed 11054N_final.bam
+
+		//split on = sign
+		String[] s = Misc.PATTERN_EQUALS.split(h);
+		
+		//split on whitespace to pull actual source
+		String[] sourceToken = Misc.WHITESPACE.split(s[1]);
+		
+		//split on /, to pull lofreq name
+		String[] name = Misc.FORWARD_SLASH.split(sourceToken[0]);
+		return name[name.length-1];
 	}
 	
 	/*Parses ID, keeps first one if dups found.*/
