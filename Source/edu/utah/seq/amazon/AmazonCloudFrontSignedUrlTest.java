@@ -5,7 +5,7 @@ import java.io.File;
 import java.util.Date;
 import com.amazonaws.services.cloudfront.*;
 
-public class AmazonSignedUrlTest {
+public class AmazonCloudFrontSignedUrlTest {
 
 	public static void main(String[] args) {
 		try {
@@ -26,7 +26,8 @@ public class AmazonSignedUrlTest {
 					Protocol.https, distributionDomain, privateKeyFile,
 					s3PathAndFileName, keyPairId, urlLinkExpirationDate);
 
-			System.out.println(url1);
+			System.out.println("wget -O test "+url1);
+			
 			
 			//Note this URL will throw an access denied for 5+min until it becomes available, so patience!
 

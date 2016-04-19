@@ -16,6 +16,7 @@ public class ArupPipelineWrapper {
 	private String submitter = "";
 	private String analysisType = "";
 	private String minimumReadDepth = "";
+	private String threads = "";
 	
 	//defaults
 	private boolean uploadVarsToNGSWeb = false;
@@ -23,7 +24,7 @@ public class ArupPipelineWrapper {
 	
 	//files
 	private File pJar = null;
-	private File pProperties = null;
+	private File truncPipePropFile = null;
 	private File bedForCoverageQC = null;
 	private File bedForVarCalling = null;
 	private File fastaReference = null;
@@ -32,10 +33,12 @@ public class ArupPipelineWrapper {
 	private File finalVcf = null;
 	private File webRootForLinks = null;
 	private File outputDirectory = null;
+	private File referenceDir = null;
 	
 	//internal
 	private String xmlTemplate = null;
 	private boolean deleteTempVcf = false;
+	private File completePipelinePropFile = null;
 	
 	
 	//constructor
@@ -43,6 +46,8 @@ public class ArupPipelineWrapper {
 		long startTime = System.currentTimeMillis();
 		
 		processArgs(args);
+		
+		buildXmlPropertiesFile();
 		
 		buildXmlTemplate();
 		
@@ -55,6 +60,46 @@ public class ArupPipelineWrapper {
 		System.out.println("\nDone! "+Math.round(diffTime)+" minutes\n");
 	}
 
+	private void buildXmlPropertiesFile() {
+		System.out.println("\nBuilding and checking your pipeline properties file -> "+truncPipePropFile);
+		StringBuilder toPrint = new StringBuilder();
+		
+		//walk through the prop file
+		String[] prop = IO.loadFileIntoStringArray(truncPipePropFile);
+		Pattern val = Pattern.compile("(<entry key.+>)([D|A|B].*)</entry>");
+		boolean missingFile = false;
+		for (String s: prop){
+			//does it match a file needing prepending? Data/, Apps/, Bed/
+			Matcher mat = val.matcher(s);
+			if (mat.matches()){
+				File test = new File (referenceDir, mat.group(2));
+				if (test.exists()) {
+					System.out.println("Found\t"+test);
+					toPrint.append(mat.group(1));
+					toPrint.append(test.toString());
+					toPrint.append("</entry>");
+				}
+				else {
+					System.out.println("Misssing\t"+test);
+					missingFile = true;
+				}
+			}
+			//threads?
+			else if (s.contains("threads")) toPrint.append("<entry key=\"threads\">"+threads+"</entry>");
+		
+			//nope just save it and add a line return
+			else toPrint.append(s);
+			toPrint.append("\n");
+		}
+		//anything missing? if so exit
+		if (missingFile) Misc.printErrAndExit("\nFailed to find all of the files in your properties file, see above.\n");
+		
+		//OK, write it out
+		completePipelinePropFile = new File (outputDirectory, "pipelineProperties.xml");
+		if (IO.writeString(toPrint.toString(), completePipelinePropFile) == false) Misc.printErrAndExit("Problem writing -> "+truncPipePropFile);
+
+	}
+
 	private void executePipelineJob() {
 		String[] cmd = null;
 		try {
@@ -63,14 +108,16 @@ public class ArupPipelineWrapper {
 			if (IO.writeString(xmlTemplate, template) == false) Misc.printErrAndExit("Problem writing -> "+template);
 			
 			//build and execute cmd
-			cmd = new String[]{"java", "-jar", "-Xmx2G", pJar.getCanonicalPath(), "-props", pProperties.getCanonicalPath(), template.getCanonicalPath()};			
+			cmd = new String[]{"java", "-jar", "-Xmx2G", pJar.getCanonicalPath(), "-props", completePipelinePropFile.getCanonicalPath(), template.getCanonicalPath()};			
 			
-			System.out.println("\nExecuting:\n"+Misc.stringArrayToString(cmd, " "));
-
-			String cmdLineOutput = IO.executeCommandReturnError(cmd);
-			//check and write output to stdout
-			if (cmdLineOutput.contains("ERROR")) Misc.printErrAndExit(cmdLineOutput+"\n\nERROR found in Pipeline.jar output, see above. Aborting!");
-			System.out.println("\nPipelineOutput:\n"+cmdLineOutput);
+			String stringCmd = Misc.stringArrayToString(cmd, " ");
+			System.out.println("\nExecuting:\n"+stringCmd);
+			System.out.println("\nPipelineOutput:");
+			String[] out = IO.executeViaProcessBuilder(cmd, true);
+			String cmdLineOutput = Misc.stringArrayToString(out, "\n").toLowerCase();
+			
+			//check output for possible errors
+			if (cmdLineOutput.contains("error")) Misc.printErrAndExit(cmdLineOutput+"\n\nERROR found in Pipeline.jar output, see above. Aborting!");
 			
 		} catch (Exception e){
 			e.printStackTrace();
@@ -102,7 +149,8 @@ public class ArupPipelineWrapper {
 	}
 
 
-	private void buildXmlTemplate() {
+	private void buildXmlTemplate() {		
+		
 		StringBuilder sb = new StringBuilder();
 		sb.append("<Pipeline>\n\n");
 		sb.append(fetchFieldXml());
@@ -160,9 +208,14 @@ public class ArupPipelineWrapper {
 				//This requires installation of List/MoreUtils.pm and Math/Round.pm and setting them in the $PERL5LIB path.
 				//It also requires hard coding the path to the splice models in the scoreSpliceSites perl app, see $dir.  
 				//NOT good! 
-				"<SpliceAnnotate class='operator.variant.SplicingPredictionAnnotator'> \n"+
+				//"<SpliceAnnotate class='operator.variant.SplicingPredictionAnnotator'> \n"+
+				//"	<VariantPool /> \n"+
+				//"</SpliceAnnotate> \n"+
+				
+				//Try this one for annotating snv splice junctions.  Doesn't handle INDELS.
+				"<GeneAnnotate class='operator.variant.ScSNVAnnotate'> \n"+
 				"	<VariantPool /> \n"+
-				"</SpliceAnnotate> \n"+
+				"</GeneAnnotate> \n"+
 				
 				"<ExAC63KAnnotate class='operator.variant.ExAC63KExomesAnnotator' justLoadOverall='true' > \n"+
 				"	<VariantPool /> \n"+
@@ -311,6 +364,7 @@ public class ArupPipelineWrapper {
 	}
 	
 	public String fetchVariantOutputXml(){
+		
 		String s =
 				
 		//Write variants to csv file no need for including bad.region, use the USeq VCFRegionMarker instead 
@@ -319,7 +373,7 @@ public class ArupPipelineWrapper {
 		"	<VariantPool /> \n"+
 		"	<Genes /> \n"+
 		"	<ViewerCSV class='buffer.CSVFile' filename='"+ outputDirectory.getName()+"_annotated.csv' /> \n"+
-		"</ViewerFile> \n"+
+		"</ViewerFile> \n\n"+
 				
 		//Create Final JsonQC Section (needs to happen after variant calls)
 		"<QCtoJSON class='operator.qc.QCtoJSON'> \n"+
@@ -332,7 +386,7 @@ public class ArupPipelineWrapper {
 		"	<NoCallCSV /> \n"+
 		"	<QCOutputFile class='buffer.TextBuffer' filename='qc.json' /> \n"+
 		"</QCtoJSON> \n"+
-				"\n";
+		"\n";
 		return s;
 	}
 	
@@ -341,8 +395,7 @@ public class ArupPipelineWrapper {
 		//Upload variants to NGS.Web
 		"<VarUploader class='operator.variant.VariantUploader' sampleID='"+ sampleId+"'> \n"+
 		"	<VariantPool /> \n"+
-		"</VarUploader> \n\n";
-				
+		"</VarUploader> \n\n";	
 		return s;
 	}
 	
@@ -351,8 +404,7 @@ public class ArupPipelineWrapper {
 				"<CreateBAMLink class='operator.LinkCreator' sample='"+ outputDirectory.getName()+"' web.root='"+ webRootForLinks+"' result.dir='links/'> \n"+
 				"        <finalBAM /> \n"+
 				"        <bedForVars /> \n"+
-				"</CreateBAMLink> \n\n";
-				
+				"</CreateBAMLink> \n\n";		
 		return s;
 	}
 	
@@ -370,20 +422,6 @@ public class ArupPipelineWrapper {
 			"    <QCOutputFile /> \n"+
 			"    <bedForVars /> \n"+
 			"</ReviewDirGenerator> \n\n";
-			
-			//delete files, hmm for some reason this is not working, skipping and running own cleanup
-			/*
-			"<Cleanup class='operator.RemoveFile'> \n"+
-			"	<realignTargets /> \n"+
-			"	<gatkDepthFiles class='buffer.GlobFileBuffer' filename='.*.DOC.sample_.*' /> \n"+
-			"	<gatkNoCallDepthFiles class='buffer.GlobFileBuffer' filename='nocallDepths.sample_.*' /> \n"+
-			"	<snpeffFiles class='buffer.GlobFileBuffer' filename='snpeff.*' /> \n"+
-			"	<noCallFiles class='buffer.GlobFileBuffer' filename='nocalls.*' /> \n"+
-			"	<noCall2Files class='buffer.GlobFileBuffer' filename='noCallDepths.*' /> \n"+
-			"	<spliceFiles class='buffer.GlobFileBuffer' filename='.*plice.*' /> \n"+
-			"</Cleanup> \n\n";
-			*/
-
 		} catch (IOException e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError fetching clean up and review dir links.\n");
@@ -416,10 +454,11 @@ public class ArupPipelineWrapper {
 					case 'y': analysisType = args[++i]; break;
 					case 'w': webRootForLinks = new File(args[++i]); break;
 					case 'e': snpEffGenome = args[++i]; break;
-					case 't': minimumReadDepth = args[++i]; break;
+					case 'i': minimumReadDepth = args[++i]; break;
+					case 't': threads = args[++i]; break;
 					case 'l': uploadVarsToNGSWeb = true; break;
 					case 'j': pJar = new File(args[++i]); break;
-					case 'p': pProperties = new File(args[++i]); break;
+					case 'p': truncPipePropFile = new File(args[++i]); break;
 					case 'q': bedForCoverageQC = new File(args[++i]); break;
 					case 'b': bedForVarCalling = new File(args[++i]); break;
 					case 'r': fastaReference = new File(args[++i]); break;
@@ -427,6 +466,7 @@ public class ArupPipelineWrapper {
 					case 'f': finalBam = new File(args[++i]); break;
 					case 'v': finalVcf = new File(args[++i]); break;
 					case 'd': outputDirectory = new File(args[++i]); break;
+					case 'c': referenceDir = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -436,8 +476,6 @@ public class ArupPipelineWrapper {
 				}
 			}	
 		}
-		
-		
 		
 		//check output dir and if needed set sampleId
 		if (outputDirectory !=null) {
@@ -455,9 +493,7 @@ public class ArupPipelineWrapper {
 		//look for required fields and files
 		checkPrintFields();
 		checkPrintFiles();
-		checkPropFiles();
 		checkForGzippedVcf();
-		
 		
 	}
 
@@ -476,7 +512,7 @@ public class ArupPipelineWrapper {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           ArupPipelineWrapper: March 2016                        **\n" +
+				"**                           ArupPipelineWrapper: April 2016                        **\n" +
 				"**************************************************************************************\n" +
 				"This app wraps ARUP's pipeline.jar app for generating QC metrics, annotating variants,\n"+
 				"and lastly creates the review directory.\n"+
@@ -486,11 +522,13 @@ public class ArupPipelineWrapper {
 				"  -m Submitter\n"+
 				"  -y Analysis type\n"+
 				"  -w Provide a root path for web links if you'd like to make them.\n"+
-				"  -t Minimum alignment depth\n"+
+				"  -i Minimum alignment depth\n"+
+				"  -t Threads\n"+
 				"  -s Sample ID, defaults to name of output directory.\n"+
 				"  -d Path to the output directory\n"+
 				"  -j Path to the pipeline.jar application\n"+
-				"  -p Path to the pipeline properties file\n"+
+				"  -p Path to the truncated pipeline properties file needing Reference prepending.\n"+
+				"  -c Path to the properties Reference directory containing the Data, Apps, and Bed dirs.\n"+
 				"  -q Path to the bed file for coverage QC\n"+
 				"  -b Path to the bed file for variant calling\n"+
 				"  -r Path to the fasta reference file w/ index and dict\n"+
@@ -503,8 +541,8 @@ public class ArupPipelineWrapper {
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/ArupPipelineWrapper -o MyJobNix3 -m DNix \n"+
 				"    -j ~/BioApps/Pipeline-1.0-SNAPSHOT-jar-with-dependencies.jar -y TestAnaly -w \n"+
-				"    ~/WebLinks -t 300 -d Results -p small_pipeline_properties.xml -q \n"+
-				"    0758221_compPad25bp_v1.bed -b 0758221_v1.bed -r \n"+
+				"    ~/WebLinks -i 300 -d Results -p truncPipeProp.xml -c /Pipe/Reference/\n"+
+				"    -q 0758221_compPad25bp_v1.bed -b 0758221_v1.bed -t 24 -r \n"+
 				"    ~/HCIAtlatl/data/Human/B37/human_g1k_v37_decoy.fasta -u CNV36B_unfiltered.bam -f \n"+
 				"    CNV36B_final.bam -v CNV36B_snvIndel.vcf\n\n" +
 
@@ -519,6 +557,7 @@ public class ArupPipelineWrapper {
 		nameField.put("Submitter", submitter);
 		nameField.put("Analysis Type", analysisType);
 		nameField.put("Minimum Align Depth", minimumReadDepth);
+		nameField.put("Threads", threads);
 		nameField.put("SnpEff Genome", snpEffGenome);
 		//set output of booleans
 		nameField.put("Upload Vars to NGSWeb", uploadVarsToNGSWeb+ "");
@@ -535,8 +574,9 @@ public class ArupPipelineWrapper {
 	
 	public void checkPrintFiles(){
 		LinkedHashMap<String,File> nameFile = new LinkedHashMap<String,File>();
+		nameFile.put("Reference directory", referenceDir);
 		nameFile.put("Pipeline.jar", pJar);
-		nameFile.put("Pipeline properties", pProperties);
+		nameFile.put("Pipeline properties", truncPipePropFile);
 		nameFile.put("Coverage QC bed", bedForCoverageQC);
 		nameFile.put("Variant calling bed", bedForVarCalling);
 		nameFile.put("Fasta genome reference", fastaReference);
@@ -550,29 +590,17 @@ public class ArupPipelineWrapper {
 		System.out.println("\nResources (name exists path):");
 		for (String name: nameFile.keySet()){
 			File f = nameFile.get(name);
-			if (f.exists() == false) missingFile = true;
-			System.out.println(name+"\t"+f.exists()+"\t"+f);
+			boolean fExists = true;
+			if (f == null) {
+				fExists = false;
+				missingFile = true;
+			}
+			else {
+				fExists = f.exists();
+				if (fExists == false) missingFile = true;
+			}
+			System.out.println(name+"\t"+fExists+"\t"+f);
 		}
 		if (missingFile) Misc.printErrAndExit("\nMissing resources! See above.");
 	}
-	
-	private void checkPropFiles() {
-		System.out.println("\nChecking your properties file -> "+pProperties);
-		String[] prop = IO.loadFileIntoStringArray(pProperties);
-		Pattern val = Pattern.compile("<entry key.+>(/.*)</entry>");
-		boolean missingFile = false;
-		for (String s: prop){
-			Matcher mat = val.matcher(s);
-			if (mat.matches()){
-				File test = new File (mat.group(1));
-				if (test.exists()) System.out.println("Found\t"+test);
-				else {
-					System.out.println("Misssing\t"+test);
-					missingFile = true;
-				}
-			}
-		}
-		if (missingFile) Misc.printErrAndExit("\nFailed to find all of the files in your properties file, see above.\n");
-	}
-
 }
