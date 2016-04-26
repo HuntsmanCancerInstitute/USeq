@@ -95,11 +95,21 @@ public class SamAlignmentExtractor {
 				workingChromosome = ssr.getSequenceName();
 				//any regions?
 				workingRegions = chromRegions.get(workingChromosome);
-				if (workingRegions == null) printAllToFail();
+				if (workingRegions != null) makeMask();
+				walkChromAlignments();
+				
+				/*
+				 * if (workingRegions == null) {
+					if (writeOffTargetToPass) printAllToPass();
+					else printAllToFail();
+					
+				}
 				else {
 					makeMask();
 					walkChromAlignments();
 				}
+				 */
+				
 				System.out.print(".");
 			}
 			
@@ -256,8 +266,9 @@ public class SamAlignmentExtractor {
 					continue;
 				}
 				
-				//does it intersect?
-				boolean onTarget = intersect(sam);
+				//does it intersect? 
+				boolean onTarget = false;
+				if (workingRegions != null) onTarget = intersect(sam);
 				if (onTarget == false) {
 					if (writeOffTargetToPass == false){
 						failingBamWriter.addAlignment(sam);
@@ -430,7 +441,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Sam Alignment Extractor: March 2016                     **\n" +
+				"**                         Sam Alignment Extractor: April 2016                      **\n" +
 				"**************************************************************************************\n" +
 				"Splits an alignment file into those that pass or fail thresholds and intersects\n"+
 				"regions of interest. Calculates a variety of QC statistics.\n"+
