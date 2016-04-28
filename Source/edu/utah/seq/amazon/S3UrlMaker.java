@@ -33,6 +33,7 @@ public class S3UrlMaker {
 	private String amazonUser = null; //david.nix@aruplab.com
 	private long hoursUntilExpiration = 72l;
 	private boolean verbose = true;
+	private boolean createURLs = false;
 
 	//internal
 	private AmazonS3 s3client;
@@ -58,6 +59,11 @@ public class S3UrlMaker {
 
 		//lookup objects to make urls 
 		lookupObjects();
+		
+		if (createURLs == false && verbose) {
+			System.out.println("\nRerun with the -d option to actually create the URLs for these files.");
+			System.exit(0);
+		}
 
 		if (keysToFetch.size() ==0) System.err.println("\nError: no S3 objects found?! Aborting.\n");
 		else {
@@ -144,6 +150,7 @@ public class S3UrlMaker {
 					case 'b': bucketName = args[++i]; break;
 					case 't': hoursUntilExpiration = Long.parseLong(args[++i]); break;
 					case 's': verbose = false; break;
+					case 'd': createURLs = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -189,8 +196,10 @@ public class S3UrlMaker {
 				"     aws_access_key_id=YOUR_ACCESS_KEY_ID\n"+
 				"     aws_secret_access_key=YOUR_SECRET_ACCESS_KEY\n"+
 				"-u Amazon USER_NAME in credentials file.\n\n"+
+				
 
 				"Optional:\n" +
+				"-d Create the URLs, defaults to just listing the objects for creation.\n\n"+
 				"-t Hours until URLs expire, defaults to 72.\n"+
 				"-s Silence non error messages.\n"+
 
