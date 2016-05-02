@@ -114,10 +114,13 @@ public class ArupPipelineWrapper {
 			System.out.println("\nExecuting:\n"+stringCmd);
 			System.out.println("\nPipelineOutput:");
 			String[] out = IO.executeViaProcessBuilder(cmd, true);
-			String cmdLineOutput = Misc.stringArrayToString(out, "\n").toLowerCase();
 			
 			//check output for possible errors
-			if (cmdLineOutput.contains("error")) Misc.printErrAndExit(cmdLineOutput+"\n\nERROR found in Pipeline.jar output, see above. Aborting!");
+			for (String line : out){
+				String lcLine = line.toLowerCase();
+				//watch out for cases where error is mentioned in a warning output line.
+				if (lcLine.contains("error") && lcLine.startsWith("warning") == false) Misc.printErrAndExit("\n\nERROR found in Pipeline.jar output, see above. Aborting!\n"+line);
+			}
 			
 		} catch (Exception e){
 			e.printStackTrace();
