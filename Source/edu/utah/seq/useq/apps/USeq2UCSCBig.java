@@ -92,6 +92,7 @@ public class USeq2UCSCBig extends Thread{
 
 		} catch (Exception e){
 			e.printStackTrace();
+			Misc.printErrAndExit("\nERROR: converting "+workingUSeqArchiveFile);
 		}
 		return null;
 
