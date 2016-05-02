@@ -71,10 +71,11 @@ public class VCFSample {
 					alleleCounts = data[i];
 					String[] multiple = data[i].split(",");
 					if (multiple.length > 1) {
-						if (referenceCounts == null) {
-							this.referenceCounts = multiple[0];
-						}
-						this.alternateCounts = multiple[1];
+						if (referenceCounts == null)  referenceCounts = multiple[0];
+						alternateCounts = multiple[1];
+						//set DP ?
+						if (readDepthDP == -1) readDepthDP = Integer.parseInt(referenceCounts) + Integer.parseInt(alternateCounts);
+						
 					} else if (multiple.length ==  1) {
 						this.alternateCounts = multiple[0];
 					} else {
