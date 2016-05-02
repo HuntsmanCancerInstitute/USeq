@@ -121,13 +121,14 @@ public class Bed extends Coordinate implements Serializable{
 				//close and save
 				Bed[] set = new Bed[workingRegions.size()];
 				workingRegions.toArray(set);
+				Arrays.sort(set);
 				split.add(set);
 				workingRegions.clear();
 				count = 0;
 			}
 			//add region
 			workingRegions.add(regions[i]);
-			count ++;
+			count++;
 		}
 		//save last?
 		if (workingRegions.size() !=0){
