@@ -72,8 +72,8 @@ public class GatkRunner {
         boolean problems = false;
         for (GatkRunnerChunk c: runners) {
 			if (c.isFailed()) Misc.printErrAndExit("\nERROR: Failed runner, aborting! \n"+c.getCmd());
-			c.getTempBed().deleteOnExit();
-			c.getTempVcf().deleteOnExit();
+			//c.getTempBed().deleteOnExit();
+			//c.getTempVcf().deleteOnExit();
 		}
 		
 		//merge vcf
@@ -103,7 +103,7 @@ public class GatkRunner {
 		for (VCFRecord r : all) {
 			String ori = r.getOriginalRecord();
 			if (unique.contains(ori) == false) {
-				out.println();
+				out.println(ori);
 				unique.add(ori);
 			}
 		}
