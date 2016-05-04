@@ -69,11 +69,11 @@ public class GatkRunner {
         }
 		
 		//check runners and delete temp files
-        boolean problems = false;
         for (GatkRunnerChunk c: runners) {
 			if (c.isFailed()) Misc.printErrAndExit("\nERROR: Failed runner, aborting! \n"+c.getCmd());
-			//c.getTempBed().deleteOnExit();
-			//c.getTempVcf().deleteOnExit();
+			c.getTempBed().deleteOnExit();
+			c.getTempVcf().deleteOnExit();
+			new File (c.getTempVcf()+".idx").deleteOnExit();
 		}
 		
 		//merge vcf
@@ -108,7 +108,6 @@ public class GatkRunner {
 			}
 		}
 		out.close();
-		
 		System.out.println("\t"+unique.size()+"\tvariants found");
 	}
 
