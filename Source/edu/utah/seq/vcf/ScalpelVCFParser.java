@@ -1,10 +1,6 @@
 package edu.utah.seq.vcf;
-
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -22,6 +18,9 @@ public class ScalpelVCFParser {
 	private double minimumAltTNRatio = 1.6;
 	private double maximumNormalAltFraction = 0.1;
 	private double minimumTumorAltFraction = 0.05;
+	private String afFormat = "##FORMAT=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency\">";
+	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
+	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
 	
 	//private String[] keys = {"13:28608243", "13:28608218", "13:28608262", "13:28608259", "13:28608257", "13:28608226", "13:28608239", "13:28608223", "13:28608232", "13:28608266", "13:28608273", "13:28608262"};
 	//private HashSet<String> key = null;
@@ -150,16 +149,52 @@ public class ScalpelVCFParser {
 			else {
 				numPass++;
 				String orig = vcf.toString();
-				out.println(orig);
+				//#CHROM POS ID REF ALT QUAL FILTER INFO FORMAT NORMAL TUMOR......
+				//   0    1   2  3   4   5     6     7      8      9     10
+				String[] fields = VCFParser.TAB.split(orig);
+				//reset FILTER
+				fields[6] = ".";
+				//reset ID
+				fields[2] = "Scalpel_"+numPass;
+				//add DP and AF for tumor to INFO
+				String tumorAF = formatAf (vcf.getSample()[1].getAltRatio());
+				fields[7] = "DP=" + vcf.getSample()[1].getReadDepthDP()+ ";AF=" + tumorAF + ";"+ fields[7] ;
+				//add af to format
+				fields[8] = fields[8]+ ":AF";
+				//add af to Norm and Tum
+				fields[9] = fields[9]+ ":"+ formatAf (vcf.getSample()[0].getAltRatio());
+				fields[10] = fields[10]+ ":"+ tumorAF;
+				
+
+				
+				out.println(Misc.stringArrayToString(fields, "\t"));
 			}
 		}
 		out.close();
 		System.out.println(numPass+"\t"+numFail);
 	}
 	
+	private String formatAf(double af){
+		if (af == 0.0) return "0";
+		return Num.formatNumberJustMax(af, 4);
+	}
+	
 	private void writeHeaderWithExtraInfo(Gzipper out, VCFParser parser) throws IOException {
 		for (String h : parser.getStringComments()) {
-			out.println(h);
+			if (h.startsWith("#CHROM")) {
+				out.println(afFormat);
+				out.println("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNORMAL\tTUMOR");
+			}
+			else if (h.startsWith("##INFO=<ID=DENOVO")){
+				out.println(afInfo);
+				out.println(dpInfo);
+			}
+			else if (h.startsWith("##source=scalpel")){
+				String[] t = Misc.PATTERN_EQUALS.split(h);
+				out.println("##source=scalpel");
+				out.println("##version="+t[1]);
+			}
+			else out.println(h);
 		}
 	}
 
@@ -217,7 +252,8 @@ public class ScalpelVCFParser {
 				"**************************************************************************************\n" +
 				"**                            Scalpel VCF Parser: May 2016                          **\n" +
 				"**************************************************************************************\n" +
-				"Filters Scalpel VCF INDEL files.\n"+
+				"Filters Scalpel VCF INDEL files for various thresholds.  Replaces the FILTER field \n"+
+				"with ., adds tumor DP and AF values to the info field.\n"+
 
 				"\nRequired Params:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s)\n" +
