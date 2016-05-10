@@ -79,7 +79,7 @@ public class IO {
 		return names;
 	}
 	
-	/**Concatinates files regardless of type.  Good for gz!
+	/**Concatinates files regardless of type.  Good for gz! Doesn't check for failed line return so its possible to join two lines together :(
 	 * @throws IOException */
 	public static void concatinateFiles(ArrayList<File> filesToConcatinate, File destination) throws IOException{
 
@@ -102,6 +102,18 @@ public class IO {
 			}
 			bos.close();
 			sis.close();
+	}
+	
+	/**Merges files watching for lack of a line return on last line to avoid line concatination. GZ/Zip OK.*/
+	public static void mergeFiles(ArrayList<File> toMerge, File destination) throws IOException{
+		PrintWriter out = new PrintWriter( new FileWriter(destination));
+		String line;
+		for (File f : toMerge){
+			BufferedReader in = IO.fetchBufferedReader(f);
+			while ((line = in.readLine()) != null) out.println(line);
+			in.close();
+		}
+		out.close();
 	}
 
 	/**Returns the amount of memory being used.*/
