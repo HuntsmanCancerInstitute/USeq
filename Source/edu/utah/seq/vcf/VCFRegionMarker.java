@@ -20,17 +20,17 @@ public class VCFRegionMarker {
 
 	//user fields
 	private File[] vcfFiles;
-	private File bedFile;
+	private File[] bedFiles;
 	private int bpPad = 0;
 	private File saveDirectory = null;
 	private boolean clearFilter = false;
-	
+
 	//internal fields
 	private HashMap<String,IntervalTree<RegionScoreText>> chrRegionIntervalTrees = null;
 	private int numRecords = 0;
 	private int numModifiedRecords = 0;
-	
-	
+
+
 	//constructor
 	public VCFRegionMarker(String[] args){
 		//start clock
@@ -38,7 +38,7 @@ public class VCFRegionMarker {
 
 		//process args
 		processArgs(args);
-		
+
 		//build interval tree for bed region file
 		createIntervalTrees();
 
@@ -52,7 +52,7 @@ public class VCFRegionMarker {
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
 	}
-	
+
 	private int[] markVcf(File vcf) {
 		try {
 			numRecords = 0;
@@ -86,7 +86,7 @@ public class VCFRegionMarker {
 					//any regions to intersect? Does it intersect?
 					if (regions != null) {
 						ArrayList<RegionScoreText> hits = fetchRecords(tokens, regions);
-						
+
 						//how many hits?
 						int numHits = hits.size();
 						String toAdd = null;
@@ -99,7 +99,7 @@ public class VCFRegionMarker {
 						}
 						//more than one
 						else toAdd = collapseNames(hits);
-						
+
 						//any to add
 						if (toAdd != null){
 							numModifiedRecords++;
@@ -124,7 +124,7 @@ public class VCFRegionMarker {
 		} 
 		return null;
 	}
-	
+
 	private ArrayList<RegionScoreText> fetchRecords(String[] vcfTokens, IntervalTree<RegionScoreText> regions) {
 		//calc start stop to fetch, interbase coordinates
 		int size = vcfTokens[4].length();
@@ -141,30 +141,45 @@ public class VCFRegionMarker {
 		String concat = Misc.hashSetToString(names, ";");
 		return concat;
 	}
-	
+
 	private void createIntervalTrees() {
-		//load bed regions 
-		HashMap<String, RegionScoreText[]> chrRegions = Bed.parseBedFile(bedFile, true, false);
-		//make HashMap of trees
-		chrRegionIntervalTrees = new HashMap<String,IntervalTree<RegionScoreText>>();
-		long numRegions = 0;
-		for (String chr : chrRegions.keySet()){
-			RegionScoreText[] regions = chrRegions.get(chr);
-			numRegions+= regions.length;
-			ArrayList<Interval<RegionScoreText>> ints = new ArrayList<Interval<RegionScoreText>>();
-			for (int i =0; i< regions.length; i++) {		
-				int start = regions[i].getStart() - bpPad;
-				if (start < 0) start = 0;
-				ints.add(new Interval<RegionScoreText>(start, regions[i].getStop()+bpPad, regions[i]));
-				//check text
-				if (regions[i].getText().length() == 0) {
-					Misc.printErrAndExit("\nERROR loading the bed file, each line must contain a text field to use in adding to the FILTER field in the VCF record. See "+regions[i].getBedLine(chr));
-				}
+		try {
+			File bedToParse = bedFiles[0];
+			//more than one bed?
+			if (bedFiles.length > 1){
+				ArrayList<File> beds = new ArrayList<File>();
+				for (File f: bedFiles) beds.add(f);
+				bedToParse = new File (saveDirectory, "tempMergedBed"+Passwords.createRandowWord(4)+ ".bed");
+				bedToParse.deleteOnExit();
+				IO.mergeFiles(beds, bedToParse);
 			}
-			IntervalTree<RegionScoreText> tree = new IntervalTree<RegionScoreText>(ints, false);
-			chrRegionIntervalTrees.put(chr, tree);
+			//load bed regions 
+			HashMap<String, RegionScoreText[]> chrRegions = Bed.parseBedFile(bedToParse, true, false);
+			//make HashMap of trees
+			chrRegionIntervalTrees = new HashMap<String,IntervalTree<RegionScoreText>>();
+			long numRegions = 0;
+			for (String chr : chrRegions.keySet()){
+				RegionScoreText[] regions = chrRegions.get(chr);
+				numRegions+= regions.length;
+				ArrayList<Interval<RegionScoreText>> ints = new ArrayList<Interval<RegionScoreText>>();
+				for (int i =0; i< regions.length; i++) {
+					int start = regions[i].getStart() - bpPad;
+					if (start < 0) start = 0;
+					ints.add(new Interval<RegionScoreText>(start, regions[i].getStop()+bpPad, regions[i]));
+					//check text
+					if (regions[i].getText().length() == 0) {
+						Misc.printErrAndExit("\nERROR loading the bed file, each line must contain a text field to use in adding to the FILTER field in the VCF record. See "+regions[i].getBedLine(chr));
+					}
+				}
+				IntervalTree<RegionScoreText> tree = new IntervalTree<RegionScoreText>(ints, false);
+				chrRegionIntervalTrees.put(chr, tree);
+			}
+			System.out.println("Loaded "+numRegions+" regions\n");
+
+		} catch (IOException e) {
+			e.printStackTrace();
+			Misc.printErrAndExit("\nERROR: problem making interval trees from bed file(s)\n");
 		}
-		System.out.println("Loaded "+numRegions+" regions\n");
 	}
 
 
@@ -190,7 +205,7 @@ public class VCFRegionMarker {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'b': bedFile = new File(args[++i]); break;
+					case 'b': bedFiles = IO.extractFiles(args[++i]); break;
 					case 'v': forExtraction = new File(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'p': bpPad = Integer.parseInt(args[++i]); break;
@@ -205,8 +220,8 @@ public class VCFRegionMarker {
 			}
 		}
 		//checkfiles
-		if (bedFile == null || bedFile.canRead() == false) Misc.printErrAndExit("\nError: please provide a bed file of regions for vcf intersection.\n");
-		
+		if (bedFiles == null || bedFiles.length == 0) Misc.printErrAndExit("\nError: please provide one or more bed files (comma delimited, no spaces) of regions for vcf intersection.\n");
+
 		//pull files
 		if (forExtraction == null || forExtraction.canRead() == false) Misc.printExit("\nError: please provide a vcf file or directory containing such to intersect.\n");
 		File[][] tot = new File[3][];
@@ -222,25 +237,25 @@ public class VCFRegionMarker {
 			if (saveDirectory.isDirectory() == false || saveDirectory.exists() == false) Misc.printErrAndExit("\nCannot find or make your save directory?! "+saveDirectory);
 		}
 		else saveDirectory = vcfFiles[0].getParentFile();
-		
+
 	}	
 
-	
+
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Region Marker : Nov 2015                        **\n" +
+				"**                              VCF Region Marker : May 2016                        **\n" +
 				"**************************************************************************************\n" +
 				"Intersects each vcf record (based on its position and max length of the alt or ref)\n" +
-				"with a chr start stop text.... bed file. For those that intersect, the bed text is \n"+
+				"with a chr start stop text.... bed file(s). For those that intersect, the bed text is \n"+
 				"added to the vcf FILTER field. Multiple hits are concatinated.\n\n" +
 
 				"Required Params:\n"+
 				"-v VCF file or directory containing such (xxx.vcf(.gz/.zip OK)) to parse\n"+
-				"-b Bed file of regions (minimum chr start stop text), interbase coordinates \n"+
-				"       (xxx.bed(.gz/.zip OK)) to intersect\n"+
-				
+				"-b Bed file(s) of regions (minimum chr start stop text), interbase coordinates \n"+
+				"       (xxx.bed(.gz/.zip OK)) to intersect, comma delimit multiple files, no spaces.\n"+
+
 				"\nOptional Params:\n"+
 				"-s Save directory for the modified vcfs\n"+
 				"-p Pad bed start stop by this # bps, defaults to 0\n"+
@@ -248,9 +263,9 @@ public class VCFRegionMarker {
 				"\n"+
 
 				"Example: java -Xmx9G -jar pathTo/USeq/Apps/VCFRegionMarker -v testHaploCaller.vcf.zip\n" +
-				"       -b /Anno/offTargetRegions.bed.gz -p 10 -s MarkedVcfs -c \n\n"+
+				"       -b /Anno/offTargetRegions.bed.gz,/Anno/pseudogene.bed -p 10 -s MarkedVcfs -c \n\n"+
 
-		"**************************************************************************************\n");
+				"**************************************************************************************\n");
 
 	}
 }
