@@ -190,8 +190,6 @@ public class StrelkaVCFParser {
 				fields[2] = "Strelka_"+numPass;
 				//reset FILTER
 				fields[6] = ".";
-				//add af to format
-				fields[8] = fields[8]+ ":AF";
 				//add GT to format, igv is now requiring this to be first
 				fields[8] = "GT:"+fields[8]+ ":AF";
 				//add af to Norm and Tum
