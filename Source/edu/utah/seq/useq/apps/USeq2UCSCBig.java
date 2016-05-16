@@ -354,6 +354,8 @@ public class USeq2UCSCBig extends Thread{
 					switch (test){
 					case 'u': useqArchives = USeqUtilities.fetchFilesRecursively(new File(args[++i]), USeqUtilities.USEQ_EXTENSION_WITH_PERIOD); break;
 					case 'd': ucscDir = new File (args[++i]); break;
+					case 'b': ucscBed2BigBed = new File (args[++i]); break;
+					case 'w': ucscWig2BigWig = new File (args[++i]); break;
 					case 'f': forceConversion = true; break;
 					case 'e': verbose = false; break;
 					case 'm': deleteTempFiles = false; break;
@@ -370,14 +372,15 @@ public class USeq2UCSCBig extends Thread{
 		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+USeqUtilities.stringArrayToString(args, " ")+"\n");
 		
 		//make files
-		if (ucscDir == null || ucscDir.isDirectory() == false) USeqUtilities.printExit("\nCannot find your directory containing the UCSC wig2BigWig and bed2BigBed apps -> "+ucscDir);
-		ucscWig2BigWig = new File( ucscDir, "wigToBigWig");
-		ucscBed2BigBed = new File( ucscDir, "bedToBigBed");
+		if (ucscDir != null && ucscDir.isDirectory()){
+			ucscWig2BigWig = new File( ucscDir, "wigToBigWig");
+			ucscBed2BigBed = new File( ucscDir, "bedToBigBed");
+		}
+		if (ucscWig2BigWig == null || ucscWig2BigWig.canExecute() == false) USeqUtilities.printExit("\nCannot find or execute ucscWig2BigWig -> "+ucscWig2BigWig+"\n");
+		if (ucscBed2BigBed == null || ucscBed2BigBed.canExecute() == false) USeqUtilities.printExit("\nCannot find or execute ucscBed2BigBed -> "+ucscBed2BigBed+"\n");
 
 		//check files
 		if (useqArchives == null || useqArchives.length == 0) USeqUtilities.printExit("\nCannot find any xxx."+USeqUtilities.USEQ_EXTENSION_NO_PERIOD+" USeq archives?\n");
-		if (ucscWig2BigWig.canExecute() == false) USeqUtilities.printExit("\nCannot find or execute -> "+ucscWig2BigWig+"\n");
-		if (ucscBed2BigBed.canExecute() == false) USeqUtilities.printExit("\nCannot find or execute -> "+ucscBed2BigBed+"\n");
 		if (timeoutApp != null && timeoutApp.canExecute() == false) USeqUtilities.printExit("\nCannot execute -> "+timeoutApp+"\n");
 		
 
@@ -421,7 +424,7 @@ public class USeq2UCSCBig extends Thread{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              USeq 2 UCSC Big: Sept 2013                          **\n" +
+				"**                               USeq 2 UCSC Big: May 2016                          **\n" +
 				"**************************************************************************************\n" +
 				"Converts USeq archives to UCSC bigWig (xxx.bw) or bigBed (xxx.bb) archives based on\n" +
 				"the data type. WARNING: bigBed format conversion will clip any associated scores to\n" +
@@ -432,6 +435,8 @@ public class USeq2UCSCBig extends Thread{
 				"       if a directory is given.\n" +
 				"-d Full path directory containing the UCSC wigToBigWig and bedToBigBed apps, download\n" +
 				"       from http://hgdownload.cse.ucsc.edu/admin/exe/ and make executable with chmod.\n"+
+				"-b Alternative to -d, specify path to the bedToBigBed app.\n"+
+				"-w Ditto, path to wigToBigWig app.\n"+
 				"-f Force conversion of xxx.useq to xxx.bw or xxx.bb overwriting any UCSC big files.\n"+
 				"       Defaults to skipping those already converted.\n"+
 				"-e Only print error messages.\n"+
