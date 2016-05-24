@@ -43,6 +43,7 @@ public class NovoalignBisulfiteParser{
 	private boolean useParsedFiles = false;
 	private String adapter = "chrAdapt";
 	private String phiX = "chrPhiX";
+	private String alt = "_alt";
 	private PrintWriter nonConvertedCs = null;
 	private PrintWriter convertedCs = null;
 	private HashMap<String, Long> nonConvertedCTypes = new HashMap<String, Long>();
@@ -131,7 +132,7 @@ public class NovoalignBisulfiteParser{
 			System.out.println("\nFiltering statistics for "+(int)total+" alignments:");
 			System.out.println(numberAlignmentsFailingQualityScore +"\tFailed mapping quality score ("+minimumPosteriorProbability+")");
 			System.out.println(numberAlignmentsFailingAlignmentScore +"\tFailed alignment score ("+maximumAlignmentScore+")");
-			System.out.println(numberControlAlignments +"\tAligned to phiX or adapters");
+			System.out.println(numberControlAlignments +"\tAligned to phiX, adapters, or alt");
 			System.out.println(numberAlignmentsFailingQC +"\tFailed vendor QC");
 			System.out.println(numberAlignmentsUnmapped +"\tAre unmapped\n");
 			
@@ -455,7 +456,8 @@ public class NovoalignBisulfiteParser{
 				}
 				
 				//skip phiX and adapter
-				if (sa.getReferenceSequence().startsWith(phiX) || sa.getReferenceSequence().startsWith(adapter)) {
+				String ref = sa.getReferenceSequence();
+				if (ref.startsWith(phiX) || ref.startsWith(adapter) || ref.endsWith(alt)) {
 					numberControlAlignments++;
 					continue;
 				}
@@ -705,7 +707,7 @@ public class NovoalignBisulfiteParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Novoalign Bisulfite Parser: Nov 2014                      **\n" +
+				"**                        Novoalign Bisulfite Parser: May 2016                      **\n" +
 				"**************************************************************************************\n" +
 				"Parses Novoalign -b2 and -b4 single and paired bisulfite sequence alignment files into\n" +
 				"PointData file formats. Generates several summary statistics on converted and non-\n" +
