@@ -13,6 +13,7 @@ public class FilterPointData {
 	//fields
 	private File[] pointDataDirectories;
 	private File[] filteredPointDataDirectories;
+	private File saveDirectory = null;
 	private HashMap<String, PointData[]>[] pointData;
 	private File regionsFile;
 	private HashMap<String,Region[]> regions;
@@ -94,7 +95,8 @@ public class FilterPointData {
 		String regionsFileName = Misc.removeExtension(regionsFile.getName());
 		for (int i=0; i< pointDataDirectories.length; i++) {
 			if (justNumbersNoSave == false) {
-				filteredPointDataDirectories[i] = new File(pointDataDirectories[i].getParentFile(), pointDataDirectories[i].getName()+"_"+regionsFileName+"_Filt"+shiftPositions+"bp");
+				if (saveDirectory == null) filteredPointDataDirectories[i] = new File(pointDataDirectories[i].getParentFile(), pointDataDirectories[i].getName()+"_"+regionsFileName+"_Filt"+shiftPositions+"bp");
+				else filteredPointDataDirectories[i] = new File(saveDirectory, pointDataDirectories[i].getName());
 				filteredPointDataDirectories[i].mkdir();		
 			}
 			startingNumObs[i] = PointData.totalObservationsMultiPointData(pointData[i]);
@@ -266,6 +268,7 @@ public class FilterPointData {
 					switch (test){
 					case 'p': pointDataDirectories = IO.extractFiles(args[++i]); break;
 					case 'r': regionsFile = new File(args[++i]); break;
+					case 'f': saveDirectory = new File(args[++i]); break;
 					case 'i': saveIntersectingData = true; break;
 					case 'n': justNumbersNoSave = true; break;
 					case 's': shiftPositions = Integer.parseInt(args[++i]); break;
@@ -289,12 +292,15 @@ public class FilterPointData {
 		}
 		//look for regionsFile
 		if (regionsFile == null || regionsFile.canRead() == false) Misc.printExit("\nEnter a regions file to use in filtering intersecting PointData.\n");
+		// any save dir?
+		if (saveDirectory != null) saveDirectory.mkdirs();
+	
 	}	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Filter Point Data: Oct 2012                             **\n" +
+				"**                          Filter Point Data: May 2016                             **\n" +
 				"**************************************************************************************\n" +
 				"FPD drops or saves observations from PointData that intersect a list of regions\n" +
 				"      (e.g. repeats, interrogated regions).\n\n" +
@@ -308,6 +314,7 @@ public class FilterPointData {
 				"      doesn't intersect.\n"+
 				"-a Acceptible intersection, fraction, defaults to 0.5\n"+
 				"-n Just calculate the number of observations after filtering, don't save any data.\n"+
+				"-f Save directory, defaults to derivative of parent.\n"+
 
 				"\n"+
 
