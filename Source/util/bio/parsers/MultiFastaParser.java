@@ -3,7 +3,9 @@ package util.bio.parsers;
 import java.io.*;
 import java.util.*;
 
+import util.gen.Gzipper;
 import util.gen.IO;
+import util.gen.Misc;
 
 /**
  * Extracts sequences and headers out of multi fasta files.
@@ -180,19 +182,28 @@ public class MultiFastaParser {
 	public int getNumReads(){return seqsAL.size();}
 
 	public static void main (String[] args){
-        MultiFastaParser m = new MultiFastaParser(args[0]);
-        System.out.println("Found seq? "+m.isFastaFound());
-        System.out.println("Length "+m.getSeqs()[0].length());
-        System.out.println("Names[0] "+m.getNames()[0]);
-        System.out.println("Seqs[0] "+m.getSeqs()[0]);
-        File parent = new File (args[0]).getParentFile();
-        //print em?
-        for (int i=0; i<m.getSeqs().length; i++){
-        	String name = m.getNames()[i].replace(".1", "");
-        	File f = new File (parent, name+".fasta");
-        	IO.writeString(">"+name+"\n"+m.getSeqs()[i], f);
-        }
-    }
+		try {
+			MultiFastaParser m = new MultiFastaParser(args[0]);
+			System.out.println("Found seq? "+m.isFastaFound());
+			System.out.println("Num seqs "+m.getSeqs().length);
+			File parent = new File (args[0]).getParentFile();
+			//print em?
+			for (int i=0; i<m.getSeqs().length; i++){
+				String nameLine = m.getNames()[i];
+				String name = Misc.WHITESPACE.split(nameLine)[0];
+				Gzipper out = new Gzipper(new File(parent, name+".fasta.gz"));
+
+				out.println(">"+nameLine);
+
+				out.println(m.getSeqs()[i]);
+				out.close();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	
 	public boolean isFastaFound() {
 		return fastaFound;
 	}
