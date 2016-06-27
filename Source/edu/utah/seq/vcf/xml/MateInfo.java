@@ -67,7 +67,7 @@ public class MateInfo {
 		//INFO
 		sb.append("EG=");
 		sb.append(gene);
-		sb.append(";ME=");
+		sb.append(";MG=");
 		sb.append(other.gene);
 		sb.append(";MATEID=");
 		sb.append(other.id);

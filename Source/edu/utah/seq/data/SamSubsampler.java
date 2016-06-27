@@ -30,6 +30,7 @@ public class SamSubsampler{
 	private String phiX = "chrPhiX";
 	private String lambda = "chrLamb";
 	private int numberOfAlignmentsToPrint = 0;
+	private double fractionAlignmentsToPrint = 0;
 	private boolean sortFinal = false;
 	private boolean applyFilters = true;
 	private boolean verbose = true;
@@ -49,6 +50,7 @@ public class SamSubsampler{
 	private long numberPassingAlignments = 0;
 
 
+
 	//constructors
 	public SamSubsampler(String[] args){
 		long startTime = System.currentTimeMillis();
@@ -59,6 +61,7 @@ public class SamSubsampler{
 		//write out final
 		long toSave = numberPassingAlignments;
 		File f = new File (saveDirectory, "randomized"+toSave+".sam.gz");
+		if (fractionAlignmentsToPrint != 0) numberOfAlignmentsToPrint = (int)Math.round(fractionAlignmentsToPrint * (double) numberPassingAlignments); 
 		printRandomAlignments(toSave, f);
 
 		//finish and calc run time
@@ -361,6 +364,7 @@ public class SamSubsampler{
 					case 'x': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'q': minimumPosteriorProbability = Float.parseFloat(args[++i]); break;
 					case 'n': numberOfAlignmentsToPrint = Integer.parseInt(args[++i]); break;
+					case 'f': fractionAlignmentsToPrint = Double.parseDouble(args[++i]); break;
 					case 's': sortFinal = true; break;
 					case 'b': applyFilters = false; break;
 					case 'h': printDocs(); System.exit(0);
@@ -387,9 +391,9 @@ public class SamSubsampler{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              SamSubsampler: June 2015                            **\n" +
+				"**                              SamSubsampler: June 2016                            **\n" +
 				"**************************************************************************************\n" +
-				"Filters, randomizes, subsamples and sorts sam/bam alignment files.\n" +
+				"Filters, randomizes, subsamples and sorts sam/bam alignments, doesn't keep pairs.\n" +
 
 				"\nOptions:\n"+
 				"-a Alignment file or directory containing SAM/BAM (xxx.sam(.zip/.gz OK) or xxx.bam).\n" +
@@ -398,6 +402,7 @@ public class SamSubsampler{
 
 				"\nDefault Options:\n"+
 				"-n Number of alignments to print, defaults to all passing thresholds.\n"+
+				"-f Fraction alignments to keep, defaults to 1.\n"+
 				"-s Sort and index output alignments.\n"+
 				"-x Maximum alignment score. Defaults to 300, smaller numbers are more stringent.\n"+
 				"-q Minimum mapping quality score. Defaults to 13, bigger numbers are more stringent.\n" +
@@ -405,7 +410,7 @@ public class SamSubsampler{
 				"-b Bypass all filters and thresholds.\n"+
 
 				"\nExample: java -Xmx25G -jar pathToUSeq/Apps/SamSubsampler -x 240 -q 20 -a\n" +
-				"      /Novo/Run7/ -s /Novo/Run7/SR -n 10000000 \n\n" +
+				"      /Novo/Run7/ -s /Novo/Run7/SR -f 0.05 \n\n" +
 
 
 				"**************************************************************************************\n");

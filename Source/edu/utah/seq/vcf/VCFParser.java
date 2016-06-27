@@ -439,7 +439,7 @@ public class VCFParser {
 	}
 	
 	/*Parses ID, keeps first one if dups found.*/
-	private static ArrayList<String> mergeHeaderIds(LinkedHashSet<String> comments){
+	public static ArrayList<String> mergeHeaderIds(LinkedHashSet<String> comments){
 		ArrayList<String> toReturn = new ArrayList<String>();
 		HashSet<String> ids = new HashSet<String>();
 		//hash on =<ID=xxxx, if collision keeps first one
