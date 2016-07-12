@@ -1,290 +1,149 @@
-
 package edu.utah.seq.parsers;
 
 import java.io.*;
 import java.util.regex.*;
+import java.util.*;
 
-import edu.utah.seq.data.*;
-import edu.utah.seq.data.sam.MalformedSamAlignmentException;
-import edu.utah.seq.data.sam.SamAlignment;
+import edu.utah.seq.barcodes.ConsensusEngine;
+import edu.utah.seq.data.sam.PicardSortSam;
+import htsjdk.samtools.*;
+import htsjdk.samtools.SAMFileHeader.SortOrder;
 import util.gen.*;
 
-import java.util.*;
-import htsjdk.samtools.SAMFileReader;
-import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SAMRecordIterator;
-import htsjdk.samtools.SAMRecord.SAMTagAndValue;
+/**
+ * App for extracting fastq data from a queryname sorted sam or bam file.  Doesn't have the memory leak in picard.  Writes as compressed gz. Error checks, unlike samtools.
+ * @author Nix
+ * */
+public class Sam2Fastq {
 
+	//user defined fields
+	private File bamFile;
+	private File saveDirectory;
 
-/**Takes an unsorted sam file and the original fastq files and pulls the original fastq data lines.  Assumes the order of the reads is preserved in all files.
- * @author david.nix@hci.utah.edu 
- **/
-public class Sam2Fastq{
-	//fields
-	private File samFile;
-	private File firstReadFastq;
-	private File secondReadFastq;
-	private BufferedReader samIn;
-	private BufferedReader firstFastqIn;
-	private BufferedReader secondFastqIn;
-	private Gzipper firstFastqOut;
-	private Gzipper secondFastqOut;
-	private Gzipper samOut;
-	private int readNameIndex = 0;
-	private boolean paired = false;
-	private static final Pattern TAB = Pattern.compile("\t");
-	private int firstFastqLineNumber = 0;
-	private int secondFastqLineNumber = 0;
-	private boolean replaceSamSeqWithOriginal = false;
+	//internal fields
+	private SamReader bamReader;
+	private Gzipper firstRead;
+	private Gzipper secondRead;
+	private Gzipper unpairedRead;
+	private Gzipper failingSam;
+	
+	//counters
+	private long numAlignments = 0;
+	private long numPaired = 0;
+	private long numUnpaired = 0;
+	private long numFailingAlignments = 0;
 
 	//constructors
-
+	/**Stand alone.*/
 	public Sam2Fastq(String[] args){
 		long startTime = System.currentTimeMillis();
 
+		//set fields
 		processArgs(args);
 
+		//launch
+		run();
+
+		//finish and calc run time
+		double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
+		System.out.println("\nDone! "+Math.round(diffTime)+" minutes\n");
+	}
+
+
+	public void run(){
 		try {
-			
-			makeReadersAndWriters();
-			
-			System.out.print("Parsing");
-			if (replaceSamSeqWithOriginal) replaceEm();
-			else parseEm();
-			System.out.println();
+			walkAlignments();
 
+			//close readers
 			closeIO();
-			
-			//finish and calc run time
-			double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
-			System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
-			
-		} catch (IOException e) {
-			System.err.println("\n\nProblems found extracting fastq data!");
-			System.err.println(e.getMessage());
+
+			//print stats
+			System.out.println("Statistics:");
+			System.out.println(numAlignments+"\tNum input alignments");
+			System.out.println(numFailingAlignments+"\tNum non primary, secondary, supplemental or vendor failing QC alignments written to failed sam file.");
+			System.out.println(numPaired+"\tNum alignment pairs exported as fastq");
+			System.out.println(numUnpaired+"\tNum unpaired alignments exported as fastq");
+
+		} catch (Exception e) {
+			e.printStackTrace();
 		} 
-		
-		
-		
 	}
-	
-	public void replaceEm() throws IOException{
-		
-		String line;
-		String oldReadNameFirst = "";
-		String oldReadNameSecond = "";
-		String oldFirstSeq = null;
-		String oldSecondSeq = null;
-		//for each alignment line
-		int dotCounter = 0;
-		int numBadLines = 0;
-		while ((line = samIn.readLine()) !=null){
-			if (++dotCounter > 1000000){
+
+
+	private void walkAlignments() throws Exception {
+
+		SAMRecordIterator it = bamReader.iterator();
+		ArrayList<SAMRecord> sameNameSams = new ArrayList<SAMRecord>();
+		String lastName = null;
+		int counter = 0;
+		//load all alignments with the same name (should be just two!)
+		while (it.hasNext()) {
+			SAMRecord sam = it.next();
+			numAlignments++;
+			if (counter++ > 1000000) {
 				System.out.print(".");
-				dotCounter = 0;
+				counter = 0;
 			}
-			line = line.trim();
-
-			//skip blank lines
-			if (line.length() == 0) continue;
-
-			//print header lines
-			if (line.startsWith("@")) {
-				samOut.println(line);
+			//remove any that are secondary or fail vendor QC, want to keep unmapped incase their mate is mapped
+			//calling all of the methods since these are not getting into the failed file for some reason
+			if (sam.getSupplementaryAlignmentFlag() || sam.isSecondaryOrSupplementary() || sam.getReadFailsVendorQualityCheckFlag() || sam.getNotPrimaryAlignmentFlag()){
+				failingSam.println(sam.getSAMString().trim());
+				numFailingAlignments++;
 				continue;
 			}
 			
-			SamAlignment sa;
-			try {
-				sa = new SamAlignment(line, false);
-			} catch (MalformedSamAlignmentException e) {
-				System.out.println("\nSkipping malformed sam alignment -> "+e.getMessage());
-				if (numBadLines++ > 100) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
+			//first one?
+			if (lastName == null){
+				lastName = sam.getReadName();
+				sameNameSams.add(sam);
 				continue;
 			}
-			
-			//fetch read name
-			String readName = sa.getName();
-System.out.println("\nNew alignment for "+readName + "  fp? "+sa.isFirstPair()+"  rs? "+sa.isReverseStrand());
-System.out.println("OriSam "+line);
-			
-			//is it first?
-			if (sa.isFirstPair()){
-				//new?
-				if (readName.equals(oldReadNameFirst) == false) {
-					oldReadNameFirst = readName;
-					oldFirstSeq = fetchFirstSeq(oldReadNameFirst);
-					oldFirstSeq = sa.processOriginalSequence(oldFirstSeq);
-				}
-				else System.out.println("\tAlready parsed");
-				sa.setSequence(oldFirstSeq);
-			}
-			
-			//second read
+
+			//part of prior set?
+			if (sam.getReadName().equals(lastName)) sameNameSams.add(sam);
 			else {
-				//new?
-				if (readName.equals(oldReadNameSecond) == false) {
-					oldReadNameSecond = readName;
-					oldSecondSeq = fetchSecondSeq(oldReadNameSecond);
-					oldSecondSeq = sa.processOriginalSequence(oldSecondSeq);
-				}
-				else System.out.println("\tAlready parsed");
-				sa.setSequence(oldSecondSeq);
+				//no, so a new one so process old and...
+				processSams(sameNameSams);
+				//reset
+				sameNameSams.clear();
+				lastName = sam.getReadName();
+				sameNameSams.add(sam);
 			}
-			
-			//print it
-System.out.println("FinSam "+line);			
-			samOut.println(sa.toStringNoMDField());
-			
 		}
-		
+		//process last
+		processSams(sameNameSams);
+		it.close();
+		System.out.println();
 	}
 
-	public void parseEm() throws IOException{
-		
-		String line;
-		String oldReadName = "";
-		//for each alignment line
-		int dotCounter = 0;
-		int numLines = 0;
-		while ((line = samIn.readLine()) !=null){
-			numLines++;
-			//print dot?
-			if (++dotCounter > 50000){
-				System.out.print(".");
-				dotCounter = 0;
+
+	private void processSams(ArrayList<SAMRecord> sameNameSams) throws Exception {
+		int num = sameNameSams.size();
+		if (num == 2){
+			//which to save?
+			SAMRecord fop = sameNameSams.get(0);
+			SAMRecord sop = sameNameSams.get(1);
+			if (fop.getFirstOfPairFlag() == false){
+				SAMRecord s = fop;
+				fop = sop;
+				sop = s;
 			}
-			
-			//skip comment lines
-			if (line.startsWith("@")) continue;
-			
-			//fetch read name
-			String readName = "@"+(TAB.split(line)[readNameIndex]);
-			
-			//check it's not the name
-			if (readName.equals(oldReadName)) continue;
-			oldReadName = readName;
-			
-			//find and print fastq data
-			findPrintFirstFastq(readName);
-			if (paired){
-				//find and print fastq data
-				findPrintSecondFastq(readName);
-			}
+			for (String x : ConsensusEngine.exportFastq(fop)) firstRead.println(x);
+			for (String x : ConsensusEngine.exportFastq(sop)) secondRead.println(x);
 		}
-		
-	}
-	
-	public String fetchFirstSeq(String readName) throws IOException{
-		String line;
-		String headerLine = "@"+readName;
-		//walk through file
-		while ((line = firstFastqIn.readLine()) != null){
-			if (line.startsWith(headerLine)){
-				//read in seq
-				line = firstFastqIn.readLine();
-				firstFastqIn.readLine();
-				firstFastqIn.readLine();
-				return line;
-			}
+		else if (num == 1){
+			//no mate 
+			SAMRecord s = sameNameSams.get(0);
+			for (String x : ConsensusEngine.exportFastq(s)) unpairedRead.println(x);
 		}
-		//should never end
-		throw new IOException("\nError: reached the end of the first fastq file without finding the read name -> "+readName);
-	}
-	public String fetchSecondSeq(String readName) throws IOException{
-		String line;
-		String headerLine = "@"+readName;
-		//walk through file
-		while ((line = secondFastqIn.readLine()) != null){
-			if (line.startsWith(headerLine)){
-				//read in seq
-				line = secondFastqIn.readLine();
-				secondFastqIn.readLine();
-				secondFastqIn.readLine();
-				return line;
-			}
+		else {
+			//must be more than 2, throw error!
+			StringBuilder sb = new StringBuilder("\nMore than 2 alignments found with the same fragment name?\n");
+			for (SAMRecord s: sameNameSams) sb.append(s.getSAMString());
+			throw new Exception(sb.toString());
 		}
-		//should never end
-		throw new IOException("\nError: reached the end of the second fastq file without finding the read name -> "+readName);
 	}
-	
-	public void findPrintFirstFastq(String readName) throws IOException{
-		String line;
-		//walk through file
-		while ((line = firstFastqIn.readLine()) != null){
-			if (line.startsWith(readName)){
-				firstFastqOut.println(line);
-				firstFastqOut.println(firstFastqIn.readLine());
-				firstFastqOut.println(firstFastqIn.readLine());
-				firstFastqOut.println(firstFastqIn.readLine());
-				firstFastqLineNumber+=4;
-				return;
-			}
-			firstFastqLineNumber++;
-		}
-		//should never end
-		throw new IOException("\nError: reached the end of the first fastq file without finding the read name -> "+readName);
-	}
-	
-	public void findPrintSecondFastq(String readName) throws IOException{
-		String line;
-		//walk through file
-		while ((line = secondFastqIn.readLine()) != null){
-			if (line.startsWith(readName)){
-				secondFastqOut.println(line);
-				secondFastqOut.println(secondFastqIn.readLine());
-				secondFastqOut.println(secondFastqIn.readLine());
-				secondFastqOut.println(secondFastqIn.readLine());
-				secondFastqLineNumber+=4;
-				//check line numbers
-				if (secondFastqLineNumber != firstFastqLineNumber) throw new IOException("\nError: line numbers between the first and the second fastq files differ for read name -> "+readName);
-				return;
-			}
-			secondFastqLineNumber++;
-		}
-		//should never end
-		throw new IOException("\nError: reached the end of the second fastq file without finding the read name -> "+readName);
-	}
-	
-	
-	public void makeReadersAndWriters() throws IOException{
-			//readers
-			samIn = IO.fetchBufferedReader(samFile);
-			firstFastqIn = IO.fetchBufferedReader(firstReadFastq);
-			if (paired) secondFastqIn = IO.fetchBufferedReader(secondReadFastq);
-			
-			//writers
-			if (replaceSamSeqWithOriginal){
-				File parsedSam = new File ("oriSeq_"+samFile);
-				samOut = new Gzipper(parsedSam);
-			}
-			else {
-				File firstParsed = new File (firstReadFastq.getParentFile(), "parsed_"+firstReadFastq.getName());
-				firstFastqOut = new Gzipper(firstParsed);
-				if (paired){
-					File secondParsed = new File (secondReadFastq.getParentFile(), "parsed_"+secondReadFastq.getName());
-					secondFastqOut = new Gzipper(secondParsed);
-				}
-			}
-			
-	}
-	
-	public void closeIO() throws IOException{
-			samIn.close();
-			firstFastqIn.close();
-			
-			if (replaceSamSeqWithOriginal) {
-				samOut.close();
-				if (paired) secondFastqIn.close();
-			}
-			else {
-				firstFastqOut.close();
-				if (paired){
-					secondFastqIn.close();
-					secondFastqOut.close();
-				}
-			}
-	}
+
 
 
 
@@ -296,9 +155,7 @@ System.out.println("FinSam "+line);
 		new Sam2Fastq(args);
 	}		
 
-
-
-	/**This method will process each argument and assign new varibles*/
+	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
@@ -309,10 +166,10 @@ System.out.println("FinSam "+line);
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'a': samFile = new File(args[++i]); break;
-					case 'f': firstReadFastq = new File(args[++i]); break;
-					case 's': secondReadFastq = new File(args[++i]); paired = true; break;
-					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
+					case 'a': bamFile = new File(args[++i]); break;
+					case 's': saveDirectory = new File(args[++i]); break;
+					case 'h': printDocs(); System.exit(0);
+					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group()+", Try -h");
 					}
 				}
 				catch (Exception e){
@@ -321,34 +178,85 @@ System.out.println("FinSam "+line);
 			}
 		}
 
-		if (samFile == null || samFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your alignment file -> "+samFile);
-		if (firstReadFastq == null || firstReadFastq.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your first read fastq file -> "+firstReadFastq);
-		if (paired){
-			if (secondReadFastq == null || secondReadFastq.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your second read fastq file -> "+secondReadFastq);
-		}
+		//look for bam files
+		if (bamFile != null && bamFile.canRead() == false) Misc.printErrAndExit("\nError: cannot read your xxx.bam file?\n"+bamFile);
+
+		//look for save file, can be null
+		if (saveDirectory == null ) Misc.printErrAndExit("\nError: please provide a directory to save the passing and failing bam alignments.\n");
+		saveDirectory.mkdirs();
+
+		//make IO
+		makeIO();
 
 	}	
 
+	private void makeIO() {
+		try {
+			SamReaderFactory readerFactory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+			bamReader = readerFactory.open(bamFile);
+
+			
+			//check that it isn't sorted by coordinate
+			if (bamReader.getFileHeader().getSortOrder().equals(SortOrder.coordinate) || bamReader.hasIndex()) {
+				bamReader.close();
+				throw new IOException ("\nError: you bam file cannot be sorted by coordinate, must be by query name.\n");
+			};
+
+			String name = Misc.removeExtension(bamFile.getName());
+			File fail = new File(saveDirectory, name+"_Fail.sam.gz");
+			File first = new File(saveDirectory, name+"_1.fastq.gz");
+			File second = new File(saveDirectory, name+"_2.fastq.gz");
+			File single = new File(saveDirectory, name+"_unpaired.fastq.gz");
+
+			firstRead = new Gzipper(first);
+			secondRead = new Gzipper(second);
+			unpairedRead = new Gzipper(single);
+			failingSam = new Gzipper(fail);
+
+			//write header
+			String header = bamReader.getFileHeader().getTextHeader().trim();
+			failingSam.println(header);
+			
+		} catch (IOException e) {
+			e.printStackTrace();
+			Misc.printErrAndExit("\nError: problem opening the bam IO readers or writers \n");
+		}
+	}
+
+	private void closeIO() {
+		try {
+			bamReader.close();
+			firstRead.close();
+			secondRead.close();
+			unpairedRead.close();
+			failingSam.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+			Misc.printErrAndExit("\nError: critical, problem closing the bam IO \n");
+		}
+	}
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Sam 2 Fastq: March 2012                            **\n" +
+				"**                                 Sam 2 Fastq: July 2016                           **\n" +
 				"**************************************************************************************\n" +
-				"Extracts the original Illumina fastq data from single or paired end sam alignments.\n" +
-				"Assumes alignments and reads are in the same order. In novoalign, set -oSync .\n"+
+				"Given a queryname sorted bam/sam alignment file, writes out fastq data for paired and \n"+
+				"unpaired alignemnts. Any non primary, secondary, supplemental or vendor failing QC\n"+
+				"alignments are written to a failed sam file.  This app doesn't have the memory leak\n"+
+				"found in Picard, writes gzipped fastq, and error checks the reads.\n"+
 
 				"\nOptions:\n"+
-				"-a Sam alignment txt file, full path, .gz/.zip OK.\n"+
-				"-f First read fastq file, ditto.\n" +
-				"-s (Optional) Second read fastq file, from paired read sequencing, ditto.\n" +
+				"-s Path to a directory for saving parsed data..\n"+
+				"-a Path to a query name sorted bam/sam alignment file. \n"+
 
+				"\n"+
 
-				"\nExample: java -Xmx1G -jar pathToUSeq/Apps/Sam2Fastq -a /SAM/unaligned.sam.gz -f \n" +
-				"     /Fastq/X1_110825_SN141_0377_AD06YNACXX_1_1.txt.gz -s \n" +
-				"     /Fastq/X1_110825_SN141_0377_AD06YNACXX_1_2.txt.gz\n\n" +
+				"Example: java -Xmx2G -jar pathTo/USeq/Apps/Sam2Fastq -a myQNSorted.bam -s S2F/\n\n"+
 
-		"**************************************************************************************\n");
+				"**************************************************************************************\n");
 
 	}
+
+
 }
