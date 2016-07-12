@@ -30,6 +30,7 @@ public class BisSeq {
 	private int minimumReadCoverage = 5;
 	private float fdrThreshold = 30;
 	private float log2RatioThreshold = 1.585f;
+	private float minimumAbsDiffInBFNC = 0.0f;
 	private boolean printGraphs = true;
 	private boolean scrambleControlData = false;
 
@@ -662,7 +663,7 @@ public class BisSeq {
 
 
 	/**Collects bases that have a minimum interrogation in both the T and C.*/
-	public static MethylatedBaseObservation[] fetchCommonBasesWithMinimumObservations(PointData nonConT, PointData conT, PointData nonConC, PointData conC, int minimumReadCoverage){
+	public MethylatedBaseObservation[] fetchCommonBasesWithMinimumObservations(PointData nonConT, PointData conT, PointData nonConC, PointData conC, int minimumReadCoverage){
 
 		//fetch arrays
 		int[] positionsNonConT = nonConT.getPositions();
@@ -755,6 +756,14 @@ public class BisSeq {
 			//enough t obs?
 			int numCObs = (int)(numConC+numNonConC);
 			if (numCObs < minimumReadCoverage) continue;
+			
+			//minimum abs diff in rations
+			if (minimumAbsDiffInBFNC != 0.0f){
+				float fracNonConT = numNonConT/(numNonConT+numConT);
+				float fracNonConC = numNonConC/(numNonConC+numConC);
+				float diff = Math.abs(fracNonConT-fracNonConC);
+				if (diff < minimumAbsDiffInBFNC) continue;
+			}
 
 			//save it
 			ibAL.add(new MethylatedBaseObservation (testPos, numNonConT, numConT, numNonConC, numConC));
@@ -992,6 +1001,7 @@ public class BisSeq {
 					case 'r': fullPathToR = new File(args[++i]); break;
 					case 'w': windowSize = Integer.parseInt(args[++i]); break;
 					case 'm': minNumObsInWindow = Integer.parseInt(args[++i]); break;
+					case 'b': minimumAbsDiffInBFNC = Float.parseFloat(args[++i]); break;
 					case 'd': minimumReadCoverage = Integer.parseInt(args[++i]); break;
 					case 'g': printGraphs = false; break;
 					case 'a': scrambleControlData = true; break;
@@ -1061,6 +1071,7 @@ public class BisSeq {
 		System.out.println(windowSize+ "\tWindow size");
 		System.out.println(minNumObsInWindow+"\tMinimum # obs in window");
 		System.out.println(minimumReadCoverage+"\tMinimum per base read coverage");
+		System.out.println(minimumAbsDiffInBFNC+"\tMinimum abs diff in per base fraction non conversion");
 		System.out.println(printGraphs+ "\tPrint graphs");
 		System.out.println(scrambleControlData+ "\tScramble control data");
 	}	
@@ -1070,7 +1081,7 @@ public class BisSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                   BisSeq: Nov 2014                               **\n" +
+				"**                                   BisSeq: June 2016                              **\n" +
 				"**************************************************************************************\n" +
 				"Takes two condition (treatment and control) PointData from converted and non-converted\n" +
 				"C bisulfite sequencing data parsed using the NovoalignBisulfiteParser and scores\n" +
@@ -1098,6 +1109,7 @@ public class BisSeq {
 
 				"\nDefault Options:\n"+
 				"-d Minimum per base read coverage, defaults to 5.\n"+
+				//"-b Minimum abs diff between base frac non conversion to include in window, defaults to 0\n"+
 				"-w Window size, defaults to 250.\n"+
 				"-m Minimum number methy C observations in window, defaults to 5. \n" +
 				"-f FDR threshold, defaults to 30 (-10Log10(0.01)).\n"+
