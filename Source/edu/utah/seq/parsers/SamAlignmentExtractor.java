@@ -29,6 +29,7 @@ public class SamAlignmentExtractor {
 	private boolean divideAlignmentScoreByCigarM = false;
 	private boolean writeOffTargetToPass = false;
 	private boolean removeSecSupNotPrim = true;
+	private boolean skipWritingFail = false;
 
 	//internal fields
 	private HashMap<String,RegionScoreText[]> chromRegions;
@@ -78,6 +79,7 @@ public class SamAlignmentExtractor {
 		System.out.println("Divide AS by cigar M\t"+divideAlignmentScoreByCigarM);
 		System.out.println("Pass off target align\t"+writeOffTargetToPass);
 		System.out.println("Fail Sec, Sup, Non Prim align\t"+removeSecSupNotPrim);
+		System.out.println("Skip writing failing align\t"+skipWritingFail);
 	}
 	
 	public void run(){
@@ -95,21 +97,11 @@ public class SamAlignmentExtractor {
 				workingChromosome = ssr.getSequenceName();
 				//any regions?
 				workingRegions = chromRegions.get(workingChromosome);
-				if (workingRegions != null) makeMask();
-				walkChromAlignments();
-				
-				/*
-				 * if (workingRegions == null) {
-					if (writeOffTargetToPass) printAllToPass();
-					else printAllToFail();
-					
-				}
+				if (workingRegions == null) printAllToFail();
 				else {
 					makeMask();
 					walkChromAlignments();
 				}
-				 */
-				
 				System.out.print(".");
 			}
 			
@@ -145,11 +137,13 @@ public class SamAlignmentExtractor {
 			Double fractionAlignmentsOnTarget = new Double((double)numPassingBasicAndOnTarget/(double)(numRawAlignments-numFailingBasic));
 			Double fractionOnTargetAndPassQCScoreFilters = new Double((double)numPassingBasicOnTargetAndScores/(double)numRawAlignments);
 			Double estimatedFractionDuplicateAlignments = new Double( (double)numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate/ (double) numPassingBasicOnTargetAndScores  );
+			Double fractionAlignmentsPassQCScoreFilters = new Double ( ((double)(numRawAlignments - numFailingBasic))/ (double)numRawAlignments);
 			
 			//output simple json, DO NOT change the key names without updated downstream apps that read this file!
 			Gzipper gz = new Gzipper(jsonOutputFile);
 			gz.println("{");
 			gz.printJson("numberUnfilteredAlignments", numberUnfilteredAlignments, true);
+			gz.printJson("fractionAlignmentsPassQCScoreFilters", fractionAlignmentsPassQCScoreFilters, true);
 			gz.printJson("fractionAlignmentsOnTarget", fractionAlignmentsOnTarget, true);
 			gz.printJson("fractionOnTargetAndPassQCScoreFilters", fractionOnTargetAndPassQCScoreFilters, true);
 			gz.printJson("estimatedFractionDuplicateAlignments", estimatedFractionDuplicateAlignments, true);
@@ -174,6 +168,7 @@ public class SamAlignmentExtractor {
 	}
 	
 	private void printAllToFail() {
+		if (skipWritingFail) return;
 		SAMRecordIterator it = bamReader.queryOverlapping(workingChromosome, 0, 0);
 		while (it.hasNext()) {
 			SAMRecord sam = it.next();
@@ -188,6 +183,7 @@ public class SamAlignmentExtractor {
 	}
 	
 	private void printUnmapped() {
+		if (skipWritingFail) return;
 		SAMRecordIterator it = bamReader.queryUnmapped();
 		while (it.hasNext()) {
 			failingBamWriter.addAlignment(it.next());
@@ -261,7 +257,7 @@ public class SamAlignmentExtractor {
 
 				//fail basic flags?
 				if (passBasic(sam) == false){
-					failingBamWriter.addAlignment(sam);
+					if (skipWritingFail == false) failingBamWriter.addAlignment(sam);
 					numFailingBasic++;
 					continue;
 				}
@@ -271,7 +267,7 @@ public class SamAlignmentExtractor {
 				if (workingRegions != null) onTarget = intersect(sam);
 				if (onTarget == false) {
 					if (writeOffTargetToPass == false){
-						failingBamWriter.addAlignment(sam);
+						if (skipWritingFail == false) failingBamWriter.addAlignment(sam);
 						continue;
 					}
 				}
@@ -321,7 +317,7 @@ public class SamAlignmentExtractor {
 						if (sam.getDuplicateReadFlag()) numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate++;
 					}
 				}
-				else failingBamWriter.addAlignment(sam);
+				else if (skipWritingFail == false) failingBamWriter.addAlignment(sam);
 			}
 			it.close();
 		} catch (Exception e){
@@ -358,6 +354,7 @@ public class SamAlignmentExtractor {
 					case 'n': biggerASIsBetter = false; break;
 					case 'd': divideAlignmentScoreByCigarM = true; break;
 					case 'f': writeOffTargetToPass = true; break;
+					case 'w': skipWritingFail = true; break;
 					case 'x': removeSecSupNotPrim = false; break;
 					case 'j': jsonOutputFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
@@ -404,7 +401,7 @@ public class SamAlignmentExtractor {
 			//must explicit set into the header that it is sorted for samtools proc alignments
 			bamReader.getFileHeader().setSortOrder(SortOrder.coordinate);
 			passingBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), true, pass);
-			failingBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), true, fail);
+			if (skipWritingFail == false) failingBamWriter = writerFactory.makeBAMWriter(bamReader.getFileHeader(), true, fail);
 		} catch (IOException e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError: problem closing the bam reader for "+bamFile);
@@ -415,7 +412,7 @@ public class SamAlignmentExtractor {
 		try {
 			bamReader.close();
 			passingBamWriter.close();
-			failingBamWriter.close();
+			if (skipWritingFail == false) failingBamWriter.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError: critical, problem closing the bam IO \n");
@@ -441,7 +438,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                         Sam Alignment Extractor: April 2016                      **\n" +
+				"**                         Sam Alignment Extractor: July 2016                       **\n" +
 				"**************************************************************************************\n" +
 				"Splits an alignment file into those that pass or fail thresholds and intersects\n"+
 				"regions of interest. Calculates a variety of QC statistics.\n"+
@@ -461,6 +458,7 @@ public class SamAlignmentExtractor {
 				"-f Save off target alignments that meet thresholds to the pass file, defaults to fail.\n"+
 				"-x Save secondary, supplemental, and non primary alignments, that pass the thresholds\n"+
 				"       defaults to fail.\n"+
+				"-w Skip writing failing alignments. Speeds up processing but kills the stats.\n"+
 
 				"\n"+
 
