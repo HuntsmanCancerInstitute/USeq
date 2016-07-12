@@ -4553,7 +4553,6 @@ public class Num {
 	public static String formatNumber(double num, int numberOfDecimalPlaces){
 		NumberFormat f = NumberFormat.getNumberInstance();
 		f.setMaximumFractionDigits(numberOfDecimalPlaces);
-		f.setMinimumFractionDigits(numberOfDecimalPlaces);
 		return f.format(num);
 	}
 	
