@@ -70,6 +70,7 @@ public class Sam2USeq {
 	private ArrayList<Double> fractionTargetBpsAL = new ArrayList<Double>();
 	private ArrayList<String> lowCoverageRegionsAL = new ArrayList<String>();
 	private ArrayList<String> exonicMedianPerBpCoverageAL = new ArrayList<String>();
+	private long numLowCoverageBps = 0;
 
 
 	/**For stand alone app.*/
@@ -328,7 +329,8 @@ public class Sam2USeq {
 			gz.printJson("targetRegionsFileName", regionFile.getName(), true);
 			gz.printJson("coverageAt0.95OfTargetBps", coverageAt95, true);
 			gz.printJson("fractionTargetBpsWithIndexedCoverage", Num.arrayListToDoubles(fractionTargetBpsAL), true);
-			gz.printJson("lowCoverageRegions", lowCoverageRegionsAL, true);  
+			gz.printJson("lowCoverageRegions", lowCoverageRegionsAL, true); 
+			gz.printJson("numberLowCoverageBps", numLowCoverageBps, true);
 			gz.printJson("exonicMedianPerBpCoverage", exonicMedianPerBpCoverageAL, false);  
 			gz.println("}");
 			gz.close();
@@ -655,7 +657,12 @@ public class Sam2USeq {
 			if (length >= minimumLength) {
 				bedOutFail.println(chromosome+"\t"+(blocks[j][0]+ firstBase)+"\t"+(blocks[j][1]+ firstBase +1) + nameScoreStrand);
 				//save for json
-				if (jsonOutputFile != null) lowCoverageRegionsAL.add(chromosome+":"+(blocks[j][0]+ firstBase)+"-"+(blocks[j][1]+ firstBase +1));
+				if (jsonOutputFile != null) {
+					int start= blocks[j][0]+ firstBase;
+					int end= blocks[j][1]+ firstBase +1;
+					numLowCoverageBps+= (end-start);
+					lowCoverageRegionsAL.add(chromosome+":"+start+"-"+end);
+				}
 			}
 		}
 	}
