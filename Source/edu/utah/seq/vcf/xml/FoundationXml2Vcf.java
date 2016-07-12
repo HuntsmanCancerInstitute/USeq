@@ -39,7 +39,7 @@ public class FoundationXml2Vcf {
 	private long numRearrangeFail = 0;
 	private ArrayList<String> failingFiles = new ArrayList<String>();
 	private String genomeVersion = "hg19";
-	private TreeMap<String, ArrayList<Disease>> diseases = new TreeMap<String, ArrayList<Disease>>();
+	private ArrayList<SampleInfo> sampleInfo = new ArrayList<SampleInfo>();
 	
 	//working data for a particular report
 	private File workingXmlFile;
@@ -65,6 +65,9 @@ public class FoundationXml2Vcf {
 			System.out.println(numCopyFail+ "\t# CNV Fail");
 			System.out.println(numRearrangePass+ "\t# Rearrange Pass");
 			System.out.println(numRearrangeFail+ "\t# Rearrange Fail");
+			
+			//sampleInfo
+			printSampleInfo();
 
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
@@ -104,37 +107,26 @@ public class FoundationXml2Vcf {
 			//build vcf
 			writeVcf();
 			
-			//create a Disease object
-			addDiseaseInfo();
+			//create an SI
+			SampleInfo si = new SampleInfo(reportAttributes);
+			if (si.allLoaded() == false) {
+				System.err.println("WARNING: missing sample info for:");
+				System.err.println(si.toString());
+				problemParsing = true;
+			}
+			sampleInfo.add(si);
 			
 			if (problemParsing) failingFiles.add(workingXmlFile.getName());
 		}
 		
 		//close the fasta lookup fetcher
 		fasta.close();
-		
-		summarizeObservedDiseases();
 
 	}
-	
-	private void addDiseaseInfo() {
-		String diseaseName = reportAttributes.get("disease");
-		if (diseaseName == null) {
-			System.err.println("\tWARNING: no associated disease found for "+reportAttributes);
-			diseaseName = "unknown";
-		}
-		else diseaseName = diseaseName.toLowerCase();
-		ArrayList<Disease> al = diseases.get(diseaseName);
-		if (al == null){
-			al = new ArrayList<Disease>();
-			diseases.put(diseaseName, al);
-		}
-		al.add(new Disease(reportAttributes));
-	}
 
-	private void summarizeObservedDiseases() {
-		System.out.println("\nObserved diseases: "+diseases.keySet());
-		
+	private void printSampleInfo() {
+		System.out.println();
+		System.out.println( SampleInfo.fetchSummaryInfo(sampleInfo) );
 	}
 
 	private void writeVcf() {
@@ -280,6 +272,7 @@ public class FoundationXml2Vcf {
 				if (name.equals("Gender")) addLastChild("Gender", cNode);
 				else if (name.equals("OrderingMD")) addLastChild("OrderingMD", cNode);
 				else if (name.equals("SpecSite")) addLastChild("SpecSite", cNode);
+				else if (name.equals("SubmittedDiagnosis")) addLastChild("SubmittedDiagnosis", cNode);
 				else if (name.equals("DOB")) dob = formatter.parse(cNode.getLastChild().getTextContent());
 				else if (name.equals("CollDate")) collDate = formatter.parse(cNode.getLastChild().getTextContent());
 			}
