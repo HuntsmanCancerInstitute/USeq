@@ -14,10 +14,10 @@ public class AggregateQCStats {
 	private File saveDirectory;
 	private File[] jsonFiles;
 
-	private String fastqMatch = "(.+)_fastqCount.json.gz";
-	private String saeMatch = "(.+)_samAlignmentExtractor.json.gz";
-	private String mpaMatch = "(.+)_mergePairedAlignments.json.gz";
-	private String s2uMatch = "(.+)_sam2USeq.json.gz";
+	private String fastqMatch = "(.+)_FastqCount.json.gz";
+	private String saeMatch = "(.+)_SamAlignmentExtractor.json.gz";
+	private String mpaMatch = "(.+)_MergePairedAlignments.json.gz";
+	private String s2uMatch = "(.+)_Sam2USeq.json.gz";
 
 	private TreeMap<String, SampleQC> samples;
 	private Pattern fastqPattern;
@@ -40,67 +40,25 @@ public class AggregateQCStats {
 		printTargetsTxtSheet();
 		
 		printHtmlTable();
-		printReadCoverageHtml();
+		printReadCoverageHtml("Coverage Over Target BPs", "Unique Observation Fold Coverage", "Fraction Target BPs");
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" Sec\n");
 	}
 	
-	private void printHtmlThresholdsDescriptions(){
-		SampleQC sqc = samples.values().iterator().next();
-		StringBuilder sb = new StringBuilder();
-		sb.append("<html>\n");
-		sb.append("<script type=\"text/javascript\" src=\"https://www.gstatic.com/charts/loader.js\"></script>\n");
-		sb.append("<body>\n");
-
-		sb.append("<div id=\"table_legend\"></div><body>\n");
-		
-		
-		
-		sb.append("<script>\n");
-		sb.append("google.charts.load('current', {'packages':['table']});\n");
-		sb.append("google.charts.setOnLoadCallback(drawLegend);\n");
-		sb.append("\n");
-		sb.append("function drawLegend() {\n");
-		sb.append("	var data = new google.visualization.DataTable();\n");
-		
-		//add columns
-		sqc.appendHtmlColumns(sb);
-		
-		sb.append("	data.addRows([\n");
-		
-		//for each sample
-		for (SampleQC s: samples.values()){
-			s.appendHtmlDataRow(sb);
-		}
-		sb.append("	]);\n");
-		sb.append("var table = new google.visualization.Table(document.getElementById('table_main'));\n");
-		sb.append("table.draw(data, {title:'Summary Stats', showRowNumber: false, width:'100%', cssClassNames:{headerCell: 'googleHeaderCell'}});\n");
-		sb.append("}\n");
-		sb.append("</script> \n");
-		sb.append("</body>\n");
-		sb.append("</html> \n");
-		
-		File html = new File(saveDirectory, "qcReport.html");
-		IO.writeString(sb.toString(), html);
-	}
-	
 	private void printHtmlTable(){
 		SampleQC sqc = samples.values().iterator().next();
 		StringBuilder sb = new StringBuilder();
-		sb.append("<html>\n");
-		sb.append("<script type=\"text/javascript\" src=\"https://www.gstatic.com/charts/loader.js\"></script>\n");
-		sb.append("<body>\n");
-
-		sb.append("<div id=\"table_main\"></div><body>\n");
-		
-		sb.append("<script>\n");
-		sb.append("google.charts.load('current', {'packages':['table']});\n");
-		sb.append("google.charts.setOnLoadCallback(drawTable);\n");
-		sb.append("\n");
-		sb.append("function drawTable() {\n");
-		sb.append("	var data = new google.visualization.DataTable();\n");
+		sb.append("<html>  \n");
+		sb.append("<head>  \n");
+		sb.append("    <style> #table_main { width: 100%; height: 100%;} </style>  \n");
+		sb.append("<script type='text/javascript' src='https://www.gstatic.com/charts/loader.js'></script>   \n");
+		sb.append("<script> \n");
+		sb.append("google.charts.load('current', {'packages':['table']}); \n");
+		sb.append("google.charts.setOnLoadCallback(drawTable); \n");
+		sb.append("function drawTable() { \n");
+		sb.append("	var data = new google.visualization.DataTable(); \n");
 		
 		//add columns
 		sqc.appendHtmlColumns(sb);
@@ -111,32 +69,37 @@ public class AggregateQCStats {
 		for (SampleQC s: samples.values()){
 			s.appendHtmlDataRow(sb);
 		}
-		sb.append("	]);\n");
-		sb.append("var table = new google.visualization.Table(document.getElementById('table_main'));\n");
-		sb.append("table.draw(data, {title:'Summary Stats', showRowNumber: false, width:'100%', cssClassNames:{headerCell: 'googleHeaderCell'}});\n");
-		sb.append("}\n");
-		sb.append("</script> \n");
-		sb.append("</body>\n");
+		sb.append("	]); \n");
+		sb.append("	var table = new google.visualization.Table(document.getElementById('table_main')); \n");
+		sb.append("	table.draw(data, {title:'Summary Stats', showRowNumber: false, cssClassNames:{headerCell: 'googleHeaderCell'}}); \n");
+		sb.append("	window.addEventListener('resize', function() { \n");
+		sb.append("		table.draw(rcData, options);  \n");
+		sb.append("        }, false); \n");
+		sb.append("} \n");
+		sb.append("</script>  \n");
+		sb.append("</head> \n");
+		sb.append("<body> \n");
+		sb.append("<div id='table_main'></div><body> \n");
+		sb.append("</body> \n");
 		sb.append("</html> \n");
 		
-		File html = new File(saveDirectory, "qcReport.html");
+		File html = new File(saveDirectory, "qcReport_Stats.html");
 		IO.writeString(sb.toString(), html);
 	}
 	
-	private void printReadCoverageHtml(){
+	
+	private void printReadCoverageHtml(String title, String hAxis, String vAxis){
 		StringBuilder sb = new StringBuilder();
-		sb.append("<html>\n");
-		sb.append("<script type=\"text/javascript\" src=\"https://www.gstatic.com/charts/loader.js\"></script>\n");
-		sb.append("<body>\n");
+		sb.append("<html> \n");
+		sb.append("<head> \n");
+		sb.append("    <style> #gChart { width: 100%; height: 100%;} </style> \n");
+		sb.append("<script type='text/javascript' src='https://www.gstatic.com/charts/loader.js'></script> \n");
+		sb.append("<script> \n");
+		sb.append("google.charts.load('current', {'packages':['corechart', 'line']}); \n");
+		sb.append("google.charts.setOnLoadCallback(drawChart); \n");
 
-		sb.append("<div id=\"chart_read_coverage\"></div><body>\n");
-
-		sb.append("<script>\n");
-		sb.append("google.charts.load('current', {'packages':['corechart', 'line']});\n");
-		sb.append("google.charts.setOnLoadCallback(draw);\n");
-		sb.append("\n");
-		sb.append("function draw() {\n");
-		sb.append("	var rcData = new google.visualization.DataTable();\n");
+		sb.append("function drawChart() { \n");
+		sb.append("	var rcData = new google.visualization.DataTable(); \n");
 		
 		//how many X axis numbers 0x, 1x, 2x, 3x, 4x,...
 		int max25 = 0;
@@ -170,19 +133,25 @@ public class AggregateQCStats {
 		sb.append("	]);\n");
 		
 		//add options
-		sb.append("var options={ title:'Coverage Over Target BPs', hAxis:{title:'Unique Observation Fold Coverage'}, vAxis:{title:'Fraction Target BPs'}, height:600 };\n");
+		sb.append("	var options={ title:'"+title+"', hAxis:{title:'"+hAxis+"'}, vAxis:{title:'"+vAxis+"'}}; \n");
+		sb.append("	var chart = new google.visualization.LineChart(document.getElementById('gChart')); \n");
+
+		sb.append("	chart.draw(rcData, options); \n");
+
+		sb.append("	 window.addEventListener('resize', function() { \n");
+		sb.append("            chart.draw(rcData, options); \n");
+		sb.append("        }, false); \n");
+		sb.append("} \n");
+
+		sb.append("</script>  \n");
+		sb.append("</head> \n");
+		sb.append("<body> \n");
+		sb.append("<div id='gChart'></div><body> \n");
+		sb.append("</body> \n");
+		sb.append("</html>  \n");
+		sb.append(" \n");
 		
-		sb.append("var chart = new google.visualization.LineChart(document.getElementById('chart_read_coverage'));\n");
-		sb.append("chart.draw(rcData, options);\n");
-		sb.append("}\n");
-		sb.append("$(window).resize(function(){");
-		sb.append("draw()\n");
-		sb.append("}\n");
-		sb.append("</script> \n");
-		sb.append("</body>\n");
-		sb.append("</html> \n");
-		
-		File html = new File(saveDirectory, "qcReportReadCoverage.html");
+		File html = new File(saveDirectory, "qcReport_ReadCoverage.html");
 		IO.writeString(sb.toString(), html);
 	}
 
@@ -307,10 +276,10 @@ public class AggregateQCStats {
 		samples = new TreeMap<String, SampleQC>();
 
 		//make patterns
-		fastqPattern = Pattern.compile(fastqMatch);
-		saePattern = Pattern.compile(saeMatch);
-		mpaPattern = Pattern.compile(mpaMatch);
-		s2uPattern = Pattern.compile(s2uMatch);
+		fastqPattern = Pattern.compile(fastqMatch, Pattern.CASE_INSENSITIVE);
+		saePattern = Pattern.compile(saeMatch, Pattern.CASE_INSENSITIVE);
+		mpaPattern = Pattern.compile(mpaMatch, Pattern.CASE_INSENSITIVE);
+		s2uPattern = Pattern.compile(s2uMatch, Pattern.CASE_INSENSITIVE);
 
 		//for each json file
 		for (File j: jsonFiles){
@@ -415,7 +384,7 @@ public class AggregateQCStats {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Aggregate QC Stats: June 2016                         **\n" +
+				"**                            Aggregate QC Stats: July 2016                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from json files produced by the\n"+
 				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, and fastq counter.\n"+
@@ -427,10 +396,10 @@ public class AggregateQCStats {
 
 				"\nDefault Options:\n"+
 				"-f FastqCount regex for parsing sample name, note the name must be identical across\n"+
-				     "the json files, defaults to (.+)_fastqCount.json.gz\n"+
-				"-s SAE regex, defaults to (.+)_samAlignmentExtractor.json.gz\n"+
-				"-m MPA regex, defaults to (.+)_mergePairedAlignments.json.gz\n"+
-				"-u S2U regex, defaults to (.+)_sam2USeq.json.gz\n"+
+				     "the json files, defaults to (.+)_FastqCount.json.gz, case insensitive.\n"+
+				"-s SAE regex, defaults to (.+)_SamAlignmentExtractor.json.gz\n"+
+				"-m MPA regex, defaults to (.+)_MergePairedAlignments.json.gz\n"+
+				"-u S2U regex, defaults to (.+)_Sam2USeq.json.gz\n"+
 				"\n"+
 
 				"Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -s QCStats/ \n\n" +
