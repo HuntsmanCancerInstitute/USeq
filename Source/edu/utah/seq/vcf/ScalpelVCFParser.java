@@ -14,7 +14,8 @@ public class ScalpelVCFParser {
 
 	private File[] vcfFiles;
 	private float minimumQual = 0;
-	private int minimumCount = 100;
+	private int minimumTumorCount = 100;
+	private int minimumNormalCount = 30;
 	private double minimumAltTNRatio = 1.6;
 	private double maximumNormalAltFraction = 0.1;
 	private double minimumTumorAltFraction = 0.05;
@@ -31,10 +32,11 @@ public class ScalpelVCFParser {
 		
 		System.out.println("Thresholds:");
 		System.out.println(minimumQual+"\tMin QUAL score");
-		System.out.println(minimumCount+"\tMin alignment depth");
+		System.out.println(minimumTumorCount+"\tMin tumor alignment depth");
+		System.out.println(minimumTumorCount+"\tMin normal alignment depth");
 		System.out.println(minimumAltTNRatio+"\tMin Allelic fraction change tAltRto/nAltRto");
-		System.out.println(maximumNormalAltFraction+"\tMax Normal alt allelic fraction");
-		System.out.println(minimumTumorAltFraction+"\tMin Tumor alt allelic fraction");
+		System.out.println(maximumNormalAltFraction+"\tMax normal alt allelic fraction");
+		System.out.println(minimumTumorAltFraction+"\tMin tumor alt allelic fraction");
 		
 		//key = fetchKey();
 		
@@ -64,8 +66,8 @@ public class ScalpelVCFParser {
 				
 				//check depth
 				int normDepth = normTum[0].getReadDepthDP();
-				int tumDepth = normTum[1].getReadDepthDP();
-				if (normDepth < minimumCount || tumDepth < minimumCount) {
+				int tumDepth = normTum[1].getReadDepthDP();			
+				if (normDepth < minimumNormalCount || tumDepth < minimumTumorCount) {
 					r.setFilter(VCFRecord.FAIL);
 					continue;
 				}
@@ -78,7 +80,7 @@ public class ScalpelVCFParser {
 				
 				double normRto = normTum[0].getAltRatio();
 				double tumRto = normTum[1].getAltRatio();
-				
+
 				//check alt allelic ratio 
 				if (minimumAltTNRatio != 0.0){
 					if (normRto == 0) normRto = 0.001;
@@ -164,9 +166,6 @@ public class ScalpelVCFParser {
 				//add af to Norm and Tum
 				fields[9] = fields[9]+ ":"+ formatAf (vcf.getSample()[0].getAltRatio());
 				fields[10] = fields[10]+ ":"+ tumorAF;
-				
-
-				
 				out.println(Misc.stringArrayToString(fields, "\t"));
 			}
 		}
@@ -223,7 +222,8 @@ public class ScalpelVCFParser {
 					switch (test){
 					case 'v': forExtraction = new File(args[++i]); break;
 					case 'm': minimumQual = Float.parseFloat(args[++i]); break;
-					case 'a': minimumCount = Integer.parseInt(args[++i]); break;
+					case 'a': minimumTumorCount = Integer.parseInt(args[++i]); break;
+					case 'b': minimumNormalCount = Integer.parseInt(args[++i]); break;
 					case 'r': minimumAltTNRatio = Double.parseDouble(args[++i]); break;
 					case 't': minimumTumorAltFraction = Double.parseDouble(args[++i]); break;
 					case 'n': maximumNormalAltFraction = Double.parseDouble(args[++i]); break;
@@ -250,7 +250,7 @@ public class ScalpelVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Scalpel VCF Parser: May 2016                          **\n" +
+				"**                            Scalpel VCF Parser: July 2016                         **\n" +
 				"**************************************************************************************\n" +
 				"Filters Scalpel VCF INDEL files for various thresholds.  Replaces the FILTER field \n"+
 				"with ., adds tumor DP and AF values to the info field.\n"+
@@ -258,7 +258,8 @@ public class ScalpelVCFParser {
 				"\nRequired Params:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s)\n" +
 				"-m Minimum QUAL score, defaults to 0\n"+
-				"-a Minimum alignment depth for both tumor and normal samples, defaults to 100\n"+
+				"-a Minimum alignment depth for tumor sample, defaults to 100\n"+
+				"-b Minimum alignment depth for normal sample, defaults to 30\n"+
 				"-t Minimum tumor alt allelic fraction, defaults to 0.05\n"+
 				"-n Maximum normal alt allelic fraction, defaults to 0.1\n"+
 				"-r Minimum alt Tum/Norm allelic ratio, defaults to 1.6.\n"+
