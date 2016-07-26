@@ -142,10 +142,10 @@ public class FoundationXml2Vcf {
 			Bed[] b = new Bed[shortVariants.size() + copyVariants.size()+ (2*rearrangeVariants.size())];
 			int counter =0;
 			
-			for (FoundationShortVariant sv : shortVariants) b[counter++] = fetchBed(sv.toVcf());
-			for (FoundationCopyVariant cnv : copyVariants) b[counter++] = fetchBed(cnv.toVcf());
+			for (FoundationShortVariant sv : shortVariants) b[counter++] = fetchBed(sv.toVcf(counter));
+			for (FoundationCopyVariant cnv : copyVariants) b[counter++] = fetchBed(cnv.toVcf(counter));
 			for (FoundationRearrangeVariant r : rearrangeVariants) {
-				String[] v = r.toVcf();
+				String[] v = r.toVcf(counter);
 				 b[counter++] = fetchBed(v[0]);
 				 b[counter++] = fetchBed(v[1]);
 			}

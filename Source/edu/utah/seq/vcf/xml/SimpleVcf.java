@@ -9,6 +9,7 @@ import util.gen.Misc;
 public class SimpleVcf  implements Comparable<SimpleVcf>{
 
 	//fields
+	private String originalRecord;
 	private String chr;
 	private int pos;  //zero based
 	private String id;
@@ -19,6 +20,8 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	private String info;
 	private int end;
 	private int length;
+	private int padPos;
+	private int padEnd;
 	private boolean insertion = false;
 	private boolean deletion = false;
 	private boolean shortVariant = true;
@@ -32,7 +35,8 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	public static String infoRAF = "##INFO=<ID=RAF,Number=A,Type=Float,Description=\"Recalled variant allele frequency\">";
 	
 	//#CHROM POS ID REF ALT QUAL FILTER INFO
-	public SimpleVcf (String vcfLine){
+	public SimpleVcf (String vcfLine, int bpPadding){
+		originalRecord = vcfLine;
 		//parse required fields
 		String[] t = Misc.TAB.split(vcfLine);
 		chr = t[0];
@@ -66,6 +70,9 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 			else end = pos+altLen;
 		}
 		length = end - pos;
+		//set bp padded positions
+		padPos = pos - bpPadding;
+		padEnd = end + bpPadding;
 	}
 	
 	/**This swaps out the pos ref alt end and appends the RAF
@@ -108,8 +115,8 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	}
 	public boolean compareToOverlap(SimpleVcf o) {
 		if (chr.equals(o.chr) == false) return false;
-		if (pos > o.end) return false;
-		if (o.pos > end) return false;
+		if (padPos > o.padEnd) return false;
+		if (o.padPos > padEnd) return false;
 		return true;
 	}
 	
@@ -174,5 +181,9 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	}
 	public void setPrint(boolean print) {
 		this.print = print;
+	}
+
+	public String getOriginalRecord() {
+		return originalRecord;
 	}
 }

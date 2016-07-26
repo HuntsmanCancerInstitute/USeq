@@ -58,8 +58,8 @@ public class FoundationRearrangeVariant {
 		String otherCoor = parseString("pos2");
 		
 		//create ids
-		String targetId = "bnd_T"+id;
-		String otherId = "bnd_M"+id;
+		String targetId = "Foundation_bnd_T"+id;
+		String otherId = "Foundation_bnd_M"+id;
 		
 		//make em, String coordinates, String id, String gene, FoundationXml2Vcf parser
 		target = new MateInfo(targetCoor, targetId, targetName, parser);
@@ -67,7 +67,7 @@ public class FoundationRearrangeVariant {
 	}
 
 	/** Returns two vcf lines, target and other with cross referencing mate info*/
-	public String[] toVcf(){
+	public String[] toVcf(int id){
 		//create common info stuff ST, DESC, IF, SVTYPE,IMPRECISE
 		StringBuilder sb = new StringBuilder();
 		sb.append(";ST="); sb.append(status);

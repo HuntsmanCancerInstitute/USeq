@@ -51,14 +51,15 @@ public class FoundationCopyVariant {
 	}
 
 	/** Returns CHROM POS ID REF ALT QUAL FILTER INFO */
-	public String toVcf(){
+	public String toVcf(int id){
 		StringBuilder sb = new StringBuilder();
 		//CHROM
 		sb.append(chromosome); sb.append("\t");
 		//POS
-		sb.append(position); sb.append("\t");
+		sb.append(position); sb.append("\tFoundation_");
 		//ID
-		sb.append(".\t");
+		sb.append(id);
+		sb.append("\t");		
 		//REF
 		sb.append(reference); sb.append("\t<");
 		//ALT

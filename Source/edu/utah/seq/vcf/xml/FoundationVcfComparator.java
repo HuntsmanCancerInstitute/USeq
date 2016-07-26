@@ -20,6 +20,7 @@ public class FoundationVcfComparator {
 	private File mergedVcf = null;
 	private SimpleVcf[] fVcfs;
 	private SimpleVcf[] rVcfs;	
+	private int bpPaddingForOverlap = 5;
 
 	//counters
 	private int numberShortFoundation = 0;
@@ -29,10 +30,12 @@ public class FoundationVcfComparator {
 	private int numberFoundationWithMultiOverlap = 0;
 	private int numberFoundationWithSingleOverlap = 0;
 	private int numberFoundationWithNoMatch = 0;
-	private int numberRecallWithNoMatch = 0;
+	private int numberPassingRecallWithNoMatch = 0;
+	private int numberFoundationNotPrinted = 0;
 	
 	private ArrayList<SimpleVcf> vcfToPrint = new ArrayList<SimpleVcf>();
 	private ArrayList<String> headerLines = new ArrayList<String>();
+	
 
 	//constructors
 	public FoundationVcfComparator(String[] args){
@@ -73,8 +76,9 @@ public class FoundationVcfComparator {
 		System.out.println( numberExactMatches +"\t# Exact matches");
 		System.out.println( numberFoundationWithSingleOverlap +"\t# Short with one overlapping recall variant");
 		System.out.println( numberFoundationWithMultiOverlap +"\t# Short with multi overlapping recal variants");
-		System.out.println( numberFoundationWithNoMatch +"\t# Short with no match");
-		System.out.println( numberRecallWithNoMatch +"\t# Recall with no Short match");
+		System.out.println( numberFoundationWithNoMatch +"\t# Short with no match"); 
+		System.out.println( numberFoundationNotPrinted +"\t# Short not printed and needs manual arbitration."); 
+		System.out.println( numberPassingRecallWithNoMatch +"\t# Passing recall variants with no Short match");
 	}
 
 	private void printVcfs() {
@@ -89,7 +93,9 @@ public class FoundationVcfComparator {
 			String[] header = mergeHeaders(headerLines);
 			
 			for (String h: header) out.println(h);
-			for (SimpleVcf v: vcf) out.println(v.getVcfLine());
+			for (SimpleVcf v: vcf) {
+				if (v.getFilter().toLowerCase().contains("fail") == false) out.println(v.getVcfLine());
+			}
 			
 			out.close();
 		} catch (IOException e) {
@@ -99,14 +105,14 @@ public class FoundationVcfComparator {
 	}
 
 	private void processRecallVcfs() {
-		//for each Recall vcf, call this after processing the Foundation vcfs
+		//for each Recall vcf, call this after processing the Foundation vcfs, skip those with a fail filter field
 		for (SimpleVcf r:rVcfs){
 			//print it?
-			if (r.isPrint()) {
+			if (r.isPrint() && r.getFilter().toLowerCase().contains("fail") == false) {
 				//mark Filter NR not reported
 				r.appendFilter("NR");
 				vcfToPrint.add(r);
-				numberRecallWithNoMatch++;
+				numberPassingRecallWithNoMatch++;
 			}
 		}
 	}
@@ -193,15 +199,22 @@ public class FoundationVcfComparator {
 
 			//exact match? 
 			if (f.getMatch() != null) {
+				
+				//hmm thinking that if there is an exact match then just print it
+				f.appendRAF(f.getMatch());
+				vcfToPrint.add(f);
+				numberExactMatches++;
+				f.getMatch().setPrint(false);
 
+				/*
 				//any overlap?
 				if (f.getOverlap().size() == 0){
 					//no overlap so good to go.
 					f.appendRAF(f.getMatch());
 					vcfToPrint.add(f);
-					System.err.println("Exact match. Printing.:");
-					System.err.println("F:\t"+f.getVcfLine());
-					System.err.println("R:\t"+f.getMatch().getVcfLine());
+					//System.err.println("Exact match. Printing.:");
+					//System.err.println("F:\t"+f.getVcfLine());
+					//System.err.println("R:\t"+f.getMatch().getVcfLine());
 					numberExactMatches++;
 					//set recall exact match to not print
 					f.getMatch().setPrint(false);
@@ -217,6 +230,7 @@ public class FoundationVcfComparator {
 					//set Foundation to not print
 					f.setPrint(false);
 				}
+				*/
 				continue;
 			}
 
@@ -236,6 +250,7 @@ public class FoundationVcfComparator {
 					}
 					//set Foundation to not print
 					f.setPrint(false);
+					numberFoundationNotPrinted++;
 				}
 				else {
 					numberFoundationWithSingleOverlap++;
@@ -254,12 +269,13 @@ public class FoundationVcfComparator {
 						System.err.println("One overlap, but diff types. Need to arbitrate. NOTHING printed.");
 						//set Foundation to not print
 						f.setPrint(false);
+						numberFoundationNotPrinted++;
 					}
 					//set recall to not print
 					f.getOverlap().get(0).setPrint(false);
 					
-					System.err.println("F:\t"+f.getVcfLine());
-					System.err.println("R:\t"+r.getVcfLine());
+					System.err.println("F:\t"+f.getOriginalRecord());
+					System.err.println("R:\t"+r.getOriginalRecord());
 				}
 				continue;
 			}
@@ -306,7 +322,7 @@ public class FoundationVcfComparator {
 		String[] lines = IO.loadFileIntoStringArray(vcf);
 		ArrayList<SimpleVcf> al = new ArrayList<SimpleVcf>();
 		for (String v: lines){
-			if (v.startsWith("#") == false) al.add(new SimpleVcf(v));
+			if (v.startsWith("#") == false) al.add(new SimpleVcf(v, bpPaddingForOverlap));
 			else headerLines.add(v);
 		}
 		SimpleVcf[] svs = new SimpleVcf[al.size()];
@@ -359,11 +375,12 @@ public class FoundationVcfComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Foundation Vcf Comparator: June 2016                   **\n" +
+				"**                           Foundation Vcf Comparator: July 2016                   **\n" +
 				"**************************************************************************************\n" +
 				"FVC compares a Fondation vcf generated with the FoundationXml2Vcf to a recalled vcf\n"+
 				"and attempts to merge them removing duplications both exact and overlapping variants.\n"+
-				"Be sure to vt normalize each before running.\n"+
+				"Be sure to vt normalize each before running. Fail filter variants with no Foundation\n"+
+				"match are not included in the merged vcf.\n"+
 
 				"\nOptions:\n"+
 				"-f Path to a FoundationOne vcf file, see the FoundationXml2Vcf app.\n"+

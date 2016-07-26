@@ -59,14 +59,15 @@ public class FoundationShortVariant {
 	}
 
 	/** Returns CHROM POS ID REF ALT QUAL FILTER INFO (EG FE ST PE DP AF)*/
-	public String toVcf(){
+	public String toVcf(int id){
 		StringBuilder sb = new StringBuilder();
 		//CHROM
 		sb.append(chromosome); sb.append("\t");
 		//POS
-		sb.append(position); sb.append("\t");
+		sb.append(position); sb.append("\tFoundation_");
 		//ID
-		sb.append(".\t");
+		sb.append(id);
+		sb.append("\t");
 		//REF
 		sb.append(reference); sb.append("\t");
 		//ALT
@@ -163,7 +164,7 @@ public class FoundationShortVariant {
 				String fasta = new String(p.getBases());
 				if (fasta.equals(basesDeleted) == false){
 					failedParsing = true;
-					System.err.println("\tWARNING: the deleted bases do not match the fasta ('"+fasta+"')?\n\t"+parsedAttributes+"\n\t"+toVcf());
+					System.err.println("\tWARNING: the deleted bases do not match the fasta ('"+fasta+"')?\n\t"+parsedAttributes+"\n\t"+toVcf(0));
 				}
 			}
 
@@ -240,7 +241,7 @@ public class FoundationShortVariant {
 		String test = new String(rs.getBases());
 		if (test.equals(reference) == false){
 			failedParsing = true;
-			System.err.println("\tWARNING: reference does not match seq from fasta ('"+test+"')?\n\t"+parsedAttributes+"\n\t"+toVcf());
+			System.err.println("\tWARNING: reference does not match seq from fasta ('"+test+"')?\n\t"+parsedAttributes+"\n\t"+toVcf(0));
 		}
 	}
 	
