@@ -19,6 +19,7 @@ public class LofreqVCFParser {
 	private File saveDirectory;
 	private float alleleFreq = 0;
 	private float readDepth = 0;
+	private boolean markFail = false;
 	
 	public LofreqVCFParser (String[] args) {
 
@@ -37,6 +38,7 @@ public class LofreqVCFParser {
 			//counters
 			int numFail = 0;
 			int numPass = 0;
+			int counter = 0;
 
 			//IO
 			String name = Misc.removeExtension(vcf.getName());
@@ -61,46 +63,47 @@ public class LofreqVCFParser {
 					//#CHROM POS ID REF ALT QUAL FILTER INFO ......
 					//   0    1   2  3   4   5     6      7
 					String[] tokens = Misc.TAB.split(line);
-					
+					boolean pass = true;
 					//skip indels?
 					if (removeIndels){
 						if (tokens[3].length() !=1 || tokens[4].length() !=1) {
 							numFail++;
-							continue;
+							pass= false;
 						}
 					}
-					
 					//pass score?
-					if (minimumScore !=0){
+					if (pass && minimumScore !=0){
 						int score = Integer.parseInt(tokens[5]);
 						if (score < minimumScore) {
 							numFail++;
-							continue;
+							pass= false;
 						}
 					}
-					
 					//read depth or allele freq?
-					if (readDepth !=0 || alleleFreq !=0){
+					if (pass && readDepth !=0 || alleleFreq !=0){
 						float[] dpAf = parseDpAf(tokens[7]);
 						if (dpAf[0] < readDepth || dpAf[1] < alleleFreq){
 							numFail++;
-							continue;
+							pass= false;
 						}
 					}
+					if (pass) numPass++;
+					//so it failed, do they want to still print it?
+					else if (markFail == false) continue;
 					
-					numPass++;
 					
 					//reset FILTER?
 					if (clearFilter) tokens[6] = ".";
+					if (pass == false && markFail) tokens[6] = "FAIL";
 					
 					//modify id
-					tokens[2] = "Lofreq_"+numPass;
+					tokens[2] = "Lofreq_"+counter;
+					counter++;
 					line = Misc.stringArrayToString(tokens, "\t");
 					
 					//print
 					if (appendFNT) modVcf.println(line+"\tGT\t./.\t./.");
 					else modVcf.println(line);
-					
 				}
 			}
 			in.close();
@@ -152,6 +155,7 @@ public class LofreqVCFParser {
 					case 'i': removeIndels = true; break;
 					case 'f': clearFilter = true; break;
 					case 'a': appendFNT = true; break;
+					case 'n': markFail = true; break;
 					case 'm': minimumScore = Float.parseFloat(args[++i]); break;
 					case 'd': readDepth = Float.parseFloat(args[++i]); break;
 					case 't': alleleFreq = Float.parseFloat(args[++i]); break;
@@ -184,7 +188,7 @@ public class LofreqVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Lofreq VCF Parser: April 2016                        **\n" +
+				"**                             Lofreq VCF Parser: July 2016                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses Lofreq vcf files with options for filtering for minimum QUAL, modifying the\n"+
 				"FILTER field, removing non SNVs, and appending FORMAT info for downstream merging.\n"+
@@ -200,6 +204,7 @@ public class LofreqVCFParser {
 				"-i Remove non SNV records\n"+
 				"-f Replace the FILTER field with '.'\n"+
 				"-a Append FORMAT NORMAL TUMOR to #CHROM line and add empty columns to records\n"+
+				"-n Mark variants failing thresholds FAIL instead of not printing\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/LofreqVCFParser -v VCFFiles/ -m 32 -i -f -a\n"+
 				"      -s FilteredLofreqVcfs/ \n\n" +
