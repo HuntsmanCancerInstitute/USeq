@@ -2,6 +2,7 @@ package edu.utah.seq.qc;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -13,6 +14,7 @@ public class AggregateQCStats {
 	//fields
 	private File saveDirectory;
 	private File[] jsonFiles;
+	private String prependString = "";
 
 	private String fastqMatch = "(.+)_FastqCount.json.gz";
 	private String saeMatch = "(.+)_SamAlignmentExtractor.json.gz";
@@ -66,9 +68,11 @@ public class AggregateQCStats {
 		sb.append("	data.addRows([\n");
 		
 		//for each sample
-		for (SampleQC s: samples.values()){
-			s.appendHtmlDataRow(sb);
+		Iterator<SampleQC> it = samples.values().iterator();
+		while (it.hasNext()){
+			it.next().appendHtmlDataRow(sb, it.hasNext() == false);
 		}
+
 		sb.append("	]); \n");
 		sb.append("	var table = new google.visualization.Table(document.getElementById('table_main')); \n");
 		sb.append("	table.draw(data, {title:'Summary Stats', showRowNumber: false, cssClassNames:{headerCell: 'googleHeaderCell'}}); \n");
@@ -83,7 +87,7 @@ public class AggregateQCStats {
 		sb.append("</body> \n");
 		sb.append("</html> \n");
 		
-		File html = new File(saveDirectory, "qcReport_Stats.html");
+		File html = new File(saveDirectory, prependString+"qcReport_Stats.html");
 		IO.writeString(sb.toString(), html);
 	}
 	
@@ -111,37 +115,37 @@ public class AggregateQCStats {
 		if (max25 < 10) max25 = 10;
 		
 		//add 1st index X column
-		sb.append("rcData.addColumn('number','X')\n");
+		sb.append("\trcData.addColumn('number','X')\n");
 		//add one for each sample
 		for (SampleQC s: samples.values()){
-			sb.append("rcData.addColumn('number','"+ s.getSampleName() +"')\n");
+			sb.append("\trcData.addColumn('number','"+ s.getSampleName() +"')\n");
 		}
 		
 		//add the data rows
-		sb.append("	rcData.addRows([\n");
+		sb.append("\trcData.addRows([\n");
 		int last = max25-1;
 		for (int i=0; i< max25; i++){
-			sb.append("[");
+			sb.append("\t\t\t[");
 			sb.append(i);
 			for (SampleQC s: samples.values()){
 				sb.append(",");
 				sb.append(s.getFractionTargetBpsWithIndexedCoverage()[i]);
 			}
-			if (i != last )sb.append("],");
+			if (i != last )sb.append("],\n");
 			else sb.append("]");
 		}
 		sb.append("	]);\n");
 		
 		//add options
-		sb.append("	var options={ title:'"+title+"', hAxis:{title:'"+hAxis+"'}, vAxis:{title:'"+vAxis+"'}}; \n");
-		sb.append("	var chart = new google.visualization.LineChart(document.getElementById('gChart')); \n");
+		sb.append("\tvar options={ title:'"+title+"', hAxis:{title:'"+hAxis+"'}, vAxis:{title:'"+vAxis+"'}}; \n");
+		sb.append("\tvar chart = new google.visualization.LineChart(document.getElementById('gChart')); \n");
 
-		sb.append("	chart.draw(rcData, options); \n");
+		sb.append("\tchart.draw(rcData, options); \n");
 
-		sb.append("	 window.addEventListener('resize', function() { \n");
-		sb.append("            chart.draw(rcData, options); \n");
-		sb.append("        }, false); \n");
-		sb.append("} \n");
+		sb.append("\twindow.addEventListener('resize', function() { \n");
+		sb.append("\t\tchart.draw(rcData, options); \n");
+		sb.append("\t\t}, false); \n");
+		sb.append("\t} \n");
 
 		sb.append("</script>  \n");
 		sb.append("</head> \n");
@@ -151,7 +155,7 @@ public class AggregateQCStats {
 		sb.append("</html>  \n");
 		sb.append(" \n");
 		
-		File html = new File(saveDirectory, "qcReport_ReadCoverage.html");
+		File html = new File(saveDirectory, prependString+"qcReport_ReadCoverage.html");
 		IO.writeString(sb.toString(), html);
 	}
 
@@ -179,7 +183,7 @@ public class AggregateQCStats {
 		sb.append("Descriptions:\n");
 		sb.append(sqc.fetchDescriptions("", "\t", "\n"));
 
-		File txt = new File(saveDirectory, "qcReport_Stats.xls");
+		File txt = new File(saveDirectory, prependString+ "qcReport_Stats.xls");
 		IO.writeString(sb.toString(), txt);
 	}
 
@@ -210,7 +214,7 @@ public class AggregateQCStats {
 			sb.append("\n");
 		}
 
-		File txt = new File(saveDirectory, "qcReport_ReadCoverage.xls");
+		File txt = new File(saveDirectory, prependString+ "qcReport_ReadCoverage.xls");
 		IO.writeString(sb.toString(), txt);
 	}
 	
@@ -246,7 +250,7 @@ public class AggregateQCStats {
 			sb.append("\n");
 		}
 
-		File txt = new File(saveDirectory, "qcReport_PerRegionCoverage.xls");
+		File txt = new File(saveDirectory, prependString+ "qcReport_PerRegionCoverage.xls");
 		IO.writeString(sb.toString(), txt);
 	}
 
@@ -302,11 +306,11 @@ public class AggregateQCStats {
 			if (test == null) test = s;
 			else {
 				//check thresholds
-				if (test.checkThresholds(s)){
+				if (test.checkThresholds(s) == false){
 					Misc.printErrAndExit("\nERROR: this sample's AS, MQ, or AS proc settings differ? Are you changing thresholds between runs? "+s.getSampleName());
 				}
 				//check json files
-				if (test.checkJsonFiles(s)) {
+				if (test.checkJsonFiles(s) == false) {
 					Misc.printErrAndExit("\nERROR: this sample is missing one or more of the required four xxx.json.gz files from the FastaCounter, SAE, MPA, S2U apps. "+s.getSampleName());
 				}
 			}
@@ -362,6 +366,7 @@ public class AggregateQCStats {
 					case 's': saeMatch = args[++i]; break;
 					case 'm': mpaMatch = args[++i]; break;
 					case 'u': s2uMatch = args[++i]; break;
+					case 'p': prependString = args[++i]; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -400,9 +405,10 @@ public class AggregateQCStats {
 				"-s SAE regex, defaults to (.+)_SamAlignmentExtractor.json.gz\n"+
 				"-m MPA regex, defaults to (.+)_MergePairedAlignments.json.gz\n"+
 				"-u S2U regex, defaults to (.+)_Sam2USeq.json.gz\n"+
+				"-p String to prepend onto output file names.\n"+
 				"\n"+
 
-				"Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -s QCStats/ \n\n" +
+				"Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -s QCStats/ -p TR774_ \n\n" +
 
 				"**************************************************************************************\n");
 

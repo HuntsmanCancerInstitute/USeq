@@ -197,7 +197,7 @@ public class SampleQC {
 		}
 	}
 	
-	public void appendHtmlDataRow(StringBuilder sb) {
+	public void appendHtmlDataRow(StringBuilder sb, boolean skipComma) {
 		//sb.append("		['Mike',  100.3, true],\n");
 		//sb.append("		['Jim',   {v:8000,   f: '$8,000'},  false],\n");
 		//sb.append("		['Alice', {v: 12500, f: '$12,500'}, true],\n");
@@ -229,7 +229,8 @@ public class SampleQC {
 		}
 		sb.append("\t\t[");
 		sb.append(Misc.stringArrayListToString(al, ","));
-		sb.append("]\n");
+		if (skipComma) sb.append("]\n");
+		else sb.append("],\n");
 	}
 	
 	
@@ -241,7 +242,7 @@ public class SampleQC {
 			al.add(divideAlignmentScoreByCigarM+ d+ "AS/ CIGAR M - Was the given AS score divided by the CIGAR M length? This is needed for bwa but not novoalign to normalize for the length of the alignment.");
 		}
 		if (s2uParsed){
-			al.add(minimumCoverageThreshold+ d+ "tCoverage Threshold - Minimum unique observationcoverage threshold for counting as a failed BP.");
+			al.add(minimumCoverageThreshold+ d+ "Coverage Threshold - Minimum unique observationcoverage threshold for counting as a failed BP.");
 		}
 		return Misc.stringArrayListToString(al, r);
 	}
@@ -249,25 +250,25 @@ public class SampleQC {
 	/**begin, divide, end*/
 	public String fetchDescriptions(String b, String d, String e){
 		ArrayList<String> al = new ArrayList<String>();
-		al.add(b+ "Sample Name"+ d+ "Name parsed from the json.gz file.");
+		al.add(b+ "Sample Name"+ d+ "Name parsed from the json.gz files.");
 		if (fastqParsed) al.add(b+ "# Fastq Reads"+ d+ "Total number of fastq reads passed to the aligner, not pairs of reads, all.");
 		if (saeParsed){
 			al.add(b+ "# Unfiltered Alignments"+ d+ "Number of unfiltered alignments.");
-			al.add(b+ "Fraction Passing QC"+ d+ "Fraction of primary alignments passing vendor QC and MQ and AS scores.This is a good measure of the fraction of quality alignments coming from a sample.");
+			al.add(b+ "Fraction Passing QC"+ d+ "Fraction of primary alignments passing vendor QC, MQ, and AS scores. This is a good measure of the fraction of quality alignments coming from a sample.");
 			al.add(b+ "Fraction On Target"+ d+ "Fraction of these quality alignments that are also on target.");
 			al.add(b+ "Fraction Duplicate"+ d+ "Fraction of these on target, quality alignments, that are marked as duplicate.");
 		}
 		if (mpaParsed){
 			al.add(b+ "Mean Insert Size"+ d+ "Mean insert size for paired reads.");
 			al.add(b+ "Fraction Overlapping BPs"+ d+ "Fraction BPs in paired alignments that overlap.");
-			al.add(b+ "# Unique BPs"+ d+ "Total number of unique, duplicate free bps. This is a good estimation of the usable yield of of data for a given samples.");
+			al.add(b+ "# Unique BPs"+ d+ "Total number of unique, duplicate free bps. This is a good estimation of the usable yield of data for a given samples.");
 			al.add(b+ "Fraction Q20 BPs"+ d+ "Fraction of these unique BPs with good quality.");
 			al.add(b+ "Fraction Q30 BPs"+ d+ "Fraction of these unique BPs with very good quality.");
 		}
 		if (s2uParsed){
 			al.add(b+ "Mean on Target Coverage"+ d+ "Traditional measure of coverage over target BPs.");
-			al.add(b+ "Coverage at 0.95 of Target BPs"+ d+ "Better measure of coverage, calculated by asking what fraction of target BPs have 0x, 1x, 2x … or more coverage. Stop when it hits 0.95.");
-			al.add(b+ "# Low Coverage Target BPs"+ d+ "Number of BPs that have less than the minimum coverage threshold.");
+			al.add(b+ "Coverage at 0.95 of Target BPs"+ d+ "Better measure of coverage, calculated by asking what fraction of target BPs have 0x, 1x, 2x or more coverage. Stop when it hits 0.95.");
+			al.add(b+ "# Low Coverage Target BPs"+ d+ "Number of target BPs with less than the minimum coverage threshold.");
 		}
 		return Misc.stringArrayListToString(al, e);
 	}
