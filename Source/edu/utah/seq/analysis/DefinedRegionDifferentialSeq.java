@@ -26,7 +26,7 @@ import edu.utah.seq.useq.apps.Bar2USeq;
 
 
 /** Compares datasets for differential counts over user defined regions (e.g. gene models).  
- * Wraps Simon Anders/ Michael Love's et al. DESeq2 package with lots of modifications. Estimates alternative splicing.
+ * Wraps Simon Anders/ Michael Love's et al. DESeq2 package with lots of modifications. Estimates alternative splicing. Also supports SamSeq (Mosbruger).
  * @author Nix
  * */
 public class DefinedRegionDifferentialSeq {
@@ -53,6 +53,13 @@ public class DefinedRegionDifferentialSeq {
 	private boolean secondStrandFlipped = false;
 	private boolean useSamSeq = false;
 	private boolean independentFiltering = true;
+	private float lowLg2 = 0.585f;
+	private float medLg2 = 1f;
+	private float highLg2 = 1.585f;
+	private float lowP = 10f;
+	private float medP = 20f;
+	private float highP = 30f;
+	private boolean addStraightPValColumns = false;
 	
 	//hidden options
 	private boolean trimUTRBPsFromExons = false;
@@ -69,7 +76,6 @@ public class DefinedRegionDifferentialSeq {
 	private LinkedHashSet<String> geneNamesWithMinimumCounts = new LinkedHashSet<String>();
 	private String[] geneNamesToAnalyze = null;
 	private File serializedConditons = null;
-	private String url;
 	private static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSDHN])");
 	public static final Pattern BAD_NAME = Pattern.compile("(.+)/[12]$");
 	public boolean saveCounts = true;
@@ -110,12 +116,11 @@ public class DefinedRegionDifferentialSeq {
 
 	/**For integration with RNASeq app.*/
 	public DefinedRegionDifferentialSeq(File treatmentBamDirectory, File controlBamDirectory, String genomeVersion, File saveDirectory,  File fullPathToR, File processedRefSeqFile, boolean scoreIntrons, boolean performStrandedAnalysis, 
-			boolean verbose, boolean reverse, boolean flipped, int maxAlignDepth, boolean useSamSeq){
+			boolean verbose, boolean reverse, boolean flipped, int maxAlignDepth, boolean useSamSeq, boolean deleteTempFiles){
 		this.treatmentBamDirectory = treatmentBamDirectory;
 		this.controlBamDirectory = controlBamDirectory;
 		this.saveDirectory = saveDirectory;
 		this.genomeVersion = genomeVersion;
-		url = "http://localhost:7085/UnibrowControl?version="+genomeVersion+"&seqid=";
 		this.fullPathToR = fullPathToR;
 		this.refSeqFile = processedRefSeqFile;
 		this.scoreIntrons = scoreIntrons;
@@ -126,6 +131,7 @@ public class DefinedRegionDifferentialSeq {
 		this.performReverseStrandedAnalysis = reverse;
 		this.maxAlignmentsDepth = maxAlignDepth;
 		this.useSamSeq = useSamSeq;
+		this.deleteTempFiles = deleteTempFiles;
 		run();
 	}
 
@@ -144,7 +150,7 @@ public class DefinedRegionDifferentialSeq {
 		writeCountTable();
 
 		//launch DESeq2/SAMSeq for differential expression
-		String thresholdName = "-10Log10(AdjP) "+Num.formatNumber(minAdjP,1)+", Log2Ratio "+Num.formatNumber(minLog2Ratio, 1);
+		String thresholdName = "-10Log10(AdjPVal) "+Num.formatNumber(minAdjP,1)+", Log2Ratio "+Num.formatNumber(minLog2Ratio, 1);
 
 		if (useSamSeq) {
 			if (verbose)  System.out.println("Running SAMseq analysis...");
@@ -1247,6 +1253,10 @@ public class DefinedRegionDifferentialSeq {
 			workbook = new XSSFWorkbook();
 			FileOutputStream fileOut = new FileOutputStream(new File(saveDirectory, "geneStats.xlsx"));
 
+			//new sheet for descriptions of headings, put first!
+			Sheet sheet5= workbook.createSheet("README");
+			addColumnDescriptors(sheet5);
+			
 			//create a worksheet
 			Sheet sheet0 = workbook.createSheet("Analyzed Genes");
 			sheet0.createFreezePane( 0, 1, 0, 1 );
@@ -1274,29 +1284,27 @@ public class DefinedRegionDifferentialSeq {
 
 			//add FPKM
 			cellIndex = addFPKMInfo(rows, cellIndex);
-
+			
 			//new sheet for diff expressed genes at relaxed thresholds
-			Sheet sheet1 = workbook.createSheet("AdjP 10 Lg2Rt 0.585");
+			Sheet sheet1 = workbook.createSheet("Low "+lowLg2+", "+lowP);
 			sheet1.createFreezePane( 0, 1, 0, 1 );
-			addDiffExpressedGenes(sheet1, 10f, 0.5849625f);
+			addDiffExpressedGenes(sheet1, lowP, lowLg2);
 
 			//new sheet for diff expressed genes at standard thresholds
-			Sheet sheet2 = workbook.createSheet("AdjP 20 Lg2Rt 1");
+			Sheet sheet2 = workbook.createSheet("Medium "+medLg2+", "+medP);
 			sheet2.createFreezePane( 0, 1, 0, 1 );
-			addDiffExpressedGenes(sheet2, 20f, 1f);
+			addDiffExpressedGenes(sheet2, medP, medLg2);
 
-			//new sheet for diff expressed genes at standard thresholds
-			Sheet sheet3 = workbook.createSheet("AdjP 30 Lg2Rt 1.585");
+			//new sheet for diff expressed genes at high thresholds
+			Sheet sheet3 = workbook.createSheet("High "+highLg2+", "+highP);
 			sheet3.createFreezePane( 0, 1, 0, 1 );
-			addDiffExpressedGenes(sheet3, 30f, 1.584963f);
+			addDiffExpressedGenes(sheet3, highP, highLg2);
 
 			//new sheet for flagged genes
 			Sheet sheet4 = workbook.createSheet("Flagged Genes");
 			addFlaggedGenes(sheet4);
 
-			//new sheet for descriptions of headings
-			Sheet sheet5= workbook.createSheet("Column Descriptions");
-			addColumnDescriptors(sheet5);
+
 
 			//write out and close
 			workbook.write(fileOut);
@@ -1341,13 +1349,14 @@ public class DefinedRegionDifferentialSeq {
 			for (int j=0; j< gr.length; j++){
 				Row r = sheet.getRow(rowIndex);
 				if (r == null) r = sheet.createRow(rowIndex);
-				gr[j].addInfo(r, columnIndex);
+				gr[j].addInfo(r, columnIndex, addStraightPValColumns);
 				//advance row
 				rowIndex++;
 			}
 
 			//advance column index
-			columnIndex+=3;
+			if(addStraightPValColumns) columnIndex+=4;
+			else columnIndex+=3;
 		}
 
 	}
@@ -1358,76 +1367,75 @@ public class DefinedRegionDifferentialSeq {
 		Font font = workbook.createFont();
 		font.setBoldweight(Font.BOLDWEIGHT_BOLD);
 		bold.setFont(font);
+		
+		CellStyle yellow = workbook.createCellStyle();
+		yellow.setFont(font);
+		yellow.setFillForegroundColor(IndexedColors.LIGHT_YELLOW.getIndex());
+		yellow.setFillPattern(CellStyle.SOLID_FOREGROUND);
 
 		int rowIndex = 0;
 
-		String[][] usedDescriptors;
-
-		if (useSamSeq) {
-			usedDescriptors = this.samSeqDescriptors;
-		} else {
-			usedDescriptors = this.deSeqDescriptors;
-		}
+		String[][] usedDescriptors = getDescriptors();
 
 		for (int i=0; i< usedDescriptors.length; i++){
 			Row row = sheet.createRow(rowIndex++);
 			Cell cell = row.createCell(0);
-			cell.setCellStyle(bold);
-			cell.setCellValue(usedDescriptors[i][0]);
-			if (usedDescriptors[i][1] != null) row.createCell(1).setCellValue(usedDescriptors[i][1]);
+			//null description?
+			if (usedDescriptors[i][1] == null){
+				cell.setCellStyle(yellow);
+				cell.setCellValue(usedDescriptors[i][0]);
+			}
+			else {
+				cell.setCellStyle(bold);
+				cell.setCellValue(usedDescriptors[i][0]);
+				row.createCell(1).setCellValue(usedDescriptors[i][1]);
+			}
+
 		}
 
 		sheet.autoSizeColumn((short)0);
 	}
-
-	private String[][] deSeqDescriptors = {
-			{"Gene/Region info:", null},
-			{"IGB HyperLink", "Click each to reposition a running instance of IGB, http://bioviz.org/igb/"},
-			{"Alt Name", "Alternative name for this gene/region"},
-			{"Coordinates", "Chromosome : Start of the gene/region - end of the gene/region"},
-			{"Strand", "Strand of the gene/region"},
-			{"Total BPs", "Total base pairs of gene/region after masking for overlapping annotations if so indicated"},
-			{"Max Abs Lg2Rto", "Maximum absolute log2 ratio observed"},
-			{"Max DESeq2 AdjP", "Maximum observed -10Log10( AdjP ) between any pairwise DESeq2 comparisons.  Note the MaxAbsLg2Rto and MaxDESeqAdjP may be from different comparisons.  "
-					+ "Moreover, all p-values and AdjPs in USeq output, both printed and in graph form have been phred transformed where the value is actually -10*Log10(AdjP or pval). Thus -10*Log10(0.001) = 30, -10*Log10(0.01) = 20, -10*Log10(0.05) = 13, and -10*Log10(0.1) = 10. "},
-					{"", ""},
-					{"For each Paired Comparison:", null},
-					{"Lg2Rto", "DESeq2's log2 ratio for differential expression."},
-					{"AdjP", "DESeq2's negative binomial -10Log10(adjusted p-value) following the Benjamini and Hochberg multiple testing correction."},
-					{"Spli Lg2Rto", "The maximum log2 ratio difference between two conditions and a gene's exon after correcting for differences in counts.  Use this to gauge the degree of potential differential splicing."},
-					{"Spli AdjPVal", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction is applied to the p-values."},
-					{"Spli Coor", "Coordinates of the exon displaying the SpliLg2Rto."},
-					{"", ""},
-					{"For each Replica:", null},
-					{"Counts", "Number of alignments that overlap a given gene/region by at least one base pair. Paired alignments are only counted once.  Alignments that span a gene/region but don't actually touch down are ignored. "},
-					{"RLog", "Per gene/region regularized log counts from DESeq2.  Use these for subsequent pca and clustering analysis."},
-					{"FPKM", "Transformed count data normalized to library size and gene/region length (counts/ exonicBasesPerKB/ millionTotalMappedReadsToGeneTable)"}
-
-	};
-
-	private String[][] samSeqDescriptors = {
-			{"Gene/Region info:", null},
-			{"IGB HyperLink", "Click each to reposition a running instance of IGB, http://bioviz.org/igb/"},
-			{"Alt Name", "Alternative name for this gene/region"},
-			{"Coordinates", "Chromosome : Start of the gene/region - end of the gene/region"},
-			{"Strand", "Strand of the gene/region"},
-			{"Total BPs", "Total base pairs of gene/region after masking for overlapping annotations if so indicated"},
-			{"Max Abs Lg2Rto", "Maximum absolute log2 ratio observed"},
-			{"Max SAMseq AdjP", "Maximum observed -10Log10( AdjP ) between any pairwise DESeq2 comparisons.  Note the MaxAbsLg2Rto and MaxDESeqAdjP may be from different comparisons.  "
-					+ "Moreover, all p-values and AdjPs in USeq output, both printed and in graph form have been phred transformed where the value is actually -10*Log10(AdjP or pval). Thus -10*Log10(0.001) = 30, -10*Log10(0.01) = 20, -10*Log10(0.05) = 13, and -10*Log10(0.1) = 10. "},
-					{"", ""},
-					{"For each Paired Comparison:", null},
-					{"Lg2Rto", "SAMseq's log2 ratio for differential expression"},
-					{"AdjP", "SAMseq's -10Log10(AdjP)"},
-					{"Spli Lg2Rto", "The maximum log2 ratio difference between two conditions and a gene's exon after correcting for differences in counts.  Use this to gauge the degree of potential differential splicing."},
-					{"Spli AdjPVal", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction is applied to the p-values."},
-					{"Spli Coor", "Coordinates of the exon displaying the SpliLg2Rto."},
-					{"", ""},
-					{"For each Replica:", null},
-					{"Counts", "Number of alignments that overlap a given gene/region by at least one base pair. Paired alignments are only counted once.  Alignments that span a gene/region but don't actually touch down are ignored. "},
-					{"FPKM", "Transformed count data normalized to library size and gene/region length (counts/ exonicBasesPerKB/ millionTotalMappedReadsToGeneTable)"}
-
-	};
+	
+	private String[][] getDescriptors(){
+		String app = "DESeq2";
+		if (useSamSeq) app = "SamSeq";
+		
+		String[][] desc = {
+				{"Thresholds for the three selected gene/region tabs:", null},
+				{"Low", "Lg2Rto "+lowLg2+", -10Lg10(AdjPval) "+lowP},
+				{"Medium", "Lg2Rto "+medLg2+", -10Lg10(AdjPval) "+medP},
+				{"High", "Lg2Rto "+highLg2+", -10Lg10(AdjPval) "+highP},
+				{"", ""},
+				{"", ""},
+				{"Column Descriptions:", null},
+				{"Gene/Region info:", null},
+				{"IGV HyperLink", "Click each to reposition a running instance of IGV, http://software.broadinstitute.org/software/igv/"},
+				{"Alt Name", "Alternative name for this gene/region"},
+				{"Coordinates", "Chromosome : Start of the gene/region - end of the gene/region"},
+				{"Strand", "Strand of the gene/region"},
+				{"Total BPs", "Total base pairs of gene/region after masking for overlapping annotations if so indicated"},
+				{"Max Abs Lg2Rto", "Maximum absolute log2 ratio observed"},
+				{"Max "+app+" AdjPval", "Maximum observed AdjP between any pairwise comparisons.  Note the MaxAbsLg2Rto and Max"+app+"AdjP may be from different comparisons. Column may be present."},
+				{"Max "+app+" -10Lg10(AdjPval)", "Maximum observed -10Log10(AdjP) between any pairwise comparisons.  Note the MaxAbsLg2Rto and Max"+app+"AdjP may be from different comparisons."},
+				{"","All p-values and AdjPs in USeq output, both printed and in graph form have been phred transformed where the value is actually -10*Log10(AdjP or pval)."},
+				{"","Thus -10*Log10(0.001) = 30, -10*Log10(0.01) = 20, -10*Log10(0.05) = 13, and -10*Log10(0.1) = 10. "},
+				{"", ""},
+				{"For each Paired Comparison:", null},
+				{"Lg2Rto", app+"'s log2 ratio for differential expression."},
+				{"AdjPval", app+"'s p-value after Benjamini and Hochberg multiple testing correction. No phred transformation. May be present."},
+				{"-10Lg10(AdjPval)", app+"'s p-value after both Benjamini and Hochberg multiple testing correction and phred transformation e.g. -10Lg10(AdjPval)"},
+				{"Spli Lg2Rto", "The maximum log2 ratio difference between two conditions and a gene's exon after correcting for differences in counts.  Use this to gauge the degree of potential differential splicing."},
+				{"Spli AdjPval", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction is applied to the p-values. May be present."},
+				{"Spli -10Lg10(AdjPval)", "Chi-square test of independence between two conditions and a gene's exons that contain 5 or more counts.  A Bonferroni correction and phred transformation is applied to the p-values."},
+				{"Spli Coor", "Coordinates of the exon displaying the SpliLg2Rto."},
+				{"", ""},
+				{"For each Replica:", null},
+				{"Counts", "Number of alignments that overlap a given gene/region by at least one base pair. Paired alignments are only counted once.  Alignments that span a gene/region but don't actually touch down are ignored. "},
+				{"RLog", "Per gene/region regularized log counts when using DESeq2.  Use these for subsequent PCA and clustering analysis. Not present with SamSeq analysis."},
+				{"FPKM", "Transformed count data normalized to library size and gene/region length (counts/ exonicBasesPerKB/ millionTotalMappedReadsToGeneTable)"}
+		};
+		return desc;
+	}
 
 	private void addFlaggedGenes(Sheet sheet) {
 		//generate gene lists
@@ -1566,6 +1574,7 @@ public class DefinedRegionDifferentialSeq {
 	/*Adds DiffExpLg2Rto DiffExpAdjP DiffSpliceLg2Rto DiffSpliceAdjP DiffSpliceCoordinates*/
 	private int addPairedConditionInfo(Row[] rows, int cellIndex) {
 		float[] noScores = {0f,0f,0f,0f,0f};
+		if (addStraightPValColumns) noScores = new float[]{0f,0f,0f,0f,0f, 0f};
 		int ci = 0;
 
 		//for each paired condition
@@ -1585,10 +1594,14 @@ public class DefinedRegionDifferentialSeq {
 				if (spliceScores != null && spliceScores.containsKey(geneNamesToAnalyze[j]))  splice = spliceScores.get(geneNamesToAnalyze[j]); 
 				//lg2Rto deseq
 				rows[rowIndex].createCell(ci++).setCellValue(fdrLog2[1]);
+				//straight pval?
+				if (addStraightPValColumns) rows[rowIndex].createCell(ci++).setCellValue(Num.antiNeg10log10(fdrLog2[0]));
 				//fdr deseq
 				rows[rowIndex].createCell(ci++).setCellValue(fdrLog2[0]);
 				//lg2 splice
 				rows[rowIndex].createCell(ci++).setCellValue(splice[1]);
+				//straight pval?
+				if (addStraightPValColumns) rows[rowIndex].createCell(ci++).setCellValue(Num.antiNeg10log10(splice[0]));
 				//fdr splice
 				rows[rowIndex].createCell(ci++).setCellValue(splice[0]);
 				//coordinates of max log2 rto spliced exon
@@ -1623,7 +1636,7 @@ public class DefinedRegionDifferentialSeq {
 
 			//hyperlink with displayName
 			Hyperlink link = createHelper.createHyperlink(Hyperlink.LINK_URL);
-			link.setAddress(fetchIGBHyperLink(gene));
+			link.setAddress(fetchIGVHyperLink(gene));
 			link.setLabel(gene.getDisplayNameThenName());
 
 			Cell hlCell = rows[rowIndex].createCell(cellIndex++);
@@ -1642,26 +1655,21 @@ public class DefinedRegionDifferentialSeq {
 			rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getTotalExonicBasePairs());
 			//MaxAbsLg2Rto
 			rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getMaxAbsLog2Ratio());
+			//Add non transformed AdjP?
+			if (addStraightPValColumns) rows[rowIndex].createCell(cellIndex++).setCellValue(Num.antiNeg10log10(gene.getFdr()));
 			//MaxDESeqAdjP
 			rows[rowIndex].createCell(cellIndex++).setCellValue(gene.getFdr());
 		}
 		return cellIndex;
 	}
 
-	private String fetchIGBHyperLink(UCSCGeneLine gene){
-		StringBuilder text = new StringBuilder();
+	private String fetchIGVHyperLink(UCSCGeneLine gene){
 		//url
 		int start = gene.getTxStart() - 50000;
 		if (start < 0) start = 0;
 		int end = gene.getTxEnd() + 50000;
+		return "http://localhost:60151/goto?locus="+gene.getChrom()+":"+start+ "-" + end;
 
-		text.append(url);
-		text.append(gene.getChrom());
-		text.append("&start=");
-		text.append(start);
-		text.append("&end=");
-		text.append(end);
-		return text.toString();
 	}
 
 	private int createCell (Row row, String value, int index, CellStyle style){
@@ -1686,18 +1694,22 @@ public class DefinedRegionDifferentialSeq {
 		return style;
 	}
 	private void makeHeaderLine(Row row, boolean all) {
+		String app = "DESeq2";
+		if (useSamSeq) app = "SamSeq";
+		
 		//create header
 		CellStyle headerCellStyle = createHeaderStyle((short)-1);
 
 		int index = 0;
 		if (all){
-			index = createCell(row, "IGB HyperLink", index, headerCellStyle);
+			index = createCell(row, "IGV HyperLink", index, headerCellStyle);
 			index = createCell(row, "Alt Name", index, headerCellStyle);
 			index = createCell(row, "Coor "+genomeVersion, index, headerCellStyle);
 			index = createCell(row, "Strand", index, headerCellStyle);
 			index = createCell(row, "Total BPs", index, headerCellStyle);
 			index = createCell(row, "Max Abs Lg2Rto", index, headerCellStyle);
-			index = createCell(row, "Max DESeq2 AdjP", index, headerCellStyle);
+			if (addStraightPValColumns) index = createCell(row, "Max "+app+" AdjPVal", index, headerCellStyle);
+			index = createCell(row, "Max "+app+" -10Lg10(AdjPVal)", index, headerCellStyle);
 		}
 
 		//for each PairedCondition
@@ -1709,10 +1721,12 @@ public class DefinedRegionDifferentialSeq {
 			String name = pc.getName();
 			if (all == false) index = createCell(row, name, index, pcCellStyle);
 			index = createCell(row, "Lg2Rto "+name, index, pcCellStyle);
-			index = createCell(row, "AdjP "+name, index, pcCellStyle);
+			if (addStraightPValColumns) index = createCell(row, "AdjPval "+name, index, pcCellStyle);
+			index = createCell(row, "-10Lg10(AdjPval) "+name, index, pcCellStyle);
 			if (all){
 				index = createCell(row, "Spli Lg2Rto "+name, index, pcCellStyle);
-				index = createCell(row, "Spli AdjPVal "+name, index, pcCellStyle);
+				if (addStraightPValColumns) index = createCell(row, "Spli AdjPVal "+name, index, pcCellStyle);
+				index = createCell(row, "Spli -10Lg10(AdjPVal) "+name, index, pcCellStyle);
 				index = createCell(row, "Spli Coor "+name, index, pcCellStyle);
 			}
 		}
@@ -1891,6 +1905,9 @@ public class DefinedRegionDifferentialSeq {
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
+		String adjPThres = null;
+		String lg2Thres = null;
+		
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -1914,7 +1931,10 @@ public class DefinedRegionDifferentialSeq {
 					case 'j': performReverseStrandedAnalysis = true; break;
 					case 'k': secondStrandFlipped = true; break;
 					case 'a': useSamSeq = true; break;
+					case 'y': addStraightPValColumns = true; break;
 					case 'f': independentFiltering = false; break;
+					case 'v': adjPThres = args[++i]; break;
+					case 'w': lg2Thres = args[++i]; break;
 					//hidden options
 					case 'o': trimUTRBPsFromExons = true; break;
 					case 'z': printFirstLastCountTable = true; break;
@@ -1931,8 +1951,23 @@ public class DefinedRegionDifferentialSeq {
 
 		//fetch genome version and make url
 		if (genomeVersion == null) Misc.printErrAndExit("\nPlease provide a versioned genome (e.g. H_sapiens_Mar_2006).\n");
-		url = "http://localhost:7085/UnibrowControl?version="+genomeVersion+"&seqid=";
 
+		//check for diff thresholds
+		if (adjPThres != null){
+			float[] lmh = Num.stringArrayToFloat(adjPThres, ",");
+			if (lmh == null || lmh.length !=3) Misc.printErrAndExit("\nFailed to parse three -10Log10(pval)s from "+adjPThres);
+			lowP = lmh[0];
+			medP = lmh[1];
+			highP = lmh[2];
+		}
+		if (lg2Thres != null){
+			float[] lmh = Num.stringArrayToFloat(lg2Thres, ",");
+			if (lmh == null || lmh.length !=3) Misc.printErrAndExit("\nFailed to parse three log2 ratio thresholds from "+lg2Thres);
+			lowLg2 = lmh[0];
+			medLg2 = lmh[1];
+			highLg2 = lmh[2];
+		}
+		
 		//look for bam files
 		if (conditionDirectories == null || conditionDirectories.length == 0) Misc.printErrAndExit("\nError: cannot find any condition directories?\n");
 		if (conditionDirectories.length < 2) Misc.printErrAndExit("\nError: must provide at least two Conditions for analysis.\n");
@@ -1972,7 +2007,7 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                     Defined Region Differential Seq:   Sept 2014                 **\n" +
+				"**                     Defined Region Differential Seq: Aug 2016                    **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +
@@ -2004,7 +2039,7 @@ public class DefinedRegionDifferentialSeq {
 				"       http://genome.ucsc.edu/FAQ/FAQformat#format1\n"+
 				"-g Genome Version  (ie H_sapiens_Mar_2006), see UCSC Browser,\n"+
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
-				"-f Turn off DESeq2 independent filtering\n" +
+				"-f Turn off DESeq2 independent filtering.\n" +
 
 				"\nAdvanced Options:\n"+
 				"-m Mask overlapping gene annotations, recommended for well annotated genomes.\n"+
@@ -2024,11 +2059,16 @@ public class DefinedRegionDifferentialSeq {
 				"-t Don't delete temp files (R script, R results, Rout, etc..).\n"+
 				"-a Run SAMseq in place of DESeq2.  This is only recommended with five or more\n" +
 				"      replicates per condition.\n" +
+				"-v Use these 3 -10Log10(AdjPVal) thresholds, comma delimited, no spaces, defaults\n"+
+				"      to 10,20,30\n"+
+				"-w Use these 3 absolute log2 ratio thresholds, comma delimited, no spaces, defaults\n"+
+				"      to 0.585,1,1.585\n"+
+				"-y Add in non phred AdjPVal columns, defaults to excluding.\n "+
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/DefinedRegionDifferentialSeq -c\n" +
 				"      /Data/TimeCourse/ESCells/ -s /Data/TimeCourse/DRDS -g H_sapiens_Feb_2009\n" +
-				"     -u /Anno/mergedHg19EnsemblGenes.ucsc.gz\n\n" +
+				"     -u /Anno/mergedHg19EnsemblGenes.ucsc.gz -w 0.322,0.585,1 -y \n\n" +
 
 				"**************************************************************************************\n");
 
