@@ -40,8 +40,10 @@ public class RNASeq {
 	private int maxMatches = 1;
 	private boolean useDESeq = true;
 	private boolean verbose = false;
+	private boolean deleteTempFiles = true;
 	private int maxAlignmentsDepth = 50000;
 	private boolean useSamSeq = false;
+	private boolean addStraightPValColumn = true;
 
 	//internal fields
 	private File filteredGeneTableFile;
@@ -65,6 +67,7 @@ public class RNASeq {
 
 	//EnrichedRegionMaker, QValFDR, Log2Ratio
 	private int[] bpBuffers = new int[]{0,500, 5000};
+	
 
 
 
@@ -229,12 +232,12 @@ public class RNASeq {
 			//score exons
 			DefinedRegionDifferentialSeq o = new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, 
 					genomeVersion, exons, rApplication, filteredGeneTableFile, false, stranded, verbose, 
-					performReverseStrandedAnalysis, secondStrandFlipped, maxAlignmentsDepth,useSamSeq);
+					performReverseStrandedAnalysis, secondStrandFlipped, maxAlignmentsDepth,useSamSeq, deleteTempFiles, addStraightPValColumn);
 			System.out.println("Introns....");
 			//score introns
 			o= new DefinedRegionDifferentialSeq(treatmentBamDirectory, controlBamDirectory, genomeVersion, 
 					introns, rApplication, filteredGeneTableFile, true, stranded, verbose, 
-					performReverseStrandedAnalysis, secondStrandFlipped, maxAlignmentsDepth,useSamSeq);
+					performReverseStrandedAnalysis, secondStrandFlipped, maxAlignmentsDepth,useSamSeq, deleteTempFiles, addStraightPValColumn);
 	
 		}
 		else {
@@ -678,11 +681,12 @@ public class RNASeq {
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'o': filterGeneTable = false; break;
 					case 'n': stranded = true; break;
-					case 'e': verbose = true; break;
-					case 'm': useDESeq = false; break;
+					case 'e': verbose = true; deleteTempFiles = false; break;
+					case 'm': useDESeq = false; break; 
+					case 'w': addStraightPValColumn = false; break; 
 					case 'j': performReverseStrandedAnalysis = true; break;
 					case 'k': secondStrandFlipped = true; break;
-					case 'b': bothFlipped = true; break;
+					case 'b': bothFlipped = true; break; 
 					case 'x': maxAlignmentsDepth = Integer.parseInt(args[++i]); break;
 					case 'q': this.useSamSeq = true; break;
 					case 'h': printDocs(); System.exit(0);
@@ -700,24 +704,25 @@ public class RNASeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                    RNASeq: May 2014                              **\n" +
+				"**                                    RNASeq: Aug 2016                              **\n" +
 				"**************************************************************************************\n" +
 				"The RNASeq application is a wrapper for processing RNA-Seq data through a variety of\n" +
 				"USeq applications. It uses the DESeq2 package for calling significant differential\n" +
 				"expression.  3-4 biological replicas per condition are strongly recommended. See \n" +
 				"http://useq.sourceforge.net/usageRNASeq.html for details constructing splice indexes,\n" +
-				"aligning your reads, and building a proper gene (NOT transcript) table.\n\n" +
+				"aligning your reads, and building a proper gene (NOT transcript) table. Use this\n"+
+				"application as a first pass transcriptome analysis. Run the individual apps for a fine\n"+
+				"tuned analysis (e.g. DefinedRegionDifferentialSeq), see \n"+
+				"http://useq.sourceforge.net/usageRNASeq.html\n\n" +
 
-				"The pipeline:\n" +
+				"The workflow:\n" +
 				"   1) Converts raw sam alignments containing splice junction coordinates into genome\n "+
 				"         coordinates outputting sorted bam alignemnts.\n"+
 				"   2) Makes relative read depth coverage tracks.\n"+
 				"   3) Scores known genes for differential exonic and intronic expression using DESeq2\n" +
 				"         and alternative splicing with a chi-square test.\n" +
 				"   4) Identifies unannotated differentially expressed transfrags using a window\n" +
-				"         scan and DESeq2.\n" +
-
-				"\nUse this application as a starting point in your transcriptome analysis.\n\n" +
+				"         scan and DESeq2.\n\n" +
 
 				"Options:\n"+
 				"-s Save directory, full path.\n"+
@@ -727,11 +732,12 @@ public class RNASeq {
 				"-c Control alignment file directory, ditto.  \n" +
 				"-n Data is stranded. Only analyze reads from the same strand as the annotation.\n"+
 				"-j Reverse stranded analysis.  Only count reads from the opposite strand of the\n" +
-				"       annotation.  This setting should be used for the Illumina's strand-specific dUTP protocol.\n" +
+				"       annotation.  This setting should be used for strand-specific dUTP protocols.\n" +
 				"-k Flip the strand of the second read pair.\n" +
 				"-b Reverse the strand of both pairs.  Use this option if you would like the orientation\n" +
 				"      of the alignments to match the orientation of the annotation in Illumina stranded \n" +
 				"      dUTP sequencing.\n" +
+				"-w Don't add non phred transformed p-value columns to spreadsheet, defaults to adding.\n"+
 				"-x Max per base alignment depth, defaults to 50000. Genes containing such high\n"+
 				"       density coverage are ignored.\n"+
 				"-v Genome version (e.g. H_sapiens_Feb_2009, M_musculus_Jul_2007), see UCSC FAQ,\n"+
@@ -753,7 +759,7 @@ public class RNASeq {
 				"       defaults to DESeq and a negative binomial test.\n"+
 				"-a Maximum alignment score. Defaults to 120, smaller numbers are more stringent.\n"+
 				"-o Don't delete overlapping exons from the gene table.\n"+
-				"-e Print verbose output from each application.\n"+
+				"-e Print verbose output from each application and retain temp files.\n"+
 				"-p Run SAMseq in place of DESeq.  This is suggested when you have five or more\n" +
 				"      replicates in each condition, and not suggested if you have fewer.  Note \n" +
 				"      that it can't be run if you don't have at least two replicates per condition\n" +
