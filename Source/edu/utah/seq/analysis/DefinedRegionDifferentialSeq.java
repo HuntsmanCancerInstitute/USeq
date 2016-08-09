@@ -116,7 +116,7 @@ public class DefinedRegionDifferentialSeq {
 
 	/**For integration with RNASeq app.*/
 	public DefinedRegionDifferentialSeq(File treatmentBamDirectory, File controlBamDirectory, String genomeVersion, File saveDirectory,  File fullPathToR, File processedRefSeqFile, boolean scoreIntrons, boolean performStrandedAnalysis, 
-			boolean verbose, boolean reverse, boolean flipped, int maxAlignDepth, boolean useSamSeq, boolean deleteTempFiles){
+			boolean verbose, boolean reverse, boolean flipped, int maxAlignDepth, boolean useSamSeq, boolean deleteTempFiles, boolean addStraightPValColumns){
 		this.treatmentBamDirectory = treatmentBamDirectory;
 		this.controlBamDirectory = controlBamDirectory;
 		this.saveDirectory = saveDirectory;
@@ -132,6 +132,7 @@ public class DefinedRegionDifferentialSeq {
 		this.maxAlignmentsDepth = maxAlignDepth;
 		this.useSamSeq = useSamSeq;
 		this.deleteTempFiles = deleteTempFiles;
+		this.addStraightPValColumns = addStraightPValColumns;
 		run();
 	}
 
