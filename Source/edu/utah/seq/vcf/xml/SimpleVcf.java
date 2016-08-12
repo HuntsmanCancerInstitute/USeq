@@ -32,6 +32,7 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	private static final Pattern afPat = Pattern.compile(".+AF=([\\d+\\.]+).*");
 	public static final String ncFilter = "##FILTER=<ID=NC,Description=\"This Foundation variant was not confirmed in subsequent recalling.\">";
 	public static final String nrFilter = "##FILTER=<ID=NR,Description=\"This variant was not reported by Foundation.\">";
+	public static final String mdFilter = "##FILTER=<ID=MD,Description=\"This Foundation variant overlapped a recall, had the same type, and was modified using info from the recall.\">";
 	public static String infoRAF = "##INFO=<ID=RAF,Number=A,Type=Float,Description=\"Recalled variant allele frequency\">";
 	
 	//#CHROM POS ID REF ALT QUAL FILTER INFO
@@ -110,6 +111,7 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	public boolean compareToExact(SimpleVcf o) {
 		if (chr.equals(o.chr) == false) return false;
 		if (pos != o.pos) return false;
+		if (ref.equals(o.ref) == false) return false;
 		if (alt.equals(o.alt) == false) return false;
 		return true;
 	}
