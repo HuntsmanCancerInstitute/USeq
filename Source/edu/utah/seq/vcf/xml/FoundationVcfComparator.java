@@ -20,7 +20,7 @@ public class FoundationVcfComparator {
 	private File mergedVcf = null;
 	private SimpleVcf[] fVcfs;
 	private SimpleVcf[] rVcfs;	
-	private int bpPaddingForOverlap = 5;
+	private int bpPaddingForOverlap = 3;
 
 	//counters
 	private int numberShortFoundation = 0;
@@ -28,7 +28,8 @@ public class FoundationVcfComparator {
 	private int numberRecall = 0;
 	private int numberExactMatches = 0;
 	private int numberFoundationWithMultiOverlap = 0;
-	private int numberFoundationWithSingleOverlap = 0;
+	private int numberFoundationWithOnlyOverlap = 0;
+	private int numberModifiedFoundationCalls = 0;
 	private int numberFoundationWithNoMatch = 0;
 	private int numberPassingRecallWithNoMatch = 0;
 	private int numberFoundationNotPrinted = 0;
@@ -73,11 +74,10 @@ public class FoundationVcfComparator {
 		System.out.println( numberRecall +"\t# Recall variants");
 		System.out.println( numberShortFoundation +"\t# Short Foundation variants");
 		System.out.println( numberOtherFoundation +"\t# Other Foundation variants");
-		System.out.println( numberExactMatches +"\t# Exact matches");
-		System.out.println( numberFoundationWithSingleOverlap +"\t# Short with one overlapping recall variant");
-		System.out.println( numberFoundationWithMultiOverlap +"\t# Short with multi overlapping recal variants");
+		System.out.println( numberExactMatches +"\t# Short with an exact match");
+		System.out.println( numberFoundationWithOnlyOverlap +"\t# Short with overlap recal variants");
+		System.out.println( numberModifiedFoundationCalls +"\t# Short modified using overlapping recal variant info");
 		System.out.println( numberFoundationWithNoMatch +"\t# Short with no match"); 
-		System.out.println( numberFoundationNotPrinted +"\t# Short not printed and needs manual arbitration."); 
 		System.out.println( numberPassingRecallWithNoMatch +"\t# Passing recall variants with no Short match");
 	}
 
@@ -160,7 +160,8 @@ public class FoundationVcfComparator {
 		//add in filter lines
 		filter.add(SimpleVcf.ncFilter);
 		filter.add(SimpleVcf.nrFilter);
-
+		filter.add(SimpleVcf.mdFilter);
+		
 		//add info lines
 		info.add(SimpleVcf.infoRAF);
 
@@ -199,89 +200,61 @@ public class FoundationVcfComparator {
 
 			//exact match? 
 			if (f.getMatch() != null) {
-				
-				//hmm thinking that if there is an exact match then just print it
+				//exact match then just print it
 				f.appendRAF(f.getMatch());
 				vcfToPrint.add(f);
 				numberExactMatches++;
 				f.getMatch().setPrint(false);
-
-				/*
-				//any overlap?
-				if (f.getOverlap().size() == 0){
-					//no overlap so good to go.
-					f.appendRAF(f.getMatch());
-					vcfToPrint.add(f);
-					//System.err.println("Exact match. Printing.:");
-					//System.err.println("F:\t"+f.getVcfLine());
-					//System.err.println("R:\t"+f.getMatch().getVcfLine());
-					numberExactMatches++;
-					//set recall exact match to not print
-					f.getMatch().setPrint(false);
-				}
-				else {
-					System.err.println("Exact match but also overlap. Need to arbitrate. NOTHING printed:");
-					System.err.println("F:\t"+f.getVcfLine());
-					for (SimpleVcf r: f.getOverlap()){
-						System.err.println("R:\t"+r.getVcfLine());
-						//set recall to not print
-						r.setPrint(false);
-					}
-					//set Foundation to not print
-					f.setPrint(false);
-				}
-				*/
 				continue;
 			}
 
-
 			//So no exact match any overlap?
 			if (f.getOverlap().size()!=0){
-
-				//more than one?
+				//always print the foundation vcf record with a NC FILTER field, not confirmed.
+				//question is what to do about the overlapping records? print with NR FILTER field, not reported by foundation?
+				numberFoundationWithOnlyOverlap++;
+				
+				//more than one overlap? print foundation and the multiple with NC and NR's
 				if (f.getOverlap().size()!=1){
-					numberFoundationWithMultiOverlap++;
-					System.err.println("Multiple overlap. Need to arbitrate. NOTHING printed:");
-					System.err.println("F:\t"+f.getVcfLine());
-					for (SimpleVcf r: f.getOverlap()){
-						System.err.println("R:\t"+r.getVcfLine());
-						//set recall to not print
-						r.setPrint(false);
-					}
-					//set Foundation to not print
-					f.setPrint(false);
-					numberFoundationNotPrinted++;
+					//System.err.println("Multiple overlap. Printing the Foundation and Recall variants:");
+					//System.err.println("F:\t"+f.getOriginalRecord());
+					//for (SimpleVcf r: f.getOverlap()) System.err.println("R:\t"+r.getOriginalRecord());
+					f.appendFilter("NC");
 				}
+				
+				//ok so only one overlap, do the types match?
 				else {
-					numberFoundationWithSingleOverlap++;
-					//ok so only one, do the types match?
 					int lenFRef = f.getRef().length();
 					int lenFAlt = f.getAlt().length();
 					SimpleVcf r = f.getOverlap().get(0);
 					int lenRRef = r.getRef().length();
 					int lenRAlt = r.getAlt().length();
-					if (lenFRef == lenRRef && lenFAlt == lenRAlt){
-						System.err.println("One overlap. Types match, recommend using recall vcf to represent the Foundation call. Printing merge.");
-						f.swapInfoWithOverlap(f.getOverlap().get(0));
-						vcfToPrint.add(f);
-					}
-					else {
-						System.err.println("One overlap, but diff types. Need to arbitrate. NOTHING printed.");
-						//set Foundation to not print
-						f.setPrint(false);
-						numberFoundationNotPrinted++;
-					}
-					//set recall to not print
-					f.getOverlap().get(0).setPrint(false);
 					
-					System.err.println("F:\t"+f.getOriginalRecord());
-					System.err.println("R:\t"+r.getOriginalRecord());
+					//types match so fix the foundation call and print, don't print the recal variant
+					if (lenFRef == lenRRef && lenFAlt == lenRAlt){
+						System.err.println("WARNING: One overlap and types match thus MODIFYING the Foundation call and printing it. Not printing the recall.");
+						f.swapInfoWithOverlap(r);
+						f.appendFilter("MD");
+						System.err.println("R:\t"+r.getOriginalRecord());
+						System.err.println("F:\t"+f.getOriginalRecord());
+						System.err.println("M:\t"+f.getVcfLine());
+						numberModifiedFoundationCalls++;
+						//set recall to not print
+						r.setPrint(false);
+					}
+					//types don't match so print foundation and recal
+					else {
+						//System.err.println("One overlap, but diff types. Printing Foundation and Recall vars.");
+						f.appendFilter("NC");
+					}
 				}
+				//in all cases print the foundation var
+				vcfToPrint.add(f);
 				continue;
 			}
 			
 			//No exact or overlap, flag and print
-			System.err.println("No match, flagging and printing short.");
+			System.err.println("WARNING: No match to this Foundation variant.");
 			numberFoundationWithNoMatch++;
 			f.appendFilter("NC");
 			vcfToPrint.add(f);
@@ -375,7 +348,7 @@ public class FoundationVcfComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Foundation Vcf Comparator: July 2016                   **\n" +
+				"**                           Foundation Vcf Comparator: Aug 2016                    **\n" +
 				"**************************************************************************************\n" +
 				"FVC compares a Fondation vcf generated with the FoundationXml2Vcf to a recalled vcf\n"+
 				"and attempts to merge them removing duplications both exact and overlapping variants.\n"+
