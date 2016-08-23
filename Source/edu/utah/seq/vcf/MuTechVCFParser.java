@@ -16,7 +16,7 @@ public class MuTechVCFParser {
 	private int minimumCount = 0;
 	private double minimumAbsFractionChange = 0;
 	private double maximumNormalAltFraction = 1;
-	private String formatZZ = "##FORMAT=<ID=FA,Number=A,Type=Float,Description=\"Allele fraction of the alternate allele with regard to reference\">";
+	private double minimumTumorAltFraction = 0;
 	
 	public MuTechVCFParser (String[] args) {
 
@@ -26,6 +26,7 @@ public class MuTechVCFParser {
 		System.out.println(minimumCount+"\tMin alignment depth");
 		System.out.println(minimumAbsFractionChange+"\tMin T-N allelic fraction change");
 		System.out.println(maximumNormalAltFraction+"\tMax Normal alt allelic fraction");
+		System.out.println(minimumTumorAltFraction+"\tMin Tumor alt allelic fraction");
 		
 		System.out.println("\nName\tPassing\tFailing");
 		for (File vcf: vcfFiles){
@@ -37,19 +38,20 @@ public class MuTechVCFParser {
 	public void parse(File vcf){
 		try {
 			VCFParser parser = new VCFParser (vcf);
-			for (VCFRecord r: parser.getVcfRecords()){
+			for (VCFRecord r: parser.getVcfRecords()){			
 				VCFSample[] tumNorm = r.getSample();
 				//check depth
 				int normDepth = tumNorm[1].getReadDepthDP();
 				int tumDepth = tumNorm[0].getReadDepthDP();
 				if (normDepth < minimumCount || tumDepth < minimumCount) {
-					r.setFilter(VCFRecord.FAIL);
+					r.setFilter(VCFRecord.FAIL);					
 					continue;
 				}
+				double normRto = tumNorm[1].getAltRatio();
+				double tumRto = tumNorm[0].getAltRatio();
+				
 				//check allelic ratio shift, SomSni has DP4
-				if (minimumAbsFractionChange != 0.0){
-					double normRto = tumNorm[1].getAltRatio();
-					double tumRto = tumNorm[0].getAltRatio();
+				if (minimumAbsFractionChange != 0){
 					double change = Math.abs(normRto-tumRto);
 					if (change < minimumAbsFractionChange){
 						r.setFilter(VCFRecord.FAIL);
@@ -58,15 +60,20 @@ public class MuTechVCFParser {
 				}
 				//check normal alt fraction?
 				if (maximumNormalAltFraction !=1){
-					double normRto = tumNorm[1].getAltRatio();
-					if (normRto > maximumNormalAltFraction){
+					if (normRto > maximumNormalAltFraction){	
+						r.setFilter(VCFRecord.FAIL);
+						continue;
+					}
+				}
+				//check tumor alt fraction?
+				if (minimumTumorAltFraction !=0){
+					if (tumRto < minimumTumorAltFraction){	
 						r.setFilter(VCFRecord.FAIL);
 						continue;
 					}
 				}
 			}
-			File out = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_Filtered.vcf");
-			printRecords(parser, out);
+			printRecords(parser, vcf);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -74,40 +81,36 @@ public class MuTechVCFParser {
 	}
 
 	public void printRecords(VCFParser parser, File f) throws Exception{
-		PrintWriter out = new PrintWriter (new FileWriter (f));
+		
+		String name = Misc.removeExtension(f.getName());
+		File passFile = new File(f.getParentFile(), name+ "_pass.vcf");
+		PrintWriter outPass = new PrintWriter (new FileWriter (passFile));
+		File failFile = new File(f.getParentFile(), name+ "_fail.vcf");
+		PrintWriter outFail = new PrintWriter (new FileWriter (failFile));
+		
 		int numFail = 0;
 		int numPass = 0;
-		//write out header
-		boolean flipSamples = false;
+
 		for (String h : parser.getStringComments()) {
-			//look for #CHROM line
-			if (h.startsWith("#CHROM")) {
-				if (h.contains("\tNORMAL\tTUMOR") == false){
-					flipSamples = true;
-					h = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNORMAL\tTUMOR";
-				}
-			}
-			out.println(h);
+			outPass.println(h);
+			outFail.println(h);
 		}
 		VCFRecord[] records = parser.getVcfRecords();
 		for (VCFRecord vcf: records){
-			if (vcf.getFilter().equals(VCFRecord.FAIL)) numFail++;
+			if (vcf.getFilter().equals(VCFRecord.FAIL)) {
+				numFail++;
+				outFail.println(vcf.getOriginalRecord());
+			}
 			else {
 				numPass++;
-				String orig = vcf.getOriginalRecord();
-				String[] fields = VCFParser.TAB.split(orig);
-				//reset ID
-				fields[2] = "MuTech"+numPass;
-				//flip samples so it is Normal Tumor
-				if (flipSamples){
-					String flip = fields[10];
-					fields[10] = fields[9];
-					fields[9] = flip;
-				}
-				out.println(Misc.stringArrayToString(fields, "\t"));
+				outPass.println(vcf.getOriginalRecord());
 			}
 		}
-		out.close();
+		outPass.close();
+		outFail.close();
+		if (numPass == 0) passFile.deleteOnExit();
+		if (numFail == 0) failFile.deleteOnExit();
+		
 		System.out.println(numPass+"\t"+numFail);
 	}
 
@@ -135,6 +138,7 @@ public class MuTechVCFParser {
 					case 'a': minimumCount = Integer.parseInt(args[++i]); break;
 					case 'r': minimumAbsFractionChange = Double.parseDouble(args[++i]); break;
 					case 'n': maximumNormalAltFraction = Double.parseDouble(args[++i]); break;
+					case 'm': minimumTumorAltFraction = Double.parseDouble(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -159,19 +163,19 @@ public class MuTechVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               MuTech VCF Parser: March 2015                      **\n" +
+				"**                               MuTech VCF Parser: Aug 2016                        **\n" +
 				"**************************************************************************************\n" +
-				"Parses MuTech VCF files, filtering for minimum tumor normal read depth, difference\n" +
-				"in alt allelic ratios, and normal alt allelic fraction. NOTE, sample order is switched\n"+
-				"in output to normal tumor.\n"+
+				"Parses MuTech2 VCF files, filtering for minimum read depth, difference in allelic\n"+
+				"ratios, and allelic fractions. Splits files into pass and fail with no modifications.\n"+
 
 				"\nRequired Options:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).\n" +
-				"-a Minimum alignment depth for both tumor and normal samples, defaults to 0.\n"+
+				"-a Minimum alignment depth for tumor and normal samples, defaults to 0.\n"+
 				"-r Minimum absolute difference in alt allelic ratios, defaults to 0.\n"+
 				"-n Maximum normal alt allelic fraction, defaults to 1.\n"+
+				"-m Minimum tumor alt allelic fraction, defaults to 0.\n"+
 
-				"\nExample: java -jar pathToUSeq/Apps/MuTechVCFParser -v /VCFFiles/ -a 15 -r 0.15\n\n"+
+				"\nExample: java -jar pathToUSeq/Apps/MuTechVCFParser -v /VCFFiles/ -a 15 -r 0.10\n\n"+
 
 
 				"**************************************************************************************\n");
