@@ -74,9 +74,13 @@ public class MaskRegionsInFastaFiles {
 				
 				//write masked fasta
 				String name = fastaParser.getNames()[0];
-				File masked = new File (saveDirectory, name+".fasta");
-				String fastaSeq = ">"+name+"\n"+new String(seq);
-				IO.writeString(fastaSeq, masked);
+				String[] t = Misc.WHITESPACE.split(name);
+				File masked = new File (saveDirectory, t[0]+".fasta.gz");
+				Gzipper out = new Gzipper(masked);
+				out.print(">");
+				out.println(name);
+				out.println(seq);
+				out.close();
 			}
 		} catch (Exception e){
 			System.out.println();
