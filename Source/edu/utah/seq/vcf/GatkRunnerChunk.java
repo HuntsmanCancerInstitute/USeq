@@ -1,5 +1,8 @@
 package edu.utah.seq.vcf;
 import java.io.File;
+import java.util.ArrayList;
+import java.util.concurrent.CopyOnWriteArrayList;
+
 import util.bio.annotation.Bed;
 import util.gen.IO;
 import util.gen.Misc;
@@ -31,6 +34,7 @@ public class GatkRunnerChunk implements Runnable{
 	}
 	
 	public void run(){
+		
 		//write out bed
 		tempBed = new File (gatkRunner.getSaveDirectory(), name+"_temp.bed");
 		Bed.writeToFile(regions, tempBed);
@@ -39,7 +43,13 @@ public class GatkRunnerChunk implements Runnable{
 		tempVcf = new File (gatkRunner.getSaveDirectory(), name+"_temp.vcf");
 
 		//build and execute gatk call
-		cmd = gatkRunner.getGatkArgs()+" -L "+tempBed+" -o "+tempVcf;
+
+		if (gatkRunner.useLowerCaseL) {
+			String[] t = Misc.WHITESPACE.split(gatkRunner.getGatkArgs());
+			t[t.length-1] = " -l "+tempBed+" -o "+tempVcf +" "+t[t.length-1];
+			cmd = Misc.stringArrayToString(t, " ");
+		}
+		else cmd = gatkRunner.getGatkArgs()+ " -L "+tempBed+" -o "+tempVcf;
 		System.out.println(cmd);
 		String[] out = IO.executeViaProcessBuilder(Misc.WHITESPACE.split(cmd), false);
 		

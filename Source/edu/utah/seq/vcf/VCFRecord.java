@@ -2,6 +2,8 @@ package edu.utah.seq.vcf;
 
 import java.util.ArrayList;
 
+import util.gen.Misc;
+
 
 /**For parsing a VCFRecord with multiple samples*/
 public class VCFRecord implements Comparable<VCFRecord> {
@@ -410,6 +412,8 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		if (chromosome.equals("chrMT")) chromosome = "chrM";
 		else if (chromosome.equals("MT")) chromosome = "M";
 	}
-
+	public String getChrPosRefAlt(){
+		return chromosome+"_"+(position+1)+"_"+reference+"_"+Misc.stringArrayToString(alternate, ",");
+	}
 
 }

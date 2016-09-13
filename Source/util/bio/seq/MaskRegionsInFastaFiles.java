@@ -79,7 +79,7 @@ public class MaskRegionsInFastaFiles {
 				Gzipper out = new Gzipper(masked);
 				out.print(">");
 				out.println(name);
-				out.println(seq);
+				out.println(new String(seq));
 				out.close();
 			}
 		} catch (Exception e){
@@ -149,7 +149,7 @@ public class MaskRegionsInFastaFiles {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                       Mask Regions In Fasta Files: Dec 2011                      **\n" +
+				"**                       Mask Regions In Fasta Files: Aug 2016                      **\n" +
 				"**************************************************************************************\n" +
 				"Replaces the region (or non region) sequence with Ns. Interbase coordinates.\n\n"+
 

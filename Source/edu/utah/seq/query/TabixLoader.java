@@ -28,24 +28,28 @@ public class TabixLoader implements Runnable{
 			int size = toQuery.size();
 			for (int i=0; i< size; i++){
 				tq = toQuery.get(i);
-				TabixReader.Iterator it = reader.query(tq.getCoordinates());
+				TabixReader.Iterator it = reader.query(tq.getTabixCoordinates());
 				String hit;
 				ArrayList<String> al = new ArrayList<String>();
 				while ((hit = it.next()) != null) al.add(hit);
+				tq.addResults(tabixFile, al);
 			}
-			reader.close();
 			complete = true;
 		} catch (IOException e) {
 			failed = true;
-			System.err.println("\n:Error searching "+tabixFile+" for "+tq.getCoordinates() );
+			System.err.println("\n:Error searching "+tabixFile+" for "+tq.getTabixCoordinates() );
 			e.printStackTrace();
+		} finally {
+			reader.close();
 		}
 	}
-
+	
+	public String toString(){
+		return "TabixLoader:\n\t"+tabixFile.toString()+"\n\t"+toQuery.size();
+	}
 	public boolean isComplete() {
 		return complete;
 	}
-
 	public boolean isFailed() {
 		return failed;
 	}

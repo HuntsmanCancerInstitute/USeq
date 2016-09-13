@@ -124,6 +124,15 @@ public class IO {
 		long usedMB = (rt.totalMemory() - rt.freeMemory()) / 1024 / 1024;
 		return usedMB+"MB @ "+System.currentTimeMillis()/1000+"Sec";
 	}
+	
+	/**Returns the amount of memory being used.*/
+	public static String memory(){
+		System.gc();
+		Runtime rt = Runtime.getRuntime();
+		System.gc();
+		long usedMB = (rt.totalMemory() - rt.freeMemory()) / 1024 / 1024;
+		return usedMB+"MB";
+	}
 
 	/**Checks to see if the current java is 1.6, 1.7, or 1.8 by executing and parsing 'java -version'*/
 	public static boolean checkJava(){

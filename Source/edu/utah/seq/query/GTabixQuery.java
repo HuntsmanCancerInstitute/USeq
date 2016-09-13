@@ -6,13 +6,17 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.utah.seq.useq.data.RegionScoreText;
+import edu.utah.seq.vcf.GatkRunnerChunk;
 import htsjdk.tribble.readers.TabixReader;
 import util.bio.annotation.Bed;
 import util.gen.IO;
 import util.gen.Misc;
+import util.gen.Num;
 
 
 /** Test of using a big genome index and tabix lookup for a variant store.
@@ -24,45 +28,132 @@ import util.gen.Misc;
  * So 15.8 sec to fetch all intersecting records with 14K T-N exome variants using Tabix readers.  Hmm the tabix retrieval is slow, need to parallelize! Doubt could get this to < 2 Sec.
  * Better to use a NoSQL db, key: data.
  * */
-public class IntersectionEngine {
+public class GTabixQuery {
 
 	//fields
 	private File chrLenBedFile;
 	private File[] vcfFiles;
 	private File[] bedFiles;
-	private File queryRegionsBedFile;
 	private int numberThreads = 0;
 	private boolean verbose = true;
 
 	//internal
+	//interbase coordinates, 0 is first base, last base in any region is not included.
 	private HashMap<String, HashSet<File>[]> chromFileIndex = new HashMap<String, HashSet<File>[]>();
+	
+	//per group query search
+	
+	/*Contains a File pointer to a datasource and the associatted TabixQueries that intersect it.
+	 * These are to be used in a tabix search.*/
+	private HashMap<File, ArrayList<TabixQuery>> fileTabixQueries = new HashMap<File, ArrayList<TabixQuery>>();
+	
+	/*Contains all the TabixQueries split by chromosome. Some may contain results*/
+	private HashMap<String, TabixQuery[]> chrTabixQueries = new HashMap<String, TabixQuery[]>();
 
-
-	public IntersectionEngine (String[] args) {
+	public GTabixQuery (String[] args) {
 		try {
 			long startTime = System.currentTimeMillis();
 			processArgs(args);
 
 			buildEngine();
 
-			long diffTime = System.currentTimeMillis() -startTime;
-			System.out.println("\n"+ diffTime+" MS to instatiate using "+IO.memory()+ " of RAM");
+			String diffTime = Num.formatNumberOneFraction(((double)(System.currentTimeMillis() -startTime))/1000);
+			System.out.println("\n"+ diffTime+"S to instantiate using "+IO.memory()+ " of RAM");
 
-			while (true){
-				System.out.print("\nProvide a bed file of regions to query against the engine (or blank to exit):\n");
-				String bedFileString = (new BufferedReader(new InputStreamReader(System.in))).readLine();
-				if (bedFileString == null || bedFileString.length()==0) {
-					System.out.println();
-					break;
-				}
-				queryRegions(new File (bedFileString));
-			}
+			queryBedFilesFromCmdLine();
 
 
 		} catch (Exception e) {
 			e.printStackTrace();
-			System.err.println("\nProblem with IntersectionEngine!");
+			System.err.println("\nProblem with executing the GQuery!");
 		}
+	}
+
+	private void queryBedFilesFromCmdLine() throws IOException {
+		while (true){
+			System.out.print("\nProvide a bed file of regions to query against the engine (or blank to exit):\n");
+			String bedFileString = (new BufferedReader(new InputStreamReader(System.in))).readLine().trim();
+			if (bedFileString == null || bedFileString.length()==0) {
+				System.out.println();
+				break;
+			}
+			File bed = new File (bedFileString);
+			if (bed.exists() == false) {
+				System.err.println("\nHmm can't seem to find that file?!");
+				continue;
+			}
+			
+			intersectBedFileRegionsWithIndex(bed);
+			
+			//filter which files to fetch data from, then retrieve it
+			//filterFiles(hits);
+			
+			loadTabixQueriesWithData();
+			
+			printTabixQueriesWithHitsBySource();
+			
+			printAllTabixQueries();
+		}
+	}
+
+	private void printAllTabixQueries() {
+		System.out.println("\nPrinting All Queries...");
+		for (String chr: chrTabixQueries.keySet()){
+			TabixQuery[] tqs = chrTabixQueries.get(chr);
+			for (TabixQuery tq : tqs){
+				System.out.println(tq.getInterbaseCoordinates());
+				HashMap<File, ArrayList<String>> sourceRes = tq.getSourceResults();
+				for (File s: sourceRes.keySet()){
+					System.out.println("\t"+s);
+					for (String r: sourceRes.get(s)){
+						System.out.println("\t\t"+r);
+					}
+				}
+			}
+		}
+	}
+
+	private void printTabixQueriesWithHitsBySource() {
+		System.out.println("\nPrinting Queries With Hits by Data Source...");
+		for (File source: fileTabixQueries.keySet()){
+			System.out.println(source);
+			ArrayList<TabixQuery> al = fileTabixQueries.get(source);
+			for (TabixQuery tq: al){
+				System.out.println("\t"+tq.getInterbaseCoordinates());
+				ArrayList<String> res = tq.getSourceResults().get(source);
+				for (String s: res) System.out.println("\t\t"+s);
+			}
+			System.out.println();
+		}
+	}
+
+	/**This takes File sources that have been previously identified to contain overlapping TabixQuery objects and performs a tabix lookup to load the associated data into each TabixQuery.
+	 * Its threaded for speed since the tabix look up is relatively slow. */
+	private void loadTabixQueriesWithData() throws IOException {
+		
+		/////////////// NEED to Optimize better use of threads when one file source has many TQs to look up.  ////////////////
+		
+		
+		long startTime = System.currentTimeMillis();
+		//dumb division, make one loader per file
+		TabixLoader[] loader = new TabixLoader[fileTabixQueries.size()];
+		ExecutorService executor = Executors.newFixedThreadPool(numberThreads);
+		System.out.println("\nFetching data from "+fileTabixQueries.size()+" files with "+numberThreads+" CPUs...");
+		int index = 0;
+		for (File tabixFile: fileTabixQueries.keySet()){
+			ArrayList<TabixQuery> toFetch = fileTabixQueries.get(tabixFile);
+			loader[index] = new TabixLoader(tabixFile, toFetch);
+			executor.execute(loader[index++]);
+		}
+		executor.shutdown();
+		//spins here until the executer is terminated, e.g. all threads complete
+        while (!executor.isTerminated()) {
+        }
+		//check loaders
+        for (TabixLoader c: loader) {
+			if (c.isFailed()) throw new IOException("\nERROR: Failed TabixLoader, aborting! \n"+c);
+		}
+        if (verbose) System.out.println( (System.currentTimeMillis() -startTime)+"\tMillisec to complete");
 	}
 
 	public void buildEngine() throws IOException {
@@ -71,31 +162,32 @@ public class IntersectionEngine {
 		loadChromIndexWithBed();
 	}
 
-	public void queryRegions(File bed) {
-		//load as bed
+	/**This takes a bed file, parses each region into a TabixQuery object and identifies which file data sources contain data that intersects it.*/
+	public void intersectBedFileRegionsWithIndex(File bed) throws IOException {
+		//load bed file of regions they want to intersect
 		HashMap<String, RegionScoreText[]> chrRegions = Bed.parseBedFile(bed, true, false);
-		//convert to Tabix
-		HashMap<String, TabixQuery[]> chrTQ = convert2TabixQuery(chrRegions);
-		//fetch files to retrieve actual data.
-		HashMap<File, ArrayList<TabixQuery>> files = queryFileIndex(chrTQ);	
+		
+		//convert them to TabixQuery and set in this
+		chrTabixQueries = convert2TabixQuery(chrRegions);
+		
+		//perform the file search
+		queryFileIndex();	
 	}
 
-	private HashMap<File, ArrayList<TabixQuery>> queryFileIndex(HashMap<String, TabixQuery[]> chrTQ) {
+	private void queryFileIndex() {
 		long startTime = System.currentTimeMillis();
 		long numQueries = 0;
 		long numSkippedQueries = 0;
 		long numQueriesWithHits = 0;
 		long numberHits = 0;
-
-		//want to create a hashmap of File:ArrayList<TabixQuery> to query
-		HashMap<File, ArrayList<TabixQuery>> toQuery = new HashMap<File, ArrayList<TabixQuery>>();
+		fileTabixQueries.clear();
 
 		//for each chromosome of regions to query
-		for (String chr: chrTQ.keySet()){
+		for (String chr: chrTabixQueries.keySet()){
 
 			//check that chr exists in index
 			if (chromFileIndex.containsKey(chr) == false){
-				int numSkipped = chrTQ.get(chr).length;
+				int numSkipped = chrTabixQueries.get(chr).length;
 				System.err.println("\nWARNING: chromosome '"+chr+"' not found in index? Skipping "+numSkipped+" query regions.");
 				numSkippedQueries += numSkipped; 
 			}
@@ -103,15 +195,15 @@ public class IntersectionEngine {
 			else {
 				HashSet<File>[] index = chromFileIndex.get(chr);
 				//for each region
-				TabixQuery[] regions = chrTQ.get(chr);
+				TabixQuery[] regions = chrTabixQueries.get(chr);
 				numQueries += regions.length;
 				for (TabixQuery tq: regions){
-					HashSet<File> hits = intersect(index, tq);
-					if (hits.size() !=0) {
-						numberHits += hits.size();
+					HashSet<File> fileHits = intersect(index, tq);
+					if (fileHits.size() !=0) {
+						numberHits += fileHits.size();
 						numQueriesWithHits++;
 					}
-					addHits(hits, toQuery, tq);
+					addHits(fileHits, fileTabixQueries, tq);
 				}
 			}
 		}
@@ -123,13 +215,7 @@ public class IntersectionEngine {
 			System.out.println(numQueriesWithHits+ "\tNum queries with hits");
 			System.out.println(numberHits+ "\tNum total hits");
 			System.out.println(diffTime+"\tMillisec to complete");
-			System.out.println("\nDataSource\tHits");
-			for (File f: toQuery.keySet()) {
-				System.out.println(f.getName()+"\t"+TabixQuery.getCoordinates(toQuery.get(f)));
-			}
-
 		}
-		return toQuery;
 	}
 
 	/**Adds the TabixQuery to an ArrayList associated with a file resource to fetch the data from.*/
@@ -157,7 +243,7 @@ public class IntersectionEngine {
 		return hits;
 	}
 
-	private static HashMap<String, TabixQuery[]> convert2TabixQuery(HashMap<String, RegionScoreText[]> chrRegions) {
+	public static HashMap<String, TabixQuery[]> convert2TabixQuery(HashMap<String, RegionScoreText[]> chrRegions) throws IOException {
 		HashMap<String, TabixQuery[]> chrTQ = new HashMap<String, TabixQuery[]>();
 		for (String chr: chrRegions.keySet()){
 			RegionScoreText[] regions = chrRegions.get(chr);
@@ -274,7 +360,7 @@ public class IntersectionEngine {
 			printDocs();
 			System.exit(0);
 		}
-		new IntersectionEngine (args);
+		new GTabixQuery (args);
 	}	
 
 	/**This method will process each argument and assign new varibles*/
@@ -292,7 +378,6 @@ public class IntersectionEngine {
 					switch (test){
 					case 'c': chrLenBedFile = new File(args[++i]); break;
 					case 't': tabixDataDir = new File(args[++i]); break;
-					case 'q': queryRegionsBedFile = new File(args[++i]); break;
 					case 'n': numberThreads = Integer.parseInt(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -315,21 +400,24 @@ public class IntersectionEngine {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Intersection Engine: Aug 2016                        **\n" +
+				"**                                    GQuery: Sept 2016                             **\n" +
 				"**************************************************************************************\n" +
-				"Beta. Needs > 25G of RAM.\n"+
+				"GQ returns bed and vcf records that overlap a provided list of regions in bed format.\n"+
+				"Strict adherence to bed format is assumed (1st base is 0, last base is not included,\n"+
+				"last base > first; vcf is in 1 base so subtract 1 from pos to convert to bed).\n"+
+				"This app needs > 27G of RAM for human/mouse. Gzip and tabix index all bed and vcf data\n"+
+				"files using default prameters. See https://github.com/samtools/htslib \n"+
 
-				"\nRequired Options:\n"+
-				"-c A bed file of chromosomes and their lengths to use to build the index, note the chr\n"+
-				"     name must match all datasets, no mixing of chrX and X, e.g. chrX 0 155270560\n"+
-				"-t A directory containing gzipped and tabix indexed vcf and bed files.\n"+
+				"\nOptions:\n"+
+				"-c A bed file of chromosomes and their lengths to use to building the intersection\n"+
+				"     index. Note, the chr name must match across all datasets, no mixing of chrX and X\n"+
+				"-t A directory containing gzipped and tabix indexed vcf and bed data source files.\n"+
 				"-n Number of processors to use, defaults to all available.\n"+
 
-				"\nExample: java -Xmx64G -jar pathToUSeq/Apps/IntersectionEngine -c b37ChrLen.bed \n"+
-				"     -t TabixDataFiles/ -n 40 \n\n" +
+				"\nExample: java -Xmx64G -jar pathToUSeq/Apps/GQuery -c b37ChrLen.bed \n"+
+				"     -t TabixDataFiles/ \n\n" +
 
 				"**************************************************************************************\n");
-
 	}
 }
 

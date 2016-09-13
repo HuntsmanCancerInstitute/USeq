@@ -18,6 +18,7 @@ public class AllelicExpressionSnp implements Serializable{
 	private ArrayList<Float> sampleGCScore;
 	private float fdr = 0;
 	private float log2Ratio = 0;
+	private ArrayList<String> geneNames;
 
 	public AllelicExpressionSnp(String chromosome, int position, String name, String reference, String alternate){
 		this.chromosome = chromosome;
@@ -53,6 +54,16 @@ public class AllelicExpressionSnp implements Serializable{
 		sb.append(chromosome); sb.append("_");
 		sb.append(position); sb.append("_");
 		sb.append(name); sb.append("_");
+		sb.append(reference); sb.append("_");
+		sb.append(alternate); 
+		
+		return sb.toString();
+	}
+	
+	public String getChrPosRefAlt(){
+		StringBuilder sb = new StringBuilder();
+		sb.append(chromosome); sb.append("_");
+		sb.append(position); sb.append("_");
 		sb.append(reference); sb.append("_");
 		sb.append(alternate); 
 		
@@ -104,6 +115,11 @@ public class AllelicExpressionSnp implements Serializable{
 			//bad het call?
 			if ((numRef+numAlt !=0) && (numRef ==0 || numAlt== 0)) sb.append("\ttrue");
 			else sb.append("\tfalse");
+			//gene names?
+			if (geneNames != null) {
+				sb.append("\t");
+				sb.append(Misc.stringArrayListToString(geneNames, ","));
+			}
 			
 			
 			
@@ -213,6 +229,14 @@ public class AllelicExpressionSnp implements Serializable{
 
 	public static long getSerialversionuid() {
 		return serialVersionUID;
+	}
+
+	public ArrayList<String> getGeneNames() {
+		return geneNames;
+	}
+
+	public void setGeneNames(ArrayList<String> geneNames) {
+		this.geneNames = geneNames;
 	}
 }
 

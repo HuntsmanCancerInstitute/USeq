@@ -34,13 +34,21 @@ public class AggregateQCStats {
 		long startTime = System.currentTimeMillis();
 		processArgs(args);
 		
+		System.out.print("Loading samples");
 		loadSamples();
+		
+		System.out.print("\nChecking samples");
 		checkSamples();
-
+		
+		System.out.println("\nSaving aggregated data...");
+		System.out.println("\tStats");
 		printStatsTxtSheet();
+		System.out.println("\tRead coverage");
 		printReadCoverageTxtSheet();
+		System.out.println("\tTargets");
 		printTargetsTxtSheet();
 		
+		System.out.println("Building html reports...");
 		printHtmlTable();
 		printReadCoverageHtml("Coverage Over Target BPs", "Unique Observation Fold Coverage", "Fraction Target BPs");
 
@@ -287,6 +295,7 @@ public class AggregateQCStats {
 
 		//for each json file
 		for (File j: jsonFiles){
+			System.out.print(".");
 			//fetch name and type
 			String[] nameType = parseSampleName(j.getName());
 			//fetch SampleQC
@@ -303,10 +312,15 @@ public class AggregateQCStats {
 		SampleQC test = null;
 		//for every sample make sure all four json files were parsed
 		for (SampleQC s : samples.values()){
+			System.out.print(".");
 			if (test == null) test = s;
 			else {
 				//check thresholds
 				if (test.checkThresholds(s) == false){
+					System.out.println("\nProblem!\nTest AS\t" +test.getAlignmentScoreThreshold());
+					System.out.println("Test MQ\t" +test.getMappingQualityThreshold());
+					System.out.println("Samp AS\t" +s.getAlignmentScoreThreshold());
+					System.out.println("Samp MQ\t" +s.getMappingQualityThreshold());
 					Misc.printErrAndExit("\nERROR: this sample's AS, MQ, or AS proc settings differ? Are you changing thresholds between runs? "+s.getSampleName());
 				}
 				//check json files
@@ -408,7 +422,7 @@ public class AggregateQCStats {
 				"-p String to prepend onto output file names.\n"+
 				"\n"+
 
-				"Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -s QCStats/ -p TR774_ \n\n" +
+				"Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -r QCStats/ -p TR774_ \n\n" +
 
 				"**************************************************************************************\n");
 

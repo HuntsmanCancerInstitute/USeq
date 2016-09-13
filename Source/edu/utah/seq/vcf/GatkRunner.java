@@ -2,8 +2,6 @@ package edu.utah.seq.vcf;
 
 import java.io.*;
 import java.util.regex.*;
-
-import edu.utah.seq.barcodes.BarcodeChromMerger;
 import util.bio.annotation.Bed;
 import util.gen.*;
 import java.util.*;
@@ -21,6 +19,7 @@ public class GatkRunner {
 	private File saveDirectory;
 	private String gatkArgs = null;
 	private int numberConcurrentThreads = 4;
+	boolean useLowerCaseL = false;
 	
 	//internal fields
 	GatkRunnerChunk[] runners;
@@ -135,6 +134,7 @@ public class GatkRunner {
 					case 'r': bedFile = new File(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'c': gatkArgs = args[++i]; break;
+					case 'l': useLowerCaseL= true; break;
 					case 't': numberConcurrentThreads = Integer.parseInt(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -179,6 +179,7 @@ public class GatkRunner {
 				"-t Number concurrent threads to run, will need > 4G RAM each.\n"+
 				"-c GATK command to execute, see the example below, modify to match your enviroment.\n"+
 				"     Most resources require full paths. Don't set -o or -L\n"+
+				"-l Use lowercased l for Lofreq compatability.\n"+
 				
 				"\nExample: java -Xmx24G -jar pathToUSeq/Apps/GatkRunner -r /SS/targets.bed -t 8 -s\n" +
 				"     /SS/HC/ -c 'java -Xmx4G -jar /SS/GenomeAnalysisTK.jar -T MuTect2 \n"+

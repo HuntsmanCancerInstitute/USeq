@@ -76,7 +76,7 @@ public class FoundationVcfComparator {
 		System.out.println( numberOtherFoundation +"\t# Other Foundation variants");
 		System.out.println( numberExactMatches +"\t# Short with an exact match");
 		System.out.println( numberFoundationWithOnlyOverlap +"\t# Short with overlap recal variants");
-		if (noModifyFoundation) System.out.println( numberModifiedFoundationCalls +"\t# Short records recommended for modification.");
+		if (noModifyFoundation) System.out.println( numberModifiedFoundationCalls +"\t# Short recommended for modification");
 		else System.out.println( numberModifiedFoundationCalls +"\t# Short modified using overlapping recal variant info");
 		System.out.println( numberFoundationWithNoMatch +"\t# Short with no match"); 
 		System.out.println( numberPassingRecallWithNoMatch +"\t# Passing recall variants with no Short match");
@@ -231,8 +231,8 @@ public class FoundationVcfComparator {
 					int lenRRef = r.getRef().length();
 					int lenRAlt = r.getAlt().length();
 					
-					//types match so fix the foundation call and print, don't print the recal variant
-					if (lenFRef == lenRRef && lenFAlt == lenRAlt){
+					//types match and it's a good recal variant, modify the foundation call and print, don't print the recal variant
+					if (lenFRef == lenRRef && lenFAlt == lenRAlt && r.getFilter().toLowerCase().contains("fail") == false){
 						if (noModifyFoundation){
 							System.err.println("WARNING: One overlap and types match, recommend modifying the Foundation record. Will print both with no chr, pos, alt, ref modifications.");
 							f.appendFilter("NC");
@@ -361,10 +361,10 @@ public class FoundationVcfComparator {
 				"**************************************************************************************\n" +
 				"**                           Foundation Vcf Comparator: Aug 2016                    **\n" +
 				"**************************************************************************************\n" +
-				"FVC compares a Fondation vcf generated with the FoundationXml2Vcf to a recalled vcf\n"+
-				"and can attempt to merge them removing exact match and overlapping variants.\n"+
-				"Be sure to vt normalize each before running. Recall variants failing FILTER are not\n"+
-				"saved.\n"+
+				"FVC compares a Foundation vcf generated with the FoundationXml2Vcf to a recalled vcf.\n"+
+				"Exact recall vars are so noted and removed. Foundation vcf with no exact but one\n"+
+				"overlapping record can be merged with -k. Be sure to vt normalize each before running.\n"+
+				"Recall variants failing FILTER are not saved.\n"+
 
 				"\nOptions:\n"+
 				"-f Path to a FoundationOne vcf file, see the FoundationXml2Vcf app.\n"+
