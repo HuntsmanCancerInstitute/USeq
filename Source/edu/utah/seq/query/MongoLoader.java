@@ -40,6 +40,8 @@ public class MongoLoader implements Runnable{
 				//range query, might want to tune this by bracketing the start and stop?
 				q.put("start", new BasicDBObject("$lt", mq.getStop()));
 				q.put("stop", new BasicDBObject("$gt", mq.getStart()));
+				//q.put("start", new BasicDBObject("$lt", mq.getStop()).append("$gt", mq.getStop()-1000));
+				//q.put("stop", new BasicDBObject("$gt", mq.getStart()).append("$lt", mq.getStart()+1000));
 
 				//there should be results every time
 				ArrayList<DBObject> results = new ArrayList<DBObject>();
@@ -49,9 +51,13 @@ public class MongoLoader implements Runnable{
 				sourceResults.put(source, results);
 			}
 
-			//save it, not thread safe so don't modify this object
+			//save it? not thread safe so don't modify this object
 			mq.setSourceResults(sourceResults);
+			
+			//print to file? and delete the results?
 		}
+		
+		
 	}
 
 	public ArrayList<MongoQuery> getToQuery() {

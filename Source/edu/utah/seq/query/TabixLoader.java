@@ -14,10 +14,12 @@ public class TabixLoader implements Runnable{
 	private ArrayList<TabixQuery> toQuery;
 	private boolean complete = false;
 	private boolean failed = false;
+	private boolean printWarnings;
 
 
-	public TabixLoader (File tabixFile, ArrayList<TabixQuery> toQuery) throws IOException{
+	public TabixLoader (File tabixFile, ArrayList<TabixQuery> toQuery, boolean printWarnings) throws IOException{
 		this.tabixFile = tabixFile;
+		this.printWarnings = printWarnings;
 		reader = new TabixReader( this.tabixFile.toString() );
 		this.toQuery = toQuery;
 	}
@@ -33,11 +35,13 @@ public class TabixLoader implements Runnable{
 				ArrayList<String> al = new ArrayList<String>();
 				while ((hit = it.next()) != null) al.add(hit);
 				tq.addResults(tabixFile, al);
+				//TODO: debug issue with tabix not returning some results
+				if (al.size() == 0 && printWarnings) System.err.println("\nError: failed to return any data from "+tabixFile+" for "+tq.getInterbaseCoordinates()+" -> tbx query-> "+tq.getTabixCoordinates() );
 			}
 			complete = true;
 		} catch (IOException e) {
 			failed = true;
-			System.err.println("\n:Error searching "+tabixFile+" for "+tq.getTabixCoordinates() );
+			System.err.println("\nError: searching "+tabixFile+" for "+tq.getTabixCoordinates() );
 			e.printStackTrace();
 		} finally {
 			reader.close();

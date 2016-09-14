@@ -18,6 +18,7 @@ import com.mongodb.DBObject;
 import com.mongodb.MongoClient;
 import edu.utah.seq.useq.data.RegionScoreText;
 import util.bio.annotation.Bed;
+import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
@@ -32,20 +33,23 @@ import util.gen.Num;
  * So 15.8 sec to fetch all intersecting records with 14K T-N exome variants using Mongo readers.  Hmm the tabix retrieval is slow, need to parallelize! Doubt could get this to < 2 Sec.
  * Better to use a NoSQL db, key: data.
  * */
-public class GQuery {
+public class MQuery {
 
 	//user defined fields
 	private File chrLenBedFile;
 	private File[] vcfFiles;
 	//private File[] bedFiles;
+	private Gzipper results;
 	private int numberThreads = 0;
 	private String genomeBuild = "b37";
 	private boolean loadDb = true;
 	private boolean printWarnings = true;
 	private boolean printStats = true;
 	private boolean printFindings = false;
-	
+
 	//internal
+	private long recordsLoaded = 0;
+	private long recordsSkipped = 0;
 	/* To restrict the fetching to particular sources then instatiate this Hash, otherwise every hit will be returned */
 	private HashSet<String> sourcesToLoad = null;
 
@@ -53,7 +57,7 @@ public class GQuery {
 	MongoClient mongoClient = null;
 	DBCollection vcfCollection = null;
 	//DBCollection bedCollection = null;
-	
+
 	/* Chrom: BpIndex[] of ArrayList<String>, interbase coordinates, 0 is first base, last base in any region is not included. */
 	private HashMap<String, ArrayList<String>[]> chromFileIndex = new HashMap<String, ArrayList<String>[]>();
 
@@ -65,15 +69,17 @@ public class GQuery {
 	private HashMap<String, MongoQuery[]> chrMongoQueries = new HashMap<String, MongoQuery[]>();
 
 
-	public GQuery (String[] args) {
+	public MQuery (String[] args) {
 		try {
 			long startTime = System.currentTimeMillis();
 			processArgs(args);
 
 			buildEngine();
 
-			String diffTime = Num.formatNumberOneFraction(((double)(System.currentTimeMillis() -startTime))/1000);
-			System.out.println("\n"+ diffTime+"sec to instantiate using "+IO.memory()+ " of RAM");
+			String diffTime = Num.formatNumberOneFraction(((double)(System.currentTimeMillis() -startTime))/(1000*60));
+			System.out.println("\n"+ diffTime+"Min to build using "+IO.memory()+ " of RAM");
+			System.out.println("\t"+recordsLoaded+"\tRecords loaded");
+			System.out.println("\t"+recordsSkipped+"\tRecords skipped");
 
 			queryBedFilesFromCmdLine();
 
@@ -99,6 +105,10 @@ public class GQuery {
 				System.err.println("\nHmm can't seem to find that file?!");
 				continue;
 			}
+			
+			//make resultsWriter
+			File output = new File(bed.getParentFile(), Misc.removeExtension(bed.getName())+"_gq.txt.gz");
+			results = new Gzipper(output);
 
 			intersectBedFileRegionsWithIndex(bed);
 
@@ -108,6 +118,17 @@ public class GQuery {
 				printMongoQueriesWithHitsBySource();
 				printAllMongoQueries();
 			}
+			
+			//close writer
+			results.close();
+		}
+	}
+	
+	private synchronized void appendResults(String res) {
+		try {
+			results.println(res);
+		} catch (IOException e) {
+			e.printStackTrace();
 		}
 	}
 
@@ -147,10 +168,10 @@ public class GQuery {
 	/**This takes the MongoQueries that intersect a resource, chunks into batches, then fires a thread on each batch to execute the mongo find(). */
 	private void loadMongoQueriesWithData() throws IOException {
 		long startTime = System.currentTimeMillis();
-		
+
 		//anything to query?
 		if (queriesWithHits.size() == 0) return; 
-		
+
 		//chunk
 		ArrayList<MongoLoader> loaders = makeLoaders(vcfCollection);
 		int numChunks = loaders.size();		
@@ -173,6 +194,7 @@ public class GQuery {
 	}
 
 	public ArrayList<MongoLoader> makeLoaders(DBCollection col){
+		
 		int numOfQuer = queriesWithHits.size();
 
 		//figure out how many queries to put in each loader
@@ -195,10 +217,6 @@ public class GQuery {
 		}
 		//add last?
 		if (chunk.size() > 0) loaders.add(new MongoLoader(vcfCollection, chunk));
-		
-		
-		
-		
 		return loaders;
 	}
 
@@ -251,7 +269,7 @@ public class GQuery {
 				for (MongoQuery q: regions){
 					//fetch sources that intersect this region
 					HashSet<String> sourceHits = intersect(index, q);
-					
+
 					if (sourceHits.size() !=0) {
 						numberHits += sourceHits.size();
 						addHits(sourceHits, q);
@@ -263,10 +281,10 @@ public class GQuery {
 		if (printStats){
 			long diffTime = System.currentTimeMillis() -startTime;
 			System.out.println("\nQuery Stats:");
-			System.out.println(numQueries+ "\tNum executed queries");
-			System.out.println(numSkippedQueries+ "\tNum skipped queries");
+			System.out.println(numQueries+ "\tNum index queries");
+			System.out.println(numSkippedQueries+ "\tNum skipped index queries");
 			System.out.println(queriesWithHits.size()+ "\tNum queries with hits");
-			System.out.println(numberHits+ "\tNum total hits");
+			System.out.println(numberHits+ "\tNum total MongoDb searches.");
 			System.out.println(diffTime+"\tMillisec to complete index search");
 		}
 	}
@@ -283,7 +301,7 @@ public class GQuery {
 
 	/**Adds the MongoQuery to an ArrayList associated with a resource to fetch the data from.*/
 	private void addHits(HashSet<String> hits, MongoQuery mq) {
-		
+
 		//create results container for MQ
 		HashMap<String, ArrayList<DBObject>> sourceResults = new HashMap<String, ArrayList<DBObject>>();
 
@@ -316,10 +334,10 @@ public class GQuery {
 		for (int i=begin; i<end; i++) {
 			if (index[i] != null) hits.addAll(index[i]);
 		}
-		
+
 		//filter against those to search?
 		if (hits.size() !=0) filterSources(hits);
-		
+
 		return hits;
 	}
 
@@ -386,7 +404,6 @@ public class GQuery {
 	/**This walks through each vcf file, loads each record, and for each base covered by the variant, it makes a reference to it in the chr:String[] hash.
 	 * It also if so indicated, load the data into mongo.  At present, the "source" reference is just File.toString(). */
 	private void loadChromIndexWithVcf() throws IOException {
-		boolean nonSimpleErrorThrown = false;
 
 		//for each vcf file
 		for (int i=0; i< vcfFiles.length; i++){
@@ -396,7 +413,7 @@ public class GQuery {
 			ArrayList<DBObject> dbo = new ArrayList<DBObject>();
 
 			BufferedReader in = IO.fetchBufferedReader(vcfFiles[i]);
-			System.out.println("\nParsing vcf "+vcfFiles[i].getName());
+			System.out.print("Parsing vcf "+vcfFiles[i].getName());
 
 			String[] t;
 			String line;
@@ -404,6 +421,7 @@ public class GQuery {
 			ArrayList<String>[] currIndex = null;
 			long numLoadedRecords = 0;
 			long numRecordsSkipped = 0;
+			int counter = 0;
 
 			//for each vcf record
 			while ((line = in.readLine()) != null){
@@ -422,45 +440,54 @@ public class GQuery {
 					//does ALT have any <> characters indicating it is not a simple snv or indel? if so skip
 					// TODO:  should parse out the end positions and not skip!
 					if (t[4].contains("<")){
-						if (nonSimpleErrorThrown == false){
-							System.err.println("\tWARNING: Only SNV/INDEL variants supported, skipping lines like "+line);
-							nonSimpleErrorThrown = true;
-						}
+						if (printWarnings) System.err.println("\tWARNING: Only SNV/INDEL variants supported, skipping -> "+line);
 						numRecordsSkipped++;
 					}
 
 					else {
 						//fetch start and stop for effected bps.
 						int[] startStop = fetchEffectedBps(t);
+						if (startStop == null) numRecordsSkipped++;
 
-						//add in references to source file over the covered bases, stop isn't covered.
-						//currently just using File.toString() to pull the unique name of the source
-						for (int j= startStop[0]; j< startStop[1]; j++){
-							if (currIndex[j] == null) currIndex[j] = new ArrayList<String>(1);
-							currIndex[j].add(vcfFiles[i].toString());
+						else {
+							//add in references to source file over the covered bases, stop isn't covered.
+							//currently just using File.toString() to pull the unique name of the source
+							for (int j= startStop[0]; j< startStop[1]; j++){
+								if (currIndex[j] == null) currIndex[j] = new ArrayList<String>(1);
+								currIndex[j].add(vcfFiles[i].toString());
+							}
+							//make db obj
+							if (loadDb) {
+								//ready to insert chunk?
+								if (loadDb && ++counter == 50000) {
+									vcfCollection.insert(dbo);
+									counter = 0;
+									dbo.clear();
+									System.out.print(".");
+								}
+								MongoVcf mv = new MongoVcf(source, startStop, line);
+								dbo.add(mv.createDBObject());
+							}
+							numLoadedRecords++;
 						}
-						//make db obj
-						if (loadDb) {
-							MongoVcf mv = new MongoVcf(source, startStop, line);
-							dbo.add(mv.createDBObject());
-						}
-						numLoadedRecords++;
 					}
 				}
 			}
 			//add records to db in batch
-			if (loadDb) vcfCollection.insert(dbo);
+			if (loadDb && dbo.size() !=0) vcfCollection.insert(dbo);
 
-			System.out.println("\t"+numLoadedRecords+" variants loaded, "+numRecordsSkipped+" skipped");
+			System.out.println("\n\t"+numLoadedRecords+" variants loaded, "+numRecordsSkipped+" skipped\n");
+			recordsLoaded += numLoadedRecords;
+			recordsSkipped += numRecordsSkipped;
 			in.close();
 		}
 	}
-	
+
 	/**Returns the interbase start stop region of effected bps for simple SNV and INDELs. 
 	 * SNV=iPos,iPos+LenRef; INS=iPos,iPos+lenRef+1; DEL=iPos+1,iPos+lenRef; iPos=pos-1.
 	 * For multi alts, returns min begin and max end of all combinations.
 	 * @throws an exception if alts with < or cases where the first base differ between ref and alt for INDELS. */
-	public static int[] fetchEffectedBps(String[] vcf) throws IOException{
+	public int[] fetchEffectedBps(String[] vcf) throws IOException{
 		//CHROM	POS	ID	REF	ALT	
 		//  0    1   2   3   4  
 		//put into interbase coordinates
@@ -478,19 +505,20 @@ public class GQuery {
 		int end = -1;
 		for (int i=0; i< alts.length; i++){
 			int[] ss = fetchEffectedBpsNoMultiAlt(iPos, ref, alts[i], vcf);
+			if (ss == null) return null;
 			if(ss[0] < begin) begin = ss[0];
 			if(ss[1]> end) end = ss[1];
 		}
-		
+
 		return new int[]{begin, end};
 	}
-	
-	private static int[] fetchEffectedBpsNoMultiAlt(int iPos, String ref, String alt, String[] vcf) throws IOException{
+
+	private int[] fetchEffectedBpsNoMultiAlt(int iPos, String ref, String alt, String[] vcf) throws IOException{
 		int begin = -1;
 		int end = -1;
 		int lenRef = ref.length();
 		int lenAlt = alt.length();
-		
+
 		//watch out for < in the alt indicative of a CNV or structural var
 		//TODO: implement!
 		if (alt.contains("<")){
@@ -507,21 +535,23 @@ public class GQuery {
 			begin = iPos;
 			end = iPos+ lenRef +1;
 			if (ref.charAt(0) != alt.charAt(0)) {
-				throw new IOException("\nError: Odd INS vcf record, the first base in the ref and alt should be the same, see -> "+Misc.stringArrayToString(vcf, "\t"));
+				if (printWarnings) System.err.println("\tWARNING: Odd INS vcf record, the first base in the ref and alt should be the same, skipping, see -> "+Misc.stringArrayToString(vcf, "\t"));
+				return null;
 			}
-			
+
 		}
 		//del? return the bps that are deleted, AT->A, ATTCG->ACC
 		else if (lenRef > lenAlt) {
 			begin = iPos+1;
 			end = iPos + lenRef;
 			if (ref.charAt(0) != alt.charAt(0)) {
-				throw new IOException("\nError: Odd DEL vcf record, the first base in the ref and alt should be the same, see -> "+Misc.stringArrayToString(vcf, "\t"));
+				if (printWarnings) System.err.println("\tWARNING: Odd DEL vcf record, the first base in the ref and alt should be the same, skipping, see -> "+Misc.stringArrayToString(vcf, "\t"));
+				return null;
 			}
 		}
 		//odd, shouldn't hit this
 		else throw new IOException("\nError: Contact admin! Odd vcf record, can't parse effected bps for -> "+Misc.stringArrayToString(vcf, "\t"));
-		
+
 		return new int[]{begin, end};
 	}
 
@@ -557,14 +587,6 @@ public class GQuery {
 			vcfCollection.createIndex(new BasicDBObject("chr", 1));
 			vcfCollection.createIndex(new BasicDBObject("start", 1));
 			vcfCollection.createIndex(new BasicDBObject("stop", 1));
-
-
-			/*bedCollection = db.getCollection("bed");
-		bedCollection.createIndex(new BasicDBObject("source", 1));
-		bedCollection.createIndex(new BasicDBObject("chr", 1));
-		bedCollection.createIndex(new BasicDBObject("start", 1));
-		bedCollection.createIndex(new BasicDBObject("stop", 1));*/
-
 		}
 	}
 
@@ -573,14 +595,8 @@ public class GQuery {
 			printDocs();
 			System.exit(0);
 		}
-		new GQuery (args);
+		new MQuery (args);
 	}	
-	
-	/*	private String genomeBuild = "b37";
-	private boolean loadDb = true;
-	private boolean printWarnings = true;
-	private boolean printStats = true;
-	private boolean printFindings = false;*/
 
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
@@ -622,16 +638,16 @@ public class GQuery {
 		//threads to use
 		int numAvail = Runtime.getRuntime().availableProcessors();
 		if (numberThreads < 1) numberThreads =  numAvail - 1;
-		System.out.println(numAvail +" Available threads. Using "+numberThreads+"\n");
-		
+		System.out.println(numAvail +" Available threads, using "+numberThreads+"\n");
+
 	}	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                    GQuery: Sept 2016                             **\n" +
+				"**                                    MQuery: Sept 2016                             **\n" +
 				"**************************************************************************************\n" +
-				"GQ returns bed and vcf records that overlap a provided list of regions in bed format.\n"+
+				"MQ returns vcf records that overlap a provided list of regions in bed format.\n"+
 				"Strict adherence to bed format is assumed (1st base is 0, last base is not included,\n"+
 				"last base > first; vcf is in 1 base so subtract 1 from pos to convert to bed).\n"+
 				"This app needs > 27G of RAM for human/mouse. Requires a running instance of MongoDB. \n"+
@@ -639,11 +655,11 @@ public class GQuery {
 				"\nRequired Params:\n"+
 				"-c A bed file of chromosomes and their lengths to use to building the intersection\n"+
 				"     index. Note, the chr name must match across all datasets, no mixing of chrX and X\n"+
-				"-d A directory containing gzipped vcf and bed data files to index. Recurses through\n"+
-				"     all sub directories looking for xxx.vcf.gz and xxx.bed.gz. Be sure to normalize\n"+
+				"-d A directory containing gzipped vcf data files to index. Recurses through\n"+
+				"     all sub directories looking for xxx.vcf.gz. Be sure to normalize\n"+
 				"     the vcf records with a package like Vt but don't decompose, see \n"+
 				"     http://genome.sph.umich.edu/wiki/Vt .\n"+
-				
+
 				"\nDefault Params:\n"+
 				"-g Genome build - data base name, defaults to 'b37'\n"+
 				"-e Use existing db, defaults to dropping and reloading\n"+
@@ -653,8 +669,8 @@ public class GQuery {
 				"-n Number of processors to use, defaults to all-1. By default, mongo uses 10, so if \n"+
 				"     running mongo on the same server set this to all-11 .\n"+
 
-				"\nExample: java -Xmx64G -jar pathToUSeq/Apps/GQuery -c b37ChrLen.bed \n"+
-				"     -d ~/DataFiles/ \n\n" +
+				"\nExample: java -Xmx64G -jar pathToUSeq/Apps/MQuery -c b37ChrLen.bed \n"+
+				"     -d ~/VCFFiles/ \n\n" +
 
 				"**************************************************************************************\n");
 	}

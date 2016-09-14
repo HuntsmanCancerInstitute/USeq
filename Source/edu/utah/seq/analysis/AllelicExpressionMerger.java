@@ -30,7 +30,19 @@ public class AllelicExpressionMerger {
 		try {
 			Gzipper out = new Gzipper(composite);
 			out.println("gene\tsnp.id\talt.dp\tref.dp");
-			for (String key: firstData.keySet()) out.println(firstData.get(key));
+			int counter = 0;
+			for (String key: firstData.keySet()) {
+				//for some bizarre reason geneiase isn't seeing the snp.id column as unique when they are! So adding another counter onto it.
+				String[] t = Misc.TAB.split(firstData.get(key));
+				t[1] = t[1]+"_"+counter;
+				counter++;
+				out.print(t[0]);
+				for (int i=1; i< t.length; i++){
+					out.print("\t");
+					out.print(t[i]);
+				}
+				out.println();
+			}
 			out.close();
 		} catch (IOException e) {
 			e.printStackTrace();
