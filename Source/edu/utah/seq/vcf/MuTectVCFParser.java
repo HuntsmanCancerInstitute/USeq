@@ -10,7 +10,7 @@ import util.gen.IO;
 import util.gen.Misc;
 
 /**Simple MuTech vcf parser. Filters for minimum read depth count in Tum and Normal, as well as minimum Alt Allele fraction change and normal Alt fraction */
-public class MuTechVCFParser {
+public class MuTectVCFParser {
 
 	private File[] vcfFiles;
 	private int minimumCount = 0;
@@ -18,7 +18,7 @@ public class MuTechVCFParser {
 	private double maximumNormalAltFraction = 1;
 	private double minimumTumorAltFraction = 0;
 	
-	public MuTechVCFParser (String[] args) {
+	public MuTectVCFParser (String[] args) {
 
 		processArgs(args);
 		
@@ -119,7 +119,7 @@ public class MuTechVCFParser {
 			printDocs();
 			System.exit(0);
 		}
-		new MuTechVCFParser(args);
+		new MuTectVCFParser(args);
 	}		
 
 
@@ -163,7 +163,7 @@ public class MuTechVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               MuTech VCF Parser: Aug 2016                        **\n" +
+				"**                               MuTect VCF Parser: Aug 2016                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses MuTech2 VCF files, filtering for minimum read depth, difference in allelic\n"+
 				"ratios, and allelic fractions. Splits files into pass and fail with no modifications.\n"+

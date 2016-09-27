@@ -8,7 +8,7 @@ import util.gen.*;
  * @author david.nix@hci.utah.edu*/
 public class Region implements Comparable<Region>, Serializable {
 	//fields
-	private static final long serialVersionUID = 1L;
+	private static final long serialVersionUID = 2L;
 	protected int start;
 	protected int stop;
 
@@ -174,5 +174,13 @@ public class Region implements Comparable<Region>, Serializable {
 			if (r[i].stop> lastBase) lastBase = r[i].stop;
 		}
 		return lastBase;
+	}
+
+	public void setStart(int start) {
+		this.start = start;
+	}
+
+	public void setStop(int stop) {
+		this.stop = stop;
 	}
 }

@@ -9,45 +9,85 @@ import htsjdk.tribble.readers.TabixReader;
 public class TabixLoader implements Runnable{
 
 	//fields
-	private File tabixFile;
+	private File tabixFile = null;
 	private TabixReader reader = null;
 	private ArrayList<TabixQuery> toQuery;
 	private boolean complete = false;
 	private boolean failed = false;
 	private boolean printWarnings;
+	private TQuery tQuery;
 
 
-	public TabixLoader (File tabixFile, ArrayList<TabixQuery> toQuery, boolean printWarnings) throws IOException{
-		this.tabixFile = tabixFile;
-		this.printWarnings = printWarnings;
-		reader = new TabixReader( this.tabixFile.toString() );
-		this.toQuery = toQuery;
+	public TabixLoader (TQuery tQuery) throws IOException{
+		this.tQuery = tQuery;
+		this.printWarnings = tQuery.isPrintWarnings();
+		
 	}
 
 	public void run() {
 		TabixQuery tq = null;
 		try {
-			int size = toQuery.size();
-			for (int i=0; i< size; i++){
-				tq = toQuery.get(i);
-				TabixReader.Iterator it = reader.query(tq.getTabixCoordinates());
-				String hit;
-				ArrayList<String> al = new ArrayList<String>();
-				while ((hit = it.next()) != null) al.add(hit);
-				tq.addResults(tabixFile, al);
-				//TODO: debug issue with tabix not returning some results
-				if (al.size() == 0 && printWarnings) System.err.println("\nError: failed to return any data from "+tabixFile+" for "+tq.getInterbaseCoordinates()+" -> tbx query-> "+tq.getTabixCoordinates() );
+			//get next chunk of queries and their associated file
+			while (getChunk()){ 
+
+				int size = toQuery.size();
+				for (int i=0; i< size; i++){
+					tq = toQuery.get(i);			
+					TabixReader.Iterator it = reader.query(tq.getTabixCoordinates());
+					String hit;
+					//TODO: these shouldn't be saved but streamed out?
+					//while ((hit = it.next()) != null){};
+					ArrayList<String> al = new ArrayList<String>();
+					while ((hit = it.next()) != null) al.add(hit);
+					tq.addResults(tabixFile, al);
+
+					if (al.size() == 0 && printWarnings) System.err.println("\tWARNING: failed to return any data from "+tabixFile+" for region "+tq.getInterbaseCoordinates()+" -> converted tbx query-> "+tq.getTabixCoordinates() );
+				}
+				
+				
 			}
 			complete = true;
 		} catch (IOException e) {
 			failed = true;
 			System.err.println("\nError: searching "+tabixFile+" for "+tq.getTabixCoordinates() );
 			e.printStackTrace();
-		} finally {
-			reader.close();
 		}
 	}
 	
+
+	/**This gets a chunk of data to process as well as a Tabix reader.*/
+	private boolean getChunk() throws IOException {
+		TabixChunk c = tQuery.getChunk();
+		
+		//anything there?
+		if (c == null) {
+			//return the reader, this is important since TQuery handles the close()
+			tQuery.getSetTabixReader(tabixFile, reader);
+			//signal a loader shutdown
+			return false;
+		}
+		
+		toQuery = c.queries;
+		
+		//first launch?
+		if (tabixFile == null){
+			tabixFile = c.tabixFile;
+			reader = tQuery.getSetTabixReader(tabixFile, null);
+			if (reader == null) reader = new TabixReader(tabixFile.toString());
+		}
+		
+		//need new reader?
+		else if (tabixFile.equals(c.tabixFile) == false){
+			//return old reader, this is important since TQuery handles the close()
+			tQuery.getSetTabixReader(tabixFile, reader);
+			//get new reader
+			tabixFile = c.tabixFile;
+			reader = tQuery.getSetTabixReader(tabixFile, null);
+			if (reader == null) reader = new TabixReader(tabixFile.toString());
+		}
+		return true;
+	}
+
 	public String toString(){
 		return "TabixLoader:\n\t"+tabixFile.toString()+"\n\t"+toQuery.size();
 	}

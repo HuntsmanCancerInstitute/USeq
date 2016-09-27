@@ -412,8 +412,10 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		if (chromosome.equals("chrMT")) chromosome = "chrM";
 		else if (chromosome.equals("MT")) chromosome = "M";
 	}
-	public String getChrPosRefAlt(){
-		return chromosome+"_"+(position+1)+"_"+reference+"_"+Misc.stringArrayToString(alternate, ",");
+	public String getChrPosRefAlt(boolean zeroPosition){
+		int pos = position;
+		if (zeroPosition == false) pos++;
+		return chromosome+"_"+ pos +"_"+reference+"_"+Misc.stringArrayToString(alternate, ",");
 	}
 
 }

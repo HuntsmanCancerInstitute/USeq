@@ -305,6 +305,33 @@ public class Bed extends Coordinate implements Serializable{
 		}
 		return chrSpec;
 	}
+	
+	public static boolean scoresSet(File bedFile){
+		BufferedReader in = null;
+		try {
+			in = IO.fetchBufferedReader(bedFile);
+			String[] tokens;
+			String line;
+			while ((line = in.readLine()) !=null) {
+				//chrom, start, stop, text, score, strand
+				//0       1       2     3     4      5
+				line = line.trim();
+				if (line.length() ==0 || line.startsWith("#")) continue;
+				tokens = Misc.TAB.split(line);
+				if (tokens.length > 4) return true;
+				return false;
+			}
+			
+		} catch (IOException e) {
+			e.printStackTrace();
+		} finally {
+			if (in != null)
+				try {
+					in.close();
+				} catch (IOException e) {}
+		}
+		return false;
+	}
 
 
 	/**Split a bed file by chromosome and strand into a HashMap of chromosomeStrand (e.g. chr3+, chr3-, chr3. or chr3 if ignoreStrand==true) : sorted NamedScoredCoordinate[].
