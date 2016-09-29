@@ -137,7 +137,9 @@ public class AggregateQCStats {
 			sb.append(i);
 			for (SampleQC s: samples.values()){
 				sb.append(",");
-				sb.append(s.getFractionTargetBpsWithIndexedCoverage()[i]);
+				float[] f = s.getFractionTargetBpsWithIndexedCoverage();
+				if (i>= f.length) sb.append(0f);
+				else sb.append(f[i]);
 			}
 			if (i != last )sb.append("],\n");
 			else sb.append("]");
@@ -217,7 +219,9 @@ public class AggregateQCStats {
 			sb.append(i);
 			for (SampleQC s: samples.values()){
 				sb.append("\t");
-				sb.append(s.getFractionTargetBpsWithIndexedCoverage()[i]);
+				float[] f = s.getFractionTargetBpsWithIndexedCoverage();
+				if (i>= f.length) sb.append(0f);
+				else sb.append(f[i]);
 			}
 			sb.append("\n");
 		}

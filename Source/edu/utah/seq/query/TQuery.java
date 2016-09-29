@@ -11,10 +11,8 @@ import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.utah.seq.useq.data.RegionScoreText;
-import edu.utah.seq.vcf.GatkRunnerChunk;
 import htsjdk.tribble.readers.TabixReader;
 import util.bio.annotation.Bed;
-import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
@@ -32,6 +30,7 @@ public class TQuery {
 	private boolean printWarnings = true;
 	private boolean printStats = true;
 	private boolean fetchData = true;
+	private boolean printJson = true;
 	private int bpPadding = 0;
 
 	//internal
@@ -55,7 +54,7 @@ public class TQuery {
 
 	/*Container for active TabixReaders*/
 	private HashMap<File, TabixReader> tabixReaders = new HashMap<File, TabixReader>();
-	
+
 	//constructor
 	public TQuery (String[] args) {
 		try {
@@ -103,63 +102,77 @@ public class TQuery {
 
 				//filter which files to fetch data from base on the parent dir name, the actual file, the file extension (bed or vcf)
 				//these might not be set so just skipped
-				//filter.filter(fileTabixQueries);
+				filter.filter(fileTabixQueries);
 
 				//fetch the underlying data (slow) or just indicate which file hit which region (fast)
 				if (fetchData) loadTabixQueriesWithData();
 				else loadTabixQueriesWithFileSources();
 
 				//print results to stdout in json format
-				printAllTabixQueries();
+				if (printJson) printAllTabixQueries();
 			}
 		}
 	}
 
 	private File parseCmdLineInput(String cmd){
-		
+
 		//split on white space
 		String[] args = Misc.WHITESPACE.split(cmd);
 
-		//first arg should be the file
-		File toInt = new File(args[0]);
-		if (toInt.exists() == false) {
-			System.err.println("\nHmm can't seem to find that file?! -> "+toInt.toString());
-			return null;
-		}
-
-		//load remainder into a hash
+		//load hash
+		File bedOrVcfFile = null;
 		HashMap<String, String> options = new HashMap<String, String>();
-		for (int i=1; i< args.length; i++) {
+		for (int i=0; i< args.length; i++) {
+
+			//attempt to split on = sign
 			String[] keyVal = Misc.PATTERN_EQUALS.split(args[i]);
+
+			//nope must be a cmd or file
 			if (keyVal.length !=2) {
-				System.err.println("\nHmm can't split this key=value?! -> "+args[i]);
-				return null;
+				String lcArg = args[i].toLowerCase();
+				if (lcArg.contains("reset")){
+					filter.reset();
+					fetchData = true;
+					printJson = true;
+					return null;
+				}
+				else if (lcArg.contains("filter")){
+					System.err.println("\nCurrent Filters:\n"+filter.getFilters("\n"));
+					return null;
+				}
+				//is it the file?
+				else {
+					bedOrVcfFile = new File(args[i]);
+					if (bedOrVcfFile.exists() == false) {
+						System.err.println("\nHmm can't split this key=value or understand the single cmd argument or find the file?! -> "+args[i]);
+						return null;
+					}
+				}
 			}
 			else options.put(keyVal[0].toLowerCase(), keyVal[1]);
 		}
 
-		//examine options
-		if (options.containsKey("reset")){
-			filter.reset();
-			fetchData = true;
-			System.err.println("\nCleared filters, returning all, set fetch data to true.");
-			return null;
-		}
+		//walk through each option
+		for (String key: options.keySet()){
 
-		else {
 			//fetchData?
-			if (options.containsKey("fetchdata")){
+			if (key.equals("fetchdata")){
 				String bool = options.get("fetchdata").toLowerCase();
 				if (bool.startsWith("t")) fetchData = true;
 				else fetchData = false;
-				System.err.println("\nFetch Data:\t"+fetchData);
 			}
 
+			//print results
+			else if (key.equals("printjson")){
+				String bool = options.get("printjson").toLowerCase();
+				if (bool.startsWith("t")) printJson = true;
+				else printJson = false;
+			}
 
 			//filter on dataType?
-			if (options.containsKey("datatype")){
-				String[] dataTypes = Misc.COMMA.split(options.get("datatype"));
-				HashSet<String> dtToReturn = new HashSet<String>();
+			else if (key.equals("datatypes")){
+				String[] dataTypes = Misc.COMMA.split(options.get("datatypes"));
+				TreeSet<String> dtToReturn = new TreeSet<String>();
 				//for each
 				for (String dt: dataTypes){
 					if (filter.getAvailableDataTypes().contains(dt)) dtToReturn.add(dt);
@@ -170,13 +183,12 @@ public class TQuery {
 				}
 				filter.setDataTypesToReturn(dtToReturn);
 				filter.setFilterOnDataTypes(true);
-				System.err.println("Returning Data Types:\t"+options.get("datatype"));
 			}
-			
+
 			//filter on fileType?
-			if (options.containsKey("filetype")){
-				String[] fileTypes = Misc.COMMA.split(options.get("filetype"));
-				HashSet<String> toReturn = new HashSet<String>();
+			else if (key.equals("filetypes")){
+				String[] fileTypes = Misc.COMMA.split(options.get("filetypes"));
+				TreeSet<String> toReturn = new TreeSet<String>();
 				//for each
 				for (String dt: fileTypes){
 					if (filter.getAvailableFileTypes().contains(dt)) toReturn.add(dt);
@@ -185,35 +197,41 @@ public class TQuery {
 						return null;
 					}
 				}
+
 				filter.setFileTypesToReturn(toReturn);
 				filter.setFilterOnFileTypes(true);
-				System.err.println("Returning File Types:\t"+options.get("filetype"));
 			}
-			
+
 			//filter on data source/ actual files?
-			if (options.containsKey("datasource")){
+			else if (key.equals("datasources")){
 				String[] dataFiles = Misc.COMMA.split(options.get("datasource"));
-				HashSet<File> toReturn = new HashSet<File>();
+				TreeSet<File> toReturn = new TreeSet<File>();
 				//for each
 				for (String fs: dataFiles){
-					File f = new File(fs);
+					File f = new File(filter.getPathToTrimmedFile()+fs);
 					if (filter.getAvailableDataFiles().contains(f)) toReturn.add(f);
 					else {
-						System.err.println("\nHmm can't find this data soure file?! -> "+fs+ " in "+filter.fetchDataFiles(", "));
+						System.err.println("\nHmm can't find this data soure file?! -> "+fs+ " in "+filter.fetchDataFilesRelative(", "));
 						return null;
 					}
 				}
 				filter.setDataFilesToReturn(toReturn);
 				filter.setFilterOnDataFiles(true);
-				System.err.println("Returning Data Sources:\t"+options.get("datasource"));
+			}
+
+
+			else {
+				System.err.println("\nSorry, this key=value isn't recognized -> "+ key+"="+options.get(key));
+				return null;
 			}
 		}
-		return toInt;
-		
-	}
-	
 
-	
+		return bedOrVcfFile;
+
+	}
+
+
+
 	/**Synchronized method for getting or setting a TabixReader.*/
 	public synchronized TabixReader getSetTabixReader(File tabixFile, TabixReader reader) {
 		//do they want an active reader?
@@ -229,7 +247,7 @@ public class TQuery {
 			return null;
 		}
 	}
-	
+
 	/**Method for freeing up the file handles.*/
 	private void closeTabixReaders(){
 		for (TabixReader tr: tabixReaders.values()) tr.close();
@@ -252,14 +270,14 @@ public class TQuery {
 			TabixQuery[] tqs = chrTabixQueries.get(chr);
 			if (tqs.length > 1) {
 				System.out.println("[");
-				System.out.print(tqs[0].toJson(scoresSet));
+				System.out.print(tqs[0].toJson(scoresSet, filter.getPathToTrimmedFile()));
 				for (int i=1; i< tqs.length; i++){
 					System.out.println(",");
-					System.out.print(tqs[i].toJson(scoresSet));
+					System.out.print(tqs[i].toJson(scoresSet, filter.getPathToTrimmedFile()));
 				}
 				System.out.println("\n]");
 			}
-			else System.out.println(tqs[0].toJson(scoresSet));
+			else System.out.println(tqs[0].toJson(scoresSet, filter.getPathToTrimmedFile()));
 		}
 		//flush the stream to while waiting for another query set
 		System.out.flush();
@@ -281,17 +299,17 @@ public class TQuery {
 		}
 		return chunks;
 	}
-	
+
 	/**Returns the next chunk or null.*/
 	public synchronized TabixChunk getChunk(){
 		if (chunkIterator.hasNext()) return chunkIterator.next();
 		return null;
 	}
-	
+
 	private void makeTabixChunks() {
 		//clear prior
 		tabixChunks.clear();
-		
+
 		//walk through files
 		for (File f: fileTabixQueries.keySet()){
 			ArrayList<TabixQuery> al = fileTabixQueries.get(f);
@@ -314,10 +332,10 @@ public class TQuery {
 				if (counter !=0) tabixChunks.add(new TabixChunk(f, tqSub));
 			}
 		}
-		
+
 		//create iterator for Loaders to pull from
 		chunkIterator = tabixChunks.iterator();
-		
+
 		if (printStats) System.err.println( tabixChunks.size()+"\tQuery chunks created");
 	}
 
@@ -325,10 +343,10 @@ public class TQuery {
 	 * Its threaded for speed since the tabix look up is relatively slow. */
 	private void loadTabixQueriesWithData() throws IOException {
 		long startTime = System.currentTimeMillis();
-		
+
 		//make TabixChunks
 		makeTabixChunks();
-		
+
 		//make one loader per thread
 		TabixLoader[] loader = new TabixLoader[numberThreads];
 		ExecutorService executor = Executors.newFixedThreadPool(numberThreads);
@@ -340,25 +358,37 @@ public class TQuery {
 
 		//spins here until the executer is terminated, e.g. all threads complete
 		while (!executor.isTerminated()) {}
-		
-		//check loaders
-		for (TabixLoader c: loader) if (c.isFailed()) throw new IOException("\nERROR: TabixLoader issue! \n"+c);
 
-		if (printStats) System.err.println( (System.currentTimeMillis() -startTime)+"\tMillisec to load queries with data");
+		//check loaders and tabulate results
+		long numFetchedDataLines = 0;
+		int numQueriesWithDataLines = 0;
+		for (TabixLoader c: loader) {
+			if (c.isFailed()) throw new IOException("\nERROR: TabixLoader issue! \n"+c);
+			numFetchedDataLines+= c.getNumberRetrievedResults();
+			numQueriesWithDataLines+= c.getNumberQueriesWithResults();
+		}
+
+		if (printStats) {
+			System.err.println( (System.currentTimeMillis() -startTime)+"\tMillisec to load queries with data");
+			System.err.println(numQueriesWithDataLines+"\tQueries found with tabix records");
+			System.err.println(numFetchedDataLines+"\tRecords loaded");
+		}
 	}
 
 
 
 	public void buildEngine() throws IOException {
 		createChromIndex();
-		filter = new TQueryFilter();
+		filter = new TQueryFilter(this);
+		System.err.println("\nParsing data sources...");
+		System.err.println("\nFileName\tRecordsParsed\tRecordsSkipped");
 		loadChromIndexWithVcf();
 		loadChromIndexWithBed();
 	}
 
 	/**This takes a bed file, parses each region into a TabixQuery object and identifies which file data sources contain data that intersects it.*/
 	public boolean intersectFileRegionsWithIndex(File inputFile) throws IOException {
-		
+
 		String name = inputFile.getName();
 		if (name.endsWith(".bed.gz") || name.endsWith(".bed")){
 
@@ -371,7 +401,7 @@ public class TQuery {
 			//convert them to TabixQuery and set in this
 			chrTabixQueries = convert2TabixQuery(chrRegions);
 		}
-		
+
 		else if (name.endsWith(".vcf.gz") || name.endsWith(".vcf")){
 			chrTabixQueries = convertVcfToTabixQuery(inputFile);
 		}
@@ -385,6 +415,7 @@ public class TQuery {
 		return true;
 	}
 
+	
 	private void queryFileIndex() {
 		long startTime = System.currentTimeMillis();
 		long numQueries = 0;
@@ -420,7 +451,7 @@ public class TQuery {
 		}
 		if (printStats){
 			long diffTime = System.currentTimeMillis() -startTime;
-			System.err.println("\nQuery Stats:");
+			System.err.println("\nQuery Stats Pre Filtering:");
 			System.err.println(numQueries+ "\tNum index queries");
 			System.err.println(numSkippedQueries+ "\tNum skipped index queries");
 			System.err.println(numQueriesWithHits+ "\tNum queries with hits");
@@ -477,7 +508,6 @@ public class TQuery {
 	private void loadChromIndexWithBed() throws IOException {
 
 		for (int i=0; i< bedDataFiles.length; i++){
-			System.err.println("\nParsing bed "+bedDataFiles[i].getName());
 
 			//load filter with file, extension, parent dir name
 			addFileToFilter(bedDataFiles[i]);
@@ -513,7 +543,7 @@ public class TQuery {
 			}
 			//clean up and stat incrementing
 			in.close();
-			System.err.println("\t"+numLoadedRecords+" regions indexed");
+			System.err.println(bedDataFiles[i].getParentFile().getName()+ File.separator+ bedDataFiles[i].getName()+ "\t"+ numLoadedRecords+"\t0");
 			recordsLoaded += numLoadedRecords;
 		}
 	}
@@ -550,7 +580,7 @@ public class TQuery {
 		}
 		//clean up and stat incrementing
 		in.close();
-		
+
 		//covert to TQ
 		HashMap<String, TabixQuery[]> tqs = new HashMap<String, TabixQuery[]>();
 		Bed[] bed = new Bed[bedAl.size()];
@@ -565,12 +595,11 @@ public class TQuery {
 		}
 		return tqs;
 	}
-	
+
 
 	private void loadChromIndexWithVcf() throws IOException {
 
 		for (int i=0; i< vcfDataFiles.length; i++){
-			System.err.println("\nParsing vcf "+vcfDataFiles[i].getName());
 
 			//load filter with file, extension, parent dir name
 			addFileToFilter(vcfDataFiles[i]);
@@ -607,9 +636,10 @@ public class TQuery {
 					}
 				}
 			}
+
 			//clean up and stat incrementing
 			in.close();
-			System.err.println("\t"+numLoadedRecords+" variants indexed, "+numRecordsSkipped+" skipped");
+			System.err.println(vcfDataFiles[i].getParentFile().getName()+ File.separator+ vcfDataFiles[i].getName()+"\t"+numLoadedRecords+"\t"+numRecordsSkipped);
 			recordsLoaded += numLoadedRecords;
 			recordsSkipped += numRecordsSkipped;
 		}
@@ -672,12 +702,12 @@ public class TQuery {
 			Matcher mat = END_POSITION.matcher(vcf[7]);
 			if (mat.matches()) end = Integer.parseInt(mat.group(1));
 			else {
-				if (printWarnings) System.err.println("\nWARNING: found a < or > containing alt, failed to parse END=number position, skipping, see -> "+Misc.stringArrayToString(vcf, "\t"));
+				if (printWarnings) System.err.println("\n\tWARNING: found a < or > containing alt, failed to parse END=number position, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
 				return null;
 			}
 			begin = iPos;
 		}
-		
+
 		//single or multi adjacent snp? return just the changed bps,  GC->AT or G->A
 		else if (lenRef == lenAlt) {
 			begin = iPos;
@@ -688,7 +718,7 @@ public class TQuery {
 			begin = iPos;
 			end = iPos+ lenRef +1;
 			if (ref.charAt(0) != alt.charAt(0)) {
-				if (printWarnings) System.err.println("\tWARNING: Odd INS vcf record, the first base in the ref and alt must be the same, use vt to normalize your variants, skipping, see -> "+Misc.stringArrayToString(vcf, "\t"));
+				if (printWarnings) System.err.println("\n\tWARNING: Odd INS vcf record, the first base in the ref and alt must be the same, use vt to normalize your variants, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
 				return null;
 			}
 
@@ -698,7 +728,7 @@ public class TQuery {
 			begin = iPos+1;
 			end = iPos + lenRef;
 			if (ref.charAt(0) != alt.charAt(0)) {
-				if (printWarnings) System.err.println("\tWARNING: Odd DEL vcf record, the first base in the ref and alt must be the same, use vt to normalize your variants, skipping, see -> "+Misc.stringArrayToString(vcf, "\t"));
+				if (printWarnings) System.err.println("\n\tWARNING: Odd DEL vcf record, the first base in the ref and alt must be the same, use vt to normalize your variants, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
 				return null;
 			}
 		}
@@ -763,8 +793,12 @@ public class TQuery {
 		if (tabixDataDir == null || tabixDataDir.isDirectory() == false) Misc.printErrAndExit("\nError: please provide a directory containing tabix indexed xxx.vcf.gz and xxx.bed.gz files with their associated xxx.gz.tbi indexes" );
 
 		vcfDataFiles = IO.fetchFilesRecursively(tabixDataDir, "vcf.gz");
-		bedDataFiles = IO.extractFiles(tabixDataDir, "bed.gz");
+		bedDataFiles = IO.fetchFilesRecursively(tabixDataDir, "bed.gz");
 		if (vcfDataFiles.length == 0 && bedDataFiles.length == 0) Misc.printErrAndExit("\nError: failed to find any xxx.bed.gz or xxx.vcf.gz tabix files in your tabixDataDir -> "+tabixDataDir);
+		//check for index
+		lookForTabixIndex(vcfDataFiles);
+		lookForTabixIndex(bedDataFiles);
+
 
 		//threads to use
 		int numAvail = Runtime.getRuntime().availableProcessors();
@@ -774,17 +808,26 @@ public class TQuery {
 
 	}	
 
+	private void lookForTabixIndex(File[] tabixFiles) {
+		ArrayList<String> badFiles = new ArrayList<String>();
+		for (File tb: tabixFiles){
+			File index = new File (tb.toString()+".tbi");
+			if (index.exists() == false) badFiles.add(tb.toString());
+		}
+		if (badFiles.size() !=0) Misc.printErrAndExit("\nError: the following files are missing their xxx.gz.tbi Tabix indexes?\n"+ Misc.stringArrayListToString(badFiles, "\n"));
+	}
+
 	public static void printDocs(){
 		System.err.println("\n" +
 				"**************************************************************************************\n" +
 				"**                                    TQuery: Sept 2016                             **\n" +
 				"**************************************************************************************\n" +
-				"TQ returns bed and vcf records that overlap lists of regions, writing json to stdout.\n"+
+				"TQ returns bed and vcf records that overlap user supplied regions in bed or vcf format."+
 				"Strict adherence to bed format is assumed (1st base is 0, last base is not included,\n"+
 				"last base > first; vcf is in 1 base so subtract 1 from pos to convert to bed).\n"+
 				"This app needs > 27G of RAM for human/ mouse/ plant. A two step search is performed\n"+
 				"using an in memory file : bp index to find intersecting regions followed by a tabix\n"+
-				"query to pull the data.\n"+
+				"query to pull the data.  Multiple data source filters can be applied to limit output.\n"+
 
 				"\nRequired Params:\n"+
 				"-c A bed file of chromosomes and their lengths (e.g. chr21 0 48129895) to use to \n"+
@@ -810,6 +853,14 @@ public class TQuery {
 
 	public boolean isPrintWarnings() {
 		return printWarnings;
+	}
+
+	public boolean isFetchData() {
+		return fetchData;
+	}
+
+	public boolean isPrintJson() {
+		return printJson;
 	}
 
 

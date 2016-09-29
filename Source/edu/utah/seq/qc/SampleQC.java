@@ -205,6 +205,7 @@ public class SampleQC {
 		int numDec = 3;
 		NumberFormat f = NumberFormat.getNumberInstance();
 		f.setMaximumFractionDigits(numDec);
+		f.setGroupingUsed(false); //no commas!
 		
 		al.add("'"+sampleName+"'");
 		if (fastqParsed) al.add(new Long(numberFastqReads).toString());

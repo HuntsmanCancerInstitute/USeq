@@ -16,6 +16,8 @@ public class TabixLoader implements Runnable{
 	private boolean failed = false;
 	private boolean printWarnings;
 	private TQuery tQuery;
+	private long numberRetrievedResults = 0;
+	private int numberQueriesWithResults = 0;
 
 
 	public TabixLoader (TQuery tQuery) throws IOException{
@@ -40,11 +42,13 @@ public class TabixLoader implements Runnable{
 					ArrayList<String> al = new ArrayList<String>();
 					while ((hit = it.next()) != null) al.add(hit);
 					tq.addResults(tabixFile, al);
-
-					if (al.size() == 0 && printWarnings) System.err.println("\tWARNING: failed to return any data from "+tabixFile+" for region "+tq.getInterbaseCoordinates()+" -> converted tbx query-> "+tq.getTabixCoordinates() );
+					//stats
+					int numRes = al.size();
+					numberRetrievedResults += numRes;
+					if (numRes != 0) numberQueriesWithResults++;
+					else if (printWarnings) System.err.println("\tWARNING: failed to return any data from "+tabixFile+" for region "+tq.getInterbaseCoordinates()+" -> converted tbx query-> "+tq.getTabixCoordinates() );
+					
 				}
-				
-				
 			}
 			complete = true;
 		} catch (IOException e) {
@@ -96,6 +100,14 @@ public class TabixLoader implements Runnable{
 	}
 	public boolean isFailed() {
 		return failed;
+	}
+
+	public long getNumberRetrievedResults() {
+		return numberRetrievedResults;
+	}
+
+	public long getNumberQueriesWithResults() {
+		return numberQueriesWithResults;
 	}
 
 }

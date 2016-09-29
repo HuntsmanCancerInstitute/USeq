@@ -313,6 +313,44 @@ public class IO {
 		}
 		return hash;
 	}
+	
+	
+	/**This removes parent dirs shared by all, assumes / as the dir divider.*/
+	public static String[] trimCommonParentDirs(File[] f){
+		//convert into String arrays
+		String[][] fileDirs = new String[f.length][];
+		int minNumDirs = 10000000;
+		for (int i=0; i< f.length; i++){
+			fileDirs[i] = Misc.FORWARD_SLASH.split(f[i].toString());
+			if (fileDirs[i].length < minNumDirs) minNumDirs = fileDirs[i].length;
+		}
+		//for each dir
+		int firstUncommonIndex = 0;
+		for (int i=0; i< minNumDirs; i++){
+			String testDirName = fileDirs[0][i];
+			boolean common = true;
+			//for each file
+			for (int j=1; j< fileDirs.length; j++){
+				if (fileDirs[j][i].equals(testDirName) == false){
+					common = false;
+					break;
+				}
+			}
+			if (common == false) {
+				firstUncommonIndex = i;
+				break;
+			}
+		}
+		//concatinate firstUncommon and afterward
+		String[] trimmed = new String[f.length];
+		for (int i=0; i< fileDirs.length; i++){
+			ArrayList<String> al = new ArrayList<String>();
+			for (int j=firstUncommonIndex; j< fileDirs[i].length; j++) al.add(fileDirs[i][j]);
+			trimmed[i] = Misc.stringArrayListToString(al, "/");
+		}
+		return trimmed;
+	}
+
 
 	/**Converts a String of "grp1=/my/file1,grp1=/my/old/file2,grp2=/my/file2,
 	 * grp2=/my/new/file3,grp3=/my/new/dir/,/my/default etc"
