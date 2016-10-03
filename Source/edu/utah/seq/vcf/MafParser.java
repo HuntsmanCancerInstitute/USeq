@@ -3,6 +3,7 @@ package edu.utah.seq.vcf;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import util.bio.annotation.Bed;
@@ -10,7 +11,7 @@ import util.gen.*;
 
 
 /**
- * Parses variant maf files. Fixes header, sorts, indexes
+ * Parses variant maf files.  Sorts, indexes. Use to process TCGA files for TQuery lookup and IGV browsing
  * @author davidnix*/
 public class MafParser {
 
@@ -19,6 +20,15 @@ public class MafParser {
 	private File outputDir;
 	private File bgzip;
 	private File tabix;
+	private boolean convertM2MT = false;
+	
+	//internal working file fields
+	private int numHeaderLines;
+	HashMap<String, Integer> hugoNameIndex = new HashMap<String, Integer>();
+	private int chromIndex = -1;
+	private int startIndex = -1;
+	private int endIndex = -1;
+	private Bed[] mafBed = null;
 
 
 	public MafParser(String[] args){
@@ -27,7 +37,7 @@ public class MafParser {
 		
 		System.out.println("Processing maf files...");
 		for (int i=0; i< mafFiles.length; i++) {
-			File parsed = parseFile(mafFiles[i]);
+			File parsed = loadSortMafFile(mafFiles[i]);
 			if (tabix != null) tabix(parsed);
 		}
 		
@@ -49,10 +59,14 @@ public class MafParser {
 		if (messages == null || messages.length !=0) Misc.printErrAndExit("\nERROR: trying to execute bgzip compression -> "+
 		Misc.stringArrayToString(cmd, " ")+"\nMessage: "+Misc.stringArrayToString(messages,  "\n"));
 		
-		//force compress it
+		//force compress it, need to add one to indexes since tabix sees the first column as 1 instead of 0
 		cmd = new String[]{
 				tabix.toString(),
-				"-f", "-s", "5", "-b", "6", "-e", "7",
+				"-f", 
+				"-s", ""+(chromIndex+1), 
+				"-b", ""+(startIndex+1),  
+				"-e", ""+(endIndex+1), 
+				"-S", ""+numHeaderLines,
 				parsed.toString()+".gz"
 		};
 		messages = IO.executeViaProcessBuilder(cmd, false);
@@ -62,52 +76,70 @@ public class MafParser {
 
 
 
-	public File parseFile(File mpfFile){
+	public File loadSortMafFile(File mpfFile){
 		try {
+			//reset
+			chromIndex = -1;
+			startIndex = -1;
+			endIndex = -1;
+			hugoNameIndex.clear();
+
 			BufferedReader in = IO.fetchBufferedReader(mpfFile);
-			StringBuilder header = new StringBuilder();
+			ArrayList<String> header = new ArrayList<String>();
 			ArrayList<Bed> bedAL = new ArrayList<Bed>();
-			
+
 			//for each line in the file
 			String line;
 			while ((line = in.readLine()) != null){
-				if (line.length() == 0) continue;
-				if (line.startsWith("#")) {
-					header.append(line);
-					header.append("\n");
-				}
+				//skip blanks
+				if (line.trim().length() == 0) continue;
+				
+				//comment?
+				if (line.startsWith("#")) header.add(line);
+				//column descriptor?
 				else if (line.startsWith("Hugo_Symbol")) {
-					header.append("#");
-					header.append(line);
-					header.append("\n");
-					header.append(line);
-					header.append("\n");
+					header.add(line);
+					//Hugo_Symbol Entrez_Gene_Id Center NCBI_Build Chromosome Start_position End_position
+					//   0               1          2       3          4            5            6
+					String[] hugo = Misc.TAB.split(line);
+					for (int x=0; x< hugo.length; x++) hugoNameIndex.put(hugo[x], x);
+					chromIndex = hugoNameIndex.get("Chromosome");
+					startIndex = hugoNameIndex.get("Start_position");
+					endIndex = hugoNameIndex.get("End_position");
 				}
+				//data line
 				else {
 					String[] t = Misc.TAB.split(line);
-					String chr = t[4];
-					int start = Integer.parseInt(t[5]);
-					int stop = Integer.parseInt(t[6]);
+					String chr = t[chromIndex];
+					if (convertM2MT && chr.equals("M")) {
+						chr = "MT";
+						t[chromIndex] = chr;
+						line = Misc.stringArrayToString(t, "\t");
+					}
+					int start = Integer.parseInt(t[startIndex]);
+					int stop = Integer.parseInt(t[endIndex]);
 					bedAL.add(new Bed(chr, start, stop, line, 0, '.'));
 				}
 			}
 			in.close();
 			System.out.println(mpfFile.getName()+"\t"+bedAL.size());
-			
+
+			numHeaderLines = header.size();
+
 			//sort
-			Bed[] bed = new Bed[bedAL.size()];
-			bedAL.toArray(bed);
-			Arrays.sort(bed);
-			
+			mafBed = new Bed[bedAL.size()];
+			bedAL.toArray(mafBed);
+			Arrays.sort(mafBed);
+
 			//print
 			String name = mpfFile.getName();
 			if (name.endsWith(".gz")) name = name.substring(0, name.length()-3);
 			File fixed = new File(outputDir, name);
 			PrintWriter out = new PrintWriter( new FileWriter( fixed ));
-			out.print(header.toString());
-			for (Bed b: bed) out.println(b.getName());
+			for (String h :header) out.println(h);
+			for (Bed b: mafBed) out.println(b.getName());
 			out.close();
-			
+
 			return fixed;
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -183,17 +215,17 @@ public class MafParser {
 				"**************************************************************************************\n" +
 				"**                                Maf Parser: Sept 2016                             **\n" +
 				"**************************************************************************************\n" +
-				"Parses and manipulates variant maf files. Sorts and adds a # header line. Provide a\n"+
-				"path to the tabix executables (https://github.com/samtools/htslib) for indexing and\n"+
-				"IGV browsing.\n\n"+
+				"Parses and manipulates variant maf files. Provide a path to the tabix executables\n"+
+				"(https://github.com/samtools/htslib) for TQuery lookup and IGV compatibility.\n\n"+
 
 				"Options:\n"+
-				"-m Path to a maf file (.maf/.txt/.gz OK) or directory containing such.\n"+
+				"-m Path to a xxx.maf file (xxx.maf.txt and .zip/.gz OK) or directory containing such.\n"+
 				"-o Output directory, will overwrite.\n" +
 				"-t To tabix index the output, provide a path to the dir containing bgzip and tabix\n"+
+				"-c Convert M chroms to MT\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/MafParser -m MafTCGAFiles/ -o Sorted/ \n"+
-				"              -t ~/BioApps/HTSlib/1.3/bin/ \n\n" +
+				"              -t ~/BioApps/HTSlib/1.3/bin/ -c \n\n" +
 
 		        "**************************************************************************************\n");
 	}

@@ -5,9 +5,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.TreeSet;
 import java.util.Iterator;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -16,9 +13,16 @@ public class TQueryFilter {
 	/**This hash is loaded with the name of the parent data directories observed with each data file.
 	 * Make this something descriptive like, foundation, h1k, or exome, etc. Users can select 1 or more to restrict 
 	 * what data is returned. */
-	private TreeSet<String> availableDataTypes = new TreeSet<String>();
-	private TreeSet<String> dataTypesToReturn = new TreeSet<String>();
-	boolean filterOnDataTypes = false;
+	private TreeSet<String> availablePrimaryDataTypes = new TreeSet<String>();
+	private TreeSet<String> primaryDataTypesToReturn = new TreeSet<String>();
+	boolean filterOnPrimaryDataTypes = false;
+	
+	/**This hash is loaded with the name of the grand parent data directories observed with each data file.
+	 * Make this something descriptive like, foundation, h1k, or exome, etc. Users can select 1 or more to restrict 
+	 * what data is returned. */
+	private TreeSet<String> availableSecondaryDataTypes = new TreeSet<String>();
+	private TreeSet<String> secondaryDataTypesToReturn = new TreeSet<String>();
+	boolean filterOnSecondaryDataTypes = false;
 	
 	/**This hash is loaded with the File data sources. */
 	private TreeSet<File> availableDataFiles = new TreeSet<File>();
@@ -29,9 +33,11 @@ public class TQueryFilter {
 	private TreeSet<String> availableFileTypes = new TreeSet<String>();
 	private TreeSet<String> fileTypesToReturn = new TreeSet<String>();
 	boolean filterOnFileTypes = false;
-	public static final Pattern FILE_TYPE = Pattern.compile(".+\\.(.+)\\.gz$");
+	
+	boolean matchVcf = false;
 	
 	private String[] trimmedDataFileNames = null;
+	private HashMap<File, String> dataFileDisplayName = new HashMap<File, String>();
 	private String pathToTrimmedFile = null;
 	private TQuery tQuery = null;
 	
@@ -42,10 +48,13 @@ public class TQueryFilter {
 	
 	/**Turns off all the filters and loads the *ToReturn to all available*/
 	public void reset() {
-		filterOnDataTypes = false;
+		filterOnSecondaryDataTypes = false;
+		filterOnPrimaryDataTypes = false;
 		filterOnDataFiles = false;
 		filterOnFileTypes = false;
-		dataTypesToReturn.addAll(availableDataTypes);
+		matchVcf = false;
+		secondaryDataTypesToReturn.addAll(availableSecondaryDataTypes);
+		primaryDataTypesToReturn.addAll(availablePrimaryDataTypes);
 		dataFilesToReturn.addAll(availableDataFiles);
 		fileTypesToReturn.addAll(availableFileTypes);
 	}
@@ -55,26 +64,36 @@ public class TQueryFilter {
 		sb.append("Available Filters and Cmds:");
 		sb.append("\n(Note, for key=val filters, use key=val1,val2,... no spaces. Only data\nsources that pass all of the filters will be included in the output.)");
 
-		sb.append("\n\n\treset\tsets all filters to default");
-		sb.append("\n\tprintFilters\tprints current filters");
-		sb.append("\n\tfetchData = true or false to pull data from disk");
-		sb.append("\n\tprintJson = true or false to print results to stdout");
-		sb.append("\n\tdataTypes = "+fetchDataTypes(","));
-		sb.append("\n\tfileTypes = "+fetchFileTypes(","));
-		sb.append("\n\tdataSources = "+fetchDataFilesRelative(","));
+		sb.append("\n\nReset\tsets all filters to default");
+		sb.append("\nPrintFilters\tprints current filters");
+		sb.append("\nFetchData = true or false to pull data from disk");
+		sb.append("\nMatchVcf = true or false to require the chr, pos, ref, and at least one alt to match");
+		sb.append("\nPrintJson = true or false to print results to stdout");
+		sb.append("\nPrimaryDataTypes = "+fetchPrimaryDataTypes(","));
+		sb.append("\nSecondaryDataTypes = "+fetchSecondaryDataTypes(","));
+		sb.append("\nFileTypes = "+fetchFileTypes(","));
+		sb.append("\nDataSources = "+fetchDataFilesRelative(","));
 		return sb.toString();
 	}
 	
-	public String getFilters(String delimiter){
+	public String getCurrentFilters(String delimiter){
 		StringBuilder sb = new StringBuilder();
 		sb.append("fetchData="+tQuery.isFetchData());
 		sb.append(delimiter);
 		sb.append("printJson="+tQuery.isPrintJson());
+		sb.append(delimiter);
+		sb.append("matchVcf="+matchVcf);
 		
-		if (filterOnDataTypes){
+		if (filterOnPrimaryDataTypes){
 			sb.append(delimiter);
-			sb.append("dataTypes=");
-			Iterator it = dataTypesToReturn.iterator();
+			sb.append("primaryDataTypes=");
+			Iterator it = primaryDataTypesToReturn.iterator();
+			sb.append(buildStringFromIterator(it, ","));
+		}
+		if (filterOnSecondaryDataTypes){
+			sb.append(delimiter);
+			sb.append("secondaryDataTypes=");
+			Iterator it = secondaryDataTypesToReturn.iterator();
 			sb.append(buildStringFromIterator(it, ","));
 		}
 		if (filterOnFileTypes){
@@ -93,8 +112,14 @@ public class TQueryFilter {
 	}
 	
 	/**Returns all the data types (parent dir names).*/
-	public String fetchDataTypes(String delimiter){
-		Iterator it = availableDataTypes.iterator();
+	public String fetchPrimaryDataTypes(String delimiter){
+		Iterator it = availablePrimaryDataTypes.iterator();
+		return buildStringFromIterator(it, delimiter);
+	}
+
+	/**Returns all the data types (grand parent dir names).*/
+	public String fetchSecondaryDataTypes(String delimiter){
+		Iterator it = availableSecondaryDataTypes.iterator();
 		return buildStringFromIterator(it, delimiter);
 	}
 	
@@ -116,6 +141,8 @@ public class TQueryFilter {
 			//set path with divider
 			int index = f[0].toString().indexOf(trimmedDataFileNames[0]);
 			pathToTrimmedFile = f[0].toString().substring(0, index);
+			//create hash for easy lookup
+			for (int i=0; i< f.length; i++) dataFileDisplayName.put(f[i], trimmedDataFileNames[i]);
 		}
 		StringBuilder sb = new StringBuilder(trimmedDataFileNames[0]);
 		for (int i=1; i< trimmedDataFileNames.length; i++){
@@ -143,24 +170,29 @@ public class TQueryFilter {
 	
 	public void filter(HashMap<File, ArrayList<TabixQuery>> fileTabixQueries){
 		//filter?
-		if (filterOnDataTypes || filterOnDataFiles|| filterOnFileTypes){
-			Matcher mat;
+		if (filterOnPrimaryDataTypes || filterOnSecondaryDataTypes || filterOnDataFiles|| filterOnFileTypes){
 			ArrayList<File> toKeep = new ArrayList<File>();
 			//for each file
 			for (File f: fileTabixQueries.keySet()){
 				boolean addIt = true;
 				
-				//filter on data types, parent directory name
-				if (filterOnDataTypes) addIt = dataTypesToReturn.contains(f.getParentFile().getName());
+				//filter on primary data types, parent directory name
+				if (filterOnPrimaryDataTypes) addIt = primaryDataTypesToReturn.contains(f.getParentFile().getName());
+				
+				//filter on secondary data types, grand parent directory name
+				if (addIt && filterOnSecondaryDataTypes) addIt = secondaryDataTypesToReturn.contains(f.getParentFile().getParentFile().getName());
 				
 				//filter on data sources
 				if (addIt && filterOnDataFiles) addIt = dataFilesToReturn.contains(f);
 				
 				//filter on file types/ extensions
 				if (addIt && filterOnFileTypes ){
-					mat = FILE_TYPE.matcher(f.getName());
-					mat.matches();
-					addIt = fileTypesToReturn.contains(mat.group(1));
+					String name = f.getName();
+					if (name.endsWith(".vcf.gz")) addIt = fileTypesToReturn.contains("vcf");
+					else if (name.endsWith(".bed.gz")) addIt = fileTypesToReturn.contains("bed");
+					else if (name.endsWith(".maf.txt.gz")) addIt = fileTypesToReturn.contains("maf");
+					//should never hit this
+					else Misc.printErrAndExit("\nERROR: unrecognized file type contact admin! "+f);
 				}
 				if (addIt) toKeep.add(f);
 			}
@@ -173,30 +205,45 @@ public class TQueryFilter {
 	}
 	
 	//getters and setters
-	public TreeSet<String> getAvailableDataTypes() {
-		return availableDataTypes;
+	public TreeSet<String> getAvailablePrimaryDataTypes() {
+		return availablePrimaryDataTypes;
 	}
-
-	public void setAvailableDataTypes(TreeSet<String> availableDataTypes) {
-		this.availableDataTypes = availableDataTypes;
+	public void setAvailablePrimaryDataTypes(TreeSet<String> availablePrimaryDataTypes) {
+		this.availablePrimaryDataTypes = availablePrimaryDataTypes;
 	}
-
-	public TreeSet<String> getDataTypesToReturn() {
-		return dataTypesToReturn;
+	public TreeSet<String> getPrimaryDataTypesToReturn() {
+		return primaryDataTypesToReturn;
 	}
-
-	public void setDataTypesToReturn(TreeSet<String> dataTypesToReturn) {
-		this.dataTypesToReturn = dataTypesToReturn;
+	public void setPrimaryDataTypesToReturn(TreeSet<String> primaryDataTypesToReturn) {
+		this.primaryDataTypesToReturn = primaryDataTypesToReturn;
 	}
-
-	public boolean isFilterOnDataTypes() {
-		return filterOnDataTypes;
+	public boolean isFilterOnPrimaryDataTypes() {
+		return filterOnPrimaryDataTypes;
 	}
-
-	public void setFilterOnDataTypes(boolean filterOnDataTypes) {
-		this.filterOnDataTypes = filterOnDataTypes;
+	public void setFilterOnPrimaryDataTypes(boolean filterOnPrimaryDataTypes) {
+		this.filterOnPrimaryDataTypes = filterOnPrimaryDataTypes;
 	}
-
+	
+	
+	public TreeSet<String> getAvailableSecondaryDataTypes() {
+		return availableSecondaryDataTypes;
+	}
+	public void setAvailableSecondaryDataTypes(TreeSet<String> a) {
+		this.availableSecondaryDataTypes = a;
+	}
+	public TreeSet<String> getSecondaryDataTypesToReturn() {
+		return secondaryDataTypesToReturn;
+	}
+	public void setSecondaryDataTypesToReturn(TreeSet<String> secondaryDataTypesToReturn) {
+		this.secondaryDataTypesToReturn = secondaryDataTypesToReturn;
+	}
+	public boolean isFilterOnSecondaryDataTypes() {
+		return filterOnSecondaryDataTypes;
+	}
+	public void setFilterOnSecondaryDataTypes(boolean filterOnSecondaryDataTypes) {
+		this.filterOnSecondaryDataTypes = filterOnSecondaryDataTypes;
+	}
+	
 	public TreeSet<String> getAvailableFileTypes() {
 		return availableFileTypes;
 	}
@@ -248,6 +295,18 @@ public class TQueryFilter {
 
 	public String getPathToTrimmedFile() {
 		return pathToTrimmedFile;
+	}
+
+	public HashMap<File, String> getDataFileDisplayName() {
+		return dataFileDisplayName;
+	}
+
+	public boolean isMatchVcf() {
+		return matchVcf;
+	}
+
+	public void setMatchVcf(boolean matchVcf) {
+		this.matchVcf = matchVcf;
 	}
 
 

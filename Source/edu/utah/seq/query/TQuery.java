@@ -23,8 +23,9 @@ public class TQuery {
 
 	//fields
 	private File chrLengthFile;
-	private File[] vcfDataFiles;
-	private File[] bedDataFiles;
+	private File[] vcfDataFiles = null;
+	private File[] mafDataFiles = null;
+	private File[] bedDataFiles = null;
 	private int numberThreads = 0;
 	private int numberQueriesInChunk = 1000;
 	private boolean printWarnings = true;
@@ -65,7 +66,7 @@ public class TQuery {
 
 			//print some stats on building the engine
 			String diffTime = Num.formatNumberOneFraction(((double)(System.currentTimeMillis() -startTime))/1000);
-			int numFiles = vcfDataFiles.length + bedDataFiles.length;
+			int numFiles = vcfDataFiles.length + bedDataFiles.length + mafDataFiles.length;
 			System.err.println("\n"+ diffTime+" Sec to build using "+IO.memory()+ " of RAM");
 			System.err.println("\t"+numFiles+"\tData sources loaded");
 			System.err.println("\t"+recordsLoaded+"\tRecords indexed");
@@ -104,12 +105,15 @@ public class TQuery {
 				//these might not be set so just skipped
 				filter.filter(fileTabixQueries);
 
-				//fetch the underlying data (slow) or just indicate which file hit which region (fast)
-				if (fetchData) loadTabixQueriesWithData();
-				else loadTabixQueriesWithFileSources();
+				//any left
+				if (fileTabixQueries.size()!=0){
+					//fetch the underlying data (slow) or just indicate which file hit which region (fast)
+					if (fetchData) loadTabixQueriesWithData();
+					else loadTabixQueriesWithFileSources();
 
-				//print results to stdout in json format
-				if (printJson) printAllTabixQueries();
+					//print results to stdout in json format
+					if (printJson) printAllTabixQueries();
+				}
 			}
 		}
 	}
@@ -137,7 +141,7 @@ public class TQuery {
 					return null;
 				}
 				else if (lcArg.contains("filter")){
-					System.err.println("\nCurrent Filters:\n"+filter.getFilters("\n"));
+					System.err.println("\nCurrent Filters:\n"+filter.getCurrentFilters("\n"));
 					return null;
 				}
 				//is it the file?
@@ -169,20 +173,43 @@ public class TQuery {
 				else printJson = false;
 			}
 
-			//filter on dataType?
-			else if (key.equals("datatypes")){
-				String[] dataTypes = Misc.COMMA.split(options.get("datatypes"));
+			//print results
+			else if (key.equals("matchvcf")){
+				String bool = options.get("matchvcf").toLowerCase();
+				if (bool.startsWith("t")) filter.setMatchVcf(true);
+				else filter.setMatchVcf(false);
+			}
+
+			//filter on primaryDataType? parent
+			else if (key.equals("primarydatatypes")){
+				String[] dataTypes = Misc.COMMA.split(options.get("primarydatatypes"));
 				TreeSet<String> dtToReturn = new TreeSet<String>();
 				//for each
 				for (String dt: dataTypes){
-					if (filter.getAvailableDataTypes().contains(dt)) dtToReturn.add(dt);
+					if (filter.getAvailablePrimaryDataTypes().contains(dt)) dtToReturn.add(dt);
 					else {
-						System.err.println("\nHmm can't find this data type?! -> "+dt+ " in "+filter.fetchDataTypes(", "));
+						System.err.println("\nHmm can't find this data type?! -> "+dt+ " in "+filter.fetchPrimaryDataTypes(", "));
 						return null;
 					}
 				}
-				filter.setDataTypesToReturn(dtToReturn);
-				filter.setFilterOnDataTypes(true);
+				filter.setPrimaryDataTypesToReturn(dtToReturn);
+				filter.setFilterOnPrimaryDataTypes(true);
+			}
+
+			//filter on secondaryDataType? grand parent
+			else if (key.equals("secondarydatatypes")){
+				String[] dataTypes = Misc.COMMA.split(options.get("secondarydatatypes"));
+				TreeSet<String> dtToReturn = new TreeSet<String>();
+				//for each
+				for (String dt: dataTypes){
+					if (filter.getAvailableSecondaryDataTypes().contains(dt)) dtToReturn.add(dt);
+					else {
+						System.err.println("\nHmm can't find this data type?! -> "+dt+ " in "+filter.fetchSecondaryDataTypes(", "));
+						return null;
+					}
+				}
+				filter.setSecondaryDataTypesToReturn(dtToReturn);
+				filter.setFilterOnSecondaryDataTypes(true);
 			}
 
 			//filter on fileType?
@@ -204,7 +231,7 @@ public class TQuery {
 
 			//filter on data source/ actual files?
 			else if (key.equals("datasources")){
-				String[] dataFiles = Misc.COMMA.split(options.get("datasource"));
+				String[] dataFiles = Misc.COMMA.split(options.get("datasources"));
 				TreeSet<File> toReturn = new TreeSet<File>();
 				//for each
 				for (String fs: dataFiles){
@@ -313,23 +340,22 @@ public class TQuery {
 		//walk through files
 		for (File f: fileTabixQueries.keySet()){
 			ArrayList<TabixQuery> al = fileTabixQueries.get(f);
-			int numTQs = al.size();
+			int numTQs = al.size();			
+
 			if (numTQs <= numberQueriesInChunk) tabixChunks.add( new TabixChunk(f, al));
 			else {
 				//walk it
 				ArrayList<TabixQuery> tqSub = new ArrayList<TabixQuery>();
-				int counter = 0;
 				for (TabixQuery tq : al){
 					tqSub.add(tq);
 					//hit max?
 					if (tqSub.size() == numberQueriesInChunk) {
 						tabixChunks.add(new TabixChunk(f, tqSub));
-						counter = 0;
 						tqSub = new ArrayList<TabixQuery>();
 					}
 				}
 				//add last?
-				if (counter !=0) tabixChunks.add(new TabixChunk(f, tqSub));
+				if (tqSub.size() !=0) tabixChunks.add(new TabixChunk(f, tqSub));
 			}
 		}
 
@@ -347,9 +373,11 @@ public class TQuery {
 		//make TabixChunks
 		makeTabixChunks();
 
-		//make one loader per thread
-		TabixLoader[] loader = new TabixLoader[numberThreads];
-		ExecutorService executor = Executors.newFixedThreadPool(numberThreads);
+		//make loaders
+		int numToMake= tabixChunks.size();
+		if (numToMake > numberThreads) numToMake = numberThreads;
+		TabixLoader[] loader = new TabixLoader[numToMake];
+		ExecutorService executor = Executors.newFixedThreadPool(numToMake);
 		for (int i=0; i< loader.length; i++){
 			loader[i] = new TabixLoader(this);
 			executor.execute(loader[i]);
@@ -362,16 +390,19 @@ public class TQuery {
 		//check loaders and tabulate results
 		long numFetchedDataLines = 0;
 		int numQueriesWithDataLines = 0;
+		long numSavedDataLines = 0;
 		for (TabixLoader c: loader) {
 			if (c.isFailed()) throw new IOException("\nERROR: TabixLoader issue! \n"+c);
 			numFetchedDataLines+= c.getNumberRetrievedResults();
 			numQueriesWithDataLines+= c.getNumberQueriesWithResults();
+			numSavedDataLines+= c.getNumberSavedResults();
 		}
 
 		if (printStats) {
 			System.err.println( (System.currentTimeMillis() -startTime)+"\tMillisec to load queries with data");
 			System.err.println(numQueriesWithDataLines+"\tQueries found with tabix records");
-			System.err.println(numFetchedDataLines+"\tRecords loaded");
+			System.err.println(numFetchedDataLines+"\tRecords retrieved");
+			System.err.println(numSavedDataLines+"\tRecords returned");
 		}
 	}
 
@@ -381,9 +412,10 @@ public class TQuery {
 		createChromIndex();
 		filter = new TQueryFilter(this);
 		System.err.println("\nParsing data sources...");
-		System.err.println("\nFileName\tRecordsParsed\tRecordsSkipped");
-		loadChromIndexWithVcf();
-		loadChromIndexWithBed();
+		System.err.println("RecordsIndexed\tRecordsSkipped\tFile");
+		if (vcfDataFiles != null) loadChromIndexWithVcf();
+		if (mafDataFiles != null) loadChromIndexWithMaf();
+		if (bedDataFiles != null) loadChromIndexWithBed();
 	}
 
 	/**This takes a bed file, parses each region into a TabixQuery object and identifies which file data sources contain data that intersects it.*/
@@ -415,7 +447,7 @@ public class TQuery {
 		return true;
 	}
 
-	
+
 	private void queryFileIndex() {
 		long startTime = System.currentTimeMillis();
 		long numQueries = 0;
@@ -452,11 +484,11 @@ public class TQuery {
 		if (printStats){
 			long diffTime = System.currentTimeMillis() -startTime;
 			System.err.println("\nQuery Stats Pre Filtering:");
-			System.err.println(numQueries+ "\tNum index queries");
-			System.err.println(numSkippedQueries+ "\tNum skipped index queries");
+			System.err.println(numQueries+ "\tNum user queries");
+			System.err.println(numSkippedQueries+ "\tNum skipped user queries");
 			System.err.println(numQueriesWithHits+ "\tNum queries with hits");
-			System.err.println(numberHits+ "\tNum total hits for tabix retrieval");
-			System.err.println(diffTime+"\tMillisec to complete index search");
+			System.err.println(numberHits+ "\tNum hits");
+			System.err.println(diffTime+"\tMillisec to complete index search\n");
 		}
 	}
 
@@ -519,13 +551,18 @@ public class TQuery {
 			String currChrom = "";
 			HashSet<File>[] currIndex = null;
 			long numLoadedRecords = 0;
+			long numSkippedRecords = 0;
 			while ((line = in.readLine()) != null){
 				if (line.startsWith("#") == false){
 					t = Misc.TAB.split(line);
 					//diff chrom?
 					if (currChrom.equals(t[0]) == false){
 						currIndex = chromFileIndex.get(t[0]);
-						if (currIndex == null) throw new IOException("\nError: Failed to find a chromosome for '"+t[0]+ "' from "+bedDataFiles[i]+" aborting on line "+line);
+						if (currIndex == null) {
+							if (printWarnings) System.err.println("\nError: Failed to find a chromosome for '"+t[0]+ "' from "+bedDataFiles[i]+" skipping line "+line);
+							numSkippedRecords++;
+							continue;
+						}
 						currChrom = t[0];
 					}
 
@@ -543,8 +580,81 @@ public class TQuery {
 			}
 			//clean up and stat incrementing
 			in.close();
-			System.err.println(bedDataFiles[i].getParentFile().getName()+ File.separator+ bedDataFiles[i].getName()+ "\t"+ numLoadedRecords+"\t0");
+			System.err.println(numLoadedRecords+"\t"+numSkippedRecords+"\t"+bedDataFiles[i]);
 			recordsLoaded += numLoadedRecords;
+			recordsSkipped += numSkippedRecords;
+		}
+	}
+
+	private void loadChromIndexWithMaf() throws IOException {
+
+		for (int i=0; i< mafDataFiles.length; i++){
+
+			//load filter with file, extension, parent dir name
+			addFileToFilter(mafDataFiles[i]);
+
+			BufferedReader in = IO.fetchBufferedReader(mafDataFiles[i]);
+
+			String[] t;
+			String line;
+			String currChrom = "";
+			int chromIndex = -1;
+			int startIndex = -1;
+			int endIndex = -1;
+			HashSet<File>[] currIndex = null;
+			long numLoadedRecords = 0;
+			long numSkippedRecords = 0;
+			while ((line = in.readLine()) != null){
+
+				//skip blanks and comments
+				if (line.trim().length() == 0 || line.startsWith("#")) continue;
+
+				//set indexes, if these don't get set they an array index out of bounds exception will be thrown below
+				if (line.startsWith("Hugo_Symbol")){
+					//Hugo_Symbol Entrez_Gene_Id Center NCBI_Build Chromosome Start_position End_position
+					//   0               1          2       3          4            5            6
+					HashMap<String, Integer> map = new HashMap<String, Integer>();
+					String[] header = Misc.TAB.split(line);
+					for (int x=0; x< header.length; x++) map.put(header[x], x);
+					chromIndex = map.get("Chromosome");
+					startIndex = map.get("Start_position");
+					endIndex = map.get("End_position");
+					continue;
+				}
+
+				//dataline
+				t = Misc.TAB.split(line);
+
+				//diff chrom?
+				if (currChrom.equals(t[chromIndex]) == false){
+					currIndex = chromFileIndex.get(t[chromIndex]);
+					if (currIndex == null) {
+						if (printWarnings) System.err.println("\tWARNING: Failed to find a chromosome for '"+t[chromIndex]+ "' skipping -> "+line);
+						numSkippedRecords++;
+						continue;
+					}
+					currChrom = t[chromIndex];
+				}
+
+				//parse start and stop, note sub one from start to convert to interbase coordinates
+				int start = Integer.parseInt(t[startIndex]) -1;
+				if (start < 0) start = 0;
+				int stop = Integer.parseInt(t[endIndex]);
+				if (stop > currIndex.length) stop = currIndex.length;
+
+				//add in references to source file over the covered bases, stop isn't covered.
+				for (int j= start; j< stop; j++){
+					if (currIndex[j] == null) currIndex[j] = new HashSet<File>(1);
+					currIndex[j].add(mafDataFiles[i]);
+				}
+				numLoadedRecords++;
+			}
+
+			//clean up and stat incrementing
+			in.close();
+			System.err.println(numLoadedRecords+"\t"+numSkippedRecords+"\t"+mafDataFiles[i]);
+			recordsLoaded += numLoadedRecords;
+			recordsSkipped += numSkippedRecords;
 		}
 	}
 
@@ -559,7 +669,7 @@ public class TQuery {
 
 				//check chrom
 				if (chromFileIndex.containsKey(t[0]) == false){
-					if (printWarnings) System.err.println("\tWARNING: Failed to find a chromosome for "+vcf+" skipping "+line);
+					if (printWarnings) System.err.println("\tWARNING: Failed to find a chromosome for '"+t[0]+ "' skipping -> "+line);
 				}
 
 				else {
@@ -573,7 +683,7 @@ public class TQuery {
 							startStop[0] = start;
 							startStop[1]+= bpPadding;
 						}
-						bedAl.add(new Bed(t[0], startStop[0], startStop[1], line.replace("\t", "\\t"), 0, '.'));
+						bedAl.add(new Bed(t[0], startStop[0], startStop[1], line, 0, '.'));
 					}
 				}
 			}
@@ -590,7 +700,10 @@ public class TQuery {
 		for (String chr: bedHash.keySet()){
 			Bed[] b = bedHash.get(chr);
 			TabixQuery[] tq = new TabixQuery[b.length];
-			for (int i=0; i< b.length; i++) tq[i] = new TabixQuery(b[i]);
+			for (int i=0; i< b.length; i++) {
+				tq[i] = new TabixQuery(b[i]);
+				tq[i].parseVcf();
+			}
 			tqs.put(chr, tq);
 		}
 		return tqs;
@@ -619,7 +732,11 @@ public class TQuery {
 					//diff chrom? pull index
 					if (currChrom.equals(t[0]) == false){
 						currIndex = chromFileIndex.get(t[0]);
-						if (currIndex == null) throw new IOException("\nError: Failed to find a chromosome for '"+t[0]+ "' from "+vcfDataFiles[i]+" aborting on line "+line);
+						if (currIndex == null) {
+							if (printWarnings) System.err.println("\tWARNING: Failed to find a chromosome for '"+t[0]+ "' skipping -> "+line);
+							numRecordsSkipped++;
+							continue;
+						}
 						currChrom = t[0];
 					}
 
@@ -639,24 +756,34 @@ public class TQuery {
 
 			//clean up and stat incrementing
 			in.close();
-			System.err.println(vcfDataFiles[i].getParentFile().getName()+ File.separator+ vcfDataFiles[i].getName()+"\t"+numLoadedRecords+"\t"+numRecordsSkipped);
+			System.err.println(numLoadedRecords+"\t"+numRecordsSkipped+ "\t"+vcfDataFiles[i]);
 			recordsLoaded += numLoadedRecords;
 			recordsSkipped += numRecordsSkipped;
 		}
 	}
 
-	/**Loads the filter with the file, extension, and parent dir name*/
+
+	/**Loads the filter with the file, extension, parent, and grand parent dir name*/
 	private void addFileToFilter(File file) {
 		//add to data sources
 		filter.getAvailableDataFiles().add(file);
 
 		//add parent dir name
-		filter.getAvailableDataTypes().add(file.getParentFile().getName());
+		String pn = file.getParentFile().getName();
+		if (pn != null && pn.trim().length()!=0) filter.getAvailablePrimaryDataTypes().add(pn);
+
+		//add grand parent dir name
+		String gpn = file.getParentFile().getParentFile().getName();
+		if (gpn != null && gpn.trim().length()!=0) filter.getAvailableSecondaryDataTypes().add(gpn);
 
 		//add extension minus .gz
-		Matcher mat = TQueryFilter.FILE_TYPE.matcher(file.getName());
-		mat.matches();
-		filter.getAvailableFileTypes().add(mat.group(1));
+		String name = file.getName();
+		if (name.endsWith(".vcf.gz")) filter.getAvailableFileTypes().add("vcf");
+		else if (name.endsWith(".bed.gz")) filter.getAvailableFileTypes().add("bed");
+		else if (name.endsWith(".maf.txt.gz")) filter.getAvailableFileTypes().add("maf");
+
+		//should never hit this
+		else Misc.printErrAndExit("\nERROR: unrecognized file type contact admin! "+file);
 	}
 
 	/**Returns the interbase start stop region of effected bps for simple SNV and INDELs. 
@@ -702,7 +829,7 @@ public class TQuery {
 			Matcher mat = END_POSITION.matcher(vcf[7]);
 			if (mat.matches()) end = Integer.parseInt(mat.group(1));
 			else {
-				if (printWarnings) System.err.println("\n\tWARNING: found a < or > containing alt, failed to parse END=number position, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
+				if (printWarnings) System.err.println("\tWARNING: found a < or > containing alt, failed to parse END=number position, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
 				return null;
 			}
 			begin = iPos;
@@ -718,7 +845,7 @@ public class TQuery {
 			begin = iPos;
 			end = iPos+ lenRef +1;
 			if (ref.charAt(0) != alt.charAt(0)) {
-				if (printWarnings) System.err.println("\n\tWARNING: Odd INS vcf record, the first base in the ref and alt must be the same, use vt to normalize your variants, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
+				if (printWarnings) System.err.println("\tWARNING: Odd INS vcf record, the first base in the ref and alt must be the same, use vt to normalize your variants, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
 				return null;
 			}
 
@@ -728,7 +855,7 @@ public class TQuery {
 			begin = iPos+1;
 			end = iPos + lenRef;
 			if (ref.charAt(0) != alt.charAt(0)) {
-				if (printWarnings) System.err.println("\n\tWARNING: Odd DEL vcf record, the first base in the ref and alt must be the same, use vt to normalize your variants, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
+				if (printWarnings) System.err.println("\tWARNING: Odd DEL vcf record, the first base in the ref and alt must be the same, use vt to normalize your variants, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
 				return null;
 			}
 		}
@@ -792,19 +919,22 @@ public class TQuery {
 		if (chrLengthFile == null) Misc.printErrAndExit("\nError: please provide a bed file of chromosome and their lengths, e.g. X 0 155270560\n" );
 		if (tabixDataDir == null || tabixDataDir.isDirectory() == false) Misc.printErrAndExit("\nError: please provide a directory containing tabix indexed xxx.vcf.gz and xxx.bed.gz files with their associated xxx.gz.tbi indexes" );
 
+		//pull data sources
 		vcfDataFiles = IO.fetchFilesRecursively(tabixDataDir, "vcf.gz");
 		bedDataFiles = IO.fetchFilesRecursively(tabixDataDir, "bed.gz");
-		if (vcfDataFiles.length == 0 && bedDataFiles.length == 0) Misc.printErrAndExit("\nError: failed to find any xxx.bed.gz or xxx.vcf.gz tabix files in your tabixDataDir -> "+tabixDataDir);
+		mafDataFiles = IO.fetchFilesRecursively(tabixDataDir, "maf.txt.gz");
+		if (vcfDataFiles.length == 0 && bedDataFiles.length == 0 && mafDataFiles.length == 0) Misc.printErrAndExit("\nError: failed to find any xxx.bed.gz, xxx.vcf.gz, or xxx.maf.txt.gz tabix files in your tabixDataDir -> "+tabixDataDir);
+
 		//check for index
 		lookForTabixIndex(vcfDataFiles);
 		lookForTabixIndex(bedDataFiles);
+		lookForTabixIndex(mafDataFiles);
 
 
 		//threads to use
 		int numAvail = Runtime.getRuntime().availableProcessors();
 		if (numberThreads < 1) numberThreads =  numAvail - 1;
 		System.err.println(numAvail +" Available processors, using "+numberThreads+" threaded loaders\n");
-
 
 	}	
 
@@ -818,11 +948,11 @@ public class TQuery {
 	}
 
 	public static void printDocs(){
-		System.err.println("\n" +
+		System.out.println("\n" +
 				"**************************************************************************************\n" +
 				"**                                    TQuery: Sept 2016                             **\n" +
 				"**************************************************************************************\n" +
-				"TQ returns bed and vcf records that overlap user supplied regions in bed or vcf format."+
+				"TQ returns vcf, maf, and bed records that overlap user's regions in bed or vcf format.\n"+
 				"Strict adherence to bed format is assumed (1st base is 0, last base is not included,\n"+
 				"last base > first; vcf is in 1 base so subtract 1 from pos to convert to bed).\n"+
 				"This app needs > 27G of RAM for human/ mouse/ plant. A two step search is performed\n"+
@@ -834,8 +964,9 @@ public class TQuery {
 				"     building the intersection index. Note, the chr name must match across all \n"+
 				"     datasets, no mixing of chr21 and 21.\n"+
 				"-d A data directory containing gzipped tabixed (https://github.com/samtools/htslib)\n"+
-				"     vcf and bed files. Recurses through all sub directories. Be sure to normalize\n"+
-				"     the vcf records with a package like Vt, see http://genome.sph.umich.edu/wiki/Vt\n"+
+				"     vcf, bed, and maf files. Recurses through all sub directories. Be sure to normalize\n"+
+				"     the vcf records with a package like Vt, see http://genome.sph.umich.edu/wiki/Vt .\n"+
+				"     Use the MafParser to sort and tabix your TCGA xxx.maf.txt files.\n"+
 
 				"\nDefault Params:\n"+
 				"-p Pad input bed/vcf regions +/- x bps, defaults to 0.\n"+
@@ -861,6 +992,10 @@ public class TQuery {
 
 	public boolean isPrintJson() {
 		return printJson;
+	}
+
+	public TQueryFilter getTabixFilter() {
+		return filter;
 	}
 
 

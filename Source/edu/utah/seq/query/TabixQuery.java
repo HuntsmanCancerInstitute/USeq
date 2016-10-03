@@ -38,6 +38,12 @@ public class TabixQuery {
 	private int stop; //interbase
 	private float score;
 	private String info = null;
+	
+	//just for vcf, need pos since the start and stop might be padded
+	private String pos = null;
+	private String ref = null;
+	private String[] alts = null;
+	
 	private HashMap<File, ArrayList<String>> sourceResults = new HashMap<File, ArrayList<String>>();
 	
 	//constructors
@@ -59,6 +65,27 @@ public class TabixQuery {
 		stop = bed.getStop();
 		score = (float) bed.getScore();
 		info = bed.getName();
+	}
+	
+	/**Good to call if working with vcf data so that an exact match can be made*/
+	public void parseVcf(){
+		String[] t = Misc.TAB.split(info);
+		pos = t[1];
+		ref = t[3];
+		alts = Misc.COMMA.split(t[4]);
+	}
+	
+	/**Comparses these vcf args against the TQ for exact matching, note only one of the alts must match, not all.*/
+	public boolean compareVcf(String otherPos, String otherRef, String[] otherAlts){
+		if (pos.equals(otherPos) == false) return false;
+		if (ref.equals(otherRef) == false) return false;
+		//one of the alts needs to match
+		for (String thisAlt: alts){
+			for (String thatAlt: otherAlts){
+				if (thisAlt.equals(thatAlt)) return true;
+			}
+		}
+		return false;
 	}
 
 	/*Need to synchronize this since multiple threads could be adding results simultaneously.*/
@@ -117,7 +144,10 @@ public class TabixQuery {
 				int numData = sourceResults.get(source).size();
 				int dataCounter = 0;
 				for (String data: sourceResults.get(source)){
-					sb.append("\n\t\t\""); sb.append(data.replace("\t", "\\t")); sb.append("\"");
+					//replace tabs with \t, " with '
+					String clean = data.replace("\t", "\\t");
+					clean = clean.replace("\"", "'");
+					sb.append("\n\t\t\""); sb.append(clean); sb.append("\"");
 					if (++dataCounter != numData) sb.append(", ");
 				}
 				if (++hitCounter != numHits) sb.append("]},\n");
@@ -150,6 +180,10 @@ public class TabixQuery {
 
 	public int getStop() {
 		return stop;
+	}
+
+	public String getInfo() {
+		return info;
 	}
 	
 	
