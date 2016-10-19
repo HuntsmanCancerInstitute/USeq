@@ -43,20 +43,18 @@ public class GeneiASEParser {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
-		
-
-		
 	}
 
 	private void parse() {
 		gr = GeneiASEResult.loadResults(resultsFile);
 		gd = GeneiASEData.loadData(dataFile);
+		
 		gGene = new TreeMap<String, GeneiASEGene>();
+		
 		for (GeneiASEResult r: gr) gGene.put(r.getGene(), new GeneiASEGene(r));
 		for (GeneiASEData d: gd){
 			GeneiASEGene gene = gGene.get(d.getGene());
-			if (gene == null) Misc.printErrAndExit("\nError: the data has a gene not found in the results "+d.getGene());
+			if (gene == null) continue; //Misc.printErrAndExit("\nError: the data has a gene not found in the results "+d.getGene());
 			gene.getData().add(d);
 		}
 	}
