@@ -11,27 +11,7 @@ import util.bio.annotation.Bed;
 import util.gen.Misc;
 
 public class TabixQuery {
-	
-	public static void main (String[] args){
-		try {
-			TabixQuery tq = new TabixQuery("chrX", new RegionScoreText(1234, 1239, 0.4f, "descript of this region"));
-			ArrayList<String> data = new ArrayList<String>();
-			String dirty = "20\t18142564\trs3828013\tA\tG\t.\tPASS\tDB;ECNT=1;HCNT=16;MAX_ED=.;MIN_ED=.;NLOD=39.13;TLOD=452.16";
-			data.add(dirty);
-			data.add("21\t28142564\trs3828013\tA\tG\t.\tPASS\tDB;ECNT=1;HCNT=16;MAX_ED=.;MIN_ED=.;NLOD=39.13;TLOD=452.16");
-			tq.getSourceResults().put(new File("/Users/u0028003/Desktop/IE/Data/chr20_1_3ConMut2.raw.vcf.gz"), null);
-			
-			ArrayList<String> data2 = new ArrayList<String>();
-			data2.add("21\t28142564\trs3828013\tA\tG\t.\tPASS\tDB;ECNT=1;HCNT=16;MAX_ED=.;MIN_ED=.;NLOD=39.13;TLOD=452.16");
-			tq.getSourceResults().put(new File("/Users/u0028003/Desktop/IE/Data/chr20_1_3ConMut2.pass.vcf.gz"), data);
-			
-			System.err.println(tq.toJson(true, "/Users/u0028003/Desktop/"));
-			
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-	
+		
 	//fields
 	private String chr;
 	private int start; //interbase	

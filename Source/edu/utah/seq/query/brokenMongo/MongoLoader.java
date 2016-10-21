@@ -1,4 +1,4 @@
-package edu.utah.seq.query;
+package edu.utah.seq.query.brokenMongo;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -23,6 +23,39 @@ public class MongoLoader implements Runnable{
 	/**This walks through each query, fetching the sources to query, executes each and then loads the results back into the query.
 	 * Assumes no other threads will be working with these queries until all the mongo executions are complete!*/
 	public void run() {
+		int size = toQuery.size();
+		
+		//for each query
+		for (int i=0; i< size; i++){
+			MongoQuery mq = toQuery.get(i);
+			//container for source: results
+			HashMap<String, BasicDBObject> sourceResults = mq.getSourceResults();
+
+			//for each source
+			for (String source : sourceResults.keySet()){
+				BasicDBObject q = sourceResults.get(source);
+
+				//there should be results every time
+				ArrayList<DBObject> results = new ArrayList<DBObject>();
+				DBCursor cursor = collection.find(q);
+				while(cursor.hasNext())  results.add(cursor.next());
+				if (results.size() == 0) Misc.printErrAndExit("\nError: query returned no results for "+mq.getInterbaseCoordinates()+" "+source+"\n"+q);
+				//sourceResults.put(source, results);
+
+			}
+
+			//save it? not thread safe so don't modify this object
+			mq.setSourceResults(sourceResults);
+			
+			//print to file? and delete the results?
+		}
+		
+		
+	}
+	
+	/*This walks through each query, fetching the sources to query, executes each and then loads the results back into the query.
+	 * Assumes no other threads will be working with these queries until all the mongo executions are complete!
+	public void runOld() {
 		int size = toQuery.size();
 		
 		//for each query
@@ -55,10 +88,8 @@ public class MongoLoader implements Runnable{
 			mq.setSourceResults(sourceResults);
 			
 			//print to file? and delete the results?
-		}
-		
-		
-	}
+		}	
+	}*/
 
 	public ArrayList<MongoQuery> getToQuery() {
 		return toQuery;

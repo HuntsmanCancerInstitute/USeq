@@ -20,6 +20,7 @@ public class Bed extends Coordinate implements Serializable{
 	private String name;
 	private double score; 
 	private char strand;
+	private static final long serialVersionUID = 1L;
 
 	//constructor
 	public Bed (String chromosome, int start, int stop, String name, double score, char strand){

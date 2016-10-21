@@ -1,4 +1,4 @@
-package edu.utah.seq.query;
+package edu.utah.seq.query.brokenMongo;
 
 import com.mongodb.BasicDBObjectBuilder;
 import com.mongodb.DBObject;

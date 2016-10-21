@@ -3,36 +3,39 @@ package edu.utah.seq.query;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-
 import htsjdk.tribble.readers.TabixReader;
 import util.gen.Misc;
 
 public class TabixLoader implements Runnable{
 
 	//fields
-	private File tabixFile = null;
-	private TabixReader reader = null;
-	private ArrayList<TabixQuery> toQuery;
-	private boolean failed = false;
 	private boolean printWarnings;
-	private TQuery tQuery;
+	private boolean failed = false;
+	private QueryLoader queryLoader;
+	
+	//working fields
+	private TabixReader reader = null;
+	private File tabixFile = null;
+	private TabixQuery tq = null;
+	private TabixChunk tc = null;
+	private ArrayList<TabixQuery> toQuery;
 	private long numberRetrievedResults = 0;
 	private int numberQueriesWithResults = 0;
 	private long numberSavedResults = 0;
 	private boolean matchVcf = false;
+	
 
-	public TabixLoader (TQuery tQuery) throws IOException{
-		this.tQuery = tQuery;
-		this.printWarnings = tQuery.isPrintWarnings();
-		this.matchVcf = tQuery.getTabixFilter().isMatchVcf();
+	public TabixLoader (QueryLoader queryLoader, boolean printWarnings) throws IOException{
+		this.queryLoader = queryLoader;
+		this.printWarnings = printWarnings;
 	}
-
+	
 	public void run() {	
-		TabixQuery tq = null;
 		try {
-			//get next chunk of queries and their associated file
-			while (getChunk()){ 
-
+			//get next chunk of work
+			while ((tc = queryLoader.getChunk()) != null){ 
+				loadWorkChunk();
+				
 				int size = toQuery.size();
 				for (int i=0; i< size; i++){
 					tq = toQuery.get(i);			
@@ -68,46 +71,51 @@ public class TabixLoader implements Runnable{
 					//good to know if a query was created yet no results came back, this should be rare, comes form how tabix defines the foot print and how TQuery does it.
 					else if (printWarnings) System.err.println("\tWARNING: failed to return any data from "+tabixFile+" for region "+tq.getInterbaseCoordinates()+" -> converted tbx query-> "+tq.getTabixCoordinates() );
 				}
-			}		
+				
+				//update the QueryRequest
+				updateQueryStats();
+			}	
+			//return the reader
+			if (tabixFile != null) queryLoader.getSetTabixReader(tabixFile, reader);
 		} catch (IOException e) {
 			failed = true;
 			System.err.println("\nError: searching "+tabixFile+" for "+tq.getTabixCoordinates() );
 			e.printStackTrace();
 		}
 	}
-
-
-	/**This gets a chunk of data to process as well as a Tabix reader.*/
-	private boolean getChunk() throws IOException {
-		TabixChunk c = tQuery.getChunk();
-
-		//anything there?
-		if (c == null) {
-			//return the reader, this is important since TQuery handles the close()
-			tQuery.getSetTabixReader(tabixFile, reader);
-			//signal a loader shutdown
-			return false;
+	
+	/*This loads a chunk of work to do and deals with the readers, returning the old or fetching a new one.*/
+	private void loadWorkChunk() throws IOException {
+		//check reader
+		if (reader != null){
+			//fetch new?
+			if (tabixFile.equals(tc.getTabixFile()) == false){
+				//return old
+				queryLoader.getSetTabixReader(tabixFile, reader);
+				//get new
+				tabixFile = tc.getTabixFile();
+				reader = queryLoader.getSetTabixReader(tabixFile, null);
+			}
 		}
-
-		toQuery = c.queries;
-
-		//first launch?
-		if (tabixFile == null){
-			tabixFile = c.tabixFile;
-			reader = tQuery.getSetTabixReader(tabixFile, null);
-			if (reader == null) reader = new TabixReader(tabixFile.toString());
+		else {
+			tabixFile = tc.getTabixFile();
+			reader = queryLoader.getSetTabixReader(tabixFile, null);
 		}
-
-		//need new reader?
-		else if (tabixFile.equals(c.tabixFile) == false){
-			//return old reader, this is important since TQuery handles the close()
-			tQuery.getSetTabixReader(tabixFile, reader);
-			//get new reader
-			tabixFile = c.tabixFile;
-			reader = tQuery.getSetTabixReader(tabixFile, null);
-			if (reader == null) reader = new TabixReader(tabixFile.toString());
-		}
-		return true;
+		//set working objects
+		toQuery = tc.getQueries();
+		matchVcf = tc.getQueryRequest().getFilter().isMatchVcf();
+		
+		//reset counters
+		numberRetrievedResults = 0;
+		numberQueriesWithResults = 0;
+		numberSavedResults = 0;
+	}
+	
+	private void updateQueryStats() {
+		QueryRequest qr = tc.getQueryRequest();
+		qr.incrementNumQueriesWithResults(numberQueriesWithResults);
+		qr.incrementNumRetrievedResults(numberRetrievedResults);
+		qr.incrementNumSavedResults(numberSavedResults);
 	}
 
 	public String toString(){
@@ -116,17 +124,4 @@ public class TabixLoader implements Runnable{
 	public boolean isFailed() {
 		return failed;
 	}
-
-	public long getNumberRetrievedResults() {
-		return numberRetrievedResults;
-	}
-
-	public long getNumberQueriesWithResults() {
-		return numberQueriesWithResults;
-	}
-
-	public long getNumberSavedResults() {
-		return numberSavedResults;
-	}
-
 }

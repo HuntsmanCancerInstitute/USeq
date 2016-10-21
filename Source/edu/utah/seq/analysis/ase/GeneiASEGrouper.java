@@ -32,10 +32,12 @@ public class GeneiASEGrouper {
 		for (int i=0; i< dirs.length; i++) {
 			groups[i] = new ASEGroup(dirs[i]);
 			allGenes.addAll(groups[i].allGenes);
+			System.out.println("\n"+dirs[i]);
+			loadSingle(dirs[i]);
 		}
 		
 		//for each gene that passed, count how many times it was seen
-		System.out.print("Gene/Locus");
+		System.out.print("\nGene/Locus");
 		for (ASEGroup g : groups){
 			System.out.print("\t");
 			System.out.print("#Pass "+g.dir.getName());

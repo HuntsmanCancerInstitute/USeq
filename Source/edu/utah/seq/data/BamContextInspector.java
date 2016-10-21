@@ -33,6 +33,7 @@ public class BamContextInspector {
 	private SamReader samReader = null;
 	private ArrayList<Bed> passAL = new ArrayList<Bed>();
 	private ArrayList<Bed> failAL = new ArrayList<Bed>();
+	private File geneiAseFile;
 
 	//constructor
 	public BamContextInspector(String[] args){
@@ -44,7 +45,8 @@ public class BamContextInspector {
 			printParams();
 
 			//load the bed file of regions to scan
-			regions = Bed.parseFile(bedIn, 0, 0);
+			if (bedIn != null) regions = Bed.parseFile(bedIn, 0, 0);
+			else parseGeneiAseTable();
 
 			//create reader
 			SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
@@ -69,9 +71,34 @@ public class BamContextInspector {
 	}
 	
 	
+	private void parseGeneiAseTable() {
+		try {
+			BufferedReader in = IO.fetchBufferedReader(geneiAseFile);
+			String line;
+			String[] t;
+			String[] c;
+			ArrayList<Bed> al = new ArrayList<Bed>();
+			while ((line = in.readLine()) != null){
+				if (line.startsWith("gene")) continue;
+				t = Misc.TAB.split(line);
+				c = Misc.UNDERSCORE.split(t[1]);
+				int start = Integer.parseInt(c[1]);
+				Bed b = new Bed(c[0], start, start+1, line, 0f, '.');
+				al.add(b);
+			}
+			regions = new Bed[al.size()];
+			al.toArray(regions);
+			in.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+
+
 	private void printParams(){
 		System.out.println("Params:");
-		System.out.println(bedIn.getName()+"\t Regions file");
+		if (bedIn != null) System.out.println(bedIn.getName()+"\t Regions file");
+		else System.out.println(geneiAseFile.getName()+"\t Regions file");
 		System.out.println(bamFile.getName()+"\t Bam file");
 		System.out.println(bpToScan+"\t BPs of flank to scan");
 		System.out.println(maxNumNonRefBps+ "\t Max num non ref BPs in flanks");
@@ -105,20 +132,31 @@ public class BamContextInspector {
 
 
 	private void printRegions() {
-		String name = Misc.removeExtension(bedIn.getName());
-		if (passAL.size() !=0) write (new File (bedIn.getParentFile(), name+"_pass.bed"), passAL);
-		if (failAL.size() !=0) write (new File (bedIn.getParentFile(), name+"_fail.bed"), failAL);
+		String name;
+		File parent;
+		if (bedIn != null) {
+			parent = bedIn.getParentFile();
+			name = bedIn.getName();
+		}
+		else {
+			parent = geneiAseFile.getParentFile();
+			name = geneiAseFile.getName();
+		}
+		if (passAL.size() !=0) write (new File (parent, "pass_"+name), passAL);
+		if (failAL.size() !=0) write (new File (parent, "fail_"+name), failAL);
 	}
 
 	private void write(File f, ArrayList<Bed> al) {
 		try {
 			Gzipper out = new Gzipper(f);
-			for (Bed b: al) out.println(b.toString());
+			for (Bed b: al) {
+				if (bedIn != null) out.println(b.toString());
+				else out.println(b.getName());
+			}
 			out.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
 	}
 
 	private void walkRegions() throws Exception {
@@ -309,6 +347,8 @@ public class BamContextInspector {
 					
 					case 'x': maxNumNonRefBps = Integer.parseInt(args[++i]); break;
 					case 'i': skipIndels = false; break;
+					//hidden
+					case 'g': geneiAseFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -323,7 +363,10 @@ public class BamContextInspector {
 		if (indexedFastaFile == null || indexedFastaFile.exists() == false)  Misc.printErrAndExit("\nError: please provide an indexed reference genome fasta file and it's index.");
 		fasta = new IndexedFastaSequenceFile(indexedFastaFile);
 		if (fasta.isIndexed() == false) Misc.printErrAndExit("\nError: cannot find your xxx.fai index or the multi fasta file isn't indexed\n"+ indexedFastaFile);
-
+		
+		if (bedIn == null && geneiAseFile == null) Misc.printErrAndExit("\nError: please provide a file of regions to scan.");
+		
+		if (bamFile == null ) Misc.printErrAndExit("\nError: please provide a sorted and indexed bam alignment file.");
 	}	
 
 	public static void printDocs(){

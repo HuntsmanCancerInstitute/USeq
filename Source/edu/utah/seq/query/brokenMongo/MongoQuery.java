@@ -1,8 +1,10 @@
-package edu.utah.seq.query;
+package edu.utah.seq.query.brokenMongo;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+
+import com.mongodb.BasicDBObject;
 import com.mongodb.DBObject;
 import edu.utah.seq.useq.data.RegionScoreText;
 
@@ -12,7 +14,8 @@ public class MongoQuery {
 	private String chr;
 	private int start; //interbase	
 	private int stop; //interbase
-	private HashMap<String, ArrayList<DBObject>> sourceResults;
+	private HashMap<String, BasicDBObject> sourceResults;
+	
 	
 	//constructors
 	/**For bed file region data, interbase coordinates assumed!
@@ -43,7 +46,7 @@ public class MongoQuery {
 		return sb.toString();
 	}
 
-	public HashMap<String, ArrayList<DBObject>> getSourceResults() {
+	public HashMap<String, BasicDBObject> getSourceResults() {
 		return sourceResults;
 	}
 
@@ -59,7 +62,7 @@ public class MongoQuery {
 		return stop;
 	}
 
-	public void setSourceResults(HashMap<String, ArrayList<DBObject>> sourceResults) {
+	public void setSourceResults(HashMap<String, BasicDBObject> sourceResults) {
 		this.sourceResults = sourceResults;
 	}
 	

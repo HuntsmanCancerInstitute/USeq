@@ -1,4 +1,4 @@
-package edu.utah.seq.query;
+package edu.utah.seq.query.brokenMongo;
 
 
 import java.io.BufferedReader;
@@ -33,7 +33,7 @@ import util.gen.Num;
  * So 15.8 sec to fetch all intersecting records with 14K T-N exome variants using Mongo readers.  Hmm the tabix retrieval is slow, need to parallelize! Doubt could get this to < 2 Sec.
  * Better to use a NoSQL db, key: data.
  * */
-public class MQuery {
+public class MLeftQuery {
 
 	//user defined fields
 	private File chrLenBedFile;
@@ -58,8 +58,8 @@ public class MQuery {
 	DBCollection vcfCollection = null;
 	//DBCollection bedCollection = null;
 
-	/* Chrom: BpIndex[] of ArrayList<String>, interbase coordinates, 0 is first base, last base in any region is not included. */
-	private HashMap<String, ArrayList<String>[]> chromFileIndex = new HashMap<String, ArrayList<String>[]>();
+	/* Chrom: BpIndex[] of HashSet<String>, interbase coordinates, 0 is first base, last base in any region is not included. */
+	private HashMap<String, HashSet<String>[]> chromFileIndex = new HashMap<String, HashSet<String>[]>();
 
 	/*Contains a data source and the MongoQueries that intersect it.*/
 	private HashMap<String, ArrayList<MongoQuery>> sourceMongoQueries = new HashMap<String, ArrayList<MongoQuery>>();
@@ -69,7 +69,7 @@ public class MQuery {
 	private HashMap<String, MongoQuery[]> chrMongoQueries = new HashMap<String, MongoQuery[]>();
 
 
-	public MQuery (String[] args) {
+	public MLeftQuery (String[] args) {
 		try {
 			long startTime = System.currentTimeMillis();
 			processArgs(args);
@@ -115,20 +115,11 @@ public class MQuery {
 			loadMongoQueriesWithData();
 
 			if (printFindings){
-				printMongoQueriesWithHitsBySource();
 				printAllMongoQueries();
 			}
 			
 			//close writer
 			results.close();
-		}
-	}
-	
-	private synchronized void appendResults(String res) {
-		try {
-			results.println(res);
-		} catch (IOException e) {
-			e.printStackTrace();
 		}
 	}
 
@@ -138,30 +129,14 @@ public class MQuery {
 			MongoQuery[] tqs = chrMongoQueries.get(chr);
 			for (MongoQuery tq : tqs){
 				System.out.println(tq.getInterbaseCoordinates());
-				HashMap<String, ArrayList<DBObject>> sourceRes = tq.getSourceResults();
+				HashMap<String, BasicDBObject> sourceRes = tq.getSourceResults();
 				if (sourceRes !=null){
 					for (String s: sourceRes.keySet()){
 						System.out.println("\t"+s);
-						for (DBObject r: sourceRes.get(s)){
-							System.out.println("\t\t"+r);
-						}
+						System.out.println("\t\t"+sourceRes.get(s));
 					}
 				}
 			}
-		}
-	}
-
-	private void printMongoQueriesWithHitsBySource() {
-		System.out.println("\nPrinting Queries With Hits by Data Source...");
-		for (String source: sourceMongoQueries.keySet()){
-			System.out.println(source);
-			ArrayList<MongoQuery> al = sourceMongoQueries.get(source);
-			for (MongoQuery mq: al){
-				System.out.println("\t"+mq.getInterbaseCoordinates());
-				ArrayList<DBObject> res = mq.getSourceResults().get(source);
-				for (DBObject s: res) System.out.println("\t\t"+s.get("record"));
-			}
-			System.out.println();
 		}
 	}
 
@@ -260,16 +235,16 @@ public class MQuery {
 			}
 
 			else {
-				ArrayList<String>[] index = chromFileIndex.get(chr);
+				HashSet<String>[] index = chromFileIndex.get(chr);
 
 				//for each query region
 				MongoQuery[] regions = chrMongoQueries.get(chr);
 				numQueries += regions.length;
 
 				for (MongoQuery q: regions){
-					//fetch sources that intersect this region
-					HashSet<String> sourceHits = intersect(index, q);
-
+					//fetch sources and their left most position that intersect this region
+					HashMap<String, Integer> sourceHits = intersect(index, q);
+					
 					if (sourceHits.size() !=0) {
 						numberHits += sourceHits.size();
 						addHits(sourceHits, q);
@@ -300,13 +275,13 @@ public class MQuery {
 	}
 
 	/**Adds the MongoQuery to an ArrayList associated with a resource to fetch the data from.*/
-	private void addHits(HashSet<String> hits, MongoQuery mq) {
+	private void addHits(HashMap<String, Integer> hits, MongoQuery mq) {
 
 		//create results container for MQ
-		HashMap<String, ArrayList<DBObject>> sourceResults = new HashMap<String, ArrayList<DBObject>>();
+		HashMap<String, BasicDBObject> sourceResults = new HashMap<String, BasicDBObject>();
 
-		//for each source
-		for (String source: hits){
+		//for each source and left position
+		for (String source: hits.keySet()){
 			//add to global hash
 			ArrayList<MongoQuery> al = sourceMongoQueries.get(source);
 			if (al == null){
@@ -314,9 +289,16 @@ public class MQuery {
 				sourceMongoQueries.put(source, al);
 			}
 			al.add(mq);
+			
+			//make db obj for mongo query
+			BasicDBObject db = new BasicDBObject();
+			//exact match
+			db.put("source", source);
+			db.put("chr", mq.getChr());
+			db.put("start", hits.get(source));
 
-			//add to MongoQuery so the loader knows what to search for
-			sourceResults.put(source, null);
+			//add it
+			sourceResults.put(source, db);
 		}
 
 		//save it in MQ
@@ -325,19 +307,38 @@ public class MQuery {
 
 	/**Checks the begin and end for out of bounds then uses a hash to collapse all the Sources found to have region that overlaps the query.
 	 * Also filters against the sourcesToLoad if set.*/
-	private HashSet<String> intersect(ArrayList<String>[] index, MongoQuery tq) {
-		HashSet<String> hits = new HashSet<String>();
+	private HashMap<String, Integer> intersect(HashSet<String>[] index, MongoQuery tq) {
+		HashMap<String, Integer> hits = new HashMap<String, Integer>();
+		//define start and stop of the scan
 		int begin = tq.getStart();
 		if (begin < 0) begin = 0;
 		int end = tq.getStop();
 		if (end >= index.length) end = index.length;
+		
+		//fetch all the data sources that intersect
 		for (int i=begin; i<end; i++) {
-			if (index[i] != null) hits.addAll(index[i]);
+			//any hits?
+			if (index[i] != null) {
+				//for each check if it has been added
+				for (String name: index[i]){
+					//new?
+					if (hits.containsKey(name) == false){
+						//left scan until it isn't found
+						int leftIndex = i;
+						while (true){
+							leftIndex--;
+							//is it null?
+							if (index[leftIndex] == null) break;
+							//does it still contain the name?
+							if (index[leftIndex].contains(name) == false) break;
+						}
+						//add one to bring it back to where it is present and save in hash
+						hits.put(name, ++leftIndex);
+					}
+					//nope just skip, already loaded
+				}
+			}
 		}
-
-		//filter against those to search?
-		if (hits.size() !=0) filterSources(hits);
-
 		return hits;
 	}
 
@@ -418,7 +419,7 @@ public class MQuery {
 			String[] t;
 			String line;
 			String currChrom = "";
-			ArrayList<String>[] currIndex = null;
+			HashSet<String>[] currIndex = null;
 			long numLoadedRecords = 0;
 			long numRecordsSkipped = 0;
 			int counter = 0;
@@ -453,7 +454,7 @@ public class MQuery {
 							//add in references to source file over the covered bases, stop isn't covered.
 							//currently just using File.toString() to pull the unique name of the source
 							for (int j= startStop[0]; j< startStop[1]; j++){
-								if (currIndex[j] == null) currIndex[j] = new ArrayList<String>(1);
+								if (currIndex[j] == null) currIndex[j] = new HashSet<String>(1);
 								currIndex[j].add(vcfFiles[i].toString());
 							}
 							//make db obj
@@ -556,7 +557,7 @@ public class MQuery {
 	}
 
 
-	/**This creates a HashMap of chr: ArrayList<String>[] where each position in the [] represents a base and contains all the sources that overlap. */
+	/**This creates a HashMap of chr: HashSet<String>[] where each position in the [] represents a base and contains all the sources that overlap. */
 	private void createChromIndex() throws IOException {
 		HashMap<String, RegionScoreText[]> chrLen = Bed.parseBedFile(chrLenBedFile, true, false);
 
@@ -564,7 +565,7 @@ public class MQuery {
 		for (String chr: chrLen.keySet()){
 			RegionScoreText[] regions = chrLen.get(chr);
 			if (regions.length !=1) throw new IOException("\nError: there can be only one bed region for each chromosome, see "+chr);
-			ArrayList<String>[] indexes = new ArrayList[regions[0].getStop()+1];
+			HashSet<String>[] indexes = new HashSet[regions[0].getStop()+1];
 			chromFileIndex.put(chr, indexes);
 			System.out.println("\t"+chr+"\t"+regions[0].getStop());
 		}
@@ -581,12 +582,11 @@ public class MQuery {
 		DB db = mongoClient.getDB( genomeBuild );
 
 		//create collection
+		vcfCollection = db.getCollection("vcf");
 		if (loadDb){
-			vcfCollection = db.getCollection("vcf");
 			vcfCollection.createIndex(new BasicDBObject("source", 1));
 			vcfCollection.createIndex(new BasicDBObject("chr", 1));
 			vcfCollection.createIndex(new BasicDBObject("start", 1));
-			vcfCollection.createIndex(new BasicDBObject("stop", 1));
 		}
 	}
 
@@ -595,7 +595,7 @@ public class MQuery {
 			printDocs();
 			System.exit(0);
 		}
-		new MQuery (args);
+		new MLeftQuery (args);
 	}	
 
 	/**This method will process each argument and assign new variables*/
