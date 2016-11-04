@@ -1149,7 +1149,7 @@ public class DefinedRegionDifferentialSeq {
 			sb.append("sampleDistMatrix <- as.matrix( sampleDists )\n");
 			sb.append("colours = colorRampPalette( rev(brewer.pal(9, 'Blues')) )(255)\n");
 			sb.append("pdf('"+sampleClusterPlot.getCanonicalPath()+"')\n");
-			sb.append("heatmap.2( sampleDistMatrix, trace='none', col=colours)\n");
+			sb.append("heatmap.2( sampleDistMatrix, trace='none', col=colours, margins=c(7,7))\n");
 			sb.append("dev.off()\n");
 			
 			sb.append("\n#for each pairing, order and number of rows same in output as in starting count table\n");
