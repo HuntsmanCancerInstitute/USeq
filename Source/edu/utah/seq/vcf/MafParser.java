@@ -172,6 +172,7 @@ public class MafParser {
 					case 'm': forExtraction = new File(args[++i]); break;
 					case 'o': outputDir = new File(args[++i]); break;
 					case 't': tabixBinDirectory = new File(args[++i]); break;
+					case 'c': convertM2MT = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
