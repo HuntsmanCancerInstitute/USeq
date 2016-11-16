@@ -68,5 +68,6 @@
 	<classpathentry kind="lib" path="LibraryJars/jsch-0.1.53.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/minimal-json-0.9.4.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/mongo-java-driver-2.14.2.jar"/>
+	<classpathentry kind="lib" path="LibraryJars/json-20140107.jar"/>
 	<classpathentry kind="output" path="Classes"/>
 </classpath>

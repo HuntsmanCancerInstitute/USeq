@@ -4680,6 +4680,20 @@ public class Num {
 			return null;
 		}
 	}
+	
+	/**Given a String of ints delimited by something, will parse or return null.*/
+	public static int[] stringToInts(String s, Pattern pat){
+		String[] tokens = pat.split(s);
+		int[] num = new int[tokens.length];
+		try {
+			for (int i=0; i< tokens.length; i++){
+				num[i] = Integer.parseInt(tokens[i]);
+			}
+			return num;
+		} catch (Exception e){
+			return null;
+		}
+	}
 
 	/**Given a String of floats delimited by something, will parse or return null.*/
 	public static float[] stringArrayToFloat(String s, String delimiter){

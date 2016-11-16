@@ -279,6 +279,7 @@ public class QueryIndex {
 			HashSet<File>[] currIndex = null;
 			long numLoadedRecords = 0;
 			long numSkippedRecords = 0;
+			int counter = 0;
 			while ((line = in.readLine()) != null){
 				if (line.startsWith("#") == false){
 					t = Misc.TAB.split(line);
@@ -296,7 +297,11 @@ public class QueryIndex {
 					//parse start and stop, note interbase coordinates
 					int start = Integer.parseInt(t[1]);
 					int stop = Integer.parseInt(t[2]);
-
+if (++counter < 1000) System.out.println(line+" "+(stop-start) );
+else {
+	counter = 0;
+	System.out.println(line+" "+(stop-start) + " "+IO.memoryUsed());
+}
 					//add in references to source file over the covered bases, stop isn't covered.
 					for (int j= start; j< stop; j++){
 						if (currIndex[j] == null) currIndex[j] = new HashSet<File>(1);

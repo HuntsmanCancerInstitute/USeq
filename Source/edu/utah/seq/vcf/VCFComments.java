@@ -61,6 +61,11 @@ public class VCFComments {
 		return fullComments.toArray(new String[0]);
 	}
 	
+	public String getCHROMLine(){
+		for (String c: originalComments) if (c.startsWith("#CHROM")) return c;
+		return null;
+	}
+	
 	/** Get comment array, no arguments returns all info fields */
 	public String[] getComments() {
 		return getComments(infoOrder);

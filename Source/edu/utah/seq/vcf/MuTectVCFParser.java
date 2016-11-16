@@ -3,9 +3,11 @@ package edu.utah.seq.vcf;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -38,6 +40,10 @@ public class MuTectVCFParser {
 	public void parse(File vcf){
 		try {
 			VCFParser parser = new VCFParser (vcf);
+			File txt = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_pass.txt.gz");
+			
+			Gzipper out = new Gzipper(txt);
+			out.println("#CHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
 			for (VCFRecord r: parser.getVcfRecords()){			
 				VCFSample[] tumNorm = r.getSample();
 				//check depth
@@ -72,7 +78,21 @@ public class MuTectVCFParser {
 						continue;
 					}
 				}
+				//build txt output
+				ArrayList<String> al = new ArrayList<String>();
+				al.add(r.getChromosome());
+				al.add((r.getPosition()+1)+"");
+				al.add(r.getReference());
+				al.add(Misc.stringArrayToString(r.getAlternate(), ","));
+				al.add(tumRto+"");
+				al.add(tumDepth+"");
+				al.add(normRto+"");
+				al.add(normDepth+"");
+				al.add(r.getFilter());
+				al.add(r.getInfoObject().getInfoString());
+				out.println(Misc.stringArrayListToString(al, "\t"));
 			}
+			out.close();
 			printRecords(parser, vcf);
 
 		} catch (Exception e) {
@@ -163,7 +183,7 @@ public class MuTectVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               MuTect VCF Parser: Aug 2016                        **\n" +
+				"**                               MuTect VCF Parser: Nov 2016                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses MuTech2 VCF files, filtering for minimum read depth, difference in allelic\n"+
 				"ratios, and allelic fractions. Splits files into pass and fail with no modifications.\n"+

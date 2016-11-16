@@ -7,7 +7,8 @@ import trans.main.*;
 import util.bio.calc.*;
 import util.bio.parsers.MultiFastaParser;
 import util.gen.*;
-import util.intervalTree.*;
+import edu.utah.seq.its.Interval;
+import edu.utah.seq.its.IntervalTree;
 
 
 /**
@@ -676,15 +677,15 @@ public class IntersectRegions {
 	}
 	
 	private HashMap<String, IntervalTree<BindingRegion>> createIntevervalFromBindingRegion(BindingRegion[] regions) {
-		HashMap<String,ArrayList<util.intervalTree.Interval<BindingRegion>>> invLists = new HashMap<String,ArrayList<util.intervalTree.Interval<BindingRegion>>>();
+		HashMap<String,ArrayList<edu.utah.seq.its.Interval<BindingRegion>>> invLists = new HashMap<String,ArrayList<edu.utah.seq.its.Interval<BindingRegion>>>();
 		
 		//Split up binding regions by chromosome
 		for (BindingRegion br: regions) {
 			String chrom = br.getChromosome();
 			if (!invLists.containsKey(chrom)) {
-				invLists.put(chrom, new ArrayList<util.intervalTree.Interval<BindingRegion>>());
+				invLists.put(chrom, new ArrayList<edu.utah.seq.its.Interval<BindingRegion>>());
 			}
-			util.intervalTree.Interval<BindingRegion> interval = new util.intervalTree.Interval<BindingRegion>(br.getStart(), br.getEnd(), br);
+			edu.utah.seq.its.Interval<BindingRegion> interval = new edu.utah.seq.its.Interval<BindingRegion>(br.getStart(), br.getEnd(), br);
 			invLists.get(chrom).add(interval);
 		}
 		
@@ -697,7 +698,7 @@ public class IntersectRegions {
 	}
 	
 	private IntervalTree<Integer> createIntevervalFromInteger(BindingRegion[] regions) {
-		ArrayList<util.intervalTree.Interval<Integer>> invLists = new ArrayList<util.intervalTree.Interval<Integer>>();
+		ArrayList<Interval<Integer>> invLists = new ArrayList<Interval<Integer>>();
 		
 		String chrom = null;
 		//Split up binding regions by chromosome
@@ -710,7 +711,7 @@ public class IntersectRegions {
 				System.exit(1);
 			}
 		
-			util.intervalTree.Interval<Integer> interval = new util.intervalTree.Interval<Integer>(br.getStart(), br.getEnd(), i);
+			Interval<Integer> interval = new edu.utah.seq.its.Interval<Integer>(br.getStart(), br.getEnd(), i);
 			invLists.add(interval);
 		}
 		

@@ -418,4 +418,20 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		return chromosome+"_"+ pos +"_"+reference+"_"+Misc.stringArrayToString(alternate, ",");
 	}
 
+	public String getRsNumber() {
+		return rsNumber;
+	}
+
+	public void setRsNumber(String rsNumber) {
+		this.rsNumber = rsNumber;
+	}
+
+	public void appendId(String primaryName) {
+		if (rsNumber.contains(primaryName)==false) {
+			if (rsNumber.length() == 0) rsNumber = primaryName;
+			else rsNumber = rsNumber+";"+primaryName;
+		}
+		
+	}
+
 }
