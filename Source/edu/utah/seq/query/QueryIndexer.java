@@ -36,6 +36,7 @@ public class QueryIndexer {
 	private File bgzip = null;
 	private File tabix = null;
 	private int numberThreads = 0;
+	private String[] skipDirs = null;
 
 	//internal fields
 	private File[] dataFilesToParse;
@@ -97,6 +98,9 @@ public class QueryIndexer {
 			workingFilesToParse = new ArrayList<File>();
 			workingFilesToParse.addAll(chrFiles.get(workingChr));
 			
+			//remove any that belong to a skip dir
+			removeSkipDirs(workingFilesToParse);
+			
 			if (workingFilesToParse.size() == 0) return; 
 
 			//prep for new chr
@@ -136,6 +140,29 @@ public class QueryIndexer {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nFATAL error with loading "+workingChr+", aborting.");
 		}
+	}
+
+	/*Removes any files that are found in a skip dir*/
+	private void removeSkipDirs(ArrayList<File> al) {
+		try {
+			if (skipDirs != null){
+				ArrayList<File> bad = new ArrayList<File>();
+				//for each file
+				for (File f: al){
+					String conPath = f.getCanonicalPath();
+					//for each skip dir
+					for (String sd: skipDirs){
+						if (conPath.startsWith(sd)) {
+							bad.add(f);
+							break;
+						}
+					}
+				}
+				al.removeAll(bad);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		} 
 	}
 
 	/**Gets a file to parse contining records that match a particular chr. Thread safe.*/
@@ -398,6 +425,7 @@ public class QueryIndexer {
 		Pattern pat = Pattern.compile("-[a-z]");
 		String useqVersion = IO.fetchUSeqVersion();
 		File tabixBinDirectory = null;
+		skipDirs = null;
 		System.out.println("\n"+useqVersion+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -410,6 +438,7 @@ public class QueryIndexer {
 					case 'd': dataDir = new File(args[++i]); break;
 					case 'i': indexDir = new File(args[++i]); break;
 					case 'e': fileExtToIndex = Misc.COMMA.split(args[++i]); break;
+					case 's': skipDirs = Misc.COMMA.split(args[++i]); break;
 					case 'q': verbose = false; break;
 					case 't': tabixBinDirectory = new File(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
@@ -430,7 +459,8 @@ public class QueryIndexer {
 		if (dataDir == null || dataDir.isDirectory() == false) Misc.printErrAndExit("\nERROR: please provide a directory containing gzipped and tabix indexed bed, vcf, maf.txt, and bedGraph files to index." );
 		if (indexDir == null ) Misc.printErrAndExit("\nERROR: please provide a directory in which to write the master query index." );
 		indexDir.mkdirs();
-
+		
+		parseSkipDirs(skipDirs);
 		parseFileExtensions();
 		parseDataSources();
 		parseChromLengthFile();
@@ -440,6 +470,24 @@ public class QueryIndexer {
 		if (numberThreads < 1) numberThreads =  numAvail - 1;
 		System.out.println(numAvail +" available processors, using "+numberThreads+" threaded loaders");
 	}	
+
+	private void parseSkipDirs(String[] skipDirs) {
+		try {
+			if (skipDirs != null){
+				String indexDirCP = dataDir.getCanonicalPath();
+				for (int i=0; i< skipDirs.length; i++){
+					File f = new File(skipDirs[i]);
+					if (f.exists() == false) Misc.printErrAndExit("\nError: failed to find one of your skip directories? "+skipDirs[i]);
+					if (f.isDirectory() == false) Misc.printErrAndExit("\nError: is this skip directory not a directory? "+skipDirs[i]);
+					String conPath = f.getCanonicalPath();
+					if (conPath.startsWith(indexDirCP) == false) Misc.printErrAndExit("\nError: this skip directory doesn't appear to be within the data directory? "+skipDirs[i]);
+					skipDirs[i] = conPath;
+				}
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 
 	private void parseChromLengthFile() {
 		HashMap<String, RegionScoreText[]> chrLen = Bed.parseBedFile(chrNameLength, true, false);
@@ -613,12 +661,17 @@ public class QueryIndexer {
 				"\nOptional Params:\n"+
 				"-e Comma delimited list, no spaces, of file type extensions to index. Defaults to\n"+
 				"     vcf.gz,bed.gz,bedGraph.gz,maf.txt.gz\n"+
+				"-s One or more directory paths, comma delimited no spaces, to skip when building\n"+
+				"     interval trees but make available for data source record retrieval. Useful for\n"+
+				"     whole genome gVCFs and read coverage files that cover large genomic regions.\n"+
 				"-q Quiet output, no per record warnings.\n"+
 
 
-				"\nExample: java -Xmx50G -jar pathToUSeq/Apps/QueryIndexer -c b37B38Hg19ChrLen.bed \n"+
-				"     -d ~/Repo/HumanVariantFiles/ -t ~/BioApps/HTSlib/1.3/bin/ -e vcf.gz,maf.txt.gz \n"+
-				"     -i ~/Repo/QueryIndex \n\n" +
+				"\nExample for generating the test index using the GitHub Query/TestResources files see\n"+
+				"https://github.com/HuntsmanCancerInstitute/Query\n\n"+
+				"d=/pathToYourLocalGitHubInstalled/Query/TestResources\n"+
+				"java -Xmx50G -jar pathToUSeq/Apps/QueryIndexer -c $d/b37Chr20-21ChromLen.bed -d $d/Data\n"+
+				"-i $d/Index -t ~/BioApps/HTSlib/1.3/bin/ -s $d/Data/B37/GVCFs \n\n" +
 
 				"**************************************************************************************\n");
 	}
