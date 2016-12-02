@@ -41,6 +41,7 @@ public class QueryIndexer {
 	//internal fields
 	private File[] dataFilesToParse;
 	private String[] fileExtToIndex = null;
+	private HashSet<File> skippedDataSources = new HashSet<File>();
 	private String[] supportedFileExtensions = {"vcf.gz", "bed.gz", "bedGraph.gz", "maf.txt.gz"};
 	private static HashMap<String, int[]> extensionsStartStopSub = new HashMap<String, int[]>();
 	private TreeMap<String, Integer> chrLengths;
@@ -127,7 +128,6 @@ public class QueryIndexer {
 				if (c.isFailed()) throw new IOException("ERROR: File Loader issue! \n"+c);
 			}
 
-
 			//save the index for this chrom
 			saveIndex(workingChr);
 
@@ -141,6 +141,7 @@ public class QueryIndexer {
 			Misc.printErrAndExit("\nFATAL error with loading "+workingChr+", aborting.");
 		}
 	}
+
 
 	/*Removes any files that are found in a skip dir*/
 	private void removeSkipDirs(ArrayList<File> al) {
@@ -159,6 +160,7 @@ public class QueryIndexer {
 					}
 				}
 				al.removeAll(bad);
+				skippedDataSources.addAll(bad);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -458,7 +460,11 @@ public class QueryIndexer {
 		if (chrNameLength == null) Misc.printErrAndExit("\nError: please provide a bed file of chromosome and their max lengths to index. e.g. X 0 155270560\n" );
 		if (dataDir == null || dataDir.isDirectory() == false) Misc.printErrAndExit("\nERROR: please provide a directory containing gzipped and tabix indexed bed, vcf, maf.txt, and bedGraph files to index." );
 		if (indexDir == null ) Misc.printErrAndExit("\nERROR: please provide a directory in which to write the master query index." );
+		
+		//remove contents of indexDir
+		IO.deleteDirectory(indexDir);
 		indexDir.mkdirs();
+		
 		
 		parseSkipDirs(skipDirs);
 		parseFileExtensions();
@@ -550,11 +556,12 @@ public class QueryIndexer {
 
 			HashMap<String, Integer> fileStringId = new HashMap<String, Integer>();
 			HashMap<String, String> fileHeaders = new HashMap<String, String>();
+			TreeSet<String> skippedFileNames = new TreeSet<String>();
 
 			for (File f: parsedFiles){
 				String trimmedName = f.toString().substring(toSkip);
 
-				//save trmmed name : id
+				//save trmmed name : id ?
 				Integer id = fileId.get(f);
 				fileStringId.put(trimmedName, id);
 
@@ -563,14 +570,24 @@ public class QueryIndexer {
 				JSONObject jo = new JSONObject();
 				jo.put("source", trimmedName);
 				jo.put("header", header);
-				fileHeaders.put(trimmedName, jo.toString(1));				
+				fileHeaders.put(trimmedName, jo.toString(1));
+				
+				//a skipped file?
+				if (skippedDataSources.contains(f)) skippedFileNames.add(trimmedName);
 			}
 
-			//save them
-			File ids = new File(indexDir, "fileIds.obj");
-			IO.saveObject(ids, fileStringId);
+			//save the headers for all
 			File h = new File(indexDir, "fileHeaders.obj");
 			IO.saveObject(h, fileHeaders);
+			
+			//save the trunk file name : id
+			File ids = new File(indexDir, "fileIds.obj");
+			IO.saveObject(ids, fileStringId);
+			
+			//save the skipped files, might be empty
+			File skippedFiles = new File(indexDir, "skippedSources.obj");
+			IO.saveObject(skippedFiles, skippedFileNames);
+			
 
 		} catch (Exception e){
 			e.printStackTrace();
