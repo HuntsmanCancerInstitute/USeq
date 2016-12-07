@@ -20,6 +20,7 @@ import org.json.JSONObject;
 import edu.utah.seq.its.Interval1D;
 import edu.utah.seq.its.IntervalST;
 import edu.utah.seq.useq.data.RegionScoreText;
+import htsjdk.tribble.index.tabix.TabixFormat;
 import htsjdk.tribble.index.tabix.TabixIndex;
 import util.bio.annotation.Bed;
 import util.gen.IO;
@@ -40,12 +41,11 @@ public class QueryIndexer {
 
 	//internal fields
 	private File[] dataFilesToParse;
-	private String[] fileExtToIndex = null;
+	private String[] fileExtToIndex = {"vcf.gz", "bed.gz", "bedgraph.gz", "maf.txt.gz"};
 	private HashSet<File> skippedDataSources = new HashSet<File>();
-	private String[] supportedFileExtensions = {"vcf.gz", "bed.gz", "bedGraph.gz", "maf.txt.gz"};
 	private static HashMap<String, int[]> extensionsStartStopSub = new HashMap<String, int[]>();
 	private TreeMap<String, Integer> chrLengths;
-	private String[] stringHeaderPatternStarts = {"^#.+", "^browser.+", "^track.+", "^Hugo_Symbol.+"};
+	private String[] stringHeaderPatternStarts = {"^[#/<@].+", "^browser.+", "^track.+", "^color.+", "^url.+", "^Hugo_Symbol.+"};
 
 	private HashMap<String, ArrayList<File>> chrFiles = new HashMap<String, ArrayList<File>>();
 	private HashMap<File, Integer> fileId = new HashMap<File, Integer>();
@@ -167,7 +167,7 @@ public class QueryIndexer {
 		} 
 	}
 
-	/**Gets a file to parse contining records that match a particular chr. Thread safe.*/
+	/**Gets a file to parse containing records that match a particular chr. Thread safe.*/
 	synchronized File getFileToParse(){
 		if (workingFilesToParse.size() == 0) return null;
 		return workingFilesToParse.remove(0);
@@ -439,7 +439,6 @@ public class QueryIndexer {
 					case 'c': chrNameLength = new File(args[++i]); break;
 					case 'd': dataDir = new File(args[++i]); break;
 					case 'i': indexDir = new File(args[++i]); break;
-					case 'e': fileExtToIndex = Misc.COMMA.split(args[++i]); break;
 					case 's': skipDirs = Misc.COMMA.split(args[++i]); break;
 					case 'q': verbose = false; break;
 					case 't': tabixBinDirectory = new File(args[++i]); break;
@@ -465,9 +464,8 @@ public class QueryIndexer {
 		IO.deleteDirectory(indexDir);
 		indexDir.mkdirs();
 		
-		
 		parseSkipDirs(skipDirs);
-		parseFileExtensions();
+		setKnownFileTypeSSS();
 		parseDataSources();
 		parseChromLengthFile();
 
@@ -516,29 +514,42 @@ public class QueryIndexer {
 
 	/*Methods to modify with hard coded file extensions*/
 
-	private void parseFileExtensions() {
-		if (fileExtToIndex == null) fileExtToIndex = supportedFileExtensions;
-		else {
-			HashSet<String> ok = new HashSet<String>();
-			for (String e : supportedFileExtensions) ok.add(e);
-			for (String t: fileExtToIndex){
-				if (ok.contains(t) == false) Misc.printErrAndExit("\nError: one or more of your requested data source extensions isn't supported, choose from these "+ok+"\n");
-			}
-		}
+	private void setKnownFileTypeSSS() {
 		//0 index start stop column info for "bed.gz", "bedGraph.gz", "maf.txt.gz"
 		//the last is the number to subtract from the start to convert to interbase
 		//note vcf.gz is it's own beast and handled separately
 		extensionsStartStopSub.put("bed.gz", new int[]{1,2,0});
-		extensionsStartStopSub.put("bedGraph.gz", new int[]{1,2,0});
+		extensionsStartStopSub.put("bedgraph.gz", new int[]{1,2,0});
 		extensionsStartStopSub.put("maf.txt.gz", new int[]{5,6,1});
 	}
-
-	public int[] getSSS(File f) {
-		String name = f.getName();
-		if (name.endsWith(".bed.gz")) return extensionsStartStopSub.get("bed.gz");
-		if (name.endsWith(".maf.txt.gz")) return extensionsStartStopSub.get("maf.txt.gz");
-		if (name.endsWith(".bedGraph.gz")) return extensionsStartStopSub.get("bedGraph.gz");
-		return null;
+	synchronized int[] getSSS(File f) {
+		int[] startStopSubtract = null;
+		try {
+			//pull known
+			String name = f.getName().toLowerCase();
+			if (name.endsWith(".bed.gz")) startStopSubtract = extensionsStartStopSub.get("bed.gz");
+			else if (name.endsWith(".maf.txt.gz")) startStopSubtract =  extensionsStartStopSub.get("maf.txt.gz");
+			else if (name.endsWith(".bedgraph.gz")) startStopSubtract =  extensionsStartStopSub.get("bedgraph.gz");
+			
+			//pull from tbi
+			//I'm suspicious of the flags field so the subtract may be wrong.  Best to manually set for each file type.
+			else {
+				File index = new File (f.getCanonicalPath()+".tbi");
+				TabixIndex ti = new TabixIndex(index);
+				TabixFormat tf = ti.getFormatSpec();
+				int startIndex = tf.startPositionColumn- 1;
+				int stopIndex = tf.endPositionColumn- 1;
+				int sub = 1;
+				if (tf.flags == 65536) sub = 0;
+				startStopSubtract = new int[]{startIndex, stopIndex, sub};
+				//System.out.println("New data type! ");
+				//Misc.printArray(startStopSubtract);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+			Misc.printErrAndExit("Error loading tbi index, aborting.");
+		}
+		return startStopSubtract;
 	}
 
 	private void saveFileHeadersAndIds(){
@@ -618,22 +629,62 @@ public class QueryIndexer {
 		in.close();
 		return header;
 	}
-
+	
 	private void parseDataSources(){
-		System.out.println("Searching for tabix data sources...");
+		try {
+			System.out.println("Searching for tabix indexes and bgzipped data sources...");
+			ArrayList<File> goodDataSources = new ArrayList<File>();
+			ArrayList<File> tbiMissingDataSources = new ArrayList<File>();
+			ArrayList<File> unrecognizedDataSource = new ArrayList<File>();
 
-		File[][] toCombine = new File[fileExtToIndex.length][];
-		for (int i=0; i< fileExtToIndex.length; i++) toCombine[i] = IO.fetchFilesRecursively(dataDir, fileExtToIndex[i]);
+			//find .tbi files and check
+			File[] tbis = IO.fetchFilesRecursively(dataDir, ".gz.tbi");
+			for (File tbi: tbis){
+				String path = tbi.getCanonicalPath();
 
-		dataFilesToParse = IO.collapseFileArray(toCombine);
-		int numFiles = dataFilesToParse.length;
+				//look for data file
+				File df = new File(path.substring(0, path.length()-4));
+				if (df.exists() == false){
+					tbiMissingDataSources.add(tbi);
+					continue;
+				}
+				
+				//is it a known type
+				boolean recognized = false;
+				for (String knownExt: fileExtToIndex){
+					if (df.getName().toLowerCase().endsWith(knownExt)){
+						recognized = true;
+						break;
+					}
+				}
+				if (recognized) goodDataSources.add(df); 
+				else unrecognizedDataSource.add(df);
+			}
 
-		dataFilesToParse = returnFilesWithTabix(dataFilesToParse);
-		int numFilesWithIndex = dataFilesToParse.length;
+			int numFiles = goodDataSources.size() + unrecognizedDataSource.size();
 
-		if (numFilesWithIndex == 0) Misc.printErrAndExit("\nERROR: failed to find any data sources with xxx.tbi indexes in your dataDir?!\n");
-		System.out.println("\t"+numFiles+" Data sources ("+ Misc.stringArrayToString(fileExtToIndex, ", ")+")");
-		System.out.println("\t"+numFilesWithIndex+" Data sources with xxx.tbi indexes");
+			//print messages
+			if (numFiles == 0) Misc.printErrAndExit("\nERROR: failed to find any data sources with xxx.tbi indexes in your dataDir?!\n");
+			System.out.println("\t"+goodDataSources.size()+" Data sources with known formats ("+ Misc.stringArrayToString(fileExtToIndex, ", ")+")");
+			if (tbiMissingDataSources.size() !=0){
+				System.out.println("\t"+tbiMissingDataSources.size()+" WARNING: The data source file(s) for the following tbi index(s) could not be found, skipping:");
+				for (File f: tbiMissingDataSources) System.out.println("\t\t"+f.getCanonicalPath());
+			}
+			if (unrecognizedDataSource.size() !=0){
+				System.out.println("\t"+unrecognizedDataSource.size()+" WARNING: Data sources with unknown format(s). The format of the "
+						+ "following files will be set using info from the tabix index and may be incorrect. Contact bioinformaticscore@utah.edu to add.");
+				for (File f: unrecognizedDataSource) System.out.println("\t\t"+f.getCanonicalPath());
+			}
+			
+			//make final set
+			goodDataSources.addAll(unrecognizedDataSource);
+			dataFilesToParse = new File[goodDataSources.size()];
+			goodDataSources.toArray(dataFilesToParse);
+			
+		} catch (IOException e){
+			e.printStackTrace();
+			Misc.printErrAndExit("\nError examining data source files. \n");
+		}
 	}
 
 	public static File[] returnFilesWithTabix(File[] tabixFiles) {
@@ -676,8 +727,6 @@ public class QueryIndexer {
 				"-i A directory in which to save the index files\n"+
 
 				"\nOptional Params:\n"+
-				"-e Comma delimited list, no spaces, of file type extensions to index. Defaults to\n"+
-				"     vcf.gz,bed.gz,bedGraph.gz,maf.txt.gz\n"+
 				"-s One or more directory paths, comma delimited no spaces, to skip when building\n"+
 				"     interval trees but make available for data source record retrieval. Useful for\n"+
 				"     whole genome gVCFs and read coverage files that cover large genomic regions.\n"+

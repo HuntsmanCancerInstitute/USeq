@@ -40,8 +40,8 @@ public class QueryIndexFileLoader implements Runnable {
 				reader = new TabixReader(sourceFile.toString());
 				TabixReader.Iterator it = reader.query(chrom);
 
-				//what's the file type
-				boolean vcf = sourceFile.getName().endsWith(".vcf.gz");
+				//is it a vcf?
+				boolean vcf = sourceFile.getName().toLowerCase().endsWith(".vcf.gz");
 				int[] startStopSubtract = null;
 				if (vcf == false) startStopSubtract = queryIndexer.getSSS(sourceFile);
 
