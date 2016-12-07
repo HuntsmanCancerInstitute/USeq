@@ -1419,7 +1419,7 @@ public class DefinedRegionDifferentialSeq {
 				{"Max "+app+" AdjPval", "Maximum observed AdjP between any pairwise comparisons.  Note the MaxAbsLg2Rto and Max"+app+"AdjP may be from different comparisons. Column may be present."},
 				{"Max "+app+" -10Lg10(AdjPval)", "Maximum observed -10Log10(AdjP) between any pairwise comparisons.  Note the MaxAbsLg2Rto and Max"+app+"AdjP may be from different comparisons."},
 				{"","All p-values and AdjPs in USeq output, both printed and in graph form have been phred transformed where the value is actually -10*Log10(AdjP or pval)."},
-				{"","Thus -10*Log10(0.001) = 30, -10*Log10(0.01) = 20, -10*Log10(0.05) = 13, and -10*Log10(0.1) = 10. "},
+				{"","Thus -10*Log10(0.001) = 30, -10*Log10(0.01) = 20, -10*Log10(0.05) = 13, and -10*Log10(0.1) = 10. To convert back in Excel, =10^(A1/-10) replace A1 with the phred containing cell."},
 				{"", ""},
 				{"For each Paired Comparison:", null},
 				{"Lg2Rto", app+"'s log2 ratio for differential expression."},

@@ -190,7 +190,7 @@ public class QueryIndexer {
 				TabixIndex ti = new TabixIndex(i);
 				//for each chromosome
 				for (String chr: chrLengths.keySet()){
-					if (ti.containsChromosome(chr)) chrFiles.get(chr).add(f);
+					if (ti.containsChromosome(chr) || ti.containsChromosome("chr"+chr)) chrFiles.get(chr).add(f);
 				}
 			}
 		} catch (IOException e) {

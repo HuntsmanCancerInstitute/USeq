@@ -13,6 +13,7 @@ public class QueryIndexFileLoader implements Runnable {
 	private boolean failed = false;
 	private QueryIndexer queryIndexer;
 	private String chrom;
+	private TabixReader reader = null;
 	private long numPassed = 0;
 	private long numFailed = 0;
 	private File sourceFile = null;
@@ -29,7 +30,6 @@ public class QueryIndexFileLoader implements Runnable {
 	}
 	
 	public void run() {	
-		TabixReader reader = null;
 		try {
 			//get next file to parse
 			while ((sourceFile = queryIndexer.getFileToParse()) != null){ 
@@ -38,7 +38,11 @@ public class QueryIndexFileLoader implements Runnable {
 				
 				//fetch a reader and iterator on the entire chr
 				reader = new TabixReader(sourceFile.toString());
-				TabixReader.Iterator it = reader.query(chrom);
+				TabixReader.Iterator it = fetchIterator(chrom);
+				if (it == null) {
+					reader.close();
+					continue;
+				}
 
 				//is it a vcf?
 				boolean vcf = sourceFile.getName().toLowerCase().endsWith(".vcf.gz");
@@ -87,6 +91,23 @@ public class QueryIndexFileLoader implements Runnable {
 		} finally {
 			if (reader != null) reader.close();
 		}
+	}
+	
+	/**Use to try to fetch an iterator without then with chr prepended to the coordinates.*/
+	private TabixReader.Iterator fetchIterator(String coor){
+		TabixReader.Iterator it = fetchInteratorOnCoordinates(coor);
+		//null? try with chr
+		if (it == null) it = fetchInteratorOnCoordinates("chr"+coor);
+		return it;
+	}
+	
+	private TabixReader.Iterator fetchInteratorOnCoordinates(String coordinates) {
+		TabixReader.Iterator it = null;
+		//watch out for no retrieved data error from tabix
+		try {
+			it = reader.query(coordinates);
+		} catch (ArrayIndexOutOfBoundsException e){}
+		return it;
 	}
 
 	private static int[] parseStartStopBpCoorVcf(String vcfRecord, boolean verbose) {
