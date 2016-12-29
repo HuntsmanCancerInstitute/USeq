@@ -1,4 +1,4 @@
-package edu.utah.seq.parsers;
+package edu.utah.seq.parsers.mpileup;
 
 import java.io.*;
 import java.util.ArrayList;

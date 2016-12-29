@@ -4,9 +4,6 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import trans.anno.GenomicRegion;
-import util.bio.parsers.MultiFastaParser;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;

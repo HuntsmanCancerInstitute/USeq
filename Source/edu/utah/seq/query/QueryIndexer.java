@@ -704,24 +704,28 @@ public class QueryIndexer {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Query Indexer: Nov 2016                           **\n" +
+				"**                                Query Indexer: Dec 2016                           **\n" +
 				"**************************************************************************************\n" +
-				"Builds index files for Query by recursing through a data directory looking for vcf,\n"+
-				"maf, bed, and bedGraph files that have been bgzip compressed and tabix indexed.\n"+
-				"Interval trees are build containing regions that overlap with one or more data sources.\n"+
+				"Builds index files for Query by recursing through a data directory looking for bgzip\n"+
+				"compressed and tabix indexed genomic data files (e.g. vcf, bed, maf, and custom).\n"+
+				"Interval trees are built containing regions that overlap with one or more data sources.\n"+
 				"These are used by the Query REST service to rapidly identify which data files contain\n"+
-				"records that overlap each users query. This app typically needs >20G RAM to run.\n"+
+				"records that overlap user's ROI. This app is threaded for simultanious file loading\n"+
+				"and requires >30G RAM to run on large data collections so use a big analysis server.\n"+
+				"Note, relative file paths are saved. So long as the structure of the Data Directory is\n"+
+				"preserved, the QueryIndexer and Query REST service don't need to run on the same file\n"+
+				"system.\n"+
 
 
 				"\nRequired Params:\n"+
-				"-c A bed file of chromosomes and their lengths (e.g. 21 0 48129895) to use to \n"+
+				"-c A bed file of chromosomes and their lengths (e.g. chr21 0 48129895) to use to \n"+
 				"     building the intersection index. Exclude those you don't want to index. For\n"+
 				"     multiple builds and species, add all, duplicates will be collapsed taking the\n"+
 				"     maximum length. Any 'chr' prefixes are ignored when indexing and searching.\n"+
-				"-d A data directory containing gzipped tabixed xxx.vcf.gz, xxx.bed.gz, xxx.bedGraph.gz,\n"+
-				"     and xxx.maf.txt.gz files. Recurses through all sub directories. Except for gVCF,\n"+
-				"     Be sure to normalize and decompose_blocksub all VCF records, see \n"+
-				"     http://genome.sph.umich.edu/wiki/Vt\n"+
+				"-d A data directory containing bgzipped and tabix indexed data files. Known file types\n"+
+				"     include xxx.vcf.gz, xxx.bed.gz, xxx.bedGraph.gz, and xxx.maf.txt.gz. Others will\n"+
+				"     be parsed using info from the xxx.gz.tbi index. Be sure to normalize and\n"+
+				"     decompose_blocksub all VCF records, see http://genome.sph.umich.edu/wiki/Vt\n"+
 				"-t Full path directory containing the compiled bgzip and tabix executables. See\n" +
 				"     https://github.com/samtools/htslib\n"+
 				"-i A directory in which to save the index files\n"+
@@ -735,8 +739,9 @@ public class QueryIndexer {
 
 				"\nExample for generating the test index using the GitHub Query/TestResources files see\n"+
 				"https://github.com/HuntsmanCancerInstitute/Query\n\n"+
+				
 				"d=/pathToYourLocalGitHubInstalled/Query/TestResources\n"+
-				"java -Xmx50G -jar pathToUSeq/Apps/QueryIndexer -c $d/b37Chr20-21ChromLen.bed -d $d/Data\n"+
+				"java -Xmx10G -jar pathToUSeq/Apps/QueryIndexer -c $d/b37Chr20-21ChromLen.bed -d $d/Data\n"+
 				"-i $d/Index -t ~/BioApps/HTSlib/1.3/bin/ -s $d/Data/B37/GVCFs \n\n" +
 
 				"**************************************************************************************\n");

@@ -25,39 +25,50 @@ public class VCFConsensus {
 	private File secondaryVcf;
 	private String primaryName;
 	private String secondaryName;
-	private VCFParser vcf1;
-	private VCFParser vcf2;
+	private int primaryNameIndex = 0;
+	private int secondaryNameIndex = 0;
+	private VCFParser primaryVcfParser;
+	private VCFParser secondaryVcfParser;
 	private Gzipper out;
 	private File mergedVcfFile;
+	private int numInCommon = 0;
 
 	public VCFConsensus(String[] args){
 		try {	
 			processArgs(args);
 
 			System.out.println("Loading vcf files...");
-			vcf1 = new VCFParser(primaryVcf, true, false, false);
-			vcf2 = new VCFParser(secondaryVcf, true, false, false);
+			primaryVcfParser = new VCFParser(primaryVcf, true, false, false);
+			secondaryVcfParser = new VCFParser(secondaryVcf, true, false, false);
 			
 			System.out.println("Merging headers...");
-			String[] mergedHeader = VCFParser.mergeHeaders(new VCFParser[]{vcf1, vcf2});
+			String[] mergedHeader = VCFParser.mergeHeaders(new VCFParser[]{primaryVcfParser, secondaryVcfParser});
 			if (mergedHeader == null) Misc.printErrAndExit("\nError: hmm something is wrong when merging headers, are the #CHROM lines different?\n");
 			
 			//create a hash of chromPosRefAlt
 			HashMap<String, VCFRecord> secondaryRecords = new HashMap<String, VCFRecord>();
-			for (VCFRecord r : vcf2.getVcfRecords()) {
-				r.appendId(secondaryName);
+			for (VCFRecord r : secondaryVcfParser.getVcfRecords()) {
+				if (secondaryName!=null) r.setRsNumber(secondaryName+ "_"+ (secondaryNameIndex++));
 				secondaryRecords.put(r.getChrPosRefAlt(false), r);
 			}
 			
 			//for each primary record
 			System.out.println("Combining records...");
 			ArrayList<VCFRecord> toPrint = new ArrayList<VCFRecord>();
-			for (VCFRecord r : vcf1.getVcfRecords()){
-				r.appendId(primaryName);
+			for (VCFRecord r : primaryVcfParser.getVcfRecords()){
+				if (primaryName!= null) r.setRsNumber(primaryName+ "_"+ (primaryNameIndex++));
 				String prim = r.getChrPosRefAlt(false);
 				if (secondaryRecords.containsKey(prim)){
+					String sec = secondaryRecords.get(prim).getRsNumber();
+					if (sec == null || sec.length()==0){
+						if (secondaryName == null) Misc.printErrAndExit("\nA secondary record was found with no ID info. Please provide a secondaryName to append to the merged output, see "+secondaryRecords.get(prim).getOriginalRecord());
+					}
+					//does the primary have a name?
+					if (r.getRsNumber() == null || r.getRsNumber().length() == 0) Misc.printErrAndExit("\nA primary record was found with no ID info. Please provide a primaryName to append to the merged output, see "+r.getOriginalRecord());
+					//add the secondary id to the primary
+					r.appendId(sec);
 					secondaryRecords.remove(prim);
-					r.appendId(secondaryName);
+					numInCommon++;
 				}
 				toPrint.add(r);
 			}
@@ -86,9 +97,10 @@ public class VCFConsensus {
 			out.close();
 			
 			//print stats
-			System.out.println(vcf1.getVcfRecords().length+"\tRecords in primary "+primaryVcf.getName());
-			System.out.println(vcf2.getVcfRecords().length+"\tRecords in secondary "+secondaryVcf.getName());
-			System.out.println(vcf2.getVcfRecords().length+"\tRecords in merge "+mergedVcfFile.getName());
+			System.out.println(primaryVcfParser.getVcfRecords().length+"\tRecords in primary "+primaryVcf.getName());
+			System.out.println(secondaryVcfParser.getVcfRecords().length+"\tRecords in secondary "+secondaryVcf.getName());
+			System.out.println(numInCommon+"\tRecords in common");
+			System.out.println(mergedRecords.length+"\tRecords in merge "+mergedVcfFile.getName());
 			
 
 		} catch (Exception e) {
@@ -101,7 +113,7 @@ public class VCFConsensus {
 			printDocs();
 			System.exit(0);
 		}
-		new VCFMerger(args);
+		new VCFConsensus(args);
 	}		
 
 
@@ -109,7 +121,6 @@ public class VCFConsensus {
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
-		File forExtraction = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -117,8 +128,11 @@ public class VCFConsensus {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'v': forExtraction = new File(args[++i]); break;
+					case 'p': primaryVcf = new File(args[++i]); break;
+					case 's': secondaryVcf = new File(args[++i]); break;
 					case 'o': mergedVcfFile = new File(args[++i]); break;
+					case 'q': primaryName = args[++i]; break;
+					case 't': secondaryName = args[++i]; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -129,42 +143,39 @@ public class VCFConsensus {
 			}
 		}
 		
-		/*here
-		
 		//pull files
-		if (forExtraction == null || forExtraction.canRead() == false) Misc.printExit("\nError: please indicate a vcf file to filter.\n");
-		File[][] tot = new File[3][];
-		tot[0] = IO.extractFiles(forExtraction,".vcf");
-		tot[1] = IO.extractFiles(forExtraction,".vcf.gz");
-		tot[2] = IO.extractFiles(forExtraction,".vcf.zip");
-		vcfFiles = IO.collapseFileArray(tot);
-		if (vcfFiles == null || vcfFiles.length ==0 || vcfFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.vcf(.zip/.gz) file(s)!\n");
-
+		if (primaryVcf == null || secondaryVcf == null) Misc.printExit("\nError: please provide both a primary and secondary vcf file to merge.\n");
+		
 		//final file
-		if (mergedVcfFile == null) mergedVcfFile = new File (vcfFiles[0].getParentFile(), "merged.vcf.gz");
-		*/
+		if (mergedVcfFile == null) Misc.printExit("\nError: please provide a file name to write the merged vcf records.\n");
+				
 	}	
-
-
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Consensus : Nov 2016                            **\n" +
+				"**                              VCF Consensus : Dec 2016                            **\n" +
 				"**************************************************************************************\n" +
-				"Merges VCF files with the same samples. Collapses the headers with a simple hash. Will\n"+
-				"not work well with downstream apps that cannot process mixed INFO and FORMAT records.\n" +
+				"Merges VCF files with the same #CHROM line. Primary records with the same chrPosRefAlt\n"+
+				"as a secondary are saved after appending the ID of the secondary, the secondary\n"+
+				"is dropped. Headers are joined keeping the primary header line when the same. Run\n" +
+				"iteratively with multiple VCF files you'd like to merge.  Good for combining multiple\n"+
+				"variant callers run on the same sample. The ID field lists which callers found each\n"+
+				"variant.\n"+
 
 				"\nRequired:\n"+
-				"-v Full path to a vcf file (xxx.vcf(.gz/.zip OK)) or directory containing such. Note,\n"+
-				"       Java often fails to parse tabix compressed vcf files.  Best to uncompress.\n\n"+
+				"-p Path to a primary vcf file (xxx.vcf(.gz/.zip OK)) to merge.\n"+
+				"-s Path to a secondary vcf file (xxx.vcf(.gz/.zip OK)) to merge.\n"+
+				"-o Path to an output xxx.vcf.gz file.\n" +
 								
-				"Optional:\n" +
-				"-o Full path to an output vcf file, defaults to merged.vcf.gz in parent -v dir.\n" +
+				"\nOptional:\n" +
+				"-q Primary name to replace the ID column.\n" +
+				"-t Secondary name to replace the ID column.\n" +
 
 				"\n"+
 
-				"Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFMerger -v /CancerSamples/\n\n"+
+				"Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFConsensus -p illumina.vcf -q Strelka\n"+
+				"-s stnd.indel.vcf.gz -t Scalpel -o indelCalls.vcf.gz \n\n"+
 
 		"**************************************************************************************\n");
 
