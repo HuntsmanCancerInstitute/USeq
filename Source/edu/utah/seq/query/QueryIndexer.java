@@ -742,7 +742,7 @@ public class QueryIndexer {
 				
 				"d=/pathToYourLocalGitHubInstalled/Query/TestResources\n"+
 				"java -Xmx10G -jar pathToUSeq/Apps/QueryIndexer -c $d/b37Chr20-21ChromLen.bed -d $d/Data\n"+
-				"-i $d/Index -t ~/BioApps/HTSlib/1.3/bin/ -s $d/Data/B37/GVCFs \n\n" +
+				"-i $d/Index -t ~/BioApps/HTSlib/1.3/bin/ -s $d/Data/Public/B37/GVCFs \n\n" +
 
 				"**************************************************************************************\n");
 	}
