@@ -1,4 +1,4 @@
-package edu.utah.tomato.daemon;
+package edu.utah.pysano.daemon;
 
 import java.io.BufferedReader;
 import java.io.File;
@@ -8,14 +8,22 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.Properties;
 import java.util.concurrent.Callable;
 import java.util.regex.Pattern;
 
-import edu.utah.tomato.util.TFLogger;
+import javax.mail.Message;
+import javax.mail.MessagingException;
+import javax.mail.Session;
+import javax.mail.Transport;
+import javax.mail.internet.InternetAddress;
+import javax.mail.internet.MimeMessage;
 
-public class TFThread implements Callable<Boolean> {
+import edu.utah.pysano.utils.Logger;
+
+public class CThread implements Callable<Boolean> {
 		private File logFile = null;
-		private TFLogger tfLogger = null;
+		private Logger tfLogger = null;
 		private File startFile = null;
 		private File errorFile = null;
 		private File stdoutFile = null;
@@ -30,18 +38,14 @@ public class TFThread implements Callable<Boolean> {
 		private File directory = null;
 		private ArrayList<File> keepers = null;
 		private ArrayList<File> deleteEarly = null;
-		private boolean deleted = false;
+		private String email = "";
 		
 		public static void setFailCount(int fc) {
 			failCount = fc;
 		}
 		
-		public TFThread(File directory, int failMax, int threadnumber, int heartbeat, ArrayList<File> keepers, ArrayList<File> deleteEarly, TFLogger tfLogger) {
-			this(directory,failMax,threadnumber,heartbeat,keepers,tfLogger);
-			this.deleteEarly = deleteEarly;
-		}
 		
-		public TFThread(File directory, int failMax, int threadnumber, int heartbeat, ArrayList<File> keepers, TFLogger tfLogger) {
+		public CThread(File directory, int failMax, int threadnumber, int heartbeat, ArrayList<File> keepers, Logger tfLogger, String email) {
 			//this.logFile = new File(directory,"log.txt");
 			this.tmpFailFile = new File(directory,"tmp.fail");
 			this.errorFile = new File(directory,"stderr.txt");
@@ -62,6 +66,7 @@ public class TFThread implements Callable<Boolean> {
 			this.tfLogger = tfLogger;
 			this.keepers.add(this.running);
 			this.keepers.add(this.endFile);
+			this.email = email;
 		}
 		
 		private void writeErrorMessage(String message, boolean internal) {
@@ -77,6 +82,7 @@ public class TFThread implements Callable<Boolean> {
 		
 		public void cleanDirectory() {
 			this.writeInfoMessage("Cleaning directory.");
+			
 			File[] fileList = this.directory.listFiles();
 			for (File file: fileList) {
 				if (!file.isDirectory() && !this.keepers.contains(file)) {
@@ -157,7 +163,7 @@ public class TFThread implements Callable<Boolean> {
 						Process p = Runtime.getRuntime().exec("touch " + startFile.toString());
 						p.waitFor();
 					} catch (IOException ioex) {
-						this.writeErrorMessage("Could not send tomato start signal.",true);
+						this.writeErrorMessage("Could not send pysano start signal.",true);
 						analysisFailed = true;
 						break;
 					} catch (InterruptedException iex2) {
@@ -199,12 +205,12 @@ public class TFThread implements Callable<Boolean> {
 								
 								//if (Pattern.matches(".+?Job failed.*", lastLine)) {
 								if (Pattern.matches("failure", lastLine)) {
-									this.writeInfoMessage("Tomato job finished with errors");
+									this.writeInfoMessage("Pysano job finished with errors");
 									tomatoFailed = true;
 								} 
 								//else if (Pattern.matches(".+?Job completed successfully.*", lastLine)) {
 								else if (Pattern.matches("success", lastLine)) {
-									this.writeInfoMessage("Tomato job finished correctly");
+									this.writeInfoMessage("Pysano job finished correctly");
 									analysisFinished = true;
 								} else {
 									this.writeWarningMessage("Don't recognize the final line of the log file, assuming failed and resubmitting");
@@ -214,10 +220,10 @@ public class TFThread implements Callable<Boolean> {
 						} else if (this.tmpFailFile.exists() && !running.exists()) {
 							foundStderr = true;
 							tomatoFailed = true;
-							this.writeInfoMessage("Tomato job finished with errors (tmp.fail found)");
+							this.writeInfoMessage("Pysano job finished with errors (tmp.fail found)");
 						} else if (!running.exists() && !logFile.exists() && !errorFile.exists() && !startFile.exists() && !endFile.exists() && foundR) {
 							foundStderr = true;
-							this.writeInfoMessage("Tomato job directory has no control or output files, resubmitting job");
+							this.writeInfoMessage("Pysano job directory has no control or output files, resubmitting job");
 						}
 						
 						if (running.exists()) {
@@ -266,15 +272,26 @@ public class TFThread implements Callable<Boolean> {
 						if (tomatoFailed) {
 							failCount += 1;
 							if (failCount > this.failMax) {
-								this.writeErrorMessage("Too many tomato run failures, killing all jobs and exiting", false);
+								this.writeErrorMessage("Too many Pysano run failures, killing all jobs and exiting", false);
 								analysisFinished = true;
 								analysisFailed = true;
-							} else if (this.deleted) {
-								this.writeErrorMessage("Some necessary files were deleted to save space, and the job can't be resubmitted. "
-										+ "(I know this is a dumb-sounding error, but it was done to save space, sorry.",true);
-								analysisFailed = true;
-							} else {
-								this.writeInfoMessage("Resubmitting tomato job.  Resubmission " + failCount + " of " + this.failMax);
+							} 
+//							else if (this.deleted) {
+//								this.writeErrorMessage("Some necessary files were deleted to save space, and the job can't be resubmitted. "
+//										+ "(I know this is a dumb-sounding error, but it was done to save space, sorry.",true);
+//								analysisFailed = true;
+//							} 
+							else {
+								this.writeInfoMessage("Resubmitting Pysano job.  Resubmission " + failCount + " of " + this.failMax);
+								String message = "TF detected a command failure. The command will be re-submitted to pysano, but it might be worth checking the logs to determine the cause of the error.  There are " + (failMax - failCount) + " re-submits remaining of " + failMax + ".";
+								try {
+									CThread.postMail(email, "TF Command Failure", message);
+								} catch (MessagingException e) {
+									tfLogger.writeErrorMessage("[CThread] Failed to send ending email", true);
+									e.printStackTrace();
+								}
+								
+								
 
 							}
 						} 
@@ -286,7 +303,7 @@ public class TFThread implements Callable<Boolean> {
 					Process p = Runtime.getRuntime().exec("touch " + endFile.getAbsolutePath());
 					p.waitFor();
 				} catch (IOException ioex) {
-					this.writeErrorMessage("Could not send tomato termination signal, please kill the jobs yourself",true);
+					this.writeErrorMessage("Could not send Pysano termination signal, please kill the jobs yourself",true);
 				} catch (InterruptedException iex2) {
 					this.writeErrorMessage("Termination signal interrupted, please kill jobs yourself",true);
 				}
@@ -306,5 +323,29 @@ public class TFThread implements Callable<Boolean> {
 			
 			return analysisFailed;
 		}
+		
+		public static void postMail(String recipients, String subject, String message) throws MessagingException {
+
+			//set the host smtp address
+			Properties props = new Properties();
+			props.put("mail.smtp.host", "hci-mail.hci.utah.edu");
+
+			//create some properties and get the default Session
+			Session session = Session.getDefaultInstance(props, null);
+
+			//create message
+			Message msg = new MimeMessage(session);
+
+			//set the from and to address
+			InternetAddress addressFrom = new InternetAddress("noreply@hci.utah.edu");
+			msg.setFrom(addressFrom);
+			msg.setRecipients(Message.RecipientType.TO, InternetAddress.parse(recipients, false));
+
+			//setting the Subject and Content type
+			msg.setSubject(subject);
+			msg.setContent(message, "text/plain");
+			Transport.send(msg);
+		}
 
 }
+

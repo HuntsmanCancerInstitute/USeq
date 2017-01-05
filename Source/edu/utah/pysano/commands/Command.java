@@ -1,4 +1,4 @@
-package edu.utah.tomato.model;
+package edu.utah.pysano.commands;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -6,7 +6,6 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -15,333 +14,378 @@ import java.io.InputStreamReader;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 
-import edu.utah.tomato.daemon.TFThreadDaemon;
-import edu.utah.tomato.model.command.TFCommandExomeAlignUgp;
-import edu.utah.tomato.model.command.TFCommandExomeMetrics;
-import edu.utah.tomato.model.command.TFCommandExomeVariant;
-import edu.utah.tomato.util.TFConstants;
-import edu.utah.tomato.util.TFLogger;
+import edu.utah.pysano.utils.Logger;
+import edu.utah.pysano.daemon.CThread;
 
 
-public abstract class TFCommand {
-	//Type of command
-	protected String commandString = null;
-	protected String commandType = null;
-	
-	//Directory locations
-	protected ArrayList<File> templateFiles = null;
-	protected File rootDirectory = null;
-	
-	//Log file
-	protected TFLogger logFile = null;
+public class Command {
+	//File paths
+	private File jobDirectory;
+	private File finalDirectory;
+	private File projectDirectory;
+	private ArrayList<File> finalDirectoryList = new ArrayList<File>();
 
-	//task list
-	protected List<Callable<Boolean>> taskList = new ArrayList<Callable<Boolean>>();
+	private ArrayList<File> inputFiles = new ArrayList<File>();
+	private ArrayList<File> externalFiles = new ArrayList<File>();
+	private ArrayList<File> outputFiles = new ArrayList<File>();
+	private ArrayList<File> protectList = new ArrayList<File>();
+	private ArrayList<File> deleteList = new ArrayList<File>();
+	private ArrayList<File> skipList = new ArrayList<File>(); //List of files that no longer need to be checked for output
+	private HashMap<File,ArrayList<File>> conditionalSkipList = new HashMap<File,ArrayList<File>>(); //if key file is found, no longer check for the files contained in the arrayList
 	
-	//cmd file options
-	protected Integer wallTime = 0;
-	protected String email = null;
-	protected boolean suppress = false;
-	protected boolean isFull = false;
-	protected Integer jobs= null;
-	protected String cluster = null;
+	private ArrayList<String> templateStringList = new ArrayList<String>();
 	
-	//Tomato thread options
-	protected Integer heartbeat = null;
-	protected Integer failmax = null;
+	private HashMap<String,String> globalProperties = new HashMap<String,String>();
+	private ArrayList<HashMap<String,String>> localProperties = new ArrayList<HashMap<String,String>>();
 	
-	//Thread daemon
-	protected TFThreadDaemon daemon = null;
+	//Command options
+	private String cluster;
+	private String email;
+	private Integer wallTime;
+	private boolean suppress;
 
-	//Variables
-	protected HashMap<String,String> properties = null;
+	//SampleInfo
+	private String sampleName = "NA";
+	private String sampleID = "NA";
 	
-	//Job directories
-	protected File finalDirectory = null;
-	protected File jobDirectory = null;
 	
-	public static TFCommand getCommandObject(File rootDirectory, String commandLine, TFLogger logFile, 
-			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress,
-			boolean deleteMetricsBams, boolean deleteReducedBams, boolean isFull, boolean use1KGenomes, boolean validateFastq, String study,  
-			File targetFile, HashMap<String,String> properties, String cluster) {
-		
-		//Validate template file
-		File templateDir = new File(properties.get("TEMPLATE_PATH"));
-		String[] commandParts = commandLine.split(":");
-		if (commandParts.length < 2) {
-			logFile.writeErrorMessage("[TFCommand] Must be at least two parts for every command", true);
-			System.exit(1);
-		}
-		
-		
-		ArrayList<File> templateFiles = new ArrayList<File>();
-		
-		//Add template files to list
-		File depFile = new File(templateDir,"templates/" + commandParts[0] + "/steps." + commandParts[1] + ".txt");
-		if (depFile.exists()) {
-			logFile.writeInfoMessage("[TFCommand] " + commandLine + " has the following pysano steps: ");
-			try {
-				BufferedReader br = new BufferedReader(new FileReader(depFile));
-				String line = "";
-				while ((line = br.readLine()) != null) {
-					File extraFile = new File(templateDir,"templates/" + commandParts[0] + "/" + line);
-					if (!extraFile.exists()) {
-						logFile.writeErrorMessage("[TFCommand] Configuration file invalid, specified template file doesn not exist: " + extraFile.toString(),false);
-						System.exit(1);
-					}
-					logFile.writeInfoMessage("[TFCommand] \t" + extraFile.getName());
-					templateFiles.add(extraFile);
-				}
-				br.close();
-			} catch (FileNotFoundException fnfe) {
-				logFile.writeErrorMessage("[TFCommand] Count not find command steps file", true);
-			} catch (IOException ioex) {
-				logFile.writeErrorMessage("[TFCommand]  Error reading command steps file",true);
-			}
-		}
-		
-		if (templateFiles.size() == 0) {
-			logFile.writeErrorMessage("[TFCommand] There were no analysis steps found in the steps file: " + depFile.getAbsolutePath() , true);
-			System.exit(1);
-		}
-		
-		TFCommand returnCommand = null;
-		if (TFConstants.alignTypes.contains(commandParts[0])) {
-			if (failmax == null) {
-				failmax = 3;
-			}
-			returnCommand = new TFCommandExomeAlignUgp(templateFiles,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, 
-					heartbeat, failmax, jobs, suppress, isFull, validateFastq, properties, cluster);
-		} else if (TFConstants.metricsTypes.contains(commandParts[0])) {
-			if (failmax == null) {
-				failmax = 3;
-			}
-			returnCommand = new TFCommandExomeMetrics(templateFiles,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, 
-					heartbeat, failmax, jobs, suppress, deleteMetricsBams, isFull, study, targetFile, properties, cluster);
-		}  else if (TFConstants.variantTypes.contains(commandParts[0])) {
-			if (failmax == null) {
-				failmax = 5;
-			}
-			returnCommand = new TFCommandExomeVariant(templateFiles,rootDirectory, commandLine, commandParts[0], logFile,email, wallTime, 
-					heartbeat, failmax, jobs, suppress, deleteReducedBams, isFull, use1KGenomes, study, targetFile, properties, cluster);
-		} else {
-			logFile.writeErrorMessage("[TFCommand] Command type not recognized: " + commandParts[0], true);
-			System.exit(1);
-		}
-		
-		logFile.writeInfoMessage("[TFCommand] " + commandLine + " is allowed " + failmax + " failures");
-		
-		return returnCommand;
-	}
+	//Logger
+	Logger logFile = null;
 	
-
-	public TFCommand(ArrayList<File> templateFile, File rootDirectory, String commandString, String commandType, TFLogger logFile, 
-			String email, Integer wallTime, Integer heartbeat, Integer failmax, Integer jobs, boolean suppress, boolean isFull, 
-			HashMap<String,String> properties, String cluster) {
-		this.templateFiles = templateFile;
-		this.rootDirectory  = rootDirectory;
-		this.commandString = commandString;
-		this.commandType = commandType;
-		this.logFile = logFile;
-		this.wallTime = wallTime;
-		this.email = email;
-		this.heartbeat = heartbeat;
-		this.failmax = failmax;
-		this.jobs = jobs;
-		this.suppress  = suppress;
-		this.properties = properties;
-		this.isFull = isFull;
+	public Command(File projectDirectory, String cluster, String email, Integer wallTime, boolean suppress, Logger logFile) {
 		this.cluster = cluster;
+		this.email = email;
+		this.wallTime = wallTime;
+		this.suppress = suppress;
+		this.logFile = logFile;
+		this.projectDirectory = projectDirectory;
+	}
+
+	public void postProcess() {
+		
+		//Create final directories
+		for (File d: finalDirectoryList) {
+			if (!d.exists()) {
+				d.mkdirs();
+			}
+		}
+		
+		//Move output files, skipping things that should no longer exist
+		for (File outputFile: outputFiles) {
+			if (skipList.contains(outputFile)) {
+				continue;
+			}
+			String directory = outputFile.getParent();
+			String basename = outputFile.getName();
+			File workingFile = new File(jobDirectory,basename);
+			File finalFile = new File(directory,basename);
+			if (workingFile.isDirectory()) {
+				finalFile.mkdirs();
+				logFile.writeInfoMessage("[Command] copying contents of " + workingFile.getAbsolutePath() + " to " + finalFile.getAbsolutePath());
+				for (File f: workingFile.listFiles()) {
+					cpFile(f,finalFile);
+				}
+			} else {
+				logFile.writeInfoMessage("[Command] moving " + workingFile.getAbsolutePath() + " to " + finalFile.getAbsolutePath());
+				moveFile(workingFile,finalFile, logFile);	
+			}	
+		}
+		
+		//Create Job log directories.
+		File finalJobDirectory = new File(projectDirectory,"Jobs");
+		if (!finalJobDirectory.exists()) {
+			finalJobDirectory.mkdir();
+		}
+		logFile.writeInfoMessage("[Command cleaning up directory " + jobDirectory.getAbsolutePath());
+		
+		//Delete files
+		for (File df: deleteList) {
+			this.deleteFile(df);
+		}
+		
+		//Tomato sometimes relaunches old files, rename cmd.txt to avoid this
+		File cmdFileOrig = new File(jobDirectory,"cmd.txt");
+		if (cmdFileOrig.exists()) {
+			File cmdFileRename = new File(jobDirectory,"cmd_done.txt");
+			moveFile(cmdFileOrig, cmdFileRename, logFile);
+		}
+		
+		logFile.writeInfoMessage("[Command] moving job directory " + jobDirectory.getAbsolutePath() + " to " + finalJobDirectory.getAbsolutePath());
+		moveFile(jobDirectory,finalJobDirectory,logFile);
+		
 	}
 	
+	public CThread prepareJobDirectory(int threadNumber, int heartbeat, int failMax) {
+		if (!jobDirectory.exists()) {
+			jobDirectory.mkdir();
+		}
+		
+		for (File inputFile: inputFiles) {
+			File destFile = new File(jobDirectory,inputFile.getName());
+			createLink(inputFile,destFile);
+		}
+		
+		for (File externalFile: externalFiles) {
+			File destFile = new File(jobDirectory,externalFile.getName());
+			createLink(externalFile,destFile);
+		}	
+		
+		createCmd();
+		
+		CThread thread = new CThread(jobDirectory, failMax, threadNumber, heartbeat, getProtectList(), logFile, email);
+		return thread;
+	}
 	
-	/** Create file links needed based on the si object */
-	public abstract ArrayList<TFSampleInfo> run(ArrayList<TFSampleInfo> sampleList);
+	protected void merge(Command c2) {
+		addOutputFiles(c2.getOutputFiles());
+		addToLocalProperties(c2.getLocalProperties());
+		addToTemplateString(c2.getTemplateString());
+		addProtectList(c2.getProtectList());
+		addDeleteList(c2.getDeleteList());
+		addExternalFileList(c2.getExternalFiles());
+		addSkipList(c2.getSkipFiles());
+		addConditionalSkipList(c2.getConditionalSkipList());
+		this.finalDirectoryList.add(c2.getFinalDirectory());
+	}
 	
-	protected abstract ArrayList<TFSampleInfo> validateSampleSet(ArrayList<TFSampleInfo> sampleList);
-	protected abstract ArrayList<TFSampleInfo> findPrereqsExisting(ArrayList<TFSampleInfo> sampleList);
-	protected abstract ArrayList<TFSampleInfo> findPrereqsNew(ArrayList<TFSampleInfo> sampleList);
-	
-    public String getCommandType() {
-    	return this.commandType;
-    }
-    
-    public String getCommandString() {
-    	return this.commandString;
-    }
-    
-    public void shutdown() {
-    	if (this.daemon != null && this.daemon.isAlive()) {
-    		logFile.writeWarningMessage("[TFCommand] Recieved termination signal, interrupting daemon");
-    		this.daemon.interrupt();
-    		while(this.daemon.isAlive()){}
-    	}
-    }
-    
-    protected ArrayList<TFSampleInfo> findPatternsExisting(ArrayList<TFSampleInfo> sampleList, File directory, ArrayList<TFMatchObject> dependantPatterns) {
-    	//Iterate through file in the directory
-    	File[] contents = directory.listFiles();
+    public boolean doesFinalExist() {
+    	boolean doesExist = true;
     	
-    	for (File file: contents) {
-			if (file.isDirectory()) {
-				continue;
-			}
-			
-			for (TFMatchObject pattern: dependantPatterns) {
-				if (pattern.testMatch(file.getName())) {
-					sampleList = this.matchDependantPatterns(file,sampleList,pattern,directory);
-				}
-			}
-		}
-		
-		sampleList = validateSampleSet(sampleList);
-		
-		return sampleList;
-    }
-    
-    /**
-     * This method searches the directory for matching files.  MasterPatterns are used to initialize SampleInfo objects.
-     * DependantPatterns are then added to already-initialized SampleInfo objects.  The validateSampleSet method
-     * is called at the end to make sure the necessary files were found.
-     * 
-     * @param directory
-     * @param masterPatterns
-     * @param dependantPatterns
-     * @return validatedSampleSets
-     */
-    protected ArrayList<TFSampleInfo> findPatternsNew (File directory, ArrayList<TFMatchObject> masterPatterns, ArrayList<TFMatchObject> dependantPatterns) {
-		//Create containers for valid/ignored files
-		ArrayList<TFSampleInfo> sampleList = new ArrayList<TFSampleInfo>();
-				
-		//Iterate through file in the directory
-		File[] contents = directory.listFiles();
-		
-		for (File file: contents) {
-			//Skip directories
-			if (file.isDirectory()) {
-				continue;
-			}
-		
-			for (TFMatchObject pattern: masterPatterns) {
-				if (pattern.testMatch(file.getName())) {
-					sampleList = this.matchMasterPatterns(file, sampleList, pattern, directory);
-				}
-			}
-		}
-		
-		for (File file: contents) {
-			if (file.isDirectory()) {
-				continue;
-			}
-			
-			for (TFMatchObject pattern: dependantPatterns) {
-				if (pattern.testMatch(file.getName())) {
-					sampleList = this.matchDependantPatterns(file,sampleList,pattern,directory);
-				}
-			}
-		}
-		
-		sampleList = validateSampleSet(sampleList);
-		
-		return sampleList;
-	}
-    
-    /** This method finds files that match the specified patterns.  If the pattern wasn't previously observed
-     * a new SampleInfo object is created. 
-     * 
-     * @param f
-     * @param sampleList
-     * @param p
-     * @param directory
-     */
-    private ArrayList<TFSampleInfo> matchMasterPatterns(File f, ArrayList<TFSampleInfo> sampleList, TFMatchObject p, File directory) {
- 
-		TFSampleInfo used = null;
-		
-		for (TFSampleInfo sample: sampleList) {
-			if (sample.comparePrefix(p.getMatchPrefix())) {
-				used = sample;
-			}
-		}
-		if (used == null) {
-			String sampleID = "unknown";
-			String puID = "unknown";
-			String sampleName = "unknown";
-			if (p.getPrefixType().equals(TFConstants.PREFIX_SAMPLEID)) {
-				sampleID = p.getMatchPrefix();
-				String[] idParts = sampleID.split("_",2);
-				
-				if (idParts.length != 2) {
-			    	logFile.writeErrorMessage("[TFCommand] File name improperly formed. Should have an underscore separating the sample name and the flowcell name: SAMPLE_FLOWCELL_1.fastq and SAMPLE_FLOWCELL_2.fastq",false);
-			    	System.exit(1);
-			    }
-				
-				sampleName = idParts[0];
-				puID = idParts[1];
-			} else if (p.getPrefixType().equals(TFConstants.PREFIX_SAMPLENAME)) {
-				sampleName = p.getMatchPrefix();
-			} else if (p.getPrefixType().equals(TFConstants.PREFIX_PUID)) {
-				puID = p.getMatchPrefix();
-			}
-			
-			
-			//Create a new SampleInfoObject
-			used = new TFSampleInfo(sampleID,sampleName,puID,logFile);
-			sampleList.add(used);
-		} 
-		
-		TFFileObject tempFO = new TFFileObject(p.getMatchFull(),directory,directory);
-		used.setFileObject(p.getMatchName(), tempFO);
-		
-		return sampleList;
-		
-	}
-    
-    /** This method adds the files that match specified patterns to an existing sampleList.
-     * 
-     * @param f
-     * @param sampleList
-     * @param p
-     * @param directory
-     */
-    private ArrayList<TFSampleInfo> matchDependantPatterns(File f, ArrayList<TFSampleInfo> sampleList, TFMatchObject p, File directory) {
-    	TFSampleInfo used = null;
-    	
-    	for (TFSampleInfo sample: sampleList) {
-    		if (p.getPrefixType().equals(TFConstants.PREFIX_SAMPLEID)) {
-    			if (sample.getSampleID().equals(p.getMatchPrefix())) {
-    				used = sample;
+    	//Check for conditional output files and update skip list
+    	for (File keyFile: conditionalSkipList.keySet()) {
+    		if (keyFile.exists()) {
+    			for (File newSkip: conditionalSkipList.get(keyFile)) {
+    				skipList.add(newSkip);
     			}
-    		} else if (p.getPrefixType().equals(TFConstants.PREFIX_SAMPLENAME)) {
-    			if (sample.getSampleName().equals(p.getMatchPrefix())) {
-    				used = sample;
-    			}
-    			
-    		} else if (p.getPrefixType().equals(TFConstants.PREFIX_PUID)) {
-    			if (sample.getPuID().equals(p.getMatchPrefix())) {
-    				used = sample;
-    			}
-    		} else {
-    			logFile.writeErrorMessage(String.format("[TFCommand] The specified StringPattern matchtype isn't recognized: %s", p.getPrefixType()), true);
-    			System.exit(1);
     		}
     	}
     	
-    	if (used != null) {
-    		TFFileObject tempFO = new TFFileObject(p.getMatchFull(),directory,directory);
-			used.setFileObject(p.getMatchName(), tempFO);
+    	//Check for the existance of all output files, ignoring files that are marked as skipped.
+    	for (File outputFile: outputFiles) {
+    		if (skipList.contains(outputFile)) {
+    			continue;
+    		}
+    		if (!outputFile.exists()) {
+    			doesExist = false;
+    		}
     	}
-    	
-    	return sampleList;
+    	return doesExist;
     }
+    
+    public boolean doesWorkingExist() {
+    	boolean doesExist = true;
+    	for (File outputFile: outputFiles) {
+    		String basename = outputFile.getName();
+    		File workingFile = new File(jobDirectory,basename);
+    		if (!workingFile.exists()) {
+    			doesExist = false;
+    		}
+    	}
+    	return doesExist;
+    }
+    
+    
+    
+	//Getters and Setters
+    public File getFinalDirectory() {
+    	return this.finalDirectory;
+    }
+    
+    public File getProjectDirectory() {
+    	return this.projectDirectory;
+    }
+    
+    public void setFinalDirectory(File finalDirectory) {
+    	this.finalDirectory = finalDirectory;
+    	this.finalDirectoryList.add(finalDirectory);
+    }
+    
+    public void setJobDirectory(File f) {
+    	this.jobDirectory = f;
+    }
+    
+    public String getSampleName() {
+    	return this.sampleName;
+    }
+    
+  
+    public String getSampleId() {
+    	return this.sampleID;
+    }
+    
+    public void setSampleName(String sampleName) {
+    	this.sampleName = sampleName;
+    }
+    
+    public void setSampleID(String sampleID) {
+    	this.sampleID = sampleID;
+    }
+    
+ 
+	protected ArrayList<File> getOutputFiles() {
+		return outputFiles;
+	}
 	
+	protected void addOutputFiles(ArrayList<File> files) {
+		outputFiles.addAll(files);
+	}
 	
+	protected HashMap<String,String> getLocalProperties() {
+		return localProperties.get(0);
+	}
+	
+	private void addToLocalProperties(HashMap<String,String> properties) {
+		localProperties.add(properties);
+	}
+	
+	protected void addLocalProperty(String key, String value) {
+		if (this.localProperties.isEmpty()) {
+			HashMap<String,String> newProperties = new HashMap<String,String>();
+			this.localProperties.add(newProperties);
+		}
+		this.localProperties.get(0).put(key, value);
+	}
+	
+	protected void setGlobalProperties(HashMap<String,String> properties) {
+		this.globalProperties = properties;
+	}
+	
+	protected String getTemplateString() {
+		return this.templateStringList.get(0);
+	}
+	
+	protected void setTemplateFile(File template) {
+		try {
+			BufferedReader br = new BufferedReader(new FileReader(template));
+			String temp = "";
+			String templateString = "";
+			while ((temp = br.readLine()) != null) {
+				templateString += temp + "\n";
+			}
+			
+			templateStringList.add(templateString);
+			br.close();
+		} catch (IOException ex) {
+			logFile.writeErrorMessage("Error parsing template file: " + ex.getMessage(), false);
+		}
+	}
+	
+	protected void addToTemplateString(String template) {
+		this.templateStringList.add(template);
+	}
+	
+	protected ArrayList<File> getProtectList() {
+		return protectList;
+	}
+	
+	protected ArrayList<File> getDeleteList() {
+		return deleteList;
+	}
+	
+	protected void addProtect(File protect) {
+		String name = protect.getName();
+		File destFile = new File(jobDirectory,name);
+		if (!this.protectList.contains(destFile)) {
+			this.protectList.add(destFile);
+		}
+		
+	}
+	
+	protected void addProtectList(ArrayList<File> protectList) {
+		for (File f: protectList) {
+			addProtect(f);
+		}
+	}
+	
+	protected void addConditionalSkip(File keyFile, File skipFile) {
+		if (!conditionalSkipList.containsKey(keyFile)) {
+			conditionalSkipList.put(keyFile, new ArrayList<File>());
+		}
+		conditionalSkipList.get(keyFile).add(skipFile);
+	}
+	
+	protected HashMap<File,ArrayList<File>> getConditionalSkipList() {
+		return this.conditionalSkipList;
+	}
+	
+	protected void addSkipFile(File skipFile) {
+		this.skipList.add(skipFile);
+	}
+	
+	protected void addSkipList(ArrayList<File> skipFiles) {
+		this.skipList.addAll(skipFiles);
+	}
+	
+	protected ArrayList<File> getSkipFiles() {
+		return this.skipList;
+	}
+	
+	protected void addExternalFile(File external) {
+		if (!this.externalFiles.contains(external)) {
+			this.externalFiles.add(external);
+		}
+	}
+	
+	protected ArrayList<File> getExternalFiles() {
+		return externalFiles;
+	}
+	
+	protected void addExternalFileList(ArrayList<File> externalFiles) {
+		for (File ef: externalFiles) {
+			this.externalFiles.add(ef);
+		}
+		
+	}
+	
+	protected void addConditionalSkipList(HashMap<File,ArrayList<File>> skipList) {
+		for (File keyFile: skipList.keySet()) {
+			if (!this.conditionalSkipList.containsKey(keyFile)) {
+				this.conditionalSkipList.put(keyFile, new ArrayList<File>());
+			}
+			this.conditionalSkipList.get(keyFile).addAll(skipList.get(keyFile));
+		}
+	}
+	
+	protected void addDelete(File delete) {
+		String name = delete.getName();
+		File destFile = new File(jobDirectory,name);
+		if (!this.deleteList.contains(destFile)) {
+			this.deleteList.add(destFile);
+		}
+		
+	}
+	
+	protected void addDeleteList(ArrayList<File> deleteList) {
+		for (File f: deleteList) {
+			addDelete(f);
+		}
+	}
+	
+	protected void addInputFiles(ArrayList<File> inputFiles) {
+		this.inputFiles.addAll(inputFiles);
+		
+	}
+	
+	protected void addOutputFile(File outputFile) {
+		this.outputFiles.add(outputFile);
+	}
+
+    
+	protected static HashMap<String,File> matchFiles(Pattern pattern, File[] contents) {
+		HashMap<String, File> matchingFiles = new HashMap<String,File>();
+		for (File f: contents) {
+			Matcher m = pattern.matcher(f.getName());
+			if (m.matches()) {
+				matchingFiles.put(m.group(1), f);
+			}
+		}
+		return matchingFiles;
+	}
+
 	    
     //Methods shared by all commands
     protected void sortVCF(File source, File dest) {
@@ -351,7 +395,7 @@ public abstract class TFCommand {
 				System.exit(1);
 			}
 			
-			ProcessBuilder pb = new ProcessBuilder(properties.get("VCF_PATH_LOCAL") + "/vcf-sort",source.getAbsolutePath());
+			ProcessBuilder pb = new ProcessBuilder(globalProperties.get("VCF_PATH_LOCAL") + "/vcf-sort",source.getAbsolutePath());
 			
 			Process p = pb.start();
 			
@@ -413,13 +457,12 @@ public abstract class TFCommand {
     			System.exit(1);
     		}
     	} else {
-			//logFile.writeErrorMessage("[deleteFile] Expected file does not exist: " + source.getAbsolutePath(),true);
-			//System.exit(1);
+			
     	}
     	
     }
     
-    protected void moveFile(File source, File dest) {
+    protected static void moveFile(File source, File dest, Logger logFile) {
 		try {
 			if (!source.exists()) {
 				logFile.writeErrorMessage("[moveFile] Expected file does not exist: " + source.getAbsolutePath(),true);
@@ -485,14 +528,6 @@ public abstract class TFCommand {
 		try {
 			if (linkname.exists()) {
 				this.deleteFile(linkname);
-//				if (linkname.getCanonicalFile().equals(filename.getAbsoluteFile())) {
-//					logFile.writeWarningMessage("[createLink] An existing link matches what you requested, using existing link");
-//				} else {
-//					logFile.writeErrorMessage("[createLink] An existing file exists at link location and it doesn't match request, refusing to overwrite existing file"
-//							+ "\nExisting: " + linkname.getCanonicalPath()
-//							+ "\nNew: " + filename.getAbsolutePath(),false);
-//					System.exit(1);
-//				}
 			}
 				
 			ProcessBuilder pb = new ProcessBuilder("ln","-s",filename.getAbsolutePath(),linkname.getAbsolutePath());
@@ -501,7 +536,7 @@ public abstract class TFCommand {
 			int val = p.waitFor();
 			
 			if (val != 0) {
-				logFile.writeErrorMessage("[createLink]  System could not create a link to you file " + filename.getAbsolutePath(),true);
+				logFile.writeErrorMessage("[createLink]  System could not create a link to your file " + filename.getAbsolutePath(),true);
 				BufferedReader br2 = new BufferedReader(new InputStreamReader(p.getErrorStream()));
 				String line2 = null;
 				while((line2 = br2.readLine()) != null) {
@@ -521,10 +556,12 @@ public abstract class TFCommand {
 		
 	}
 	
+	
+	
 	protected void mergeVcf(ArrayList<File> vcfList, File dest) {
 		try {
 			ArrayList<String> command  = new ArrayList<String>();
-			command.add(properties.get("VCF_PATH_LOCAL") + "/vcf-concat");
+			command.add(globalProperties.get("VCF_PATH_LOCAL") + "/vcf-concat");
 
 			for (File bam: vcfList) {
 				if (!bam.exists()) {
@@ -583,7 +620,7 @@ public abstract class TFCommand {
 				logFile.writeErrorMessage("[bgzip] Expected file does not exist: " + source.getAbsolutePath(),true);
 			}
 			
-			ProcessBuilder pb = new ProcessBuilder(properties.get("TABIX_PATH_LOCAL") + "/bgzip",source.getAbsolutePath());
+			ProcessBuilder pb = new ProcessBuilder(globalProperties.get("TABIX_PATH_LOCAL") + "/bgzip",source.getAbsolutePath());
 			Process p = pb.start();
 			
 			int val = p.waitFor();
@@ -615,7 +652,7 @@ public abstract class TFCommand {
 				System.exit(1);
 			}
 			
-			ProcessBuilder pb = new ProcessBuilder(properties.get("TABIX_PATH_LOCAL") + "tabix","-p","vcf",source.getAbsolutePath());
+			ProcessBuilder pb = new ProcessBuilder(globalProperties.get("TABIX_PATH_LOCAL") + "tabix","-p","vcf",source.getAbsolutePath());
 			Process p = pb.start();
 			
 			int val = p.waitFor();
@@ -655,15 +692,14 @@ public abstract class TFCommand {
 	}
    
 	
-    protected void createCmd(HashMap<String,String> replacements, File cmdFile, int index) {
+    protected void createCmd() {
 		//Write command file
 		try {
-			BufferedReader br = new BufferedReader(new FileReader(this.templateFiles.get(index)));
-			BufferedWriter bw = new BufferedWriter(new FileWriter(cmdFile));
+			BufferedWriter bw = new BufferedWriter(new FileWriter(new File(jobDirectory,"cmd.txt")));
 			
 			
 			if (this.suppress) {
-				bw.write(String.format("#e %s -n\n", this.email));
+				bw.write(String.format("#e %s -abe\n", this.email));
 				//bw.write(String.format("#e %s -n\n#c ember\n", this.email));
 			} else {
 				bw.write(String.format("#e %s \n", this.email));
@@ -674,7 +710,7 @@ public abstract class TFCommand {
 				bw.write(String.format("#c " + this.cluster));
 			}
 			
-			if (this.wallTime != null) {
+			if (wallTime != null) {
 				bw.write(String.format("#w %s\n", this.wallTime));
 			}
 			
@@ -684,6 +720,7 @@ public abstract class TFCommand {
 			bw.write("MEMTOTAL=`free | grep Mem | awk '{ print $2 }'`\n");
 			bw.write("MEMGB=`expr $MEMTOTAL / 1048576`\n");
 			bw.write("SMGB=`expr $MEMGB - 2`\n");
+			bw.write("SMGB2=`expr $MEMGB / 2`\n");
 			bw.write("NCPU=`nproc`\n");
 			bw.write("GCT=$NCPU\n");
 			bw.write("DISKAVAIL=`df -hP . | tail -n 1 | awk '{print $4}'`\n");
@@ -702,21 +739,20 @@ public abstract class TFCommand {
 			bw.write("\n\n");
 			
 		
-			//Write command file
-			String line = null;
 
-			
-			while((line = br.readLine()) != null) {
-				String edited = line;
-				for (String key: replacements.keySet()) {
-				
-					edited = edited.replaceAll(key, replacements.get(key));
+			for (int i=0; i<templateStringList.size();i++) {
+				String edited = templateStringList.get(i);
+				for (String key: localProperties.get(i).keySet()) {
+					edited = edited.replaceAll(key, localProperties.get(i).get(key));
+				}
+				for (String key: globalProperties.keySet()) {
+					edited = edited.replaceAll(key, globalProperties.get(key));
 				}
 				bw.write(edited + "\n");
+				
 			}
-			
-			
-			br.close();
+		
+	
 			bw.close();
 			
 			
@@ -727,42 +763,17 @@ public abstract class TFCommand {
 		
 	}
     
-    protected void cleanup(HashSet<File> runDirectoryList, HashSet<File> deleteList) {
-		//clean up unwanted files
-		for (File df: deleteList) {
-			this.deleteFile(df);
-		}
-		
-		//move job directories
-		for (File rd: runDirectoryList) {
-			//Tomato sometimes relaunches old files, rename cmd.txt to avoid this
-			File cmdFileOrig = new File(rd,"cmd.txt");
-			if (cmdFileOrig.exists()) {
-				File cmdFileRename = new File(rd,"cmd_done.txt");
-				this.moveFile(cmdFileOrig, cmdFileRename);
-			}
-			
-			
-			File existDir = new File(this.jobDirectory,rd.getName());
-			if (existDir.exists()) {
-				deleteFolder(existDir);
-			}
-			this.moveFile(rd, this.jobDirectory);
-			
-		}
-	}
-    
-    protected void validateFileSet(TFSampleInfo fi) {
-		logFile.writeInfoMessage("[TFCommand] Validating fastq files for sample: " + fi.getSampleName());
-		logFile.writeInfoMessage("[TFCommand] Validating paired-end file 1");
-		int lines1 = validateFastq(fi,TFConstants.FILE_FASTQ1);
+  
+    protected static void validateFastqSet(File file1, File file2, Logger logFile) {
+		logFile.writeInfoMessage("[TFCommand] Validating paired-end file 1: " + file1.getAbsolutePath());
+		int lines1 = validateFastq(file1, logFile);
 		if (lines1 == 0) {
 			logFile.writeErrorMessage("Paired-end fastq file 1 is empty",false);
 			System.exit(1);
 		}
 		logFile.writeInfoMessage("[TFCommand] Validated " + lines1 + " records");
 		logFile.writeInfoMessage("[TFCommand] Validating paired-end file 2");
-		int lines2 = validateFastq(fi,TFConstants.FILE_FASTQ2);
+		int lines2 = validateFastq(file2, logFile);
 		if (lines2 == 0) {
 			logFile.writeErrorMessage("[TFCommand] Paired-end fastq file 2 is empty",false);
 			System.exit(1);
@@ -772,13 +783,12 @@ public abstract class TFCommand {
 			logFile.writeErrorMessage("[TFCommand] Paired-end fastq files have unequal numbers of lines: " + lines1 + " " + lines2,false);
 			System.exit(1);
 		}
-		fi.setRecordCount(lines1);
 	}
 	
-	protected int validateFastq(TFSampleInfo fi, String name) {
+	protected static int validateFastq(File file, Logger logFile) {
 		int retval = 0;
 		try {
-			GZIPInputStream gzip = new GZIPInputStream(new FileInputStream(fi.getFileObject(name).getFinalPath()));
+			GZIPInputStream gzip = new GZIPInputStream(new FileInputStream(file));
 			BufferedReader br = new BufferedReader(new InputStreamReader(gzip));
 			int counter = 0;
 			int readLength = 0;
@@ -836,7 +846,7 @@ public abstract class TFCommand {
 			
 			if (min-33 >= 31) {
 				logFile.writeInfoMessage("[TFCommand] Fastq detected as ASCII-64.  Min: " + (min-64) + ". Max: " + (max-64));
-				fi.setQual64();
+				
 			} else {
 				logFile.writeInfoMessage("[TFCommand] Fastq detected as ASCII-33.  Min: " + (min-33) + ". Max: " + (max-33));
 				
@@ -851,7 +861,7 @@ public abstract class TFCommand {
 			br.close();
 			retval = counter / 4;
 			
-			fi.setReadLength(rl);
+			
 		} catch (Exception ioex) {
 			logFile.writeErrorMessage("[TFCommand] Error reading fastq file, exiting: " + ioex.getMessage(),true) ;
 			ioex.printStackTrace();
