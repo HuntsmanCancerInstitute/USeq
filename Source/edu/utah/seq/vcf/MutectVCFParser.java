@@ -11,7 +11,7 @@ import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 
-/**Simple MuTech vcf parser. Filters for minimum read depth count in Tum and Normal, as well as minimum Alt Allele fraction change and normal Alt fraction */
+/**Simple MuTech vcf parser.  */
 public class MutectVCFParser {
 
 	private File[] vcfFiles;
@@ -44,56 +44,45 @@ public class MutectVCFParser {
 	public void parse(File vcf){
 		try {
 			VCFParser parser = new VCFParser (vcf);
-			File txt = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_pass.txt.gz");
+			File txt = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+".txt.gz");
 			
 			Gzipper out = new Gzipper(txt);
-			out.println("#CHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
+			out.println("#PASS\tCHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
 			for (VCFRecord r: parser.getVcfRecords()){			
 				VCFSample[] tumNorm = r.getSample();
-				//check depth
-				int normDepth = tumNorm[1].getReadDepthDP();
-				int tumDepth = tumNorm[0].getReadDepthDP();
-				if (normDepth < minimumNormalReadDepth || tumDepth < minimumTumorReadDepth) {
-					r.setFilter(VCFRecord.FAIL);					
-					continue;
-				}
+				boolean pass = true;
 				double normRto = tumNorm[1].getAltRatio();
 				double tumRto = tumNorm[0].getAltRatio();
 				
+				//check depth
+				int normDepth = tumNorm[1].getReadDepthDP();
+				int tumDepth = tumNorm[0].getReadDepthDP();
+				if (normDepth < minimumNormalReadDepth || tumDepth < minimumTumorReadDepth) pass = false;
+				
 				//check allelic ratio diff
-				if (minimumTNFractionDiff != 0){
+				if (pass && minimumTNFractionDiff != 0){
 					double change = tumRto-normRto;
-					if (change < minimumTNFractionDiff){
-						r.setFilter(VCFRecord.FAIL);
-						continue;
-					}
+					if (change < minimumTNFractionDiff) pass = false;
 				}
 				
 				//check T/N AF ratio
-				if (minimumTNRatio != 0 && normRto !=0){
+				if (pass && minimumTNRatio != 0 && normRto !=0){
 					double change = tumRto/normRto;
-					if (change < minimumTNRatio){
-						r.setFilter(VCFRecord.FAIL);
-						continue;
-					}
+					if (change < minimumTNRatio) pass = false;
 				}
 				
 				//check normal alt fraction?
-				if (maximumNormalAltFraction !=1){
-					if (normRto > maximumNormalAltFraction){	
-						r.setFilter(VCFRecord.FAIL);
-						continue;
-					}
+				if (pass && maximumNormalAltFraction !=1){
+					if (normRto > maximumNormalAltFraction) pass = false;
 				}
 				//check tumor alt fraction?
-				if (minimumTumorAltFraction !=0){
-					if (tumRto < minimumTumorAltFraction){	
-						r.setFilter(VCFRecord.FAIL);
-						continue;
-					}
+				if (pass && minimumTumorAltFraction !=0){
+					if (tumRto < minimumTumorAltFraction) pass = false;
 				}
+				
 				//build txt output
 				ArrayList<String> al = new ArrayList<String>();
+				al.add(pass+"");
 				al.add(r.getChromosome());
 				al.add((r.getPosition()+1)+"");
 				al.add(r.getReference());
@@ -104,10 +93,15 @@ public class MutectVCFParser {
 				al.add(normDepth+"");
 				al.add(r.getFilter());
 				al.add(r.getInfoObject().getInfoString());
-				out.println(Misc.stringArrayListToString(al, "\t"));
+				String line = Misc.stringArrayListToString(al, "\t");
+				out.println(line);
+				if (pass) r.setFilter(VCFRecord.PASS);
+				else r.setFilter(VCFRecord.FAIL);
+
 			}
 			out.close();
-			printRecords(parser, vcf);
+			File outFile = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_Filtered.vcf.gz");
+			printRecords(parser, outFile);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -116,11 +110,7 @@ public class MutectVCFParser {
 
 	public void printRecords(VCFParser parser, File f) throws Exception{
 		
-		String name = Misc.removeExtension(f.getName());
-		File passFile = new File(f.getParentFile(), name+ "_pass.vcf");
-		PrintWriter outPass = new PrintWriter (new FileWriter (passFile));
-		File failFile = new File(f.getParentFile(), name+ "_fail.vcf");
-		PrintWriter outFail = new PrintWriter (new FileWriter (failFile));
+		Gzipper out = new Gzipper (f);
 		
 		int numFail = 0;
 		int numPass = 0;
@@ -136,8 +126,7 @@ public class MutectVCFParser {
 				t[10] = tu;
 				h = Misc.stringArrayToString(t, "\t");
 			}
-			outPass.println(h);
-			outFail.println(h);
+			out.println(h);
 		}
 		VCFRecord[] records = parser.getVcfRecords();
 		for (VCFRecord vcf: records){
@@ -147,22 +136,15 @@ public class MutectVCFParser {
 			String no = t[10];
 			t[9] = no;
 			t[10] = tu;
-			if (vcf.getFilter().equals(VCFRecord.FAIL)) {
-				numFail++;
-				t[2] = "Mutect_"+numFail;
-				outFail.println(Misc.stringArrayToString(t, "\t"));
-			}
+			if (vcf.getFilter().equals(VCFRecord.FAIL))numFail++;
+			
 			else {
 				numPass++;
 				t[2] = "Mutect_"+numPass;
-				outPass.println(Misc.stringArrayToString(t, "\t"));
+				out.println(Misc.stringArrayToString(t, "\t"));
 			}
 		}
-		outPass.close();
-		outFail.close();
-		if (numPass == 0) passFile.deleteOnExit();
-		if (numFail == 0) failFile.deleteOnExit();
-		
+		out.close();
 		System.out.println(numPass+"\t"+numFail);
 	}
 

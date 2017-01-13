@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -14,13 +15,15 @@ import util.gen.Num;
 
 /**Simple Strelka INDEL vcf formatter and parser.
  * Takes the tumor QSI or QSS score and replaces the qual. 
- * Can also filter for minimum read depth count in Tum and Normal, as well as minimum Alt Allele fraction change. */
+ */
 public class StrelkaVCFParser {
 
 	private File[] vcfFiles;
 	private float minimumScore = 0;
-	private int minimumCount = 0;
-	private double minimumAltTNRatio = 0;
+	private int minimumTumorReadDepth = 0;
+	private int minimumNormalReadDepth = 0;
+	private double minimumTNFractionDiff = 0;
+	private double minimumTNRatio = 0;
 	private double maximumNormalAltFraction = 1;
 	private Pattern qsiOrs = Pattern.compile(".+;QS[IS]=(\\d+);.+");
 	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
@@ -33,12 +36,13 @@ public class StrelkaVCFParser {
 
 		processArgs(args);
 		
-		System.out.println("Thresholds:");
-		System.out.println(minimumScore+"\tMin QSI/ QSS score");
-		System.out.println(minimumCount+"\tMin alignment depth");
-		System.out.println(minimumAltTNRatio+"\tMin Allelic fraction change");
-		System.out.println(maximumNormalAltFraction+"\tMax Normal alt allelic fraction");
-		System.out.println(minimumTumorAltFraction+"\tMin Tumor alt allelic fraction");
+		System.out.println("Thresholds for Tumor and Normal:");
+		System.out.println(minimumTumorReadDepth+"\tMin T alignment depth");
+		System.out.println(minimumNormalReadDepth+"\tMin N alignment depth");
+		System.out.println(minimumTNFractionDiff+"\tMin T-N allelic fraction diff");
+		System.out.println(minimumTNRatio+"\tMin T/N allelic fraction ratio");
+		System.out.println(maximumNormalAltFraction+"\tMax N allelic fraction");
+		System.out.println(minimumTumorAltFraction+"\tMin T allelic fraction");
 		
 		System.out.println("\nName\tPassing\tFailing");
 		for (File vcf: vcfFiles){
@@ -94,20 +98,13 @@ public class StrelkaVCFParser {
 		try {
 			VCFParser parser = new VCFParser (vcf);
 			if (parser.getSampleNames()[1].equals("TUMOR") == false) Misc.printErrAndExit("Error: TUMOR doesn't appear to be the second sample in the VCF file?! "+vcf.getName());
-			//set all to pass
-			parser.setFilterFieldOnAllRecords(VCFRecord.PASS);
+			
+			File txt = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+".txt.gz");
+			Gzipper out = new Gzipper(txt);
+			out.println("#PASS\tCHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
 			
 			for (VCFRecord r: parser.getVcfRecords()){	
 				VCFSample[] normTum = r.getSample();
-				
-				//check depth
-				int normDepth = normTum[0].getReadDepthDP();
-				int tumDepth = normTum[1].getReadDepthDP();
-				if (normDepth < minimumCount || tumDepth < minimumCount) {
-					r.setFilter(VCFRecord.FAIL);
-					continue;
-				}
-				
 				//set allele counts
 				if (r.isSNP()) {
 					setAltRefCountsForSnvs(r, normTum[0]);
@@ -117,38 +114,35 @@ public class StrelkaVCFParser {
 					setAltRefCountsForIndels(r, normTum[0]);
 					setAltRefCountsForIndels(r, normTum[1]);
 				}
+				double normRto = normTum[0].getAltRatio();
+				double tumRto = normTum[1].getAltRatio();
+				boolean pass = true;
 				
-				//check alt allelic ratio 
-				if (minimumAltTNRatio != 0.0){
-					double normRto = normTum[0].getAltRatio();
-					if (normRto == 0) normRto = 0.001;
-					double tumRto = normTum[1].getAltRatio();
-					if (tumRto == 0) tumRto = 0.001;
-					
-					double rto = tumRto/normRto;
-					
-					if (rto < minimumAltTNRatio){
-						r.setFilter(VCFRecord.FAIL);
-						continue;
-					}
+				//check depth
+				int normDepth = normTum[0].getReadDepthDP();
+				int tumDepth = normTum[1].getReadDepthDP();
+				
+				if (normDepth < minimumNormalReadDepth || tumDepth < minimumTumorReadDepth) pass = false;
+				
+				//check allelic ratio diff
+				if (pass && minimumTNFractionDiff != 0){
+					double change = tumRto-normRto;
+					if (change < minimumTNFractionDiff) pass = false;
+				}
+				
+				//check T/N AF ratio
+				if (pass && minimumTNRatio != 0 && normRto !=0){
+					double change = tumRto/normRto;
+					if (change < minimumTNRatio) pass = false;
 				}
 				
 				//check normal alt fraction?
-				if (maximumNormalAltFraction !=1){
-					double normRto = normTum[0].getAltRatio();
-					if (normRto > maximumNormalAltFraction){
-						r.setFilter(VCFRecord.FAIL);
-						continue;
-					}
+				if (pass && maximumNormalAltFraction !=1){
+					if (normRto > maximumNormalAltFraction) pass = false;
 				}
-				
 				//check tumor alt fraction?
-				if (minimumTumorAltFraction !=0){
-					double tumAF = normTum[1].getAltRatio();
-					if (tumAF < minimumTumorAltFraction){
-						r.setFilter(VCFRecord.FAIL);
-						continue;
-					}
+				if (pass && minimumTumorAltFraction !=0){
+					if (tumRto < minimumTumorAltFraction) pass = false;
 				}
 				
 				//set QSI QSS score
@@ -156,10 +150,30 @@ public class StrelkaVCFParser {
 				if (mat.matches() == false) Misc.printErrAndExit("QSI or QSS scored doesn't appear to be present in the record? "+r.getOriginalRecord());
 				float score = Float.parseFloat(mat.group(1));
 				r.setQuality(score);
-				if (score < minimumScore) r.setFilter(VCFRecord.FAIL);
+				if (score < minimumScore) pass = false;
+				
+				//build txt output
+				ArrayList<String> al = new ArrayList<String>();
+				al.add(pass+"");
+				al.add(r.getChromosome());
+				al.add((r.getPosition()+1)+"");
+				al.add(r.getReference());
+				al.add(Misc.stringArrayToString(r.getAlternate(), ","));
+				al.add(tumRto+"");
+				al.add(tumDepth+"");
+				al.add(normRto+"");
+				al.add(normDepth+"");
+				al.add(r.getFilter());
+				al.add(r.getInfoObject().getInfoString());
+				String line = Misc.stringArrayListToString(al, "\t");
+				out.println(line);
+				if (pass) r.setFilter(VCFRecord.PASS);
+				else r.setFilter(VCFRecord.FAIL);
 			}
-			File out = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_Filtered.vcf.gz");
-			printRecords(parser, out);
+			out.close();
+			
+			File outFile = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_Filtered.vcf.gz");
+			printRecords(parser, outFile);
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -188,8 +202,6 @@ public class StrelkaVCFParser {
 				fields[5] = Integer.toString((int)vcf.getQuality());
 				//reset ID
 				fields[2] = "Strelka_"+numPass;
-				//reset FILTER
-				fields[6] = ".";
 				//add GT to format, igv is now requiring this to be first
 				fields[8] = "GT:"+fields[8]+ ":AF";
 				//add af to Norm and Tum
@@ -246,10 +258,12 @@ public class StrelkaVCFParser {
 					switch (test){
 					case 'v': forExtraction = new File(args[++i]); break;
 					case 'm': minimumScore = Float.parseFloat(args[++i]); break;
-					case 'a': minimumCount = Integer.parseInt(args[++i]); break;
-					case 'r': minimumAltTNRatio = Double.parseDouble(args[++i]); break;
 					case 't': minimumTumorAltFraction = Double.parseDouble(args[++i]); break;
 					case 'n': maximumNormalAltFraction = Double.parseDouble(args[++i]); break;
+					case 'u': minimumTumorReadDepth = Integer.parseInt(args[++i]); break;
+					case 'o': minimumNormalReadDepth = Integer.parseInt(args[++i]); break;
+					case 'd': minimumTNFractionDiff = Double.parseDouble(args[++i]); break;
+					case 'r': minimumTNRatio = Double.parseDouble(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -273,23 +287,24 @@ public class StrelkaVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Strelka VCF Parser: April 2016                        **\n" +
+				"**                             Strelka VCF Parser: Jan 2017                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS\n"+
-				"score. Also filters for minimum tumor normal read depth, T/N alt allelic ratio,\n"+
-				"and tumor and normal alt allelic ratios. Lastly, it sets the FILTER field to '.' and\n"+
-				"inserts the tumor DP and AF info.\n"+
+				"score. Also filters for read depth, T/N alt allelic ratio and diff,\n"+
+				"and tumor and normal alt allelic ratios. Lastly, it inserts the tumor DP and AF info.\n"+
 
 				"\nRequired Params:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).\n" +
 				"-m Minimum QSI or QSS score, defaults to 0.\n"+
-				"-a Minimum alignment depth for both tumor and normal samples, defaults to 0.\n"+
-				"-r Minimum alt Tum/Norm allelic ratio, defaults to 0.\n"+
-				"-t Minimum tumor alt allelic fraction, defaults to 0.\n"+
-				"-n Maximum normal alt allelic fraction, defaults to 1.\n"+
+				"-t Minimum tumor allele frequency (AF), defaults to 0.\n"+
+				"-n Maximum normal AF, defaults to 1.\n"+
+				"-u Minimum tumor alignment depth, defaults to 0.\n"+
+				"-o Minimum normal alignment depth, defaults to 0.\n"+
+				"-d Minimum T-N AF difference, defaults to 0.\n"+
+				"-r Minimum T/N AF ratio, defaults to 0.\n"+
 
-				"\nExample: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -a 150\n"+
-				"      -r 2 -n 0.6 -t 0.025  \n\n" +
+				"\nExample: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -t 0.05\n"+
+				"        -n 0.5 -u 100 -o 20 -d 0.05 -r 2\n\n"+
 
 
 				"**************************************************************************************\n");
