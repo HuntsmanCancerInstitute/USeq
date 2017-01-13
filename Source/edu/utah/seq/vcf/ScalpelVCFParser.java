@@ -17,15 +17,13 @@ public class ScalpelVCFParser {
 	private int minimumTumorCount = 100;
 	private int minimumNormalCount = 30;
 	private double minimumAltTNRatio = 1.6;
+	private double minimumTNFractionDiff = 0;
 	private double maximumNormalAltFraction = 0.1;
 	private double minimumTumorAltFraction = 0.05;
 	private boolean markFail = false;
 	private String afFormat = "##FORMAT=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency\">";
 	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
 	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
-	
-	//private String[] keys = {"13:28608243", "13:28608218", "13:28608262", "13:28608259", "13:28608257", "13:28608226", "13:28608239", "13:28608223", "13:28608232", "13:28608266", "13:28608273", "13:28608262"};
-	//private HashSet<String> key = null;
 	
 	public ScalpelVCFParser (String[] args) { 
 
@@ -35,12 +33,11 @@ public class ScalpelVCFParser {
 		System.out.println(minimumQual+"\tMin QUAL score");
 		System.out.println(minimumTumorCount+"\tMin tumor alignment depth");
 		System.out.println(minimumTumorCount+"\tMin normal alignment depth");
-		System.out.println(minimumAltTNRatio+"\tMin Allelic fraction change tAltRto/nAltRto");
+		System.out.println(minimumAltTNRatio+"\tMin Allelic fraction change (tAltRto/nAltRto)");
+		System.out.println(minimumTNFractionDiff+"\tMin Allelic fraction diff (tAltRto - nAltRto)");
 		System.out.println(maximumNormalAltFraction+"\tMax normal alt allelic fraction");
 		System.out.println(minimumTumorAltFraction+"\tMin tumor alt allelic fraction");
 		System.out.println(markFail+"\tMark variants failing thresholds FAIL instead of not printing.");
-		
-		//key = fetchKey();
 		
 		System.out.println("\nName\tPassing\tFailing");
 		for (File vcf: vcfFiles){
@@ -48,12 +45,6 @@ public class ScalpelVCFParser {
 			parse(vcf);
 		}
 	}
-	
-	/*public HashSet<String> fetchKey(){
-		HashSet<String> key = new HashSet<String>();
-		for (String x : keys) key.add(x);
-		return key;
-	}*/
 	
 
 	public void parse(File vcf){
@@ -84,11 +75,18 @@ public class ScalpelVCFParser {
 				double tumRto = normTum[1].getAltRatio();
 
 				//check alt allelic ratio 
-				if (minimumAltTNRatio != 0.0){
-					if (normRto == 0) normRto = 0.001;
-					if (tumRto == 0) tumRto = 0.001;
+				if (minimumAltTNRatio != 0.0 && normRto !=0){
 					double rto = tumRto/normRto;
 					if (rto < minimumAltTNRatio){
+						r.setFilter(VCFRecord.FAIL);
+						continue;
+					}
+				}
+				
+				//check alt allelic diff 
+				if (minimumTNFractionDiff != 0.0 ){
+					double diff = tumRto - normRto;
+					if (diff < minimumTNFractionDiff){
 						r.setFilter(VCFRecord.FAIL);
 						continue;
 					}
@@ -120,23 +118,6 @@ public class ScalpelVCFParser {
 			e.printStackTrace();
 		}
 	}
-
-	/*public void scoreRecords(VCFParser parser) throws Exception{
-		int numFail = 0;
-		int numPass = 0;
-		int numOnTarget = 0;
-		
-		VCFRecord[] records = parser.getVcfRecords();
-		for (VCFRecord vcf: records){
-			if (vcf.getFilter().equals(VCFRecord.FAIL)) numFail++;
-			else {
-				numPass++;
-				String test = vcf.getChromosome()+":"+(vcf.getPosition()+1);
-				if (key.contains(test)) numOnTarget++;
-			}
-		}
-		System.out.println(numPass+"\t"+numFail+"\t"+numOnTarget);
-	}*/
 	
 	public void printRecords(VCFParser parser, File f) throws Exception{
 		Gzipper out = new Gzipper (f);
@@ -235,6 +216,7 @@ public class ScalpelVCFParser {
 					case 'r': minimumAltTNRatio = Double.parseDouble(args[++i]); break;
 					case 't': minimumTumorAltFraction = Double.parseDouble(args[++i]); break;
 					case 'n': maximumNormalAltFraction = Double.parseDouble(args[++i]); break;
+					case 'd': minimumTNFractionDiff = Double.parseDouble(args[++i]); break;
 					case 'f': markFail = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -259,7 +241,7 @@ public class ScalpelVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Scalpel VCF Parser: July 2016                         **\n" +
+				"**                            Scalpel VCF Parser: Jan 2017                         **\n" +
 				"**************************************************************************************\n" +
 				"Filters Scalpel VCF INDEL files for various thresholds.  Replaces the FILTER field \n"+
 				"with . or FAIL, adds tumor DP and AF values to the info field.\n"+
@@ -272,10 +254,11 @@ public class ScalpelVCFParser {
 				"-t Minimum tumor alt allelic fraction, defaults to 0.05\n"+
 				"-n Maximum normal alt allelic fraction, defaults to 0.1\n"+
 				"-r Minimum alt Tum/Norm allelic ratio, defaults to 1.6\n"+
+				"-d Minimum alt Tum-Norm difference, defaults to 0.\n"+
 				"-f Mark variants failing thresholds FAIL instead of not printing\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/Scalpel/VCFParser -v /VCFFiles/ -m 150 -a 200\n"+
-				"      -r 2 -n 0.2 -t 0.03  \n\n" +
+				"      -r 2 -n 0.2 -t 0.03  -d 0.03\n\n" +
 
 
 				"**************************************************************************************\n");
