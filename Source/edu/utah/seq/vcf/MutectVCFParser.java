@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
+import util.gen.Num;
 
 /**Simple MuTech vcf parser.  */
 public class MutectVCFParser {
@@ -21,6 +22,9 @@ public class MutectVCFParser {
 	private double minimumTNRatio = 0;
 	private double maximumNormalAltFraction = 1;
 	private double minimumTumorAltFraction = 0;
+	private boolean excludeNonPass = false;
+	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
+	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
 	
 	public MutectVCFParser (String[] args) {
 
@@ -33,6 +37,7 @@ public class MutectVCFParser {
 		System.out.println(minimumTNRatio+"\tMin T/N allelic fraction ratio");
 		System.out.println(maximumNormalAltFraction+"\tMax N allelic fraction");
 		System.out.println(minimumTumorAltFraction+"\tMin T allelic fraction");
+		System.out.println(excludeNonPass+"\tRemove non PASS FILTER field records.");
 		
 		System.out.println("\nName\tPassing\tFailing");
 		for (File vcf: vcfFiles){
@@ -79,6 +84,10 @@ public class MutectVCFParser {
 				if (pass && minimumTumorAltFraction !=0){
 					if (tumRto < minimumTumorAltFraction) pass = false;
 				}
+				//check PASS?
+				if (pass && excludeNonPass && r.getFilter().toLowerCase().contains("pass") == false){
+					pass = false;
+				}
 				
 				//build txt output
 				ArrayList<String> al = new ArrayList<String>();
@@ -115,6 +124,8 @@ public class MutectVCFParser {
 		int numFail = 0;
 		int numPass = 0;
 
+		//print header
+		boolean addInfo = true;
 		for (String h : parser.getStringComments()) {
 			//watch out for #CHROM line, switch TUMOR NORMAL to NORMAL and TUMOR to match others
 			if (h.startsWith("#CHROM")){
@@ -126,19 +137,30 @@ public class MutectVCFParser {
 				t[10] = tu;
 				h = Misc.stringArrayToString(t, "\t");
 			}
+			else if (addInfo && h.startsWith("##INFO")){
+				out.println(afInfo);
+				out.println(dpInfo);
+				addInfo = false;
+			}
 			out.println(h);
 		}
+		
+		//print records
 		VCFRecord[] records = parser.getVcfRecords();
 		for (VCFRecord vcf: records){
-			String[] t = Misc.TAB.split(vcf.getOriginalRecord());
-			//flip t[9] and t[10]
-			String tu = t[9];
-			String no = t[10];
-			t[9] = no;
-			t[10] = tu;
-			if (vcf.getFilter().equals(VCFRecord.FAIL))numFail++;
-			
+			if (vcf.getFilter().equals(VCFRecord.FAIL)) numFail++;
 			else {
+				String[] t = Misc.TAB.split(vcf.getOriginalRecord());
+				
+				//add DP and AF for tumor to INFO
+				String tumorAF = Num.formatNumberJustMax(vcf.getSample()[0].getAltRatio(), 4);
+				t[7] = "DP=" + vcf.getSample()[0].getReadDepthDP()+ ";AF=" + tumorAF + ";"+ t[7] ;
+				
+				//flip t[9] and t[10]
+				String tu = t[9];
+				String no = t[10];
+				t[9] = no;
+				t[10] = tu;
 				numPass++;
 				t[2] = "Mutect_"+numPass;
 				out.println(Misc.stringArrayToString(t, "\t"));
@@ -175,6 +197,7 @@ public class MutectVCFParser {
 					case 'o': minimumNormalReadDepth = Integer.parseInt(args[++i]); break;
 					case 'd': minimumTNFractionDiff = Double.parseDouble(args[++i]); break;
 					case 'r': minimumTNRatio = Double.parseDouble(args[++i]); break;
+					case 'p': excludeNonPass = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -202,7 +225,8 @@ public class MutectVCFParser {
 				"**                               Mutect VCF Parser: Jan 2017                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses Mutect2 VCF files, filtering for read depth, allele frequency diff ratio, etc.\n"+
-				"Splits files into pass and fail with no modification.\n"+
+				"Inserts AF and DP into for the tumor sample into the INFO field. Changes the sample\n"+
+				"order to Normal and Tumor and updates the #CHROM line.\n"+
 
 				"\nRequired Options:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).\n" +
@@ -212,6 +236,7 @@ public class MutectVCFParser {
 				"-o Minimum normal alignment depth, defaults to 0.\n"+
 				"-d Minimum T-N AF difference, defaults to 0.\n"+
 				"-r Minimum T/N AF ratio, defaults to 0.\n"+
+				"-p Remove non PASS filter field records.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/MutectVCFParser -v /VCFFiles/ -t 0.05 -n 0.5 -u 100\n"+
 				"        -o 20 -d 0.05 -r 2\n\n"+

@@ -31,6 +31,7 @@ public class StrelkaVCFParser {
 	private String afFormat = "##FORMAT=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency\">";
 	private String gtFormat = "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">";
 	private double minimumTumorAltFraction = 0;
+	private boolean excludeNonPass = false;
 	
 	public StrelkaVCFParser (String[] args) { 
 
@@ -43,6 +44,7 @@ public class StrelkaVCFParser {
 		System.out.println(minimumTNRatio+"\tMin T/N allelic fraction ratio");
 		System.out.println(maximumNormalAltFraction+"\tMax N allelic fraction");
 		System.out.println(minimumTumorAltFraction+"\tMin T allelic fraction");
+		System.out.println(excludeNonPass+"\tRemove non PASS FILTER field records.");
 		
 		System.out.println("\nName\tPassing\tFailing");
 		for (File vcf: vcfFiles){
@@ -143,6 +145,10 @@ public class StrelkaVCFParser {
 				//check tumor alt fraction?
 				if (pass && minimumTumorAltFraction !=0){
 					if (tumRto < minimumTumorAltFraction) pass = false;
+				}
+				//check PASS?
+				if (pass && excludeNonPass && r.getFilter().toLowerCase().contains("pass") == false){
+					pass = false;
 				}
 				
 				//set QSI QSS score
@@ -264,6 +270,7 @@ public class StrelkaVCFParser {
 					case 'o': minimumNormalReadDepth = Integer.parseInt(args[++i]); break;
 					case 'd': minimumTNFractionDiff = Double.parseDouble(args[++i]); break;
 					case 'r': minimumTNRatio = Double.parseDouble(args[++i]); break;
+					case 'p': excludeNonPass = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -302,6 +309,7 @@ public class StrelkaVCFParser {
 				"-o Minimum normal alignment depth, defaults to 0.\n"+
 				"-d Minimum T-N AF difference, defaults to 0.\n"+
 				"-r Minimum T/N AF ratio, defaults to 0.\n"+
+				"-p Remove non PASS filter field records.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -t 0.05\n"+
 				"        -n 0.5 -u 100 -o 20 -d 0.05 -r 2\n\n"+
