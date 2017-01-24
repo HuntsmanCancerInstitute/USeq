@@ -1,9 +1,5 @@
 package edu.utah.seq.parsers.mpileup;
 
-import java.io.BufferedReader;
-import java.io.File;
-
-import util.gen.IO;
 import util.gen.Misc;
 
 public class MpileupLine {

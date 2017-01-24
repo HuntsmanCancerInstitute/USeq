@@ -55,6 +55,31 @@ public class MpileupSample {
 	
 	public MpileupSample() {}
 
+	/**Appends a comma delimited list counts of observed base observations that pass the minBaseQual: GATC forward, GATC reverse, ins, del, as well as the num that failed minBaseQual so 11 values*/
+	public void appendCounts(StringBuilder sb, boolean combineStrands){
+		if (combineStrands){
+			for (int i=0; i< forwardGATC.length; i++){
+				sb.append((forwardGATC[i]+reverseGATC[i]));
+				sb.append(",");
+			}
+		}
+		else {
+			for (int c: forwardGATC){
+				sb.append(c);
+				sb.append(",");
+			}
+			for (int c: reverseGATC){
+				sb.append(c);
+				sb.append(",");
+			}
+		}
+		sb.append(insertions);
+		sb.append(",");
+		sb.append(deletions);
+		sb.append(",");
+		sb.append(poorQualBases);
+	}
+	
 	public void debug(){
 		System.out.println("LN: "+record.getLine());
 		System.out.println("BS: "+baseSymbols);
@@ -71,8 +96,10 @@ public class MpileupSample {
 	}
 	
 	public void printMinInfo(){
-		System.out.println(pass+" "+record.getChr()+" "+record.getZeroPos()+" "+readCoverageAll+" "+ getAlleleFreqNonRef());
+		System.out.println(record.getChr()+" "+(record.getZeroPos()+1)+" "+readCoverageAll+" "+ getAlleleFreqNonRefPlusIndels());
 	}
+	
+	
 	
 	public void scanBases(char[] bases){
 		//fetch qualities
@@ -157,6 +184,11 @@ public class MpileupSample {
 	public double getAlleleFreqNonRef(){
 		double nonRefCounts = getNonRefBaseCounts();
 		return nonRefCounts/((double)(readCoverageForwardBases+ readCoverageReverseBases));
+	}
+	
+	public double getAlleleFreqNonRefPlusIndels(){
+		double nonRefCounts = getNonRefBaseCounts()+ insertions + deletions;
+		return nonRefCounts/((double)(readCoverageAll));
 	}
 	
 	public int getNonRefBaseCounts() {
@@ -249,6 +281,14 @@ public class MpileupSample {
 
 	public int getMpileupReadCount() {
 		return mpileupReadCount;
+	}
+
+	public int getInsertions() {
+		return insertions;
+	}
+
+	public int getDeletions() {
+		return deletions;
 	}
 
 
