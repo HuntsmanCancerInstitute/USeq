@@ -97,7 +97,10 @@ public class VCFComparator {
 			scoredCallsAL.add(new ScoredCalls(Misc.removeExtension(vcfTest.getName())));
 
 			//call after comparing!
-			if (saveDirectory != null) printParsedDatasets();
+			if (saveDirectory != null) {
+				printParsedDatasets();
+				printIntersectingDatasets();
+			}
 
 		}
 		
@@ -539,7 +542,7 @@ public class VCFComparator {
 			createIntervalTreesForBedCalls();
 		}
 		else if (keyParser == null && keyBedCalls == null){			
-			keyParser = new VCFParser(vcfKey, true, requireGenotypeMatch, false);		
+			keyParser = new VCFParser(vcfKey, true, true, false);		
 			if (removeNonPass){				
 				keyParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
 				keyParser.filterVCFRecords(VCFRecord.PASS);
@@ -568,7 +571,7 @@ public class VCFComparator {
 		results.append(res);
 		
 		//parse test variants!
-		testParser = new VCFParser(vcfTest, true, requireGenotypeMatch, useVQSLOD);
+		testParser = new VCFParser(vcfTest, true, true, useVQSLOD);
 		
 		if (removeNonPass){
 			testParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
@@ -753,6 +756,73 @@ public class VCFComparator {
 			e.printStackTrace();
 		}
 	}
+	
+	public void printIntersectingDatasets(){
+		//any to print?
+		if (testMatchingVCF == null || testMatchingVCF.length ==0) return;
+		try {
+			//fetch names for the key and test variant data
+			String filter = "All_";
+			if (removeSNPs) filter = "NonSNP_";
+			else if (removeNonSNPs) filter = "SNP_";
+			String keyName = Misc.removeExtension(vcfKey.getName()); 
+			String testName = Misc.removeExtension(vcfTest.getName());
+			File spreadsheet = new File (saveDirectory, "pairedMatches_"+filter+keyName+"_"+testName+".txt.gz");
+			Gzipper out = new Gzipper(spreadsheet);
+			keyName= keyName+"\t";
+			testName= testName+"\t";
+			
+			//print header
+			int maxNumSamples = testMatchingVCF[0].getKey().getSample().length;
+			int numSInT = testMatchingVCF[0].getTest().getSample().length;
+			if (numSInT> maxNumSamples) maxNumSamples = numSInT;
+			out.print("#Dataset\tChr\tPos\tRef\tAlt\tFilter\t");
+			for (int i=0; i< maxNumSamples; i++){
+				out.print("AF_Sample");
+				out.print(i);
+				out.print("\tDP_Sample");
+				out.print(i);
+				out.print("\t");
+			}
+			out.println("VCFRecord");
+			//print records
+			for (VCFMatch match: testMatchingVCF){
+				out.print(keyName);
+				out.println(fetchSpreadSheetRecord(match.getKey(), maxNumSamples));
+				out.print(testName);
+				out.println(fetchSpreadSheetRecord(match.getTest(), maxNumSamples));
+			}
+			out.close();
+		} catch (Exception e){
+			e.printStackTrace();
+		}
+	}
+	
+	public static String fetchSpreadSheetRecord(VCFRecord r, int maxNumSamples){
+		StringBuilder sb = new StringBuilder();
+		//build txt output
+		sb.append(r.getChromosome()); sb.append("\t");
+		sb.append((r.getPosition()+1)); sb.append("\t");
+		sb.append(r.getReference()); sb.append("\t");
+		sb.append(Misc.stringArrayToString(r.getAlternate(), ",")); sb.append("\t");
+		//filter output
+		String filt = Misc.TAB.split(r.getOriginalRecord())[6];
+		sb.append(filt); sb.append("\t");
+		
+		//print samples, some might be blank
+		VCFSample[] samples = r.getSample();
+		int numSamples = 0;
+		if (samples !=null ) numSamples = samples.length;
+		for (int i=0; i< maxNumSamples; i++){
+			if (samples == null || i >= numSamples) sb.append(".\t.\t");
+			else {
+				sb.append(samples[i].getAltRatio()); sb.append("\t");
+				sb.append(samples[i].getReadDepthDP()); sb.append("\t");
+			}
+		}
+		sb.append(r.getOriginalRecord());
+		return sb.toString();
+	}
 
 
 
@@ -846,7 +916,7 @@ public class VCFComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Comparator : June 2015                          **\n" +
+				"**                              VCF Comparator : Jan 2017                           **\n" +
 				"**************************************************************************************\n" +
 				"Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls\n" +
 				"that fall in the common interrogated regions are compared. WARNING tabix gzipped files\n" +
