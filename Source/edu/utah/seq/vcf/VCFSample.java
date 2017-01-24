@@ -22,6 +22,7 @@ public class VCFSample {
 	private String alleleCounts = null;
 	private String referenceCounts = null;
     private String alternateCounts = null;
+    private double alleleFreqAF = -1;
     private String[] data = null;
     private String[] format = null;
     private boolean missingQual = false;
@@ -35,14 +36,12 @@ public class VCFSample {
 		this.originalRecord = sample;
 		this.originalFormat = sampleFormat;
 		//is it a no call?
-		if (sample.equals(".") || sample.substring(0,3).startsWith("./.") ){
-			noCall = true;
-		}
+		if (sample.equals(".") || sample.equals("./.") ) noCall = true;
 		else {
 			data = VCFParser.COLON.split(sample);
 			format = VCFParser.COLON.split(sampleFormat);
 			if (data.length != format.length) throw new Exception("Incorrect number of fields in sample -> "+sample+" for indicated format -> "+sampleFormat);
-			//attempt to parse GT, DP, GQ
+			//attempt to parse GT, DP, GQ, AF
 			for (int i=0; i< format.length; i++){
 				if (format[i].equals("GT")) {
 					genotypeGT = data[i];
@@ -56,8 +55,12 @@ public class VCFSample {
 						noCall = true;
 						break;
 					} else {
-						readDepthDP = Integer.parseInt(data[i]);
+						//only set if not set
+						if (readDepthDP == -1) readDepthDP = Integer.parseInt(data[i]);
 					}
+				}
+				else if (format[i].equals("AF")) {
+					alleleFreqAF = Double.parseDouble(data[i]);
 				}
 				else if (format[i].equals("GQ")) {
 					if (data[i].equals(".")) {
@@ -73,8 +76,8 @@ public class VCFSample {
 					if (multiple.length > 1) {
 						if (referenceCounts == null)  referenceCounts = multiple[0];
 						alternateCounts = multiple[1];
-						//set DP ?
-						if (readDepthDP == -1) readDepthDP = Integer.parseInt(referenceCounts) + Integer.parseInt(alternateCounts);
+						//set DP, this will override anything set by DP
+						readDepthDP = Integer.parseInt(referenceCounts) + Integer.parseInt(alternateCounts);
 						
 					} else if (multiple.length ==  1) {
 						this.alternateCounts = multiple[0];
@@ -114,10 +117,15 @@ public class VCFSample {
 	
 	/**Returns -1 if either ref or alt counts are null.*/
 	public double getAltRatio(){
+		if (alleleFreqAF != -1) return alleleFreqAF;
 		if (referenceCounts == null || alternateCounts == null) return -1;
-		double ref = Double.parseDouble(referenceCounts);
 		double alt = Double.parseDouble(alternateCounts);
-		return alt/(alt+ref);
+		if (alt == 0.0) alleleFreqAF = 0.0;
+		else {
+			double ref = Double.parseDouble(referenceCounts);
+			alleleFreqAF = alt/(alt+ref);
+		}
+		return alleleFreqAF;
 	}
 	
 	public String getReferenceCount() {

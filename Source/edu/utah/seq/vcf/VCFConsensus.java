@@ -67,6 +67,7 @@ public class VCFConsensus {
 					if (r.getRsNumber() == null || r.getRsNumber().length() == 0) Misc.printErrAndExit("\nA primary record was found with no ID info. Please provide a primaryName to append to the merged output, see "+r.getOriginalRecord());
 					//add the secondary id to the primary
 					r.appendId(sec);
+					r.appendFilter(secondaryRecords.get(prim).getFilter());
 					secondaryRecords.remove(prim);
 					numInCommon++;
 				}
@@ -154,10 +155,10 @@ public class VCFConsensus {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Consensus : Dec 2016                            **\n" +
+				"**                              VCF Consensus : Jan 2016                            **\n" +
 				"**************************************************************************************\n" +
 				"Merges VCF files with the same #CHROM line. Primary records with the same chrPosRefAlt\n"+
-				"as a secondary are saved after appending the ID of the secondary, the secondary\n"+
+				"as a secondary are saved after appending the ID and FILTER, the secondary\n"+
 				"is dropped. Headers are joined keeping the primary header line when the same. Run\n" +
 				"iteratively with multiple VCF files you'd like to merge.  Good for combining multiple\n"+
 				"variant callers run on the same sample. The ID field lists which callers found each\n"+

@@ -431,7 +431,13 @@ public class VCFRecord implements Comparable<VCFRecord> {
 			if (rsNumber.length() == 0) rsNumber = primaryName;
 			else rsNumber = rsNumber+";"+primaryName;
 		}
-		
+	}
+	public void appendFilter(String otherFilter) {
+		if (otherFilter.equals(".")) return;
+		if (filter.contains(otherFilter)==false) {
+			if (filter.length() == 0) filter = otherFilter;
+			else filter = filter+";"+otherFilter;
+		}
 	}
 
 }
