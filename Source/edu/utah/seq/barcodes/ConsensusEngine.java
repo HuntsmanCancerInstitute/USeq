@@ -26,6 +26,7 @@ public class ConsensusEngine {
 	private double minimumIdentity = 0.66;
 	private char[][] seq;
 	private int[][] qual;
+	private int familySize;
 	
 	//counters
 	private double gCount = 0;
@@ -58,8 +59,10 @@ public class ConsensusEngine {
 	 * The first's name is used as the representative for the fastq return
 	 * @return String[4] representing a fastq record.  */
 	public String[] callConsensus(SAMRecord[] sams) throws IOException {
+		familySize = sams.length;
+		
 		//just one?
-		if (sams.length == 1) return ConsensusEngine.exportFastq(sams[0]);
+		if (familySize == 1) return ConsensusEngine.exportFastq(sams[0]);
 		
 		loadSeqQualArrays(sams);
 		nSeqQualArray();
@@ -74,7 +77,7 @@ public class ConsensusEngine {
 	private String[] buildFastq(SAMRecord sam) {
 		String[] fastqRecord = new String[4];
 		//names
-		fastqRecord[0] = "@"+sam.getReadName();
+		fastqRecord[0] = "@"+sam.getReadName()+":FS:"+familySize;
 		fastqRecord[2] = "+";
 		
 		String seq = new String(consensusSeq);

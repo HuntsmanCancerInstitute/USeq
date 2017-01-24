@@ -247,8 +247,9 @@ public class BarcodeChromMerger implements Runnable {
 				
 				//collapse clusters
 				for (SAMRecord[] c2Col : clusters){
+					int familySize = c2Col.length;
 					//just one, thus no cluster
-					if (c2Col.length == 1) writeOutSingle(c2Col[0]);
+					if (familySize == 1) writeOutSingle(c2Col[0]);
 					
 					else {
 						//call consensus on these secondOfPairs with no mapped mates in file
@@ -256,13 +257,15 @@ public class BarcodeChromMerger implements Runnable {
 						
 						//fetch unmapped mates, these would be first of pair
 						SAMRecord[] unmapped = collectMates(c2Col);
-						
 						// no mates? write out as single end, otherwise cluster and write as paired
 						if (unmapped == null) writeOutSingleEndFastq(fastq);
-						else writeOutPairedEndFastq(consensusEngine.callConsensus(unmapped), fastq);
+						else {
+							if (unmapped.length != familySize) Misc.printErrAndExit("Error: mate numbers don't match? "+familySize+" vs "+unmapped.length);
+							writeOutPairedEndFastq(consensusEngine.callConsensus(unmapped), fastq);
+						}
 					}
 					//increment family size in histogram
-					famSizeHist.count(c2Col.length);
+					famSizeHist.count(familySize);
 				}
 			}
 		}	
@@ -297,7 +300,10 @@ public class BarcodeChromMerger implements Runnable {
 				//attempt to collect mates of these first of pairs 
 				SAMRecord[] mates = collectMates(c2Col);
 				if (mates == null) writeOutSingleEndFastq(fastq);
-				else writeOutPairedEndFastq(fastq, consensusEngine.callConsensus(mates));
+				else {
+					if (mates.length != c2Col.length) Misc.printErrAndExit("Error: mate numbers don't match for first of pair? "+c2Col.length+" vs "+mates.length);
+					writeOutPairedEndFastq(fastq, consensusEngine.callConsensus(mates));
+				}
 				//increment family size in histogram
 				famSizeHist.count(c2Col.length);
 			}
