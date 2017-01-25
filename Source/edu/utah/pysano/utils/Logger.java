@@ -1,4 +1,4 @@
-package edu.utah.tomato.util;
+package edu.utah.pysano.utils;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -8,14 +8,14 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
-public class TFLogger {
+public class Logger {
 	private BufferedWriter logWriter = null;
 	private BufferedWriter localLogWriter = null;
 	private String logLevel = null;
 	private String lastEror = "";
 	private boolean failed = false;
 
-	public TFLogger(File logDirectory, File localDirectory, String logPrefix, String logLevel) {
+	public Logger(File logDirectory, File localDirectory, String logPrefix, String logLevel) {
 		this.logLevel = logLevel;
 
 		DateFormat dateFormat = new SimpleDateFormat("yyyyMMdd_HHmmss");
@@ -37,7 +37,7 @@ public class TFLogger {
 	    	logWriter = new BufferedWriter(new FileWriter(new File(logDir,logName)));
 	    	localLogWriter = new BufferedWriter(new FileWriter(new File(localDirectory,logName)));
 	    } catch (IOException ioex) {
-	    	writeErrorMessage("Could not open TomatoFarmer logging file",true);
+	    	writeErrorMessage("Could not open TF logging file",true);
 	    }
 	    
 	}
@@ -52,7 +52,7 @@ public class TFLogger {
 			this.logWriter.flush();
 			this.localLogWriter.flush();
 		} catch (IOException ioex) {
-			writeErrorMessage("Error writing to TomatoFarmer log file.  Exiting run, please contact core with the run log: bioinformaticscore@utah.edu\n",true);
+			writeErrorMessage("Error writing to TF log file.  Exiting run, please contact core with the run log: bioinformaticscore@utah.edu\n",true);
 			System.exit(1);
 		}
 	}
@@ -106,7 +106,7 @@ public class TFLogger {
 			logWriter.close();
 			localLogWriter.close();
 		} catch (IOException ioex) {
-			writeErrorMessage("Failed to close TomatoFarmer logging file",true);
+			writeErrorMessage("Failed to close TF logging file",true);
 		}
 	}
 	

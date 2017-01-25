@@ -1,4 +1,4 @@
-package edu.utah.tomato.daemon;
+package edu.utah.pysano.daemon;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,11 +10,12 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadPoolExecutor;
 
-import edu.utah.tomato.util.TFLogger;
+import edu.utah.pysano.utils.Logger;
 
-public class TFThreadDaemon extends Thread {
+
+public class CThreadDaemon extends Thread {
 	
-	private TFLogger logFile = null;
+	private Logger logFile = null;
 	private List<Callable<Boolean>> taskList = null; 
 	private ExecutorService pool = null;
 	private ExecutorCompletionService<Boolean> service;
@@ -34,16 +35,14 @@ public class TFThreadDaemon extends Thread {
 	 * @param totalJobs Number of jobs the daemon will handle.  Daemon exits once this is reached.
 	 * @param concurrentJobs Number of concurrent jobs daemon will handle.  this limits cluster workload
 	 */
-	public TFThreadDaemon(TFLogger logFile, String commandString, Integer totalJobs, Integer concurrentJobs) {
+	public CThreadDaemon(Logger logFile, String commandString, int totalJobs, int concurrentJobs) {
 		this.logFile = logFile;
 		this.commandString = commandString;
 		this.totalJobs = totalJobs;
 		this.taskList = new ArrayList<Callable<Boolean>>();
 		this.pool = Executors.newFixedThreadPool(concurrentJobs);
 		this.service = new ExecutorCompletionService<Boolean>(pool);
-		this.concurrentJobs = concurrentJobs;
-		
-		
+		this.concurrentJobs = concurrentJobs;	
 	}
 	
 	
