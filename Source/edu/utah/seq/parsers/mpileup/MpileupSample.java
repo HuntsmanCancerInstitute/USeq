@@ -246,6 +246,21 @@ public class MpileupSample {
 
 		return maskedBaseCalls;
 	}
+	
+	public double findMaxSnvAF(){
+		double maxAF = Double.MIN_NORMAL;
+		char ref = record.getRef().charAt(0);
+		int[] indexesToScan = null;
+		if (ref == 'G') indexesToScan = new int[]{A_INDEX, T_INDEX, C_INDEX};
+		else if (ref == 'A') indexesToScan = new int[]{G_INDEX, T_INDEX, C_INDEX};
+		else if (ref == 'T') indexesToScan = new int[]{G_INDEX,A_INDEX,C_INDEX};
+		else if (ref == 'C') indexesToScan = new int[]{G_INDEX,A_INDEX, T_INDEX};
+		for (int index: indexesToScan){
+			double af = getAlleleFreq(index);
+			if (af> maxAF) maxAF = af;
+		}
+		return maxAF;
+	}
 
 	public int getReadCoverageAll() {
 		return readCoverageAll;
