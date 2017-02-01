@@ -123,8 +123,12 @@ public class EstimateErrorRates{
 				if (ml.getChr() == null) continue;
 				if (outCounts != null) saveCounts(ml);
 
-				//merge sample counts
+				//merge sample counts?
 				MpileupSample[] toMerge = ml.getSamples();
+				if (toMerge == null || toMerge.length == 0) {
+					workingSamples.clear();
+					continue;
+				}
 
 				if (samplesToProcess != null){
 					MpileupSample[] sub = new MpileupSample[samplesToProcess.length];
@@ -134,7 +138,8 @@ public class EstimateErrorRates{
 					}
 					toMerge = sub;
 				}
-				MpileupSample sample = MpileupSample.mergeSampleCounts(toMerge);
+				MpileupSample sample = toMerge[0];
+				if (toMerge.length > 1) sample = MpileupSample.mergeSampleCounts(toMerge);
 
 				//check quality
 				checkQuality(sample);
@@ -167,6 +172,7 @@ public class EstimateErrorRates{
 
 		}catch (Exception e){
 			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem paring mpileup file! Aborting."+mpileupFile);
 		}
 
 	}
@@ -367,7 +373,7 @@ public class EstimateErrorRates{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Estimate Error Rates: Jan 2016                        **\n" +
+				"**                            Estimate Error Rates: Jan 2017                        **\n" +
 				"**************************************************************************************\n" +
 				"EER scans an mpileup file looking for short windows of adjacent bps (default 7) where\n"+
 				"1) each base exceeds a minimum read depth of high quality bases (>100)\n"+
@@ -395,9 +401,9 @@ public class EstimateErrorRates{
 				"-s Comma delimited list (zero is 1st sample, no spaces) of sample indexes to merge,\n"+
 				"     defaults to all.\n"+
 				"-c File path to save a count table of parsed observations, defaults to none.\n"+
-				"-r Full path to R (version 3+) loaded with DESeq2, samr, and gplots defaults to\n"+
-				"       '/usr/bin/R' file, see http://www.bioconductor.org . Type 'library(DESeq2);\n"+
-				"       library(samr); library(gplots)' in R to see if they are installed. \n"+
+				//"-r Full path to R (version 3+) loaded with DESeq2, samr, and gplots defaults to\n"+
+				//"       '/usr/bin/R' file, see http://www.bioconductor.org . Type 'library(DESeq2);\n"+
+				//"       library(samr); library(gplots)' in R to see if they are installed. \n"+
 
 				"\nExample: java -Xmx4G -jar pathToUSeq/Apps/EstimateErrorRates -m normExo.mpileup.gz\n" +
 				"     -r 200 -i 0.15 -f 2 -s 0,3,4 -c countTable.txt.gz\n" +
