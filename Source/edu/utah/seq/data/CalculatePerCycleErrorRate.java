@@ -126,7 +126,7 @@ public class CalculatePerCycleErrorRate {
 					names[nameIndex++] = name;
 				}
 				else {
-					System.out.print("\t"+name1+"\t"+name1+"_err\t"+name1+"_obs\t"+name2+"_err\t"+name2+"_obs");
+					System.out.print("\t"+name1+"_err\t"+name1+"_incorr\t"+name1+"_total\t"+name2+"_err\t"+name2+"_incorr\t"+name2+"_total");
 					names[nameIndex++] = name;
 					names[nameIndex++] = name;
 				}
