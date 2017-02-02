@@ -111,7 +111,7 @@ public class VCFBackgroundScanner {
 				if (addInfo && record.startsWith("##INFO=")) {
 					vcfOut.println("##INFO=<ID=BKZ,Number=1,Type=Float,Description=\"Smallest AF z-score calculated from background AFs over effected bases. "
 							+ "Values < ~4 are suspicous, non reference observations are likely present in the background samples.\">");
-					vcfOut.println("##INFO=<ID=BKAF,Type=String,Description=\"Non-reference AFs from the background samples used to calculate the BKZ.\">");
+					vcfOut.println("##INFO=<ID=BKAF,Number=1,Type=String,Description=\"Non-reference AFs from the background samples used to calculate the BKZ.\">");
 					addInfo = false;
 				}
 				vcfOut.println(record);
