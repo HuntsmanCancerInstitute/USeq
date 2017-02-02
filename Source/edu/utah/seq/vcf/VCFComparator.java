@@ -542,7 +542,7 @@ public class VCFComparator {
 			createIntervalTreesForBedCalls();
 		}
 		else if (keyParser == null && keyBedCalls == null){			
-			keyParser = new VCFParser(vcfKey, true, requireGenotypeMatch, false);		
+			keyParser = new VCFParser(vcfKey, true, true, false);		
 			if (removeNonPass){				
 				keyParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);
 				keyParser.filterVCFRecords(VCFRecord.PASS);
@@ -571,7 +571,7 @@ public class VCFComparator {
 		results.append(res);
 		
 		//parse test variants!
-		testParser = new VCFParser(vcfTest, true, requireGenotypeMatch, useVQSLOD);
+		testParser = new VCFParser(vcfTest, true, true, useVQSLOD);
 		
 		if (removeNonPass){
 			testParser.setFilterFieldPeriodToTextOnAllRecords(VCFRecord.PASS);

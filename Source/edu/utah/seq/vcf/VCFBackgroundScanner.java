@@ -40,6 +40,7 @@ public class VCFBackgroundScanner {
 	private int minReadCoverage = 20;
 	private int minNumSamples = 3;
 	private boolean verbose = false;
+	private boolean removeNonZScoredRecords = false;
 	private double minimumZScore = 0;
 	private double maxSampleAF = 0.3;
 	
@@ -85,7 +86,8 @@ public class VCFBackgroundScanner {
 				
 				//print summary stats
 				if (tooFewSamples.size() !=0){
-					System.err.println("WARNING, the following did not have enough background samples present to calculate a z-score. Saving as unmodified records. Visually inspect!");
+					System.err.println("WARNING, the following did not have any mpileup lines (e.g. outside the compiled regions?) or enough background "
+							+ "samples passing thresholds to calculate a z-score. ");
 					System.err.println(Misc.stringArrayListToString(tooFewSamples, "\n"));
 				}
 				System.out.println("\t#Rec="+numRecords+" #Saved="+numSaved+" #NotScored="+numNotScored+" #FailingBKZ="+numFailingZscore+"\n");
@@ -107,7 +109,8 @@ public class VCFBackgroundScanner {
 			if (record.length() == 0) continue;
 			if (record.startsWith("#")){
 				if (addInfo && record.startsWith("##INFO=")) {
-					vcfOut.println("##INFO=<ID=BKZ,Number=1,Type=Float,Description=\"Smallest AF z-score calculated from background AFs over effected bases. Values < ~4 are suspicous, non reference observations are likely present in the background samples.\">");
+					vcfOut.println("##INFO=<ID=BKZ,Number=1,Type=Float,Description=\"Smallest AF z-score calculated from background AFs over effected bases. "
+							+ "Values < ~4 are suspicous, non reference observations are likely present in the background samples.\">");
 					vcfOut.println("##INFO=<ID=BKAF,Type=String,Description=\"Non-reference AFs from the background samples used to calculate the BKZ.\">");
 					addInfo = false;
 				}
@@ -135,7 +138,16 @@ public class VCFBackgroundScanner {
 		
 		//interbase coor of effected bps
 		int[] startStop = QueryIndexFileLoader.fetchEffectedBps(fields, true);
-		if (startStop == null) throw new IOException ("Failed to parse the effected bps for this variant:\n"+record);
+		if (startStop == null) {
+			System.err.println("Failed to parse the effected bps.");
+			if (removeNonZScoredRecords == false) {
+				vcfOut.println(record);
+				numSaved++;
+			}
+			tooFewSamples.add(record);
+			numNotScored++;
+			return;
+		}
 		
 		//pull mpileup records, if none then warn and save vcf record
 		int start = startStop[0]+1-bpBuffer;
@@ -143,11 +155,13 @@ public class VCFBackgroundScanner {
 		String tabixCoor = fields[0]+":"+start+"-"+(startStop[1]+bpBuffer);
 		TabixReader.Iterator it = fetchInteratorOnCoordinates(tabixCoor);
 		if (it == null) {
-			
-			vcfOut.println(record);
+			if (removeNonZScoredRecords == false) {
+				vcfOut.println(record);
+				numSaved++;
+			}
 			tooFewSamples.add(record);
 			numNotScored++;
-			numSaved++;
+			
 			return;
 		}
 		
@@ -178,10 +192,12 @@ public class VCFBackgroundScanner {
 		
 		//was a z-score calculated?
 		if (minZScore == Double.MAX_VALUE) {
-			vcfOut.println(record);
+			if (removeNonZScoredRecords == false) {
+				vcfOut.println(record);
+				numSaved++;
+			}
 			tooFewSamples.add(record);
 			numNotScored++;
-			numSaved++;
 		}
 		
 		//append min zscore and save
@@ -212,11 +228,6 @@ public class VCFBackgroundScanner {
 			sb.append(Num.formatNumber(toExamine[i].getAlleleFreqNonRefPlusIndels(), 4));
 		}
 		return sb.toString();
-	}
-	
-	private void append4Decimals(double num, StringBuilder sb){
-		if (num ==0) sb.append("0");
-		else sb.append(fourDecimalMax.format(num));
 	}
 
 	private void printPileupInfo(MpileupLine ml, MpileupSample[] toExamine, double zscore) {
@@ -309,6 +320,7 @@ public class VCFBackgroundScanner {
 					case 'q': minBaseQuality = Integer.parseInt(args[++i]); break;
 					case 'c': minReadCoverage = Integer.parseInt(args[++i]); break;
 					case 'a': minNumSamples = Integer.parseInt(args[++i]); break;
+					case 'e': removeNonZScoredRecords = true; break;
 					case 'd': verbose = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
@@ -367,6 +379,7 @@ public class VCFBackgroundScanner {
 		System.out.println(minBaseQuality+"\tMin mpileup sample base quality");
 		System.out.println(maxSampleAF+"\tMax mpileup sample AF");
 		System.out.println(minNumSamples+"\tMin # samples for z-score calc");
+		System.out.println(removeNonZScoredRecords+ "\tExclude vcf records that could not be z-scored");
 		System.out.println(verbose+"\tVerbose");
 		System.out.println(minimumZScore+"\tMin vcf AF z-score to save");
 		if (sampleIndexesToExamine!=null) System.out.println(Misc.hashSetToString(sampleIndexesToExamine, ",")+"\tMpileup samples to examine");
@@ -404,12 +417,13 @@ public class VCFBackgroundScanner {
 				"-c Minimum mpileup sample read coverge, defaults to 20\n"+
 				"-f Maximum mpileup sample AF, defaults to 0.3\n"+
 				"-a Minimum # mpileup samples for z-score calculation, defaults to 3\n" +
+				"-e Exclude vcf records that could not be z-scored\n"+
 				"-d Print verbose debugging output\n" +
 
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundScanner -v SomaticVcfs/ -z 3\n"+
-				"-m bkg.mpileup.gz -s BkgFiltVcfs/ -b 1 -q 13 \n\n"+
+				"-m bkg.mpileup.gz -s BkgFiltVcfs/ -b 1 -q 13 -e \n\n"+
 
 		        "**************************************************************************************\n");
 	}
