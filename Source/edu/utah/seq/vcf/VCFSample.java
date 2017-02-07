@@ -36,7 +36,7 @@ public class VCFSample {
 		this.originalRecord = sample;
 		this.originalFormat = sampleFormat;
 		//is it a no call?
-		if (sample.equals(".") || sample.equals("./.") ) noCall = true;
+		if (sample.equals(".") || sample.equals("./.") || sample.startsWith("./.:0,0") ) noCall = true;
 		else {
 			data = VCFParser.COLON.split(sample);
 			format = VCFParser.COLON.split(sampleFormat);

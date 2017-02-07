@@ -6,7 +6,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -53,11 +52,11 @@ public class QueryIndexer {
 
 
 	//per chr fields
-	private TreeSet<File>[] workingIndex = null;
-	private HashMap<String, TreeSet<File>> fileNames2TheirPointers = new HashMap<String, TreeSet<File>>();
+	private ArrayList<IndexRegion>[] workingIndex = null;
 	private ArrayList<File> workingFilesToParse = null;
 	private long workingPassed = 0;
 	private long workingFailed = 0;
+	private String workingChr = null;
 
 	//constructor
 	@SuppressWarnings("unchecked")
@@ -75,7 +74,10 @@ public class QueryIndexer {
 		//for each chromosome
 		if (verbose) System.out.println("Indexing records by chr...\n\tchr\t#pass\t#fail\tmemUsed");
 		else System.out.print("Indexing records by chr...\n\t"); 
-		for (String chr: chrLengths.keySet()) parseChr(chr);
+		for (String chr: chrLengths.keySet()) {
+			workingChr = chr;
+			parseChr();
+		}
 
 		if (verbose == false) System.out.println(": "+IO.memory());
 
@@ -86,14 +88,11 @@ public class QueryIndexer {
 		System.out.println("Saving file headers...");
 		saveFileHeadersAndIds();
 
-		System.out.print("Building and saving interval trees...\n\t");
-		saveIntervalTrees();
-
 		String diffTime = Num.formatNumberOneFraction(((double)(System.currentTimeMillis() -startTime))/1000/60);
-		System.out.println("\n"+ diffTime+" Min to parse "+ totalRecordsProcessed+" records and build the query index trees");
+		System.out.println("\n"+ diffTime+" Min to parse "+ totalRecordsProcessed+" records and build the query index");
 	}
 
-	public void parseChr(String workingChr){
+	public void parseChr(){
 		try {
 			//any files?
 			workingFilesToParse = new ArrayList<File>();
@@ -105,7 +104,7 @@ public class QueryIndexer {
 			if (workingFilesToParse.size() == 0) return; 
 
 			//prep for new chr
-			workingIndex = new TreeSet[chrLengths.get(workingChr)+1];
+			workingIndex = new ArrayList[chrLengths.get(workingChr)+1];
 			workingPassed = 0;
 			workingFailed = 0;
 
@@ -129,7 +128,7 @@ public class QueryIndexer {
 			}
 
 			//save the index for this chrom
-			saveIndex(workingChr);
+			saveIndex();
 
 			//cleanup
 			if (verbose) System.out.println("\t"+workingChr+"\t"+workingPassed+"\t"+workingFailed+"\t"+IO.memory());
@@ -165,6 +164,21 @@ public class QueryIndexer {
 		} catch (IOException e) {
 			e.printStackTrace();
 		} 
+	}
+	
+	synchronized void addRegions (ArrayList<IndexRegion> regions) {
+		for (IndexRegion region: regions){
+			//add start
+			int sIndex = region.start;
+			if (workingIndex[sIndex] == null) workingIndex[sIndex] = new ArrayList<IndexRegion>();
+			workingIndex[sIndex].add(region);
+
+			//add stop 
+			sIndex = region.stop;
+			if (workingIndex[sIndex] == null) workingIndex[sIndex] = new ArrayList<IndexRegion>();
+			workingIndex[sIndex].add(region);
+		}
+		regions.clear();
 	}
 
 	/**Gets a file to parse containing records that match a particular chr. Thread safe.*/
@@ -205,114 +219,43 @@ public class QueryIndexer {
 		for (File f: dataFilesToParse) fileId.put(f, counter++);
 	}
 
-	public void saveIntervalTrees(){
-		try {
-			File[] chrBed = IO.extractFiles(indexDir, ".qi.bed.gz");
-			HashMap<String, IntervalST<int[]>> chrTrees = new HashMap<String, IntervalST<int[]>>();
-			HashMap<String, int[]> idsFileIndex = new HashMap<String, int[]>();
-			//for each file
-			for (File f: chrBed){
-				BufferedReader in = IO.fetchBufferedReader(f);
-				IntervalST<int[]> st = new IntervalST<int[]>();
-				String line;
-				while ((line = in.readLine())!= null){
-					String[] t = Misc.TAB.split(line);
-					int start = Integer.parseInt(t[1]);
-					int stop = Integer.parseInt(t[2]);
-					int[] ids = idsFileIndex.get(t[3]);
-					if (ids == null){
-						ids = stringToInts(t[3], Misc.COMMA);
-						idsFileIndex.put(t[3], ids);
-					}
-					//the end is included in IntervalST so sub 1 from end
-					st.put(new Interval1D(start, stop-1), ids);
-				}
-				in.close();
 
-				//save tree
-				String chr = f.getName().replace(".qi.bed.gz", "");
-
-				chrTrees.put(chr, st);
-				System.out.print(chr+" ");
-			}
-			System.out.println(": "+IO.memory());
-
-			File t = new File (indexDir, "its.obj");
-			IO.saveObject(t, chrTrees);
-
-		} catch (IOException e) {
-			e.printStackTrace();
-			Misc.printErrAndExit("\nERROR: problem saving interval trees, aborting.\n");
-		}
-	}
-
-	/**Given a String of ints delimited by something, will parse or return null.*/
-	public static int[] stringToInts(String s, Pattern pat){
-		String[] tokens = pat.split(s);
-		int[] num = new int[tokens.length];
-		try {
-			for (int i=0; i< tokens.length; i++){
-				num[i] = Integer.parseInt(tokens[i]);
-			}
-			return num;
-		} catch (Exception e){
-			return null;
-		}
-	}
-
-
-	public void saveIndex(String workingChr){
+	public void saveIndex(){
 		try {
 			File queryIndexFile = new File(indexDir, workingChr+".qi.bed");
 			PrintWriter out = new PrintWriter(new FileWriter((queryIndexFile)));
-			//collect bps with the same set of files
-			//start first entry, should always contain one or more files
-			int start = Integer.MIN_VALUE;
-			String priorIds = "";
-			int stop = Integer.MIN_VALUE;
-
+			HashSet<IndexRegion> openRegions = new HashSet<IndexRegion>();
+			int startPos = -1;
+			ArrayList<RegionToPrint> toSave = new ArrayList<RegionToPrint>();
+			
 			for (int i=0; i< workingIndex.length; i++){
-				if (workingIndex[i] == null) {
-					//in a block? write out old if not the first
-					if (start != Integer.MIN_VALUE){
-						out.print(workingChr); out.print("\t");
-						out.print(start); out.print("\t");
-						out.print(i); out.print("\t");
-						out.println(priorIds);
-
-						//reset start 
-						priorIds = "";
-						start = Integer.MIN_VALUE;
-					}
+				if (workingIndex[i]== null) continue;
+				//System.out.println(" xxxxxxxxxxxxxxxxxxxxxxxxxxxxx Index "+i);
+				
+				//first in block?
+				if (openRegions.size() == 0){
+					openRegions.addAll(workingIndex[i]);
+					startPos = i;
+					if (toSave.size() != 0) saveRegions(toSave, out);
 				}
-
-				//nope hash present
+				
+				//must be adding a new so need to save old
 				else {
-					//save last good position
-					stop = i;
-					//different ids?
-					String currentIds = fetchSortedIds(workingIndex[i]);
-					if (priorIds.equals(currentIds) == false){
-						//write out old if not the first
-						if (start != Integer.MIN_VALUE){
-							out.print(workingChr); out.print("\t");
-							out.print(start); out.print("\t");
-							out.print(stop); out.print("\t");
-							out.println(priorIds);
-						}
-						//start new
-						priorIds = currentIds;
-						start = i;
+					toSave.add(new RegionToPrint(startPos, i, fetchIds(openRegions)));
+					startPos = i;
+					
+					//go through each of the current index regions
+					for (IndexRegion ir: workingIndex[i]){
+						//already in open then this must be an end so remove it
+						if (openRegions.contains(ir)) openRegions.remove(ir);
+						//not present so this is a beginning, add it
+						else openRegions.add(ir);
 					}
 				}
 			}
 			//save last?
-			if (start != Integer.MIN_VALUE){
-				out.print(workingChr); out.print("\t");
-				out.print(start); out.print("\t");
-				out.print(stop+1); out.print("\t");
-				out.println(priorIds);
-			}
+			if (toSave.size() != 0) saveRegions(toSave, out);
+			
 			//close it
 			out.close();
 		} catch (IOException e){
@@ -320,75 +263,70 @@ public class QueryIndexer {
 			Misc.printErrAndExit("\nERROR: problem saving the index for "+workingChr+", aborting.\n");
 		}
 	}
-
-
-
-	/**Returns the int id concat rep for all the files in the sorted TreeSet*/
-	private String fetchSortedIds(TreeSet<File> files) {
-		int[] ids = new int[files.size()];
-		int counter = 0;
-		for (File f: files) ids[counter++] = fileId.get(f);
-		return Misc.intArrayToString(ids, ",");
-	}
-
-
-
-	/**Need to run through some gymnastics here since hits to the current TreeSet[] will be out of order and coming in from multiple threads.
-	 * Using this method as the bottleneck to keep the additions current. */
-	synchronized void addRef(int bp, File f) {
-
-		Integer fId = fileId.get(f);
-		//nothing entered just yet?
-		if (workingIndex[bp] == null) {
-			//any existing tree
-			TreeSet<File> ts = fileNames2TheirPointers.get(fId.toString());
-			if (ts == null){
-				ts = new TreeSet<File>();
-				ts.add(f);
-				fileNames2TheirPointers.put(fId.toString(), ts);
+	
+	private void saveRegions(ArrayList<RegionToPrint> al, PrintWriter out){
+		//set first
+		RegionToPrint rtp = al.get(0);
+		
+		//walk looking for same ids in following regions and merge em
+		int num = al.size();
+		for (int i=1; i< num; i++){
+			RegionToPrint next = al.get(i);
+			//same file id's
+			if (next.ids.equals(rtp.ids)) rtp.stop = next.stop;
+			else {
+				StringBuilder sb = new StringBuilder(workingChr);
+				rtp.appendInfo(sb);
+				out.println(sb);
+				rtp = next;
 			}
-			workingIndex[bp] = ts;
+		}
+		//print last
+		StringBuilder sb = new StringBuilder(workingChr);
+		rtp.appendInfo(sb);
+		out.println(sb);
+		al.clear();
+		
+	}
+	
+	private class RegionToPrint{
+		int start;
+		int stop;
+		String ids;
+		
+		public RegionToPrint(int start, int stop, String ids){
+			this.start = start;
+			this.stop = stop;
+			this.ids = ids;
 		}
 
-		//does the current hash already contain the file due to overlapping regions?
-		else if (workingIndex[bp].contains(f) == false){
-			//ok something there but it doesn't contain this file
-			//attempt to find an existing hash with these files
-			String key = fetchCompositeIdKey(workingIndex[bp], fId);
-			TreeSet<File> ts = fileNames2TheirPointers.get(key);
-			if (ts == null){
-				ts = new TreeSet<File>();
-				ts.addAll(workingIndex[bp]);
-				ts.add(f);
-				fileNames2TheirPointers.put(key, ts);
-			}
-			workingIndex[bp] = ts;
+		public void appendInfo(StringBuilder sb) {
+			sb.append("\t");
+			sb.append(start);
+			sb.append("\t");
+			sb.append(stop);
+			sb.append("\t");
+			sb.append(ids);
 		}
-		//yes, so don't do anything it's already there
 	}
 
-
-	/**This is expensive in computing time. Returns a String of sorted ints representing the file ids.*/
-	private String fetchCompositeIdKey(TreeSet<File> set, Integer newId) {
-		int numOld = set.size();
-
-		//make int[]
-		int[] ids = new int[numOld+1];
-		Iterator<File> it = set.iterator();
-		for (int i=0; i< numOld; i++) ids[i] = fileId.get(it.next());
-		ids[numOld] = newId;
-
-		//sort
-		Arrays.sort(ids);
-
-		//concat
-		StringBuilder sb = new StringBuilder();
-		sb.append(ids[0]);
-		for (int i=1; i< ids.length; i++){
+	private static String fetchIds(HashSet<IndexRegion> al) {
+		//just one?
+		if (al.size() == 1) return new Integer (al.iterator().next().fileId).toString();
+		
+		//hash ids and sort, might have dups
+		TreeSet<Integer> ids = new TreeSet<Integer>();
+		Iterator<IndexRegion> it = al.iterator();
+		while (it.hasNext())ids.add(it.next().fileId);
+	
+		//create string
+		Iterator<Integer>iit = ids.iterator();
+		StringBuilder sb = new StringBuilder(iit.next().toString());
+		while (iit.hasNext()){
 			sb.append(",");
-			sb.append(ids[i]);
+			sb.append(iit.next().toString());
 		}
-
+		
 		return sb.toString();
 	}
 
@@ -437,7 +375,7 @@ public class QueryIndexer {
 				try{
 					switch (test){
 					case 'c': chrNameLength = new File(args[++i]); break;
-					case 'd': dataDir = new File(args[++i]); break;
+					case 'd': dataDir = new File(args[++i]).getCanonicalFile(); break;
 					case 'i': indexDir = new File(args[++i]); break;
 					case 's': skipDirs = Misc.COMMA.split(args[++i]); break;
 					case 'q': verbose = false; break;
@@ -704,7 +642,7 @@ public class QueryIndexer {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Query Indexer: Dec 2016                           **\n" +
+				"**                                Query Indexer: Feb 2017                           **\n" +
 				"**************************************************************************************\n" +
 				"Builds index files for Query by recursing through a data directory looking for bgzip\n"+
 				"compressed and tabix indexed genomic data files (e.g. vcf, bed, maf, and custom).\n"+
@@ -747,12 +685,16 @@ public class QueryIndexer {
 				"**************************************************************************************\n");
 	}
 
-	public TreeSet<File>[] getWorkingIndex() {
+	public ArrayList<IndexRegion>[] getWorkingIndex() {
 		return workingIndex;
 	}
 
 	public boolean isVerbose() {
 		return verbose;
+	}
+
+	public HashMap<File, Integer> getFileId() {
+		return fileId;
 	}
 
 }

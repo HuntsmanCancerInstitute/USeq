@@ -2,6 +2,7 @@ package edu.utah.seq.query;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import htsjdk.tribble.readers.TabixReader;
@@ -19,6 +20,8 @@ public class QueryIndexFileLoader implements Runnable {
 	private File sourceFile = null;
 	private int indexLength = 0;
 	private boolean verbose;
+	private ArrayList<IndexRegion> toAdd = new ArrayList<IndexRegion>();
+	private static final int numToLoad = 2500;
 	
 	public static final Pattern END_POSITION = Pattern.compile(".*END=(\\d+).*", Pattern.CASE_INSENSITIVE);
 	
@@ -35,6 +38,8 @@ public class QueryIndexFileLoader implements Runnable {
 			while ((sourceFile = queryIndexer.getFileToParse()) != null){ 
 				numPassed = 0;
 				numFailed = 0;
+				toAdd.clear();
+				int fileId = queryIndexer.getFileId().get(sourceFile);
 				
 				//fetch a reader and iterator on the entire chr
 				reader = new TabixReader(sourceFile.toString());
@@ -75,11 +80,11 @@ public class QueryIndexFileLoader implements Runnable {
 						System.err.println("\tWARNING: This record's covered bps were trimmed ("+startStop[0]+" - "+startStop[1]+
 								") to match the chrom length ("+indexLength+") -> "+record);
 					}
-
-					//add in references to source file over the covered bases, stop isn't covered.
-					for (int j= startStop[0]; j< startStop[1]; j++) queryIndexer.addRef(j, sourceFile);
-
+					toAdd.add(new IndexRegion(startStop[0], startStop[1], fileId));
+					if (toAdd.size() > numToLoad) queryIndexer.addRegions(toAdd);
 				}
+				//add last
+				queryIndexer.addRegions(toAdd);
 				queryIndexer.incrementPassFail(numPassed, numFailed);
 				reader.close();
 			}	
