@@ -119,6 +119,7 @@ public class EstimateErrorRates{
 			ArrayList<MpileupSample> workingSamples = new ArrayList<MpileupSample>();
 
 			while ((line=in.readLine())!= null){
+				if (line.startsWith("#") || line.trim().length() == 0) continue;
 				MpileupLine ml = new MpileupLine(line, minBaseQuality);
 				if (ml.getChr() == null) continue;
 				if (outCounts != null) saveCounts(ml);
