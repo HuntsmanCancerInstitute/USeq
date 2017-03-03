@@ -773,8 +773,23 @@ public class VCFComparator {
 			testName= testName+"\t";
 			
 			//print header
-			int maxNumSamples = testMatchingVCF[0].getKey().getSample().length;
-			int numSInT = testMatchingVCF[0].getTest().getSample().length;
+			VCFSample[] samples = null;
+			samples = testMatchingVCF[0].getKey().getSample();
+			if (samples == null) {
+				System.out.println("\tNo samples in key, skipping PrintIntersectingDatasets.");
+				out.close();
+				spreadsheet.delete();
+				return;
+			}
+			int maxNumSamples = samples.length;
+			samples = testMatchingVCF[0].getTest().getSample();
+			if (samples == null) {
+				System.out.println("\tNo samples in test, skipping PrintIntersectingDatasets.");
+				out.close();
+				spreadsheet.delete();
+				return;
+			}
+			int numSInT = samples.length;
 			if (numSInT> maxNumSamples) maxNumSamples = numSInT;
 			out.print("#Dataset\tChr\tPos\tRef\tAlt\tFilter\t");
 			for (int i=0; i< maxNumSamples; i++){
