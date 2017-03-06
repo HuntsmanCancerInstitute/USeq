@@ -31,6 +31,7 @@ public class VCFComparator {
 	private boolean removeNonPass = false;
 	private boolean useVQSLOD = false;
 	private boolean requireAltMatch = true;
+	private int indelBpPad = 0;
 
 
 	private HashMap<String,RegionScoreText[]> keyBedCalls = null;
@@ -373,20 +374,35 @@ public class VCFComparator {
 	}
 
 	public void countMatches(VCFLookUp key, VCFLookUp test, ArrayList<VCFMatch> matches, ArrayList<VCFRecord> nonMatches){
-		//for each record in the test
+		
 		int[] posTest = test.getBasePosition();
 		VCFRecord[] vcfTest = test.getVcfRecord();
+		
+		//for each test record 
 		for (int i=0; i< vcfTest.length; i++){
+			
 			//fetch records from key
-			VCFRecord[] matchingKey = key.fetchVCFRecords(posTest[i], posTest[i]+1);			
+			int start = posTest[i];
+			int stop = posTest[i]+1;
+			
+			//fuzz it?
+			if (indelBpPad != 0){
+				start = start - indelBpPad;
+				if (start < 0) start = 0;
+				stop+= indelBpPad;
+			}
+					
+			//fetch the key records that intersect
+			VCFRecord[] matchingKey = key.fetchVCFRecords(start, stop);	
 			
 			//no records found
 			if (matchingKey == null) {
 				nonMatches.add(vcfTest[i]);
 			}
 			else {				
-				//for each match
+				//for each key that matches
 				boolean matchFound = false;
+				boolean indelFound = false;
 				for (int x=0; x< matchingKey.length; x++){	
 					//check to see if it matches
 					if (requireAltMatch == false || vcfTest[i].matchesAlternateAlleleGenotype(matchingKey[x], requireGenotypeMatch)) {
@@ -396,6 +412,19 @@ public class VCFComparator {
 						matchFound = true;
 						break;
 					}
+					//is it an indel?
+					if (indelFound == false && matchingKey[x].isSNP() == false) indelFound = true;
+				}
+				//do a fuzzy indel match?
+				if (matchFound == false && indelBpPad !=0 && indelFound){
+					//flip all to match, should really only be one.
+					for (VCFRecord k: matchingKey){
+						k.setFilter(VCFRecord.PASS);
+						vcfTest[i].setFilter(VCFRecord.PASS);
+						matches.add(new VCFMatch(k, vcfTest[i]));
+						matchFound = true;
+					}
+					
 				}
 				if (matchFound == false) {					
 					nonMatches.add(vcfTest[i]);
@@ -874,6 +903,7 @@ public class VCFComparator {
 					case 'v': useVQSLOD = true; break;
 					case 'n': removeSNPs = true; break;
 					case 'e': removeNonPass = true; break;
+					case 'i': indelBpPad = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -923,6 +953,7 @@ public class VCFComparator {
 		if (all) res.append(all+"\tCompare all variant\n");
 		else if (removeSNPs) res.append(removeSNPs+"\tCompare non-SNP variants, not SNPs\n");
 		else if (removeNonSNPs) res.append(removeNonSNPs+"\tCompare SNPs, not non-SNP variants\n");
+		if (indelBpPad !=0) res.append(indelBpPad+ "\tRelaxing INDEL matches to included all test variants within "+indelBpPad+" of a key INDEL variant\n");
 		res.append("\n");
 		options = res.toString();
 		System.out.print(options);
@@ -931,7 +962,7 @@ public class VCFComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Comparator : Jan 2017                           **\n" +
+				"**                              VCF Comparator : March 2017                         **\n" +
 				"**************************************************************************************\n" +
 				"Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls\n" +
 				"that fall in the common interrogated regions are compared. WARNING tabix gzipped files\n" +
@@ -957,6 +988,7 @@ public class VCFComparator {
 				"-p Provide a full path directory for saving the parsed data. Defaults to not saving.\n"+
 				"-e Exclude test and key records whose FILTER field is not . or PASS. Defaults to\n" +
 				"       scoring all.\n"+
+				"-i Relax matches to key INDELs to include all test variants within x bps.\n"+
 
 				"\n"+
 
