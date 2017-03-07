@@ -27,7 +27,7 @@ import util.gen.Num;
  * tabix-0.2.6/bgzip ~/repro3Ct8Norm.mpileup
  * tabix-0.2.6/tabix -s 1 -b 2 -e 2 ~/repro3Ct8Norm.mpileup.gz
  * @author Nix*/
-public class VCFBackgroundScanner {
+public class VCFBackgroundChecker {
 	
 	//user defined fields
 	private File[] vcfFiles;
@@ -43,6 +43,7 @@ public class VCFBackgroundScanner {
 	private boolean removeNonZScoredRecords = false;
 	private double minimumZScore = 0;
 	private double maxSampleAF = 0.3;
+	private boolean replaceQualScore = false;
 	
 	//internal
 	private TabixReader reader = null;
@@ -62,7 +63,7 @@ public class VCFBackgroundScanner {
 	private ArrayList<String> tooFewSamples = new ArrayList<String>();
 	
 	//constructor
-	public VCFBackgroundScanner(String[] args){
+	public VCFBackgroundChecker(String[] args){
 		try {	
 			processArgs(args);
 			
@@ -123,6 +124,15 @@ public class VCFBackgroundScanner {
 		}
 		in.close();
 	}
+	
+	private void printScoredVcf(String[] fields, String record) throws IOException{
+		if (replaceQualScore) {
+			fields[5] = "0";
+			vcfOut.println(Misc.stringArrayToString(fields, "\t"));
+		}
+		else vcfOut.println(record);
+		numSaved++;
+	}
 
 	private void score(String record) throws Exception {
 		//#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NORMAL	TUMOR
@@ -140,10 +150,7 @@ public class VCFBackgroundScanner {
 		int[] startStop = QueryIndexFileLoader.fetchEffectedBps(fields, true);
 		if (startStop == null) {
 			System.err.println("Failed to parse the effected bps.");
-			if (removeNonZScoredRecords == false) {
-				vcfOut.println(record);
-				numSaved++;
-			}
+			if (removeNonZScoredRecords == false) printScoredVcf(fields, record);
 			tooFewSamples.add(record);
 			numNotScored++;
 			return;
@@ -155,13 +162,9 @@ public class VCFBackgroundScanner {
 		String tabixCoor = fields[0]+":"+start+"-"+(startStop[1]+bpBuffer);
 		TabixReader.Iterator it = fetchInteratorOnCoordinates(tabixCoor);
 		if (it == null) {
-			if (removeNonZScoredRecords == false) {
-				vcfOut.println(record);
-				numSaved++;
-			}
+			if (removeNonZScoredRecords == false) printScoredVcf(fields, record);
 			tooFewSamples.add(record);
 			numNotScored++;
-			
 			return;
 		}
 		
@@ -192,10 +195,7 @@ public class VCFBackgroundScanner {
 		
 		//was a z-score calculated?
 		if (minZScore == Double.MAX_VALUE) {
-			if (removeNonZScoredRecords == false) {
-				vcfOut.println(record);
-				numSaved++;
-			}
+			if (removeNonZScoredRecords == false) printScoredVcf(fields, record);
 			tooFewSamples.add(record);
 			numNotScored++;
 		}
@@ -204,7 +204,9 @@ public class VCFBackgroundScanner {
 		else {
 			//fetch AFs
 			String bkafs = fetchFormattedAFs(minZScoreSamples);
-			fields[7] = "BKZ="+Num.formatNumber(minZScore, 3)+";BKAF="+bkafs+";"+fields[7];
+			String bkzString = Num.formatNumber(minZScore, 3);
+			fields[7] = "BKZ="+bkzString+";BKAF="+bkafs+";"+fields[7];
+			if (replaceQualScore) fields[5] = bkzString;
 			String modRecord = Misc.stringArrayToString(fields, "\t");
 			//threshold it?
 			if (minimumZScore == 0) {
@@ -293,7 +295,7 @@ public class VCFBackgroundScanner {
 			printDocs();
 			System.exit(0);
 		}
-		new VCFBackgroundScanner(args);
+		new VCFBackgroundChecker(args);
 	}		
 	
 
@@ -322,6 +324,7 @@ public class VCFBackgroundScanner {
 					case 'a': minNumSamples = Integer.parseInt(args[++i]); break;
 					case 'e': removeNonZScoredRecords = true; break;
 					case 'd': verbose = true; break;
+					case 'r': replaceQualScore = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -382,6 +385,7 @@ public class VCFBackgroundScanner {
 		System.out.println(removeNonZScoredRecords+ "\tExclude vcf records that could not be z-scored");
 		System.out.println(verbose+"\tVerbose");
 		System.out.println(minimumZScore+"\tMin vcf AF z-score to save");
+		System.out.println(replaceQualScore+"\tReplace QUAL score with z-score and set non scored records to 0");
 		if (sampleIndexesToExamine!=null) System.out.println(Misc.hashSetToString(sampleIndexesToExamine, ",")+"\tMpileup samples to examine");
 		else System.out.println("All\tMpileup samples to examine");
 	}
@@ -390,13 +394,13 @@ public class VCFBackgroundScanner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           VCF Background Scanner : Jan 2016                      **\n" +
+				"**                           VCF Background Checker : Mar 2016                      **\n" +
 				"**************************************************************************************\n" +
-				"VBS calculates non-reference allele frequencies (AF) from a background multi-sample \n"+
+				"VBC calculates non-reference allele frequencies (AF) from a background multi-sample \n"+
 				"mpileup file over each vcf record. It then calculates a z-score for the vcf AF and \n"+
 				"appends it to the INFO field. If multiple bps are affected (e.g. INDELs) or bp padding\n"+
 				"provided, the lowest bp z-score is appended. Z-scores < ~4 are indicative of non\n"+
-				"reference bps in the background samples. Note, VBS requires an AF tag in the INFO\n"+
+				"reference bps in the background samples. Note, VBC requires an AF tag in the INFO\n"+
 				"field of each record. \n"+
 
 				"\nRequired:\n"+
@@ -418,11 +422,12 @@ public class VCFBackgroundScanner {
 				"-f Maximum mpileup sample AF, defaults to 0.3\n"+
 				"-a Minimum # mpileup samples for z-score calculation, defaults to 3\n" +
 				"-e Exclude vcf records that could not be z-scored\n"+
+				"-r Replace QUAL value with z-score. Un scored vars will be assigned 0\n"+
 				"-d Print verbose debugging output\n" +
 
 				"\n"+
 
-				"Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundScanner -v SomaticVcfs/ -z 3\n"+
+				"Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundChecker -v SomaticVcfs/ -z 3\n"+
 				"-m bkg.mpileup.gz -s BkgFiltVcfs/ -b 1 -q 13 -e \n\n"+
 
 		        "**************************************************************************************\n");

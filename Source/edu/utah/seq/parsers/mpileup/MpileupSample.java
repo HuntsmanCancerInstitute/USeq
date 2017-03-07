@@ -78,6 +78,10 @@ public class MpileupSample {
 		sb.append(deletions);
 		sb.append(",");
 		sb.append(poorQualBases);
+		sb.append(",");
+		sb.append((getNonRefBaseCounts()+ insertions + deletions));
+		sb.append(",");
+		sb.append(getAlleleFreqNonRefPlusIndels());
 	}
 	
 	public void debug(){

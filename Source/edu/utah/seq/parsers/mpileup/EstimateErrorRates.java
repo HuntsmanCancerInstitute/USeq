@@ -46,7 +46,7 @@ public class EstimateErrorRates{
 			printSettings();
 
 			//any count table?
-			if (outCounts != null) outCounts.println("#Chr\tPos(1based)\tRef\tSample base counts for passing GATC forward, GATC reverse, ins, del, and num failed minQual");
+			if (outCounts != null) outCounts.println("#Chr\tPos(1based)\tRef\tSample base counts for passing GATC forward, GATC reverse, ins, del, failed minQual, nonRef, nonRefFreq");
 
 			System.out.println("\nParsing...");
 			parse();
@@ -61,7 +61,7 @@ public class EstimateErrorRates{
 
 			if (outCounts != null) {
 				//add a line that can be tabixed
-				outCounts.print("observations\t1\tError Observations: G, A, T, C, totalSnv, INS, DEL, totalIndel\t");
+				outCounts.print("observations\t1\tError Observations: G, A, T, C, totalSnv, INS, DEL, totalWithIndel, nonRef, nonRefAF\t");
 				outCounts.print(gBases); outCounts.print(",");
 				outCounts.print(aBases); outCounts.print(",");
 				outCounts.print(tBases); outCounts.print(",");

@@ -953,7 +953,7 @@ public class VCFComparator {
 		if (all) res.append(all+"\tCompare all variant\n");
 		else if (removeSNPs) res.append(removeSNPs+"\tCompare non-SNP variants, not SNPs\n");
 		else if (removeNonSNPs) res.append(removeNonSNPs+"\tCompare SNPs, not non-SNP variants\n");
-		if (indelBpPad !=0) res.append(indelBpPad+ "\tRelaxing INDEL matches to included all test variants within "+indelBpPad+" of a key INDEL variant\n");
+		if (indelBpPad !=0) res.append(indelBpPad+ "\tRelaxing INDEL matches to included all test variants within "+indelBpPad+"bp of a key INDEL variant\n");
 		res.append("\n");
 		options = res.toString();
 		System.out.print(options);
