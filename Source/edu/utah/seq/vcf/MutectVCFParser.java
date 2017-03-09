@@ -55,6 +55,8 @@ public class MutectVCFParser {
 			out.println("#PASS\tCHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
 			for (VCFRecord r: parser.getVcfRecords()){			
 				VCFSample[] tumNorm = r.getSample();
+				if (tumNorm.length !=2) Misc.printErrAndExit("\nLooks like there aren't two samples present in this VCF, aborting.\n");
+				
 				boolean pass = true;
 				double normRto = tumNorm[1].getAltRatio();
 				double tumRto = tumNorm[0].getAltRatio();
