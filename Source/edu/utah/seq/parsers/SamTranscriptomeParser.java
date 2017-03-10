@@ -13,13 +13,15 @@ import edu.utah.seq.data.sam.*;
 public class SamTranscriptomeParser{
 	//fields
 	private File[] dataFiles;
+	private BufferedReader in = null;
 	private File saveFile;
 	private File outputFile;
 	private String replacementHeader = null;
-	private float maximumAlignmentScore = 90;
+	private float maximumAlignmentScore = Float.MAX_VALUE;
 	private float minimumMappingQualityScore = 0;
 	private int numberAlignments = 0;
 	private int numberUnmapped = 0;
+	private int numberMultiMappedSkipped = 0;
 	private int numberFailingVendorQC = 0;
 	private int numberPassingAlignments = 0;
 	private int numberFailingAlignmentScore = 0;
@@ -41,7 +43,7 @@ public class SamTranscriptomeParser{
 	private boolean reverseStrand = false;
 	private boolean reverseBoth = false;
 	private boolean removeControlAlignments = true;
-	private boolean randomPickAlignment = false;
+	private boolean randomPickAlignment = true;
 	private HashSet<SamAlignment> uniques = new HashSet<SamAlignment>();
 	private ArrayList<SamAlignment> firstPair = new ArrayList<SamAlignment>();
 	private ArrayList<SamAlignment> secondPair = new ArrayList<SamAlignment>();
@@ -98,7 +100,7 @@ public class SamTranscriptomeParser{
 	public void doWork() throws IOException{
 		//make print writer
 		outputFile = new File(saveFile+"_temp.sam.gz");
-		//samOut = new PrintWriter( new FileWriter (outputFile));
+
 		samOut = new Gzipper(outputFile);
 		if (replacementHeader != null) samOut.println(replacementHeader);
 
@@ -110,10 +112,18 @@ public class SamTranscriptomeParser{
 		}
 
 		//for each file, parse and save to disk	
-		if (verbose) System.out.println("\nParsing, filtering, and merging SAM files...");
-		for (int i=0; i< dataFiles.length; i++){
-			if (verbose) System.out.print("\t"+dataFiles[i].getName());
-			parseFile(dataFiles[i]); 
+		if (verbose) System.out.println("\nParsing, filtering, and merging SAMs...");
+		if (dataFiles != null){
+			for (int i=0; i< dataFiles.length; i++){
+				if (verbose) System.out.print("\t"+dataFiles[i].getName());
+				in = IO.fetchBufferedReader(dataFiles[i]);
+				parseFile(); 
+				if (verbose) System.out.println();
+			}
+		}
+		else {
+			if (verbose) System.out.print("\tReading from standard in");
+			parseFile(); 
 			if (verbose) System.out.println();
 		}
 
@@ -139,18 +149,18 @@ public class SamTranscriptomeParser{
 		}
 
 		//stats
-		double fractionPassing = ((double)numberPassingAlignments)/((double)numberAlignments);
+		double fractionPassing = ((double)(numberPassingAlignments-numberMultiMappedSkipped))/((double)numberAlignments);
 		if (verbose) System.out.println("\nStats (some flags aren't set so be suspicious of zero read catagories):\n");
 		System.out.println("\t"+numberAlignments+"\tTotal # Alignments from raw sam file");
-		System.out.println("\t"+numberPassingAlignments+"\tAlignments passing filters ("+Num.formatPercentOneFraction(fractionPassing)+")");
+		System.out.println("\t"+(numberPassingAlignments-numberMultiMappedSkipped)+"\tAlignments passing filters ("+Num.formatPercentOneFraction(fractionPassing)+")");
 		System.out.println("\t\t"+numberUnmapped+"\t# Unmapped Reads");
 		System.out.println("\t\t"+numberFailingVendorQC+"\t# Alignments failing vendor/ platform QC");
 		System.out.println("\t\t"+numberFailingAlignmentScore+"\t# Alignments failing alignment score");
 		System.out.println("\t\t"+numberFailingMappingQualityScore+"\t# Alignments failing mapping quality score");
 		System.out.println("\t\t"+numberAdapter+"\t# Adapter alignments");
 		System.out.println("\t\t"+numberPhiX+"\t# PhiX alignments");
+		System.out.println("\t\t"+numberMultiMappedSkipped+ "\t# Multi mapped alignments skipped");
 		System.out.println();
-		System.out.println("\t"+numberPrintedAlignments+"\t# Alignments written to SAM/BAM file. These passed the maxMatch, collapsed coordinate, and possibly merge pairs filters.");
 		//pair overlap stats?
 		if (mergePairedAlignments) {
 			double fractionFailed = numberFailedMergedPairs/ (numberFailedMergedPairs+ numberMergedPairs);
@@ -162,12 +172,10 @@ public class SamTranscriptomeParser{
 		}
 	}
 
-	public boolean parseFile(File samFile){
-		BufferedReader in = null;
+	public boolean parseFile(){
 		int numBadLines = 0;
 		String line = null;
 		try {
-			in = IO.fetchBufferedReader(samFile);
 			String priorReadName = "";
 			boolean priorSet = false;
 			ArrayList<SamAlignment> alignmentsToSave = new ArrayList<SamAlignment>();
@@ -448,13 +456,18 @@ public class SamTranscriptomeParser{
 					if (firstPairPresent || nonPairedPresent){
 						int index = random.nextInt(numberFirstPair);
 						printSam(firstPair.get(index), numberFirstPair);
+						if (numberFirstPair > 1) numberMultiMappedSkipped+= (numberFirstPair-1);
 					}
 					//second pair?
 					if (secondPairPresent){
 						int index = random.nextInt(numberSecondPair);
 						printSam(secondPair.get(index), numberSecondPair);
+						if (numberSecondPair > 1) numberMultiMappedSkipped+= (numberSecondPair-1);
 					}
 				}
+				//don't print any!
+				else numberMultiMappedSkipped+= (numberFirstPair+numberSecondPair);
+				
 			}
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -739,7 +752,7 @@ public class SamTranscriptomeParser{
 					case 'h': replacementHeaderFile = new File(args[++i]); break;
 					case 'c': removeControlAlignments = false; break;
 					case 'b': reverseBoth = true; break;
-					case 'd': randomPickAlignment = true; break;
+					case 'e': randomPickAlignment = false; break;
 					case 'p': mergePairedAlignments = true; break;
 					case 'q': maximumProperPairDistanceForMerging = Integer.parseInt(args[++i]); mergePairedAlignments = true; break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
@@ -759,17 +772,24 @@ public class SamTranscriptomeParser{
 			if (maxMatches > 1 || randomPickAlignment == true) Misc.printExit("Error: One cannot have a positive minimum mapping quality score and ALSO" +
 			" enable more than one maximum matches or random picks! Either set the minimum mapping quality to 0, the default, OR set the maximum matches to 1 and not select the pick random alignment option.\n");
 		}
+		
+		//read from the command line?
+		if (forExtraction == null) {
+			if (saveFile == null) Misc.printErrAndExit("\nError: provide a file path to use in saving the parsed alignemtns when reading from standard in.\n");
+			in = new BufferedReader(new InputStreamReader(System.in));
+		}
+		else {
+			//pull files
+			File[][] tot = new File[3][];
+			tot[0] = IO.extractFiles(forExtraction,".sam");
+			tot[1] = IO.extractFiles(forExtraction,".sam.gz");
+			tot[2] = IO.extractFiles(forExtraction,".sam.zip");
 
-		//pull files
-		File[][] tot = new File[3][];
-		tot[0] = IO.extractFiles(forExtraction,".sam");
-		tot[1] = IO.extractFiles(forExtraction,".sam.gz");
-		tot[2] = IO.extractFiles(forExtraction,".sam.zip");
-
-		dataFiles = IO.collapseFileArray(tot);
-		if (dataFiles == null || dataFiles.length==0) dataFiles = IO.extractFiles(forExtraction);
-		if (dataFiles == null || dataFiles.length ==0 || dataFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.txt(.zip/.gz) file(s)!\n");
-
+			dataFiles = IO.collapseFileArray(tot);
+			if (dataFiles == null || dataFiles.length==0) dataFiles = IO.extractFiles(forExtraction);
+			if (dataFiles == null || dataFiles.length ==0 || dataFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.txt(.zip/.gz) file(s)!\n");
+		}
+		
 		//check save file
 		if (saveFile != null){
 			if (saveFile.getName().endsWith(".sam") == false && saveFile.getName().endsWith(".bam") == false)  Misc.printErrAndExit("\nError: your indicated save file must end with xxx.sam or xxx.bam -> "+saveFile);
@@ -823,7 +843,7 @@ public class SamTranscriptomeParser{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Sam Transcriptome Parser: Dec 2013                      **\n" +
+				"**                          Sam Transcriptome Parser: March 2017                    **\n" +
 				"**************************************************************************************\n" +
 				"STP takes SAM alignment files that were aligned against chromosomes and extended\n" +
 				"splice junctions (see MakeTranscriptome app), converts the coordinates to genomic\n" +
@@ -833,21 +853,20 @@ public class SamTranscriptomeParser{
 
 				"\nOptions:\n"+
 				"-f The full path file or directory containing raw xxx.sam(.gz/.zip OK) file(s).\n" +
-				"      Multiple files will be merged.\n" +
+				"      Multiple files will be merged. Skip -f and specify -s to read from standard in.\n" +
 
 				"\nDefault Options:\n"+
 				"-s Save file, defaults to that inferred by -f. If an xxx.sam extension is provided,\n" +
 				"      the alignments won't be sorted by coordinate or saved as a bam file.\n"+
-				"-a Maximum alignment score. Defaults to 90, smaller numbers are more stringent.\n" +
-				"      Approx 30pts per mismatch.\n"+
+				"-a Maximum alignment score. Defaults to Float.MAX_VALUE, no threshold.\n"+
 				"-m Minimum mapping quality score, defaults to 0 (no filtering), larger numbers are\n" +
 				"      more stringent. Only applies to genomic matches, not splice junctions. Set to 13\n" +
 				"      or more to require near unique alignments.\n"+
 				"-x Maximum mapping quality, reset reads with a mapping quality greater than the max to\n"+
 				"      this max.\n"+
 				"-n Maximum number of locations each read may align, defaults to 1 (unique matches).\n"+
-				"-d If the maximum number of locations threshold fails, save one randomly picked repeat\n" +
-				"      alignment per read.\n"+
+				"-e Don't randomly pick one random alignment when the maximum number of locations\n"+
+				"       threshold fails, fail all.\n"+
 				"-r Reverse the strand of the second paired alignment. Reversing the strand is\n" +
 				"      needed for proper same strand visualization of paired stranded Illumina data.\n"+
 				"-b Reverse the strand of both pairs.  Use this option if you would like the orientation\n" +
@@ -864,7 +883,7 @@ public class SamTranscriptomeParser{
 				"      header from the read data.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/SamTranscriptomeParser -f /Novo/Run7/\n" +
-				"     -m 20 -s /Novo/STPParsedBams/run7.bam -p -r \n\n" +
+				"     -m 20 -s /Novo/STPParsedBams/run7.bam -p -r  \n\n" +
 
 		"**************************************************************************************\n");
 
