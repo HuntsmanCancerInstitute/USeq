@@ -15,17 +15,10 @@ public class GatkRunnerChunk implements Runnable{
 	private GatkRunner gatkRunner;
 	private Bed[] regions;
 	private String name;
-	public String getName() {
-		return name;
-	}
-
 	private String cmd;
-	public String getCmd() {
-		return cmd;
-	}
-
 	private File tempVcf;
 	private File tempBed;
+	private File bamOut = null;
 	
 	public GatkRunnerChunk(Bed[] regions, GatkRunner gatkRunner, String uniqueName) throws Exception{
 		this.gatkRunner = gatkRunner;
@@ -41,6 +34,12 @@ public class GatkRunnerChunk implements Runnable{
 
 		//make temp vcf
 		tempVcf = new File (gatkRunner.getSaveDirectory(), name+"_temp.vcf");
+		
+		//output the bam?
+		if (gatkRunner.bamOut) {
+			bamOut = new File (gatkRunner.getSaveDirectory(), name+"_temp.bam");
+			bamOut.deleteOnExit();
+		}
 
 		//build and execute gatk call
 
@@ -50,6 +49,8 @@ public class GatkRunnerChunk implements Runnable{
 			cmd = Misc.stringArrayToString(t, " ");
 		}
 		else cmd = gatkRunner.getGatkArgs()+ " -L "+tempBed+" -o "+tempVcf;
+		if (bamOut != null) cmd = cmd + " -bamout "+bamOut;
+		
 		System.out.println(cmd);
 		String[] out = IO.executeViaProcessBuilder(Misc.WHITESPACE.split(cmd), false);
 		
@@ -68,6 +69,13 @@ public class GatkRunnerChunk implements Runnable{
 	}
 	
 	//getters and setters
+	public String getCmd() {
+		return cmd;
+	}
+	public String getName() {
+		return name;
+	}
+	
 	public boolean isComplete() {
 		return complete;
 	}
@@ -82,5 +90,9 @@ public class GatkRunnerChunk implements Runnable{
 
 	public File getTempBed() {
 		return tempBed;
+	}
+
+	public File getBamOut() {
+		return bamOut;
 	}
 }

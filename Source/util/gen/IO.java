@@ -474,7 +474,21 @@ public class IO {
 		}
 		File[] files = new File[al.size()];
 		al.toArray(files);
+		//just to be safe
+		convertToCanonicalPaths(files);
 		return files;
+	}
+
+	/** converts local files to their full path files */
+	public static void convertToCanonicalPaths(File[] f) {
+		int num = f.length;
+		for (int i=0; i< num; i++)
+			try {
+				f[i] = f[i].getCanonicalFile();
+			} catch (IOException e) {
+				System.err.println("\nFAILED to convert to canonical paths.\n");
+				e.printStackTrace();
+			}
 	}
 
 	/**Concatinates the full path file names for the given File array.*/

@@ -2,6 +2,8 @@ package edu.utah.seq.vcf;
 
 import java.io.*;
 import java.util.regex.*;
+
+import edu.utah.seq.parsers.MergeSams;
 import util.bio.annotation.Bed;
 import util.gen.*;
 import java.util.*;
@@ -20,6 +22,7 @@ public class GatkRunner {
 	private String gatkArgs = null;
 	private int numberConcurrentThreads = 4;
 	boolean useLowerCaseL = false;
+	boolean bamOut = false;
 	
 	//internal fields
 	GatkRunnerChunk[] runners;
@@ -78,6 +81,12 @@ public class GatkRunner {
 		//merge vcf
 		System.out.println("\nMerging vcfs...");
 		mergeVcfs();
+		
+		//merge bams?
+		if (bamOut) {
+			System.out.println("\nMerging bams...");
+			mergeBams();
+		}
 	}
 
 	private void mergeVcfs() throws Exception{
@@ -109,6 +118,13 @@ public class GatkRunner {
 		out.close();
 		System.out.println("\t"+unique.size()+"\tvariants found");
 	}
+	
+	private void mergeBams() throws Exception{
+		File[] bams = new File[runners.length];
+		for (int i=0; i< runners.length; i++) bams[i] = runners[i].getBamOut();
+		File mergedBam = new File (saveDirectory, "mutect.realigned.bam");
+		MergeSams ms = new MergeSams(bams, mergedBam, false);
+	}
 
 
 	public static void main(String[] args) {
@@ -135,6 +151,7 @@ public class GatkRunner {
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'c': gatkArgs = args[++i]; break;
 					case 'l': useLowerCaseL= true; break;
+					case 'b': bamOut= true; break;
 					case 't': numberConcurrentThreads = Integer.parseInt(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -167,12 +184,12 @@ public class GatkRunner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Gatk Runner: May 2016                              **\n" +
+				"**                               Gatk Runner: March 2017                            **\n" +
 				"**************************************************************************************\n" +
 				"Takes a bed file of target regions, splits it by the number of threads, writes out\n"+
-				"each, executes the GATK Gatktype caller, and merges the vcf results. \n"+
+				"each, executes the GATK Gatktype caller, and merges the chunked results. \n"+
 
-				"\nRequired Options:\n"+
+				"\nOptions:\n"+
 				"-r A regions bed file (chr, start, stop,...) to intersect, see\n" +
 				"       http://genome.ucsc.edu/FAQ/FAQformat#format1 , gz/zip OK.\n"+
 				"-s Path to a directory for saving the results.\n"+
@@ -180,8 +197,9 @@ public class GatkRunner {
 				"-c GATK command to execute, see the example below, modify to match your enviroment.\n"+
 				"     Most resources require full paths. Don't set -o or -L\n"+
 				"-l Use lowercased l for Lofreq compatability.\n"+
+				"-b Add a -bamout argument and merge bam chunks.\n"+
 				
-				"\nExample: java -Xmx24G -jar pathToUSeq/Apps/GatkRunner -r /SS/targets.bed -t 8 -s\n" +
+				"\nExample: java -Xmx24G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -t 8 -s\n" +
 				"     /SS/HC/ -c 'java -Xmx4G -jar /SS/GenomeAnalysisTK.jar -T MuTect2 \n"+
 				"    -R /SS/human_g1k_v37.fasta --dbsnp /SS/dbsnp_138.b37.vcf \n"+
 				"    --cosmic /SS/v76_GRCh37_CosmicCodingMuts.vcf.gz -I:tumor /SS/sarc.bam -I:normal \n"+
