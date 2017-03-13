@@ -93,7 +93,7 @@ public class MergeSams{
 		if (verbose) System.out.println("\nParsing, filtering, and merging SAM files...");
 		for (int i=0; i< dataFiles.length; i++){
 			if (verbose) System.out.print("\t"+dataFiles[i].getName());
-			parseSam(dataFiles[i]); 
+			parseSam(dataFiles[i],i+"_"); 
 			if (verbose) System.out.println();
 		}
 
@@ -148,7 +148,7 @@ public class MergeSams{
 		}	
 	}
 
-	public boolean parseSam(File samFile){
+	public boolean parseSam(File samFile, String nameAppender){
 		SAMRecord sam = null;
 		try {
 			SamReader sr = factory.open(samFile);
@@ -166,25 +166,25 @@ public class MergeSams{
 					//is it aligned?
 					if (sam.getReadUnmappedFlag()){
 						numberUnmapped++;
-						if (saveBadReads) samOut.println(sam.getSAMString().trim());
+						if (saveBadReads) samOut.println(nameAppender+ sam.getSAMString().trim());
 						continue;
 					}
 					//does it pass the vendor qc?
 					if (sam.getReadFailsVendorQualityCheckFlag()){
 						numberFailingVendorQC++;
-						if (saveBadReads) samOut.println(sam.getSAMString().trim());
+						if (saveBadReads) samOut.println(nameAppender+ sam.getSAMString().trim());
 						continue;
 					}
 
 					//skip phiX and adapter
 					if (sam.getReferenceName().startsWith("chrPhiX")){
 						numberPhiX++;
-						if (saveBadReads) samOut.println(sam.getSAMString().trim());
+						if (saveBadReads) samOut.println(nameAppender+ sam.getSAMString().trim());
 						continue;
 					}
 					if (sam.getReferenceName().startsWith("chrAdapt")){
 						numberAdapter++;
-						if (saveBadReads) samOut.println(sam.getSAMString().trim());
+						if (saveBadReads) samOut.println(nameAppender+ sam.getSAMString().trim());
 						continue;
 					}
 
@@ -201,14 +201,14 @@ public class MergeSams{
 					if (alignmentScore != Integer.MIN_VALUE){
 						if (alignmentScore > maximumAlignmentScore){
 							numberFailingAlignmentScore++;
-							if (saveBadReads) samOut.println(sam.getSAMString().trim());
+							if (saveBadReads) samOut.println(nameAppender+ sam.getSAMString().trim());
 							continue;
 						}
 					}
 					int mappingQuality = sam.getMappingQuality();
 					if (mappingQuality < minimumMappingQualityScore){
 						numberFailingMappingQualityScore++;
-						if (saveBadReads) samOut.println(sam.getSAMString().trim());
+						if (saveBadReads) samOut.println(nameAppender+ sam.getSAMString().trim());
 						continue;
 					}
 
@@ -220,14 +220,14 @@ public class MergeSams{
 					//bad length?
 					if (endPosition >= maxLength) {
 						System.err.println("WARNING: the end of the following alignment exceeds the the max length of the index? "+maxLength+"\n"+sam.getSAMString());
-						if (saveBadReads) samOut.println(sam.getSAMString().trim());
+						if (saveBadReads) samOut.println(nameAppender+ sam.getSAMString().trim());
 						numberExceedingEnd++;
 						continue;
 					}
 
 					//OK, it passes, increment counter
 					numberPassingAlignments++;
-					samOut.println(sam.getSAMString().trim());
+					samOut.println(nameAppender+ sam.getSAMString().trim());
 
 				} catch (IllegalArgumentException i){
 					numberFailingVendorQC++;
@@ -345,7 +345,7 @@ public class MergeSams{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 Merge Sams: June 2015                            **\n" +
+				"**                                 Merge Sams: March 2017                           **\n" +
 				"**************************************************************************************\n" +
 				"Merges sam and bam files. Adds a stripped header if one is not provided. This most\n"+
 				"likely will not play nicely with GATK or Picard downstream apps, good for USeq.\n"+
