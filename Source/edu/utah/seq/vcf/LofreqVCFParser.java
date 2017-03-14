@@ -96,6 +96,9 @@ public class LofreqVCFParser {
 					if (clearFilter) tokens[6] = ".";
 					if (pass == false && markFail) tokens[6] = "FAIL";
 					
+					//remove SOMATIC; from Info
+					tokens[7] = tokens[7].replace("SOMATIC;", "");
+					
 					//modify id
 					tokens[2] = "Lofreq_"+counter;
 					counter++;
@@ -188,7 +191,7 @@ public class LofreqVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Lofreq VCF Parser: July 2016                         **\n" +
+				"**                             Lofreq VCF Parser: March 2017                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses Lofreq vcf files with options for filtering for minimum QUAL, modifying the\n"+
 				"FILTER field, removing non SNVs, and appending FORMAT info for downstream merging.\n"+
