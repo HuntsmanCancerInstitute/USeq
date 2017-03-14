@@ -1,9 +1,15 @@
 package edu.utah.seq.vcf.xml;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import util.gen.Gzipper;
+import util.gen.IO;
 import util.gen.Misc;
 
 public class SimpleVcf  implements Comparable<SimpleVcf>{
@@ -133,6 +139,31 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 		if (length < other.length) return -1;
 		if (length > other.length) return 1;
 		return 0;
+	}
+	
+	/**Sorts a VCF and writes it out compressed but not indexed.  This loads everything into memory so it can blow up. Careful.
+	 * @return number of vcf records*/
+	public static int sortVcf(File unsortedVcfFile, File sortedOutVcfFile) throws IOException { 
+		Gzipper out = new Gzipper(sortedOutVcfFile);
+		BufferedReader in = IO.fetchBufferedReader(unsortedVcfFile);
+		String line;
+		ArrayList<SimpleVcf> records = new ArrayList<SimpleVcf>();
+		//load em watching for blanks
+		while ((line = in.readLine())!=null){
+			if (line.trim().length() == 0) continue;
+			if (line.startsWith("#")) out.println(line);
+			else records.add(new SimpleVcf(line, 0));
+		}
+		//sort em
+		SimpleVcf[] toSort = new SimpleVcf[records.size()];
+		records.toArray(toSort);
+		Arrays.sort(toSort);
+		//print em
+		for (SimpleVcf v: toSort) out.println(v.getOriginalRecord());
+		//cleanup
+		in.close();
+		out.close();
+		return toSort.length;
 	}
 	
 	//getters and setters

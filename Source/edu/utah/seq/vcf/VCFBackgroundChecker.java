@@ -3,7 +3,9 @@ package edu.utah.seq.vcf;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -20,6 +22,7 @@ import edu.utah.seq.parsers.mpileup.MpileupLine;
 import edu.utah.seq.parsers.mpileup.MpileupSample;
 import edu.utah.seq.parsers.mpileup.MpileupTabixLoader;
 import edu.utah.seq.query.QueryIndexFileLoader;
+import edu.utah.seq.vcf.xml.SimpleVcf;
 import htsjdk.tribble.readers.TabixReader;
 import util.gen.Gzipper;
 import util.gen.IO;
@@ -55,7 +58,7 @@ public class VCFBackgroundChecker {
 	//working
 	private File vcfFile;
 	private BufferedReader vcfIn;
-	private Gzipper vcfOut;
+	private PrintWriter vcfOut;
 	private int numRecords = 0;
 	private int numNotScored = 0;
 	private int numFailingZscore = 0;
@@ -83,7 +86,9 @@ public class VCFBackgroundChecker {
 				tooFewSamples.clear();
 				System.out.println(vcfFile.getName());
 				String name = Misc.removeExtension(vcfFile.getName());
-				vcfOut = new Gzipper(new File(saveDir, name+"_BKZed.vcf.gz"));
+				File tempVcf = new File(saveDir, name+"_BKZed.vcf");
+				tempVcf.deleteOnExit();
+				vcfOut = new PrintWriter(new FileWriter(tempVcf));
 				createReaderSaveHeader();
 				
 				ExecutorService executor = Executors.newFixedThreadPool(numberThreads);
@@ -97,9 +102,11 @@ public class VCFBackgroundChecker {
 				for (MpileupTabixLoader l: loaders) {
 					if (l.isFailed()) throw new IOException("ERROR: File Loader issue! \n");
 				}
-				
 				vcfOut.close();
 				vcfIn.close();
+				
+				//sort, in memory so hopefully it doesn't blow up 
+				SimpleVcf.sortVcf(tempVcf, new File(tempVcf.getParentFile(), tempVcf.getName()+".gz"));
 				
 				//print summary stats
 				if (tooFewSamples.size() !=0){
@@ -118,6 +125,8 @@ public class VCFBackgroundChecker {
 		}
 	}
 	
+
+
 	/**Just prints out records.*/
 	public synchronized void saveModifiedVcf(ArrayList<String> vcf) throws IOException{
 		for (String s: vcf) vcfOut.println(s);
