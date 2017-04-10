@@ -26,6 +26,7 @@ public class StrelkaVCFParser {
 	private double minimumTNRatio = 0;
 	private double maximumNormalAltFraction = 1;
 	private Pattern qsiOrs = Pattern.compile(".+;QS[IS]=(\\d+);.+");
+	private boolean printSpreadsheet = true;
 	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
 	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
 	private String afFormat = "##FORMAT=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency\">";
@@ -45,6 +46,7 @@ public class StrelkaVCFParser {
 		System.out.println(maximumNormalAltFraction+"\tMax N allelic fraction");
 		System.out.println(minimumTumorAltFraction+"\tMin T allelic fraction");
 		System.out.println(excludeNonPass+"\tRemove non PASS FILTER field records.");
+		System.out.println(printSpreadsheet+"\tPrint spreadsheet output.");
 		
 		System.out.println("\nName\tPassing\tFailing");
 		for (File vcf: vcfFiles){
@@ -101,9 +103,13 @@ public class StrelkaVCFParser {
 			VCFParser parser = new VCFParser (vcf);
 			if (parser.getSampleNames()[1].equals("TUMOR") == false) Misc.printErrAndExit("Error: TUMOR doesn't appear to be the second sample in the VCF file?! "+vcf.getName());
 			
-			File txt = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+".txt.gz");
-			Gzipper out = new Gzipper(txt);
-			out.println("#PASS\tCHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
+			File txt = null;
+			Gzipper out = null;
+			if (printSpreadsheet){
+				txt = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+".txt.gz");
+				out = new Gzipper(txt);
+				out.println("#PASS\tCHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
+			}
 			
 			for (VCFRecord r: parser.getVcfRecords()){	
 				VCFSample[] normTum = r.getSample();
@@ -172,11 +178,11 @@ public class StrelkaVCFParser {
 				al.add(r.getFilter());
 				al.add(r.getInfoObject().getInfoString());
 				String line = Misc.stringArrayListToString(al, "\t");
-				out.println(line);
+				if (printSpreadsheet) out.println(line);
 				if (pass) r.setFilter(VCFRecord.PASS);
 				else r.setFilter(VCFRecord.FAIL);
 			}
-			out.close();
+			if (printSpreadsheet) out.close();
 			
 			File outFile = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_Filtered.vcf.gz");
 			printRecords(parser, outFile);
@@ -271,6 +277,7 @@ public class StrelkaVCFParser {
 					case 'd': minimumTNFractionDiff = Double.parseDouble(args[++i]); break;
 					case 'r': minimumTNRatio = Double.parseDouble(args[++i]); break;
 					case 'p': excludeNonPass = true; break;
+					case 's': printSpreadsheet = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -294,7 +301,7 @@ public class StrelkaVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Strelka VCF Parser: Jan 2017                         **\n" +
+				"**                             Strelka VCF Parser: April 2017                       **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS\n"+
 				"score. Also filters for read depth, T/N alt allelic ratio and diff,\n"+
@@ -310,6 +317,7 @@ public class StrelkaVCFParser {
 				"-d Minimum T-N AF difference, defaults to 0.\n"+
 				"-r Minimum T/N AF ratio, defaults to 0.\n"+
 				"-p Remove non PASS filter field records.\n"+
+				"-s Print spreadsheet variant summary.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -t 0.05\n"+
 				"        -n 0.5 -u 100 -o 20 -d 0.05 -r 2\n\n"+

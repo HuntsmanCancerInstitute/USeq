@@ -23,6 +23,7 @@ public class MutectVCFParser {
 	private double maximumNormalAltFraction = 1;
 	private double minimumTumorAltFraction = 0;
 	private boolean excludeNonPass = false;
+	private boolean printSpreadsheet = true;
 	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
 	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
 	
@@ -38,6 +39,7 @@ public class MutectVCFParser {
 		System.out.println(maximumNormalAltFraction+"\tMax N allelic fraction");
 		System.out.println(minimumTumorAltFraction+"\tMin T allelic fraction");
 		System.out.println(excludeNonPass+"\tRemove non PASS FILTER field records.");
+		System.out.println(printSpreadsheet+"\tPrint spreadsheet output.");
 		
 		System.out.println("\nName\tPassing\tFailing");
 		for (File vcf: vcfFiles){
@@ -49,10 +51,14 @@ public class MutectVCFParser {
 	public void parse(File vcf){
 		try {
 			VCFParser parser = new VCFParser (vcf);
-			File txt = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+".txt.gz");
+			File txt = null;
+			Gzipper out = null;
+			if (printSpreadsheet){
+				txt = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+".txt.gz");
+				out = new Gzipper(txt);
+				out.println("#PASS\tCHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
+			}
 			
-			Gzipper out = new Gzipper(txt);
-			out.println("#PASS\tCHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
 			for (VCFRecord r: parser.getVcfRecords()){			
 				VCFSample[] tumNorm = r.getSample();
 				if (tumNorm.length !=2) Misc.printErrAndExit("\nLooks like there aren't two samples present in this VCF, aborting.\n");
@@ -105,12 +111,12 @@ public class MutectVCFParser {
 				al.add(r.getFilter());
 				al.add(r.getInfoObject().getInfoString());
 				String line = Misc.stringArrayListToString(al, "\t");
-				out.println(line);
+				if (printSpreadsheet) out.println(line);
 				if (pass) r.setFilter(VCFRecord.PASS);
 				else r.setFilter(VCFRecord.FAIL);
 
 			}
-			out.close();
+			if (printSpreadsheet) out.close();
 			File outFile = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_Filtered.vcf.gz");
 			printRecords(parser, outFile);
 
@@ -200,6 +206,7 @@ public class MutectVCFParser {
 					case 'd': minimumTNFractionDiff = Double.parseDouble(args[++i]); break;
 					case 'r': minimumTNRatio = Double.parseDouble(args[++i]); break;
 					case 'p': excludeNonPass = true; break;
+					case 's': printSpreadsheet = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -224,7 +231,7 @@ public class MutectVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Mutect VCF Parser: Jan 2017                        **\n" +
+				"**                               Mutect VCF Parser: April 2017                      **\n" +
 				"**************************************************************************************\n" +
 				"Parses Mutect2 VCF files, filtering for read depth, allele frequency diff ratio, etc.\n"+
 				"Inserts AF and DP into for the tumor sample into the INFO field. Changes the sample\n"+
@@ -239,6 +246,7 @@ public class MutectVCFParser {
 				"-d Minimum T-N AF difference, defaults to 0.\n"+
 				"-r Minimum T/N AF ratio, defaults to 0.\n"+
 				"-p Remove non PASS filter field records.\n"+
+				"-s Print spreadsheet variant summary.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/MutectVCFParser -v /VCFFiles/ -t 0.05 -n 0.5 -u 100\n"+
 				"        -o 20 -d 0.05 -r 2\n\n"+
