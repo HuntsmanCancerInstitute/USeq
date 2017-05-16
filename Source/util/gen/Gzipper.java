@@ -62,6 +62,17 @@ public class Gzipper {
 		}
 	}
 	
+	/**Adds a delimiter to each element in the array then a final return*/
+	public void println(Object[] obj, String delimiter) throws IOException{
+		byte[] db = delimiter.getBytes();
+		out.write(obj[0].toString().getBytes());
+		for (int i=1; i< obj.length; i++){
+			out.write(db);
+			out.write(obj[i].toString().getBytes());
+		}
+		out.write(rtn);
+	}
+	
 	public void print(String line) throws IOException{
 		out.write(line.getBytes());
 	}

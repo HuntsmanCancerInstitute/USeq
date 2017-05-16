@@ -125,10 +125,7 @@ public class VCFUtilities {
 				recordCount++;
 			}
 			
-			if (recordCount == 0) {
-				System.out.println("No VCF records found, exiting");
-				System.exit(1);
-			}
+			if (recordCount == 0) System.err.println("\nWARNING, No VCF records found!");
 			
 			in.close();
 		} catch (FileNotFoundException fnfe) {

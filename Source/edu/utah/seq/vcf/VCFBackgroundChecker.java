@@ -2,28 +2,20 @@ package edu.utah.seq.vcf;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.LinkedHashSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import edu.utah.seq.parsers.mpileup.MpileupLine;
-import edu.utah.seq.parsers.mpileup.MpileupSample;
+import edu.utah.seq.parsers.mpileup.BinomialMixture;
 import edu.utah.seq.parsers.mpileup.MpileupTabixLoader;
-import edu.utah.seq.query.QueryIndexFileLoader;
 import edu.utah.seq.vcf.xml.SimpleVcf;
-import htsjdk.tribble.readers.TabixReader;
 import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
@@ -39,6 +31,7 @@ public class VCFBackgroundChecker {
 	private File[] vcfFiles;
 	private File mpileup;
 	private File saveDir;
+	private File fullPathToR = new File ("/usr/bin/R");
 	private HashSet<Integer> sampleIndexesToExamine = null;
 	private int bpBuffer = 0;
 	private int minBaseQuality = 20;
@@ -54,19 +47,25 @@ public class VCFBackgroundChecker {
 	//internal
 	private static final int numVcfToProc = 100;
 	private MpileupTabixLoader[] loaders;
+	public static final double zscoreForInfinity = 1000;
+	public static final double  zscoreLessThanZero = 0.001;
+	private boolean deleteTempFiles = false;
 
 	//working
 	private File vcfFile;
 	private BufferedReader vcfIn;
-	private PrintWriter vcfOut;
+	private PrintWriter rOut;
 	private int numRecords = 0;
 	private int numNotScored = 0;
 	private int numFailingZscore = 0;
 	private int numSaved = 0;
 	private ArrayList<String> tooFewSamples = new ArrayList<String>();
+	private ArrayList<String> vcfHeader = new ArrayList<String>();
+	private ArrayList<String> vcfRecords = new ArrayList<String>();
 	
 	//constructor
 	public VCFBackgroundChecker(String[] args){
+		long startTime = System.currentTimeMillis();
 		try {	
 			processArgs(args);
 			
@@ -74,39 +73,54 @@ public class VCFBackgroundChecker {
 			loaders = new MpileupTabixLoader[numberThreads];
 			for (int i=0; i< loaders.length; i++) loaders[i] = new MpileupTabixLoader(mpileup, this);
 			
+			//make Alun's BM caller
+//BinomialMixture bm = new BinomialMixture(fullPathToR, saveDir, deleteTempFiles);
 
 			//for each vcf file
 			System.out.println("\nParsing vcf files...");
 			for (int i=0; i< vcfFiles.length; i++){
+				//set values and clear past data
 				vcfFile = vcfFiles[i];
 				numRecords = 0;
 				numNotScored = 0;
 				numFailingZscore = 0;
 				numSaved = 0;
 				tooFewSamples.clear();
+				vcfRecords.clear();
+				
 				System.out.println(vcfFile.getName());
 				String name = Misc.removeExtension(vcfFile.getName());
-				File tempVcf = new File(saveDir, name+"_BKZed.vcf");
-				tempVcf.deleteOnExit();
-				vcfOut = new PrintWriter(new FileWriter(tempVcf));
 				createReaderSaveHeader();
+				File tempRData = new File(saveDir, name+"_RObs.txt");
+//if (deleteTempFiles) tempRData.deleteOnExit();
+				tempRData.deleteOnExit();
+				rOut = new PrintWriter( new FileWriter(tempRData));
 				
+				//load mpileup data
 				ExecutorService executor = Executors.newFixedThreadPool(numberThreads);
 				for (MpileupTabixLoader l: loaders) executor.execute(l);
 				executor.shutdown();
-
-				//spins here until the executer is terminated, e.g. all threads complete
 				while (!executor.isTerminated()) {}
 
 				//check loaders 
 				for (MpileupTabixLoader l: loaders) {
 					if (l.isFailed()) throw new IOException("ERROR: File Loader issue! \n");
 				}
-				vcfOut.close();
 				vcfIn.close();
+				rOut.close();
 				
-				//sort, in memory so hopefully it doesn't blow up 
-				SimpleVcf.sortVcf(tempVcf, new File(tempVcf.getParentFile(), tempVcf.getName()+".gz"));
+				//estimate pvalue of tumor obs vs panel of normals data
+				//disable for now, just sort
+				
+//double[] pvals = bm.estimatePValues(tempRData);
+//Misc.printArray(pvals);
+//if (pvals == null) throw new Exception("Error estimating PON pvalues!");
+//VcfSorter[] finalVcfs = addPVals(pvals);
+				
+				VcfSorter[] finalVcfs = fetchVcfSorterArray();
+				Arrays.sort(finalVcfs);
+				
+				writeOutModifiedVcf (finalVcfs, new File(saveDir, name+".vcf.gz"));
 				
 				//print summary stats
 				if (tooFewSamples.size() !=0){
@@ -122,15 +136,89 @@ public class VCFBackgroundChecker {
 		} finally {
 			//shut down loaders
 			for (MpileupTabixLoader m : loaders) m.getTabixReader().close();
+			
+			//finish and calc run time
+			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
+			System.out.println("\nDone! "+Math.round(diffTime)+" min\n");
 		}
 	}
+
+	private void writeOutModifiedVcf(VcfSorter[] finalVcfs, File file) throws IOException {
+		Gzipper out = new Gzipper(file);
+		//add header
+		for (String s: vcfHeader) out.println(s);
+		for (VcfSorter v : finalVcfs) out.println(v.fields, "\t");
+		out.close();
+	}
 	
+	private VcfSorter[] fetchVcfSorterArray() throws Exception {
+		int num= vcfRecords.size();
 
+		VcfSorter[] v = new VcfSorter[num];
+		for (int x = 0; x < num; x++){
+			String vcf = vcfRecords.get(x);
+			v[x] = new VcfSorter(Misc.TAB.split(vcf));
+		}
+		return v;
+	}
 
-	/**Just prints out records.*/
-	public synchronized void saveModifiedVcf(ArrayList<String> vcf) throws IOException{
-		for (String s: vcf) vcfOut.println(s);
-		numSaved+= vcf.size();
+	private VcfSorter[] addPVals(double[] pvals) throws Exception {
+		if (pvals.length != this.vcfRecords.size()) throw new Exception ("The number of pvalues and number of modified vcf records do not match?");
+
+		VcfSorter[] v = new VcfSorter[pvals.length];
+		for (int x = 0; x < pvals.length; x++){
+			String vcf = vcfRecords.get(x);
+			String pval = Num.formatNumberJustMax(pvals[x], 1);
+			
+			//#CHROM POS ID REF ALT QUAL FILTER INFO FORMAT SAMPLES
+			String[] fields = Misc.TAB.split(vcf);
+			fields[7] = "BKP="+ pval+ ";" + fields[7];
+			v[x] = new VcfSorter(fields);
+		}
+		return v;
+	}
+	
+	private class VcfSorter implements Comparable<VcfSorter>{
+		private String chr;
+		private int pos;
+		//#CHROM POS ID REF ALT QUAL FILTER INFO FORMAT SAMPLES
+		String[] fields;
+		
+		public VcfSorter(String[] fields){
+			this.fields = fields;
+			chr = fields[0];
+			pos = Integer.parseInt(fields[1]);
+		}
+		
+		public int compareTo(VcfSorter other) {
+			//sort by chromosome
+			int x = chr.compareTo(other.chr);
+			if (x !=0) return x;
+			//sort by position
+			if (pos < other.pos) return -1;
+			if (pos > other.pos) return 1;
+			return 0;
+		}
+	}
+
+	public synchronized void save(ArrayList<String> vcf, ArrayList<int[][]> baseCounts) {
+		int num = vcf.size();
+		numSaved += num;
+		
+		//write out data for R
+//disable!
+		/*
+		for (int i =0; i< num; i++){
+			rOut.println("#"+vcf.get(i));
+			int[][] bc = baseCounts.get(i);
+			String nonRef = Misc.intArrayToString(bc[0], "\t");
+			String total = Misc.intArrayToString(bc[1], "\t");
+			rOut.println(nonRef);
+			rOut.println(total);
+		}*/
+		
+		//save vcf records
+		vcfRecords.addAll(vcf);
 	}
 
 	/**Loads the AL with vcf lines up to the numVcfToProc, if none could be read, returns false, otherwise true.*/
@@ -157,6 +245,7 @@ public class VCFBackgroundChecker {
 	
 	private void createReaderSaveHeader() throws Exception {
 		vcfIn = IO.fetchBufferedReader(vcfFile);
+		vcfHeader.clear();
 		String record;
 		boolean addInfo = true;
 		boolean endFound = false;
@@ -165,12 +254,15 @@ public class VCFBackgroundChecker {
 			if (record.length() == 0) continue;
 			if (record.startsWith("#")){
 				if (addInfo && record.startsWith("##INFO=")) {
-					vcfOut.println("##INFO=<ID=BKZ,Number=1,Type=Float,Description=\"Smallest AF z-score calculated from background AFs over effected bases. "
+					vcfHeader.add("##FILTER=<ID=BKAF,Description=\"One or more background control sample AFs are >= the variants.\">");
+					vcfHeader.add("##INFO=<ID=BKZ,Number=1,Type=Float,Description=\"Smallest AF z-score calculated from background AFs over effected bases. "
 							+ "Values < ~4 are suspicous, non reference observations are likely present in the background samples.\">");
-					vcfOut.println("##INFO=<ID=BKAF,Number=1,Type=String,Description=\"Non-reference AFs from the background samples used to calculate the BKZ.\">");
+					vcfHeader.add("##INFO=<ID=BKAF,Number=1,Type=String,Description=\"Non-reference AFs from the background samples used to calculate the BKZ.\">");
+//vcfHeader.add("##INFO=<ID=BKP,Number=1,Type=Float,Description=\"-10Log10(B&H AdjPval) estimate based on an EM binomial mixture model of background normal observations.\">");
+					
 					addInfo = false;
 				}
-				vcfOut.println(record);
+				vcfHeader.add(record);
 				if (record.startsWith("#CHROM")){
 					endFound = true;
 					break;
@@ -179,8 +271,6 @@ public class VCFBackgroundChecker {
 			else {
 				endFound = true;
 				break;
-				//numRecords++;
-				//score(record);
 			}
 		}
 		if (endFound == false) Misc.printErrAndExit("\nERROR: failed to find the #CHROM line, aborting\n");
@@ -212,6 +302,7 @@ public class VCFBackgroundChecker {
 					case 'v': forExtraction = new File(args[++i]); break;
 					case 's': saveDir = new File(args[++i]); break;
 					case 'm': mpileup = new File(args[++i]); break;
+					case 'r': fullPathToR = new File(args[++i]); break;
 					case 'i': sampleIndexes = Num.parseInts(args[++i], Misc.COMMA); break;
 					case 'z': minimumZScore = Double.parseDouble(args[++i]); break;
 					case 'b': bpBuffer = Integer.parseInt(args[++i]); break;
@@ -220,7 +311,7 @@ public class VCFBackgroundChecker {
 					case 'a': minNumSamples = Integer.parseInt(args[++i]); break;
 					case 'e': removeNonZScoredRecords = true; break;
 					case 'd': verbose = true; break;
-					case 'r': replaceQualScore = true; break;
+					case 'u': replaceQualScore = true; break;
 					case 't': numberThreads = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
@@ -259,6 +350,10 @@ public class VCFBackgroundChecker {
 		int numAvail = Runtime.getRuntime().availableProcessors();
 		if (numberThreads < 1 || numberThreads > numAvail) numberThreads =  numAvail - 1;
 		
+		//check for R and required libraries, don't need it if they just want the first and last 1/3 count table
+		//disabled for now
+//if (fullPathToR == null || fullPathToR.canExecute()== false) Misc.printErrAndExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
+		
 		printSettings();
 		
 	}	
@@ -287,7 +382,7 @@ public class VCFBackgroundChecker {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                         VCF Background Checker : March 2016                      **\n" +
+				"**                         VCF Background Checker : May 2017                        **\n" +
 				"**************************************************************************************\n" +
 				"VBC calculates non-reference allele frequencies (AF) from a background multi-sample \n"+
 				"mpileup file over each vcf record. It then calculates a z-score for the vcf AF and \n"+
@@ -304,6 +399,7 @@ public class VCFBackgroundChecker {
 				"      2) Bgzip: 'tabix-0.2.6/bgzip bkg.mpileup'\n"+
                 "         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bkg.mpileup.gz'\n"+
 				"-s Path to directory in which to save the modified vcf file(s)\n"+
+//"-r Full path to R, defaults to /usr/bin/R \n"+
 						
 				"\nOptional:\n" +
 				"-i Comma delimited list (zero is 1st sample, no spaces) of mpileup sample indexes to\n"+
@@ -315,14 +411,15 @@ public class VCFBackgroundChecker {
 				"-f Maximum mpileup sample AF, defaults to 0.3\n"+
 				"-a Minimum # mpileup samples for z-score calculation, defaults to 3\n" +
 				"-e Exclude vcf records that could not be z-scored\n"+
-				"-r Replace QUAL value with z-score. Un scored vars will be assigned 0\n"+
+				"-u Replace QUAL value with z-score. Un scored vars will be assigned 0\n"+
 				"-d Print verbose debugging output\n" +
 				"-t Number of threads to use, defaults to all\n"+
+				
 
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundChecker -v SomaticVcfs/ -z 3\n"+
-				"-m bkg.mpileup.gz -s BkgFiltVcfs/ -b 1 -q 13 -e -r \n\n"+
+				"-m bkg.mpileup.gz -s BkgFiltVcfs/ -b 1 -q 13 -e -r /usr/share/R -u \n\n"+
 
 		        "**************************************************************************************\n");
 	}
@@ -367,7 +464,4 @@ public class VCFBackgroundChecker {
 	public HashSet<Integer> getSampleIndexesToExamine() {
 		return sampleIndexesToExamine;
 	}
-
-
-
 }

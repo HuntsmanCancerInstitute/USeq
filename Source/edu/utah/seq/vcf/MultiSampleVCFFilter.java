@@ -45,6 +45,7 @@ public class MultiSampleVCFFilter {
 		//Count vcf records
 		ArrayList<File> tempVcfFiles = new ArrayList<File>();
 		int recordCount = VCFUtilities.countReads(vcfInFile);
+		if (recordCount == 0) return;
 		int chunks = recordCount / VCFUtilities.readsToChunk + 1;
 		
 		File tempDir = null;
@@ -72,7 +73,7 @@ public class MultiSampleVCFFilter {
 				parser =  new VCFParser(vcfInFile, true, true, true, i,VCFUtilities.readsToChunk);
 			}
 			else parser = new VCFParser(vcfInFile,true, true, true);
-			parser.appendChrFixMT();
+			parser.appendChrFixMT(); //this is ok since only the original record is printed out, not the modified.  
 			
 			String fileName = vcfInFile.getName();
 			if (chunks !=1) fileName = i+"_"+fileName;
@@ -374,17 +375,14 @@ public class MultiSampleVCFFilter {
 			if (sampleNames == null) {
 				System.out.println("If filtering by genotype, you must specify sample names (-n)\n");
 				System.exit(1);
-				
 			}
 			if (groups == null) {
 				System.out.println("If filtering by genotype, you must specify groups (-u)\n");
 				System.exit(1);
-				
 			}
 			if (this.flagsByGroup == null) {
 				System.out.println("If filtering by genotype, you must specify flags by group (-l)\n");
 				System.exit(1);
-				
 			}
 			
 			int total = 0;

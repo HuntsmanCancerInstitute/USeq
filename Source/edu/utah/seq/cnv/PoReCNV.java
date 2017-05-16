@@ -64,6 +64,7 @@ public class PoReCNV {
 	private GeneExonSample[][] sampleGES = null;
 	private double[] totalCounts = null;
 	private SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+	private String thresholds = null;
 
 	//container for samples and their exons that pass the minimumCounts threshold
 	private GeneExonSample[] ges = null;
@@ -114,7 +115,7 @@ public class PoReCNV {
 			System.err.println("\nError processing chunks, check logs and temp files. Aborting.\n");
 			return;
 		}
-		//set sig threshold
+		//set sig thresholds for all using chunk[0], hmm, not good!
 		setSignificanceThreshold();
 
 		//find overlapping variants in exons with a deletion?
@@ -134,8 +135,8 @@ public class PoReCNV {
 
 		System.out.println("\n"+numExonsProcessed+" "+annoType+"s processed, "+numberPassingExons+" passed thresholds ("+minimumLog2Ratio+" Lg2Rto, "+minimumAdjPVal+" AdjPVal)");
 
-		//convert graphs to useq format
-		new Bar2USeq(graphDirectory, true);
+		//convert graphs to useq format, this is causing too many open file handles problem so just do it manually after it's finished running
+		//new Bar2USeq(graphDirectory, true);
 	}
 
 	private void setSignificanceThreshold() {
@@ -202,8 +203,8 @@ public class PoReCNV {
 			ArrayList<GeneExonSample> al = new ArrayList<GeneExonSample>();
 			al.add(ges[0]);
 
-			Gzipper outAll = new Gzipper(new File(saveDirectory, "results"+annoType+"All.xls.gz"));
-			Gzipper outPass = new Gzipper(new File(saveDirectory, "results"+annoType+"Pass.xls.gz"));
+			Gzipper outAll = new Gzipper(new File(saveDirectory, "results"+annoType+thresholds+"All.xls.gz"));
+			Gzipper outPass = new Gzipper(new File(saveDirectory, "results"+annoType+thresholds+"Pass.xls.gz"));
 
 			//print headers
 			String gn = "Gene Name";
@@ -414,7 +415,7 @@ public class PoReCNV {
 	private void searchForAdjacents() {
 
 		try{
-			outPassBed = new Gzipper(new File(saveDirectory, "results"+annoType+"Pass.bed.gz"));
+			outPassBed = new Gzipper(new File(saveDirectory, "results"+annoType+thresholds+"Pass.bed.gz"));
 			outPassBed.println("#Chr\tStart\tStop\tSampleName:lg2Rto(Obs/Exp)_res_z_count;\tNumInGroup\tStrand");
 
 			//for each sample
@@ -1411,6 +1412,7 @@ public class PoReCNV {
 					case 'g': genomeVersion = args[++i]; break;
 					case 'w': mergeExonCounts = true; annoType = "Gene"; break;
 					case 'x': excludeSexChromosomes = false; break;
+					case 'z': deleteTempFiles = false; break;
 					case 'm': minNumInEachChunk = Integer.parseInt(args[++i]); break;
 					case 'e': minimumCounts = Integer.parseInt(args[++i]); break;
 					case 'l': minimumLog2Ratio = Float.parseFloat(args[++i]); break;
@@ -1483,6 +1485,9 @@ public class PoReCNV {
 			numberConcurrentThreads = Runtime.getRuntime().availableProcessors();
 		}
 		
+		//set appender
+		thresholds = minimumLog2Ratio+"Lg2Rto"+minimumAdjPVal+"PVal";
+		
 		printParams();
 
 	}	
@@ -1508,7 +1513,7 @@ public class PoReCNV {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Po Re CNV: June 2015                              **\n" +
+				"**                                PoRe CNV: April 2017                              **\n" +
 				"**************************************************************************************\n" +
 				"Uses Poisson regression and Pearson residuals to identify exons or genes whose counts\n"+
 				"differ significantly from the fitted value base on all the exon sample counts. This\n"+
@@ -1541,6 +1546,7 @@ public class PoReCNV {
 				"-m Minimum number exons per data chunk, defaults to 1500.\n"+
 				"-w Examine whole gene counts for CNVs, defaults to exons.\n"+
 				"-x Keep sex chromosomes (X,Y), defaults to removing. Don't mix sexes!\n"+
+				"-z Don't delete temp files.\n"+
 				
 				"\n"+
 

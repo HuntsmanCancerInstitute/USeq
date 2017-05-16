@@ -26,6 +26,8 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	
 	private boolean missingQual = false;
 	
+
+	
 	/**Only extracts some of the fields from a record*/
 	public VCFRecord(String record, VCFParser vcfParser, boolean loadSamples, boolean loadInfo) throws Exception{
 		originalRecord = record;
@@ -126,6 +128,25 @@ public class VCFRecord implements Comparable<VCFRecord> {
 	/**Return original unmodified record line.*/
 	public String toString(){
 		return originalRecord;
+	}
+	
+	/**Returns Chrom thru Info fields*/
+	public String getTruncatedRecord(){
+		StringBuilder sb = new StringBuilder();
+		sb.append(chromosome); sb.append("\t");
+		sb.append((position+1)); sb.append("\t");
+		sb.append(rsNumber); sb.append("\t");
+		sb.append(reference); sb.append("\t");
+		sb.append(alternate[0]);
+		for (int i=1; i<alternate.length; i++){
+			sb.append(",");
+			sb.append(alternate[i]);
+		}
+		sb.append("\t");
+		sb.append(quality); sb.append("\t");
+		sb.append(filter); sb.append("\t");
+		sb.append(info.getInfoString());
+		return sb.toString();
 	}
 	
 	/**Checks if any of the alternate alleles match and optionally that the genotype of the first sample are identical.*/

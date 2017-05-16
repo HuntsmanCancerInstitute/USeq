@@ -38,7 +38,9 @@ public class GatkRunnerChunk implements Runnable{
 		//output the bam?
 		if (gatkRunner.bamOut) {
 			bamOut = new File (gatkRunner.getSaveDirectory(), name+"_temp.bam");
+			File bai = new File (gatkRunner.getSaveDirectory(), name+"_temp.bai");
 			bamOut.deleteOnExit();
+			bai.deleteOnExit();
 		}
 
 		//build and execute gatk call

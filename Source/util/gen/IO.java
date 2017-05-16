@@ -1002,13 +1002,13 @@ public class IO {
 		String[] cmd = {"chmod", "777", fullPath};
 		String[] res = IO.executeCommandLineReturnAll(cmd);
 		if (res == null || res.length !=0 ) {
-			shellFile.delete();
+			//shellFile.delete();
 			return null;
 		}
 		//execute
 		cmd = new String[]{fullPath};
 		res = IO.executeCommandLineReturnAll(cmd);
-		shellFile.delete();
+		//shellFile.delete();
 		return res; 
 	}
 
