@@ -26,7 +26,6 @@ public class MergeSams{
 	private float minimumMappingQualityScore = 0;
 	private int numberAlignments = 0;
 	private int numberUnmapped = 0;
-	private int numberExceedingEnd = 0;
 	private int numberFailingVendorQC = 0;
 	private int numberPassingAlignments = 0;
 	private int numberFailingAlignmentScore = 0;
@@ -34,10 +33,13 @@ public class MergeSams{
 	private int numberAdapter = 0;
 	private int numberPhiX = 0;
 	private boolean verbose = true;
+	private boolean addProgramArgs = false;
 	
 	private Gzipper samOut;
 	private boolean saveBadReads = false;
 	private HashMap <String, Integer> chromLength = new HashMap <String, Integer>();
+	private HashSet<String> readGroups = new HashSet<String>();
+	private HashSet<String> programParams = new HashSet<String>();
 	private String programArguments;
 	private static final Pattern TAB = Pattern.compile("\\t");
 	private String genomeVersion = null;
@@ -114,7 +116,6 @@ public class MergeSams{
 			System.out.println("\t\t"+numberFailingVendorQC+"\t# Alignments failing vendor/ platform QC and or malformed");
 			System.out.println("\t\t"+numberFailingAlignmentScore+"\t# Alignments failing alignment score");
 			System.out.println("\t\t"+numberFailingMappingQualityScore+"\t# Alignments failing mapping quality score");
-			System.out.println("\t\t"+numberExceedingEnd+"\t# Alignments exceeding the length of the chromosome in the header");
 			System.out.println("\t\t"+numberAdapter+"\t# Adapter alignments");
 			System.out.println("\t\t"+numberPhiX+"\t# PhiX alignments");
 			System.out.println();
@@ -144,7 +145,9 @@ public class MergeSams{
 					if (chromLength.containsKey(chrom)) currLength = chromLength.get(chrom);
 					if (length > currLength) chromLength.put(chrom, new Integer(length));
 				}
-			} 
+			}
+			else if (lines[i].startsWith("@RG")) readGroups.add(lines[i]);
+			else if (lines[i].startsWith("@PG")) programParams.add(lines[i]);
 		}	
 	}
 
@@ -212,19 +215,6 @@ public class MergeSams{
 						continue;
 					}
 
-					//check chrom length
-					String chrom = sam.getReferenceName();
-					int maxLength =0;
-					if (chromLength.containsKey(chrom)) maxLength = (chromLength.get(chrom)).intValue();
-					int endPosition = sam.getAlignmentEnd();
-					//bad length?
-					if (endPosition >= maxLength) {
-						System.err.println("WARNING: the end of the following alignment exceeds the the max length of the index? "+maxLength+"\n"+sam.getSAMString());
-						if (saveBadReads) samOut.println(nameAppender+ sam.getSAMString().trim());
-						numberExceedingEnd++;
-						continue;
-					}
-
 					//OK, it passes, increment counter
 					numberPassingAlignments++;
 					samOut.println(nameAppender+ sam.getSAMString().trim());
@@ -257,10 +247,13 @@ public class MergeSams{
 			int length = chromLength.get(chromosome);
 			al.add("@SQ\tSN:"+chromosome+ gv+ "\tLN:"+length);
 		}
-		//add program
+		//add programs
 		al.add("@PG\tID:MergeSams\tCL: args "+programArguments);
-		//add readgroup
-		al.add("@RG\tID:mergedReadGroup\tSM:mergedSamples");
+		if (addProgramArgs) for (String pg: programParams) al.add(pg);
+		
+		//add read group
+		for (String rg: readGroups) al.add(rg);
+		
 		return Misc.stringArrayListToString(al, "\n");
 	}
 
@@ -345,10 +338,10 @@ public class MergeSams{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 Merge Sams: March 2017                           **\n" +
+				"**                                 Merge Sams: May 2017                             **\n" +
 				"**************************************************************************************\n" +
-				"Merges sam and bam files. Adds a stripped header if one is not provided. This most\n"+
-				"likely will not play nicely with GATK or Picard downstream apps, good for USeq.\n"+
+				"Merges sam and bam files. Adds a consensus header if one is not provided. These may\n"+
+				"not work with GATK or Picard downstream apps, good for USeq.\n"+
 
 				"\nOptions:\n"+
 				"-d The full path to a directory containing xxx.bam or xxx.sam.gz files to merged.\n" +
@@ -364,6 +357,8 @@ public class MergeSams{
 				"-h Full path to a txt file containing a sam header, defaults to autogenerating the\n"+
 				"      header from the sam/bam headers.\n"+
 				"-t Don't delete temp xxx.sam.gz file.\n"+
+				"-p Add program arguments to header, defaults to deleting, note duplicate cause Picard\n"+
+				"      apps to fail.\n"+
 				"-q Quiet, print only errors.\n"+
 
 				"\nExample: java -Xmx1500M -jar pathToUSeq/Apps/MergeSams -f /Novo/Run7/\n" +
