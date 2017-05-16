@@ -199,7 +199,7 @@ public class Consensus {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  Consensus : Dec 2015                            **\n" +
+				"**                                  Consensus : March 2017                          **\n" +
 				"**************************************************************************************\n" +
 				"Consensus clusters alignments sharing the same unclipped start position and molecular\n"+
 				"barcode. It then calls consensus on the clustered alignments outputing fastq for\n"+

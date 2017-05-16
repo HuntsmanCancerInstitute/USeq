@@ -43,6 +43,8 @@ public class BarcodeLoader extends Thread{
 	private long numFastqUnpairedOut = 0;
 	private long numPassingSamOut = 0;
 	private long numFailingSamOut = 0;
+	private long numModifiedBps = 0;
+	private long totalPassingBps = 0;
 	private Histogram famSizeHist = new Histogram(0, 100, 100);
 
 
@@ -93,6 +95,8 @@ public class BarcodeLoader extends Thread{
 		System.out.println("Passing bam records: "+numPassingSamOut);
 		System.out.println("Failing bam records: "+numFailingSamOut);
 		System.out.println("Bad barcodes       : "+numBadBarcodes);
+		System.out.println("Modified BPs       : "+numModifiedBps);
+		System.out.println("Total BPs          : "+totalPassingBps);
 		//histo
 		System.out.println("\nFamily size histogram:");
 		famSizeHist.printScaledHistogram();
@@ -279,6 +283,12 @@ public class BarcodeLoader extends Thread{
 	public synchronized void incrementNumFastqPairsOut(long n) {
 		numFastqPairsOut += n;
 	}
+	public synchronized void incrementNumModifiedBps(long n) {
+		numModifiedBps += n;
+	}
+	public synchronized void incrementTotalPassingBps(long n) {
+		totalPassingBps += n;
+	}
 	public synchronized void incrementNumFastqUnpairedOut(long n) {
 		numFastqUnpairedOut += n;
 	}
@@ -311,4 +321,6 @@ public class BarcodeLoader extends Thread{
 	public File getPassingSamFile() {
 		return passingSamFile;
 	}
+
+	
 }

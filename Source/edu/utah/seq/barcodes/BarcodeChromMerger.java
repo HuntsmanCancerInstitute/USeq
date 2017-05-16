@@ -35,6 +35,7 @@ public class BarcodeChromMerger implements Runnable {
 	private long numFastqUnpairedOut = 0;
 	private long numPassingSamOut = 0;
 	private long numFailingSamOut = 0;
+	private long totalPassingBps = 0;
 	private Histogram famSizeHist = new Histogram(0, 100, 100);
 	private static final Pattern alignmentScore = Pattern.compile("\\s+AS:i:(\\d+)\\s*");
 	
@@ -120,6 +121,8 @@ public class BarcodeChromMerger implements Runnable {
 		barcodeLoader.incrementNumFailingSamOut(numFailingSamOut);
 		barcodeLoader.incrementNumBadBarcodes(numBadBarcodes);
 		barcodeLoader.incrementFamSizeHist(famSizeHist);
+		barcodeLoader.incrementNumModifiedBps(consensusEngine.getBpsModified());
+		barcodeLoader.incrementTotalPassingBps(totalPassingBps);
 	}
 	
 	public void closeIO() throws IOException{
@@ -485,6 +488,7 @@ public class BarcodeChromMerger implements Runnable {
 	public void writeOutPassingSam(SAMRecord sam) throws IOException{
 		passingSamWriter.print(sam.getSAMString());
 		numPassingSamOut++;
+		totalPassingBps += sam.getReadBases().length;
 	}
 	public void writeOutFailingSam(SAMRecord sam) throws IOException{
 		failingSamWriter.print(sam.getSAMString());
@@ -494,10 +498,13 @@ public class BarcodeChromMerger implements Runnable {
 		fastqReadOneWriter.println(first);
 		fastqReadTwoWriter.println(second);
 		numFastqPairsOut++;
+		totalPassingBps += first.length;
+		totalPassingBps += second.length;
 	}
 	public void writeOutSingleEndFastq(String[] single) throws IOException{
 		fastqUnpairedWriter.println(single);
 		numFastqUnpairedOut++;
+		totalPassingBps += single.length;
 	}
 
 	public File getPassingSamFile() {
@@ -518,6 +525,10 @@ public class BarcodeChromMerger implements Runnable {
 
 	public File getFastqFileUnpaired() {
 		return fastqFileUnpaired;
+	}
+
+	public ConsensusEngine getConsensusEngine() {
+		return consensusEngine;
 	}
 
 }

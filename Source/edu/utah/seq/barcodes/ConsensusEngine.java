@@ -33,6 +33,7 @@ public class ConsensusEngine {
 	private double aCount = 0;
 	private double tCount = 0;
 	private double cCount = 0;
+	private long bpsModified = 0l;
 	
 	//max base quality observed
 	private int gQual = 0;
@@ -153,26 +154,31 @@ public class ConsensusEngine {
 		if (frac >= minimumIdentity) {
 			consensusSeq[i] = 'G';
 			consensusQual[i] = gQual;
+			if (frac != 1.0) bpsModified++;
 			return;
 		}
 		frac = aCount/total;
 		if (frac >= minimumIdentity) {
 			consensusSeq[i] = 'A';
 			consensusQual[i] = aQual;
+			if (frac != 1.0) bpsModified++;
 			return;
 		}
 		frac = tCount/total;
 		if (frac >= minimumIdentity) {
 			consensusSeq[i] = 'T';
 			consensusQual[i] = tQual;
+			if (frac != 1.0) bpsModified++;
 			return;
 		}
 		frac = cCount/total;
 		if (frac >= minimumIdentity) {
 			consensusSeq[i] = 'C';
 			consensusQual[i] = cQual;
+			if (frac != 1.0) bpsModified++;
 			return;
 		}
+		bpsModified++;
 		consensusSeq[i] = 'N';
 		consensusQual[i] = 0;
 	}
@@ -230,7 +236,11 @@ public class ConsensusEngine {
 		}
 		return rcSeq.toString();
 	}
+	public long getBpsModified() {
+		return bpsModified;
+	}
 
+	/*
 	public static void main(String[] args) {
 		try {
 			//load some clustered alignments
@@ -258,10 +268,7 @@ public class ConsensusEngine {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
-
-
-	}
+	}*/
 
 
 
