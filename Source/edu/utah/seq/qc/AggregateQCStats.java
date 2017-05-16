@@ -26,6 +26,8 @@ public class AggregateQCStats {
 	private Pattern saePattern;
 	private Pattern mpaPattern;
 	private Pattern s2uPattern;
+	
+	private boolean debug = false;
 
 
 	//constructors
@@ -231,6 +233,7 @@ public class AggregateQCStats {
 	}
 	
 	private void printTargetsTxtSheet() {
+		if (debug) System.out.println();
 		SampleQC sqc = samples.values().iterator().next();
 		StringBuilder sb = new StringBuilder();
 
@@ -245,8 +248,9 @@ public class AggregateQCStats {
 		int counter = 0;
 		for (SampleQC s: samples.values()){
 			String[][] testRegions = splitOutCoor(s.getExonicMedianPerBpCoverage());
-			if (regions.length != testRegions[0].length) Misc.printErrAndExit("\nERROR: the number of regions differ between samples?! "+testRegions.length);
-			for (int i=0; i< regions.length; i++) if (regions[i].equals(testRegions[0][i])== false) Misc.printErrAndExit("\nERROR: the regions differ between samples?! "+testRegions[0][i]);
+			if (debug) System.out.println(s.sampleName+"\t"+testRegions[0].length +"\t"+s.getTargetRegionsFileNameSAE()+"\t"+s.getTargetRegionsFileNameS2U());
+			if (regions.length != testRegions[0].length) Misc.printErrAndExit("\nERROR: the number of regions differ between samples, top?! Rerun with -v to debug ");
+			for (int i=0; i< regions.length; i++) if (regions[i].equals(testRegions[0][i])== false) Misc.printErrAndExit("\nERROR: the regions differ between samples, indi?! Rerun with -v to debug");
 			//add em
 			counts[counter++] = testRegions[1];
 		}
@@ -385,6 +389,7 @@ public class AggregateQCStats {
 					case 'm': mpaMatch = args[++i]; break;
 					case 'u': s2uMatch = args[++i]; break;
 					case 'p': prependString = args[++i]; break;
+					case 'v': debug = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -407,7 +412,7 @@ public class AggregateQCStats {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Aggregate QC Stats: July 2016                         **\n" +
+				"**                            Aggregate QC Stats: May 2017                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from json files produced by the\n"+
 				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, and fastq counter.\n"+
@@ -424,6 +429,7 @@ public class AggregateQCStats {
 				"-m MPA regex, defaults to (.+)_MergePairedAlignments.json.gz\n"+
 				"-u S2U regex, defaults to (.+)_Sam2USeq.json.gz\n"+
 				"-p String to prepend onto output file names.\n"+
+				"-v Print verbose debugging output.\n"+
 				"\n"+
 
 				"Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -r QCStats/ -p TR774_ \n\n" +

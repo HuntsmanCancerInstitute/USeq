@@ -30,6 +30,7 @@ public class SampleQC {
 	private double mappingQualityThreshold;
 	private double alignmentScoreThreshold;
 	private boolean divideAlignmentScoreByCigarM;
+	private String targetRegionsFileNameSAE;
 
 	//MPA
 	private boolean mpaParsed = false;
@@ -48,6 +49,7 @@ public class SampleQC {
 	private String[] lowCoverageRegions; 
 	private String[] exonicMedianPerBpCoverage;
 	private long numberLowCoverageBps;
+	private String targetRegionsFileNameS2U;
 
 	//constructor
 	public SampleQC( String sampleName){
@@ -81,6 +83,8 @@ public class SampleQC {
 				//AS threshold see boolean it might be divided the the length of the M's in the CIGAR String
 				alignmentScoreThreshold = jo.getDouble("alignmentScoreThreshold", -1);
 				divideAlignmentScoreByCigarM = jo.getBoolean("divideAlignmentScoreByCigarM", true);
+				//target file
+				targetRegionsFileNameSAE = jo.getString("targetRegionsFileName", "notFound");
 			}
 			else if (type.equals("mpa")){
 				mpaParsed = true;
@@ -111,6 +115,8 @@ public class SampleQC {
 				lowCoverageRegions = parseStringArray(jo.get("lowCoverageRegions"));
 				//number of target bps failing the coverage threshold
 				numberLowCoverageBps = jo.getLong("numberLowCoverageBps", -1);
+				//name of targets
+				targetRegionsFileNameS2U = jo.getString("targetRegionsFileName", "notFound");
 			}
 			in.close();
 		} catch (IOException e) {
@@ -378,6 +384,14 @@ public class SampleQC {
 
 	public boolean isFastqParsed() {
 		return fastqParsed;
+	}
+
+	public String getTargetRegionsFileNameS2U() {
+		return targetRegionsFileNameS2U;
+	}
+
+	public String getTargetRegionsFileNameSAE() {
+		return targetRegionsFileNameSAE;
 	}
 
 
