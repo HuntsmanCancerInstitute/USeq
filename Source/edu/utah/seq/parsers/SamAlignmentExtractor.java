@@ -24,6 +24,7 @@ public class SamAlignmentExtractor {
 	private File bedFile;
 	private File saveDirectory;
 	private int minimumMappingQuality = -1;
+	private int minimumFamilySize = 0;
 	private double alignmentScoreThreshold = -1.0;
 	private boolean biggerASIsBetter = true;
 	private boolean divideAlignmentScoreByCigarM = false;
@@ -34,6 +35,7 @@ public class SamAlignmentExtractor {
 	//internal fields
 	private HashMap<String,RegionScoreText[]> chromRegions;
 	private static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSDHN])");
+	private static Pattern FAMILY_SIZE = Pattern.compile(".+:FS:(\\d+).*");
 	private SamReader bamReader;
 	private SAMFileWriter passingBamWriter;
 	private SAMFileWriter failingBamWriter;
@@ -43,11 +45,13 @@ public class SamAlignmentExtractor {
 	private int numRawAlignments = 0;
 	private int numPassingBasicOnTargetYetFailingMQ = 0;
 	private int numPassingBasicOnTargetYetFailingAS = 0;
-	private int numPassingBasicAndOnTarget;
-	private int numFailingBasic;
-	private int numPassingBasicOnTargetAndScores;
-	private int numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate;
+	private int numPassingBasicAndOnTarget = 0;
+	private int numFailingBasic = 0;
+	private int numFailingFS = 0;
+	private int numPassingBasicOnTargetAndScores = 0;
+	private int numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate = 0;
 	private File jsonOutputFile;
+	private Histogram histogram = new Histogram(1, 250, 249);
 	
 	
 	//constructors
@@ -77,6 +81,7 @@ public class SamAlignmentExtractor {
 		System.out.println("Align Score\t"+alignmentScoreThreshold);
 		System.out.println("Bigger AS is better\t"+biggerASIsBetter);
 		System.out.println("Divide AS by cigar M\t"+divideAlignmentScoreByCigarM);
+		System.out.println("Min Family Size\t"+minimumFamilySize);
 		System.out.println("Pass off target align\t"+writeOffTargetToPass);
 		System.out.println("Fail Sec, Sup, Non Prim align\t"+removeSecSupNotPrim);
 		System.out.println("Skip writing failing align\t"+skipWritingFail);
@@ -108,6 +113,9 @@ public class SamAlignmentExtractor {
 			//save all unmapped to fail
 			printUnmapped();
 			
+			//close readers
+			closeIO();
+			
 			//print stats
 			System.out.println("\n\nSAE statistics:");
 			printStatLine(numFailingBasic, numRawAlignments, "Unmapped, failing vendor QC, possibly secondary/ non prim");
@@ -116,11 +124,12 @@ public class SamAlignmentExtractor {
 			String dir = "<";
 			if (biggerASIsBetter == false) dir = ">";
 			printStatLine(numPassingBasicOnTargetYetFailingAS, numPassingBasicAndOnTarget, "Failing AS score ("+dir+alignmentScoreThreshold+")");
+			if (minimumFamilySize !=0) printStatLine(numFailingFS, (numRawAlignments-numFailingBasic), "Failing minimum molecular barcode family size ("+minimumFamilySize+")");
 			printStatLine(numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate, numPassingBasicOnTargetAndScores, "Duplicates (not filtered)");
 			printStatLine(numPassingBasicOnTargetAndScores, numRawAlignments, "Passing all filters");
-
-			//close readers
-			closeIO();
+			
+			System.out.println("\nFamily Size Histogram for alignments passing filters:");
+			if (minimumFamilySize !=0) histogram.printScaledHistogram();
 			
 			if (jsonOutputFile !=null) saveJson();
 
@@ -309,6 +318,19 @@ public class SamAlignmentExtractor {
 						}
 					}
 				}
+				//family size
+				if (minimumFamilySize !=0 && passScores){
+					int size = 1;
+					Matcher fs = FAMILY_SIZE.matcher(sam.getReadName());
+					if (fs.matches()) size = Integer.parseInt(fs.group(1));
+					histogram.count(size);
+					if (size < minimumFamilySize) {
+						passScores = false;
+						numFailingFS++;
+					}
+				}
+				
+				
 				//pass? or fail? scores
 				if (passScores) {
 					passingBamWriter.addAlignment(sam);
@@ -350,6 +372,7 @@ public class SamAlignmentExtractor {
 					case 'r': bedFile = new File(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'q': minimumMappingQuality = Integer.parseInt(args[++i]); break;
+					case 'm': minimumFamilySize = Integer.parseInt(args[++i]); break;
 					case 'a': alignmentScoreThreshold = Double.parseDouble(args[++i]); break;
 					case 'n': biggerASIsBetter = false; break;
 					case 'd': divideAlignmentScoreByCigarM = true; break;
@@ -438,7 +461,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                         Sam Alignment Extractor: July 2016                       **\n" +
+				"**                         Sam Alignment Extractor: March 2017                      **\n" +
 				"**************************************************************************************\n" +
 				"Splits an alignment file into those that pass or fail thresholds and intersects\n"+
 				"regions of interest. Calculates a variety of QC statistics.\n"+
@@ -454,6 +477,7 @@ public class SamAlignmentExtractor {
 				"-a Alignment score threshold, defaults to no filtering. \n"+
 				"-n Smaller alignment scores are better (novo), defaults to bigger are better (bwa).\n"+
 				"-d Divide alignment score by the number of CIGAR M bases.\n"+
+				"-m Minimum molecular barcode family size, defaults to 0. Requires :FS:# in read name.\n"+
 				"-j Write summary stats in json format to this file.\n"+
 				"-f Save off target alignments that meet thresholds to the pass file, defaults to fail.\n"+
 				"-x Save secondary, supplemental, and non primary alignments, that pass the thresholds\n"+
