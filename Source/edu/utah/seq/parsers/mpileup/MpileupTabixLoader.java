@@ -7,9 +7,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import edu.utah.seq.query.QueryIndexFileLoader;
 import edu.utah.seq.vcf.VCFBackgroundChecker;
+import edu.utah.seq.vcf.VCFBackgroundCheckerGraphite;
 import htsjdk.tribble.readers.TabixReader;
 import util.gen.Misc;
 import util.gen.Num;
@@ -24,7 +24,7 @@ public class MpileupTabixLoader implements Runnable{
 	private ArrayList<String> vcfLines = new ArrayList<String>();
 	private ArrayList<String> modVcfRecords = new ArrayList<String>();
 	private ArrayList<String> tooFewSamples = new ArrayList<String>();
-	private int bpBuffer;
+	private ArrayList<int[][]> baseCounts = new ArrayList<int[][]>();
 	private int minBaseQuality;
 	private int minReadCoverage;
 	private int minNumSamples;
@@ -35,19 +35,16 @@ public class MpileupTabixLoader implements Runnable{
 	private int numNotScored = 0;
 	private int numFailingZscore = 0;
 	private boolean verbose;
-	private HashSet<Integer> sampleIndexesToExamine = null;
 	
 	//internal
-	private static final Pattern DP = Pattern.compile(".*DP=(\\d+).*");
-	private static final Pattern AF = Pattern.compile(".*AF=([\\d\\.]+).*");
-	private static final double zscoreForInfinity = 1000;
+	public static final Pattern AF = Pattern.compile(".*AF=([\\d\\.]+).*");
+	public static final Pattern DP = Pattern.compile(".*DP=([\\d\\.]+).*");
 	private static final NumberFormat fourDecimalMax = NumberFormat.getNumberInstance();
 
 	
 
 	public MpileupTabixLoader (File mpileupFile, VCFBackgroundChecker vbc) throws IOException{
 		this.vbc = vbc;
-		bpBuffer = vbc.getBpBuffer();
 		minBaseQuality = vbc.getMinBaseQuality();
 		minReadCoverage = vbc.getMinReadCoverage();
 		minNumSamples = vbc.getMinNumSamples();
@@ -56,7 +53,6 @@ public class MpileupTabixLoader implements Runnable{
 		maxSampleAF = vbc.getMaxSampleAF();
 		replaceQualScore = vbc.isReplaceQualScore();
 		verbose = vbc.isVerbose();
-		sampleIndexesToExamine = vbc.getSampleIndexesToExamine();
 		tabixReader = new TabixReader(mpileupFile.getCanonicalPath());
 		fourDecimalMax.setMaximumFractionDigits(4);
 	}
@@ -68,12 +64,12 @@ public class MpileupTabixLoader implements Runnable{
 				
 				//for each
 				for (String record: vcfLines) score(record);
-				vbc.saveModifiedVcf(modVcfRecords);
+				vbc.save(modVcfRecords, baseCounts);
 				
 				//cleanup
 				vcfLines.clear();
 				modVcfRecords.clear();
-				
+				baseCounts.clear();
 			}
 			//update
 			vbc.update(numNotScored, numFailingZscore, tooFewSamples);
@@ -96,9 +92,10 @@ public class MpileupTabixLoader implements Runnable{
 		Matcher mat = AF.matcher(fields[7]);
 		if (mat.matches() == false) throw new IOException ("Failed to parse AF= number from the INFO field in this variant:\n"+record);
 		double freq = Double.parseDouble(mat.group(1));
-		//mat = DP.matcher(fields[7]);
-		//if (mat.matches() == false) throw new IOException ("Failed to parse DP= number from the INFO field in this variant:\n"+record);
-		//double depth = Double.parseDouble(mat.group(1));
+		mat = DP.matcher(fields[7]);
+		if (mat.matches() == false) throw new IOException ("Failed to parse DP= number from the INFO field in this variant:\n"+record);
+		double depth = Double.parseDouble(mat.group(1));
+		int numNonRef = (int)Math.round(depth*freq);
 		
 		//interbase coor of effected bps
 		int[] startStop = QueryIndexFileLoader.fetchEffectedBps(fields, true);
@@ -111,9 +108,9 @@ public class MpileupTabixLoader implements Runnable{
 		}
 		
 		//pull mpileup records, if none then warn and save vcf record
-		int start = startStop[0]+1-bpBuffer;
+		int start = startStop[0]+1;
 		if (start < 1) start = 1;
-		String tabixCoor = fields[0]+":"+start+"-"+(startStop[1]+bpBuffer);
+		String tabixCoor = fields[0]+":"+start+"-"+(startStop[1]);
 		TabixReader.Iterator it = fetchInteratorOnCoordinates(tabixCoor);
 		if (it == null) {
 			if (removeNonZScoredRecords == false) printScoredVcf(fields, record);
@@ -145,7 +142,10 @@ public class MpileupTabixLoader implements Runnable{
 			//calculate zscore
 			double[] meanStd = calcMeanStdev(toExamine);
 			double zscore = (freq-meanStd[0])/meanStd[1];
-			if (Double.isInfinite(zscore)) zscore = zscoreForInfinity;
+			if (Double.isInfinite(zscore)) zscore = VCFBackgroundChecker.zscoreForInfinity;
+			if (zscore < VCFBackgroundChecker.zscoreLessThanZero) zscore = VCFBackgroundChecker.zscoreLessThanZero;
+			
+			
 			if (zscore < minZScore) {
 				minZScore = zscore;
 				minZScoreSamples = toExamine;
@@ -165,19 +165,58 @@ public class MpileupTabixLoader implements Runnable{
 		
 		//append min zscore and save
 		else {
+			//was a background AF >= tum AF seen?
+			boolean highAF = highBkgrndAFsFound(freq, minZScoreSamples);
+			if (highAF) fields[6] = modifyFilterField(fields[6]);
+			
 			//fetch AFs
 			String bkafs = fetchFormattedAFs(minZScoreSamples);
 			String bkzString = Num.formatNumberNoComma(minZScore, 2);
 			fields[7] = "BKZ="+bkzString+";BKAF="+bkafs+";"+fields[7];
 			if (replaceQualScore) fields[5] = bkzString;
 			String modRecord = Misc.stringArrayToString(fields, "\t");
+			
+			//build counts for R, first is the tumor sample, the latter are the normals
+			int[][] counts = fetchCountsForR(minZScoreSamples, numNonRef, depth);
+			
 			//threshold it?
-			if (minimumZScore == 0) modVcfRecords.add(modRecord);
+			if (minimumZScore == 0) {
+				modVcfRecords.add(modRecord);
+				baseCounts.add(counts);
+			}
 			else {
 				if (minZScore < minimumZScore) numFailingZscore++;
-				else modVcfRecords.add(modRecord);
+				else {
+					modVcfRecords.add(modRecord);
+					baseCounts.add(counts);
+				}
 			}
 		}
+	}
+	
+	/**Adds a BKAF fail to the FILTER field.*/
+	private static String modifyFilterField(String filterField) {
+		//nada or pass?
+		if (filterField.length() == 0 || filterField.equals(".") || filterField.toUpperCase().equals("PASS")) return "BKAF";
+		else return "BKAF;" +filterField;
+	}
+
+	public static boolean highBkgrndAFsFound(double tAF, MpileupSample[] toExamine) {
+		for (int i=0; i< toExamine.length; i++) if (toExamine[i].getAlleleFreqNonRefPlusIndels() >= tAF) return true;
+		return false;
+	}
+	
+	private int[][] fetchCountsForR(MpileupSample[] minZScoreSamples, int numNonRef, double depth ){
+		int[] nonRef = new int[minZScoreSamples.length+1];
+		int[] total = new int[nonRef.length];
+		nonRef[0] = numNonRef;
+		total[0] = ((int)depth) - numNonRef;
+		int index = 1;
+		for (MpileupSample ms: minZScoreSamples){
+			nonRef[index] = ms.getNonRefBaseCounts() + ms.getInsertions()+ ms.getDeletions();
+			total[index++] = ms.getReadCoverageAll();
+		}
+		return new int[][]{nonRef,total};
 	}
 	
 	private void printScoredVcf(String[] fields, String record) throws IOException{
@@ -188,11 +227,11 @@ public class MpileupTabixLoader implements Runnable{
 		else modVcfRecords.add(record);
 	}
 	
-	private static String fetchFormattedAFs(MpileupSample[] toExamine) {
+	public static String fetchFormattedAFs(MpileupSample[] toExamine) {
 		StringBuilder sb = new StringBuilder(Num.formatNumber(toExamine[0].getAlleleFreqNonRefPlusIndels(), 4));
 		for (int i=1; i< toExamine.length; i++){
 			sb.append(",");
-			sb.append(Num.formatNumber(toExamine[i].getAlleleFreqNonRefPlusIndels(), 4));
+			sb.append(Num.formatNumberJustMax(toExamine[i].getAlleleFreqNonRefPlusIndels(), 4));
 		}
 		return sb.toString();
 	}
@@ -241,25 +280,13 @@ public class MpileupTabixLoader implements Runnable{
 			if (allSamples[i].getReadCoverageAll() < minReadCoverage) continue;
 			//check af for each base and ins del, if any exceed then skip, likely germline
 			if (allSamples[i].findMaxSnvAF() > maxSampleAF || allSamples[i].getAlleleFreqINDEL() > maxSampleAF) continue;
-			//select samples?
-			if (sampleIndexesToExamine != null){
-				if (sampleIndexesToExamine.contains(i)) al.add(allSamples[i]);
-			}
-			else al.add(allSamples[i]);
+			al.add(allSamples[i]);
 		}
 		
 		MpileupSample[] toExamine = new MpileupSample[al.size()];
 		al.toArray(toExamine);
 		return toExamine;
 	}
-	
-	/*
-	private void updateQueryStats() {
-		QueryRequest qr = tc.getQueryRequest();
-		qr.incrementNumQueriesWithResults(numberQueriesWithResults);
-		qr.incrementNumRetrievedResults(numberRetrievedResults);
-		qr.incrementNumSavedResults(numberSavedResults);
-	}*/
 
 	public boolean isFailed() {
 		return failed;
