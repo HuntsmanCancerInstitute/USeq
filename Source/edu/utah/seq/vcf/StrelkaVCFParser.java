@@ -26,7 +26,7 @@ public class StrelkaVCFParser {
 	private double minimumTNRatio = 0;
 	private double maximumNormalAltFraction = 1;
 	private Pattern qsiOrs = Pattern.compile(".+;QS[IS]=(\\d+);.+");
-	private boolean printSpreadsheet = true;
+	private boolean printSpreadsheet = false;
 	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
 	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
 	private String afFormat = "##FORMAT=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency\">";
@@ -301,7 +301,7 @@ public class StrelkaVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Strelka VCF Parser: April 2017                       **\n" +
+				"**                             Strelka VCF Parser: May 2017                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS\n"+
 				"score. Also filters for read depth, T/N alt allelic ratio and diff,\n"+
