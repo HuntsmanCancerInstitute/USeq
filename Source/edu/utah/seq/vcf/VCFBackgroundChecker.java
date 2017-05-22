@@ -254,10 +254,10 @@ public class VCFBackgroundChecker {
 			if (record.length() == 0) continue;
 			if (record.startsWith("#")){
 				if (addInfo && record.startsWith("##INFO=")) {
-					vcfHeader.add("##FILTER=<ID=BKAF,Description=\"One or more background control sample AFs are >= the variants.\">");
+					vcfHeader.add("##FILTER=<ID=BKAF,Description=\"One or more background control sample AFs are >= 0.9 x variant AF.\">");
 					vcfHeader.add("##INFO=<ID=BKZ,Number=1,Type=Float,Description=\"Smallest AF z-score calculated from background AFs over effected bases. "
 							+ "Values < ~4 are suspicous, non reference observations are likely present in the background samples.\">");
-					vcfHeader.add("##INFO=<ID=BKAF,Number=1,Type=String,Description=\"Non-reference AFs from the background samples used to calculate the BKZ.\">");
+					vcfHeader.add("##INFO=<ID=BKAF,Number=1,Type=String,Description=\"Sorted list (largest to smallest) of background non-reference AFs used to calculate the BKZ.\">");
 //vcfHeader.add("##INFO=<ID=BKP,Number=1,Type=Float,Description=\"-10Log10(B&H AdjPval) estimate based on an EM binomial mixture model of background normal observations.\">");
 					
 					addInfo = false;
@@ -388,8 +388,9 @@ public class VCFBackgroundChecker {
 				"mpileup file over each vcf record. It then calculates a z-score for the vcf AF and \n"+
 				"appends it to the INFO field. If multiple bps are affected (e.g. INDELs) or bp padding\n"+
 				"provided, the lowest bp z-score is appended. Z-scores < ~4 are indicative of non\n"+
-				"reference bps in the background samples. Note, VBC requires an AF tag in the INFO\n"+
-				"field of each record. \n"+
+				"reference bps in the background samples. A flag is appended the FILTER field if a\n"+
+				"background AF was found within 10% of the vcf AF. Note, VBC requires AF and DP tags\n"+
+				"in the INFO field of each record to use in the z-score and p-value calculations. \n"+
 
 				"\nRequired:\n"+
 				"-v Path to a xxx.vcf(.gz/.zip OK) file or directory containing such.\n" +

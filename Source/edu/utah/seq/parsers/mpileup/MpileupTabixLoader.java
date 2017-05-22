@@ -4,6 +4,8 @@ import java.io.File;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -165,14 +167,17 @@ public class MpileupTabixLoader implements Runnable{
 		
 		//append min zscore and save
 		else {
+			
+			//fetch sorted, smallest to largest AFs
+			double[] bkgAFs = fetchSortedAFs(minZScoreSamples);
+			
 			//was a background AF >= tum AF seen?
-			boolean highAF = highBkgrndAFsFound(freq, minZScoreSamples);
-			if (highAF) fields[6] = modifyFilterField(fields[6]);
+			if ((0.9*freq <= bkgAFs[bkgAFs.length-1])) fields[6] = modifyFilterField(fields[6]);
 			
 			//fetch AFs
-			String bkafs = fetchFormattedAFs(minZScoreSamples);
+			String bkafString = fetchFormattedAFs(bkgAFs);
 			String bkzString = Num.formatNumberNoComma(minZScore, 2);
-			fields[7] = "BKZ="+bkzString+";BKAF="+bkafs+";"+fields[7];
+			fields[7] = "BKZ="+bkzString+";BKAF="+bkafString+";"+fields[7];
 			if (replaceQualScore) fields[5] = bkzString;
 			String modRecord = Misc.stringArrayToString(fields, "\t");
 			
@@ -227,11 +232,19 @@ public class MpileupTabixLoader implements Runnable{
 		else modVcfRecords.add(record);
 	}
 	
-	public static String fetchFormattedAFs(MpileupSample[] toExamine) {
-		StringBuilder sb = new StringBuilder(Num.formatNumber(toExamine[0].getAlleleFreqNonRefPlusIndels(), 4));
-		for (int i=1; i< toExamine.length; i++){
+	public static double[] fetchSortedAFs(MpileupSample[] toExamine){
+		double[] bkgAFs = new double[toExamine.length];
+		for (int i=0; i< bkgAFs.length; i++) bkgAFs[i]= toExamine[i].getAlleleFreqNonRefPlusIndels();
+		Arrays.sort(bkgAFs);
+		return bkgAFs;
+	}
+	
+	public static String fetchFormattedAFs(double[] sortedAFs) {
+		
+		StringBuilder sb = new StringBuilder(Num.formatNumber(sortedAFs[sortedAFs.length-1], 4));
+		for (int i=sortedAFs.length-2; i>-1; i--){
 			sb.append(",");
-			sb.append(Num.formatNumberJustMax(toExamine[i].getAlleleFreqNonRefPlusIndels(), 4));
+			sb.append(Num.formatNumberJustMax(sortedAFs[i], 4));
 		}
 		return sb.toString();
 	}
