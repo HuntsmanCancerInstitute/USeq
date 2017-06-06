@@ -104,7 +104,7 @@ public class VCFParser {
 	public static final Pattern COLON = Pattern.compile(":");
 	public static final Pattern COMMA = Pattern.compile(",");
 	public static final Pattern SLASH = Pattern.compile("/");
-	public static final Pattern ID = Pattern.compile(".+=<ID=([/.\\w]+),.+");
+	public static final Pattern ID = Pattern.compile(".+=<ID=(.+)");
 	private ArrayList<String> badVcfRecords = new ArrayList<String>();
 	private HashMap<String, VCFLookUp> chromosomeVCFRecords = null;
 	private boolean loadRecords = true;
@@ -444,8 +444,10 @@ public class VCFParser {
 		HashSet<String> ids = new HashSet<String>();
 		//hash on =<ID=xxxx, if collision keeps first one
 		for (String s : comments){
-			Matcher mat = ID.matcher(s);
+			String[] f = COMMA.split(s);
+			Matcher mat = ID.matcher(f[0]);
 			if (mat.matches()){
+				//System.out.println(f[0]+" -> "+mat.group(1)+" ori "+s);
 				if (ids.contains(mat.group(1)) == false){
 					toReturn.add(s);
 					ids.add(mat.group(1));
