@@ -23,7 +23,7 @@ public class MutectVCFParser {
 	private double maximumNormalAltFraction = 1;
 	private double minimumTumorAltFraction = 0;
 	private boolean excludeNonPass = false;
-	private boolean printSpreadsheet = true;
+	private boolean printSpreadsheet = false;
 	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
 	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
 	
@@ -231,7 +231,7 @@ public class MutectVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Mutect VCF Parser: April 2017                      **\n" +
+				"**                               Mutect VCF Parser: July 2017                       **\n" +
 				"**************************************************************************************\n" +
 				"Parses Mutect2 VCF files, filtering for read depth, allele frequency diff ratio, etc.\n"+
 				"Inserts AF and DP into for the tumor sample into the INFO field. Changes the sample\n"+
