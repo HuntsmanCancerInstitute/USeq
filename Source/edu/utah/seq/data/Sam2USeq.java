@@ -51,6 +51,7 @@ public class Sam2USeq {
 	private Histogram histogram;
 	private ArrayList<File> files2Zip = new ArrayList<File>();
 	private float scalar = 0;
+	private double scalarDenominator = 1000000.0;
 	private Pattern cigarSub = Pattern.compile("(\\d+)([MSDHN])");
 	private Pattern supportedCigars = Pattern.compile(".*[^\\dMIDSHN].*");
 	private Pattern cigarWithRepeats = Pattern.compile("(.+\\D)(\\d+)$");
@@ -71,6 +72,7 @@ public class Sam2USeq {
 	private ArrayList<String> lowCoverageRegionsAL = new ArrayList<String>();
 	private ArrayList<String> exonicMedianPerBpCoverageAL = new ArrayList<String>();
 	private long numLowCoverageBps = 0;
+	
 
 
 	/**For stand alone app.*/
@@ -297,7 +299,7 @@ public class Sam2USeq {
 		closeWriters();
 
 		//set scalar
-		scalar = (float)(numberPassingAlignmentsForScaling/ 1000000.0);
+		scalar = (float)(numberPassingAlignmentsForScaling/ scalarDenominator);
 	}
 
 	/**Closes writers.*/
@@ -670,7 +672,7 @@ public class Sam2USeq {
 	/**Makes a stairstep graph from base count data.  The firstBase is added to the index to create a bp position.  Note if you scaleCounts then the original float[] is modified!*/
 	public PositionScore[] makeStairStepGraph(int firstBase, float[] baseCount, boolean scaleCounts){
 		//scale it?
-		if (scaleCounts){
+		if (scaleCounts){		
 			for (int i=0; i< baseCount.length; i++){
 				if (baseCount[i] !=0) baseCount[i] = baseCount[i]/scalar;
 			}
@@ -805,6 +807,7 @@ public class Sam2USeq {
 					case 'd': barDirectory = new File(args[i+1]); i++; break;
 					case 's': stranded = true; break;
 					case 'e': scaleRepeats = true; break;
+					case 'g': scalarDenominator  = Double.parseDouble(args[++i]); break;
 					case 'k': makeAveReadLengthGraph = true; break;
 					case 'm': minimumMappingQuality = Float.parseFloat(args[++i]); break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
@@ -919,6 +922,7 @@ public class Sam2USeq {
 			}
 			else {
 				System.out.println(makeRelativeTracks+"\tMake relative covererage tracks.");
+				if (makeRelativeTracks) System.out.println(scalarDenominator+"\tScalar denominator.");
 				System.out.println(scaleRepeats+"\tScale repeat alignments by the number of matches.");
 			}
 			System.out.println(stranded+"\tMake stranded covererage tracks.");
@@ -958,7 +962,7 @@ public class Sam2USeq {
 		numberPassingAlignmentsForScaling = count.longValue();
 
 		//set scalar
-		scalar = (float)(((double)numberPassingAlignmentsForScaling)/ 1000000.0);
+		scalar = (float)(((double)numberPassingAlignmentsForScaling)/ scalarDenominator);
 	}
 
 	public void printStats(){
@@ -1057,7 +1061,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 Sam 2 USeq : Oct 2016                            **\n" +
+				"**                                 Sam 2 USeq : May 2017                            **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
@@ -1081,6 +1085,7 @@ public class Sam2USeq {
 				"      total number of genome wide alignments for that read.  Repeat alignments are\n" +
 				"      thus given fractional count values at a given location. Requires that the IH\n" +
 				"      tag was set.\n"+
+				"-g Set the denominator of the scaler to this value, default 1000000\n"+
 				"-b Path to a region bed file (tab delim: chr start stop ...) to use in calculating\n" +
 				"      read coverage statistics.  Be sure these do not overlap! Run the MergeRegions app\n" +
 				"      if in doubt.\n"+ 
