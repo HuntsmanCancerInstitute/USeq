@@ -195,6 +195,16 @@ public class MpileupSample {
 		return nonRefCounts/((double)(readCoverageAll));
 	}
 	
+	/**Provide GATC, capitalized, returns the index.*/
+	public static int getIndex(char gatcBase){
+		int index = -1;
+		if (gatcBase == 'G') index = G_INDEX;
+		else if (gatcBase == 'A') index = A_INDEX;
+		else if (gatcBase == 'T') index = T_INDEX;
+		else if (gatcBase == 'C') index = C_INDEX;
+		return index;
+	}
+	
 	public int getNonRefBaseCounts() {
 		char ref = record.getRef().charAt(0);
 		int index = -1;
