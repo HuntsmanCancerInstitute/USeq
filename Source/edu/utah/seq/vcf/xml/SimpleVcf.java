@@ -65,7 +65,12 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 		else {
 			//define the end as the max effected genomic region
 			int refLen = ref.length();
-			int altLen = ref.length();
+			//find max alt length, there many be more than one, not good!
+			String[] splitAlts = Misc.COMMA.split(alt);
+			int altLen = splitAlts[0].length();
+			for (int i=1; i< splitAlts.length; i++){
+				if (splitAlts[i].length() > altLen) altLen = splitAlts[i].length();
+			}
 			if (refLen > altLen) {
 				end = pos+refLen;
 				deletion = true;
@@ -194,6 +199,10 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	public boolean isDeletion() {
 		return deletion;
 	}
+	public boolean isSnv(){
+		if (shortVariant && insertion == false && deletion == false) return true;
+		return false;
+	}
 	public SimpleVcf getMatch() {
 		return match;
 	}
@@ -218,5 +227,13 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 
 	public String getOriginalRecord() {
 		return originalRecord;
+	}
+
+	public void setAlt(String alt) {
+		this.alt = alt;
+	}
+
+	public String getId() {
+		return id;
 	}
 }

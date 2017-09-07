@@ -84,6 +84,7 @@ public class MaxEntScanScore5 {
 		double preComputedScore = seqScores.get(sub);
 		//calc final 
 		double score = consensus + preComputedScore;
+		//System.out.println(upperCase9Mer+"->"+score);
 		return score;
 	}
 	

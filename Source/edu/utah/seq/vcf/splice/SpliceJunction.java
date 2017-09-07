@@ -23,9 +23,11 @@ public class SpliceJunction implements Comparable<SpliceJunction>{
 	private String referenceSequence;
 	private double alternateScore;
 	private String alternateSequence;
+	private double scoreDelta;
 	
-	/**-10Log10(pvalue)*/
+	/**-10Log10(pvalue), not used by the VCFSpliceScanner*/
 	private double transPValue;
+
 	
 	public SpliceJunction(char gainOrDamage, char fiveOrThreePrime, char annotation, int position){
 		this.gainOrDamage = gainOrDamage ;
@@ -40,6 +42,8 @@ public class SpliceJunction implements Comparable<SpliceJunction>{
 		this.fiveOrThreePrime = fiveOrThreePrime;
 		this.annotation = annotation;
 	}
+
+	public SpliceJunction() {}
 
 	public int compareTo(SpliceJunction o) {
 		String thisCS = this.getCompareToString();
@@ -114,6 +118,15 @@ public class SpliceJunction implements Comparable<SpliceJunction>{
 	}
 	public void setGainOrDamage(char gainOrDamage) {
 		this.gainOrDamage = gainOrDamage;
+	}
+
+	public void setScoreDelta(double delta) {
+		this.scoreDelta= delta;
+		
+	}
+
+	public double getScoreDelta() {
+		return scoreDelta;
 	}
 	
 }

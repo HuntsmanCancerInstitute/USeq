@@ -82,6 +82,7 @@ public class MaxEntScanScore3 {
 		String sub = upperCase23Mer.substring(0,18) + upperCase23Mer.substring(20,23);
 		double mes = maxEntScore(sub);
 		//calc final 
+		//System.out.println(upperCase23Mer+"->"+(consensus + mes));
 		return consensus + mes;
 	}
 	
