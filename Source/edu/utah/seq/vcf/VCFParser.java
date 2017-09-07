@@ -330,7 +330,6 @@ public class VCFParser {
 		}catch (Exception e) {
 			System.err.println("\nAborting, problem parsing vcf file -> "+vcfFile);
 			e.printStackTrace();
-			System.exit(1);
 		} finally{
 			try {
 				in.close();
@@ -338,9 +337,9 @@ public class VCFParser {
 		}
 	}
 	
-	/**Merges headers eliminating duplicate lines.  Does a bad ID name collision checking, silently keeps first one. Source's are concatinated with a _.
+	/**Merges headers eliminating duplicate lines.  Does a bad ID name collision checking, silently keeps first one. Source's are concatenated with a _.
 	 * Returns null if CHROM lines differ. */
-	public static String[] mergeHeaders(VCFParser[] parsers) {
+	public static String[] mergeHeaders(VCFParser[] parsers, boolean tossSampleInfo) {
 		LinkedHashSet<String> other = new LinkedHashSet<String>();
 		LinkedHashSet<String> contig = new LinkedHashSet<String>();
 		LinkedHashSet<String> info = new LinkedHashSet<String>();
@@ -369,7 +368,7 @@ public class VCFParser {
 				else if (h.startsWith("##source=")){
 					source.add(parseSourceName(h));
 				}
-				else if (h.startsWith("#CHROM")) {
+				else if (h.startsWith("#CHROM") && tossSampleInfo == false) {
 					if (chromLine == null) chromLine = h;
 					else if (chromLine.equals(h) == false) return null;
 				}
@@ -383,6 +382,11 @@ public class VCFParser {
 		ArrayList<String> filterAL = mergeHeaderIds(filter);
 		ArrayList<String> formatAL = mergeHeaderIds(format);
 		ArrayList<String> infoAL = mergeHeaderIds(info);
+		
+		if (tossSampleInfo) {
+			formatAL.clear();
+			chromLine = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO";
+		}
 		
 		//Concatenate sources
 		String concatSource = null;

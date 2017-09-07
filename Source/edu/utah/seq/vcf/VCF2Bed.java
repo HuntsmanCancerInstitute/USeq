@@ -16,12 +16,13 @@ public class VCF2Bed {
 	private File[] vcfFiles;
 	private File saveDirectory;
 	private int padding = 0;
+	private boolean onlyEnds = false;
 	
 	public VCF2Bed (String[] args) {
 
 		processArgs(args);
 		for (File vcf: vcfFiles) {
-			System.out.println(vcf.getName());
+			System.out.print(vcf.getName());
 			parse(vcf);
 		}
 		
@@ -33,12 +34,21 @@ public class VCF2Bed {
 			File bed = new File (saveDirectory, Misc.removeExtension(vcf.getName())+"Pad"+ padding +"bp.bed.gz");
 			try {
 				Gzipper out = new Gzipper(bed);
-				HashMap<String,RegionScoreText[]> chrReg = Bed.parseVcfFile(vcf, padding, false);
+				HashMap<String,RegionScoreText[]> chrReg = null;
+				if (onlyEnds) chrReg = Bed.parseVcfFileForENDVars(vcf);
+				else chrReg = Bed.parseVcfFile(vcf, padding, false);
+				int numPrinted = 0;
 				for (String chr: chrReg.keySet()){
 					RegionScoreText[] regions = chrReg.get(chr);
+					numPrinted += regions.length;
 					for (RegionScoreText r: regions) out.println(r.getBedLine(chr));
 				}
 				out.close();
+				if (numPrinted == 0) {
+					bed.deleteOnExit();
+					System.out.println("\nNo records to print?");
+				}
+				else System.out.println("\t"+numPrinted);
 			} catch (Exception e) {
 				e.printStackTrace();
 				Misc.printErrAndExit("\nProblem parsing and saving bed file from "+vcf);
@@ -68,6 +78,7 @@ public class VCF2Bed {
 					case 'v': forExtraction = new File(args[++i]); break;
 					case 'p': padding = Integer.parseInt(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
+					case 'e': onlyEnds = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -95,7 +106,7 @@ public class VCF2Bed {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  VCF 2 Bed: July 2015                            **\n" +
+				"**                                  VCF 2 Bed: June 2017                            **\n" +
 				"**************************************************************************************\n" +
 				"Converts a vcf file to bed format.\n"+
 
@@ -103,6 +114,7 @@ public class VCF2Bed {
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).\n" +
 				"-p Padding to expand each variants size, defaults to 0\n"+
 				"-s Directory to save the bed files, defaults to the parent of the vcf\n"+
+				"-e Print out only the END=xxx containing vcf records as the bed based on the end value.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/VCF2Bed -v /VCFFiles/ -p 25 \n\n" +
 				"**************************************************************************************\n");

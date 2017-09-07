@@ -95,6 +95,7 @@ public class GatkRunner {
 		for (GatkRunnerChunk c: runners) {
 			vp = new VCFParser(c.getTempVcf(), true, false, false);
 			VCFRecord[] records = vp.getVcfRecords();
+			if (records == null) continue;
 			for (VCFRecord r: records) recordsAL.add(r);
 		}
 		VCFRecord[] all = new VCFRecord[recordsAL.size()];
@@ -184,7 +185,7 @@ public class GatkRunner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Gatk Runner: March 2017                            **\n" +
+				"**                               Gatk Runner: June 2017                             **\n" +
 				"**************************************************************************************\n" +
 				"Takes a bed file of target regions, splits it by the number of threads, writes out\n"+
 				"each, executes the GATK Gatktype caller, and merges the chunked results. \n"+

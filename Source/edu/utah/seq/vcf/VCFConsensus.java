@@ -32,81 +32,99 @@ public class VCFConsensus {
 	private Gzipper out;
 	private File mergedVcfFile;
 	private int numInCommon = 0;
+	private boolean verbose = true;
+	private boolean tossSampleInfo = false;
 
 	public VCFConsensus(String[] args){
 		try {	
 			processArgs(args);
-
-			System.out.println("Loading vcf files...");
-			primaryVcfParser = new VCFParser(primaryVcf, true, false, false);
-			secondaryVcfParser = new VCFParser(secondaryVcf, true, false, false);
-			
-			System.out.println("Merging headers...");
-			String[] mergedHeader = VCFParser.mergeHeaders(new VCFParser[]{primaryVcfParser, secondaryVcfParser});
-			if (mergedHeader == null) Misc.printErrAndExit("\nError: hmm something is wrong when merging headers, are the #CHROM lines different?\n");
-			
-			//create a hash of chromPosRefAlt
-			HashMap<String, VCFRecord> secondaryRecords = new HashMap<String, VCFRecord>();
-			for (VCFRecord r : secondaryVcfParser.getVcfRecords()) {
-				if (secondaryName!=null) r.setRsNumber(secondaryName+ "_"+ (secondaryNameIndex++));
-				secondaryRecords.put(r.getChrPosRefAlt(false), r);
-			}
-			
-			//for each primary record
-			System.out.println("Combining records...");
-			ArrayList<VCFRecord> toPrint = new ArrayList<VCFRecord>();
-			for (VCFRecord r : primaryVcfParser.getVcfRecords()){
-				if (primaryName!= null) r.setRsNumber(primaryName+ "_"+ (primaryNameIndex++));
-				String prim = r.getChrPosRefAlt(false);
-				if (secondaryRecords.containsKey(prim)){
-					String sec = secondaryRecords.get(prim).getRsNumber();
-					if (sec == null || sec.length()==0){
-						if (secondaryName == null) Misc.printErrAndExit("\nA secondary record was found with no ID info. Please provide a secondaryName to append to the merged output, see "+secondaryRecords.get(prim).getOriginalRecord());
-					}
-					//does the primary have a name?
-					if (r.getRsNumber() == null || r.getRsNumber().length() == 0) Misc.printErrAndExit("\nA primary record was found with no ID info. Please provide a primaryName to append to the merged output, see "+r.getOriginalRecord());
-					//add the secondary id to the primary
-					r.appendId(sec);
-					r.appendFilter(secondaryRecords.get(prim).getFilter());
-					secondaryRecords.remove(prim);
-					numInCommon++;
+			doWork();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public VCFConsensus(File primaryVcf, File secondaryVcf, File mergedVcfFile, boolean tossSampleInfo, boolean verbose) throws Exception{
+		this.primaryVcf = primaryVcf;
+		this.secondaryVcf = secondaryVcf;
+		this.mergedVcfFile = mergedVcfFile;
+		this.tossSampleInfo = tossSampleInfo;
+		this.verbose = verbose;
+		doWork();
+	}
+	
+	public void doWork() throws Exception {
+		if (verbose) System.out.println("Loading vcf files...");
+		primaryVcfParser = new VCFParser(primaryVcf, true, false, false);
+		secondaryVcfParser = new VCFParser(secondaryVcf, true, false, false);
+		
+		if (verbose) System.out.println("Merging headers...");
+		String[] mergedHeader = VCFParser.mergeHeaders(new VCFParser[]{primaryVcfParser, secondaryVcfParser}, tossSampleInfo);
+		if (mergedHeader == null) Misc.printErrAndExit("\nError: hmm something is wrong when merging headers, are the #CHROM lines different?\n");
+		
+		//create a hash of chromPosRefAlt
+		HashMap<String, VCFRecord> secondaryRecords = new HashMap<String, VCFRecord>();
+		for (VCFRecord r : secondaryVcfParser.getVcfRecords()) {
+			if (secondaryName!=null) r.setRsNumber(secondaryName+ "_"+ (secondaryNameIndex++));
+			secondaryRecords.put(r.getChrPosRefAlt(false), r);
+		}
+		
+		//for each primary record
+		if (verbose) System.out.println("Combining records...");
+		ArrayList<VCFRecord> toPrint = new ArrayList<VCFRecord>();
+		for (VCFRecord r : primaryVcfParser.getVcfRecords()){
+			if (primaryName!= null) r.setRsNumber(primaryName+ "_"+ (primaryNameIndex++));
+			String prim = r.getChrPosRefAlt(false);
+			if (secondaryRecords.containsKey(prim)){
+				String sec = secondaryRecords.get(prim).getRsNumber();
+				if (sec == null || sec.length()==0){
+					if (secondaryName == null) Misc.printErrAndExit("\nA secondary record was found with no ID info. Please provide a secondaryName to append to the merged output, see "+secondaryRecords.get(prim).getOriginalRecord());
 				}
-				toPrint.add(r);
+				//does the primary have a name?
+				if (r.getRsNumber() == null || r.getRsNumber().length() == 0) Misc.printErrAndExit("\nA primary record was found with no ID info. Please provide a primaryName to append to the merged output, see "+r.getOriginalRecord());
+				//add the secondary id to the primary
+				r.appendId(sec);
+				r.appendFilter(secondaryRecords.get(prim).getFilter());
+				secondaryRecords.remove(prim);
+				numInCommon++;
 			}
-			
-			//add on remaining secondaries
-			toPrint.addAll(secondaryRecords.values());
-			
-			System.out.println("Sorting and saving vcf records...");
-			VCFRecord[] mergedRecords = new VCFRecord[toPrint.size()];
-			toPrint.toArray(mergedRecords);
-			Arrays.sort(mergedRecords);
+			toPrint.add(r);
+		}
+		
+		//add on remaining secondaries
+		toPrint.addAll(secondaryRecords.values());
+		
+		if (verbose) System.out.println("Sorting and saving vcf records...");
+		VCFRecord[] mergedRecords = new VCFRecord[toPrint.size()];
+		toPrint.toArray(mergedRecords);
+		Arrays.sort(mergedRecords);
 
-			//print header and records
-			out = new Gzipper(mergedVcfFile);
-			for (String l : mergedHeader) out.println(l);
-			for (VCFRecord v: mergedRecords) {
-				String[] ori = Misc.TAB.split(v.getOriginalRecord());
-				ori[2] = v.getRsNumber();
-				out.print(ori[0]);
-				for (int i=1; i< ori.length; i++){
-					out.print("\t");
-					out.print(ori[i]);
-				}
-				out.println();
+		//print header and records
+		out = new Gzipper(mergedVcfFile);
+		for (String l : mergedHeader) out.println(l);
+		for (VCFRecord v: mergedRecords) {
+			String[] ori = Misc.TAB.split(v.getOriginalRecord());
+			ori[2] = v.getRsNumber();
+			out.print(ori[0]);
+			int numToPrint = 0;
+			if (tossSampleInfo) numToPrint = 8;
+			else numToPrint = ori.length;
+			for (int i=1; i< numToPrint; i++){
+				out.print("\t");
+				out.print(ori[i]);
 			}
-			out.close();
-			
-			//print stats
+			out.println();
+		}
+		out.close();
+		
+		//print stats
+		if (verbose) {
 			System.out.println(primaryVcfParser.getVcfRecords().length+"\tRecords in primary "+primaryVcf.getName());
 			System.out.println(secondaryVcfParser.getVcfRecords().length+"\tRecords in secondary "+secondaryVcf.getName());
 			System.out.println(numInCommon+"\tRecords in common");
 			System.out.println(mergedRecords.length+"\tRecords in merge "+mergedVcfFile.getName());
-			
-
-		} catch (Exception e) {
-			e.printStackTrace();
 		}
+		
 	}
 
 	public static void main(String[] args) {
@@ -155,7 +173,7 @@ public class VCFConsensus {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Consensus : Jan 2016                            **\n" +
+				"**                              VCF Consensus : June 2017                           **\n" +
 				"**************************************************************************************\n" +
 				"Merges VCF files with the same #CHROM line. Primary records with the same chrPosRefAlt\n"+
 				"as a secondary are saved after appending the ID and FILTER, the secondary\n"+
