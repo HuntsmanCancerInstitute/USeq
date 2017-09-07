@@ -499,7 +499,7 @@ public class VCFSpliceScanner {
 				"       0 All types (gain or damaged in exon, intron, and splice)\n"+
 				"       1 Just report damaged splices\n"+
 				"       2 Report damaged splices and novel splices in exons and splice junctions.\n"+
-				"-a Minimum new splice junction score, defaults to 3.\n"+
+				"-a Minimum new splice junction score in Alt, max score in Ref, defaults to 3.\n"+
 				"-b Minimum new splice junction score difference, new - refseq, defaults to 1.\n"+
 				"-c Maximum damaged splice junction score, defaults to 3.\n"+
 				"-d Minimum damaged score difference, refseq - new, defaults to 1.\n"+

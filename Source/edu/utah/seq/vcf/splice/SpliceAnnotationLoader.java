@@ -646,6 +646,8 @@ public class SpliceAnnotationLoader implements Runnable {
 				if (a[i] < minNewAltScore) continue;
 				//skip due to bad base in reference?
 				if (r[i] == -1000) continue;
+				//is the ref less than min threshold
+				if (r[i] > minNewAltScore) continue;
 				double testR = r[i];
 				if (testR < 0) testR = 0;
 				double delta = a[i] - testR;
@@ -685,7 +687,7 @@ public class SpliceAnnotationLoader implements Runnable {
 			else return null;
 		}
 
-		//indel, this is a region scoring effort, not 1:1.
+		//indel, this is a partial direct comparison, not necessarily 1:1.
 		else{
 			//insert zeros at the center position of the smaller array
 			if (a.length > r.length) r = Num.expand(r, a.length);
@@ -699,6 +701,8 @@ public class SpliceAnnotationLoader implements Runnable {
 				if (r[i] == -1000) continue;
 				//is the alt score big enough?
 				if (a[i] < minNewAltScore) continue;
+				//is the ref small enought?
+				if (r[i] > minNewAltScore) continue;
 				//calc diff
 				double ref = r[i];
 				if (ref < 0) ref = 0;
