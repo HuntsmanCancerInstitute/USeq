@@ -39,6 +39,7 @@ public class IntersectRegions {
 	private boolean entirelyContained = false; 
 	private boolean saveIntersectionPairs = false;
 	private ArrayList intersectedRegions = new ArrayList();
+	private HashSet<String> performedComparisons = new HashSet<String>();
 	private File intersectionFile = null;
 
 	public IntersectRegions(String[] arguments){	
@@ -59,7 +60,7 @@ public class IntersectRegions {
 		}
 		else summaryLines.append("\n");
 	
-		ArrayList<HashMap<String,IntervalTree<BindingRegion>>> it2List = new ArrayList<HashMap<String,IntervalTree<BindingRegion>>>();
+		HashMap<String, HashMap<String,IntervalTree<BindingRegion>>> it2List = new HashMap<String, HashMap<String,IntervalTree<BindingRegion>>>();
 
 		//for each first file
 		for (int x=0; x<firstRegionsFiles.length; x++){
@@ -79,28 +80,37 @@ public class IntersectRegions {
 			
 			double[] bpsLength = statBindingRegionArray(set1);
 			stats.append(firstRegionsFiles[x].getName()+"\t"+set1.length+"\t"+(int)bpsLength[0]+ "\t"+Num.formatNumber(bpsLength[1],4)+"\n");
-
+			
 			//for each second file
 			for (int i=0; i< secondRegionsFiles.length; i++){
+
+				
 				BindingRegion[] set2;
 				if (twos[i] == null){
 					if (intervalFiles) twos[i] = parseIntervalFile(secondRegionsFiles[i]);
 					else twos[i] = parseRegionsFile(secondRegionsFiles[i]);
 				}
-				set2 = twos[i];
+				set2 = twos[i];				
+				
 				if (set2.length == 0) {
 					System.out.println("\tError: no regions in "+secondRegionsFiles[i]+"! Skipping!");
-					it2List.add(new HashMap<String,IntervalTree<BindingRegion>>());
+					it2List.put(secondRegionsFiles[i].toString(), new HashMap<String,IntervalTree<BindingRegion>>());
 					continue;
 				}
 				
+				//are they different files?
+				if (secondRegionsFiles[i].toString().equals(firstRegionsFiles[x].toString())) continue;
+				String f_s = firstRegionsFiles[x].toString() + secondRegionsFiles[i].toString();
+				String s_f = secondRegionsFiles[i].toString() + firstRegionsFiles[x].toString();
+				if (performedComparisons.contains(f_s) || performedComparisons.contains(s_f)) continue;
+				performedComparisons.add(f_s);
+				performedComparisons.add(s_f);
+				
 				//Create or grab stored IntervalTree
-				HashMap<String,IntervalTree<BindingRegion>> it2 = null;
-				if (i<it2List.size()) {
-					it2 = it2List.get(i);
-				} else {
-					it2 = this.createIntevervalFromBindingRegion(set2);
-					it2List.add(it2);
+				HashMap<String,IntervalTree<BindingRegion>> it2 = it2List.get(secondRegionsFiles[i].toString());
+				if (it2 == null) {
+					it2 = createIntevervalFromBindingRegion(set2);
+					it2List.put(secondRegionsFiles[i].toString(), it2);
 				}
 				
 				//count regions
@@ -241,7 +251,7 @@ public class IntersectRegions {
 				float remaining1 = (set2.length - i) * (totalTime / i);
 				//float remaining2 = (set2.length - i ) / 1000 * minutes;
 				//System.out.println(seconds + " " + minutes + " " + remaining1 + " " + remaining2);
-				System.out.println(String.format("\tFinished testing random regions for %d of %d regions in file2. Time for last 1000 regions: %.2f min.  Estimated Remaining time: %.2f min.",i,set2.length,minutes,remaining1));
+				//System.out.println(String.format("\tFinished testing random regions for %d of %d regions in file2. Time for last 1000 regions: %.2f min.  Estimated Remaining time: %.2f min.",i,set2.length,minutes,remaining1));
 			}
 			if (chromSpecificOne.length == 0) {
 				continue;
@@ -534,7 +544,7 @@ public class IntersectRegions {
 	public static void printDocs(){ 
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Intersect Regions: May 2012                           **\n" +
+				"**                            Intersect Regions: May 2017                           **\n" +
 				"**************************************************************************************\n" +
 				"IR intersects lists of regions (tab delimited: chrom start stop(inclusive)). Random\n" +
 				"regions can also be used to calculate a p-value and fold enrichment.\n\n"+

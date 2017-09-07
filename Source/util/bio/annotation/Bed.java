@@ -21,6 +21,7 @@ public class Bed extends Coordinate implements Serializable{
 	private double score; 
 	private char strand;
 	private static final long serialVersionUID = 1L;
+	public static Pattern END = Pattern.compile(".*END=(\\d+).*");
 
 	//constructor
 	public Bed (String chromosome, int start, int stop, String name, double score, char strand){
@@ -405,6 +406,57 @@ public class Bed extends Coordinate implements Serializable{
 		}
 		return chrSpec;
 	}
+	
+	/**Splits a vcf file by chromosome into a HashMap of RegionScoreText[] for variants that contain an END=xxx String.
+	 * Places the record number in the bed score column and the vcf ID in the bed name column.*/
+	public static HashMap<String,RegionScoreText[]> parseVcfFileForENDVars(File vcfFile){
+		HashMap<String,ArrayList<RegionScoreText>> chrAls = new HashMap<String,ArrayList<RegionScoreText>>();
+		String line = null;
+		try{
+			BufferedReader in = IO.fetchBufferedReader(vcfFile);
+			ArrayList<RegionScoreText> al = new ArrayList<RegionScoreText>(); 
+			String currChrom = "";
+			Matcher mat;
+			int recordNumber = -1;
+			while ((line = in.readLine()) !=null) {
+				line = line.trim();
+				if (line.length() ==0 || line.startsWith("#")) continue;
+				recordNumber++;
+				//look for end
+				mat = END.matcher(line);
+				if (mat.matches() == false) continue;
+				//pull stop, set start, and fetch chr
+				int stop = Integer.parseInt(mat.group(1));
+				int start = stop -1;
+				String[] fields = Misc.TAB.split(line);
+				String chr = fields[0];
+				//save it
+				if (currChrom.equals(chr) == false) {
+					al = chrAls.get(chr);
+					if (al == null) al = new ArrayList<RegionScoreText>();
+					chrAls.put(chr, al);
+				}
+				al.add(new RegionScoreText(start, stop, recordNumber, fields[2]));
+			}
+		}catch (Exception e){
+			e.printStackTrace();
+			Misc.printErrAndExit("\nMalformed vcf line? -> "+line+"\n Aborting!");
+		}
+		//sort and load hash
+		HashMap<String,RegionScoreText[]> chrSpec = new HashMap<String,RegionScoreText[]>();
+		Iterator<String> it = chrAls.keySet().iterator();
+		ArrayList<RegionScoreText> al = null;
+		while (it.hasNext()){
+			String cs = it.next();
+			al = chrAls.get(cs);
+			RegionScoreText[] nsss = new RegionScoreText[al.size()];
+			al.toArray(nsss);
+			Arrays.sort(nsss);
+			chrSpec.put(cs, nsss);
+		}
+		return chrSpec;
+	}
+
 	
 	/**Splits a vcf file by chromosome into a HashMap of RegionScoreText[]. Use the padding to expand the 
 	 * size of the variant. SNV, INS, or DEL is assigned to the name field, QUAL to the score field.*/

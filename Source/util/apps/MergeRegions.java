@@ -20,11 +20,23 @@ public class MergeRegions {
 	//fields
 	private File directory;
 	private File[] regionFiles;
+	private File mergedFile;
+	private int numberMergedRegions = 0;
 	
 	public MergeRegions(String[] args) {
 		//process args
 		processArgs(args);
-
+		doWork();
+		
+	}
+	
+	public MergeRegions (File[] regionFiles, File mergedFile){
+		this.regionFiles = regionFiles;
+		this.mergedFile = mergedFile;
+		doWork();
+	}
+	
+	public void doWork(){
 		//load and sort regions
 		GenomicRegion[][] regions = new GenomicRegion[regionFiles.length][];
 		GenomicRegionComparator comp = new GenomicRegionComparator();
@@ -52,11 +64,15 @@ public class MergeRegions {
 		
 		//for each chromosome make merge
 		Iterator it = map.keySet().iterator();
-		File mergedFile;
-		if (directory.isDirectory() == false){
-			mergedFile = new File(directory+".merged");
+
+		//any mergedFile?
+		if (mergedFile == null){
+			if (directory.isDirectory() == false){
+				mergedFile = new File(directory+".merged");
+			}
+			else mergedFile = new File(directory,"mergedUnion.txt");
 		}
-		else mergedFile = new File(directory,"mergedUnion.txt");
+		
 		try {
 			PrintWriter out = new PrintWriter( new FileWriter( mergedFile));
 			while (it.hasNext()){
@@ -87,10 +103,9 @@ public class MergeRegions {
 		} catch (IOException e){
 			e.printStackTrace();
 		}
-		
-		
 	}
-	public static void print(String chromosome, boolean[] bps, PrintWriter out){
+	
+	public void print(String chromosome, boolean[] bps, PrintWriter out){
 		boolean in = false;
 		int i=0;
 		for (; i<bps.length; i++){
@@ -103,12 +118,14 @@ public class MergeRegions {
 			else if (in && bps[i] == false){
 				out.println(i);
 				in = false;
+				numberMergedRegions++;
 			}
 		}
 		//close old?
 		if (in){
 			if (bps[i-1]) out.println(i);
 			else out.println(i-1);
+			numberMergedRegions++;
 		}
 	}
 	
@@ -122,7 +139,6 @@ public class MergeRegions {
 
 	/**This method will process each argument and assign new varibles*/
 	public void processArgs(String[] args){
-		File fastaDirectory = null;
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		for (int i = 0; i<args.length; i++){
@@ -154,7 +170,7 @@ public class MergeRegions {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Merge Regions: May 2009                              **\n" +
+				"**                             Merge Regions: July 2017                             **\n" +
 				"**************************************************************************************\n" +
 				"Flattens tab delimited bed files (chr start stop ...). Assumes interbase coordinates.\n" +
 
@@ -164,6 +180,10 @@ public class MergeRegions {
 				"\nExample: java -Xmx4000M -jar pathTo/Apps/MergeRegions -d /Anno/TilingDesign/\n\n" +
 
 		"************************************************************************************\n");
+	}
+
+	public void setNumberMergedRegions(int numberMergedRegions) {
+		this.numberMergedRegions = numberMergedRegions;
 	}
 	
 }

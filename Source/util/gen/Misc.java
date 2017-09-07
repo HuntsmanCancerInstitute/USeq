@@ -148,6 +148,19 @@ public class Misc {
 		return trueCount;
 	}
 	
+	/**Fetch random string constisting of ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890*/
+	private static String SALTCHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
+	public static String getRandomString(int length) {
+        StringBuilder salt = new StringBuilder();
+        Random rnd = new Random();
+        while (salt.length() < length) { // length of the random string.
+            int index = (int) (rnd.nextFloat() * SALTCHARS.length());
+            salt.append(SALTCHARS.charAt(index));
+        }
+        String saltStr = salt.toString();
+        return saltStr;
+    }
+	
 	/**Prints key + seperator + value+ return to out.*/
 	public static void printHashMap(HashMap hash, String seperator){
 		Iterator it = hash.keySet().iterator();

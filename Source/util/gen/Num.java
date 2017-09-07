@@ -59,7 +59,22 @@ public class Num {
 		return (int)Math.round(halfLength) + start;
 	}
 
-
+	/**Expands the double[] length to that indicated, if even # in double[] then just inserts zeros at the mid point. 
+	 * If odd, then duplicates the center # and then inserts zeros at the mid point. len must be > double[] length.*/
+	public static double[] expand(double[] ref, int len) {
+		double[] expanded = new double[len];
+		int half = (int)Math.round(((double)ref.length)/2.0);
+		//if odd
+		if (ref.length % 2 ==1) {
+			System.arraycopy(ref, 0, expanded, 0, half);
+			System.arraycopy(ref, half-1, expanded, len-half, half);
+		}
+		else {
+			System.arraycopy(ref, 0, expanded, 0, half);
+			System.arraycopy(ref, half, expanded, len-half, half);
+		}
+		return expanded;
+	}
 	/**@return number of trues in boolean[]*/
 	public static int countNumberTrue (boolean[] b){
 		int num =0;
@@ -5072,6 +5087,30 @@ public class Num {
 	public static int[] parseInts(String s, Pattern comma) {
 		String[] i = comma.split(s);
 		return Num.parseInts(i);
+	}
+
+	/**Splits the region defined by the start and stop (not included) into chunks of approx the same chunkSize*/
+	public static int[][] chunkRegion(double chunkSize, int start, int stop) {
+		//how many?
+		double size = stop - start;
+		double numCuts = Math.round(size/chunkSize);
+		int bpPerCut = (int)Math.round(size/numCuts);
+		int begin = start;
+		int[][] ss = new int[(int)numCuts][2];
+		int finalIndex = (int)numCuts -1;
+		for (int i=0; i< numCuts; i++){
+			int end = begin + bpPerCut;
+			//last one?
+			if (i == finalIndex) {
+				ss[i] = new int[]{begin, stop};
+				break;
+			}
+			else {
+				ss[i] = new int[]{begin, end};
+				begin = end;
+			}
+		}
+		return ss;
 	}
 
 }

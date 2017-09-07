@@ -201,7 +201,7 @@ public class RandomRegions {
 	 * genomicRegions.*/
 	public void makeRegions(File regionsFile){
 		//parse file
-		System.out.println("\tLoading interrogated region coordinates for "+regionsFile.getName()+" ...");
+		//System.out.println("\tLoading interrogated region coordinates for "+regionsFile.getName()+" ...");
 		GenomicRegion[] rs = GenomicRegion.parseRegions(regionsFile);
 		
 		//check starts

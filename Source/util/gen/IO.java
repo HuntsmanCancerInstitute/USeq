@@ -619,8 +619,30 @@ public class IO {
 			String line;
 			while ((line = in.readLine()) !=null) {
 				line = line.trim();
-				if (line.length() !=0)num++;
+				if (line.length() !=0) num++;
 			}
+			in.close();
+		}
+		catch (IOException e){
+			System.out.println("\nProblem counting the number of lines in the file: "+file);
+			e.printStackTrace();
+		}
+		return num;
+	}
+	
+	/**Counts the number of lines in a file skipping blanks and those starting with #.
+	 * gz, zip, or txt OK.*/
+	public static long countNonBlankOrCommentLines(File file){
+		long num =0;
+		try {
+			BufferedReader in = IO.fetchBufferedReader(file);
+			String line;
+			while ((line = in.readLine()) !=null) {
+				line = line.trim();
+				if (line.startsWith("#")) continue;
+				if (line.length() !=0) num++;
+			}
+			in.close();
 		}
 		catch (IOException e){
 			System.out.println("\nProblem counting the number of lines in the file: "+file);
@@ -637,6 +659,7 @@ public class IO {
 			while ((in.readLine()) !=null) {
 				num++;
 			}
+			in.close();
 		}
 		catch (IOException e){
 			System.out.println("\nProblem counting the number of lines in the file: "+file);
@@ -2349,6 +2372,15 @@ public class IO {
 			e.printStackTrace();
 		}
 		return null;
+	}
+
+	public static void deleteZeroSizedFiles(File[] alignments) {
+		for (File f: alignments) {
+			if (f.exists()){
+				if (f.getName().endsWith(".gz") && f.length() <= 20) f.delete();
+				else if (f.length() == 0 ) f.delete();
+			}
+		}
 	}
 
 }

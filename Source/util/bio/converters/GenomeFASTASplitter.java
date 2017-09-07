@@ -1,6 +1,5 @@
 package util.bio.converters;
 import java.io.*;
-
 import util.bio.parsers.*;
 import util.gen.*;
 
@@ -39,6 +38,7 @@ public class GenomeFASTASplitter {
 		}
 		
 		//write composite
+		/*
 		try{
 			PrintWriter out = new PrintWriter(new FileWriter(new File(genomeFile.getParentFile(),"stripped.fasta")));
 			System.out.print("Writing stripped.fasta file");
@@ -50,7 +50,7 @@ public class GenomeFASTASplitter {
 			out.close();
 		} catch (IOException e){
 			e.printStackTrace();
-		}
+		}*/
 		
 		System.out.println("\nDone!\n");
 		

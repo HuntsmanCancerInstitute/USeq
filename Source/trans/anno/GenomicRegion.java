@@ -261,7 +261,10 @@ public class GenomicRegion implements Serializable{
 				chromosome = tokens[0];
 				start = Integer.parseInt(tokens[1]);
 				stop = Integer.parseInt(tokens[2]);
-				if (stop < start) throw new Exception("Stop position is less than start!");
+				if (stop < start) {
+					System.err.println("Stop position is less than start! "+file.getName()+ line);
+					continue;
+				}
 				if (tokens.length>3){
 					StringBuffer sb = new StringBuffer();
 					for (int i=3; i<tokens.length; i++) {
