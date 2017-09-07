@@ -527,15 +527,16 @@ public class EnrichedRegionMaker {
 			String totalControl = info.getNotes().get("totalControlObservations");
 			if (totalControl != null) totalSum = totalSum + ", TotalCtrlObs="+totalControl;
 			out.println(totalSum);
-
-			String url = "=HYPERLINK(\"http://localhost:7085/UnibrowControl?version="+info.getVersionedGenome()+"&seqid=";
+			
+			//IGV http://localhost:60151/goto?locus=chr9:3482353-3947342
+			String url = "=HYPERLINK(\"http://localhost:60151/goto?locus=";
 			//for each ER
 			for (int i=0; i< ers.length; i++){
 				//url
 				int winStart = ers[i].getStart() - 7500;
 				if (winStart < 0) winStart = 0;
 				int winEnd = ers[i].getStop() + 7500;
-				out.print(url+ers[i].getChromosome()+"&start="+winStart+"&end="+winEnd+"\",\""+(i+1)+"\")\t");
+				out.print(url+ers[i].getChromosome()+":"+winStart+"-"+winEnd+"\",\""+(i+1)+"\")\t");
 				out.print(ers[i].getChromosome());
 				out.print("\t");
 				out.print(ers[i].getStart());
