@@ -330,7 +330,6 @@ public class SamAlignmentExtractor {
 					}
 				}
 				
-				
 				//pass? or fail? scores
 				if (passScores) {
 					passingBamWriter.addAlignment(sam);

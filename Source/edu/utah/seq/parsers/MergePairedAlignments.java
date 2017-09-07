@@ -6,6 +6,7 @@ import util.gen.*;
 import java.util.*;
 import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
 import edu.utah.seq.data.ChromDataSave;
+import edu.utah.seq.useq.data.Region;
 import htsjdk.samtools.SAMSequenceRecord;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
@@ -21,6 +22,7 @@ public class MergePairedAlignments {
 	//user defined fields
 	private File bamFile;
 	private File saveDirectory;
+	private File bedRegionFile = null;
 	private float maximumAlignmentScore = 300;
 	private float minimumMappingQualityScore = 0;
 	private boolean secondPairReverseStrand = false;
@@ -74,6 +76,7 @@ public class MergePairedAlignments {
 	private ArrayList<String> chromosomes = null;
 	private String samHeader;
 	private ArrayList<PairedAlignmentChrParser> parsers;
+	private HashMap<String,Region[]> regions = null;
 
 	//constructors
 	public MergePairedAlignments(String[] args){
@@ -91,6 +94,17 @@ public class MergePairedAlignments {
 			e.printStackTrace();
 		}
 	}
+	
+	public MergePairedAlignments(File bedRegionFile, File bamFile, File saveDirectory) throws IOException{
+		this.bedRegionFile = bedRegionFile;
+		this.bamFile = bamFile;
+		this.saveDirectory = saveDirectory;
+		printPairedStatsAndHistogram = false;
+		crossCheckMateCoordinates = false;
+		saveSams = true;
+		numberConcurrentThreads = Runtime.getRuntime().availableProcessors() -1;
+		doWork();
+	}
 
 	public void doWork() throws IOException{
 
@@ -101,7 +115,7 @@ public class MergePairedAlignments {
 		//for each chromosome, create a thread object but don't start
 		parsers = new ArrayList<PairedAlignmentChrParser>();
 		//add parser for unmapped reads, note this doesn't fetch all of them, need to scan rest of chromosomes
-		parsers.add(new PairedAlignmentChrParser("unmapped", this));
+		if (regions == null) parsers.add(new PairedAlignmentChrParser("unmapped", this));
 		//add chrom parsers
 		for (int i=0; i< chromosomes.size(); i++) parsers.add(new PairedAlignmentChrParser(chromosomes.get(i), this));
 		//for (int i=23; i< 26; i++) parsers.add(new PairedAlignmentChrParser(chromosomes.get(i), this));
@@ -135,7 +149,8 @@ public class MergePairedAlignments {
 		if (jsonOutputFile != null) saveJson();
 	}
 
-	/**Runs each parser in its own thread to max threads defined by user.*/
+	/**Runs each parser in its own thread to max threads defined by user. Rewrite using ExecutorService!
+	 * Hmm, I suspect this runs out of memory and then silently exits on occassion. */
 	private void runThreads() {
 		while (true){ 
 			try {
@@ -146,6 +161,7 @@ public class MergePairedAlignments {
 					if (p.isStarted() && p.isComplete()==false) numRunning++;
 					if (p.isStarted() == false) toStart.add(p);
 				}
+//System.out.println("Num running "+numRunning);				
 				int numToStart = numberConcurrentThreads - numRunning;
 				if (numToStart > 0){
 					int stop = numToStart;
@@ -153,17 +169,22 @@ public class MergePairedAlignments {
 					for (int i=0; i< stop; i++){
 						PairedAlignmentChrParser p = toStart.get(i);
 						p.start();
-						//System.out.println("Starting "+p.getChromosome());
+//System.out.println("Starting "+p.getChromosome());
 					}
 				}
 				boolean allComplete = true;
 				for (PairedAlignmentChrParser p : parsers){
 						if (p.isComplete() == false) {
+//System.out.println("To complete "+p.getChromosome());
 						allComplete = false;
 						break;
 					}
 				}
-				if (allComplete) break;
+//System.out.println("Complete "+allComplete+" "+IO.memoryUsed());				
+				if (allComplete) {
+//System.out.println("All threads done ");					
+					break;
+				}
 				//sleep
 				Thread.sleep(1000);
 			} catch (InterruptedException ie) {
@@ -299,8 +320,12 @@ public class MergePairedAlignments {
 			List<SAMSequenceRecord> chrs = samReader.getFileHeader().getSequenceDictionary().getSequences();
 			chromosomes = new ArrayList<String>();
 			for (SAMSequenceRecord r : chrs) chromosomes.add(r.getSequenceName());
-			//chromosomes.add("22");
-			//chromosomes.add("21");
+
+			//limit to just those in their bed file?
+			if (regions != null) {
+				chromosomes.retainAll(regions.keySet());
+				if (chromosomes.size() == 0) Misc.printErrAndExit("\nError: no chromosomes to scan?! Are you sure your region bed file and bam alignment file use the same chr naming convention?");
+			}
 
 			samReader.close();
 		} catch (Exception e) {
@@ -333,6 +358,7 @@ public class MergePairedAlignments {
 					switch (test){
 					case 'b': bamFile = new File(args[++i]); break;
 					case 'd': saveDirectory = new File(args[++i]); break;
+					case 'e': bedRegionFile = new File(args[++i]); break;
 					case 's': saveSams = true; break;
 					case 'm': crossCheckMateCoordinates = false; break;
 					case 'r': secondPairReverseStrand = true; break;
@@ -365,8 +391,12 @@ public class MergePairedAlignments {
 		//number of threads to use?
 		if (numberConcurrentThreads == 0) numberConcurrentThreads = Runtime.getRuntime().availableProcessors();
 		
+		//any regions?
+		if (bedRegionFile != null) regions = Region.parseStartStops(bedRegionFile, 0, 0, 1);
+		
 		//print info
 		System.out.println("Settings:");
+		if (bedRegionFile != null) System.out.println("Select region file\t"+bedRegionFile);
 		System.out.println(maximumAlignmentScore+ "\tMaximum alignment score (AS).");
 		System.out.println(minimumMappingQualityScore+ "\tMinimum mapping quality score (MQ).");
 		System.out.println(removeDuplicates +"\tRemove all alignments marked duplicate.");
@@ -382,7 +412,7 @@ public class MergePairedAlignments {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Merge Paired Alignments: July 2015                    **\n" +
+				"**                            Merge Paired Alignments: July 2017                    **\n" +
 				"**************************************************************************************\n" +
 				"Merges proper paired alignments that pass a variety of checks and thresholds. Only\n" +
 				"unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps\n" +
@@ -397,6 +427,7 @@ public class MergePairedAlignments {
 				"\nDefault Options:\n"+
 				"-s Save merged xxx.sam.gz alignments instead of binary ChromData. Either can be used\n"+
 				"      in Sam2USeq for read coverage analysis, the ChromData is much faster.\n"+
+				"-e Only process and save alignments overlapping this bed format region file.\n"+
 				"-u Remove all alignments marked as duplicates, defaults to keeping.\n"+
 				"-a Maximum alignment score (AS:i: tag). Defaults to 300, smaller numbers are more\n" +
 				"      stringent for novoalign where each mismatch is ~30pts.\n"+
@@ -471,5 +502,9 @@ public class MergePairedAlignments {
 
 	public boolean isCalculateBaseQualities() {
 		return calculateBaseQualities;
+	}
+
+	public HashMap<String, Region[]> getRegions() {
+		return regions;
 	}
 }

@@ -8,6 +8,7 @@ import util.gen.*;
 import java.util.*;
 import java.util.regex.Matcher;
 
+import htsjdk.samtools.QueryInterval;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SamReader;
@@ -15,6 +16,7 @@ import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.ValidationStringency;
 import edu.utah.seq.data.ChromData;
 import edu.utah.seq.data.sam.*;
+import edu.utah.seq.useq.data.Region;
 
 /**Used to parse one chromosome worth of alignments in a thread*/
 public class PairedAlignmentChrParser extends Thread{
@@ -582,9 +584,23 @@ public class PairedAlignmentChrParser extends Thread{
 			//get reader and interator
 			SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
 			SamReader samReader = factory.open(mpa.getBamFile());
-			if (queryUnMapped) samIterator = samReader.queryUnmapped();
-			else samIterator = samReader.queryOverlapping(chromosome, 0, 0);
 			
+			//Just select regions?			
+			Region[] regions = null;
+			if (mpa.getRegions() != null) regions = mpa.getRegions().get(chromosome);
+			
+			if (regions != null){
+				//make QueryIntervals
+				int index = samReader.getFileHeader().getSequenceIndex(chromosome);
+				QueryInterval[] qi = new QueryInterval[regions.length];
+				for (int i=0; i< regions.length; i++) qi[i] = new QueryInterval(index, regions[i].getStart(), regions[i].getStop());
+				samIterator = samReader.queryOverlapping(qi);
+			}
+			//Unmapped?
+			else if (queryUnMapped) samIterator = samReader.queryUnmapped();
+			//Everything!
+			else samIterator = samReader.queryOverlapping(chromosome, 0, 0);
+
 			//any records?
 			if (samIterator.hasNext() == false) return;
 
