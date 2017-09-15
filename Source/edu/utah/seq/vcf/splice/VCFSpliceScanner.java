@@ -47,6 +47,7 @@ public class VCFSpliceScanner {
 	private double maxDamagedAltScore = 3;
 	private double minDamagedScoreDelta = 1;
 	
+	private boolean removeInfoDropNonAffected = false;
 	private boolean scoreNovelIntronJunctions = false;
 	private boolean scoreNovelExonJunctions = true;
 	private boolean scoreNovelSpliceJunctionsInSplice = true;
@@ -112,7 +113,10 @@ public class VCFSpliceScanner {
 
 
 	private void concatTempVcf() throws IOException {
-		IO.concatinateFiles(gzippedToConcat, annotatedVcfFile);
+		File toSortVcf = new File(tempDirectory, "toSort.vcf.gz");
+		IO.concatinateFiles(gzippedToConcat, toSortVcf);
+		System.out.println("Sorting vcf...");
+		SimpleVcf.sortVcf(toSortVcf, annotatedVcfFile);
 	}
 
 	private void printThresholds(){
@@ -125,6 +129,7 @@ public class VCFSpliceScanner {
 		sb.append(scoreNovelIntronJunctions +"\tLook for novel intron splice junctions, outside of known splice junctions.\n");
 		sb.append(scoreNovelExonJunctions +"\tLook for novel splice junctions in exons.\n");
 		sb.append(scoreNovelSpliceJunctionsInSplice +"\tLook for novel splice junctions inside known splice junctions.\n");
+		sb.append(this.removeInfoDropNonAffected +"\tPrint only variants that effect splice junctions and remove unnecessary info for downstream annotators.\n");
 		sb.append(vcfExportCategory +"\tExport catagory for adding info to vcf records.\n");
 		System.out.println(sb);
 	}
@@ -335,7 +340,8 @@ public class VCFSpliceScanner {
 			//comments
 			if (line.startsWith("#")){
 				//add info lines?
-				if (addedInfo == false && line.startsWith("##INFO=")){
+				if (line.startsWith("##INFO=")){
+					if (addedInfo == false) { 
 					addedInfo = true;
 					vcfOut.println("##INFO=<ID=VCFSS,Number=.,Type=String,Description=\"USeq VCFSpliceScanner output. "
 							+ "One or more splice junction (SJ) effects delimited by a &. Each unit consists of one or "
@@ -346,14 +352,25 @@ public class VCFSpliceScanner {
 							+ "gained SJ for SNVs.  For INDELS, it is the variant position. The scores are the MaxEntScan "
 							+ "values for the reference and alternate sequences. See Yeo and Burge 2004, "
 							+ "http://www.ncbi.nlm.nih.gov/pubmed/15285897\">");
-					
+					}
+					//print the info?
+					if (removeInfoDropNonAffected == false) vcfOut.println(line);
 				}
-				vcfOut.println(line);
-				//out.println(line);
-				if (line.startsWith("#CHROM")){
+				//Format lines
+				else if (line.startsWith("##FORMAT") || line.startsWith("##FILTER")){
+					if(removeInfoDropNonAffected == false) vcfOut.println(line);
+				}
+				
+				//Chrome line
+				else if (line.startsWith("#CHROM")){
 					foundChrom = true;
+					if (removeInfoDropNonAffected) vcfOut.println("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO");
+					else vcfOut.println(line);
 					break;
 				}
+
+				//must be something else so just print it.
+				else vcfOut.println(line);
 			}
 		}
 		if (foundChrom == false) throw new IOException("\tError: Failed to find the #CHROM header line? Aborting.\n");
@@ -394,6 +411,7 @@ public class VCFSpliceScanner {
 					case 'b': minNewScoreDelta = Double.parseDouble(args[++i]); break;
 					case 'c': maxDamagedAltScore = Double.parseDouble(args[++i]); break;
 					case 'd': minDamagedScoreDelta = Double.parseDouble(args[++i]); break;
+					case 's': removeInfoDropNonAffected = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -466,6 +484,112 @@ public class VCFSpliceScanner {
 		else Misc.printErrAndExit("\nLo siento, yo no comprendo su Export Category?\n");
 		
 	}
+	
+	private static void scoreKnownSplices(HashMap<String,UCSCGeneLine[]> chromGenes, String workingSequence, String workingChromosomeName, File spliceModelDirectory) {
+
+		int lenMinOne = workingSequence.length() - 1;
+		HashSet<String> scored5Plus = new HashSet<String>();
+		HashSet<String> scored3Plus = new HashSet<String>();
+		HashSet<String> scored5Minus = new HashSet<String>();
+		HashSet<String> scored3Minus = new HashSet<String>();
+		Histogram spliceHistogram5 = new Histogram(-14, 14, 2500);
+		Histogram spliceHistogram3 = new Histogram(-14, 14, 2500);
+
+		MaxEntScanScore5 score5 = new MaxEntScanScore5(spliceModelDirectory);
+		MaxEntScanScore3 score3 = new MaxEntScanScore3(spliceModelDirectory);
+
+		//for each transcript
+		for (UCSCGeneLine g: chromGenes.get(workingChromosomeName)){
+			ExonIntron[] introns = g.getIntrons();
+			if (introns == null) continue;
+			boolean plusStrand = g.getStrand().equals("+");
+			//mask both 5' and 3' junctions
+			int startJunc = 0;
+			int endJunc = 0;
+			for (int i=0; i< introns.length; i++){
+				//plus strand 
+				if (plusStrand){
+					//5'
+					startJunc = introns[i].getStart()-3;     
+					endJunc = introns[i].getStart()+6;
+					if (startJunc < 0) startJunc = 0;
+					if (endJunc > lenMinOne) endJunc = lenMinOne;
+					String coor = startJunc+"-"+endJunc;
+					//add to histogram of known splice scores?
+					if (scored5Plus.contains(coor) == false){
+						scored5Plus.add(coor);
+
+						String seq = workingSequence.substring(startJunc, endJunc);
+						double score = score5.scoreSequenceWithChecks(seq);
+						if (score != Double.MIN_VALUE) {
+							spliceHistogram5.count(score);
+							System.out.println(workingChromosomeName+"\t"+startJunc+"\t"+endJunc+"\t5_"+seq+"\t"+score+"\t+");
+						}
+
+
+					}
+					//3'
+					startJunc = introns[i].getEnd()-20;
+					endJunc = introns[i].getEnd()+3;
+					if (startJunc < 0) startJunc = 0;
+					if (endJunc > lenMinOne) endJunc = lenMinOne;
+					coor = startJunc+"-"+endJunc;
+					if (scored3Plus.contains(coor) == false){
+						scored3Plus.add(coor);
+
+						String seq = workingSequence.substring(startJunc, endJunc);
+						double score = score3.scoreSequenceWithChecks(seq);
+						if (score != Double.MIN_VALUE) spliceHistogram3.count(score);
+						//System.out.println("+ 3\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);
+						System.out.println(workingChromosomeName+"\t"+startJunc+"\t"+endJunc+"\t3_"+seq+"\t"+score+"\t+");
+
+					}
+				}
+				//minus strand
+				else {
+					//3'
+					startJunc = introns[i].getStart()-3;
+					endJunc = introns[i].getStart()+20;
+					if (startJunc < 0) startJunc = 0;
+					if (endJunc > lenMinOne) endJunc = lenMinOne;
+					String coor = startJunc+"-"+endJunc;
+					//add to histogram of known splice scores?
+					if (scored3Minus.contains(coor) == false){
+						scored3Minus.add(coor);
+						String seq = workingSequence.substring(startJunc, endJunc);
+						seq = Seq.reverseComplementDNA(seq);
+						double score = score3.scoreSequenceWithChecks(seq);
+						if (score != Double.MIN_VALUE) spliceHistogram3.count(score);
+						//System.out.println("- 3\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);
+						System.out.println(workingChromosomeName+"\t"+startJunc+"\t"+endJunc+"\t3_"+seq+"\t"+score+"\t-");
+
+					}
+
+					//5'
+					startJunc = introns[i].getEnd()-6;
+					endJunc = introns[i].getEnd()+3;
+					if (startJunc < 0) startJunc = 0;
+					if (endJunc > lenMinOne) endJunc = lenMinOne;
+					coor = startJunc+"-"+endJunc;
+					//add to histogram of known splice scores?
+					if (scored5Minus.contains(coor) == false){
+						scored5Minus.add(coor);
+						String seq = workingSequence.substring(startJunc, endJunc);
+						seq = Seq.reverseComplementDNA(seq);
+						double score = score5.scoreSequenceWithChecks(seq);
+						if (score != Double.MIN_VALUE) {
+							spliceHistogram5.count(score);
+							//System.out.println("- 5\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);
+							System.out.println(workingChromosomeName+"\t"+startJunc+"\t"+endJunc+"\t5_"+seq+"\t"+score+"\t-");
+						}
+
+
+					}
+				}
+			}
+		}
+	}
+
 
 
 	public static void printDocs(){
@@ -503,6 +627,7 @@ public class VCFSpliceScanner {
 				"-b Minimum new splice junction score difference, new - refseq, defaults to 1.\n"+
 				"-c Maximum damaged splice junction score, defaults to 3.\n"+
 				"-d Minimum damaged score difference, refseq - new, defaults to 1.\n"+
+				"-s Format vcf with minimal output for downstream annotators, e.g. snpEff.\n"+
 
 				"\n"+
 				
@@ -554,6 +679,11 @@ public class VCFSpliceScanner {
 	}
 	public double getMinDamagedScoreDelta() {
 		return minDamagedScoreDelta;
+	}
+
+
+	public boolean isRemoveInfoDropNonAffected() {
+		return removeInfoDropNonAffected;
 	}
 	
 }

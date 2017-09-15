@@ -1118,7 +1118,23 @@ public class Misc {
 			sb.append(s[i]);
 		}
 		return sb.toString();
-	}	
+	}
+	
+	/**Returns a String separated by commas for each bin, skips nulls.*/
+	public static String stringArrayToStringSkipNulls(String[] s, String separator){
+		if (s==null) return "";
+		int len = s.length;
+		if (len==1) return s[0];
+		if (len==0) return "";
+		StringBuffer sb = new StringBuffer(s[0]);
+		for (int i=1; i<len; i++){
+			if (s[i] != null){
+				sb.append(separator);
+				sb.append(s[i]);
+			}
+		}
+		return sb.toString();
+	}
 	
 	/**Creates a HashMap from a String[] where the array is ordered such as key,value,key,value...
 	 * Returns null if odd number of Strings*/

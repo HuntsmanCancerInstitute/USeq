@@ -37,6 +37,7 @@ public class SpliceAnnotationLoader implements Runnable {
 	private HashMap<String, SpliceJunction[]> scoredNovelSplices = new HashMap<String, SpliceJunction[]>();
 	private SpliceJunction dummySpliceJunction = new SpliceJunction();
 	private SpliceJunction[] knownSplice = null;
+	private boolean removeInfoDropNonAffected = false;
 	private IntervalST<ArrayList<UCSCGeneLine>> workingGeneTree;
 	private boolean workingTranscriptIsPlusStrand;
 	private String workingSequence;
@@ -78,6 +79,7 @@ public class SpliceAnnotationLoader implements Runnable {
 			this.maxDamagedAltScore = vsa.getMaxDamagedAltScore();
 			this.minDamagedScoreDelta = vsa.getMinDamagedScoreDelta();
 			this.vcfExportCategory = vsa.getVcfExportCategory();
+			this.removeInfoDropNonAffected = vsa.isRemoveInfoDropNonAffected();
 
 			//results writer, MUST close at end of loader life!!!!!!!!!
 			vcfOut = new Gzipper (tempVcf);
@@ -165,13 +167,25 @@ public class SpliceAnnotationLoader implements Runnable {
 					vcf.setAlt(oriAlts);
 					
 					//modify INFO field?
-					if (effects.size() == 0) vcfOut.println(vcf.getOriginalRecord());
+					if (effects.size() == 0 ) {
+						if (removeInfoDropNonAffected == false) vcfOut.println(vcf.getOriginalRecord());
+					}
 					else {
 						numVariantsEffectingSJs++;
 						String e = consolidateEffects(effects);
 						String[] fields = Misc.TAB.split(vcf.getOriginalRecord());
-						fields[7] = fields[7]+";VCFSS="+e;
-						String f = Misc.stringArrayToString(fields, "\t");
+						if (removeInfoDropNonAffected) {
+							//remove info from ID, FILTER, QUAL columns
+							fields[2] = ".";
+							fields[5] = ".";
+							fields[6] = ".";
+							//set INFO
+							fields[7] = "VCFSS="+e;
+							//wipe out any FORMAT or sample columns
+							for (int i=8; i< fields.length; i++) fields[i] = null;
+						}
+						else fields[7] = fields[7]+";VCFSS="+e; 
+						String f = Misc.stringArrayToStringSkipNulls(fields, "\t");
 						vcfOut.println(f);
 						//System.out.println("\n"+f);
 						effects.clear();
