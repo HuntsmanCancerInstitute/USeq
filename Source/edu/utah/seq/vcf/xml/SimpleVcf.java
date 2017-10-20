@@ -114,6 +114,10 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 		
 	}
 	
+	public void appendID(SimpleVcf o) {
+		if (o.getId().equals(".") == false) id = id+";"+o.getId();
+	}
+	
 	public String toString(){
 		//#CHROM POS ID REF ALT QUAL FILTER INFO FORMAT SAMPLES.....
 		return chr+ "\t"+ (1+pos)+ "\t"+ id+ "\t"+ ref+ "\t"+ alt+ "\t"+ qual+ "\t"+ filter+ "\t"+ info;
@@ -236,4 +240,6 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	public String getId() {
 		return id;
 	}
+
+
 }

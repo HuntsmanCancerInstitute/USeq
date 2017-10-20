@@ -203,6 +203,7 @@ public class FoundationVcfComparator {
 			if (f.getMatch() != null) {
 				//exact match then just print it
 				f.appendRAF(f.getMatch());
+				f.appendID(f.getMatch());
 				vcfToPrint.add(f);
 				numberExactMatches++;
 				f.getMatch().setPrint(false);
@@ -359,7 +360,7 @@ public class FoundationVcfComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Foundation Vcf Comparator: Aug 2016                    **\n" +
+				"**                           Foundation Vcf Comparator: Oct 2017                    **\n" +
 				"**************************************************************************************\n" +
 				"FVC compares a Foundation vcf generated with the FoundationXml2Vcf to a recalled vcf.\n"+
 				"Exact recall vars are so noted and removed. Foundation vcf with no exact but one\n"+
