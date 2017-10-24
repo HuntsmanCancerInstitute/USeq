@@ -19,7 +19,7 @@ import edu.utah.seq.data.sam.*;
 import edu.utah.seq.useq.data.Region;
 
 /**Used to parse one chromosome worth of alignments in a thread*/
-public class PairedAlignmentChrParser extends Thread{
+public class PairedAlignmentChrParser implements Runnable{
 
 	//fields
 	private String chromosome = null;
@@ -38,8 +38,7 @@ public class PairedAlignmentChrParser extends Thread{
 	private double minimumFractionInFrameMismatch = 0.05;
 	private float maximumAlignmentScore;
 	private float minimumMappingQualityScore;
-	private boolean complete = false;
-	private boolean started = false;
+	private boolean failed = false;
 	private boolean saveSams = false;
 	private boolean removeDuplicates = false;
 	private boolean onlyMergeOverlappingAlignments = true;
@@ -93,8 +92,6 @@ public class PairedAlignmentChrParser extends Thread{
 
 	public void run(){
 		try {
-			started = true;
-			
 			File chromDataFile = null;
 			if (saveSams == false){ 
 				//make binary data container, nonstranded
@@ -114,11 +111,9 @@ public class PairedAlignmentChrParser extends Thread{
 			alignments = null;
 			firstPairs = null;
 			secondPairs = null;
-			
-			//finish
-			complete = true;
 		} catch (Exception e) {
-			Misc.printErrAndExit("Error parsing "+chromosome+" data from "+mpa.getBamFile());
+			failed = true;
+			System.err.println("Error parsing "+chromosome+" data from "+mpa.getBamFile());
 			e.printStackTrace();
 		}
 	}
@@ -696,8 +691,8 @@ public class PairedAlignmentChrParser extends Thread{
 		}
 	}
 
-	public boolean isComplete() {
-		return complete;
+	public boolean isFailed() {
+		return failed;
 	}
 
 	public int getNumberAlignments() {
@@ -790,10 +785,6 @@ public class PairedAlignmentChrParser extends Thread{
 
 	public String getChromosome() {
 		return chromosome;
-	}
-
-	public boolean isStarted() {
-		return started;
 	}
 
 	public ChromData getChromData() {

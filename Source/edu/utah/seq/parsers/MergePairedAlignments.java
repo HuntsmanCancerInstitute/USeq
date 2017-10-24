@@ -4,8 +4,12 @@ import java.io.*;
 import java.util.regex.*;
 import util.gen.*;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
 import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
 import edu.utah.seq.data.ChromDataSave;
+import edu.utah.seq.parsers.mpileup.MpileupTabixLoader;
 import edu.utah.seq.useq.data.Region;
 import htsjdk.samtools.SAMSequenceRecord;
 import htsjdk.samtools.SamReader;
@@ -149,48 +153,20 @@ public class MergePairedAlignments {
 		if (jsonOutputFile != null) saveJson();
 	}
 
-	/**Runs each parser in its own thread to max threads defined by user. Rewrite using ExecutorService!
-	 * Hmm, I suspect this runs out of memory and then silently exits on occassion. */
 	private void runThreads() {
-		while (true){ 
-			try {
-				//how many running
-				int numRunning = 0;
-				ArrayList<PairedAlignmentChrParser> toStart = new ArrayList<PairedAlignmentChrParser>();
-				for (PairedAlignmentChrParser p : parsers){
-					if (p.isStarted() && p.isComplete()==false) numRunning++;
-					if (p.isStarted() == false) toStart.add(p);
-				}
-//System.out.println("Num running "+numRunning);				
-				int numToStart = numberConcurrentThreads - numRunning;
-				if (numToStart > 0){
-					int stop = numToStart;
-					if (stop > toStart.size()) stop = toStart.size();
-					for (int i=0; i< stop; i++){
-						PairedAlignmentChrParser p = toStart.get(i);
-						p.start();
-//System.out.println("Starting "+p.getChromosome());
-					}
-				}
-				boolean allComplete = true;
-				for (PairedAlignmentChrParser p : parsers){
-						if (p.isComplete() == false) {
-//System.out.println("To complete "+p.getChromosome());
-						allComplete = false;
-						break;
-					}
-				}
-//System.out.println("Complete "+allComplete+" "+IO.memoryUsed());				
-				if (allComplete) {
-//System.out.println("All threads done ");					
-					break;
-				}
-				//sleep
-				Thread.sleep(1000);
-			} catch (InterruptedException ie) {
-				ie.printStackTrace();
-				Misc.printErrAndExit("\nProblem running threads!");
+		try {
+			ExecutorService executor = Executors.newFixedThreadPool(numberConcurrentThreads);
+			for (PairedAlignmentChrParser p : parsers) executor.execute(p);
+			executor.shutdown();
+			while (!executor.isTerminated()) {}
+
+			//check loaders 
+			for (PairedAlignmentChrParser p : parsers) {
+				if (p.isFailed()) throw new Exception("ERROR: Alignment parser thread issue! \n");
 			}
+		} catch (Exception ie) {
+			ie.printStackTrace();
+			Misc.printErrAndExit("\nProblem running threads!");
 		}
 	}
 
