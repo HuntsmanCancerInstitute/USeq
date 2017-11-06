@@ -304,33 +304,49 @@ public class AnnotatedVcfParser {
 	 * */
 	private boolean checkImpact(String[] splitInfo) throws Exception {
 		//find ANN=
-		String ann = null;
+		String annValue = null;
 		for (String i: splitInfo){
 			if (i.startsWith("ANN=")) {
-				ann = i;
+				annValue = i;
 				break;
 			}
 		}
-		if (ann == null) {
+		if (annValue == null) {
 			if (verbose) IO.p("\tImpact Check\tfalse\tNo ANN");
 			return false;
 		}
 		numWithAnn++;
-		//split ANN and save impact
-		String[] splitAnn = Misc.PIPE.split(ann);
-		String impact = splitAnn[2];
-		if (impacts.containsKey(impact)) impacts.put(impact, new Integer( impacts.get(impact)+1 ));
-		else impacts.put(impact, new Integer(1));
-		
+
+		//drop ANN=
+		annValue = annValue.substring(4);
+
+		//split ANN by comma
+		String[] splitAnns = Misc.COMMA.split(annValue);
+
+		//for each annotation
+		for (String ann: splitAnns){
+			//split ANN and save impact
+			String[] splitAnn = Misc.PIPE.split(ann);
+			String impact = splitAnn[2];
+			if (impacts.containsKey(impact)) impacts.put(impact, new Integer( impacts.get(impact)+1 ));
+			else impacts.put(impact, new Integer(1));
+		}
+
 		//check if impact is one of the ones they want
 		if (passingAnnImpact!=null){
-			boolean passImpact = passingAnnImpact.contains(impact.toLowerCase());
-			if (verbose) IO.p("\tImpact Check\t"+passImpact+"\t"+impact);
-			if (passImpact) {
-				numPassingAnnImpact++;
-				return true;
+			//for each annotation
+			for (String ann: splitAnns){
+				String[] splitAnn = Misc.PIPE.split(ann);
+				String impact = splitAnn[2];
+				boolean passImpact = passingAnnImpact.contains(impact.toLowerCase());
+				if (verbose) IO.p("\tImpact Check\t"+passImpact+"\t"+impact);
+				if (passImpact) {
+					numPassingAnnImpact++;
+					return true;
+				}
 			}
-			else return false;
+			//none found so return false
+			return false;
 		}
 		else return false;
 	}
