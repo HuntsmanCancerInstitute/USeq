@@ -64,6 +64,8 @@ public class FoundationRearrangeVariant {
 		//make em, String coordinates, String id, String gene, FoundationXml2Vcf parser
 		target = new MateInfo(targetCoor, targetId, targetName, parser);
 		other = new MateInfo(otherCoor, otherId, otherName, parser);
+		
+		if (other.isFailedParsing() || target.isFailedParsing()) failedParsing = true;
 	}
 
 	/** Returns two vcf lines, target and other with cross referencing mate info*/

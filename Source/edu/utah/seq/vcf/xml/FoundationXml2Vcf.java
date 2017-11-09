@@ -469,7 +469,7 @@ public class FoundationXml2Vcf {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Foundation Xml 2 Vcf: June 2016                      **\n" +
+				"**                             Foundation Xml 2 Vcf: Nov 2017                       **\n" +
 				"**************************************************************************************\n" +
 				"Attempts to parse xml foundation reports to vcf. This is an inprecise process with\n"+
 				"some insertions, multi snv, and multi vars. VCF variants have not been normalized.\n"+
