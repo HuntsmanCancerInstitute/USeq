@@ -12,10 +12,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import edu.utah.seq.parsers.mpileup.BinomialMixture;
 import edu.utah.seq.parsers.mpileup.MpileupTabixLoader;
-import edu.utah.seq.vcf.xml.SimpleVcf;
 import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
@@ -31,7 +28,6 @@ public class VCFBackgroundChecker {
 	private File[] vcfFiles;
 	private File mpileup;
 	private File saveDir;
-	private File fullPathToR = new File ("/usr/bin/R");
 	private HashSet<Integer> sampleIndexesToExamine = null;
 	private int bpBuffer = 0;
 	private int minBaseQuality = 20;
@@ -49,7 +45,6 @@ public class VCFBackgroundChecker {
 	private MpileupTabixLoader[] loaders;
 	public static final double zscoreForInfinity = 1000;
 	public static final double  zscoreLessThanZero = 0.001;
-	private boolean deleteTempFiles = false;
 
 	//working
 	private File vcfFile;
@@ -162,6 +157,7 @@ public class VCFBackgroundChecker {
 		return v;
 	}
 
+	/*
 	private VcfSorter[] addPVals(double[] pvals) throws Exception {
 		if (pvals.length != this.vcfRecords.size()) throw new Exception ("The number of pvalues and number of modified vcf records do not match?");
 
@@ -176,7 +172,7 @@ public class VCFBackgroundChecker {
 			v[x] = new VcfSorter(fields);
 		}
 		return v;
-	}
+	}*/
 	
 	private class VcfSorter implements Comparable<VcfSorter>{
 		private String chr;
@@ -302,7 +298,6 @@ public class VCFBackgroundChecker {
 					case 'v': forExtraction = new File(args[++i]); break;
 					case 's': saveDir = new File(args[++i]); break;
 					case 'm': mpileup = new File(args[++i]); break;
-					case 'r': fullPathToR = new File(args[++i]); break;
 					case 'i': sampleIndexes = Num.parseInts(args[++i], Misc.COMMA); break;
 					case 'z': minimumZScore = Double.parseDouble(args[++i]); break;
 					case 'b': bpBuffer = Integer.parseInt(args[++i]); break;
@@ -350,10 +345,6 @@ public class VCFBackgroundChecker {
 		int numAvail = Runtime.getRuntime().availableProcessors();
 		if (numberThreads < 1 || numberThreads > numAvail) numberThreads =  numAvail - 1;
 		
-		//check for R and required libraries, don't need it if they just want the first and last 1/3 count table
-		//disabled for now
-//if (fullPathToR == null || fullPathToR.canExecute()== false) Misc.printErrAndExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
-		
 		printSettings();
 		
 	}	
@@ -382,7 +373,7 @@ public class VCFBackgroundChecker {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                         VCF Background Checker : May 2017                        **\n" +
+				"**                         VCF Background Checker : Nov 2017                        **\n" +
 				"**************************************************************************************\n" +
 				"VBC calculates non-reference allele frequencies (AF) from a background multi-sample \n"+
 				"mpileup file over each vcf record. It then calculates a z-score for the vcf AF and \n"+
@@ -390,7 +381,7 @@ public class VCFBackgroundChecker {
 				"provided, the lowest bp z-score is appended. Z-scores < ~4 are indicative of non\n"+
 				"reference bps in the background samples. A flag is appended the FILTER field if a\n"+
 				"background AF was found within 10% of the vcf AF. Note, VBC requires AF and DP tags\n"+
-				"in the INFO field of each record to use in the z-score and p-value calculations. \n"+
+				"in the INFO field of each record to use in the z-score calculation. \n"+
 
 				"\nRequired:\n"+
 				"-v Path to a xxx.vcf(.gz/.zip OK) file or directory containing such.\n" +
@@ -400,7 +391,6 @@ public class VCFBackgroundChecker {
 				"      2) Bgzip: 'tabix-0.2.6/bgzip bkg.mpileup'\n"+
                 "         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bkg.mpileup.gz'\n"+
 				"-s Path to directory in which to save the modified vcf file(s)\n"+
-//"-r Full path to R, defaults to /usr/bin/R \n"+
 						
 				"\nOptional:\n" +
 				"-i Comma delimited list (zero is 1st sample, no spaces) of mpileup sample indexes to\n"+
@@ -420,7 +410,7 @@ public class VCFBackgroundChecker {
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundChecker -v SomaticVcfs/ -z 3\n"+
-				"-m bkg.mpileup.gz -s BkgFiltVcfs/ -b 1 -q 13 -e -r /usr/share/R -u \n\n"+
+				"-m bkg.mpileup.gz -s BkgFiltVcfs/ -b 1 -q 13 -u \n\n"+
 
 		        "**************************************************************************************\n");
 	}
