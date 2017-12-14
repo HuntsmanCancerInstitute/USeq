@@ -124,13 +124,16 @@ public class MpileupSample {
 			case 'n': poorQualBases++; qsIndex++; break;
 			case 'N': poorQualBases++; qsIndex++; break;
 			case '*': countDeletion(qualScores[qsIndex++]); break;
-			default: Misc.printExit("\nProblem, unknown base symbol! " + bases[i] +" in "+ record.getLine());
+			default: Misc.printErrAndExit("\nProblem, unknown base symbol! " + bases[i] +" in "+ record.getLine());
 			}
 		}
-		//check lengths
+		//check lengths, if a masked base was encountered this will differ, its OK
+		//maybe not?
 		if ((qualScores.length) != qsIndex) {
 			debug();
-			Misc.printErrAndExit("Quality score to masked base mismatch! "+record.getLine());
+			System.err.println("Quality score to masked base mismatch! "+qsIndex+" vs "+qualScores.length+" "+record.getLine()+"\n");
+			pass = false;
+			return;
 		}
 		//compare with record
 		readCoverageForwardBases = Num.sumIntArray(forwardGATC);
@@ -138,7 +141,9 @@ public class MpileupSample {
 		
 		if (mpileupReadCount != (poorQualBases+ deletions+ readCoverageForwardBases+ readCoverageReverseBases)) {
 			debug();
-			Misc.printErrAndExit("Read count mismatch! "+record.getLine());
+			System.err.println("Read count mismatch! "+record.getLine()+"\n");
+			pass = false;
+			return;
 		}
 		
 		readCoverageAll = deletions + insertions + readCoverageForwardBases + readCoverageReverseBases; 
@@ -274,6 +279,27 @@ public class MpileupSample {
 			if (af> maxAF) maxAF = af;
 		}
 		return maxAF;
+	}
+	
+	/**Returns double[]{maxAF, maxIndex}, null if ref isn't GATC*/
+	public double[] findMaxSnvAFAndIndex(){
+		double maxAF = Double.MIN_NORMAL;
+		int maxIndex = -1;
+		char ref = record.getRef().charAt(0);
+		int[] indexesToScan = null;
+		if (ref == 'G') indexesToScan = new int[]{A_INDEX, T_INDEX, C_INDEX};
+		else if (ref == 'A') indexesToScan = new int[]{G_INDEX, T_INDEX, C_INDEX};
+		else if (ref == 'T') indexesToScan = new int[]{G_INDEX,A_INDEX,C_INDEX};
+		else if (ref == 'C') indexesToScan = new int[]{G_INDEX,A_INDEX, T_INDEX};
+		else return null;
+		for (int index: indexesToScan){
+			double af = getAlleleFreq(index);
+			if (af> maxAF) {
+				maxAF = af;
+				maxIndex = index;
+			}
+		}
+		return new double[]{maxAF, maxIndex};
 	}
 
 	public int getReadCoverageAll() {

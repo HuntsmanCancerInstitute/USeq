@@ -23,7 +23,9 @@ public class Misc {
 	public static final Pattern COLON = Pattern.compile(":");
 	public static final Pattern COMMA = Pattern.compile(",");
 	public static final Pattern SEMI_COLON = Pattern.compile(";");
+	public static final Pattern PIPE = Pattern.compile("\\|");
 	public static final Pattern GREATER_THAN = Pattern.compile(">");
+	public static final Pattern AMP = Pattern.compile("&");
 	
 	/**Calls garbage collection then returns total - free.*/
 	public static long fetchUsedMemory(){
@@ -201,6 +203,21 @@ public class Misc {
 	
 	/**Converts a hash to a String using the delimiter to join.*/
 	public static String hashSetToString(HashSet hash, String delimiter){
+		if (hash.size() == 0) return "";
+		Iterator it = hash.iterator();
+		StringBuilder s = new StringBuilder();
+		Object obj = (Object)it.next();
+		s.append(obj.toString());
+		while (it.hasNext()){
+			obj = it.next();
+			s.append(delimiter);
+			s.append(obj.toString());
+		}
+		return s.toString();
+	}
+	
+	/**Converts a hash to a String using the delimiter to join.*/
+	public static String treeSetToString(TreeSet hash, String delimiter){
 		if (hash.size() == 0) return "";
 		Iterator it = hash.iterator();
 		StringBuilder s = new StringBuilder();

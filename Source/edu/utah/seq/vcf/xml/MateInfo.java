@@ -25,7 +25,7 @@ public class MateInfo {
 		this.parser = parser;
 		
 		parseChromPos();
-		parseRef();
+		if (failedParsing == false) parseRef();
 	}
 	
 	private void parseRef() {
@@ -43,7 +43,7 @@ public class MateInfo {
 			end = Integer.parseInt(mat.group(3));
 		}
 		else {
-			System.err.println("\tError: failed to match the chr:pos-end for '"+coordinates+ "'");
+			System.err.println("\tError in MateInfo: failed to match the chr:pos-end for '"+coordinates+ "'");
 			failedParsing = true;
 		}
 	}

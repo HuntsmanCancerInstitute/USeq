@@ -44,11 +44,12 @@ public class SampleQC {
 	private boolean s2uParsed = false;
 	private double meanOnTargetCoverage;
 	private int minimumCoverageThreshold;
+	private double coverageAt090OfTargetBps;
 	private double coverageAt095OfTargetBps;
 	private float[] fractionTargetBpsWithIndexedCoverage;
 	private String[] lowCoverageRegions; 
 	private String[] exonicMedianPerBpCoverage;
-	private long numberLowCoverageBps;
+	//private long numberLowCoverageBps;
 	private String targetRegionsFileNameS2U;
 
 	//constructor
@@ -105,6 +106,8 @@ public class SampleQC {
 				meanOnTargetCoverage= jo.getDouble("meanOnTargetCoverage", -1);
 				//this is the fraction of target bps with >=0x, >=1x, >=2x .....
 				fractionTargetBpsWithIndexedCoverage = parseFloatArray(jo.get("fractionTargetBpsWithIndexedCoverage"));
+				//the coverage # found at 0.90 of target bps, calculate by asking what fraction of target bps have at minimum, 0x 1x, 2x, 3x, ... stop when fraction hits 0.90.
+				coverageAt090OfTargetBps = jo.getDouble("coverageAt0.90OfTargetBps", -1);
 				//the coverage # found at 0.95 of target bps, calculate by asking what fraction of target bps have at minimum, 0x 1x, 2x, 3x, ... stop when fraction hits 0.95.
 				coverageAt095OfTargetBps = jo.getDouble("coverageAt0.95OfTargetBps", -1);
 				//this is the median of the per bp coverage across each region supplied to S2U
@@ -114,7 +117,7 @@ public class SampleQC {
 				//bps that fail the minimum coverage threshold
 				lowCoverageRegions = parseStringArray(jo.get("lowCoverageRegions"));
 				//number of target bps failing the coverage threshold
-				numberLowCoverageBps = jo.getLong("numberLowCoverageBps", -1);
+				//numberLowCoverageBps = jo.getLong("numberLowCoverageBps", -1);
 				//name of targets
 				targetRegionsFileNameS2U = jo.getString("targetRegionsFileName", "notFound");
 			}
@@ -144,8 +147,9 @@ public class SampleQC {
 		}
 		if (s2uParsed){
 			al.add(new Double(meanOnTargetCoverage).toString());
+			al.add(new Double(coverageAt090OfTargetBps).toString());
 			al.add(new Double(coverageAt095OfTargetBps).toString());
-			al.add(new Long(numberLowCoverageBps).toString());
+			//al.add(new Long(numberLowCoverageBps).toString());
 		}
 		return Misc.stringArrayListToString(al, "\t");
 	}
@@ -169,8 +173,9 @@ public class SampleQC {
 		}
 		if (s2uParsed){
 			al.add("Mean on Target Coverage");
+			al.add("Coverage at 0.9 of Target BPs");
 			al.add("Coverage at 0.95 of Target BPs");
-			al.add("# Low Coverage Target BPs");
+			//al.add("# Low Coverage Target BPs");
 		}
 		return Misc.stringArrayListToString(al, "\t");
 	}
@@ -197,8 +202,9 @@ public class SampleQC {
 		}
 		if (s2uParsed){
 			sb.append("	data.addColumn('number', 'Mean on Target Coverage');\n");
+			sb.append("	data.addColumn('number', 'Coverage at 0.9 of Target BPs');\n");
 			sb.append("	data.addColumn('number', 'Coverage at 0.95 of Target BPs');\n");
-			sb.append("	data.addColumn('number', '# Low Coverage Target BPs');\n");
+			//sb.append("	data.addColumn('number', '# Low Coverage Target BPs');\n");
 		}
 	}
 	
@@ -230,8 +236,9 @@ public class SampleQC {
 		}
 		if (s2uParsed){
 			al.add(f.format(meanOnTargetCoverage) );
+			al.add(f.format(coverageAt090OfTargetBps) );
 			al.add(f.format(coverageAt095OfTargetBps) );
-			al.add(new Long(numberLowCoverageBps).toString());
+			//al.add(new Long(numberLowCoverageBps).toString());
 		}
 		sb.append("\t\t[");
 		sb.append(Misc.stringArrayListToString(al, ","));
@@ -273,8 +280,10 @@ public class SampleQC {
 		}
 		if (s2uParsed){
 			al.add(b+ "Mean on Target Coverage"+ d+ "Traditional measure of coverage over target BPs.");
+			al.add(b+ "Coverage at 0.9 of Target BPs"+ d+ "Better measure of coverage, calculated by asking what fraction of target BPs have 0x, 1x, 2x or more coverage. Stop when it hits 0.9.");
 			al.add(b+ "Coverage at 0.95 of Target BPs"+ d+ "Better measure of coverage, calculated by asking what fraction of target BPs have 0x, 1x, 2x or more coverage. Stop when it hits 0.95.");
-			al.add(b+ "# Low Coverage Target BPs"+ d+ "Number of target BPs with less than the minimum coverage threshold.");
+
+			//al.add(b+ "# Low Coverage Target BPs"+ d+ "Number of target BPs with less than the minimum coverage threshold.");
 		}
 		return Misc.stringArrayListToString(al, e);
 	}
@@ -359,6 +368,9 @@ public class SampleQC {
 	}
 	public double getCoverageAt095OfTargetBps() {
 		return coverageAt095OfTargetBps;
+	}
+	public double getCoverageAt090OfTargetBps() {
+		return coverageAt090OfTargetBps;
 	}
 	public float[] getFractionTargetBpsWithIndexedCoverage() {
 		return fractionTargetBpsWithIndexedCoverage;

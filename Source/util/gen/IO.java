@@ -2116,6 +2116,38 @@ public class IO {
 		return col;
 	}
 
+	/**Parses the indexed columns of a tab delimited file, all lines included.
+	 * Will return an empty String if index column doesn't exist, separates values with a tab.
+	 * Skips # comment lines.*/
+	public static String[] parseColumns (File file, int[] indexes){
+		ArrayList<String> al = new ArrayList<String>();
+		
+		try{
+			BufferedReader in = IO.fetchBufferedReader(file);
+			String line;
+			String[] tokens;
+			while ((line=in.readLine()) != null){
+				if (line.startsWith("#")) continue;
+				tokens = Misc.TAB.split(line);
+				//for each column
+				StringBuilder sb = new StringBuilder(tokens[indexes[0]]);
+				for (int i=1; i< indexes.length; i++){
+					sb.append("\t");
+					sb.append(tokens[indexes[i]]);
+				}
+				al.add(sb.toString());
+			}
+			in.close();
+		} catch (Exception e){
+			e.printStackTrace();
+			Misc.printExit("\nError: problem extracting columns from "+file+", aborting.\n");
+		}
+		String[] col = new String[al.size()];
+		al.toArray(col);
+		return col;
+	}
+
+	
 	/**Parses a tab delimited file, the indexed column is used as the key, 
 	 * the entire line as the value, blank lines skipped, returns null if 
 	 * a duplicate key is found.*/

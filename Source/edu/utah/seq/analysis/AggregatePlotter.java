@@ -29,6 +29,7 @@ public class AggregatePlotter {
 	private boolean averageRegionScores = false;
 	private int bpPad = 0;
 	private float userScalar = 0;
+	private boolean divideByTotalCounts = false;
 	
 	//strand usage
 	private static final int COMBINE = 0; //draw from both, invert - strand
@@ -45,8 +46,6 @@ public class AggregatePlotter {
 	private float[][] regionScores = null;
 	private float[] mergedRegionScores = null;
 	private float numberOfRegions = 0;
-	private float normalizer;
-
 
 	//constructors
 	public AggregatePlotter(String[] args){
@@ -62,8 +61,7 @@ public class AggregatePlotter {
 		//fetch data but don't load it.
 		System.out.println("Fetching data...");
 		chromPointData = PointData.fetchStrandedCombinePointData(pointDataDirs);
-		float totalObs = PointData.totalObservationsMultiPointData(chromPointData);
-		normalizer = totalObs/userScalar;		
+		float totalObs = PointData.totalObservationsMultiPointData(chromPointData);		
 		System.out.println("\t"+(int)totalObs+" reads");
 
 		//for each region load data
@@ -74,7 +72,7 @@ public class AggregatePlotter {
 			String chromStrand = it.next();
 			chromosome = chromStrand.substring(0,chromStrand.length()-1);
 			strand = chromStrand.substring(chromStrand.length()-1);
-			if (strand.equals(".") && strandUsage != COMBINE) Misc.printErrAndExit("\nStrand usage has been indicated yet regions aren't stranded! Is your bed file properly formated (5 columns)? Aborting.\n"+chromStrand);
+			if (strand.equals(".") && strandUsage != COMBINE) Misc.printErrAndExit("\nStrand usage has been indicated yet regions aren't stranded! Is your bed file properly formated (5 columns)? Aborting.\nBadOne -> "+chromStrand+"\nAll -> "+chromRegions.keySet());
 
 			//fetch and shift positions or delog scores
 			if (halfPeakShift !=0 || delogScores || replaceScoresWithOne) shiftPositions();
@@ -110,8 +108,11 @@ public class AggregatePlotter {
 		//normalize by dividing against the number of regions?
 		if(normalize) normalizeSummedRegionScores();
 		
-		//normalize by dividing against (total obs/ userScalar)
-		if (userScalar != 0) normalizeSummedRegionScoresByUserScalar();
+		//divide scores by total counts?
+		if (divideByTotalCounts) divideSummedRegionScoresByValue(totalObs);
+		
+		//divide by user scalar
+		if (userScalar != 0) divideSummedRegionScoresByValue(userScalar);
 
 		//print arrays
 		printSmoothedArrays();
@@ -143,8 +144,8 @@ public class AggregatePlotter {
 		for (int i=0; i< mergedRegionScores.length; i++) mergedRegionScores[i] = mergedRegionScores[i]/numberOfRegions;
 	}
 	
-	private void normalizeSummedRegionScoresByUserScalar(){
-		for (int i=0; i< mergedRegionScores.length; i++) mergedRegionScores[i] = mergedRegionScores[i]/normalizer;
+	private void divideSummedRegionScoresByValue(float value){
+		for (int i=0; i< mergedRegionScores.length; i++) mergedRegionScores[i] = mergedRegionScores[i]/value;
 	}
 	
 	/**Sums the columns/ bp for all the regions*/
@@ -394,7 +395,8 @@ public class AggregatePlotter {
 					case 't': pointDataDirs = IO.extractFiles(args[++i]); break;
 					case 'b': bedFile = new File(args[++i]); break;
 					case 'p': peakShift = Integer.parseInt(args[++i]); break;
-					case 'j': userScalar = Float.parseFloat(args[++i]); break;
+					case 'l': divideByTotalCounts = true; break;
+					case 'k': userScalar = Float.parseFloat(args[++i]); break;
 					case 's': scaleSize = Integer.parseInt(args[++i]); break;
 					case 'f': bpPad = Integer.parseInt(args[++i]); break;
 					case 'v': scaleScores = true; break;
@@ -434,7 +436,8 @@ public class AggregatePlotter {
 		System.out.println("\tPeak shift\t"+peakShift);
 		System.out.println("\tStrand usage\t"+strandUsage);
 		if (scaleSize !=0 ) System.out.println("\tScale size\t"+scaleSize);
-		if (userScalar !=0) System.out.println("\tDivide scores by (# PD Obs/"+userScalar+")");
+		if (userScalar !=0) System.out.println("\tDivide each region score by "+userScalar);
+		System.out.println("\tDivide each region score by the total # observations "+divideByTotalCounts);
 		System.out.println("\tDivide scores by # regions\t"+normalize);
 		System.out.println("\tDelog2 scores\t"+delogScores);
 		System.out.println("\tReplace scores with 1\t"+replaceScoresWithOne);
@@ -446,7 +449,7 @@ public class AggregatePlotter {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Aggregate Plotter:  June 2017                         **\n" +
+				"**                            Aggregate Plotter:  Nov 2017                          **\n" +
 				"**************************************************************************************\n" +
 				"Fetches point data contained within each region, inverts - stranded annotation, zeros\n" +
 				"the coordinates, sums, and window averages the values.  Usefull for generating\n" +
@@ -468,7 +471,8 @@ public class AggregatePlotter {
 				"-d Delog2 scores. Do it if your data is in log2 space.\n"+
 				"-v Convert each region scores to % of total.\n"+
 				"-n Divide scores by the number of regions.\n"+
-				"-j Divide each aggregate sum by the (total observations in the PointData x this value)\n"+
+				"-k Divide each regions score by this value.\n"+
+				"-l Divide each regions score by the total number of observations.\n"+
 				"-s Scale all regions to a particular size. Defaults to max region size.\n"+
 				"-a Average region scores instead of summing.\n"+
 
@@ -476,7 +480,7 @@ public class AggregatePlotter {
 
 				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/AgregatePlotter -t\n" +
 				"      /Data/PolIIRep1/,/Data/PolIIRep2/ -b /Anno/tssSites.bed -p 73 -u 1\n"+
-				"      -j 1000000\n\n" +
+				"      -l \n\n" +
 
 		"**************************************************************************************\n");
 

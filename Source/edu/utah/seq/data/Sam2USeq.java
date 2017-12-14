@@ -51,7 +51,7 @@ public class Sam2USeq {
 	private Histogram histogram;
 	private ArrayList<File> files2Zip = new ArrayList<File>();
 	private float scalar = 0;
-	private double scalarDenominator = 1000000.0;
+	private double scalarCount = Double.MAX_VALUE;
 	private Pattern cigarSub = Pattern.compile("(\\d+)([MSDHN])");
 	private Pattern supportedCigars = Pattern.compile(".*[^\\dMIDSHN].*");
 	private Pattern cigarWithRepeats = Pattern.compile("(.+\\D)(\\d+)$");
@@ -299,7 +299,8 @@ public class Sam2USeq {
 		closeWriters();
 
 		//set scalar
-		scalar = (float)(numberPassingAlignmentsForScaling/ scalarDenominator);
+		if (scalarCount == Double.MAX_VALUE) scalar = (float)(numberPassingAlignmentsForScaling/ 1000000.0);
+		else scalar = (float)(scalarCount/ 1000000.0);
 	}
 
 	/**Closes writers.*/
@@ -315,10 +316,13 @@ public class Sam2USeq {
 	@SuppressWarnings("unchecked")
 	private void saveJson() {
 		try {
-			//find max coverage just at or over 0.95
+			//find max coverage just at or over 0.95 and 0.9
 			int coverageAt95 = 0;
+			int coverageAt90 = -1;
 			for (int i=fractionTargetBpsAL.size()-1; i >=0; i--){
-				if (fractionTargetBpsAL.get(i).doubleValue() >= 0.95) {
+				double cov = fractionTargetBpsAL.get(i).doubleValue();
+				if (cov >= 0.9 && coverageAt90 == -1) coverageAt90 = i;
+				if (cov >= 0.95) {
 					coverageAt95 = i;
 					break;
 				}
@@ -330,6 +334,7 @@ public class Sam2USeq {
 			gz.printJson("minimumCoverageThreshold", (int)minimumCounts, true);
 			gz.printJson("targetRegionsFileName", regionFile.getName(), true);
 			gz.printJson("coverageAt0.95OfTargetBps", coverageAt95, true);
+			gz.printJson("coverageAt0.90OfTargetBps", coverageAt90, true);
 			gz.printJson("fractionTargetBpsWithIndexedCoverage", Num.arrayListToDoubles(fractionTargetBpsAL), true);
 			gz.printJson("lowCoverageRegions", lowCoverageRegionsAL, true); 
 			gz.printJson("numberLowCoverageBps", numLowCoverageBps, true);
@@ -807,7 +812,7 @@ public class Sam2USeq {
 					case 'd': barDirectory = new File(args[i+1]); i++; break;
 					case 's': stranded = true; break;
 					case 'e': scaleRepeats = true; break;
-					case 'g': scalarDenominator  = Double.parseDouble(args[++i]); break;
+					case 'g': scalarCount  = Double.parseDouble(args[++i]); break;
 					case 'k': makeAveReadLengthGraph = true; break;
 					case 'm': minimumMappingQuality = Float.parseFloat(args[++i]); break;
 					case 'a': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
@@ -840,7 +845,7 @@ public class Sam2USeq {
 				if (stranded || scaleRepeats) Misc.printErrAndExit("\nError: cannot perform a stranded or scaled repeat analysis with ChromData from MergePairedAlignments.  Aborting.\n");
 				loadChromData();
 			}
-			else Misc.printExit("\nError: cannot find your xxx.sam(.zip/.gz) file(s)!\n");
+			else Misc.printErrAndExit("\nError: cannot find your xxx.sam(.zip/.gz) file(s)!\n");
 		}
 
 		//barDirectory for saving point data?
@@ -922,7 +927,7 @@ public class Sam2USeq {
 			}
 			else {
 				System.out.println(makeRelativeTracks+"\tMake relative covererage tracks.");
-				if (makeRelativeTracks) System.out.println(scalarDenominator+"\tScalar denominator.");
+				if (makeRelativeTracks && scalarCount != Double.MAX_VALUE) System.out.println(scalarCount+"\tScalar count.");
 				System.out.println(scaleRepeats+"\tScale repeat alignments by the number of matches.");
 			}
 			System.out.println(stranded+"\tMake stranded covererage tracks.");
@@ -962,7 +967,8 @@ public class Sam2USeq {
 		numberPassingAlignmentsForScaling = count.longValue();
 
 		//set scalar
-		scalar = (float)(((double)numberPassingAlignmentsForScaling)/ scalarDenominator);
+		if (scalarCount == Double.MAX_VALUE) scalar = (float)(numberPassingAlignmentsForScaling/ 1000000.0);
+		else scalar = (float)(scalarCount/ 1000000.0);
 	}
 
 	public void printStats(){
@@ -1061,7 +1067,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 Sam 2 USeq : May 2017                            **\n" +
+				"**                                  Sam 2 USeq : Dec 2017                           **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
@@ -1085,7 +1091,7 @@ public class Sam2USeq {
 				"      total number of genome wide alignments for that read.  Repeat alignments are\n" +
 				"      thus given fractional count values at a given location. Requires that the IH\n" +
 				"      tag was set.\n"+
-				"-g Set the denominator of the scaler to this value, default 1000000\n"+
+				"-g Set the scalar count to this value, defaults to the number of passing alignments.\n"+
 				"-b Path to a region bed file (tab delim: chr start stop ...) to use in calculating\n" +
 				"      read coverage statistics.  Be sure these do not overlap! Run the MergeRegions app\n" +
 				"      if in doubt.\n"+ 

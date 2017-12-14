@@ -58,7 +58,7 @@ public class GatkRunner {
 		ArrayList<Bed[]> splitBed = Bed.splitByNumber(regions, numRegionsPerChunk);
 		
 		//create runners and start
-		System.out.println("Launching...");
+		System.out.println("Launching...\n");
 		runners = new GatkRunnerChunk[splitBed.size()];
 		ExecutorService executor = Executors.newFixedThreadPool(runners.length);
 		for (int i=0; i< runners.length; i++) {
@@ -185,7 +185,7 @@ public class GatkRunner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Gatk Runner: June 2017                             **\n" +
+				"**                               Gatk Runner: Oct  2017                             **\n" +
 				"**************************************************************************************\n" +
 				"Takes a bed file of target regions, splits it by the number of threads, writes out\n"+
 				"each, executes the GATK Gatktype caller, and merges the chunked results. \n"+

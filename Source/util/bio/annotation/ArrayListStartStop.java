@@ -3,7 +3,7 @@ import java.io.*;
 import java.util.*;
 
 import util.gen.IO;
-
+import util.gen.Misc;
 import edu.utah.seq.useq.data.Region;
 
 
@@ -42,7 +42,7 @@ public class ArrayListStartStop extends Region {
 			while ((line = in.readLine()) !=null) {
 				line = line.trim();
 				if (line.length() ==0 || line.startsWith("#")) continue;
-				tokens = line.split("\\s+");
+				tokens = Misc.TAB.split(line);
 				if (tokens.length < 3) continue;
 				//does chrom already exist?
 				String chrom;

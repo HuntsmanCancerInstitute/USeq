@@ -5,51 +5,89 @@ import java.util.regex.*;
 import java.util.*;
 import util.gen.IO;
 import util.gen.Misc;
+import util.gen.Num;
 
 public class FileCrossFilter {
-	
+
 	private File matcherFile;
 	private String[] uniqueIDs;
 	private File[] filesToParse;
-	private int indexMatcher = 0;
-	private int indexFilesToParse = 0;
-	private boolean ignoreDuplicateKeys = false;
+	private int[] indexMatcher;
+	private int[] indexFilesToParse;
+	private HashMap<String,String> toParseMap = new HashMap<String, String>();
+	private PrintWriter out = null;
 	
+
 	public FileCrossFilter (String[] args){
 		processArgs(args);
 		//load matcher file
-		uniqueIDs = IO.parseColumn(matcherFile, indexMatcher);
+		uniqueIDs = IO.parseColumns(matcherFile, indexMatcher);
 		//for each file parse and print matching lines
 		parseAndPrintMatches();
 		System.out.println("\nDone!\n");
 	}
-	
-	public void parseAndPrintMatches(){
-		for (int i=0; i< filesToParse.length; i++){
-			System.out.println("\tParsing "+filesToParse[i].getName());
-			HashMap map = IO.parseFile(filesToParse[i], indexFilesToParse,ignoreDuplicateKeys );
-			if (map == null) Misc.printExit("Error: duplicate key found in "+filesToParse[i].getName() );
-			try {
+
+	public void parseAndPrintMatches() {
+		try {
+			System.out.println("Parsing...\nFileName\tNumMatches\tNumFailedMatches");
+			for (int i=0; i< filesToParse.length; i++){
+				System.out.print(filesToParse[i].getName());
+				
+				//make writer for the parsed file
 				File file = new File (filesToParse[i].getParentFile(), Misc.removeExtension(filesToParse[i].getName())+"_Matched.xls");
-				PrintWriter out = new PrintWriter ( new FileWriter (file));
-				//for each uniqueID
+				out = new PrintWriter ( new FileWriter (file));
+				
+				//load the file into a hashmap where the key is the columns they defined, the value the line of the file
+				loadHashMap(filesToParse[i]);
+				
+				//for each matcher key
+				int numMatches = 0;
+				int numFails = 0;
 				for (int j=0; j< uniqueIDs.length; j++){
-					if (map.containsKey(uniqueIDs[j])) out.println(map.get(uniqueIDs[j]));
+					if (toParseMap.containsKey(uniqueIDs[j])) {
+						out.println(toParseMap.get(uniqueIDs[j]));
+						numMatches++;
+					}
 					else {
 						out.println();
-						System.err.println("\tKey not found! "+uniqueIDs[j]+" in "+filesToParse[i].getName());
+						numFails++;
 					}
 				}
 				out.close();
-			} catch (Exception e){
-				e.printStackTrace();
+				System.out.println("\t"+numMatches+"\t"+numFails);
 			}
+		} catch (Exception e){
+			e.printStackTrace();
 		}
 	}
-	
+
+	private void loadHashMap(File toParse) throws IOException {
+		toParseMap.clear();
+		BufferedReader in = IO.fetchBufferedReader(toParse);
+		String line;
+		String[] columns;
+		while ((line = in.readLine())!= null){
+			if (line.startsWith("#")) {
+				out.println(line);
+				continue;
+			}
+			columns = Misc.TAB.split(line);
+			StringBuilder sb = new StringBuilder(columns[indexFilesToParse[0]]);
+			for (int i=1; i< indexFilesToParse.length; i++){
+				sb.append("\t");
+				sb.append(columns[indexFilesToParse[i]]);
+			}
+			//does it exist?
+			String key = sb.toString();			
+			if (toParseMap.containsKey(key)) Misc.printErrAndExit("\nERROR: Duplicate key found in file to parse, see '"+key+"' in "+toParse);
+			toParseMap.put(key, line);
+		}
+	}
+
 	/**This method will process each argument and assign new varibles*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
+		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -57,11 +95,10 @@ public class FileCrossFilter {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'f': filesToParse = IO.extractFiles(new File(args[i+1]));  i++; break;
-					case 'm': matcherFile = new File(args[i+1]); i++; break;
-					case 'i': ignoreDuplicateKeys = true; break;
-					case 'a': indexMatcher = Integer.parseInt(args[i+1]); i++; break;
-					case 'b': indexFilesToParse = Integer.parseInt(args[i+1]); i++; break;
+					case 'p': filesToParse = IO.extractFiles(new File(args[++i])); break;
+					case 'm': matcherFile = new File(args[++i]); break;
+					case 'a': indexMatcher = Num.parseInts(args[++i], Misc.COMMA); break;
+					case 'b': indexFilesToParse = Num.parseInts(args[++i], Misc.COMMA); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nError: unknown option! " + mat.group());
 					}
@@ -76,27 +113,29 @@ public class FileCrossFilter {
 		if (matcherFile == null ) Misc.printExit("\nCannot find your matcher file?\n");
 		if (filesToParse == null) Misc.printExit("\nCannot find your file(s) to parse??\n");
 	}	
-	
+
 	public static void printDocs(){ 
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            File Cross Filter: March 2008                         **\n" +
+				"**                            File Cross Filter: Sept 2017                         **\n" +
 				"**************************************************************************************\n" +
-				"FCF take a column in the matcher file and uses it to parse the rows from other files.\n" +
-				"Useful for pulling out and printing in order the rows that match the first file.\n\n" +
-				
-				"-m Full path file text for a tab delimited txt file to use in matching.\n" +
-				"-f Full path file text to parse, can specify a directory too.\n" +
-				"-i Ignore duplicate keys.\n"+
-				"-a Column index containing the unique IDs in the matcher, defaults to 0.\n"+
-				"-b Column index containing the unique IDs in the parsers, defaults to 0.\n"+
-				
-				"Example: java -jar pathTo/T2/Apps/FileCrossFilter -f /extendedArrayData/ -m /old/\n" +
-				"     originalArray.txt -a 2 -b 2\n\n" +
-				
-		"**************************************************************************************\n");		
+				"FCF takes one or more columns in the matcher file and uses these as a key to parse and\n"+
+				"save matching keys in the to parse files. Use this to parse lines in files that match\n"+
+				"those in another. Keys must be unique. The order and number of the rows in the matcher\n"+
+				"file is preserved, if a match is not found in the parsed file, a blank line is inserted\n"+
+				"instead.\n\n" +
+
+				"-m Path to a tab delimited txt (.gz/.zip OK) file to use in matching.\n" +
+				"-a One or more column indexs in the matcher file to use as the key.\n"+
+				"-p Path to a file or directory of files to parse (.gz/.zip OK).\n" +
+				"-b One or more column indexes in the parse file(s) to use as a key.\n"+
+
+				"\nExample: java -jar pathTo/USeq/Apps/FileCrossFilter -m intRegions.bed -a 0,1,2\n" +
+				"     -p SpreadSheetData/ -b 0,1,2 \n\n" +
+
+				"**************************************************************************************\n");		
 	}
-	
+
 	public static void main(String[] args) {
 		if (args.length == 0) {
 			printDocs();

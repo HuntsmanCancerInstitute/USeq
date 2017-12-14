@@ -325,10 +325,13 @@ public class AggregateQCStats {
 			else {
 				//check thresholds
 				if (test.checkThresholds(s) == false){
-					System.out.println("\nProblem!\nTest AS\t" +test.getAlignmentScoreThreshold());
-					System.out.println("Test MQ\t" +test.getMappingQualityThreshold());
-					System.out.println("Samp AS\t" +s.getAlignmentScoreThreshold());
-					System.out.println("Samp MQ\t" +s.getMappingQualityThreshold());
+					String tn = test.getSampleName();
+					String sn = s.getSampleName();
+					System.out.println("\nProblem!\n"+tn+" AS\t" +test.getAlignmentScoreThreshold());
+					System.out.println(tn+" MQ\t" +test.getMappingQualityThreshold());
+					System.out.println(sn+" AS\t" +s.getAlignmentScoreThreshold());
+					System.out.println(sn+" MQ\t" +s.getMappingQualityThreshold());
+					
 					Misc.printErrAndExit("\nERROR: this sample's AS, MQ, or AS proc settings differ? Are you changing thresholds between runs? "+s.getSampleName());
 				}
 				//check json files
@@ -412,7 +415,7 @@ public class AggregateQCStats {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Aggregate QC Stats: May 2017                          **\n" +
+				"**                            Aggregate QC Stats: Oct 2017                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from json files produced by the\n"+
 				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, and fastq counter.\n"+

@@ -56,11 +56,11 @@ public class GatkRunnerChunk implements Runnable{
 		System.out.println(cmd);
 		String[] out = IO.executeViaProcessBuilder(Misc.WHITESPACE.split(cmd), false);
 		
-		//any errors?
+		//any errors? ignore StatusLogger errors
 		for (String line: out) {
-			if (line.toLowerCase().contains("error")){
+			if (line.toLowerCase().contains("error") && line.contains("StatusLogger") == false){
 				Misc.printArray(out);
-				System.err.println("\n\nGATK threw an error when executing:\n"+cmd);
+				System.err.println("\n\nAborting, GATK threw an error when executing:\n"+cmd+"\nErrorLine: "+line+"\n");
 				failed = true;
 				break;
 			}

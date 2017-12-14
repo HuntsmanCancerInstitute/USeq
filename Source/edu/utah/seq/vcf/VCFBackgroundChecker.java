@@ -28,7 +28,6 @@ public class VCFBackgroundChecker {
 	private File[] vcfFiles;
 	private File mpileup;
 	private File saveDir;
-	private HashSet<Integer> sampleIndexesToExamine = null;
 	private int bpBuffer = 0;
 	private int minBaseQuality = 20;
 	private int minReadCoverage = 20;
@@ -318,11 +317,6 @@ public class VCFBackgroundChecker {
 			}
 		}
 		
-		if (sampleIndexes!= null){
-			sampleIndexesToExamine = new HashSet<Integer>(sampleIndexes.length);
-			for (Integer i: sampleIndexes) sampleIndexesToExamine.add(i);
-		}
-		
 		//pull vcf files
 		if (forExtraction == null || forExtraction.exists() == false) Misc.printErrAndExit("\nError: please enter a path to a vcf file or directory containing such.\n");
 		File[][] tot = new File[3][];
@@ -364,16 +358,13 @@ public class VCFBackgroundChecker {
 		System.out.println(removeNonZScoredRecords+ "\tExclude vcf records that could not be z-scored");
 		System.out.println(verbose+"\tVerbose");
 		System.out.println(replaceQualScore+"\tReplace QUAL score with z-score and set non scored records to 0");
-		
-		if (sampleIndexesToExamine!=null) System.out.println(Misc.hashSetToString(sampleIndexesToExamine, ",")+"\tMpileup samples to examine");
-		else System.out.println("All\tMpileup samples to examine");
 	}
 
 	
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                         VCF Background Checker : Nov 2017                        **\n" +
+				"**                         VCF Background Checker : Dec 2017                        **\n" +
 				"**************************************************************************************\n" +
 				"VBC calculates non-reference allele frequencies (AF) from a background multi-sample \n"+
 				"mpileup file over each vcf record. It then calculates a z-score for the vcf AF and \n"+
@@ -393,8 +384,6 @@ public class VCFBackgroundChecker {
 				"-s Path to directory in which to save the modified vcf file(s)\n"+
 						
 				"\nOptional:\n" +
-				"-i Comma delimited list (zero is 1st sample, no spaces) of mpileup sample indexes to\n"+
-				"     examine, defaults to all.\n"+
 				"-b BP padding, defaults to 0\n"+
 				"-z Minimum vcf z-score, defaults to 0, no filtering\n"+
 				"-q Minimum mpileup sample bp quality, defaults to 20\n"+
@@ -450,9 +439,5 @@ public class VCFBackgroundChecker {
 
 	public boolean isVerbose() {
 		return verbose;
-	}
-
-	public HashSet<Integer> getSampleIndexesToExamine() {
-		return sampleIndexesToExamine;
 	}
 }

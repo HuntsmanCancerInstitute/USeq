@@ -86,26 +86,38 @@ public class MpileupTabixLoader implements Runnable{
 		}
 	}
 	
+	private void printFailingRecord(String[] fields, String record) throws IOException{
+		if (removeNonZScoredRecords == false) printScoredVcf(fields, record);
+		tooFewSamples.add(record);
+		numNotScored++;
+	}
+	
 	private void score(String record) throws Exception {
 		//#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NORMAL	TUMOR
 		String[] fields = Misc.TAB.split(record);
 		
 		//fetch DP and AF
 		Matcher mat = AF.matcher(fields[7]);
-		if (mat.matches() == false) throw new IOException ("Failed to parse AF= number from the INFO field in this variant:\n"+record);
+		if (mat.matches() == false) {
+			System.err.println ("WARNING: Failed to parse AF= number from the INFO field in this variant -> "+record+" skipping.");
+			printFailingRecord(fields, record);
+			return;
+		}
 		double freq = Double.parseDouble(mat.group(1));
 		mat = DP.matcher(fields[7]);
-		if (mat.matches() == false) throw new IOException ("Failed to parse DP= number from the INFO field in this variant:\n"+record);
+		if (mat.matches() == false) {
+			System.err.println ("WARNING: Failed to parse DP= number from the INFO field in this variant:\n"+record);
+			printFailingRecord(fields, record);
+			return;
+		}
 		double depth = Double.parseDouble(mat.group(1));
 		int numNonRef = (int)Math.round(depth*freq);
 		
 		//interbase coor of effected bps
 		int[] startStop = QueryIndexFileLoader.fetchEffectedBps(fields, true);
 		if (startStop == null) {
-			System.err.println("Failed to parse the effected bps.");
-			if (removeNonZScoredRecords == false) printScoredVcf(fields, record);
-			tooFewSamples.add(record);
-			numNotScored++;
+			System.err.println("WARNING: Failed to parse the effected bps for : "+record);
+			printFailingRecord(fields, record);
 			return;
 		}
 		
@@ -115,9 +127,7 @@ public class MpileupTabixLoader implements Runnable{
 		String tabixCoor = fields[0]+":"+start+"-"+(startStop[1]);
 		TabixReader.Iterator it = fetchInteratorOnCoordinates(tabixCoor);
 		if (it == null) {
-			if (removeNonZScoredRecords == false) printScoredVcf(fields, record);
-			tooFewSamples.add(record);
-			numNotScored++;
+			printFailingRecord(fields, record);
 			return;
 		}
 		
@@ -159,15 +169,10 @@ public class MpileupTabixLoader implements Runnable{
 		}
 		
 		//was a z-score calculated?
-		if (minZScore == Double.MAX_VALUE) {
-			if (removeNonZScoredRecords == false) printScoredVcf(fields, record);
-			tooFewSamples.add(record);
-			numNotScored++;
-		}
+		if (minZScore == Double.MAX_VALUE) printFailingRecord(fields, record);
 		
 		//append min zscore and save
 		else {
-			
 			//fetch sorted, smallest to largest AFs
 			double[] bkgAFs = fetchSortedAFs(minZScoreSamples);
 			

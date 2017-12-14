@@ -74,8 +74,8 @@ public class MpileupParser {
 		nonRefFreqHistogram.printScaledHistogram();
 		
 		//finish and calc run time
-		double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
-		System.out.println("\nDone! "+Math.round(diffTime)+" min\n");
+		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
+		System.out.println("\nDone! "+Math.round(diffTime)+" sec\n");
 	}
 	
 	
