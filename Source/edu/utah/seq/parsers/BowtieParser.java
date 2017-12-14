@@ -16,6 +16,7 @@ import java.util.*;
  **/
 public class BowtieParser {
 	//fields
+	private boolean delme;
 	private File[] dataFiles;
 	private File saveDirectory;
 	private File workingFile;
