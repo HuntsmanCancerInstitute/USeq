@@ -1,6 +1,6 @@
-package edu.utah.seq.parsers.mpileup;
+package edu.utah.seq.parsers.mpileup.concordance;
 
-import edu.utah.seq.parsers.mpileup.MpileupVariantComparator.ParsedSample;
+import edu.utah.seq.parsers.mpileup.concordance.ConcordanceChunk.ParsedSample;
 import util.gen.Histogram;
 import util.gen.IO;
 import util.gen.Num;
@@ -18,6 +18,15 @@ public 	class Similarity implements Comparable<Similarity>{
 	private Histogram sampleAMisMatchAFs = new Histogram(0,1,101);
 	private Histogram sampleBMisMatchAFs = new Histogram(0,1,101);
 	
+	public void add(Similarity other) throws Exception {
+		this.numMatchesAB += other.numMatchesAB;
+		this.numMisMatchesAB += other.numMisMatchesAB;
+		this.numMatchesBA += other.numMatchesBA;
+		this.numMisMatchesBA += other.numMisMatchesBA;
+		this.sampleAMisMatchAFs.addCounts(other.sampleAMisMatchAFs);
+		this.sampleBMisMatchAFs.addCounts(other.sampleBMisMatchAFs);
+	}
+	
 	Similarity(int a, int b, double minAFForHom, double minAFForMatch){
 		sampleA = a;
 		sampleB = b;
@@ -27,9 +36,9 @@ public 	class Similarity implements Comparable<Similarity>{
 
 	public String toString(String[] sampleNames){
 		double fracMatchAB = (double)numMatchesAB/(double)(numMatchesAB+ numMisMatchesAB);
-		String ab = sampleNames[sampleA]+"->"+ sampleNames[sampleB]+"\t"+ Num.formatNumber(fracMatchAB, 3)+" ("+(int)numMatchesAB+"/"+(int)(numMatchesAB+numMisMatchesAB)+")\n";
+		String ab = sampleNames[sampleA]+"->"+ sampleNames[sampleB]+"\t"+ Num.formatNumberMinOne(fracMatchAB, 3)+" ("+(int)numMatchesAB+"/"+(int)(numMatchesAB+numMisMatchesAB)+")\n";
 		double fracMatchBA = (double)numMatchesBA/(double)(numMatchesBA+ numMisMatchesBA);
-		String ba = sampleNames[sampleB]+"->"+ sampleNames[sampleA]+"\t"+ Num.formatNumber(fracMatchBA, 3)+" ("+(int)numMatchesBA+"/"+(int)(numMatchesBA+numMisMatchesBA)+")\n";
+		String ba = sampleNames[sampleB]+"->"+ sampleNames[sampleA]+"\t"+ Num.formatNumberMinOne(fracMatchBA, 3)+" ("+(int)numMatchesBA+"/"+(int)(numMatchesBA+numMisMatchesBA)+")\n";
 		return ab+ba;
 	}
 	
@@ -82,6 +91,8 @@ public 	class Similarity implements Comparable<Similarity>{
 		if (this.maxMatch < o.maxMatch) return 1;
 		return 0;
 	}
+
+
 
 
 

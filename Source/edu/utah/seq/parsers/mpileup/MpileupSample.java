@@ -112,7 +112,7 @@ public class MpileupSample {
 		int qsIndex = 0;
 		for (int i=0; i< bases.length; i++){
 			switch (bases[i]){
-			case 'M': break; //skip it's masked
+			case 'M': break; 
 			case 'g': count(reverseGATC, G_INDEX, qualScores[qsIndex++]); break;
 			case 'G': count(forwardGATC, G_INDEX, qualScores[qsIndex++]); break;
 			case 'a': count(reverseGATC, A_INDEX, qualScores[qsIndex++]); break;
@@ -127,11 +127,10 @@ public class MpileupSample {
 			default: Misc.printErrAndExit("\nProblem, unknown base symbol! " + bases[i] +" in "+ record.getLine());
 			}
 		}
-		//check lengths, if a masked base was encountered this will differ, its OK
-		//maybe not?
+		//check lengths, if masked its ok
 		if ((qualScores.length) != qsIndex) {
-			debug();
-			System.err.println("Quality score to masked base mismatch! "+qsIndex+" vs "+qualScores.length+" "+record.getLine()+"\n");
+			//debug();
+			//System.err.println("Quality score to masked base mismatch! "+qsIndex+" vs "+qualScores.length+" "+record.getLine()+"\n");
 			pass = false;
 			return;
 		}

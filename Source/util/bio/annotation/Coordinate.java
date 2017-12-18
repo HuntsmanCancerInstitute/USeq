@@ -7,7 +7,7 @@ import trans.anno.BindingRegion;
 import util.gen.IO;
 
 /**Base class for holding info about a genomic coordinate.*/
-public class Coordinate implements Comparable, Serializable{
+public class Coordinate implements Comparable<Coordinate>, Serializable{
 	//fields
 	String chromosome;
 	int start;
@@ -21,8 +21,7 @@ public class Coordinate implements Comparable, Serializable{
 		this.stop = stop;
 	}
 	/**Sorts by chromsome, start position, length (smallest to largest).*/
-	public int compareTo(Object other){
-		Coordinate otherCoor = (Coordinate)other;
+	public int compareTo(Coordinate otherCoor){
 		//sort by chromosome
 		int compare = otherCoor.chromosome.compareTo(chromosome);
 		if (compare !=0) return compare * -1;;

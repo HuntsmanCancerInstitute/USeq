@@ -4572,6 +4572,14 @@ public class Num {
 	}
 	
 	/**Converts a double ddd.dddddddd to a user determined number of decimal places right of the .  */
+	public static String formatNumberMinOne(double num, int numberOfDecimalPlaces){
+		NumberFormat f = NumberFormat.getNumberInstance();
+		f.setMaximumFractionDigits(numberOfDecimalPlaces);
+		f.setMinimumFractionDigits(1);
+		return f.format(num);
+	}
+	
+	/**Converts a double ddd.dddddddd to a user determined number of decimal places right of the .  */
 	public static String formatNumberNoComma(double num, int numberOfDecimalPlaces){
 		NumberFormat f = NumberFormat.getNumberInstance();
 		f.setMaximumFractionDigits(numberOfDecimalPlaces);
