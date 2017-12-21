@@ -192,7 +192,7 @@ public class AlignmentEndTrimmer {
 				if (!this.refHash.containsKey(chrom)) {
 					if (!notFound.contains(chrom)) {
 						notFound.add(chrom);
-						System.out.println(String.format("Chromosome %s not found in reference file, skipping trimming step", chrom));
+						Misc.printErrAndExit(String.format("Chromosome %s not found in reference file, skipping trimming step", chrom));
 					}
 				} else if (!sr.getReadUnmappedFlag()) {
 					String refSeq = null;
@@ -674,8 +674,12 @@ public class AlignmentEndTrimmer {
 					sequence.append(line.toUpperCase());
 				}
 			}
+			//added by Nix, 21 Dec 2017
+			//add last!
+			refHash.put(chrom, sequence.toString());
 			br.close();
 			this.refHash = refHash;
+			System.out.println("\tChroms parsed - "+refHash.keySet());
 		} catch (IOException ioex) {
 			System.out.println("Error processing reference file: " + ioex.getMessage());
 			ioex.printStackTrace();
@@ -697,7 +701,7 @@ public class AlignmentEndTrimmer {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Alignment End Trimmer: April 2014                     **\n" +
+				"**                            Alignment End Trimmer: Dec 2017                       **\n" +
 				"**************************************************************************************\n" +
 				"This application can be used to trim alignments according to the density of mismatches.\n"+
 				"Each base of the alignment is compared to the reference sequence from the start of the\n" +
