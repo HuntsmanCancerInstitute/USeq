@@ -84,6 +84,35 @@ public class Bed extends Coordinate implements Serializable{
 		return bed;
 	}
 	
+	/**Parses a tab delimited txt file containing chr start stop. Skips # lines and spaces.
+	 * @param subStart - bases to be subtracted from region starts
+	 * @param subEnd - bases to be subtracted from region ends
+	 * @param chrStartStopIndexes - three indexes that define the chr start stop columns, for bed use 0,1,2
+	 * */
+	public static Bed[] parseFilePutLineInNameNoScoreOrStrand(File bedFile, int subStart, int subEnd, int[] chrStartStopIndexes){
+		Bed[] bed =null;
+		String line = null;
+		try{
+			BufferedReader in = IO.fetchBufferedReader(bedFile);
+			String[] tokens;
+			ArrayList<Bed> al = new ArrayList<Bed>();
+			while ((line = in.readLine()) !=null) {
+				line = line.trim();
+				if (line.length() ==0 || line.startsWith("#")) continue;
+				tokens = line.split("\\s+");
+				if (tokens.length < 3) continue;				
+				al.add(new Bed(tokens[chrStartStopIndexes[0]], Integer.parseInt(tokens[chrStartStopIndexes[1]])-subStart, Integer.parseInt(tokens[chrStartStopIndexes[2]])- subEnd, line, 0, '.'));
+			}
+			bed = new Bed[al.size()];
+			al.toArray(bed);
+		}catch (Exception e){
+			e.printStackTrace();
+			System.out.println("Bad line? -> "+line);
+		}
+		return bed;
+	}
+
+	
 	/**Chunks the Bed[] by number of bp, then sorts each.*/
 	public static ArrayList<Bed[]> splitByBp(Bed[] regions, int numBpsPerSplit) {
 		ArrayList<Bed[]> split = new ArrayList<Bed[]>();
