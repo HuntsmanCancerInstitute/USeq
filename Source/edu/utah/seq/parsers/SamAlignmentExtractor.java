@@ -50,6 +50,7 @@ public class SamAlignmentExtractor {
 	private int numFailingFS = 0;
 	private int numPassingBasicOnTargetAndScores = 0;
 	private int numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate = 0;
+	private int numExcludeChrom = 0;
 	private File jsonOutputFile;
 	private Histogram histogram = new Histogram(1, 250, 249);
 	
@@ -95,7 +96,7 @@ public class SamAlignmentExtractor {
 
 			//for each
 			//TODO: thread this! would need to write out individual them merge... might be slow.. the bottleneck is the io not the compute so parallel won't gain much
-			System.out.print("\nWalking bam alignments");
+			System.out.print("\nWalking bam alignments for ");
 			Iterator<SAMSequenceRecord> it = chrList.iterator();
 			while (it.hasNext()){
 				SAMSequenceRecord ssr = it.next();
@@ -107,7 +108,7 @@ public class SamAlignmentExtractor {
 					makeMask();
 					walkChromAlignments();
 				}
-				System.out.print(".");
+				System.out.print(workingChromosome+" ");
 			}
 			
 			//save all unmapped to fail
@@ -181,12 +182,13 @@ public class SamAlignmentExtractor {
 		SAMRecordIterator it = bamReader.queryOverlapping(workingChromosome, 0, 0);
 		while (it.hasNext()) {
 			SAMRecord sam = it.next();
-			failingBamWriter.addAlignment(sam);
 			numRawAlignments++;
 			//fail basic?
 			if (passBasic(sam) == false) numFailingBasic++;
-			
-			
+			else {
+				if (writeOffTargetToPass) passingBamWriter.addAlignment(sam);
+				else failingBamWriter.addAlignment(sam);
+			}
 		}
 		it.close();
 	}
@@ -460,7 +462,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                         Sam Alignment Extractor: March 2017                      **\n" +
+				"**                         Sam Alignment Extractor: Jan 2018                        **\n" +
 				"**************************************************************************************\n" +
 				"Splits an alignment file into those that pass or fail thresholds and intersects\n"+
 				"regions of interest. Calculates a variety of QC statistics.\n"+
