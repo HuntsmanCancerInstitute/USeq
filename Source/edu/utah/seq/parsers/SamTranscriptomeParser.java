@@ -219,7 +219,7 @@ public class SamTranscriptomeParser{
 
 				SamAlignment sa;
 				try {
-					sa = new SamAlignment(line, true);
+					sa = new SamAlignment(line, false);
 				} catch (Exception e) {
 					if (verbose) System.out.println("\nSkipping malformed sam alignment -> "+e.getMessage()+"\n"+line);
 					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
