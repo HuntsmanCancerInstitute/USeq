@@ -478,7 +478,7 @@ public class AggregatePlotter {
 
 				"\n"+
 
-				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/AgregatePlotter -t\n" +
+				"Example: java -Xmx1500M -jar pathTo/USeq/Apps/AggregatePlotter -t\n" +
 				"      /Data/PolIIRep1/,/Data/PolIIRep2/ -b /Anno/tssSites.bed -p 73 -u 1\n"+
 				"      -l \n\n" +
 
