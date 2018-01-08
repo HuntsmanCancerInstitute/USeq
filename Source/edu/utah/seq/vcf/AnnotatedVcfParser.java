@@ -27,6 +27,7 @@ public class AnnotatedVcfParser {
 	private double maxFracBKAFs = 0; //maximum number of background samples with >= AF, measure as fraction of total samples, 50 for foundation so 5 max
 	private String[] passingIDKeys = null;
 	private TreeSet<String> passingAnnImpact = null;
+	private TreeSet<String> passingAnnEffect = new TreeSet<String>();
 	private TreeSet<String> passingClinSig = null;
 	private TreeSet<String> excludeClinSig = null;
 	private TreeSet<String> passingGermlineGenes = null;
@@ -37,18 +38,20 @@ public class AnnotatedVcfParser {
 	private boolean orAnnos = false;
 	
 	//Patterns
-	private static final Pattern AF = Pattern.compile(";*AF=([\\d\\.]+);");
-	private static final Pattern DP = Pattern.compile(";*DP=(\\d+);");
-	private static final Pattern EXAC = Pattern.compile(";*dbNSFP_ExAC_AF=([\\d\\.]+);");
-	private static final Pattern G1000 = Pattern.compile(";*dbNSFP_1000Gp3_AF=([\\d\\.]+);");
-	private static final Pattern CLINSIG = Pattern.compile(";*CLNSIG=(\\w+);");
+	private static final Pattern AF = Pattern.compile("AF=([\\d\\.]+);");
+	private static final Pattern DP = Pattern.compile("DP=(\\d+);");
+	private static final Pattern EXAC = Pattern.compile("dbNSFP_ExAC_AF=([\\d\\.e-]+);");
+	private static final Pattern G1000 = Pattern.compile("dbNSFP_1000Gp3_AF=([\\d\\.e-]+);");
+	private static final Pattern CLINSIG = Pattern.compile("CLNSIG=([\\w/,]+);");
 	private static final Pattern BKAF = Pattern.compile(";*BKAF=([\\d\\.,]+);");
+	private static final Pattern COMMA_SLASH = Pattern.compile(",|/");
 	
 	//trackers
 	private Histogram afs = new Histogram(0, 1.01, 101);
 	private TreeMap<String, Integer> clinsig = new TreeMap<String, Integer>();
 	private int[] dps = new int[10000];
 	private TreeMap<String, Integer> impacts = new TreeMap<String, Integer>();
+	private TreeMap<String, Integer> effects = new TreeMap<String, Integer>();
 	private String acmgGenes = "ACTA2,ACTC1,APC,APOB,ATM,ATP7B,BARD1,BMPR1A,BRCA1,BRCA2,BRIP1,CACNA1S,CDH1,CDK4,CDKN2A,CHEK2,COL3A1,DSC2,DSG2,DSP,"
 			+ "EPCAM,FBN1,GLA,GREM1,KCNH2,KCNQ1,LDLR,LMNA,MEN1,MLH1,MSH2,MSH6,MUTYH,MYBPC3,MYH7,MYH11,MYL2,MYL3,NBN,NF2,OTC,PALB2,PCSK9,"
 			+ "PKP2,PMS2,POLD1,POLE,PRKAG2,PTEN,RAD51C,RAD51D,RB1,RET,RYR1,RYR2,SCN5A,SDHAF2,SDHB,SDHC,SDHD,SMAD3,SMAD4,STK11,TGFBR1,"
@@ -205,10 +208,10 @@ public class AnnotatedVcfParser {
 		if (passPop2 == false) return false;
 		//check that one is good
 		if (passClinSig != null){
-			//are they looking for particular clinsig terms
-			if (passingClinSig != null && passClinSig[0] == true) return true;
 			//are they excluding vars based on clinSig terms? if one was found fail the record
 			if (excludeClinSig !=null && passClinSig[1] == true) return false;
+			//are they looking for particular clinsig terms
+			if (passingClinSig != null && passClinSig[0] == true) return true;
 		}
 		if (passingVCFSS != null && passSplice == true) return true;
 		if (passingAnnImpact != null && passImpact == true) return true;
@@ -334,27 +337,38 @@ public class AnnotatedVcfParser {
 		if (mat.find()){
 			//record findings
 			numWithClin++;
-			String cs = mat.group(1);
-			if (clinsig.containsKey(cs)) {
-				int count = clinsig.get(cs);
-				clinsig.put(cs, new Integer( ++count ));
+			String csAll = mat.group(1);
+			if (clinsig.containsKey(csAll)) {
+				int count = clinsig.get(csAll);
+				clinsig.put(csAll, new Integer( ++count ));
 			}
-			else clinsig.put(cs, new Integer(1));
+			else clinsig.put(csAll, new Integer(1));
 			
+			String[] cTerms = COMMA_SLASH.split(csAll);
 			boolean passClinSig = false;
 			//is there a check for particular clinsig terms?
 			if (passingClinSig != null){
-				passClinSig = passingClinSig.contains(cs.toLowerCase());
-				if (verbose) IO.p("\tCLINSIG For Check\t"+passClinSig+"\t"+cs);
-				if (passClinSig) numPassingClinSing++;
+				for (String cs: cTerms){
+					passClinSig = passingClinSig.contains(cs.toLowerCase());
+					if (verbose) IO.p("\tCLINSIG For Check\t"+passClinSig+"\t"+cs);
+					if (passClinSig) {
+						numPassingClinSing++;
+						break;
+					}
+				}
 			}
 			
 			boolean passClinSigAgainst = false;
 			//is there a check against particular clinsig terms?
-			if (passingClinSig != null){
-				passClinSigAgainst = excludeClinSig.contains(cs.toLowerCase());
-				if (verbose) IO.p("\tCLINSIG Against Check\t"+passClinSigAgainst+"\t"+cs);
-				if (passClinSigAgainst) numPassingExcludeClinSing++;
+			if (excludeClinSig != null){
+				for (String cs: cTerms){
+					passClinSigAgainst = excludeClinSig.contains(cs.toLowerCase());
+					if (verbose) IO.p("\tCLINSIG Against Check\t"+passClinSigAgainst+"\t"+cs);
+					if (passClinSigAgainst) {
+						numPassingExcludeClinSing++;
+						break;
+					}
+				}
 			}
 			return new boolean[]{passClinSig, passClinSigAgainst};
 		}
@@ -400,6 +414,7 @@ public class AnnotatedVcfParser {
 			String impact = splitAnn[2];
 			if (impacts.containsKey(impact)) impacts.put(impact, new Integer( impacts.get(impact)+1 ));
 			else impacts.put(impact, new Integer(1));
+
 		}
 
 		//check if impact is one of the ones they want
@@ -412,6 +427,10 @@ public class AnnotatedVcfParser {
 				if (verbose) IO.p("\tImpact Check\t"+passImpact+"\t"+impact);
 				if (passImpact) {
 					numPassingAnnImpact++;
+					//Annotation effect
+					String effect = splitAnn[1];
+					if (effects.containsKey(effect)) effects.put(effect, new Integer( effects.get(effect)+1 ));
+					else effects.put(effect, new Integer(1));
 					return true;
 				}
 			}
@@ -637,7 +656,8 @@ public class AnnotatedVcfParser {
 		if (maximumPopAF != 0) IO.p("\t"+ maximumPopAF+"\t: Maximum population AF from dbNSFP_ExAC_AF or dbNSFP_1000Gp3_AF");
 		if (maxFracBKAFs != 0) IO.p("\t"+ maxFracBKAFs+"\t: Maximum fraction of background samples with an AF >= observed AF");
 		if (passingAnnImpact != null) IO.p("\n\t"+Misc.treeSetToString(passingAnnImpact, ",")+"\t: ANN impact keys");
-		if (passingClinSig != null) IO.p("\n\t"+Misc.treeSetToString(passingClinSig, ",")+"\t: CLINSIG keys");
+		if (passingClinSig != null) IO.p("\n\t"+Misc.treeSetToString(passingClinSig, ",")+"\t: CLINSIG keep keys");
+		if (excludeClinSig != null) IO.p("\t"+Misc.treeSetToString(excludeClinSig, ",")+"\t: CLINSIG exclude keys");
 		if (passingVCFSS != null) {
 			IO.p("\n\t"+Misc.stringArrayToString(passingVCFSS, ",")+"\t: Splice junction types to scan");
 			IO.p("\t"+ minimumVCFSSDiff+"\t: Minimum difference in MaxEnt scan scores for a splice junction effect");
@@ -690,15 +710,19 @@ public class AnnotatedVcfParser {
 	
 	public void printDistributions(){
 		if (passingClinSig != null){
-			IO.p("\nObserved CLINSIG annotations and their frequency:" );
+			IO.p("\nObserved CLINSIG annotations:" );
 			for (String key: clinsig.keySet()) IO.p("\t"+key+"\t"+clinsig.get(key));
 		}
 		if (passingAnnImpact != null){
-			IO.p("\nObserved ANN impacts and their frequency:");
+			IO.p("\nObserved ANN impacts:");
 			for (String key: impacts.keySet()) IO.p("\t"+key+"\t"+impacts.get(key));
 		}
+		if (true){
+			IO.p("\nObserved ANN effects for passing Impacts:");
+			for (String key: effects.keySet()) IO.p("\t"+key+"\t"+effects.get(key));
+		}
 		if (passingGermlineGenes != null){
-			IO.p("\nObserved ACMG germline genes and their frequency:");
+			IO.p("\nObserved ACMG germline genes:");
 			for (String key: observedGermlineGenes.keySet()) IO.p("\t"+key+"\t"+observedGermlineGenes.get(key));
 		}
 		if (minimumAF != 0 || maximumAF != 1 || maxFracBKAFs != 0){
@@ -765,6 +789,7 @@ public class AnnotatedVcfParser {
 
 		//pull vcf files
 		if (forExtraction == null || forExtraction.exists() == false) Misc.printErrAndExit("\nError: please enter a path to a vcf file or directory containing such.\n");
+		
 		File[][] tot = new File[3][];
 		tot[0] = IO.extractFiles(forExtraction, ".vcf");
 		tot[1] = IO.extractFiles(forExtraction,".vcf.gz");
