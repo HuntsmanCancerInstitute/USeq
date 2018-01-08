@@ -280,7 +280,25 @@ public class IO {
 		double diff = (double) (new Date().getTime() - file.lastModified());
 		return diff/(24*60*60*1000);
 	}
-
+	
+	/**Fetches the first set of # lines at the beginning of the file. Stops when a non # line is found.
+	 * @throws IOException */
+	public static String fetchHeader(File file) throws IOException{
+		BufferedReader in = IO.fetchBufferedReader(file);
+		StringBuilder sb = new StringBuilder();
+		String line;
+		while ((line = in.readLine()) !=null) {
+			line = line.trim();
+			if (line.length() ==0) continue;
+			if (line.startsWith("#")){
+				sb.append(line);
+				sb.append("\n");
+			}
+			else break;
+		}
+		return sb.toString();
+	}
+	
 	/**Converts a String of "grp1=/my/Dir1,grp2=/my/Dir2, etc that contains 
 	 * directories into a LinkedHashMap.
 	 * Returns null and prints an error message if an error was thrown, ie no directory, not a directory
