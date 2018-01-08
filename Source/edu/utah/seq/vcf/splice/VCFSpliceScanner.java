@@ -324,7 +324,7 @@ public class VCFSpliceScanner {
 
 		} catch (Exception e){
 			e.printStackTrace();
-			Misc.printErrAndExit("\nDo your chromosome names in the gene table and vcf file match? Watch for 'chr'.\n");
+			Misc.printErrAndExit("\nDo your chromosome names in the gene table and vcf file match? Watch for 'chr'. "+workingChromosomeName);
 		}
 	}
 
@@ -582,8 +582,6 @@ public class VCFSpliceScanner {
 							//System.out.println("- 5\t"+startJunc+"\t"+endJunc+"\t"+seq+"\t"+score);
 							System.out.println(workingChromosomeName+"\t"+startJunc+"\t"+endJunc+"\t5_"+seq+"\t"+score+"\t-");
 						}
-
-
 					}
 				}
 			}
@@ -595,7 +593,7 @@ public class VCFSpliceScanner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             VCF Splice Scanner : Sept 2017                       **\n" +
+				"**                             VCF Splice Scanner : Dec 2017                        **\n" +
 				"**************************************************************************************\n" +
 				"Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and\n"+
 				"Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice\n"+
