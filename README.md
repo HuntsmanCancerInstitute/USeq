@@ -3,7 +3,12 @@ Applications for analyzing next generation sequencing data from Illumina, SOLiD,
 ChIP-seq, RNA-seq, Bis-seq, re-sequencing, SNP INDELs, capture array design tools, IGB/ DAS2/IGV/UCSC 
 graph manipulation tools.... GUI and cmd line interface.
 
-## Installation in Eclipse
+## Installing the latest version
+1. Download the USeq_xxx.zip file from https://github.com/HuntsmanCancerInstitute/USeq/releases
+2. Uncompress
+3. Execute an app with no parameters to pull the help menue, e.g. java -jar USeq_9.1.3/Apps/BamConcordance
+
+## Installation in Eclipse for developers
 1. Clone the github repo.
 2. Download Apache ANT libraries (apache-ant-1.9.6-bin.tar.gz) from http://ant.apache.org/bindownload.cgi and unzip.
 3. Set ANT_HOME in your bash profile to point to the unzipped ANT directory. Don't forget to source the file to implement the changes.
