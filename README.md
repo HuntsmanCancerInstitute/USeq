@@ -5,7 +5,7 @@
 1. Download the USeq_xxx.zip file from https://github.com/HuntsmanCancerInstitute/USeq/releases
 2. Uncompress
 3. Execute an app with no parameters to pull the help menu, e.g. java -jar USeq_9.1.3/Apps/BamConcordance
-4. See the usage and application guides in the USeq_xxxx/Documentation folder
+4. See the usage and application guides in the USeq_xxxx/Documentation release or visit http://bioserver.hci.utah.edu/USeq/Documentation/
 
 ## Installation in Eclipse for developers
 1. Clone the github repo.
