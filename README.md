@@ -1,7 +1,5 @@
 # USeq
-Applications for analyzing next generation sequencing data from Illumina, SOLiD, and 454 platforms. 
-ChIP-seq, RNA-seq, Bis-seq, re-sequencing, SNP INDELs, capture array design tools, IGB/ DAS2/IGV/UCSC 
-graph manipulation tools.... GUI and cmd line interface.
+180+ Java applications for analyzing next generation sequencing data from ChIP-seq, RNA-seq, Bis-seq, DNA-seq, Variant Annotation and Filtering, Alignment/ VCF QC, capture array design tools, IGB/ DAS2/IGV/UCSC file manipution apps.... GUI and cmd line interface.
 
 ## Installing the latest version
 1. Download the USeq_xxx.zip file from https://github.com/HuntsmanCancerInstitute/USeq/releases
