@@ -1,5 +1,5 @@
 # USeq
-[180+ Java applications](http://bioserver.hci.utah.edu/USeq/Documentation/cmdLnMenus.html) for analyzing next generation sequencing data from ChIP-seq, RNA-seq, Bis-seq, DNA-seq, Variant Annotation and Filtering, Alignment/ VCF QC, capture array design tools, IGB/ DAS2/IGV/UCSC file manipution apps.... GUI and cmd line interface.
+[180+ Java applications](http://bioserver.hci.utah.edu/USeq/Documentation/cmdLnMenus.html) for analyzing next generation sequencing data from ChIPSeq, RNASeq, BisSeq, DNASeq, Variant Annotation/ Filtering, Alignment/VCF QC, capture array design, IGV/ DAS2/IGB/UCSC file manipulation, etc. GUI and cmd line interface.
 
 ## Installing the latest version
 1. Download the [USeq_xxx.zip](https://github.com/HuntsmanCancerInstitute/USeq/releases) file
