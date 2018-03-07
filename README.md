@@ -1,11 +1,11 @@
 # USeq
-180+ Java applications for analyzing next generation sequencing data from ChIP-seq, RNA-seq, Bis-seq, DNA-seq, Variant Annotation and Filtering, Alignment/ VCF QC, capture array design tools, IGB/ DAS2/IGV/UCSC file manipution apps.... GUI and cmd line interface.
+[180+ Java applications](http://bioserver.hci.utah.edu/USeq/Documentation/cmdLnMenus.html) for analyzing next generation sequencing data from ChIP-seq, RNA-seq, Bis-seq, DNA-seq, Variant Annotation and Filtering, Alignment/ VCF QC, capture array design tools, IGB/ DAS2/IGV/UCSC file manipution apps.... GUI and cmd line interface.
 
 ## Installing the latest version
-1. Download the USeq_xxx.zip file from https://github.com/HuntsmanCancerInstitute/USeq/releases
+1. Download the [USeq_xxx.zip](https://github.com/HuntsmanCancerInstitute/USeq/releases) file
 2. Uncompress
 3. Execute an app with no parameters to pull the help menu, e.g. java -jar USeq_9.1.3/Apps/BamConcordance
-4. See the usage and application guides in the USeq_xxxx/Documentation release or visit http://bioserver.hci.utah.edu/USeq/Documentation/
+4. See the usage and application guides in the [USeq_xxxx/Documentation](http://bioserver.hci.utah.edu/USeq/Documentation/) release
 
 ## Installation in Eclipse for developers
 1. Clone the github repo.
