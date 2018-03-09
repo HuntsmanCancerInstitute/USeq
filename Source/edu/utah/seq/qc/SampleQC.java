@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import com.eclipsesource.json.JsonArray;
 import com.eclipsesource.json.JsonObject;

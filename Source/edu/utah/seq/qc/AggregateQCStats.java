@@ -242,15 +242,17 @@ public class AggregateQCStats {
 		sb.append(fetchTabbedSampleNames());
 		sb.append("\n");
 
-		//check the samples and make sure the regions are identical, except for the coverage count
+		//check the samples and make sure the regions are identical, except for the coverage count, watch the order this changes!
 		String[] regions = splitOutCoor(sqc.getExonicMedianPerBpCoverage())[0];
 		String[][] counts = new String[samples.size()][regions.length];
 		int counter = 0;
 		for (SampleQC s: samples.values()){
 			String[][] testRegions = splitOutCoor(s.getExonicMedianPerBpCoverage());
 			if (debug) System.out.println(s.sampleName+"\t"+testRegions[0].length +"\t"+s.getTargetRegionsFileNameSAE()+"\t"+s.getTargetRegionsFileNameS2U());
-			if (regions.length != testRegions[0].length) Misc.printErrAndExit("\nERROR: the number of regions differ between samples, top?! Rerun with -v to debug ");
-			for (int i=0; i< regions.length; i++) if (regions[i].equals(testRegions[0][i])== false) Misc.printErrAndExit("\nERROR: the regions differ between samples, indi?! Rerun with -v to debug");
+			if (regions.length != testRegions[0].length) Misc.printErrAndExit("\nERROR: the number of regions differ between samples, top?! Rerun with -v to debug. "+
+					regions.length+" vs "+ testRegions[0].length+ " Sample "+s.sampleName);
+			for (int i=0; i< regions.length; i++) if (regions[i].equals(testRegions[0][i])== false) Misc.printErrAndExit("\nERROR: the regions differ between samples?! Rerun with -v to debug. "+
+					regions[i]+" vs "+testRegions[0][i]+ " Sample "+s.sampleName);
 			//add em
 			counts[counter++] = testRegions[1];
 		}
@@ -270,14 +272,22 @@ public class AggregateQCStats {
 		IO.writeString(sb.toString(), txt);
 	}
 
-
+	/*"19:60391-60514 8.0", "19:60655-60778 53.0" */
 	private String[][] splitOutCoor(String[] regions){
-		String[] coor = new String[regions.length];
-		String[] values = new String[regions.length];
+		//use hash to sort!
+		TreeMap<String, String> coorVal = new TreeMap<String,String>();
 		for (int i=0; i< regions.length; i++){
 			String[] tokens = Misc.WHITESPACE.split(regions[i]);
-			coor[i] = tokens[0];
-			values[i] = tokens[1];
+			coorVal.put(tokens[0], tokens[1]);
+		}
+		//convert to array
+		String[] coor = new String[regions.length];
+		String[] values = new String[regions.length];
+		int i=0;
+		for (String key: coorVal.keySet()){
+			coor[i] = key;
+			values[i] = coorVal.get(key);
+			i++;
 		}
 		return new String[][]{coor, values};
 	}
@@ -415,10 +425,10 @@ public class AggregateQCStats {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Aggregate QC Stats: Oct 2017                          **\n" +
+				"**                            Aggregate QC Stats: Feb 2018                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from json files produced by the\n"+
-				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, and fastq counter.\n"+
+				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, and Fastq counter.\n"+
 
 				"\nOptions:\n"+
 				"-j Directory containing xxx.json.gz files for parsing. Recurses through all other\n"+
