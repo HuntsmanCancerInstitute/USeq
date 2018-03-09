@@ -45,6 +45,15 @@ public class MpileupLine {
 		}
 		
 	}
+	
+	public String getBed(){
+		StringBuilder sb = new StringBuilder(chr);
+		sb.append("\t");
+		sb.append(zeroPos);
+		sb.append("\t");
+		sb.append(zeroPos+1);
+		return sb.toString();
+	}
 
 	/*
 	public static void main(String[] args) throws Exception{

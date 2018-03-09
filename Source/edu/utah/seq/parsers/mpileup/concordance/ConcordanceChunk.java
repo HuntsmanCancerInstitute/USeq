@@ -4,10 +4,16 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
+
+import edu.utah.seq.its.Interval1D;
+import edu.utah.seq.its.IntervalST;
 import edu.utah.seq.parsers.mpileup.MpileupLine;
 import edu.utah.seq.parsers.mpileup.MpileupSample;
+import htsjdk.tribble.readers.TabixReader;
 import util.bio.annotation.Bed;
+import util.gen.Gzipper;
 import util.gen.Histogram;
+import util.gen.IO;
 import util.gen.Misc;
 
 public class ConcordanceChunk implements Runnable{
@@ -20,16 +26,22 @@ public class ConcordanceChunk implements Runnable{
 	private String chunkName;
 	private String cmd = null;
 	private File tempBed;
+	private File commonSnvBed;
+	private Gzipper misMatchBed;
 	private int minSnvDP;
 	private double minAFForHom;
 	private double minAFForMatch;
 	private double minAFForHis;
 	private int minBaseQuality;
+	private int minMapQuality;
 	private double maxIndel;
 	private Histogram[] afHist;
 	private Histogram[] chrXAfHist;
 	private Similarity[] similarities;
 	private long numMpileupLinesProc = 0;
+	private IntervalST<String> commonSnvRegions = null;
+	private String currCommonChr = "";
+	private TabixReader tabixReader;
 	
 	public ConcordanceChunk(Bed[] regions, BamConcordance bcc, String chunkName) throws Exception{
 		this.bcc = bcc;
@@ -41,16 +53,22 @@ public class ConcordanceChunk implements Runnable{
 		this.minAFForMatch = bcc.getMinAFForMatch();
 		this.minBaseQuality = bcc.getMinBaseQuality();
 		this.maxIndel = bcc.getMaxIndel();
+		this.minMapQuality = bcc.getMinMappingQuality();
+		this.commonSnvBed = bcc.getCommonSnvBed();
+		if (commonSnvBed != null) tabixReader = new TabixReader(commonSnvBed.toString());
 	}
 	
 	public void run(){
-		try {		
+		try {	
 			//write out bed
 			tempBed = new File (bcc.getTempDirectory(), chunkName+"_temp.bed");
 			Bed.writeToFile(regions, tempBed);
+			
+			//make gzipper
+			misMatchBed = new Gzipper(new File (bcc.getTempDirectory(), chunkName+"_MisMatch.bed.gz"));
 
 			//build and execute samtools call
-			cmd = bcc.getSamtools()+" mpileup -B -q 13 -d 1000000 -f "+bcc.getFasta()+" -l "+tempBed+" "+bcc.getBamNames();
+			cmd = bcc.getSamtools()+" mpileup -B -Q "+ minBaseQuality +" -q "+ minMapQuality +" -d 1000000 -f "+bcc.getFasta()+" -l "+tempBed+" "+bcc.getBamNames();
 
 			ProcessBuilder pb = new ProcessBuilder(Misc.WHITESPACE.split(cmd));
 
@@ -70,8 +88,12 @@ public class ConcordanceChunk implements Runnable{
 				
 				//parse line
 				MpileupLine ml = new MpileupLine(line, minBaseQuality);
-				if (ml.getChr() == null || ml.getRef().equals("N")) continue;
-				boolean chrX = (ml.getChr().equals("X") || ml.getChr().equals("chrX"));
+				String chr = ml.getChr();
+				if (chr == null || ml.getRef().equals("N")) continue;
+				boolean chrX = (chr.equals("X") || chr.equals("chrX"));
+				
+				//load common snv interval tree?
+				if (chr.equals(currCommonChr) == false) loadIntervalTree(chr);
 
 				//get samples
 				MpileupSample[] samples = ml.getSamples();
@@ -87,28 +109,74 @@ public class ConcordanceChunk implements Runnable{
 				if (samples.length != afHist.length) continue;
 
 				//parse and check samples, this increments the histograms
-				for (int i=0; i<samples.length; i++) parsedSamples[i] = new ParsedSample(samples[i], chrX, i);
-
-				//contrast samples
-				for (int i=0; i< similarities.length; i++) similarities[i].contrast(parsedSamples);
-
-				//if (counter++ > 50000) return;
+				boolean passDPIndel = false;
+				boolean passAF = false;
+				for (int i=0; i<samples.length; i++) {
+					parsedSamples[i] = new ParsedSample(samples[i], chrX, i);
+					if (parsedSamples[i].passDpIndel) {
+						passDPIndel = true;
+						if (parsedSamples[i].maxAFIndex!=null && parsedSamples[i].maxAFIndex[0] >= minAFForHom) passAF = true;
+					}
+				}
+				
+				//any that pass?
+				if (passDPIndel == true && passAF == true){
+					//common?
+					if (commonSnp(ml.getZeroPos()) == false) {
+						//contrast samples
+						boolean foundMisMatch = false;
+						for (int i=0; i< similarities.length; i++) {
+							if (similarities[i].contrast(parsedSamples)) foundMisMatch = true;
+						}
+						//save it?
+						if (foundMisMatch) misMatchBed.println(ml.getBed());
+					}
+				}
 			}
-			data.close();
 
 			//finish
+			data.close();
+			misMatchBed.close();
+			if (commonSnvBed != null) tabixReader.close();
 			complete = true;
 			failed = false;
-			System.out.println("\t"+numMpileupLinesProc+" bases parsed for job "+chunkName);
-
+			System.out.println(chunkName+ " job complete. "+numMpileupLinesProc+" bases parsed.");
+			
+			
 		} catch (Exception e) {
 			System.err.println("Problem executing -> "+cmd);
 			e.printStackTrace();
 			complete = false;
 			failed = true;
-		}
+		} 
 	}
 	
+	private boolean commonSnp(int zeroPos) {
+		if (commonSnvRegions == null) return false;
+		Interval1D interval = new Interval1D (zeroPos, zeroPos);
+		if (commonSnvRegions.contains(interval)) return true;
+		return false;
+	}
+
+	class CommonVarChecker {
+		boolean checkIfCommon;
+		boolean common;
+	}
+	
+	private void loadIntervalTree(String chr) throws Exception{
+		currCommonChr = chr;
+		if (commonSnvBed == null) return;
+		commonSnvRegions = new IntervalST<String>();
+		TabixReader.Iterator it = tabixReader.query(chr);
+		String hit;
+		while ((hit = it.next()) != null) {
+			String[] t = Misc.TAB.split(hit);
+			int start = Integer.parseInt(t[1]);
+			int stop = Integer.parseInt(t[2]);
+			commonSnvRegions.put(new Interval1D(start, stop-1), chr);
+		}
+	}
+
 	//a helper classes
 	class ParsedSample {
 		boolean passDpIndel;
@@ -153,8 +221,8 @@ public class ConcordanceChunk implements Runnable{
 		afHist = new Histogram[numSamples];
 		chrXAfHist = new Histogram[numSamples];
 		for (int i=0; i< numSamples; i++){
-			afHist[i] = new Histogram(minAFForHis,1,25);
-			chrXAfHist[i] = new Histogram(minAFForHis,1,25);
+			afHist[i] = new Histogram(minAFForHis,1.01,25);
+			chrXAfHist[i] = new Histogram(minAFForHis,1.01,25);
 		}
 
 		//make Sims and PCs
@@ -193,6 +261,10 @@ public class ConcordanceChunk implements Runnable{
 
 	public Similarity[] getSimilarities() {
 		return similarities;
+	}
+
+	public Gzipper getMisMatchBed() {
+		return misMatchBed;
 	}
 
 }

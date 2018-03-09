@@ -57,11 +57,14 @@ public 	class Similarity implements Comparable<Similarity>{
 		else maxMatch = fracMatchBA;
 	}
 
-	public void contrast(ParsedSample[] ps){
+	/**Returns whether a proper mismatch was observed.
+	 * @param commonVarChecker */
+	public boolean contrast(ParsedSample[] ps){
 		//check if both pass DP and INDEL
-		if (ps[sampleA].passDpIndel == false || ps[sampleB].passDpIndel == false) return;
-
+		if (ps[sampleA].passDpIndel == false || ps[sampleB].passDpIndel == false) return false;
+		
 		//is A homozygous?
+		boolean misMatch = false;
 		if (ps[sampleA].maxAFIndex[0] >= minAFForHom){
 			int baseIndex = (int)ps[sampleA].maxAFIndex[1];
 			double afB = ps[sampleB].ms.getAlleleFreq(baseIndex);
@@ -70,6 +73,7 @@ public 	class Similarity implements Comparable<Similarity>{
 			else {
 				numMisMatchesAB++;
 				sampleBMisMatchAFs.count(afB);
+				misMatch = true;
 			}
 		}
 
@@ -82,8 +86,10 @@ public 	class Similarity implements Comparable<Similarity>{
 			else {
 				numMisMatchesBA++;
 				sampleAMisMatchAFs.count(afA);
+				misMatch = true;
 			}
 		}	
+		return misMatch;
 	}
 
 	public int compareTo(Similarity o) {

@@ -2,7 +2,11 @@ package edu.utah.seq.parsers.mpileup.concordance;
 
 import java.io.*;
 import java.util.regex.*;
+
+import edu.utah.seq.its.Interval1D;
+import edu.utah.seq.its.IntervalST;
 import util.bio.annotation.Bed;
+import util.bio.parsers.UCSCGeneLine;
 import util.gen.*;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -15,6 +19,7 @@ public class BamConcordance {
 
 	//user defined fields
 	private File bedFile;
+	private File commonSnvBed;
 	private File samtools;
 	private File fasta;
 	private File[] bamFiles;
@@ -23,6 +28,7 @@ public class BamConcordance {
 	private double minAFForMatch = 0.90;
 	private double minAFForHis = 0.05;
 	private int minBaseQuality = 20;
+	private int minMappingQuality = 20;
 
 	//internal fields
 	private File tempDirectory;
@@ -37,6 +43,8 @@ public class BamConcordance {
 	//internal fields
 	ConcordanceChunk[] runners;
 	
+
+	
 	//constructors
 	public BamConcordance(String[] args){
 		try {
@@ -48,6 +56,8 @@ public class BamConcordance {
 			doWork();
 
 			printStats();
+			
+			printGenderRatios();
 
 			printHist();
 			
@@ -62,10 +72,9 @@ public class BamConcordance {
 	}
 
 	public void doWork() throws Exception{
+		System.out.println("\nParsing and spliting bed files...");
 		
-		System.out.println("\nParsing and spliting bed file...");
-		
-		//parse regions and randomize
+		//parse regions and sort
 		Bed[] regions = Bed.parseFile(bedFile, 0, 0);
 		Arrays.sort(regions);
 		int numRegionsPerChunk = 1+ (int)Math.round( (double)regions.length/ (double)numberThreads );
@@ -87,11 +96,18 @@ public class BamConcordance {
         while (!executor.isTerminated()) {
         }
 		
-		//check runners
+		//check runners and pull bed gzippers
+        ArrayList<File> toMerge = new ArrayList<File>();
         for (ConcordanceChunk c: runners) {
 			if (c.isFailed()) Misc.printErrAndExit("\nERROR: Failed runner, aborting! \n"+c.getCmd());
 			c.getTempBed().delete();
+			toMerge.add(c.getMisMatchBed().getGzipFile());
 		}
+        
+        //write out mismatch bed file
+        String name= Misc.removeExtension(bamFiles[0].getParentFile().getName());
+        File misMatchBed = new File(bamFiles[0].getParentFile(), name+"_MisMatch.bed.gz");
+        IO.concatinateFiles(toMerge, misMatchBed);
         
         aggregateStats(runners);
         
@@ -119,6 +135,8 @@ public class BamConcordance {
     		//similarities
     		Similarity[] s = runners[i].getSimilarities();
     		for (int x=0; x< s.length; x++) similarities[x].add(s[x]);
+    		
+    		runners[i].getMisMatchBed().getGzipFile().delete();
     	}
 	}
 
@@ -129,7 +147,10 @@ public class BamConcordance {
 		IO.p(minAFForMatch+"\tminAFForMatch");
 		IO.p(minAFForHis+"\tMinAFForHis");
 		IO.p(minBaseQuality+"\tMinBaseQuality");
+		IO.p(minMappingQuality+"\tMinMappingQuality");
 		IO.p(maxIndel+"\tMaxIndel");
+		if (commonSnvBed!= null) IO.p(commonSnvBed.getName()+ "\tCommon SNV exclusion file");
+		else IO.p("All SNVs counted, common and uncommon.");
 	}
 
 	public void printStats(){
@@ -140,6 +161,37 @@ public class BamConcordance {
 		for (int i=0; i< similarities.length; i++) System.out.println(similarities[i].toString(sampleNames));
 	}
 
+	public void printGenderRatios(){
+		IO.p("Het/Hom histogram AF count ratios for AllChrs, ChrX, log2(All/X)");
+		for (int i=0; i< afHist.length; i++){
+			double allChr = ratioCenterVsLast(afHist[i]);
+			double chrX = ratioCenterVsLast(chrXAfHist[i]);
+			double lgrto = Num.log2(allChr/chrX);
+			IO.p(sampleNames[i] +"\t"+Num.formatNumber(allChr, 3)+"\t"+Num.formatNumber(chrX, 3)+"\t"+Num.formatNumber(lgrto, 3));
+		}
+	}
+	
+	/**Sums the num of middle and end bins, returns the ratio. Hard coded!*/
+	public double ratioCenterVsLast(Histogram his){
+		long[] counts = his.getBinCounts();
+		
+		//0.895 - 1.0
+		double end = 0;
+		end+= counts[22];
+		end+= counts[23];
+		end+= counts[24];
+		if (end ==0) end++;
+		
+		//0.396 - 0.588
+		double middle = 0;
+		middle+= counts[9];
+		middle+= counts[10];
+		middle+= counts[11];
+		middle+= counts[12];
+		
+		return middle/end;
+	}
+	
 	public void printHist(){
 		IO.p("\nHistograms of AFs observed:");
 		for (int i=0; i< afHist.length; i++){
@@ -150,13 +202,11 @@ public class BamConcordance {
 			chrXAfHist[i].printScaledHistogram();
 			System.out.println();
 		}
-		
 		IO.p("\nHistograms of the AFs for mis matched homozygous variants - contamination check:");
 		for (int i=0; i< similarities.length; i++) {
 			similarities[i].toStringMismatch(sampleNames);
 			System.out.println();
 		}
-		
 	}
 
 
@@ -182,6 +232,7 @@ public class BamConcordance {
 				try{
 					switch (test){
 					case 'r': bedFile = new File(args[++i]); break;
+					case 'c': commonSnvBed = new File(args[++i]); break;
 					case 's': samtools = new File(args[++i]); break;
 					case 'f': fasta = new File(args[++i]); break;
 					case 'b': bamFiles = IO.extractFiles(new File(args[++i]), ".bam"); break;
@@ -189,6 +240,7 @@ public class BamConcordance {
 					case 'a': minAFForHom = Double.parseDouble(args[++i]); break;
 					case 'm': minAFForMatch = Double.parseDouble(args[++i]); break;
 					case 'q': minBaseQuality = Integer.parseInt(args[++i]); break;
+					case 'u': minMappingQuality = Integer.parseInt(args[++i]); break;
 					case 't': numberThreads = Integer.parseInt(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -239,35 +291,42 @@ public class BamConcordance {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Bam Concordance: Dec  2017                         **\n" +
+				"**                               Bam Concordance: Feb  2018                         **\n" +
 				"**************************************************************************************\n" +
-				"BC calculates sample level concordance based on homozygous SNVs found in each bam\n"+
-				"file. Samples derived from the same person will show high similarity (>0.9). Run BC on\n"+
+				"BC calculates sample level concordance based on uncommon homozygous SNVs found in bam\n"+
+				"files. Samples from the same person will show high similarity (>0.9). Run BC on\n"+
 				"related sample bams (e.g tumor & normal exomes, tumor RNASeq) plus an unrelated bam\n"+
-				"for comparison. BC also generates a variety of AF histograms for checking gender and\n"+
-				"sample contamination. Although threaded, BC runs slowly with more that a few bams.\n"+
-				"Use the USeq ClusterMultiSampleVCF app to quickly check large batches of vcfs to\n"+
-				"identify the likely mismatched sample pair.\n\n"+
+				"for comparison. Mismatches passing filters are written to file. BC also generates a\n"+
+				"variety of AF histograms for checking gender and sample contamination. Although\n"+
+				"threaded, BC runs slowly with more that a few bams. Use the USeq ClusterMultiSampleVCF\n"+
+				"app to check large batches of vcfs to identify the likely mismatched sample pairs.\n\n"+
 				
 				"WARNING! Mpileup does not check that the chr order is the same across samples and the\n"+
 				"fasta reference, be certain they are or mpileup will produce incorrect counts. Use\n"+
 				"Picard's ReorderSam app if in doubt.\n\n"+
+				
+				"Note re FFPE derived RNASeq data: A fair bit of systematic error is found in these\n"+
+				"datasets.  As such, the RNA-> DNA contrasts are low. Yet the DNA->RNA are > 0.9\n\n"+
 
 				"Options:\n"+
 				"-r Path to a bed file of regions to interrogate.\n"+
 				"-s Path to the samtools executable.\n"+
 				"-f Path to an indexed reference fasta file.\n"+
 				"-b Path to a directory containing indexed bam files.\n"+
+				"-c Path to a tabix indexed bed file of common dbSNPs. Download 00-common_all.vcf.gz \n"+
+				"       from ftp://ftp.ncbi.nih.gov/snp/organisms/, run VCF2Bed, bgzip and tabix it\n"+
+				"       with https://github.com/samtools/htslib, defaults to no exclusion from calcs. \n"+
 				"-d Minimum read depth, defaults to 25.\n"+
 				"-a Minimum allele frequency to count as a homozygous variant, defaults to 0.95\n"+
 				"-m Minimum allele frequency to count a homozygous match, defaults to 0.9\n"+
 				"-q Minimum base quality, defaults to 20.\n"+
+				"-u Minimum mapping quality, defaults to 20.\n"+
 				"-t Number of threads to use.  If not set, determines this based on the number of\n"+
 				"      threads and memory available to the JVM so set the -Xmx value to the max.\n\n"+
 
 				"Example: java -Xmx120G -jar pathTo/USeq/Apps/BamConcordance -r ~/exomeTargets.bed\n"+
 				"      -s ~/Samtools1.3.1/bin/samtools -b ~/Patient7Bams -d 10 -a 0.9 -m 0.8 -f\n"+
-				"      ~/B37/human_g1k_v37.fasta\n\n" +
+				"      ~/B37/human_g1k_v37.fasta -c ~/B37/b38ComSnps.bed.gz\n\n" +
 
 				"**************************************************************************************\n");
 
@@ -315,6 +374,14 @@ public class BamConcordance {
 
 	public File[] getBamFiles() {
 		return bamFiles;
+	}
+
+	public int getMinMappingQuality() {
+		return minMappingQuality;
+	}
+
+	public File getCommonSnvBed() {
+		return commonSnvBed;
 	}
 
 	
