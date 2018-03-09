@@ -5096,6 +5096,11 @@ public class Num {
 		String[] i = comma.split(s);
 		return Num.parseInts(i);
 	}
+	
+	public static double[] parseDoubles(String s, Pattern pat) {
+		String[] i = pat.split(s);
+		return Num.parseDoubles(i);
+	}	
 
 	/**Splits the region defined by the start and stop (not included) into chunks of approx the same chunkSize*/
 	public static int[][] chunkRegion(double chunkSize, int start, int stop) {

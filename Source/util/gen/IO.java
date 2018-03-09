@@ -1146,6 +1146,9 @@ public class IO {
 	public static void p(Object obj){
 		System.out.println(obj.toString());
 	}
+	public static void p(){
+		System.out.println();
+	}
 	
 	public static void e(Object obj){
 		System.err.println(obj.toString());

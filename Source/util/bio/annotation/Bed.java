@@ -4,6 +4,8 @@ import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 
+import edu.utah.seq.its.Interval1D;
+import edu.utah.seq.its.IntervalST;
 import edu.utah.seq.useq.data.Region;
 import edu.utah.seq.useq.data.RegionScoreText;
 import edu.utah.seq.vcf.VCFLookUp;
@@ -276,6 +278,39 @@ public class Bed extends Coordinate implements Serializable{
 		return chromRegions;
 	}
 
+	/**Creates an IntervalTree for rapid intersection.  The returning string is just the chr name.
+	 * @throws Exception */
+	public static HashMap<String,IntervalST<String>> parseRegions(File bedFile) throws Exception{
+		HashMap<String,IntervalST<String>> chrAls = new HashMap<String,IntervalST<String>>();
+		String line = null;
+		BufferedReader in = IO.fetchBufferedReader(bedFile);
+		String[] tokens;
+		String currChr = "";
+		IntervalST<String> al = null;
+		
+		while ((line = in.readLine()) !=null) {
+			line = line.trim();
+			if (line.length() ==0 || line.startsWith("#")) continue;
+			tokens = Misc.TAB.split(line);
+			if (tokens.length < 3) throw new Exception("Error: the following bed line does not contain requisit number of tab delimited columns (chr, start, stop...)\n\t-> "+line);
+
+			//fetch IntervalST
+			if (currChr != tokens[0]){
+				currChr = tokens[0];
+				if (chrAls.containsKey(currChr)) al = chrAls.get(currChr);
+				else {
+					al = new IntervalST<String>(); 
+					chrAls.put(currChr, al);
+				}
+			}
+			//add entry, end is included in search so subtract 1
+			int start = Integer.parseInt(tokens[1]);
+			int stop = Integer.parseInt(tokens[2])-1;
+			al.put(new Interval1D(start, stop), currChr);
+		}
+		return chrAls;
+	}
+	
 	/**Split a bed file by chromosome and strand into a HashMap of chromosomeStrand 
 	 * (e.g. chr3+, chr3-, or chr3.; can force chr3. if ignoreStrand==true.)
 	 * Will automatically add chr3. if missing strand info.*/
