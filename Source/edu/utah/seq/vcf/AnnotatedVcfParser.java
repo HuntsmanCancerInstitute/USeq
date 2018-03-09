@@ -25,6 +25,7 @@ public class AnnotatedVcfParser {
 	private double maximumAF = 1;
 	private double maximumPopAF = 0;
 	private double maxFracBKAFs = 0; //maximum number of background samples with >= AF, measure as fraction of total samples, 50 for foundation so 5 max
+	private double minimumBKZ = 0;
 	private String[] passingIDKeys = null;
 	private TreeSet<String> passingAnnImpact = null;
 	private TreeSet<String> passingAnnEffect = new TreeSet<String>();
@@ -44,6 +45,7 @@ public class AnnotatedVcfParser {
 	private static final Pattern G1000 = Pattern.compile("dbNSFP_1000Gp3_AF=([\\d\\.e-]+);");
 	private static final Pattern CLINSIG = Pattern.compile("CLNSIG=([\\w/,]+);");
 	private static final Pattern BKAF = Pattern.compile(";*BKAF=([\\d\\.,]+);");
+	private static final Pattern BKZ = Pattern.compile("BKZ=([\\d\\.]+);");
 	private static final Pattern COMMA_SLASH = Pattern.compile(",|/");
 	
 	//trackers
@@ -85,9 +87,10 @@ public class AnnotatedVcfParser {
 		long startTime = System.currentTimeMillis();
 		processArgs(args);
 		if (somaticProcessing) modifySettingsForFoundation();
-		IO.p("Parsing:");
+		IO.p("Parsing (#pass #fail):");
 		for (File vcf: vcfFiles){
-			IO.p("\t"+vcf.getName());
+			System.out.print("\t"+vcf.getName());
+			if (verbose) IO.p();
 			parse(vcf);
 		}
 		printSettings();
@@ -109,7 +112,8 @@ public class AnnotatedVcfParser {
 			passVcf = new Gzipper( new File (saveDirectory, name + "_Pass.vcf.gz"));
 			failVcf = new Gzipper( new File (saveDirectory, name + "_Fail.vcf.gz"));
 			BufferedReader in = IO.fetchBufferedReader(vcf);
-			
+			int numPassingVcf = 0;
+			int numFailingVcf = 0;
 			//for each line in the file
 			while ((vcfLine = in.readLine()) != null){
 				vcfLine = vcfLine.trim();
@@ -139,7 +143,7 @@ public class AnnotatedVcfParser {
 				if (maximumPopAF != 0) 			passPop = checkPopFreq(cells[7]);
 				if (passingAnnImpact != null) 	passImpact = checkImpact(info);
 				if (passingClinSig != null || excludeClinSig != null) 	passClinSig = checkClinSig(cells[7]);
-				if (maxFracBKAFs != 0) 			passBKAF = checkBKAFs(cells[7]);
+				if (maxFracBKAFs != 0 || minimumBKZ !=0) passBKAF = checkBKAFs(cells[7]);
 				if (passingVCFSS != null) 		passSplice = checkSplice(cells[7], info);
 				if (passingIDKeys != null) 		passID = checkIDs(cells[2]);
 				
@@ -149,12 +153,19 @@ public class AnnotatedVcfParser {
 				else pass = allPass(passID, passDP, passAF, passImpact, passSplice, passPop, passBKAF, passClinSig);
 				
 				if (pass){
-					numPass++;
+					numPassingVcf++;
 					passVcf.println(vcfLine);
 				}
-				else failVcf.println(vcfLine);
+				else {
+					failVcf.println(vcfLine);
+					numFailingVcf++;
+				}
 				if (verbose) IO.p("\tPass all filters\t"+pass);	
 			}
+			numPass+=numPassingVcf;
+			
+			if (verbose == false) IO.p("\t"+numPassingVcf+"\t"+numFailingVcf);
+			
 			//close io
 			in.close();
 			passVcf.close();
@@ -304,31 +315,53 @@ public class AnnotatedVcfParser {
 
 	
 	private boolean[] checkBKAFs(String info) throws Exception {
-		Matcher mat = BKAF.matcher(info);
-		if (mat.find()){
-			
-			//record findings
-			numWithBKAFs++;
-			String bkafs = mat.group(1);
-			double[] afs = Num.stringArrayToDouble(bkafs, ",");
-			
-			//score
-			double numFailing = 0;
-			for (double af: afs) if (af>= obsAF) numFailing++;
-			double fractFailing = numFailing/(double)afs.length;
-			boolean passingBkaf = fractFailing <= maxFracBKAFs; 
-			
-			if (verbose) IO.p("\tBKAF Check\t"+passingBkaf+"\t"+fractFailing+"\t"+bkafs);
-			if (passingBkaf) {
-				numPassingBKAFs++;
-				return new boolean[]{true, true};
+		boolean foundBK = false;
+		boolean passBKs = false;
+		
+		//both of the following must pass if both are being scored
+				
+		//check max fraction
+		if (maxFracBKAFs !=0){
+			Matcher mat = BKAF.matcher(info);
+			if (mat.find()){
+				foundBK = true;
+				//record findings
+				String bkafs = mat.group(1);
+				double[] afs = Num.stringArrayToDouble(bkafs, ",");
+				//score
+				double numFailing = 0;
+				for (double af: afs) if (af>= obsAF) numFailing++;
+				double fractFailing = numFailing/(double)afs.length;
+				boolean passingBkaf = fractFailing <= maxFracBKAFs; 
+				if (verbose) IO.p("\tBKAF Check\t"+passingBkaf+"\t"+fractFailing+"\t"+bkafs);
+				if (passingBkaf) passBKs = true;
 			}
-			else return new boolean[]{true, false};
+			else {
+				if (verbose) IO.p("\tBKAF Check\tNA\tNo BKAFs");
+			}
 		}
-		else {
-			if (verbose) IO.p("\tBKAF Check\tNA\tNo BKAFs");
-			return new boolean[]{false, false};
+		
+		//check min BKZ score
+		if (minimumBKZ !=0){
+			Matcher mat = BKZ.matcher(info);
+			if (mat.find()){
+				double bkz = Double.parseDouble(mat.group(1));
+				boolean pass = bkz >= minimumBKZ;
+				if (verbose) IO.p("\tBKZ Check\t"+pass+"\t"+bkz);
+				//prior not scored?
+				if (foundBK == false && pass == true) passBKs = true;
+				//prior scored but this failed
+				if (foundBK == true && pass == false) passBKs = false;
+				foundBK = true;
+			}
+			else {
+				if (verbose) IO.p("\tBKZ Check\tNA\tNo BKZ");
+			}
 		}
+		if (verbose) IO.p("\tBKZ Checks\t"+foundBK+"\t"+passBKs);
+		if (foundBK) numWithBKAFs++;
+		if (passBKs) numPassingBKAFs++;
+		return new boolean[]{foundBK, passBKs};
 	}
 
 	/*Returns null if no clinvar annotation, returns boolean[]{foundRequestedForClinvar, foundRequestedAgainstClinvar}*/
@@ -655,6 +688,7 @@ public class AnnotatedVcfParser {
 		}
 		if (maximumPopAF != 0) IO.p("\t"+ maximumPopAF+"\t: Maximum population AF from dbNSFP_ExAC_AF or dbNSFP_1000Gp3_AF");
 		if (maxFracBKAFs != 0) IO.p("\t"+ maxFracBKAFs+"\t: Maximum fraction of background samples with an AF >= observed AF");
+		if (minimumBKZ != 0) IO.p("\t"+ minimumBKZ+"\t: Minimum BKZ quality score");
 		if (passingAnnImpact != null) IO.p("\n\t"+Misc.treeSetToString(passingAnnImpact, ",")+"\t: ANN impact keys");
 		if (passingClinSig != null) IO.p("\n\t"+Misc.treeSetToString(passingClinSig, ",")+"\t: CLINSIG keep keys");
 		if (excludeClinSig != null) IO.p("\t"+Misc.treeSetToString(excludeClinSig, ",")+"\t: CLINSIG exclude keys");
@@ -693,8 +727,8 @@ public class AnnotatedVcfParser {
 			IO.p("\t"+ format(numPassingAnnImpact, numWithAnn)+"Passing Ann Impact");
 		}
 		if (maxFracBKAFs != 0) {
-			IO.p("\t"+ format(numWithBKAFs, numRecords)+"With BKAFs");
-			IO.p("\t"+ format(numPassingBKAFs, numWithBKAFs)+"Passing BKAFs");
+			IO.p("\t"+ format(numWithBKAFs, numRecords)+"With BKAFs BKZs");
+			IO.p("\t"+ format(numPassingBKAFs, numWithBKAFs)+"Passing BKAFs BKZs");
 		}
 		if (passingClinSig != null){
 			IO.p("\t"+ format(numWithClin, numRecords)+"With Clin");
@@ -767,6 +801,7 @@ public class AnnotatedVcfParser {
 					case 'b': maxFracBKAFs = Double.parseDouble(args[++i]); break;
 					case 'g': passingVCFSS = Misc.COMMA.split(args[++i]); break;
 					case 'n': minimumVCFSSDiff = Double.parseDouble(args[++i]); break;
+					case 'z': minimumBKZ = Double.parseDouble(args[++i]); break;
 					case 'a': impactString = args[++i]; break;
 					case 'c': clinString = args[++i]; break;
 					case 'e': clinStringExclude = args[++i]; break;
@@ -829,7 +864,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.p("\n" +
 				"**************************************************************************************\n" +
-				"**                              Annotated Vcf Parser  Dec 2017                      **\n" +
+				"**                              Annotated Vcf Parser  Feb 2018                      **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff w/ dbNSFP and clinvar, plus the\n"+
 				"VCFBackgroundChecker and VCFSpliceScanner USeq apps into passing and failing records.\n"+
