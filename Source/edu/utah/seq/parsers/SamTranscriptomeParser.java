@@ -365,8 +365,6 @@ public class SamTranscriptomeParser{
 	 * Saves them if they pass a whole set of filters.*/
 	public void filterPrintAlignments(ArrayList<SamAlignment> al){
 		try {
-			
-			
 			//collapse alignments with same coordinates, CIGAR, and from same read pair 
 			uniques.clear();
 			for (SamAlignment sam : al) uniques.add(sam); 
@@ -439,7 +437,6 @@ public class SamTranscriptomeParser{
 						}
 					}
 				}
-
 			}
 
 			//print em?
