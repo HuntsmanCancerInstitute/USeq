@@ -150,7 +150,12 @@ public class GatkRunner {
 					switch (test){
 					case 'r': bedFile = new File(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
-					case 'c': gatkArgs = args[++i]; break;
+					case 'c': {
+						StringInt si = parseCmd(args, ++i); 
+						gatkArgs = si.cmd;
+						i = si.i-1;
+						break;
+					}
 					case 'l': useLowerCaseL= true; break;
 					case 'b': bamOut= true; break;
 					case 't': numberConcurrentThreads = Integer.parseInt(args[++i]); break;
@@ -178,17 +183,35 @@ public class GatkRunner {
 	
 		//determine number of threads
 		double gigaBytesAvailable = ((double)Runtime.getRuntime().maxMemory())/ 1073741824.0;
-		
-	
 	}	
 	
+	private StringInt parseCmd(String[] args, int i) {
+		ArrayList<String> al = new ArrayList<String>();
+		
+		for (; i< args.length; i++){
+			if (args[i].equals("-r") || args[i].equals("-s") || args[i].equals("-l") || args[i].equals("-b") || args[i].equals("-t")) break;
+			al.add(args[i]);
+		}
+		String cmd = Misc.stringArrayListToString(al, " ");
+		return new StringInt(i,cmd);
+	}
+	
+	private class StringInt{
+		int i;
+		String cmd;
+		public StringInt(int i, String cmd){
+			this.i = i;
+			this.cmd = cmd;
+		}
+	}
+
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Gatk Runner: Oct  2017                             **\n" +
+				"**                               Gatk Runner: Feb 2018                              **\n" +
 				"**************************************************************************************\n" +
 				"Takes a bed file of target regions, splits it by the number of threads, writes out\n"+
-				"each, executes the GATK Gatktype caller, and merges the chunked results. \n"+
+				"each, executes the GATK Gatktype caller, and merges the results. \n"+
 
 				"\nOptions:\n"+
 				"-r A regions bed file (chr, start, stop,...) to intersect, see\n" +

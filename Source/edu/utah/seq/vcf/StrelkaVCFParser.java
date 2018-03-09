@@ -33,6 +33,7 @@ public class StrelkaVCFParser {
 	private String gtFormat = "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">";
 	private double minimumTumorAltFraction = 0;
 	private boolean excludeNonPass = false;
+	private File saveDirectory = null;
 	
 	public StrelkaVCFParser (String[] args) { 
 
@@ -45,6 +46,7 @@ public class StrelkaVCFParser {
 		System.out.println(minimumTNRatio+"\tMin T/N allelic fraction ratio");
 		System.out.println(maximumNormalAltFraction+"\tMax N allelic fraction");
 		System.out.println(minimumTumorAltFraction+"\tMin T allelic fraction");
+		System.out.println(minimumScore+"\tMin QSI or QSS score");
 		System.out.println(excludeNonPass+"\tRemove non PASS FILTER field records.");
 		System.out.println(printSpreadsheet+"\tPrint spreadsheet output.");
 		
@@ -106,7 +108,7 @@ public class StrelkaVCFParser {
 			File txt = null;
 			Gzipper out = null;
 			if (printSpreadsheet){
-				txt = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+".txt.gz");
+				txt = new File (saveDirectory, Misc.removeExtension(vcf.getName())+".txt.gz");
 				out = new Gzipper(txt);
 				out.println("#PASS\tCHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
 			}
@@ -184,7 +186,7 @@ public class StrelkaVCFParser {
 			}
 			if (printSpreadsheet) out.close();
 			
-			File outFile = new File (vcf.getParentFile(), Misc.removeExtension(vcf.getName())+"_Filtered.vcf.gz");
+			File outFile = new File (saveDirectory, Misc.removeExtension(vcf.getName())+"_Filtered.vcf.gz");
 			printRecords(parser, outFile);
 
 		} catch (Exception e) {
@@ -278,6 +280,7 @@ public class StrelkaVCFParser {
 					case 'r': minimumTNRatio = Double.parseDouble(args[++i]); break;
 					case 'p': excludeNonPass = true; break;
 					case 's': printSpreadsheet = true; break;
+					case 'f': saveDirectory = new File(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -296,12 +299,15 @@ public class StrelkaVCFParser {
 		tot[2] = IO.extractFiles(forExtraction,".vcf.zip");
 		vcfFiles = IO.collapseFileArray(tot);
 		if (vcfFiles == null || vcfFiles.length ==0 || vcfFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.vcf(.zip/.gz OK) file(s)!\n");
+		if (saveDirectory == null) saveDirectory = vcfFiles[0].getParentFile();
+		else saveDirectory.mkdirs();
+		
 	}	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Strelka VCF Parser: May 2017                         **\n" +
+				"**                             Strelka VCF Parser: Feb 2018                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS\n"+
 				"score. Also filters for read depth, T/N alt allelic ratio and diff,\n"+
@@ -318,9 +324,10 @@ public class StrelkaVCFParser {
 				"-r Minimum T/N AF ratio, defaults to 0.\n"+
 				"-p Remove non PASS filter field records.\n"+
 				"-s Print spreadsheet variant summary.\n"+
+				"-f Directory in which to save the parsed files, defaults to the parent dir of the vcfs.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -t 0.05\n"+
-				"        -n 0.5 -u 100 -o 20 -d 0.05 -r 2\n\n"+
+				"        -n 0.5 -u 100 -o 20 -d 0.05 -r 2 -f ParsedVcfs \n\n"+
 
 
 				"**************************************************************************************\n");
