@@ -68,7 +68,7 @@ public class IntervalST<Value>  implements java.io.Serializable {
     *  randomized insertion
     ***************************************************************************/
     public void put(Interval1D interval, Value value) {
-        if (contains(interval)) { System.out.println("duplicate"); remove(interval);  }
+        if (contains(interval)) remove(interval);  
         root = randomizedInsert(root, interval, value);
     }
 
