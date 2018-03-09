@@ -1,3 +1,5 @@
+See the github release notes and commits for changes to the apps.
+
 ----USeq_9.0.1----
 SamAlignmentExtractor
 * Fixed an issue when using the -x option to keep off target reads in the pass file.  Whole chromosomes we're being dropped when the target bed file didn't contain any regions for the chromosome.

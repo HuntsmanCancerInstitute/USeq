@@ -18,19 +18,17 @@
 </head>
 <center><H1>USeq</H1></center>
 <p>
-<h2>Disclaimer:</h2> This software is distributed with no warrantee or guarantee of fitness. See the open source <A HREF="license.txt">BSD License</A></b>.<p>
+<h2>Disclaimer:</h2> This software is distributed with no warrantee or guarantee of fitness. See the open source <A HREF="license.html">BSD License</A></b>.<p>
 
 <h2>What is USeq?</h2>
-USeq is a collection of software tools for for both low and high level analysis of next generation sequencing datasets (e.g. Illumina, SOLiD, IonTorrent, PacBio...)
-from ChIPSeq, RNASeq, MethylSeq, and DNASeq. USeq is under continuous development at <a href="https://www.aruplab.com/">ARUP Laboratories</a>
- and the <a href="http://healthcare.utah.edu/huntsmancancerinstitute/research/shared-resources/center-managed/bioinformatics/">
-Huntsman Cancer Institute</a>. 
+USeq is a collection of 180+ Java applications for analyzing next generation sequencing data from ChIPSeq, RNASeq, BisSeq, DNASeq, Variant Annotation/ Filtering, Alignment/VCF QC, capture array design, IGV/ DAS2/IGB/UCSC file manipulation, etc. Both GUI and cmd line interfaces are available.
+USeq is under continuous development at the <a href="http://healthcare.utah.edu/huntsmancancerinstitute/research/shared-resources/center-managed/bioinformatics/">Huntsman Cancer Institute</a>. 
 <p>
-A description of some of the statistics and comparison of methods used in USeq is now published, see <A HREF="http://www.biomedcentral.com/1471-2105/9/523">Nix DA, Courdy SJ, Boucher KM: Empirical methods for controlling false positives and estimating confidence in chIP-seq peaks. BMC Bioinformatics. 2008 Dec 5;9(1):523.<a>
-Note, USeq now makes use of the <a href="http://www.bioconductor.org/packages/release/bioc/html/DESeq2.html">DESeq2 R package</a> to calculate p-values from a negative binomial distribution for differential enrichment/ reduction. See <A HREF="http://biorxiv.org/content/early/2014/05/27/002832"> Love MI, Huber W, and Anders S (2014)</a>  
+A description of some of the statistics and comparison of methods used in USeq is published, see <A HREF="http://www.biomedcentral.com/1471-2105/9/523">Nix DA, Courdy SJ, Boucher KM: Empirical methods for controlling false positives and estimating confidence in chIP-seq peaks. BMC Bioinformatics. 2008 Dec 5;9(1):523.<a>
+Note, USeq  makes use of the <a href="http://www.bioconductor.org/packages/release/bioc/html/DESeq2.html">DESeq2 R package</a> to calculate p-values from a negative binomial distribution for differential enrichment/ reduction. See <A HREF="http://biorxiv.org/content/early/2014/05/27/002832"> Love MI, Huber W, and Anders S (2014)</a>  
 <p>
 <h2>How to use/ install USeq?</h2>
-To use USeq, download the <a href="https://github.com/ARUP-NGS/USeq/releases">latest release</a> and install <a href="http://www.java.com/en/download/">Java 1.7+</a>. Some apps will require additional <a href="http://www.r-project.org/">R</a> libraries
+To use USeq, download the <a href="https://github.com/HuntsmanCancerInstitute/USeq/releases">latest release</a> and install <a href="http://www.java.com/en/download/">Java 1.7+</a>. Some apps will require additional <a href="http://www.r-project.org/">R</a> libraries
 such as Storey's <a href="http://genomics.princeton.edu/storeylab/qvalue/">Q-Value</a> 
 and the Huber's lab <a href="http://www.bioconductor.org/packages/release/bioc/html/DESeq2.html">DESeq2</a>.<br>
 
@@ -47,6 +45,7 @@ around the USeq applications. <p>
 
 <H2>Documentation:</H2>
  <ul>
+ 	<li><A HREF="https://github.com/HuntsmanCancerInstitute/USeq">GitHub Site</A> - Source code, releases, and developer information.</li>
 	<li><A HREF="usage.html">Usage</A> - Contains detailed tutorials in how to use USeq to process your sequencing data (ChIP-Seq, <a href="usageRNASeq.html">RNA-Seq</a>, <a href="usageBisSeq.html">Bis-Seq</a> etc).</li> 
 	<li><A HREF="applications.html">Applications</A> - A listing of the various USeq applications.</li>
 	<li><A HREF="cmdLnMenus.html">Menus</A> - Command line menus/ instructions/ parameters for each of the applications.</li>

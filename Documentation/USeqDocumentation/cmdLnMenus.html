@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.0.8
+			<html><head><title>USeq Command Line Menus 9.1.5
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -27,7 +27,13 @@
 				
 					<a href="#AllelicMethylationDetector">AllelicMethylationDetector</a><br>
 				
+					<a href="#AnnotateBedWithGenes">AnnotateBedWithGenes</a><br>
+				
+					<a href="#AnnotatedVcfParser">AnnotatedVcfParser</a><br>
+				
 					<a href="#ArupPipelineWrapper">ArupPipelineWrapper</a><br>
+				
+					<a href="#BamConcordance">BamConcordance</a><br>
 				
 					<a href="#BamContextInspector">BamContextInspector</a><br>
 				
@@ -46,6 +52,8 @@
 					<a href="#BedStats">BedStats</a><br>
 				
 					<a href="#Bed2UCSCRefFlat">Bed2UCSCRefFlat</a><br>
+				
+					<a href="#BedRegionSplitter">BedRegionSplitter</a><br>
 				
 					<a href="#BisSeq">BisSeq</a><br>
 				
@@ -71,6 +79,8 @@
 				
 					<a href="#ConcatinateFastas">ConcatinateFastas</a><br>
 				
+					<a href="#CorrectVCFEnds">CorrectVCFEnds</a><br>
+				
 					<a href="#CorrelatePointData">CorrelatePointData</a><br>
 				
 					<a href="#CountChromosomes">CountChromosomes</a><br>
@@ -82,6 +92,8 @@
 					<a href="#CorrelationMaps">CorrelationMaps</a><br>
 				
 					<a href="#ConvertFasta2GCBarGraph">ConvertFasta2GCBarGraph</a><br>
+				
+					<a href="#DbNSFPCoordinateConverter">DbNSFPCoordinateConverter</a><br>
 				
 					<a href="#DefinedRegionBisSeq">DefinedRegionBisSeq</a><br>
 				
@@ -125,19 +137,21 @@
 				
 					<a href="#FileSplitter">FileSplitter</a><br>
 				
+					<a href="#FilterIntersectingRegions">FilterIntersectingRegions</a><br>
+				
+					<a href="#FilterPointData">FilterPointData</a><br>
+				
 					<a href="#FoundationVcfComparator">FoundationVcfComparator</a><br>
 				
 					<a href="#FoundationXml2Vcf">FoundationXml2Vcf</a><br>
+				
+					<a href="#FreebayesVCFParser">FreebayesVCFParser</a><br>
 				
 					<a href="#GatkRunner">GatkRunner</a><br>
 				
 					<a href="#GeneiASEParser">GeneiASEParser</a><br>
 				
 					<a href="#Graph2Bed">Graph2Bed</a><br>
-				
-					<a href="#FilterIntersectingRegions">FilterIntersectingRegions</a><br>
-				
-					<a href="#FilterPointData">FilterPointData</a><br>
 				
 					<a href="#GenerateOverlapStats">GenerateOverlapStats</a><br>
 				
@@ -151,7 +165,11 @@
 				
 					<a href="#IntersectRegions">IntersectRegions</a><br>
 				
+					<a href="#JointGenotypeVCFParser">JointGenotypeVCFParser</a><br>
+				
 					<a href="#KeggPathwayEnrichment">KeggPathwayEnrichment</a><br>
+				
+					<a href="#KnownSpliceJunctionScanner">KnownSpliceJunctionScanner</a><br>
 				
 					<a href="#LofreqVCFParser">LofreqVCFParser</a><br>
 				
@@ -311,7 +329,11 @@
 				
 					<a href="#VarScanVCFParser">VarScanVCFParser</a><br>
 				
-					<a href="#VCFBackgroundScanner">VCFBackgroundScanner</a><br>
+					<a href="#VCFBackgroundChecker">VCFBackgroundChecker</a><br>
+				
+					<a href="#VCFBackgroundCheckerGraphite">VCFBackgroundCheckerGraphite</a><br>
+				
+					<a href="#VCFBamAnnotator">VCFBamAnnotator</a><br>
 				
 					<a href="#VCF2Bed">VCF2Bed</a><br>
 				
@@ -333,9 +355,11 @@
 				
 					<a href="#VCFReporter">VCFReporter</a><br>
 				
-					<a href="#VCFSpliceAnnotator">VCFSpliceAnnotator</a><br>
+					<a href="#VCFSpliceScanner">VCFSpliceScanner</a><br>
 				
 					<a href="#VCFTabix">VCFTabix</a><br>
+				
+					<a href="#VCF2Tvs">VCF2Tvs</a><br>
 				
 					<a href="#Wig2Bar">Wig2Bar</a><br>
 				
@@ -352,7 +376,7 @@
 			<br><p>
 		
 					<a name="AggregatePlotter"><pre>**************************************************************************************
-**                            Aggregate Plotter:  August 2012                       **
+**                            Aggregate Plotter:  Nov 2017                          **
 **************************************************************************************
 Fetches point data contained within each region, inverts - stranded annotation, zeros
 the coordinates, sums, and window averages the values.  Usefull for generating
@@ -370,23 +394,27 @@ Options:
        strand), or 3 (ignore).
        this option to select particular stranded data to aggregate.
 -r Replace scores with 1.
+-f Pad start and stop of each bed region xxx bps, defaults to 0.
 -d Delog2 scores. Do it if your data is in log2 space.
 -v Convert each region scores to % of total.
 -n Divide scores by the number of regions.
+-k Divide each regions score by this value.
+-l Divide each regions score by the total number of observations.
 -s Scale all regions to a particular size. Defaults to max region size.
 -a Average region scores instead of summing.
 
-Example: java -Xmx1500M -jar pathTo/USeq/Apps/AgregatePlotter -t
+Example: java -Xmx1500M -jar pathTo/USeq/Apps/AggregatePlotter -t
       /Data/PolIIRep1/,/Data/PolIIRep2/ -b /Anno/tssSites.bed -p 73 -u 1
+      -l 
 
 **************************************************************************************
 </pre><br><p>
 				
 					<a name="AggregateQCStats"><pre>**************************************************************************************
-**                            Aggregate QC Stats: July 2016                         **
+**                            Aggregate QC Stats: Feb 2018                          **
 **************************************************************************************
 Parses and aggregates alignment quality statistics from json files produced by the
-SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, and fastq counter.
+SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, and Fastq counter.
 
 Options:
 -j Directory containing xxx.json.gz files for parsing. Recurses through all other
@@ -400,6 +428,7 @@ the json files, defaults to (.+)_FastqCount.json.gz, case insensitive.
 -m MPA regex, defaults to (.+)_MergePairedAlignments.json.gz
 -u S2U regex, defaults to (.+)_Sam2USeq.json.gz
 -p String to prepend onto output file names.
+-v Print verbose debugging output.
 
 Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -r QCStats/ -p TR774_ 
 
@@ -407,7 +436,7 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -r QCStats/ -p T
 </pre><br><p>
 				
 					<a name="AlignmentEndTrimmer"><pre>**************************************************************************************
-**                            Alignment End Trimmer: April 2014                     **
+**                            Alignment End Trimmer: Dec 2017                       **
 **************************************************************************************
 This application can be used to trim alignments according to the density of mismatches.
 Each base of the alignment is compared to the reference sequence from the start of the
@@ -585,6 +614,65 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/AllelicMethylationDetector -s AMD
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="AnnotateBedWithGenes"><pre>**************************************************************************************
+**                           Annotate Bed With Genes   Jan 2017                     **
+**************************************************************************************
+Takes a bed like file and a UCSC gene table, intersects them and adds a new column to
+the file with the gene names that intersect the gene exons or regions. 
+
+Parameters:
+-u UCSC RefFlat or RefSeq gene table file, full path. See,
+       http://genome.ucsc.edu/cgi-bin/hgTables, (geneName name2(optional) chrom strand
+       txStart txEnd cdsStart cdsEnd exonCount exonStarts exonEnds). 
+-b Bed like file of regions to intersect with genes, gz/zip OK
+-i Indexes defining chr start stop columns, defaults to 0,1,2 for bed format.
+-r Gzipped results file.
+-p Bp padding to expand the bed regions when intersecting with genes.
+-g Intersect gene regions with bed, not gene exons.
+
+Example: java -Xmx2G -jar pathTo/USeq/Apps/AnnotateBedWithGenes -p 100 -g -i 1,2,3
+      -b targetRegions.bed -r targetRegionsWithGenes.txt.gz -u hg19EnsGenes.ucsc.gz
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
+**                              Annotated Vcf Parser  Feb 2018                      **
+**************************************************************************************
+Splits VCF files that have been annotated with SnpEff w/ dbNSFP and clinvar, plus the
+VCFBackgroundChecker and VCFSpliceScanner USeq apps into passing and failing records.
+Use the -e option to inspect the effect of the various filters on each record. Use
+the VCFRegionFilter app to restrict variants to particular gene regions.
+
+Options:
+-v File path or directory containing xxx.vcf(.gz/.zip OK) file(s) to filter.
+-s Directory for saving the results.
+-f Perform a candidate somatic variant processing. Setting the following overrides
+        the defaults. 
+-d Minimum DP alignment depth
+-m Minimum AF allele frequency
+-x Maximum AF allele frequency
+-j Ignore the max AF filter for ACMG incidental germline gene variants.
+-p Maximum population allele frequency, only applies if present.
+-b Maximum fraction of BKAF samples with allele frequency >= VCF AF, only applies
+       if present.
+-g Splice junction types to scan.
+-n Minimum difference in splice junction scores, only applies if present.
+-a Comma delimited list of SnpEff ANN impact categories to select for.
+-c Comma delimited list of CLINSIG terms to select for.
+-e Comma delimited list of CLINSIG terms to select against.
+-i Comma delimited list of VCF ID keys to select for. If the VCF ID contains one or
+       more, the record is passed regardless of other filters. The match is not exact.
+ -o Only require, if set or present, SnpEff ANN or CLINSIG or Splice to be true to pass.
+       Defaults to require that all set pass.
+-r Verbose per record output.
+
+Example: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/
+        -d 75 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -g D5S,D3S,G5S,G3S -n 3.5 -a
+        HIGH,MODERATE -c Pathogenic,Likely_pathogenic -i Foundation,Tempus -v
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="ArupPipelineWrapper"><pre>**************************************************************************************
 **                           ArupPipelineWrapper: April 2016                        **
 **************************************************************************************
@@ -618,6 +706,47 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/ArupPipelineWrapper -o MyJobNix3 -m D
     -q 0758221_compPad25bp_v1.bed -b 0758221_v1.bed -t 24 -r 
     ~/HCIAtlatl/data/Human/B37/human_g1k_v37_decoy.fasta -u CNV36B_unfiltered.bam -f 
     CNV36B_final.bam -v CNV36B_snvIndel.vcf
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="BamConcordance"><pre>**************************************************************************************
+**                               Bam Concordance: Feb  2018                         **
+**************************************************************************************
+BC calculates sample level concordance based on uncommon homozygous SNVs found in bam
+files. Samples from the same person will show high similarity (>0.9). Run BC on
+related sample bams (e.g tumor & normal exomes, tumor RNASeq) plus an unrelated bam
+for comparison. Mismatches passing filters are written to file. BC also generates a
+variety of AF histograms for checking gender and sample contamination. Although
+threaded, BC runs slowly with more that a few bams. Use the USeq ClusterMultiSampleVCF
+app to check large batches of vcfs to identify the likely mismatched sample pairs.
+
+WARNING! Mpileup does not check that the chr order is the same across samples and the
+fasta reference, be certain they are or mpileup will produce incorrect counts. Use
+Picard's ReorderSam app if in doubt.
+
+Note re FFPE derived RNASeq data: A fair bit of systematic error is found in these
+datasets.  As such, the RNA-> DNA contrasts are low. Yet the DNA->RNA are > 0.9
+
+Options:
+-r Path to a bed file of regions to interrogate.
+-s Path to the samtools executable.
+-f Path to an indexed reference fasta file.
+-b Path to a directory containing indexed bam files.
+-c Path to a tabix indexed bed file of common dbSNPs. Download 00-common_all.vcf.gz 
+       from ftp://ftp.ncbi.nih.gov/snp/organisms/, run VCF2Bed, bgzip and tabix it
+       with https://github.com/samtools/htslib, defaults to no exclusion from calcs. 
+-d Minimum read depth, defaults to 25.
+-a Minimum allele frequency to count as a homozygous variant, defaults to 0.95
+-m Minimum allele frequency to count a homozygous match, defaults to 0.9
+-q Minimum base quality, defaults to 20.
+-u Minimum mapping quality, defaults to 20.
+-t Number of threads to use.  If not set, determines this based on the number of
+      threads and memory available to the JVM so set the -Xmx value to the max.
+
+Example: java -Xmx120G -jar pathTo/USeq/Apps/BamConcordance -r ~/exomeTargets.bed
+      -s ~/Samtools1.3.1/bin/samtools -b ~/Patient7Bams -d 10 -a 0.9 -m 0.8 -f
+      ~/B37/human_g1k_v37.fasta -c ~/B37/b38ComSnps.bed.gz
 
 **************************************************************************************
 </pre><br><p>
@@ -810,6 +939,22 @@ Parameters:
 
 Example: java -Xmx2G -jar pathTo/USeq/Apps/Bed2UCSCRefFlat -u refSeqJun2015.ucsc
       -b targetRegionsFat.bed -r targetRegionsFat.ucsc
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="BedRegionSplitter"><pre>**************************************************************************************
+**                             Bed Region Splitter : June 2017                      **
+**************************************************************************************
+Regions exceeding the chunk size are split into multiple parts.
+
+Required:
+-d Path to a file or directory containing such to chunk.
+
+Optional:
+-c BP chunk size, defaults to 2000.
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/BedRegionSplitter -d ToSplit/ -c 5000 
+
 **************************************************************************************
 </pre><br><p>
 				
@@ -1157,6 +1302,21 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/ConcatinateFastas -n 2000 -d
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="CorrectVCFEnds"><pre>**************************************************************************************
+**                                Correct VCF Ends: July 2017                       **
+**************************************************************************************
+Use to correct the END=xxx tags in a Crossmap vcf . Removes any MC tags. Adds chr.
+
+Required Options:
+-v Path to the Crossmap vcf file.
+-b Path to the VCF2Bed -> Crossmap bed file
+-r Path to save the modifed gzipped file. 
+
+Ex: java -jar USeq_XXX/Apps/CorrectVCFEnds -v b38.vcf -b b38.bed -r finalB38.vcf.gz
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="CorrelatePointData"><pre>**************************************************************************************
 **                                CorrelatePointData: Aug 2011                      **
 **************************************************************************************
@@ -1206,7 +1366,7 @@ Example: java -Xmx2000M -jar pathTo/Apps/BisulfiteConvertFastas -f /affy/Fastas/
 </pre><br><p>
 				
 					<a name="Consensus"><pre>**************************************************************************************
-**                                  Consensus : Dec 2015                            **
+**                                  Consensus : March 2017                          **
 **************************************************************************************
 Consensus clusters alignments sharing the same unclipped start position and molecular
 barcode. It then calls consensus on the clustered alignments outputing fastq for
@@ -1279,6 +1439,22 @@ Required Parameters:
 
 Example: java -Xmx4G -jar pathTo/Apps/ConvertFasta2GCBarGraph -f /affy/Fastas/
       -v H_sapiens_Feb_2009
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="DbNSFPCoordinateConverter"><pre>**************************************************************************************
+**                         DbNSFP Coordinate Converter: Dec 2017                    **
+**************************************************************************************
+Walks a directory of dbNSFP files swapping the B38 coordinates with the B37, splits
+by chromosome, sorts, and writes out the final composite. 
+Options:
+-d Path to a directory of dbNSFP files to parse.
+-s Path to a directory for saving the results.
+
+
+Example: java -Xmx20G -jar pathToUSeq/Apps/DbNSFPChrSplitter -d DbNSFP3.5a 
+     -s B37_DbNSFP3.5a 
 
 **************************************************************************************
 </pre><br><p>
@@ -1770,18 +1946,21 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/FindSharedRegions -f
 </pre><br><p>
 				
 					<a name="FileCrossFilter"><pre>**************************************************************************************
-**                            File Cross Filter: March 2008                         **
+**                            File Cross Filter: Sept 2017                         **
 **************************************************************************************
-FCF take a column in the matcher file and uses it to parse the rows from other files.
-Useful for pulling out and printing in order the rows that match the first file.
+FCF takes one or more columns in the matcher file and uses these as a key to parse and
+save matching keys in the to parse files. Use this to parse lines in files that match
+those in another. Keys must be unique. The order and number of the rows in the matcher
+file is preserved, if a match is not found in the parsed file, a blank line is inserted
+instead.
 
--m Full path file text for a tab delimited txt file to use in matching.
--f Full path file text to parse, can specify a directory too.
--i Ignore duplicate keys.
--a Column index containing the unique IDs in the matcher, defaults to 0.
--b Column index containing the unique IDs in the parsers, defaults to 0.
-Example: java -jar pathTo/T2/Apps/FileCrossFilter -f /extendedArrayData/ -m /old/
-     originalArray.txt -a 2 -b 2
+-m Path to a tab delimited txt (.gz/.zip OK) file to use in matching.
+-a One or more column indexs in the matcher file to use as the key.
+-p Path to a file or directory of files to parse (.gz/.zip OK).
+-b One or more column indexes in the parse file(s) to use as a key.
+
+Example: java -jar pathTo/USeq/Apps/FileCrossFilter -m intRegions.bed -a 0,1,2
+     -p SpreadSheetData/ -b 0,1,2 
 
 **************************************************************************************
 </pre><br><p>
@@ -1839,105 +2018,6 @@ Example: java -Xmx256M -jar pathTo/T2/FileSplitter -f /affy/bpmap.txt -n 50000
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="FoundationVcfComparator"><pre>**************************************************************************************
-**                           Foundation Vcf Comparator: Aug 2016                    **
-**************************************************************************************
-FVC compares a Foundation vcf generated with the FoundationXml2Vcf to a recalled vcf.
-Exact recall vars are so noted and removed. Foundation vcf with no exact but one
-overlapping record can be merged with -k. Be sure to vt normalize each before running.
-Recall variants failing FILTER are not saved.
-
-Options:
--f Path to a FoundationOne vcf file, see the FoundationXml2Vcf app.
--r Path to a recalled snv/indel vcf file.
--m Path to named vcf file for saving the results.
--k Attempt to merge Foundation records that overlap a recall and are the same type. 
-     Defaults to printing both.
-
-Example: java -Xmx2G -jar pathToUSeq/Apps/FoundationVcfComparator -f /F1/TRF145.vcf
-     -r /F1/TRF145_recall.vcf.gz -s /F1/TRF145_merged.vcf.gz -k 
-
-**************************************************************************************
-</pre><br><p>
-				
-					<a name="FoundationXml2Vcf"><pre>**************************************************************************************
-**                             Foundation Xml 2 Vcf: June 2016                      **
-**************************************************************************************
-Attempts to parse xml foundation reports to vcf. This is an inprecise process with
-some insertions, multi snv, and multi vars. VCF variants have not been normalized.
-Consider left aligning and demultiplexing.
-
-Options:
--x Path to a FoundationOne xml report or directory containing such.
--s Path to a directory for saving the results.
--f Path to the reference fasta with xxx.fai index
--o Skip variants that clearly fail to convert, e.g. var seq doesn't match fasta.
-     Defaults to marking 'ci' in FILTER field.
-
-Example: java -Xmx2G -jar pathToUSeq/Apps/FoundationXml2Vcf -x /F1/TRF145179.xml
-     -f /Ref/human_g1k_v37.fasta -s /F1/VCF/ 
-
-**************************************************************************************
-</pre><br><p>
-				
-					<a name="GatkRunner"><pre>**************************************************************************************
-**                               Gatk Runner: May 2016                              **
-**************************************************************************************
-Takes a bed file of target regions, splits it by the number of threads, writes out
-each, executes the GATK Gatktype caller, and merges the vcf results. 
-
-Required Options:
--r A regions bed file (chr, start, stop,...) to intersect, see
-       http://genome.ucsc.edu/FAQ/FAQformat#format1 , gz/zip OK.
--s Path to a directory for saving the results.
--t Number concurrent threads to run, will need > 4G RAM each.
--c GATK command to execute, see the example below, modify to match your enviroment.
-     Most resources require full paths. Don't set -o or -L
--l Use lowercased l for Lofreq compatability.
-
-Example: java -Xmx24G -jar pathToUSeq/Apps/GatkRunner -r /SS/targets.bed -t 8 -s
-     /SS/HC/ -c 'java -Xmx4G -jar /SS/GenomeAnalysisTK.jar -T MuTect2 
-    -R /SS/human_g1k_v37.fasta --dbsnp /SS/dbsnp_138.b37.vcf 
-    --cosmic /SS/v76_GRCh37_CosmicCodingMuts.vcf.gz -I:tumor /SS/sarc.bam -I:normal 
-    /SS/norm.bam'
-
-**************************************************************************************
-</pre><br><p>
-				
-					<a name="GeneiASEParser"><pre>**************************************************************************************
-**                              GeneiASE Parser:  Sept 2016                         **
-**************************************************************************************
-Combines the GeneiASE results file with the input data file.
-
-Required Options:
--r GeneiASE results output file
--d GeneiASE input data file
--o Output file for the summary spreadsheet
-
-Example: java -Xmx4G -jar pathTo/USeq/Apps/AllelicExpressionDetector -b Bam/RPENormal/
--n D002-14,D005-14,D006-14,D009-14 -d GenotypingResults.txt.gz -s SNPMap_Ref2Alt_Int.txt
--r RPENormal -t ~/Anno/b37EnsGenes7Sept2016_Exons.bed.gz
-
-**************************************************************************************
-</pre><br><p>
-				
-					<a name="Graph2Bed"><pre>**************************************************************************************
-**                                 Graph 2 Bed: Feb 2011                            **
-**************************************************************************************
-Converts USeq stair step and heat map graphs into region bed files using a threshold.
-Do not use this with non USeq generated graphs. Won't work with bar or point graphs.
-
-Options:
--p Point Data directories, full path, comma delimited. Should contain chromosome
-       specific xxx.bar.zip or xxx_-_.bar files. May point this to a single directory
-       of such too.
--t Threshold, regions exceeding it will be saved, defaults to 0.
-
-Example: java -Xmx1500M -jar pathTo/USeq/Apps/Graph2Bed -t 9 -p /data/ReadCoverage
-
-**************************************************************************************
-</pre><br><p>
-				
 					<a name="FilterIntersectingRegions"><pre>**************************************************************************************
 **                        Filter Intersecting Regions: Feb 2015                     **
 **************************************************************************************
@@ -1980,6 +2060,130 @@ Options:
 
 Example: java -Xmx1500M -jar pathTo/USeq/Apps/FilterPointData -p /data/PointData 
       -r /repeats/hg18RepeatMasker.bed -a 0.75
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="FoundationVcfComparator"><pre>**************************************************************************************
+**                           Foundation Vcf Comparator: Oct 2017                    **
+**************************************************************************************
+FVC compares a Foundation vcf generated with the FoundationXml2Vcf to a recalled vcf.
+Exact recall vars are so noted and removed. Foundation vcf with no exact but one
+overlapping record can be merged with -k. Be sure to vt normalize each before running.
+Recall variants failing FILTER are not saved.
+
+Options:
+-f Path to a FoundationOne vcf file, see the FoundationXml2Vcf app.
+-r Path to a recalled snv/indel vcf file.
+-m Path to named vcf file for saving the results.
+-k Attempt to merge Foundation records that overlap a recall and are the same type. 
+     Defaults to printing both.
+
+Example: java -Xmx2G -jar pathToUSeq/Apps/FoundationVcfComparator -f /F1/TRF145.vcf
+     -r /F1/TRF145_recall.vcf.gz -s /F1/TRF145_merged.vcf.gz -k 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="FoundationXml2Vcf"><pre>**************************************************************************************
+**                             Foundation Xml 2 Vcf: Nov 2017                       **
+**************************************************************************************
+Attempts to parse xml foundation reports to vcf. This is an inprecise process with
+some insertions, multi snv, and multi vars. VCF variants have not been normalized.
+Consider left aligning and demultiplexing.
+
+Options:
+-x Path to a FoundationOne xml report or directory containing such.
+-s Path to a directory for saving the results.
+-f Path to the reference fasta with xxx.fai index
+-o Skip variants that clearly fail to convert, e.g. var seq doesn't match fasta.
+     Defaults to marking 'ci' in FILTER field.
+
+Example: java -Xmx2G -jar pathToUSeq/Apps/FoundationXml2Vcf -x /F1/TRF145179.xml
+     -f /Ref/human_g1k_v37.fasta -s /F1/VCF/ 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="FreebayesVCFParser"><pre>**************************************************************************************
+**                            Freebayes VCF Parser: Mar 2017                        **
+**************************************************************************************
+Parses Freebayes VCF files, filtering for read depth, allele frequency diff ratio, etc.
+Inserts AF and DP into for the tumor sample into the INFO field. Changes the sample
+order to Normal and Tumor and updates the #CHROM line. Put the tumor bam first when
+calling freebayes.
+
+Required Options:
+-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
+-t Minimum tumor allele frequency (AF), defaults to 0.
+-n Maximum normal AF, defaults to 1.
+-u Minimum tumor alignment depth, defaults to 0.
+-o Minimum normal alignment depth, defaults to 0.
+-d Minimum T-N AF difference, defaults to 0.
+-r Minimum T/N AF ratio, defaults to 0.
+-p Remove non PASS filter field records.
+
+Example: java -jar pathToUSeq/Apps/FreebayesVCFParser -v /VCFFiles/ -t 0.05 -n 0.5
+        -u 100 -o 20 -d 0.05 -r 2
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="GatkRunner"><pre>**************************************************************************************
+**                               Gatk Runner: Feb 2018                              **
+**************************************************************************************
+Takes a bed file of target regions, splits it by the number of threads, writes out
+each, executes the GATK Gatktype caller, and merges the results. 
+
+Options:
+-r A regions bed file (chr, start, stop,...) to intersect, see
+       http://genome.ucsc.edu/FAQ/FAQformat#format1 , gz/zip OK.
+-s Path to a directory for saving the results.
+-t Number concurrent threads to run, will need > 4G RAM each.
+-c GATK command to execute, see the example below, modify to match your enviroment.
+     Most resources require full paths. Don't set -o or -L
+-l Use lowercased l for Lofreq compatability.
+-b Add a -bamout argument and merge bam chunks.
+
+Example: java -Xmx24G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -t 8 -s
+     /SS/HC/ -c 'java -Xmx4G -jar /SS/GenomeAnalysisTK.jar -T MuTect2 
+    -R /SS/human_g1k_v37.fasta --dbsnp /SS/dbsnp_138.b37.vcf 
+    --cosmic /SS/v76_GRCh37_CosmicCodingMuts.vcf.gz -I:tumor /SS/sarc.bam -I:normal 
+    /SS/norm.bam'
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="GeneiASEParser"><pre>**************************************************************************************
+**                              GeneiASE Parser:  Sept 2016                         **
+**************************************************************************************
+Combines the GeneiASE results file with the input data file.
+
+Required Options:
+-r GeneiASE results output file
+-d GeneiASE input data file
+-o Output file for the summary spreadsheet
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/AllelicExpressionDetector -b Bam/RPENormal/
+-n D002-14,D005-14,D006-14,D009-14 -d GenotypingResults.txt.gz -s SNPMap_Ref2Alt_Int.txt
+-r RPENormal -t ~/Anno/b37EnsGenes7Sept2016_Exons.bed.gz
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="Graph2Bed"><pre>**************************************************************************************
+**                                 Graph 2 Bed: Feb 2011                            **
+**************************************************************************************
+Converts USeq stair step and heat map graphs into region bed files using a threshold.
+Do not use this with non USeq generated graphs. Won't work with bar or point graphs.
+
+Options:
+-p Point Data directories, full path, comma delimited. Should contain chromosome
+       specific xxx.bar.zip or xxx_-_.bar files. May point this to a single directory
+       of such too.
+-t Threshold, regions exceeding it will be saved, defaults to 0.
+
+Example: java -Xmx1500M -jar pathTo/USeq/Apps/Graph2Bed -t 9 -p /data/ReadCoverage
 
 **************************************************************************************
 </pre><br><p>
@@ -2092,7 +2296,7 @@ Example: java -Xmx1500M -jar pathTo/Apps/IntersectKeyWithRegions -k /data/key.tx
 </pre><br><p>
 				
 					<a name="IntersectRegions"><pre>**************************************************************************************
-**                            Intersect Regions: May 2012                           **
+**                            Intersect Regions: May 2017                           **
 **************************************************************************************
 IR intersects lists of regions (tab delimited: chrom start stop(inclusive)). Random
 regions can also be used to calculate a p-value and fold enrichment.
@@ -2123,6 +2327,31 @@ Example: java -Xmx1500M -jar pathTo/Apps/IntersectRegions -f /data/miRNAs.txt
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="JointGenotypeVCFParser"><pre>**************************************************************************************
+**                          Joint Genotype VCF Parser: Dec 2017                     **
+**************************************************************************************
+Splits and filters GATK joint genotyped multi sample vcf files. Use vt to decompose 
+the multi alts. See https://genome.sph.umich.edu/wiki/Vt#Decompose . Replaces the AF
+and DP INFO fields with the sample level values.
+
+Required Params:
+-v Path to vt decomposed GATK joint genotyped multi sample vcf file, gz/zip OK.
+     ~/BioApps/vt decompose -s jointGenotyped.vcf.gz -o jointGenotyped.decomp.vcf.gz
+-s Path to a directory to save the split files.
+
+Optional Params:
+-q Minimum QUAL value, defaults to 20
+-d Minimum read depth based on the AD sample values, defaults to 10
+-a Minimum AF allele freq, defaults to 0.2
+-g Minimum GT genotype quality, defaults to 20
+-f Print debugging output to screen
+
+Example: java -jar -Xmx2G pathToUSeq/Apps/HaplotypeVCFParser -d 20 -a 0.25 -g 30 -f
+      -v jointGenotyped.decomp.vcf.gz -s SplitFilteredVcfs/ -q 30 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="KeggPathwayEnrichment"><pre>**************************************************************************************
 **                           Kegg Pathway Enrichment:  Aug 2009                     **
 **************************************************************************************
@@ -2149,8 +2378,32 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/KeggPathwayEnrichment -e
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="KnownSpliceJunctionScanner"><pre>**************************************************************************************
+**                      Known Splice Junction Scanner : Sept 2017                   **
+**************************************************************************************
+Scores know splice junctions using the MaxEntScan algorithms. See Yeo and
+Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. 
+
+Required Options:
+-r Name of a gzipped bed file to use in saving the results, will over write.
+-f Path to the reference fasta with associated xxx.fai index
+-u UCSC RefFlat or RefSeq transcript (not merged genes) file, full path. See RefSeq 
+       http://genome.ucsc.edu/cgi-bin/hgTables, (uniqueName1 name2(optional) chrom
+       strand txStart txEnd cdsStart cdsEnd exonCount (commaDelimited)exonStarts
+       (commaDelimited)exonEnds). Example: ENSG00000183888 C1orf64 chr1 + 16203317
+       16207889 16203385 16205428 2 16203317,16205000 16203467,16207889 .
+-m Full path directory name containing the me2x3acc1-9, splice5sequences and me2x5
+       splice model files. See USeqDocumentation/splicemodels/ or 
+       http://genes.mit.edu/burgelab/maxent/download/ 
+
+Example: java -Xmx10G -jar ~/USeq/Apps/KnownSpliceJunctionScanner -f ~/Hg19/hg19.fasta
+       -r ~/exm2.bed.gz -m ~/USeq/Documentation/splicemodels -u ~/hg19EnsTrans.ucsc.zip
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="LofreqVCFParser"><pre>**************************************************************************************
-**                             Lofreq VCF Parser: July 2016                         **
+**                             Lofreq VCF Parser: March 2017                        **
 **************************************************************************************
 Parses Lofreq vcf files with options for filtering for minimum QUAL, modifying the
 FILTER field, removing non SNVs, and appending FORMAT info for downstream merging.
@@ -2378,7 +2631,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MergeOverlappingGenes -d
 </pre><br><p>
 				
 					<a name="MergePairedAlignments"><pre>**************************************************************************************
-**                            Merge Paired Alignments: July 2015                    **
+**                            Merge Paired Alignments: Oct 2017                     **
 **************************************************************************************
 Merges proper paired alignments that pass a variety of checks and thresholds. Only
 unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps
@@ -2393,6 +2646,7 @@ Options:
 Default Options:
 -s Save merged xxx.sam.gz alignments instead of binary ChromData. Either can be used
       in Sam2USeq for read coverage analysis, the ChromData is much faster.
+-e Only process and save alignments overlapping this bed format region file.
 -u Remove all alignments marked as duplicates, defaults to keeping.
 -a Maximum alignment score (AS:i: tag). Defaults to 300, smaller numbers are more
       stringent for novoalign where each mismatch is ~30pts.
@@ -2435,7 +2689,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/MergePointData -p
 </pre><br><p>
 				
 					<a name="MergeRegions"><pre>**************************************************************************************
-**                             Merge Regions: May 2009                              **
+**                             Merge Regions: July 2017                             **
 **************************************************************************************
 Flattens tab delimited bed files (chr start stop ...). Assumes interbase coordinates.
 
@@ -2448,10 +2702,10 @@ Example: java -Xmx4000M -jar pathTo/Apps/MergeRegions -d /Anno/TilingDesign/
 </pre><br><p>
 				
 					<a name="MergeSams"><pre>**************************************************************************************
-**                                 Merge Sams: June 2015                            **
+**                                 Merge Sams: May 2017                             **
 **************************************************************************************
-Merges sam and bam files. Adds a stripped header if one is not provided. This most
-likely will not play nicely with GATK or Picard downstream apps, good for USeq.
+Merges sam and bam files. Adds a consensus header if one is not provided. These may
+not work with GATK or Picard downstream apps, good for USeq.
 
 Options:
 -d The full path to a directory containing xxx.bam or xxx.sam.gz files to merged.
@@ -2467,6 +2721,8 @@ Default Options:
 -h Full path to a txt file containing a sam header, defaults to autogenerating the
       header from the sam/bam headers.
 -t Don't delete temp xxx.sam.gz file.
+-p Add program arguments to header, defaults to deleting, note duplicate cause Picard
+      apps to fail.
 -q Quiet, print only errors.
 
 Example: java -Xmx1500M -jar pathToUSeq/Apps/MergeSams -f /Novo/Run7/
@@ -2726,14 +2982,15 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/MultiSampleVCFFilter
 </pre><br><p>
 				
 					<a name="MutectVCFParser"><pre>**************************************************************************************
-**                               Mutect VCF Parser: Jan 2017                        **
+**                               Mutect VCF Parser: March 2018                      **
 **************************************************************************************
 Parses Mutect2 VCF files, filtering for read depth, allele frequency diff ratio, etc.
 Inserts AF and DP into for the tumor sample into the INFO field. Changes the sample
 order to Normal and Tumor and updates the #CHROM line.
 
-Required Options:
+Options:
 -v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
+-f Directory to save the parsed files, defaults to the parent dir of the first vcf.
 -t Minimum tumor allele frequency (AF), defaults to 0.
 -n Maximum normal AF, defaults to 1.
 -u Minimum tumor alignment depth, defaults to 0.
@@ -2741,6 +2998,7 @@ Required Options:
 -d Minimum T-N AF difference, defaults to 0.
 -r Minimum T/N AF ratio, defaults to 0.
 -p Remove non PASS filter field records.
+-s Print spreadsheet variant summary.
 
 Example: java -jar pathToUSeq/Apps/MutectVCFParser -v /VCFFiles/ -t 0.05 -n 0.5 -u 100
         -o 20 -d 0.05 -r 2
@@ -3072,7 +3330,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/PointDataManipulator -p
 </pre><br><p>
 				
 					<a name="PoReCNV"><pre>**************************************************************************************
-**                                Po Re CNV: June 2015                              **
+**                                PoRe CNV: April 2017                              **
 **************************************************************************************
 Uses Poisson regression and Pearson residuals to identify exons or genes whose counts
 differ significantly from the fitted value base on all the exon sample counts. This
@@ -3105,6 +3363,7 @@ Default Options:
 -m Minimum number exons per data chunk, defaults to 1500.
 -w Examine whole gene counts for CNVs, defaults to exons.
 -x Keep sex chromosomes (X,Y), defaults to removing. Don't mix sexes!
+-z Don't delete temp files.
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/PoReCNV -s PRCnvResults/  -b BamFiles
        -u hg19EnsGenes.ucsc.gz -a RBambedSource.R  -g H_sapiens_Feb_2009 
@@ -3526,7 +3785,7 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/Sam2Fastq -a /SAM/unaligned.sam.gz -f
 </pre><br><p>
 				
 					<a name="Sam2USeq"><pre>**************************************************************************************
-**                                 Sam 2 USeq : Oct 2016                            **
+**                                  Sam 2 USeq : Jan 2018                           **
 **************************************************************************************
 Generates per base read depth stair-step graph files for genome browser visualization.
 By default, values are scaled per million mapped reads with no score thresholding. Can
@@ -3550,6 +3809,7 @@ Default Options:
       total number of genome wide alignments for that read.  Repeat alignments are
       thus given fractional count values at a given location. Requires that the IH
       tag was set.
+-g Set the scalar count to this value, defaults to the number of passing alignments.
 -b Path to a region bed file (tab delim: chr start stop ...) to use in calculating
       read coverage statistics.  Be sure these do not overlap! Run the MergeRegions app
       if in doubt.
@@ -3563,6 +3823,8 @@ Default Options:
 -k Make average alignment length graph instead of read depth.
 -d Full path to a directory for saving bar binary PointData, defaults to not saving.
 -j Write summary stats in json format to this file, requires -b and -c.
+-y Include CIGAR Ns in read coverage, defaults to just M values.
+-z Flip the strand of the 2nd of pair alignments.
 
 Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r
      -v H_sapiens_Feb_2009 -b ccdsExons.bed.gz 
@@ -3571,7 +3833,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r
 </pre><br><p>
 				
 					<a name="SamAlignmentExtractor"><pre>**************************************************************************************
-**                         Sam Alignment Extractor: July 2016                       **
+**                         Sam Alignment Extractor: Jan 2018                        **
 **************************************************************************************
 Splits an alignment file into those that pass or fail thresholds and intersects
 regions of interest. Calculates a variety of QC statistics.
@@ -3587,6 +3849,7 @@ Default Options:
 -a Alignment score threshold, defaults to no filtering. 
 -n Smaller alignment scores are better (novo), defaults to bigger are better (bwa).
 -d Divide alignment score by the number of CIGAR M bases.
+-m Minimum molecular barcode family size, defaults to 0. Requires :FS:# in read name.
 -j Write summary stats in json format to this file.
 -f Save off target alignments that meet thresholds to the pass file, defaults to fail.
 -x Save secondary, supplemental, and non primary alignments, that pass the thresholds
@@ -3644,7 +3907,7 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/SamParser -f /Novo/Run7/
 </pre><br><p>
 				
 					<a name="SamTranscriptomeParser"><pre>**************************************************************************************
-**                          Sam Transcriptome Parser: Dec 2013                      **
+**                          Sam Transcriptome Parser: March 2017                    **
 **************************************************************************************
 STP takes SAM alignment files that were aligned against chromosomes and extended
 splice junctions (see MakeTranscriptome app), converts the coordinates to genomic
@@ -3654,21 +3917,20 @@ fragment are grouped together.
 
 Options:
 -f The full path file or directory containing raw xxx.sam(.gz/.zip OK) file(s).
-      Multiple files will be merged.
+      Multiple files will be merged. Skip -f and specify -s to read from standard in.
 
 Default Options:
 -s Save file, defaults to that inferred by -f. If an xxx.sam extension is provided,
       the alignments won't be sorted by coordinate or saved as a bam file.
--a Maximum alignment score. Defaults to 90, smaller numbers are more stringent.
-      Approx 30pts per mismatch.
+-a Maximum alignment score. Defaults to Float.MAX_VALUE, no threshold.
 -m Minimum mapping quality score, defaults to 0 (no filtering), larger numbers are
       more stringent. Only applies to genomic matches, not splice junctions. Set to 13
       or more to require near unique alignments.
 -x Maximum mapping quality, reset reads with a mapping quality greater than the max to
       this max.
 -n Maximum number of locations each read may align, defaults to 1 (unique matches).
--d If the maximum number of locations threshold fails, save one randomly picked repeat
-      alignment per read.
+-e Don't randomly pick one random alignment when the maximum number of locations
+       threshold fails, fail all.
 -r Reverse the strand of the second paired alignment. Reversing the strand is
       needed for proper same strand visualization of paired stranded Illumina data.
 -b Reverse the strand of both pairs.  Use this option if you would like the orientation
@@ -3685,7 +3947,7 @@ Default Options:
       header from the read data.
 
 Example: java -Xmx1500M -jar pathToUSeq/Apps/SamTranscriptomeParser -f /Novo/Run7/
-     -m 20 -s /Novo/STPParsedBams/run7.bam -p -r 
+     -m 20 -s /Novo/STPParsedBams/run7.bam -p -r  
 
 **************************************************************************************
 </pre><br><p>
@@ -4332,15 +4594,16 @@ Example: java -jar pathToUSeq/Apps/VarScanVCFParser -v /VarScan2/VCFFiles/
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="VCFBackgroundScanner"><pre>**************************************************************************************
-**                           VCF Background Scanner : Jan 2016                      **
+					<a name="VCFBackgroundChecker"><pre>**************************************************************************************
+**                         VCF Background Checker : Dec 2017                        **
 **************************************************************************************
-VBS calculates non-reference allele frequencies (AF) from a background multi-sample 
+VBC calculates non-reference allele frequencies (AF) from a background multi-sample 
 mpileup file over each vcf record. It then calculates a z-score for the vcf AF and 
 appends it to the INFO field. If multiple bps are affected (e.g. INDELs) or bp padding
 provided, the lowest bp z-score is appended. Z-scores < ~4 are indicative of non
-reference bps in the background samples. Note, VBS requires an AF tag in the INFO
-field of each record. 
+reference bps in the background samples. A flag is appended the FILTER field if a
+background AF was found within 10% of the vcf AF. Note, VBC requires AF and DP tags
+in the INFO field of each record to use in the z-score calculation. 
 
 Required:
 -v Path to a xxx.vcf(.gz/.zip OK) file or directory containing such.
@@ -4352,8 +4615,6 @@ Required:
 -s Path to directory in which to save the modified vcf file(s)
 
 Optional:
--i Comma delimited list (zero is 1st sample, no spaces) of mpileup sample indexes to
-     examine, defaults to all.
 -b BP padding, defaults to 0
 -z Minimum vcf z-score, defaults to 0, no filtering
 -q Minimum mpileup sample bp quality, defaults to 20
@@ -4361,16 +4622,83 @@ Optional:
 -f Maximum mpileup sample AF, defaults to 0.3
 -a Minimum # mpileup samples for z-score calculation, defaults to 3
 -e Exclude vcf records that could not be z-scored
+-u Replace QUAL value with z-score. Un scored vars will be assigned 0
 -d Print verbose debugging output
+-t Number of threads to use, defaults to all
 
-Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundScanner -v SomaticVcfs/ -z 3
--m bkg.mpileup.gz -s BkgFiltVcfs/ -b 1 -q 13 -e 
+Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundChecker -v SomaticVcfs/ -z 3
+-m bkg.mpileup.gz -s BkgFiltVcfs/ -b 1 -q 13 -u 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCFBackgroundCheckerGraphite"><pre>**************************************************************************************
+**                         VCF Background Checker : April 2016                      **
+**************************************************************************************
+VBC calculates non-ref allele frequencies (AF) from a normal background multi-sample 
+mpileup file over each snv or using normal bams and graphite for indel and multi alts.
+It then calculates a z-score for the vcf AF and appends it to the INFO field. Z-scores
+< ~4 are indicative of non reference bps in the background samples. Note, VBC requires
+an AF tag in the INFO field of each record. 
+
+Required:
+-v Path to a xxx.vcf(.gz/.zip OK) file or directory containing such.
+-m Path to a bgzip compressed and tabix indexed multi-sample mpileup file. e.g.:
+      1) Mpileup: 'echo "#SampleOrder: "$(ls *bam) > bkg.mpileup; samtools mpileup
+             -B -q 13 -d 1000000 -f $fastaIndex -l $bedFile *.bam >> bkg.mpileup'
+      2) Bgzip: 'tabix-0.2.6/bgzip bkg.mpileup'
+         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bkg.mpileup.gz'
+-g Path to graphite executable, see https://github.com/dillonl/graphite.
+-n Directory containing normal background indexed bams for graphite AF estimation.
+-i Indexed fasta file used to align the normal bams.
+-s Path to a directory to save the modified vcf file(s)
+
+Optional:
+-z Minimum vcf z-score, defaults to 0, no filtering
+-q Minimum mpileup sample bp quality, defaults to 20
+-c Minimum sample read coverge, defaults to 20
+-f Maximum sample AF, defaults to 0.3
+-a Minimum # samples for z-score calculation, defaults to 3
+-e Exclude vcf records that could not be z-scored
+-r Replace QUAL value with z-score. Un scored vars will be assigned 0
+-d Print verbose debugging output
+-t Number of threads to use, defaults to all
+-o Additional bash shell commands before executing graphite,e.g. 'module load gcc/4.9'
+-b BP intersection radius for pushing SNVs to graphite for AF estimation, default 125
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundChecker -v SomaticVcfs/ -z 3
+-m bkg.mpileup.gz -s BkgFiltVcfs/ -b 50 -q 13 -e -r -g ~/Graphite/bin/graphite -n
+~/BkgrndNormalBams/ -o 'module load gcc/4.9.2' -i ~/B37/b37.fa 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCFBamAnnotator"><pre>**************************************************************************************
+**                             VCF Bam Annotator : Aug 2017                         **
+**************************************************************************************
+This app pulls read coverage information from each bam over the vcf variants and adds
+the data as sample information in the vcf. Of particular use is the breakdown of
+alignment depth by R1 and R2. 
+
+Options:
+-v Vcf file (xxx.vcf(.gz/.zip OK)) to annotate.
+-b Comma delimited list of indexed bam files to extract alignment info.
+-n Comma delimited list of 'Sample Names' corresponding to the bams, defaults to the
+     bam file names.
+-r Annotated vcf results file.
+-f Indexed reference fasta used in aligning the bams.
+-s Path to the samtools executable.
+-g Path to the HTSlib bgzip executable.
+-t Path to the HTSlib tabix executable.
+-p Number of threads to use, defaults to all available.
+Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFConsensus -p illumina.vcf -q Strelka
+-s stnd.indel.vcf.gz -t Scalpel -o indelCalls.vcf.gz 
 
 **************************************************************************************
 </pre><br><p>
 				
 					<a name="VCF2Bed"><pre>**************************************************************************************
-**                                  VCF 2 Bed: July 2015                            **
+**                                  VCF 2 Bed: June 2017                            **
 **************************************************************************************
 Converts a vcf file to bed format.
 
@@ -4378,6 +4706,7 @@ Required Options:
 -v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
 -p Padding to expand each variants size, defaults to 0
 -s Directory to save the bed files, defaults to the parent of the vcf
+-e Print out only the END=xxx containing vcf records as the bed based on the end value.
 
 Example: java -jar pathToUSeq/Apps/VCF2Bed -v /VCFFiles/ -p 25 
 
@@ -4439,7 +4768,7 @@ Example: java -Xmx20G -jar pathTo/USeq/Apps/VCFAnnotator -v 9908R.vcf
 </pre><br><p>
 				
 					<a name="VCFComparator"><pre>**************************************************************************************
-**                              VCF Comparator : Jan 2017                           **
+**                              VCF Comparator : March 2017                         **
 **************************************************************************************
 Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls
 that fall in the common interrogated regions are compared. WARNING tabix gzipped files
@@ -4465,6 +4794,7 @@ Optional Options:
 -p Provide a full path directory for saving the parsed data. Defaults to not saving.
 -e Exclude test and key records whose FILTER field is not . or PASS. Defaults to
        scoring all.
+-i Relax matches to key INDELs to include all test variants within x bps.
 
 Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFComparator -a /NIST/NA12878/key.vcf
        -b /NIST/NA12878/regions.bed.gz -c /EdgeBio/Exome/testHaploCaller.vcf.zip
@@ -4474,7 +4804,7 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFComparator -a /NIST/NA12878/key.v
 </pre><br><p>
 				
 					<a name="VCFConsensus"><pre>**************************************************************************************
-**                              VCF Consensus : Jan 2016                            **
+**                              VCF Consensus : June 2017                           **
 **************************************************************************************
 Merges VCF files with the same #CHROM line. Primary records with the same chrPosRefAlt
 as a secondary are saved after appending the ID and FILTER, the secondary
@@ -4648,60 +4978,43 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFReporter -v 9908R.vcf
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="VCFSpliceAnnotator"><pre>**************************************************************************************
-**                            VCF Splice Annotator : May 2014                       **
+					<a name="VCFSpliceScanner"><pre>**************************************************************************************
+**                             VCF Splice Scanner : Dec 2017                        **
 **************************************************************************************
 Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and
 Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice
 acceptors and donors are scored for loss of a junction.  Exonic, intronic, and splice
-bases are scanned for novel junctions.  Note, indels in exons causing
-frameshifts are not annotated. This app only looks for changes in splicing. Pvalues
-for gained exonic or intronic splices are estimated by generating null distibutions
-of masked sequence scores. Likewise, damaged splice pvalues are calculated using a
-score distribution from scoring high confidence splice junctions. A detailed spread-
-sheet and modified vcf file are produced. 
+bases are scanned for novel junctions in a window around each variant. See the vcf
+INFO header for a description of the output. Use this information to identify likely
+snv and indel variants that may effect splicing.
 
 Required Options:
--r Save directory for writing results files.
--v VCF file or directory containing such (xxx.vcf(.gz/.zip OK)).
--f Fasta file directory, chromosome specific xxx.fa/.fasta(.zip/.gz OK) files.
+-v Path to a vcf file to annotate (xxx.vcf(.gz/.zip OK)).
+-r Name of a gzipped vcf file to use in saving the results, will over write.
+-f Path to the reference fasta with xxx.fai index
 -u UCSC RefFlat or RefSeq transcript (not merged genes) file, full path. See RefSeq 
        http://genome.ucsc.edu/cgi-bin/hgTables, (uniqueName1 name2(optional) chrom
        strand txStart txEnd cdsStart cdsEnd exonCount (commaDelimited)exonStarts
        (commaDelimited)exonEnds). Example: ENSG00000183888 C1orf64 chr1 + 16203317
        16207889 16203385 16205428 2 16203317,16205000 16203467,16207889 .
 -m Full path directory name containing the me2x3acc1-9, splice5sequences and me2x5
-       splice model files. See USeq/Documentation/ or 
+       splice model files. See USeqDocumentation/splicemodels/ or 
        http://genes.mit.edu/burgelab/maxent/download/ 
--h Histogram object file for estimating pvalues or complete -j -t below. Some can be
-       downloaded from http://tinyurl.com/mobfkjn 
 
 Optional options:
--e Don't scan exonic bases for novel splice junctions.
--i Don't scan intronic bases for novel splice junctions.
--s Don't scan known splice junctions for novel splice junctions.
--x Export category for adding info to the vcf file, defaults to 0:
+-x Export category for adding info to the vcf file, defaults to 2:
        0 All types (gain or damaged in exon, intron, and splice)
-       1 Just damaged splices
-       2 Damaged splices and novel splices in exons and splice junctions
--a Minimum 5' threshold for scoring the presence of a splice junction, defaults to 4.
--b Minimum 3' threshold for scoring the presence of a splice junction, defaults to 4.
--c Minimum difference for loss or gain of a 5' splice junction, defaults to 4.
--d Minimum difference for loss or gain of a 3' splice junction, defaults to 4.
--p Minimum -10Log10(pvalue) for reporting a splice junction, defaults to 13.
-
-Options for generating reusable splice score histograms:
--j Bam alignment splice file from running the SamTranscriptomeParser with -j to use
-       in checking for actual use of the known splice junction prior to scoring it for
-       inclusion in the known junction histograms. Besure to remove duplicates with the
-       Picard MarkDuplicates app too.
--t CCDS transcript file, see -u above.
--k Minimum read coverage for known splice junction scoring, defaults to 10
+       1 Just report damaged splices
+       2 Report damaged splices and novel splices in exons and splice junctions.
+-a Minimum new splice junction score in Alt, max score in Ref, defaults to 3.
+-b Minimum new splice junction score difference, new - refseq, defaults to 1.
+-c Maximum damaged splice junction score, defaults to 3.
+-d Minimum damaged score difference, refseq - new, defaults to 1.
+-s Format vcf with minimal output for downstream annotators, e.g. snpEff.
 
 Example: java -Xmx10G -jar ~/USeq/Apps/VCFSpliceAnnotator -f ~/Hg19/Fa/ -v ~/exm2.vcf
-       -m ~/USeq/Documentation/splicemodels -i -u ~/Hg19/hg19EnsTrans.ucsc.zip -t
-       ~/Hg19/hg19CCDSTrans.ucsc.zip -j ~/Hg19/allReadsSTP.bam -r ~/ExmSJAnno/
-
+       -m ~/USeq/Documentation/splicemodels -i -u ~/Hg19/hg19EnsTrans.ucsc.zip -r
+       ~/ExmSJAnno/exm2VSSAnno.vcf.gz -x 0
 **************************************************************************************
 </pre><br><p>
 				
@@ -4720,6 +5033,24 @@ Required Options:
 
 Example: java -jar pathToUSeq/Apps/VCFTabix -v /VarScan2/VCFFiles/
      -t /Samtools/Tabix/tabix-0.2.6/ 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCF2Tvs"><pre>**************************************************************************************
+**                                 VCF 2 Tvs: March 2018                            **
+**************************************************************************************
+Converts vcf files' SNVs and INDELs to tvs Illumina CE/CA format. 
+
+Required Options:
+-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
+-s Directory to save the tvs files, defaults to the parent of the vcf
+-q Minimum QUAL, defaults to 0, no threshold.
+-z Ignore QUAL thresholding when BKZ= is absent from INFO field.
+-b Max frac BKAFs >= AF, defaults to 1, no threshold.
+-i ID column string forcing export. Case insensitive.
+
+Example: java -jar pathToUSeq/Apps/VCF2Tvs -v VCFss/ -q 3 -z -b 0.2 -i Foundation 
 
 **************************************************************************************
 </pre><br><p>
@@ -4856,7 +5187,7 @@ Example: java -jar pathToUSeq/Apps/SomaticSniperVCFParser -v /VCFFiles/ -m 32 -a
 </pre><br><p>
 				
 					<a name="StrelkaVCFParser"><pre>**************************************************************************************
-**                             Strelka VCF Parser: Jan 2017                         **
+**                             Strelka VCF Parser: Feb 2018                         **
 **************************************************************************************
 Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS
 score. Also filters for read depth, T/N alt allelic ratio and diff,
@@ -4872,9 +5203,11 @@ Required Params:
 -d Minimum T-N AF difference, defaults to 0.
 -r Minimum T/N AF ratio, defaults to 0.
 -p Remove non PASS filter field records.
+-s Print spreadsheet variant summary.
+-f Directory in which to save the parsed files, defaults to the parent dir of the vcfs.
 
 Example: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -t 0.05
-        -n 0.5 -u 100 -o 20 -d 0.05 -r 2
+        -n 0.5 -u 100 -o 20 -d 0.05 -r 2 -f ParsedVcfs 
 
 **************************************************************************************
 </pre><br><p>
