@@ -40,6 +40,8 @@ public class Sam2USeq {
 	private int minimumLength = 0;
 	private double maximumCoverageCalculated = 101;
 	private File jsonOutputFile = null;
+	private boolean flipStrandSecondRead = false;
+	private boolean includeNs = false;
 
 	//internal
 	private ChromData chromData;
@@ -202,10 +204,6 @@ public class Sam2USeq {
 					//chromosome, converting to chr
 					String chromosome = sam.getReferenceName();
 
-					/*Don't do this its causing issues with b37
-					if (chromosome.startsWith("chr") == false) chromosome = "chr"+chromosome;
-					 */
-
 					//skip phiX and adapter
 					if (chromosome.startsWith(phiX) || chromosome.startsWith(adapter)) continue;
 
@@ -234,8 +232,17 @@ public class Sam2USeq {
 					//make chromosome strand
 					String strand = null;
 					if (stranded){
-						if (sam.getReadNegativeStrandFlag()) strand = "-";
-						else strand = "+";
+						boolean plusStrand;
+						if (flipStrandSecondRead && sam.getReadPairedFlag() && sam.getSecondOfPairFlag()){
+							if (sam.getReadNegativeStrandFlag()) plusStrand = true;
+							else plusStrand = false;	
+						}
+						else {
+							if (sam.getReadNegativeStrandFlag()) plusStrand = false;
+							else plusStrand = true;
+						}
+						if (plusStrand) strand = "+";
+						else strand = "-";
 					}
 					else strand = ".";
 					String chromosomeStrand = chromosome+strand;
@@ -452,7 +459,7 @@ public class Sam2USeq {
 					String call = mat.group(2);
 					int numberBases = Integer.parseInt(mat.group(1));
 					//a match
-					if (call.equals("M")) {
+					if (call.equals("M") || (includeNs == true && call.equals("N"))) {
 						for (int i = 0; i< numberBases; i++) {
 							baseCounts[start] += numRepeats;
 							alignmnentLengths[start] += alignmentLength;
@@ -822,6 +829,8 @@ public class Sam2USeq {
 					case 'b': regionFile = new File(args[i+1]); i++; break;
 					case 'o': logFile = new File(args[++i]); break;
 					case 'j': jsonOutputFile = new File(args[++i]); break;
+					case 'z': flipStrandSecondRead = true; break;
+					case 'y': includeNs = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -931,6 +940,8 @@ public class Sam2USeq {
 				System.out.println(scaleRepeats+"\tScale repeat alignments by the number of matches.");
 			}
 			System.out.println(stranded+"\tMake stranded covererage tracks.");
+			if (stranded) System.out.println(flipStrandSecondRead+"\tFlip strand of second of pair alignments.");
+			System.out.println(includeNs+"\tInclude Ns in read coverage calculations.");
 			System.out.println(minimumMappingQuality+"\tMinimum mapping quality score.");
 			System.out.println(maximumAlignmentScore+"\tMaximum alignment score.");
 			if (minimumCounts !=0){
@@ -1067,7 +1078,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  Sam 2 USeq : Dec 2017                           **\n" +
+				"**                                  Sam 2 USeq : Jan 2018                           **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
@@ -1105,6 +1116,8 @@ public class Sam2USeq {
 				"-k Make average alignment length graph instead of read depth.\n"+
 				"-d Full path to a directory for saving bar binary PointData, defaults to not saving.\n"+
 				"-j Write summary stats in json format to this file, requires -b and -c.\n"+
+				"-y Include CIGAR Ns in read coverage, defaults to just M values.\n"+
+				"-z Flip the strand of the 2nd of pair alignments.\n"+
 				
 
 				"\n"+
