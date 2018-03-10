@@ -14,7 +14,7 @@ import util.gen.Misc;
 import util.gen.Num;
 
 /**Converts a vcf file into a simple chr pos ref alt %AF for Illumina CE/CA uploads.*/
-public class VCF2Tvs {
+public class VCF2Tsv {
 
 	private File[] vcfFiles;
 	private File saveDirectory;
@@ -24,7 +24,7 @@ public class VCF2Tvs {
 	private Pattern keepId = null;
 	private String keepIdString = "";
 
-	public VCF2Tvs (String[] args) {
+	public VCF2Tsv (String[] args) {
 
 		processArgs(args);
 
@@ -41,7 +41,7 @@ public class VCF2Tvs {
 
 	public void parse(File vcfFile){
 
-		File bed = new File (saveDirectory, Misc.removeExtension(vcfFile.getName())+".tvs.gz");
+		File bed = new File (saveDirectory, Misc.removeExtension(vcfFile.getName())+".tsv.gz");
 		String line = null;
 		int numPrinted = 0;
 		int numNotPrinted = 0;
@@ -87,12 +87,13 @@ public class VCF2Tvs {
 					if (keepId != null && parse == false){
 						if (keepId.matcher(vcf.getRsNumber()).matches()) parse = true;
 					}
+					
+					//check for . in ref or alt, these are junk vars from the old Strelka
+					if (vcf.getReference().equals(".") || vcf.getAlternate()[0].equals(".")) parse = false;
 
 				}
 
 				if (parse){
-					vcf.appendChr();
-					vcf.correctChrMTs();
 					String afPercent = Num.formatNumber(af*100, 1);
 					if (vcf.getAlternate().length !=1) throw new Exception("More than one alt, use vt decompose "+line);
 					out.println(vcf.getChromosome()+"\t"+(vcf.getPosition()+1)+ "\t"+ vcf.getReference()+"\t"+vcf.getAlternate()[0]+"\t"+afPercent);
@@ -127,7 +128,7 @@ public class VCF2Tvs {
 			printDocs();
 			System.exit(0);
 		}
-		new VCF2Tvs(args);
+		new VCF2Tsv(args);
 	}		
 
 
@@ -177,9 +178,9 @@ public class VCF2Tvs {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 VCF 2 Tvs: March 2018                            **\n" +
+				"**                                 VCF 2 Tsv: March 2018                            **\n" +
 				"**************************************************************************************\n" +
-				"Converts vcf files' SNVs and INDELs to tvs Illumina CE/CA format. \n"+
+				"Converts vcf files' SNVs and INDELs to tsv Illumina CE/CA format. \n"+
 
 				"\nRequired Options:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).\n" +
@@ -189,7 +190,7 @@ public class VCF2Tvs {
 				"-b Max frac BKAFs >= AF, defaults to 1, no threshold.\n"+
 				"-i ID column string forcing export. Case insensitive.\n"+
 
-				"\nExample: java -jar pathToUSeq/Apps/VCF2Tvs -v VCFss/ -q 3 -z -b 0.2 -i Foundation \n\n" +
+				"\nExample: java -jar pathToUSeq/Apps/VCF2Tsv -v VCFss/ -q 3 -z -b 0.2 -i Foundation \n\n" +
 				"**************************************************************************************\n");
 
 	}
