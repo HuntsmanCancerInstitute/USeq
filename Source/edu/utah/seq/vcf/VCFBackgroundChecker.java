@@ -28,7 +28,6 @@ public class VCFBackgroundChecker {
 	private File[] vcfFiles;
 	private File mpileup;
 	private File saveDir;
-	private int bpBuffer = 0;
 	private int minBaseQuality = 20;
 	private int minReadCoverage = 20;
 	private int minNumSamples = 3;
@@ -286,7 +285,6 @@ public class VCFBackgroundChecker {
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		File forExtraction = null;
-		int[] sampleIndexes = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -297,9 +295,7 @@ public class VCFBackgroundChecker {
 					case 'v': forExtraction = new File(args[++i]); break;
 					case 's': saveDir = new File(args[++i]); break;
 					case 'm': mpileup = new File(args[++i]); break;
-					case 'i': sampleIndexes = Num.parseInts(args[++i], Misc.COMMA); break;
 					case 'z': minimumZScore = Double.parseDouble(args[++i]); break;
-					case 'b': bpBuffer = Integer.parseInt(args[++i]); break;
 					case 'q': minBaseQuality = Integer.parseInt(args[++i]); break;
 					case 'c': minReadCoverage = Integer.parseInt(args[++i]); break;
 					case 'a': minNumSamples = Integer.parseInt(args[++i]); break;
@@ -348,7 +344,6 @@ public class VCFBackgroundChecker {
 	public void printSettings(){
 		System.out.println("Settings:\nBackground\t"+mpileup);
 		System.out.println("Save dir\t"+saveDir);
-		System.out.println(bpBuffer+"\tBP buffer");
 		System.out.println(minReadCoverage+"\tMin mpileup sample read coverage");
 		System.out.println(minBaseQuality+"\tMin mpileup sample base quality");
 		System.out.println(maxSampleAF+"\tMax mpileup sample AF");
@@ -364,7 +359,7 @@ public class VCFBackgroundChecker {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                         VCF Background Checker : Dec 2017                        **\n" +
+				"**                         VCF Background Checker : March 2018                      **\n" +
 				"**************************************************************************************\n" +
 				"VBC calculates non-reference allele frequencies (AF) from a background multi-sample \n"+
 				"mpileup file over each vcf record. It then calculates a z-score for the vcf AF and \n"+
@@ -405,9 +400,6 @@ public class VCFBackgroundChecker {
 	}
 
 	//getters and setters
-	public int getBpBuffer() {
-		return bpBuffer;
-	}
 
 	public int getMinBaseQuality() {
 		return minBaseQuality;
