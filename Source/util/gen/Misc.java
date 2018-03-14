@@ -138,6 +138,19 @@ public class Misc {
 	        array[n - 1] = tmp;
 	    }
 	}
+
+	/**For multiple iterations.*/
+	public static void randomize (int[] array, Random rng){     
+	    // n is the number of items left to shuffle
+	    for (int n = array.length; n > 1; n--) {
+	        // Pick a random element to move to the end
+	        int k = rng.nextInt(n);  // 0 <= k <= n - 1.
+	        // Simple swap of variables
+	        int tmp = array[k];
+	        array[k] = array[n - 1];
+	        array[n - 1] = tmp;
+	    }
+	}
 	
 	/**Does not check if indexes are out of bounds!
 	 * @return the number of trues between the start and stop
