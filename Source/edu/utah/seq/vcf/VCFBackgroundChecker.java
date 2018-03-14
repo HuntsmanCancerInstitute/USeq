@@ -374,12 +374,13 @@ public class VCFBackgroundChecker {
 				"-m Path to a bgzip compressed and tabix indexed multi-sample mpileup file. e.g.:\n"+
 				"      1) Mpileup: 'echo \"#SampleOrder: \"$(ls *bam) > bkg.mpileup; samtools mpileup\n"+
 				"             -B -q 13 -d 1000000 -f $fastaIndex -l $bedFile *.bam >> bkg.mpileup'\n"+
-				"      2) Bgzip: 'tabix-0.2.6/bgzip bkg.mpileup'\n"+
-                "         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bkg.mpileup.gz'\n"+
+				"      2) (Optional) MpileupRandomizer: java -jar -Xmx10G ~/USeqApps/MpileupRandomizer"+
+				"             -r 20 -s 3 -m bkg.mpileup\n"+
+				"      3) Bgzip: 'tabix-0.2.6/bgzip bkg.mpileup_DP20MS3.txt'\n"+
+                "         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bkg.mpileup_DP20MS3.txt.gz'\n"+
 				"-s Path to directory in which to save the modified vcf file(s)\n"+
 						
 				"\nOptional:\n" +
-				"-b BP padding, defaults to 0\n"+
 				"-z Minimum vcf z-score, defaults to 0, no filtering\n"+
 				"-q Minimum mpileup sample bp quality, defaults to 20\n"+
 				"-c Minimum mpileup sample read coverge, defaults to 20\n"+
