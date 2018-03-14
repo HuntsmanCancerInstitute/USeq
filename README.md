@@ -1,9 +1,13 @@
 # USeq
-Applications for analyzing next generation sequencing data from Illumina, SOLiD, and 454 platforms. 
-ChIP-seq, RNA-seq, Bis-seq, re-sequencing, SNP INDELs, capture array design tools, IGB/ DAS2/IGV/UCSC 
-graph manipulation tools.... GUI and cmd line interface.
+[180+ Java applications](http://bioserver.hci.utah.edu/USeq/Documentation/cmdLnMenus.html) for analyzing next generation sequencing data from ChIPSeq, RNASeq, BisSeq, DNASeq, variant annotation/ filtering, alignment/VCF QC, capture array design, IGV/ DAS2/IGB/UCSC file manipulation, etc. Both GUI and cmd line interfaces.
 
-## Installation in Eclipse
+## Installing the latest version
+1. Download the latest [USeq_xxx.zip](https://github.com/HuntsmanCancerInstitute/USeq/releases) release
+2. Uncompress
+3. Execute an app with no parameters to pull the help menu, e.g. java -jar USeq_9.1.3/Apps/BamConcordance
+4. See the usage and application guides in the [USeq_xxxx/Documentation](http://bioserver.hci.utah.edu/USeq/Documentation/) release
+
+## Installation in Eclipse for developers
 1. Clone the github repo.
 2. Download Apache ANT libraries (apache-ant-1.9.6-bin.tar.gz) from http://ant.apache.org/bindownload.cgi and unzip.
 3. Set ANT_HOME in your bash profile to point to the unzipped ANT directory. Don't forget to source the file to implement the changes.
