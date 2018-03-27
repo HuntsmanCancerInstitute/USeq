@@ -130,6 +130,9 @@ public class LofreqVCFParser {
 			else if (t[i].startsWith("AF=")) af = Float.parseFloat(t[i].substring(3));
 		}
 		if (dp == -1 || af == -1) Misc.printErrAndExit("\nError: failed to parse a DP or AF from "+info);
+		
+		//watch out for incorrect af calcs! Lofreq bug!
+		if (af > 1.0f) af = 1.0f;
 		return new float[]{dp, af};
 	}
 
