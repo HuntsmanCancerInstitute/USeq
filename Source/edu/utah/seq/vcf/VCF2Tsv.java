@@ -94,7 +94,10 @@ public class VCF2Tsv {
 				}
 
 				if (parse){
+					//check for bad AFs
+					if (af > 1.0) af = 1.0;
 					String afPercent = Num.formatNumber(af*100, 1);
+					
 					if (vcf.getAlternate().length !=1) throw new Exception("More than one alt, use vt decompose "+line);
 					out.println(vcf.getChromosome()+"\t"+(vcf.getPosition()+1)+ "\t"+ vcf.getReference()+"\t"+vcf.getAlternate()[0]+"\t"+afPercent);
 					numPrinted++;
