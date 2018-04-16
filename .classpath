@@ -1,73 +1,73 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="Source"/>
-	<classpathentry kind="lib" path="LibraryJars/activation.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/amazonWebServices18Jan07.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/ant.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/biojava-1.5.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/bytecode.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/bzip2.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-beanutils.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-collections-3.0.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-collections-3.1.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-collections-testframework-3.0.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-collections.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-dbcp-1.1.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-el.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-fileupload-1.2.2.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-httpclient-3.0.1.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-logging-api.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-logging.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-math3-3.0-sources.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-math3-3.0.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-net-3.1.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-pool-1.1.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/dom4j-1.6.1.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/flanaganReComp.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/freehep-2.1.1.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/GDACFiles.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/htsjdk-1.114.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/jasper-compiler.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/jasper-runtime.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/jcommon-1.0.0.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/jets3t-0.5.0.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/jfreechart-1.0.1.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/jmx.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/jsp-api.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/log4j-1.2.12.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/mail.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/mysql-connector-java-3.0.9-stable-bin.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/naming-common.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/naming-factory.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/naming-java.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/naming-resources.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/picard-1.114.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/picard-1.92.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/poi-3.10.1-20140818.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/poi-3.9-20121203.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/poi-ooxml-3.10.1-20140818.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/poi-ooxml-3.9-20121203.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/poi-ooxml-schemas-3.10.1-20140818.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/poi-ooxml-schemas-3.9-20121203.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/protobuf-java-2.2.0.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/sam-1.92.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/servlet-api.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/TableLayout.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/xbean.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="LibraryJars/jets3t-0.9.4.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/bcprov-jdk15on-154.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/aws-java-sdk-1.10.62.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/com.fasterxml.jackson.databind.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/com.fasterxml.jackson.core.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/com.fasterxml.jackson.annotations.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/httpclient-4.5.2.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/httpcore-4.4.4.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/joda-time-2.9.2.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/jsch-0.1.53.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/minimal-json-0.9.4.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/mongo-java-driver-2.14.2.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/json-20140107.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/commons-codec-1.10.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/activation.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/amazonWebServices18Jan07.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/ant.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/biojava-1.5.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/bytecode.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/bzip2.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-beanutils.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-collections-3.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-collections-3.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-collections-testframework-3.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-collections.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-dbcp-1.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-el.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-fileupload-1.2.2.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-httpclient-3.0.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-logging-api.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-logging.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-math3-3.0-sources.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-math3-3.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-net-3.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-pool-1.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/dom4j-1.6.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/flanaganReComp.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/freehep-2.1.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/GDACFiles.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/htsjdk-1.114.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/jasper-compiler.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/jasper-runtime.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/jcommon-1.0.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/jets3t-0.5.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/jfreechart-1.0.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/jmx.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/jsp-api.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/log4j-1.2.12.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/mail.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/mysql-connector-java-3.0.9-stable-bin.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/naming-common.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/naming-factory.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/naming-java.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/naming-resources.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/picard-1.114.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/picard-1.92.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/poi-3.10.1-20140818.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/poi-3.9-20121203.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/poi-ooxml-3.10.1-20140818.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/poi-ooxml-3.9-20121203.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/poi-ooxml-schemas-3.10.1-20140818.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/poi-ooxml-schemas-3.9-20121203.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/protobuf-java-2.2.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/sam-1.92.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/servlet-api.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/TableLayout.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/xbean.jar"/>
+	<classpathentry exported="true" kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/jets3t-0.9.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/bcprov-jdk15on-154.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/aws-java-sdk-1.10.62.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/com.fasterxml.jackson.databind.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/com.fasterxml.jackson.core.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/com.fasterxml.jackson.annotations.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/httpclient-4.5.2.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/httpcore-4.4.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/joda-time-2.9.2.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/jsch-0.1.53.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/minimal-json-0.9.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/mongo-java-driver-2.14.2.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/json-20140107.jar"/>
+	<classpathentry exported="true" kind="lib" path="LibraryJars/commons-codec-1.10.jar"/>
 	<classpathentry kind="output" path="Classes"/>
 </classpath>

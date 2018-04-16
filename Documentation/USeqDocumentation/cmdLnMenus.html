@@ -213,6 +213,8 @@
 				
 					<a href="#MpileupParser">MpileupParser</a><br>
 				
+					<a href="#MpileupRandomizer">MpileupRandomizer</a><br>
+				
 					<a href="#MultipleReplicaScanSeqs">MultipleReplicaScanSeqs</a><br>
 				
 					<a href="#MultiSampleVCFFilter">MultiSampleVCFFilter</a><br>
@@ -359,7 +361,7 @@
 				
 					<a href="#VCFTabix">VCFTabix</a><br>
 				
-					<a href="#VCF2Tvs">VCF2Tvs</a><br>
+					<a href="#VCF2Tsv">VCF2Tsv</a><br>
 				
 					<a href="#Wig2Bar">Wig2Bar</a><br>
 				
@@ -2889,6 +2891,25 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MpileupParser -p /Pileups/N2.mpileup.
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="MpileupRandomizer"><pre>**************************************************************************************
+**                             Mpileup Randomizer: March 2018                       **
+**************************************************************************************
+Upon finding a gap in the coverage, the sample order is randomized and maintained. Use
+this app to 'de-identify' a multi sample mpileup file while maintaining INDEL blocks.
+
+Required Options:
+-m Path to a Samtools mpileup file (gz/zip OK).
+
+Default Options:
+-r Minimum read depth to pass a sample, default 10
+-s Minimum number of samples that must pass to save line, default 3
+-g Minimum gap, defaults to 75
+
+Example: java -Xmx4G -jar pathToUSeq/Apps/MpileupRandomizer -m normExo.mpileup.gz
+     -o randomized.mpileup.gz -r 20 -s 4 
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="MultipleReplicaScanSeqs"><pre>**************************************************************************************
 **                        Multiple Replica Scan Seqs: May 2014                      **
 **************************************************************************************
@@ -4595,7 +4616,7 @@ Example: java -jar pathToUSeq/Apps/VarScanVCFParser -v /VarScan2/VCFFiles/
 </pre><br><p>
 				
 					<a name="VCFBackgroundChecker"><pre>**************************************************************************************
-**                         VCF Background Checker : Dec 2017                        **
+**                         VCF Background Checker : March 2018                      **
 **************************************************************************************
 VBC calculates non-reference allele frequencies (AF) from a background multi-sample 
 mpileup file over each vcf record. It then calculates a z-score for the vcf AF and 
@@ -4610,12 +4631,12 @@ Required:
 -m Path to a bgzip compressed and tabix indexed multi-sample mpileup file. e.g.:
       1) Mpileup: 'echo "#SampleOrder: "$(ls *bam) > bkg.mpileup; samtools mpileup
              -B -q 13 -d 1000000 -f $fastaIndex -l $bedFile *.bam >> bkg.mpileup'
-      2) Bgzip: 'tabix-0.2.6/bgzip bkg.mpileup'
-         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bkg.mpileup.gz'
+      2) (Optional) MpileupRandomizer: java -jar -Xmx10G ~/USeqApps/MpileupRandomizer             -r 20 -s 3 -m bkg.mpileup
+      3) Bgzip: 'tabix-0.2.6/bgzip bkg.mpileup_DP20MS3.txt'
+         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bkg.mpileup_DP20MS3.txt.gz'
 -s Path to directory in which to save the modified vcf file(s)
 
 Optional:
--b BP padding, defaults to 0
 -z Minimum vcf z-score, defaults to 0, no filtering
 -q Minimum mpileup sample bp quality, defaults to 20
 -c Minimum mpileup sample read coverge, defaults to 20
@@ -5037,10 +5058,10 @@ Example: java -jar pathToUSeq/Apps/VCFTabix -v /VarScan2/VCFFiles/
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="VCF2Tvs"><pre>**************************************************************************************
-**                                 VCF 2 Tvs: March 2018                            **
+					<a name="VCF2Tsv"><pre>**************************************************************************************
+**                                 VCF 2 Tsv: March 2018                            **
 **************************************************************************************
-Converts vcf files' SNVs and INDELs to tvs Illumina CE/CA format. 
+Converts vcf files' SNVs and INDELs to tsv Illumina CE/CA format. 
 
 Required Options:
 -v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
@@ -5050,7 +5071,7 @@ Required Options:
 -b Max frac BKAFs >= AF, defaults to 1, no threshold.
 -i ID column string forcing export. Case insensitive.
 
-Example: java -jar pathToUSeq/Apps/VCF2Tvs -v VCFss/ -q 3 -z -b 0.2 -i Foundation 
+Example: java -jar pathToUSeq/Apps/VCF2Tsv -v VCFss/ -q 3 -z -b 0.2 -i Foundation 
 
 **************************************************************************************
 </pre><br><p>

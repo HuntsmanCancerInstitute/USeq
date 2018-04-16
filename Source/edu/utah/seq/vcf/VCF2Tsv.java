@@ -60,12 +60,18 @@ public class VCF2Tsv {
 
 				//skip structural vars even in Id match calls
 				if (vcf.getAlternate()[0].startsWith("<") == false) {
-
+					
+					
 					//check quality
 					float qual = vcf.getQuality();
 					if (qual ==0 && line.contains("BKZ=") == false && ignoreNoBKZThresholding) parse = true;
 					if (parse == false){
 						if (qual >= minimumQual) parse = true;
+					}
+					
+					//check for multi alts
+					if (vcf.getAlternate().length != 1){
+						parse = false;
 					}
 
 					//check frac BKAF?
