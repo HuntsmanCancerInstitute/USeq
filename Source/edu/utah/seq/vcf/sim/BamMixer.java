@@ -43,6 +43,8 @@ public class BamMixer {
 	private File modifiedPairedVariantBamFile;
 	private File unmodifiedPairedVariantBamFile; 
 	private static final Pattern BB = Pattern.compile(":BB");
+	private Pattern numUnder = Pattern.compile("^\\d[\\d_]+");
+	private Pattern trailingBB = Pattern.compile(":BB-");
 	
 	public BamMixer (String[] args){
 		long startTime = System.currentTimeMillis();
@@ -107,6 +109,24 @@ public class BamMixer {
 			System.out.println("\t"+fractions[i]+ "\t" +countForVar[i]+ "\t" +countForUnMod[i]);
 		}
 	}
+	
+	/**Removes leading and trailing info from BamMixer
+	 * e.g. 0_HWI-D00294:322:CATY4ANXX:6:1101:1166:34209:BB-INS_178536299_C_CT_2  ->  HWI-D00294:322:CATY4ANXX:6:1101:1166:34209*/
+	public void stripNameNumber(SAMRecord sam){
+		String name = sam.getReadName();
+		int start = 0; 
+		int stop = name.length();
+		
+		Matcher mat = numUnder.matcher(name);
+		if (mat.find()) start = mat.end();
+
+		Matcher trailing = trailingBB.matcher(name);
+		if (trailing.find()) stop = trailing.start();
+		
+		String newName = name.substring(start, stop);
+		sam.setReadName(newName);
+	}
+
 
 	public int countPassingAlignments(File bamSam) {
 		SamReader reader = readerFactory.open(bamSam);
@@ -153,7 +173,7 @@ public class BamMixer {
 		while (i.hasNext()) {
 			SAMRecord sam = i.next();
 			//check it
-			if (sam.isSecondaryOrSupplementary() || sam.getReadUnmappedFlag()) {
+			if (sam.isSecondaryOrSupplementary() || sam.getReadUnmappedFlag() || sam.getProperPairFlag() == false) {
 				numNotAligned++;
 				continue;
 			}
@@ -173,6 +193,10 @@ public class BamMixer {
 					break;
 				}
 			}
+			
+			//strip out leading and trailing header info
+			stripNameNumber(sam);
+			
 			//write out
 			if (isModified) {
 				modWriter.addAlignment(sam);
@@ -201,7 +225,7 @@ public class BamMixer {
 	private void mergePairedAndUnPaired() {
 		File[] toMerge = {modifiedPairedVariantBamFile, unPairedVariantBamFile};
 		mergedVariantBam = new File(saveDirectory, "mergedVariants.bam");
-		variantMS = new MergeSams(toMerge, mergedVariantBam, verbose);
+		variantMS = new MergeSams(toMerge, mergedVariantBam, verbose, false);
 		System.out.println("\t"+variantMS.getNumberPassingAlignments()+"\ttotal # modified alignments");
 	}
 	
@@ -211,7 +235,7 @@ public class BamMixer {
 			File f = new File (saveDirectory, fractions[i]+"Var.bam");
 			File[] toMerge = {unModifiedNoMatchBamFile, unmodifiedPairedVariantBamFile, subVar[i], subNorm[i]};
 			System.out.println("\t"+subVar[i].getName()+"\t"+subNorm[i].getName()+"\t"+unModifiedNoMatchBamFile.getName()+"\t"+unPairedVariantBamFile.getName());
-			new MergeSams(toMerge, f, verbose);
+			new MergeSams(toMerge, f, verbose, false);
 		}
 	}
 

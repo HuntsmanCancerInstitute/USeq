@@ -286,8 +286,7 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		if (reference.length() != 1) return false;
 		//check each alternate for non snp
 		for (int i=0; i< alternate.length; i++){
-			if (alternate[i].length() != 1) return false;
-			// old way,  if (alternate[i].length() != 1 || alternate[i].equals(".") == true) return false;
+			if (alternate[i].length() != 1 || alternate[i].equals(".")) return false;
 		}
 		return true;
 	}
@@ -459,6 +458,22 @@ public class VCFRecord implements Comparable<VCFRecord> {
 			if (filter.length() == 0) filter = otherFilter;
 			else filter = filter+";"+otherFilter;
 		}
+	}
+
+	public int getSizeIndel() {
+		int max = reference.length();
+		for (String a: alternate) if (a.length() > max) max = a.length();
+		return max;
+	}
+
+	/**For non snvs, checks to see that the first base in the ref and alt are the same.*/
+	public boolean checkLeadingRef() {
+		if (isSNP()) return true;
+		char ref = reference.charAt(0);
+		for (String alt: alternate){
+			if (alt.charAt(0) != ref) return false;
+		}
+		return true;
 	}
 
 }

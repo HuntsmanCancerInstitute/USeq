@@ -18,6 +18,7 @@ public class GatkRunnerChunk implements Runnable{
 	private String cmd;
 	private File tempVcf;
 	private File tempBed;
+	private File tempLog;
 	private File bamOut = null;
 	
 	public GatkRunnerChunk(Bed[] regions, GatkRunner gatkRunner, String uniqueName) throws Exception{
@@ -35,6 +36,9 @@ public class GatkRunnerChunk implements Runnable{
 		//make temp vcf
 		tempVcf = new File (gatkRunner.getSaveDirectory(), name+"_temp.vcf");
 		
+		//make log file
+		tempLog = new File (gatkRunner.getSaveDirectory(), name+"_temp.log");
+		
 		//output the bam?
 		if (gatkRunner.bamOut) {
 			bamOut = new File (gatkRunner.getSaveDirectory(), name+"_temp.bam");
@@ -44,7 +48,6 @@ public class GatkRunnerChunk implements Runnable{
 		}
 
 		//build and execute gatk call
-
 		if (gatkRunner.useLowerCaseL) {
 			String[] t = Misc.WHITESPACE.split(gatkRunner.getGatkArgs());
 			t[t.length-1] = " -l "+tempBed+" -o "+tempVcf +" "+t[t.length-1];
@@ -54,7 +57,7 @@ public class GatkRunnerChunk implements Runnable{
 		if (bamOut != null) cmd = cmd + " -bamout "+bamOut;
 		
 		System.out.println(cmd);
-		String[] out = IO.executeViaProcessBuilder(Misc.WHITESPACE.split(cmd), false);
+		String[] out = IO.executeViaProcessBuilder(Misc.WHITESPACE.split(cmd), tempLog);
 		
 		//any errors? ignore StatusLogger errors
 		for (String line: out) {
@@ -96,5 +99,9 @@ public class GatkRunnerChunk implements Runnable{
 
 	public File getBamOut() {
 		return bamOut;
+	}
+
+	public File getTempLog() {
+		return tempLog;
 	}
 }

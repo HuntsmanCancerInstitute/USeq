@@ -20,7 +20,7 @@ public class GatkRunner {
 	private File bedFile;
 	private File saveDirectory;
 	private String gatkArgs = null;
-	private int numberConcurrentThreads = 4;
+	private int numberThreads = 0;
 	boolean useLowerCaseL = false;
 	boolean bamOut = false;
 	
@@ -52,7 +52,7 @@ public class GatkRunner {
 		//parse regions and randomize
 		Bed[] regions = Bed.parseFile(bedFile, 0, 0);
 		Misc.randomize(regions, 0);
-		int numRegionsPerChunk = 1+ (int)Math.round( (double)regions.length/ (double)numberConcurrentThreads );
+		int numRegionsPerChunk = 1+ (int)Math.round( (double)regions.length/ (double)numberThreads );
 		
 		//split regions
 		ArrayList<Bed[]> splitBed = Bed.splitByNumber(regions, numRegionsPerChunk);
@@ -75,6 +75,7 @@ public class GatkRunner {
 			if (c.isFailed()) Misc.printErrAndExit("\nERROR: Failed runner, aborting! \n"+c.getCmd());
 			c.getTempBed().deleteOnExit();
 			c.getTempVcf().deleteOnExit();
+			c.getTempLog().deleteOnExit();
 			new File (c.getTempVcf()+".idx").deleteOnExit();
 		}
 		
@@ -124,7 +125,7 @@ public class GatkRunner {
 		File[] bams = new File[runners.length];
 		for (int i=0; i< runners.length; i++) bams[i] = runners[i].getBamOut();
 		File mergedBam = new File (saveDirectory, "mutect.realigned.bam");
-		MergeSams ms = new MergeSams(bams, mergedBam, false);
+		MergeSams ms = new MergeSams(bams, mergedBam, false, true);
 	}
 
 
@@ -158,7 +159,7 @@ public class GatkRunner {
 					}
 					case 'l': useLowerCaseL= true; break;
 					case 'b': bamOut= true; break;
-					case 't': numberConcurrentThreads = Integer.parseInt(args[++i]); break;
+					case 't': numberThreads = Integer.parseInt(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -166,6 +167,19 @@ public class GatkRunner {
 					Misc.printErrAndExit("\nSorry, something doesn't look right with this parameter: -"+test+"\n");
 				}
 			}
+		}
+		
+		//threads to use
+		double gigaBytesAvailable = ((double)Runtime.getRuntime().maxMemory())/ 1073741824.0;
+		int numPossCores = (int)Math.round(gigaBytesAvailable/5.0);
+		if (numPossCores < 1) numPossCores = 1;
+		int numPossThreads = Runtime.getRuntime().availableProcessors();
+		if (numberThreads == 0){
+			if (numPossCores <= numPossThreads) numberThreads = numPossCores;
+			else numberThreads = numPossThreads;
+			System.out.println("Core usage:\n\tGB available to Java:\t"+ Num.formatNumber(gigaBytesAvailable, 1));
+			System.out.println("\tAvailable cores:\t"+numPossThreads);
+			System.out.println("\tNumber cores to use @ 5GB/core:\t"+numberThreads+"\n");
 		}
 
 		//check save dir
@@ -180,9 +194,8 @@ public class GatkRunner {
 		if (gatkArgs == null) Misc.printErrAndExit("\nError: please provide a gatk launch cmd similar to the example.\n\n");
 		if (gatkArgs.contains("~") || gatkArgs.contains("./")) Misc.printErrAndExit("\nError: provide full paths in the GATK command.\n"+gatkArgs);
 		if (gatkArgs.contains(" -o ") || gatkArgs.contains(" -L ")) Misc.printErrAndExit("\nError: please don't provide a -o or -L argument to the cmd.\n"+gatkArgs);	
-	
-		//determine number of threads
-		double gigaBytesAvailable = ((double)Runtime.getRuntime().maxMemory())/ 1073741824.0;
+		
+		
 	}	
 	
 	private StringInt parseCmd(String[] args, int i) {
@@ -208,26 +221,28 @@ public class GatkRunner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Gatk Runner: Feb 2018                              **\n" +
+				"**                               Gatk Runner: March 2018                            **\n" +
 				"**************************************************************************************\n" +
 				"Takes a bed file of target regions, splits it by the number of threads, writes out\n"+
-				"each, executes the GATK Gatktype caller, and merges the results. \n"+
+				"each, executes the GATK Gatktype caller, and merges the results. Set the -Xmx to the\n"+
+				"maximum available on the machine to enable correct cpu thread usage.\n"+
 
 				"\nOptions:\n"+
 				"-r A regions bed file (chr, start, stop,...) to intersect, see\n" +
 				"       http://genome.ucsc.edu/FAQ/FAQformat#format1 , gz/zip OK.\n"+
 				"-s Path to a directory for saving the results.\n"+
-				"-t Number concurrent threads to run, will need > 4G RAM each.\n"+
+				"-t Number concurrent thread override. Sets itself based on the memory and cpus \n"+
+				"     available to the JVM.\n"+
 				"-c GATK command to execute, see the example below, modify to match your enviroment.\n"+
 				"     Most resources require full paths. Don't set -o or -L\n"+
 				"-l Use lowercased l for Lofreq compatability.\n"+
 				"-b Add a -bamout argument and merge bam chunks.\n"+
 				
-				"\nExample: java -Xmx24G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -t 8 -s\n" +
+				"\nExample: java -Xmx24G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -s\n" +
 				"     /SS/HC/ -c 'java -Xmx4G -jar /SS/GenomeAnalysisTK.jar -T MuTect2 \n"+
 				"    -R /SS/human_g1k_v37.fasta --dbsnp /SS/dbsnp_138.b37.vcf \n"+
-				"    --cosmic /SS/v76_GRCh37_CosmicCodingMuts.vcf.gz -I:tumor /SS/sarc.bam -I:normal \n"+
-				"    /SS/norm.bam'\n\n" +
+				"    --cosmic /SS/v76_GRCh37_CosmicCodingMuts.vcf.gz -I:tumor /SS/sar.bam -I:normal \n"+
+				"    /SS/normal.bam'\n\n" +
 
 				"**************************************************************************************\n");
 

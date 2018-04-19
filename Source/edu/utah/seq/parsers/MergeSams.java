@@ -34,6 +34,7 @@ public class MergeSams{
 	private int numberPhiX = 0;
 	private boolean verbose = true;
 	private boolean addProgramArgs = false;
+	private boolean appendFileIndex = true;
 	
 	private Gzipper samOut;
 	private boolean saveBadReads = false;
@@ -63,11 +64,12 @@ public class MergeSams{
 		}
 	}
 	
-	public MergeSams(File[] samBam, File mergedBam, boolean verbose){
+	public MergeSams(File[] samBam, File mergedBam, boolean verbose, boolean appendFileIndex){
 		try {
 			dataFiles = samBam;
 			saveFile = mergedBam;
 			this.verbose = verbose;
+			this.appendFileIndex = appendFileIndex;
 			doWork();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -95,7 +97,8 @@ public class MergeSams{
 		if (verbose) System.out.println("\nParsing, filtering, and merging SAM files...");
 		for (int i=0; i< dataFiles.length; i++){
 			if (verbose) System.out.print("\t"+dataFiles[i].getName());
-			parseSam(dataFiles[i],i+"_"); 
+			if (appendFileIndex) parseSam(dataFiles[i],i+"_"); 
+			else parseSam(dataFiles[i],""); 
 			if (verbose) System.out.println();
 		}
 

@@ -31,6 +31,7 @@ public class SamAlignmentExtractor {
 	private boolean writeOffTargetToPass = false;
 	private boolean removeSecSupNotPrim = true;
 	private boolean skipWritingFail = false;
+	private boolean keepUnmapped = false;
 
 	//internal fields
 	private HashMap<String,RegionScoreText[]> chromRegions;
@@ -86,6 +87,7 @@ public class SamAlignmentExtractor {
 		System.out.println("Pass off target align\t"+writeOffTargetToPass);
 		System.out.println("Fail Sec, Sup, Non Prim align\t"+removeSecSupNotPrim);
 		System.out.println("Skip writing failing align\t"+skipWritingFail);
+		System.out.println("Write unmapped align to pass\t"+keepUnmapped);
 	}
 	
 	public void run(){
@@ -111,7 +113,7 @@ public class SamAlignmentExtractor {
 				System.out.print(workingChromosome+" ");
 			}
 			
-			//save all unmapped to fail
+			//save all unmapped to fail or pass
 			printUnmapped();
 			
 			//close readers
@@ -197,9 +199,14 @@ public class SamAlignmentExtractor {
 		if (skipWritingFail) return;
 		SAMRecordIterator it = bamReader.queryUnmapped();
 		while (it.hasNext()) {
-			failingBamWriter.addAlignment(it.next());
 			numRawAlignments++;
-			numFailingBasic++;
+			if (keepUnmapped) {
+				passingBamWriter.addAlignment(it.next());
+			}
+			else {
+				failingBamWriter.addAlignment(it.next());
+				numFailingBasic++;
+			}
 		}
 		it.close();
 	}
@@ -251,9 +258,13 @@ public class SamAlignmentExtractor {
 	}
 	
 	private boolean passBasic(SAMRecord sam){
-		if (sam.getReadUnmappedFlag() || sam.getReadFailsVendorQualityCheckFlag()) return false;
-		else if (removeSecSupNotPrim ){
+		
+		if (sam.getReadFailsVendorQualityCheckFlag()) return false;
+		if (removeSecSupNotPrim ){
 			if (sam.isSecondaryOrSupplementary() || sam.getNotPrimaryAlignmentFlag()) return false;
+		}
+		if (keepUnmapped == false){
+			if (sam.getReadUnmappedFlag()) return false;
 		}
 		return true;
 	}
@@ -379,6 +390,7 @@ public class SamAlignmentExtractor {
 					case 'd': divideAlignmentScoreByCigarM = true; break;
 					case 'f': writeOffTargetToPass = true; break;
 					case 'w': skipWritingFail = true; break;
+					case 'u': keepUnmapped = true; break;
 					case 'x': removeSecSupNotPrim = false; break;
 					case 'j': jsonOutputFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
@@ -462,7 +474,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                         Sam Alignment Extractor: Jan 2018                        **\n" +
+				"**                        Sam Alignment Extractor: April 2018                       **\n" +
 				"**************************************************************************************\n" +
 				"Splits an alignment file into those that pass or fail thresholds and intersects\n"+
 				"regions of interest. Calculates a variety of QC statistics.\n"+
@@ -484,6 +496,7 @@ public class SamAlignmentExtractor {
 				"-x Save secondary, supplemental, and non primary alignments, that pass the thresholds\n"+
 				"       defaults to fail.\n"+
 				"-w Skip writing failing alignments. Speeds up processing but kills the stats.\n"+
+				"-u Write unmapped alignments to the pass file, defaults to writing to fail.\n"+
 
 				"\n"+
 

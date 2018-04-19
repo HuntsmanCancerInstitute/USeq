@@ -199,6 +199,11 @@ public class MpileupSample {
 		return nonRefCounts/((double)(readCoverageAll));
 	}
 	
+	/**Returns the forward + reverse base counts for the provided index.*/
+	public int getBaseCounts(int baseIndex){
+		return forwardGATC[baseIndex] + reverseGATC[baseIndex];
+	}
+	
 	/**Provide GATC, capitalized, returns the index.*/
 	public static int getIndex(char gatcBase){
 		int index = -1;

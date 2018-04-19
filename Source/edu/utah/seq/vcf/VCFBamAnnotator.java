@@ -19,9 +19,7 @@ import util.bio.annotation.Bed;
 import util.gen.IO;
 import util.gen.Misc;
 
-/**Fast and loose merge of vcf files with the same sample names.  Essentially hashes header to collapse.  
- * For records with the same chr pos ref alt, keeps the master and adds the idName
- * Probably won't play nice with downstream apps that can't handle mixed FORMAT and INFO records if these are different in the files to merge.
+/** Beta for checking read 1 and read 2 bias
  * @author Nix*/
 public class VCFBamAnnotator {
 	

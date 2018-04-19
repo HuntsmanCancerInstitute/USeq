@@ -17,7 +17,6 @@ import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.utah.seq.data.sam.SamLayoutLite;
-import edu.utah.seq.parsers.SamAlignmentExtractor;
 import edu.utah.seq.vcf.VCFLookUp;
 import edu.utah.seq.vcf.VCFParser;
 import edu.utah.seq.vcf.VCFRecord;
@@ -37,6 +36,8 @@ public class BamBlaster {
 	private File bamFile;
 	private File saveDirectory;
 	private File vcfFile;
+	private int maxSizeIndel = 50;
+	private int minAlignmentDepth = 25;
 	
 	//internal fields
 	private boolean warn = false;
@@ -59,6 +60,7 @@ public class BamBlaster {
 	private Gzipper fastqSecondOut;
 	private Gzipper fastqUnpairedOut;
 	private Gzipper excludedVCF;
+	private Gzipper includedVCF;
 	private int numberExcludedVcf = 0;
 	private int numberProcessedVcf = 0;
 	
@@ -68,7 +70,7 @@ public class BamBlaster {
 		processArgs(args);
 		
 		//find max read length from bam
-		readLength = estimateReadLength();
+		readLength = estimateReadLength() + maxSizeIndel;
 
 		//for each chromosome of variants
 		System.out.println("Processing variants....");
@@ -78,7 +80,7 @@ public class BamBlaster {
 			processVars();
 		}
 		System.out.println("\t"+numberProcessedVcf +"\t# Processed Vcf records");
-		if (numberExcludedVcf !=0) System.out.println("\t"+numberExcludedVcf +"\t# Vcf records excluded (too close (<"+readLength+"bp) or not a SNV/INDEL)");
+		if (numberExcludedVcf !=0) System.out.println("\t"+numberExcludedVcf +"\t# Vcf records excluded (too close (<"+readLength+"bp), too big (>"+maxSizeIndel+"), lacking reference first base, or not a SNV/INDEL)");
 		else excludedVCF.getGzipFile().deleteOnExit(); 
 			
 		//clear hashes and close temBamWriter
@@ -99,6 +101,7 @@ public class BamBlaster {
 			fastqSecondOut.close();
 			fastqUnpairedOut.close();
 			excludedVCF.close();
+			includedVCF.close();
 			varReportOut.close();
 			unmodifiedFastqBamWriter.close();
 		} catch (IOException e) {
@@ -204,16 +207,18 @@ public class BamBlaster {
 	private void printFastq(SAMRecord sam, Gzipper out, String name) {
 		try {
 			String seq;
-			String qual;
+			String qual = null;
+			//original qualities present?
+			Object o = sam.getAttribute("OQ");
+			if (o != null) qual = (String)o;
+			else Misc.printErrAndExit("No OQ:Z tag with original quality scores in " + sam.getSAMString() + "\nAborting!");
+			
 			//negative strand? reverse em
 			if (sam.getReadNegativeStrandFlag()) {
 				seq = Seq.reverseComplementDNA(sam.getReadString());
-				qual = Misc.reverse(sam.getBaseQualityString());
+				qual = Misc.reverse(qual);
 			}
-			else {
-				seq = sam.getReadString();
-				qual = sam.getBaseQualityString();
-			}
+			else seq = sam.getReadString();
 			out.print("@");
 			out.println(name);
 			out.println(seq);
@@ -275,19 +280,31 @@ public class BamBlaster {
 			//for each variant
 			int priorEnd = -1000;
 			for (VCFRecord vcf: workingVcf){
+				//check size, leading base, and for N's!
+				if (vcf.getSizeIndel() > maxSizeIndel || vcf.checkLeadingRef() == false || vcf.getAlternate()[0].equals("N")){
+					excludedVCF.println(vcf.getOriginalRecord());
+					numberExcludedVcf++;
+				}
 				//check distance
-				int dist = vcf.getPosition() - priorEnd;
-				if (dist <= readLength){
+				else if ((vcf.getPosition() - priorEnd) <= readLength){
 					excludedVCF.println(vcf.getOriginalRecord());
 					numberExcludedVcf++;
 				}
 				else {
-					numberProcessedVcf++;
-					priorEnd= vcf.getMaxEndPosition();
 					//fetch alignments
 					ArrayList<SAMRecord> al = fetchAlignments(vcf);
-					//attempt to modify
-					modify(al, vcf);
+					//enough coverage?
+					if (al.size() < minAlignmentDepth ){
+						excludedVCF.println(vcf.getOriginalRecord());
+						numberExcludedVcf++;
+					}
+					else {
+						numberProcessedVcf++;
+						priorEnd= vcf.getMaxEndPosition();
+						//attempt to modify
+						modify(al, vcf);	
+					}
+					
 				}
 			}
 		} catch (IOException e) {
@@ -338,6 +355,7 @@ public class BamBlaster {
 	private void modify(ArrayList<SAMRecord> al, VCFRecord vcf) throws IOException {
 		int numberOverlaps = al.size();
 		int numberModified = 0;
+		boolean included = false;
 		if (vcf.isSNP()) {
 			for (SAMRecord r: al) {
 				//already modified?
@@ -347,6 +365,7 @@ public class BamBlaster {
 					modifiedNames.add(qualName);
 					numberModified++;
 					tempBamWriter.addAlignment(r);
+					included = true;
 				}
 			}
 		}
@@ -359,6 +378,7 @@ public class BamBlaster {
 					modifiedNames.add(qualName);
 					numberModified++;
 					tempBamWriter.addAlignment(r);
+					included = true;
 				}
 			}
 		}
@@ -371,6 +391,7 @@ public class BamBlaster {
 					modifiedNames.add(qualName);
 					numberModified++;
 					tempBamWriter.addAlignment(r);
+					included = true;
 				}
 			}
 		}
@@ -379,6 +400,7 @@ public class BamBlaster {
 			excludedVCF.println(vcf);
 			numberExcludedVcf++;
 		}
+		if (included) includedVCF.println(vcf);
 		//stats
 		varReportOut.println(numberModified+"\t"+numberOverlaps+"\t"+vcf);
 	}
@@ -475,8 +497,8 @@ public class BamBlaster {
 		SAMRecordIterator i = bamReader.queryOverlapping(workingChrom, (start+1), end); 
 		while (i.hasNext()) {
 			SAMRecord sam = i.next();
-			//unmapped? not primary?
-			if (sam.getReadUnmappedFlag() || sam.isSecondaryOrSupplementary()) continue;
+			//unmapped? not primary? not proper pair?
+			if (sam.getReadUnmappedFlag() || sam.isSecondaryOrSupplementary() || sam.getProperPairFlag() == false) continue;
 			//fetch blocks of actual alignment
 			ArrayList<int[]> blocks = fetchAlignmentBlocks(sam.getCigarString(), sam.getUnclippedStart()-1);
 			//check to see if any intersect the region, needed since the queryOverlap returns spanners
@@ -530,6 +552,8 @@ public class BamBlaster {
 					case 'b': bamFile = new File(args[++i]); break;
 					case 'r': saveDirectory = new File(args[++i]); break;
 					case 'v': vcfFile = new File(args[++i]); break;
+					case 's': maxSizeIndel = Integer.parseInt(args[++i]); break;
+					case 'd': minAlignmentDepth = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -587,8 +611,11 @@ public class BamBlaster {
 			fastqFirstOut = new Gzipper(new File(saveDirectory, name+"_BB_1.fastq.gz"));
 			fastqSecondOut = new Gzipper(new File(saveDirectory, name+"_BB_2.fastq.gz"));
 			fastqUnpairedOut = new Gzipper(new File(saveDirectory, name+"_BB_unpaired.fastq.gz"));
-			excludedVCF = new Gzipper(new File(saveDirectory, Misc.removeExtension(vcfFile.getName())+"_excluded.vcf.gz"));
+			String vcfName = Misc.removeExtension(vcfFile.getName());
+			excludedVCF = new Gzipper(new File(saveDirectory, vcfName+"_excluded.vcf.gz"));
 			excludedVCF.println(vcfParser.getStringComments());
+			includedVCF = new Gzipper(new File(saveDirectory, vcfName+"_included.vcf.gz"));
+			includedVCF.println(vcfParser.getStringComments());
 			//make writer for variant info
 			File varReport = new File(saveDirectory, name+"_varRep.txt");
 			varReportOut = new PrintWriter (new FileWriter(varReport));
@@ -621,7 +648,7 @@ public class BamBlaster {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Bam Blaster : June 2014                            **\n" +
+				"**                              Bam Blaster : April 2018                            **\n" +
 				"**************************************************************************************\n" +
 				"Injects SNVs and INDELs from a vcf file into bam alignments. These and their mates are\n"+
 				"extracted as fastq for realignment. For SNVs, only alignment bases that match the\n"+
@@ -629,15 +656,18 @@ public class BamBlaster {
 				"Secondary/supplemental are skipped. Only one variant per alignment. Variants within a\n"+
 				"read length distance of prior are ignored and saved to file for iterative processing.\n"+
 				"Be sure to normalize and decompose your vcf file (e.g.https://github.com/atks/vt).\n" +
-				"Use the BamMixer to add proportions of your realignments (e.g. 10%) with the\n"+
-				"unmodified.bams (e.g. 90%). Use the VCFVariantMaker to generate random vcf variants.\n\n"+
+				"INDELs first base must be reference. Use the BamMixer to add proportions of your\n"+
+				"realignments (e.g. 10%) with the unmodified.bams (e.g. 90%). Use the VCFVariantMaker\n"+
+				"to generate random vcf variants or pull a VCF from Clinvar/ Cosmic.\n\n"+
 
 				"Required:\n"+
 				"-b Path to a coordinate sorted bam file with index.\n"+
 				"-v Path to a trimmed, normalized, decomposed vcf variant file, zip/gz OK.\n"+
 				"-r Full path to a directory to save the results.\n" +
+				"-s Max size INDEL, defaults to 50\n"+
+				"-d Min alignment depth, defaults to 25\n"+
 
-				"Example: java -Xmx10G -jar pathTo/USeq/Apps/BamBlaster -b ~/BMData/na12878.bam\n"+
+				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/BamBlaster -b ~/BMData/na12878.bam\n"+
 				"    -r ~/BMData/BB1 -v ~/BMData/clinvar.pathogenic.SnvIndel.vcf.gz \n\n" +
 
 				"**************************************************************************************\n");

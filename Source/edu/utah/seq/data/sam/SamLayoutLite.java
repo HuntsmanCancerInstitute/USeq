@@ -2,6 +2,8 @@ package edu.utah.seq.data.sam;
 
 import htsjdk.samtools.SAMRecord;
 import java.util.regex.Matcher;
+
+import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
@@ -40,6 +42,7 @@ public class SamLayoutLite{
 		printArray(pos);
 	}
 	
+	/*
 	public static void main (String[] args){
 		SamAlignment s;
 		try {
@@ -55,7 +58,7 @@ public class SamLayoutLite{
 		} catch (Exception e) {
 			e.printStackTrace();
 		} 
-	}
+	}*/
 	
 
 	
@@ -82,9 +85,10 @@ public class SamLayoutLite{
 	
 	/**This replaces the refBases with the altBases and changes the difference to D but does not actually modify the layout length.*/
 	public boolean markDeletion(int startPos, String refBases, String altBases, boolean warn) {
-		//System.out.println("DELETION: "+startPos+" "+refBases+" "+altBases);
+
 		int index = Num.findSmallestIndexToValue(pos, startPos);
-		
+//System.out.println("DELETION: "+startPos+" "+refBases+" "+altBases+" "+index);	
+//.print();
 		if (index < 0 || index >= seq.length) {
 			//sometimes the starting position of the deletion is before the start of the alignment so delete one until ref is empty
 			if (index == -1 && refBases.length()!=0){
@@ -102,8 +106,11 @@ public class SamLayoutLite{
 		int endIndex = refBases.length() + index;
 		if (endIndex > seq.length) endIndex = seq.length;
 		
-		//change seq
+		
 		int stop = index + altBases.length();
+		//watch out for cases where attempting to modify off the end of the aligment
+		if (stop > seq.length) stop = seq.length;
+		//change seq
 		int counter = 0;
 		boolean changed=false;
 		for (int i= index; i< stop; i++){
@@ -121,6 +128,9 @@ public class SamLayoutLite{
 			qual[i] = '!';
 			changed = true;
 		}
+//IO.p(changed);
+//print();
+//System.exit(0);
 		return changed;
 	}
 	

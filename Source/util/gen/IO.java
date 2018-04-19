@@ -1003,6 +1003,34 @@ public class IO {
 		return res;
 	}
 	
+	/**Uses ProcessBuilder to execute a cmd, combines standard error and standard out into one and returns and prints their output.*/
+	public static String[] executeViaProcessBuilder(String[] command, File log){
+		ArrayList<String> al = new ArrayList<String>();
+		try {
+			PrintWriter out = new PrintWriter(new FileWriter(log));
+			ProcessBuilder pb = new ProcessBuilder(command);
+			pb.redirectErrorStream(true);
+			Process proc = pb.start();
+
+			BufferedReader data = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+			String line;
+			while ((line = data.readLine()) != null){
+				al.add(line);
+				out.println(line);
+				out.flush();
+			}
+			data.close();
+			out.close();
+		} catch (Exception e) {
+			System.err.println("Problem executing -> "+Misc.stringArrayToString(command," "));
+			e.printStackTrace();
+			return null;
+		}
+		String[] res = new String[al.size()];
+		al.toArray(res);
+		return res;
+	}
+	
 	/**Executes tokenized params on command line, use full paths.
 	 * Put each param in its own String.  
 	 * Returns the output, starting with ERROR if it encountered an issue

@@ -206,7 +206,7 @@ public class QueryIndexFileLoader implements Runnable {
 			begin = iPos;
 			end = iPos+ lenRef +1;
 			if (ref.charAt(0) != alt.charAt(0)) {
-				if (verbose) System.err.println("\tWARNING: Odd INS vcf record, the first base in the ref and alt should be the same, use vt to normalize your variants, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
+				if (verbose) System.err.println("\tWARNING: Odd INS vcf record, the first base in the ref and alt should be the same, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
 				return null;
 			}
 
@@ -216,7 +216,7 @@ public class QueryIndexFileLoader implements Runnable {
 			begin = iPos;
 			end = iPos + lenRef;
 			if (ref.charAt(0) != alt.charAt(0)) {
-				if (verbose) System.err.println("\tWARNING: Odd DEL vcf record, the first base in the ref and alt should be the same, use vt to normalize your variants, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
+				if (verbose) System.err.println("\tWARNING: Odd DEL vcf record, the first base in the ref and alt should be the same, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
 				return null;
 			}
 		}

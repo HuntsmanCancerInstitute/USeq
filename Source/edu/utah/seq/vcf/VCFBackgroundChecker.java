@@ -374,7 +374,7 @@ public class VCFBackgroundChecker {
 				"-m Path to a bgzip compressed and tabix indexed multi-sample mpileup file. e.g.:\n"+
 				"      1) Mpileup: 'echo \"#SampleOrder: \"$(ls *bam) > bkg.mpileup; samtools mpileup\n"+
 				"             -B -q 13 -d 1000000 -f $fastaIndex -l $bedFile *.bam >> bkg.mpileup'\n"+
-				"      2) (Optional) MpileupRandomizer: java -jar -Xmx10G ~/USeqApps/MpileupRandomizer"+
+				"      2) (Optional) MpileupRandomizer: java -jar -Xmx10G ~/USeqApps/MpileupRandomizer\n"+
 				"             -r 20 -s 3 -m bkg.mpileup\n"+
 				"      3) Bgzip: 'tabix-0.2.6/bgzip bkg.mpileup_DP20MS3.txt'\n"+
                 "         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bkg.mpileup_DP20MS3.txt.gz'\n"+
@@ -395,7 +395,7 @@ public class VCFBackgroundChecker {
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundChecker -v SomaticVcfs/ -z 3\n"+
-				"-m bkg.mpileup.gz -s BkgFiltVcfs/ -b 1 -q 13 -u \n\n"+
+				"-m bkg.mpileup.gz -s BkgFiltVcfs/ -q 13 -u \n\n"+
 
 		        "**************************************************************************************\n");
 	}
