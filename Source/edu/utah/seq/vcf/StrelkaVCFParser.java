@@ -64,10 +64,10 @@ public class StrelkaVCFParser {
 	public void setAltRefCountsForIndels(VCFRecord record, VCFSample sample){
 		//parse tir and tar
 		String tir = sample.getFormatData("TIR");
-		if (tir == null) Misc.printErrAndExit("\nError: TIR doesn't appear in this sample?! "+sample.getUnmodifiedSampleString());
+		if (tir == null) Misc.printErrAndExit("\nError: TIR doesn't appear in this sample?! "+sample.getUnmodifiedSampleString()+"\n"+record.getOriginalRecord());
 		String[] tier1_2IndelCounts = Misc.COMMA.split(tir);
 		String tar = sample.getFormatData("TAR");
-		if (tar == null) Misc.printErrAndExit("\nError: TAR doesn't appear in this sample?! "+sample.getUnmodifiedSampleString());
+		if (tar == null) Misc.printErrAndExit("\nError: TAR doesn't appear in this sample?! "+sample.getUnmodifiedSampleString()+"\n"+record.getOriginalRecord());
 		String[] tier1_2NonIndelCounts = Misc.COMMA.split(tar);
 		
 		sample.setReferenceCounts(tier1_2NonIndelCounts[0]);
@@ -114,6 +114,12 @@ public class StrelkaVCFParser {
 			}
 			
 			for (VCFRecord r: parser.getVcfRecords()){	
+				//look for . in ref or first alt
+				if (r.getReference().equals(".") || r.getAlternate()[0].equals(".")){
+					r.setFilter(VCFRecord.FAIL);
+					continue;
+				}
+				
 				VCFSample[] normTum = r.getSample();
 				//set allele counts
 				if (r.isSNP()) {
@@ -307,10 +313,10 @@ public class StrelkaVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Strelka VCF Parser: Feb 2018                         **\n" +
+				"**                             Strelka VCF Parser: April 2018                       **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS\n"+
-				"score. Also filters for read depth, T/N alt allelic ratio and diff,\n"+
+				"score. Also filters for read depth, T/N alt allelic ratio and diff, ref/alt with '.',\n"+
 				"and tumor and normal alt allelic ratios. Lastly, it inserts the tumor DP and AF info.\n"+
 
 				"\nRequired Params:\n"+
