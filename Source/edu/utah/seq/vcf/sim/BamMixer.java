@@ -42,9 +42,9 @@ public class BamMixer {
 	private File mergedVariantBam;
 	private File modifiedPairedVariantBamFile;
 	private File unmodifiedPairedVariantBamFile; 
-	private static final Pattern BB = Pattern.compile(":BB");
-	private Pattern numUnder = Pattern.compile("^\\d[\\d_]+");
-	private Pattern trailingBB = Pattern.compile(":BB-");
+	private static final Pattern BB = Pattern.compile(":BB-");
+	private static Pattern numUnder = Pattern.compile("^\\d[\\d_]+");
+	private static Pattern trailingBB = Pattern.compile(":BB-");
 	
 	public BamMixer (String[] args){
 		long startTime = System.currentTimeMillis();
@@ -112,7 +112,7 @@ public class BamMixer {
 	
 	/**Removes leading and trailing info from BamMixer
 	 * e.g. 0_HWI-D00294:322:CATY4ANXX:6:1101:1166:34209:BB-INS_178536299_C_CT_2  ->  HWI-D00294:322:CATY4ANXX:6:1101:1166:34209*/
-	public void stripNameNumber(SAMRecord sam){
+	public static void stripNameNumber(SAMRecord sam){
 		String name = sam.getReadName();
 		int start = 0; 
 		int stop = name.length();
@@ -199,6 +199,8 @@ public class BamMixer {
 			
 			//write out
 			if (isModified) {
+				//add tag
+				sam.setAttribute("BB", tokens[1]);
 				modWriter.addAlignment(sam);
 				numMod++;
 			}
@@ -294,7 +296,7 @@ public class BamMixer {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Bam Mixer : June 2014                              **\n" +
+				"**                               Bam Mixer : April 2018                             **\n" +
 				"**************************************************************************************\n" +
 				"Combines bam alignment files in different fractions to simulate multiple variant\n"+
 				"frequencies. Run BamBlaster first.\n\n"+

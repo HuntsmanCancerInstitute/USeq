@@ -184,7 +184,7 @@ public class BamBlaster {
 		//now run through the modified hash and extract fastq as unpaired any non dummy record
 		for (SAMRecord sam : readName2Pairs.values()){
 			if (sam != dummy){
-				String name = sam.getReadName()+":BB-"+sam.getAttribute("BB")+"_0";
+				String name = sam.getReadName();
 				printFastq(sam, fastqUnpairedOut, name);
 				numUnpaired++;
 			}
@@ -353,6 +353,14 @@ public class BamBlaster {
 	
 	
 	private void modify(ArrayList<SAMRecord> al, VCFRecord vcf) throws IOException {
+		//substitute base qualities with original
+		for (SAMRecord r: al){
+			Object o = r.getAttribute("OQ");
+			if (o == null) throw new IOException("Faild to find an OQ original quality tag in this sam alignment "+r.getSAMString());
+			String qual = (String)o;
+			r.setBaseQualityString(qual);
+		}
+		
 		int numberOverlaps = al.size();
 		int numberModified = 0;
 		boolean included = false;
@@ -379,6 +387,7 @@ public class BamBlaster {
 					numberModified++;
 					tempBamWriter.addAlignment(r);
 					included = true;
+					r.setOriginalBaseQualities(r.getBaseQualities());
 				}
 			}
 		}
@@ -392,6 +401,7 @@ public class BamBlaster {
 					numberModified++;
 					tempBamWriter.addAlignment(r);
 					included = true;
+					r.setOriginalBaseQualities(r.getBaseQualities());
 				}
 			}
 		}
@@ -400,6 +410,7 @@ public class BamBlaster {
 			excludedVCF.println(vcf);
 			numberExcludedVcf++;
 		}
+
 		if (included) includedVCF.println(vcf);
 		//stats
 		varReportOut.println(numberModified+"\t"+numberOverlaps+"\t"+vcf);
@@ -648,12 +659,12 @@ public class BamBlaster {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              Bam Blaster : April 2018                            **\n" +
+				"**                              Bam Blaster : May 2018                              **\n" +
 				"**************************************************************************************\n" +
 				"Injects SNVs and INDELs from a vcf file into bam alignments. These and their mates are\n"+
 				"extracted as fastq for realignment. For SNVs, only alignment bases that match the\n"+
 				"reference and have a CIGAR of M are modified. Not all alignments can be modified.\n"+
-				"Secondary/supplemental are skipped. Only one variant per alignment. Variants within a\n"+
+				"Secondary/supplemental/not proper are skipped. One var per alignment. Variants within\n"+
 				"read length distance of prior are ignored and saved to file for iterative processing.\n"+
 				"Be sure to normalize and decompose your vcf file (e.g.https://github.com/atks/vt).\n" +
 				"INDELs first base must be reference. Use the BamMixer to add proportions of your\n"+
@@ -668,7 +679,7 @@ public class BamBlaster {
 				"-d Min alignment depth, defaults to 25\n"+
 
 				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/BamBlaster -b ~/BMData/na12878.bam\n"+
-				"    -r ~/BMData/BB1 -v ~/BMData/clinvar.pathogenic.SnvIndel.vcf.gz \n\n" +
+				"    -r ~/BMData/BB0 -v ~/BMData/clinvar.pathogenic.SnvIndel.vcf.gz \n\n" +
 
 				"**************************************************************************************\n");
 	}

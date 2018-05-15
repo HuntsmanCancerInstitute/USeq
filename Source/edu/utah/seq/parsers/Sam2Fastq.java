@@ -28,12 +28,16 @@ public class Sam2Fastq {
 	private Gzipper secondRead;
 	private Gzipper unpairedRead;
 	private Gzipper failingSam;
+	private ArrayList<SAMRecord> toCollapse = new ArrayList<SAMRecord>();
+	private HashMap<String, SAMRecord> qualSam = new HashMap<String, SAMRecord>();
 	
 	//counters
 	private long numAlignments = 0;
 	private long numPaired = 0;
 	private long numUnpaired = 0;
 	private long numFailingAlignments = 0;
+	private long procSamCalls = 0;
+	private long lineNumberSearch = 0;
 	
 	
 
@@ -56,6 +60,7 @@ public class Sam2Fastq {
 
 	public void run(){
 		try {
+			System.out.print("Walking alignments ");
 			walkAlignments();
 
 			//close readers
@@ -82,11 +87,11 @@ public class Sam2Fastq {
 		ArrayList<SAMRecord> sameNameSams = new ArrayList<SAMRecord>();
 		String lastName = null;
 		int counter = 0;
-		//load all alignments with the same name (should be just two!)
+		
 		while (it.hasNext()) {
 			SAMRecord sam = it.next();
 			numAlignments++;
-			if (counter++ > 1000000) {
+			if (counter++ > 50000) {
 				System.out.print(".");
 				counter = 0;
 			}
@@ -151,20 +156,33 @@ public class Sam2Fastq {
 
 	private void processSams(ArrayList<SAMRecord> sameNameSams) throws Exception {
 		int num = sameNameSams.size();
-		//a pair
+		procSamCalls++;
+		
+		//a pair?
 		if (num == 2){
 			//which to save?
 			SAMRecord fop = sameNameSams.get(0);
 			SAMRecord sop = sameNameSams.get(1);
-			if (fop.getFirstOfPairFlag() == false){
-				SAMRecord s = fop;
-				fop = sop;
-				sop = s;
+			
+			//paired?
+			if ((fop.getReadPairedFlag() == false || sop.getReadPairedFlag() == false) || (fop.getFirstOfPairFlag() == sop.getFirstOfPairFlag())){
+				sameNameSams.clear();
+				if (fop.getAttribute("BB") != null) sameNameSams.add(fop);
+				else sameNameSams.add(sop);
+				processSams(sameNameSams);
 			}
-			for (String x : exportFastq(fop)) firstRead.println(x);
-			for (String x : exportFastq(sop)) secondRead.println(x);
-			numPaired++;
+			else {
+				if (fop.getFirstOfPairFlag() == false){
+					SAMRecord s = fop;
+					fop = sop;
+					sop = s;
+				}
+				for (String x : exportFastq(fop)) firstRead.println(x);
+				for (String x : exportFastq(sop)) secondRead.println(x);
+				numPaired++;
+			}
 		}
+		
 		//just one
 		else if (num == 1){
 			SAMRecord s = sameNameSams.get(0);
@@ -172,68 +190,45 @@ public class Sam2Fastq {
 			
 			//look for mate? 
 			if (unfilteredBamFile != null){
-				//attempt to find from raw
+				
+				//find from raw
 				ArrayList<SAMRecord> rawSams = fetchUnfilteredSams(s.getReadName());
-				if (rawSams == null){
-					//this can sometimes happen because the read names are different and thus the order
-					//reset the iterator and try again
-					unfilteredIt.close();
-					unfilteredIt = unfilteredBamReader.iterator();
-					rawSams = fetchUnfilteredSams(s.getReadName());
-					if (rawSams == null){
-						//still null so fail it and reset iterator
-						for (String x : exportFastq(s)) unpairedRead.println(x);
-						numUnpaired++;
-						unfilteredIt.close();
-						unfilteredIt = unfilteredBamReader.iterator();
-						return;
-					}
+				if (rawSams == null) throw new IOException("\nFailed to find "+s.getReadName()+" in "+unfilteredBamFile.getName());
+				
+				//check there are two
+				if (rawSams.size() != 2) throw new IOException("\nDidn't find 2 reads for "+s.getReadName()+" from "+unfilteredBamFile.getName()+" found "+rawSams.size());
+				
+				//compare quality strings, these don't flip relative to the alignment strand, might be modified with an indel so no match
+				String q0 = rawSams.get(0).getBaseQualityString();
+				String q1 = rawSams.get(1).getBaseQualityString();
+				if (q0.equals(q1) == false){
+					//assign based on original quality string
+					String sQ = getOriginalQualities(s);
+					String reSQ = new StringBuilder(sQ).reverse().toString();
+					if (sQ.equals(q0) || reSQ.equals(q0)) m = rawSams.get(1);
+					else if (sQ.equals(q1) || reSQ.equals(q1)) m = rawSams.get(0);
 				}
-				//paired?
-				boolean firstOfPair = false;
-				if (s.getReadPairedFlag()){
-					firstOfPair = s.getFirstOfPairFlag();
-					for (SAMRecord sam: rawSams){
-						if (sam.getSupplementaryAlignmentFlag() || sam.isSecondaryOrSupplementary() || sam.getNotPrimaryAlignmentFlag()) continue;
-						else {
-							if (sam.getFirstOfPairFlag() != firstOfPair) {
-								m=sam;
-								break;
-							}
-						}
-					}
+				
+				//compare based on read pairing, if it is paired
+				if (m == null && s.getReadPairedFlag() == true){
+					if (rawSams.get(0).getFirstOfPairFlag() != s.getFirstOfPairFlag()) m = rawSams.get(0);
+					else m = rawSams.get(1);
 				}
-				//single
-				else {
-					int pos = s.getUnclippedStart();
-					boolean strand = s.getReadNegativeStrandFlag();
-					for (SAMRecord sam: rawSams){
-						if (sam.getSupplementaryAlignmentFlag() || sam.isSecondaryOrSupplementary() || sam.getNotPrimaryAlignmentFlag()) continue;
-						else {
-							if (sam.getUnclippedStart() != pos || sam.getReadNegativeStrandFlag() != strand) {
-								m = sam;
-								//use mate to define firstOfPair for the unpaired read
-								if (m.getFirstOfPairFlag() == true) firstOfPair = false;
-								else firstOfPair = true;
-								break;
-							}
-						}
-					}
-					
-				}
-
+			
+				//found mate?
 				if (m == null) {
 					for (String x : exportFastq(s)) unpairedRead.println(x);
 					numUnpaired++;
 				}
 				else {
+					boolean firstOfPair = m.getFirstOfPairFlag();
 					if (firstOfPair){
-						for (String x : exportFastq(s)) firstRead.println(x);
-						for (String x : exportFastq(m)) secondRead.println(x);
-					}
-					else {
 						for (String x : exportFastq(m)) firstRead.println(x);
 						for (String x : exportFastq(s)) secondRead.println(x);
+					}
+					else {
+						for (String x : exportFastq(s)) firstRead.println(x);
+						for (String x : exportFastq(m)) secondRead.println(x);
 					}
 					numPaired++;
 				}
@@ -245,19 +240,54 @@ public class Sam2Fastq {
 			}
 		}
 		
-		//more than one found, this shouldn't happen.
+		//more than two found
 		else {
-			//must be more than 2, throw error!
-			StringBuilder sb = new StringBuilder("\nMore than 2 alignments found with the same fragment name?\n");
-			for (SAMRecord s: sameNameSams) sb.append(s.getSAMString());
-			throw new Exception(sb.toString());
+			//attempt to collapse on BB tag
+			toCollapse.clear();
+			for (SAMRecord s: sameNameSams) {
+				if (s.getAttribute("BB") != null) toCollapse.add(s);
+			}
+			//success?
+			if (toCollapse.size() != 0 && toCollapse.size() < 3) {
+				sameNameSams = toCollapse;
+				processSams(sameNameSams);
+			}
+			else if (toCollapse.size() == 0){
+				//attempt to collapse on quality string
+				qualSam.clear();
+				for (SAMRecord s: sameNameSams) {
+					qualSam.put(getOriginalQualities(s), s);
+				}
+				if (qualSam.size() != 0 && qualSam.size() < 3) {
+					toCollapse.addAll(qualSam.values());
+					sameNameSams = toCollapse;
+					processSams(sameNameSams);
+				}
+				else {
+					System.out.println("\nFailed to collapse "+sameNameSams.get(0).getReadName()+". Skipping");
+				}
+			}
+			else {
+				//must still be more than 2, give up.
+				StringBuilder sb = new StringBuilder();
+				for (SAMRecord s: toCollapse) {
+					sb.append(s.getSAMString());
+					failingSam.println(s.getSAMString());
+				}
+				System.out.println("\nFailed to collapse and find mates for "+sameNameSams.get(0).getReadName()+". Skipping\n"+sb);
+			}
 		}
 	}
 
 
-
+	private String getOriginalQualities(SAMRecord s) throws IOException{
+		Object ob = s.getAttribute("OQ");
+		if (ob == null) throw new IOException("\nFailed to find the OQ:Z origninal qualities attribute in "+ bamFile.getName()+ " for "+s.getReadName());
+		return (String) ob;
+	}
 
 	private ArrayList<SAMRecord> fetchUnfilteredSams(String readName) {
+		//System.out.println(lineNumberSearch+"\tsearching for\t"+readName);
 		ArrayList<SAMRecord> matches = new ArrayList<SAMRecord>();
 		boolean found = false;
 		
@@ -266,14 +296,18 @@ public class Sam2Fastq {
 			matches.add(lastSam);
 			found = true;
 		}
-	
+		
+		//keep looking since there is likely more than one
 		while (unfilteredIt.hasNext()) {
 			lastSam = unfilteredIt.next();
+			lineNumberSearch++;
 			if (lastSam.getReadName().equals(readName)){
 				matches.add(lastSam);
 				found = true;
 			}
-			else if (found) return matches;
+			else if (found) {
+				return matches;
+			}
 		}
 		return null;
 	}
@@ -376,20 +410,20 @@ public class Sam2Fastq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam 2 Fastq: March 2018                           **\n" +
+				"**                                Sam 2 Fastq: May 2018                              **\n" +
 				"**************************************************************************************\n" +
-				"Given a query name sorted bam/sam alignment file, writes out fastq data for paired and \n"+
+				"Given a query name sorted alignment file, S2F writes out fastq data for paired and \n"+
 				"unpaired alignemnts. Any non-primary, secondary, or supplemental \n"+
 				"alignments are written to a failed sam file.  This app doesn't have the memory leak\n"+
 				"found in Picard, writes gzipped fastq, and error checks the reads. Provide an\n"+
-				"unfiltered bam to use in retrieving missing mate alignments. S2F will remove pre and\n"+
+				"unfiltered fastq-bam to use in retrieving missing mates. S2F will remove pre and\n"+
 				"post naming info from the BamBlaster restoring the original fragment names.\n"+
 
 				"\nOptions:\n"+
-				"-s Path to a directory for saving parsed data..\n"+
+				"-s Path to a directory for saving parsed data.\n"+
 				"-a Path to a query name sorted bam/sam alignment file. \n"+
 				"-u (Optional) Path to a query name sorted unfiltered bam/sam alignment file for use\n"+
-				"      in fetching missing mates of the first bam.\n"+
+				"      in fetching missing mates of the first bam. Convert fastq to bam, then qn sort.\n"+
 
 				"\n"+
 

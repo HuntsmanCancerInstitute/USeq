@@ -210,7 +210,7 @@ public class MpileupRandomizer{
 	public static void printDocs(){
 		IO.p("\n" +
 				"**************************************************************************************\n" +
-				"**                             Mpileup Randomizer: March 2018                       **\n" +
+				"**                             Mpileup Randomizer: May 2018                         **\n" +
 				"**************************************************************************************\n" +
 				"Upon finding a gap in the coverage, the sample order is randomized and maintained. Use\n"+
 				"this app to 'de-identify' a multi sample mpileup file while maintaining INDEL blocks.\n"+
@@ -221,10 +221,10 @@ public class MpileupRandomizer{
 				"\nDefault Options:\n"+
 				"-r Minimum read depth to pass a sample, default 10\n"+
 				"-s Minimum number of samples that must pass to save line, default 3\n"+
-				"-g Minimum gap, defaults to 75\n"+
+				"-g Minimum gap, defaults to 125\n"+
 
 				"\nExample: java -Xmx4G -jar pathToUSeq/Apps/MpileupRandomizer -m normExo.mpileup.gz\n" +
-				"     -o randomized.mpileup.gz -r 20 -s 4 \n" +
+				"    -r 20 -s 4 \n" +
 
 				"**************************************************************************************\n");
 
