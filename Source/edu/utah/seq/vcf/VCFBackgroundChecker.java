@@ -126,6 +126,7 @@ public class VCFBackgroundChecker {
 			
 		} catch (Exception e) {
 			e.printStackTrace();
+			Misc.printErrAndExit("Problem encountered, aborting!");
 		} finally {
 			//shut down loaders
 			for (MpileupTabixLoader m : loaders) m.getTabixReader().close();
@@ -325,6 +326,7 @@ public class VCFBackgroundChecker {
 		//save dir?
 		if (saveDir == null) Misc.printExit("\nError: please provide a directory in which to save the marked vcf files\n");
 		saveDir.mkdirs();
+		if (saveDir.exists()==false || saveDir.canWrite()==false) Misc.printExit("\nError: failed to find or create a writeable save directory? Aborting.\n");
 		
 		//tabix indexed mpileup?
 		if (mpileup == null || mpileup.canRead() == false) Misc.printExit("\nError: please provide a path to a bgzipped tabix indexed mpileup file.\n");
@@ -359,7 +361,7 @@ public class VCFBackgroundChecker {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                         VCF Background Checker : March 2018                      **\n" +
+				"**                         VCF Background Checker : May 2018                        **\n" +
 				"**************************************************************************************\n" +
 				"VBC calculates non-reference allele frequencies (AF) from a background multi-sample \n"+
 				"mpileup file over each vcf record. It then calculates a z-score for the vcf AF and \n"+
