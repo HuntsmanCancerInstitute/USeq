@@ -7,12 +7,14 @@ import java.util.regex.Pattern;
 import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
+import util.gen.Num;
 
 /**Lofreq formatter and parser. */
 public class LofreqVCFParser {
 
 	private File[] vcfFiles;
 	private float minimumScore = 0;
+	private int minimumAltReadDepth = 0;
 	private boolean appendFNT = false;
 	private boolean removeIndels = false;
 	private boolean clearFilter = false;
@@ -82,7 +84,7 @@ public class LofreqVCFParser {
 					//read depth or allele freq?
 					if (pass && readDepth !=0 || alleleFreq !=0){
 						float[] dpAf = parseDpAf(tokens[7]);
-						if (dpAf[0] < readDepth || dpAf[1] < alleleFreq){
+						if (dpAf[0] < readDepth || dpAf[1] < alleleFreq || (dpAf[2]) < minimumAltReadDepth){
 							numFail++;
 							pass= false;
 						}
@@ -125,15 +127,20 @@ public class LofreqVCFParser {
 		String[] t = Misc.SEMI_COLON.split(info);
 		float dp = -1f;
 		float af = -1f;
+		float alt = -1f;
 		for (int i=0; i< t.length; i++){
 			if (t[i].startsWith("DP=")) dp = Float.parseFloat(t[i].substring(3));
 			else if (t[i].startsWith("AF=")) af = Float.parseFloat(t[i].substring(3));
+			else if (t[i].startsWith("DP4=")) {
+				int[] counts = Num.stringArrayToInts(t[i].substring(4), ",");
+				if (counts.length == 4) alt = counts[2]+counts[3];
+			}
 		}
-		if (dp == -1 || af == -1) Misc.printErrAndExit("\nError: failed to parse a DP or AF from "+info);
+		if (dp == -1 || af == -1 || alt == -1) Misc.printErrAndExit("\nError: failed to parse a DP, AF, and DP4 from "+info);
 		
 		//watch out for incorrect af calcs! Lofreq bug!
 		if (af > 1.0f) af = 1.0f;
-		return new float[]{dp, af};
+		return new float[]{dp, af, alt};
 	}
 
 	public static void main(String[] args) {
@@ -165,6 +172,7 @@ public class LofreqVCFParser {
 					case 'm': minimumScore = Float.parseFloat(args[++i]); break;
 					case 'd': readDepth = Float.parseFloat(args[++i]); break;
 					case 't': alleleFreq = Float.parseFloat(args[++i]); break;
+					case 'r': minimumAltReadDepth = Integer.parseInt(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -194,7 +202,7 @@ public class LofreqVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Lofreq VCF Parser: March 2017                        **\n" +
+				"**                             Lofreq VCF Parser: May 2018                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses Lofreq vcf files with options for filtering for minimum QUAL, modifying the\n"+
 				"FILTER field, removing non SNVs, and appending FORMAT info for downstream merging.\n"+
@@ -207,13 +215,14 @@ public class LofreqVCFParser {
 				"-m Minimum QUAL score, defaults to 0\n"+
 				"-d Minimum DP read depth, defaults to 0\n"+
 				"-t Minimum AF allele freq, defaults to 0\n"+
+				"-r Minimum Alt count, defaults to 0\n"+
 				"-i Remove non SNV records\n"+
 				"-f Replace the FILTER field with '.'\n"+
 				"-a Append FORMAT NORMAL TUMOR to #CHROM line and add empty columns to records\n"+
 				"-n Mark variants failing thresholds FAIL instead of not printing\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/LofreqVCFParser -v VCFFiles/ -m 32 -i -f -a\n"+
-				"      -s FilteredLofreqVcfs/ \n\n" +
+				"      -s FilteredLofreqVcfs/ -r 3 \n\n" +
 
 
 				"**************************************************************************************\n");

@@ -19,6 +19,7 @@ public class MutectVCFParser {
 	private int minimumTumorReadDepth = 0;
 	private int minimumNormalReadDepth = 0;
 	private double minimumTNFractionDiff = 0;
+	private int minimumAltReadDepth = 0;
 	private double minimumTNRatio = 0;
 	private double maximumNormalAltFraction = 1;
 	private double minimumTumorAltFraction = 0;
@@ -33,8 +34,9 @@ public class MutectVCFParser {
 		processArgs(args);
 		
 		System.out.println("Thresholds for Tumor and Normal:");
-		System.out.println(minimumTumorReadDepth+"\tMin T alignment depth");
 		System.out.println(minimumNormalReadDepth+"\tMin N alignment depth");
+		System.out.println(minimumTumorReadDepth+"\tMin T alignment depth");
+		System.out.println(minimumAltReadDepth+"\tMin T alt count");
 		System.out.println(minimumTNFractionDiff+"\tMin T-N allelic fraction diff");
 		System.out.println(minimumTNRatio+"\tMin T/N allelic fraction ratio");
 		System.out.println(maximumNormalAltFraction+"\tMax N allelic fraction");
@@ -73,6 +75,10 @@ public class MutectVCFParser {
 				int normDepth = tumNorm[1].getReadDepthDP();
 				int tumDepth = tumNorm[0].getReadDepthDP();
 				if (normDepth < minimumNormalReadDepth || tumDepth < minimumTumorReadDepth) pass = false;
+				
+				//check alt counts
+				int altCounts = Integer.parseInt(tumNorm[0].getAlternateCounts());
+				if (altCounts < minimumAltReadDepth) pass = false;
 				
 				//check allelic ratio diff
 				if (pass && minimumTNFractionDiff != 0){
@@ -206,6 +212,7 @@ public class MutectVCFParser {
 					case 'u': minimumTumorReadDepth = Integer.parseInt(args[++i]); break;
 					case 'o': minimumNormalReadDepth = Integer.parseInt(args[++i]); break;
 					case 'd': minimumTNFractionDiff = Double.parseDouble(args[++i]); break;
+					case 'a': minimumAltReadDepth = Integer.parseInt(args[++i]); break;
 					case 'r': minimumTNRatio = Double.parseDouble(args[++i]); break;
 					case 'p': excludeNonPass = true; break;
 					case 's': printSpreadsheet = true; break;
@@ -235,7 +242,7 @@ public class MutectVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Mutect VCF Parser: March 2018                      **\n" +
+				"**                               Mutect VCF Parser: May 2018                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses Mutect2 VCF files, filtering for read depth, allele frequency diff ratio, etc.\n"+
 				"Inserts AF and DP into for the tumor sample into the INFO field. Changes the sample\n"+
@@ -247,6 +254,7 @@ public class MutectVCFParser {
 				"-t Minimum tumor allele frequency (AF), defaults to 0.\n"+
 				"-n Maximum normal AF, defaults to 1.\n"+
 				"-u Minimum tumor alignment depth, defaults to 0.\n"+
+				"-a Minimum tumor alt count, defaults to 0.\n"+
 				"-o Minimum normal alignment depth, defaults to 0.\n"+
 				"-d Minimum T-N AF difference, defaults to 0.\n"+
 				"-r Minimum T/N AF ratio, defaults to 0.\n"+
@@ -255,7 +263,7 @@ public class MutectVCFParser {
 				
 
 				"\nExample: java -jar pathToUSeq/Apps/MutectVCFParser -v /VCFFiles/ -t 0.05 -n 0.5 -u 100\n"+
-				"        -o 20 -d 0.05 -r 2\n\n"+
+				"        -o 20 -d 0.05 -r 2 -a 3 \n\n"+
 
 
 				"**************************************************************************************\n");

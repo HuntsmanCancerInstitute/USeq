@@ -25,6 +25,7 @@ public class StrelkaVCFParser {
 	private double minimumTNFractionDiff = 0;
 	private double minimumTNRatio = 0;
 	private double maximumNormalAltFraction = 1;
+	private int minimumAltReadDepth = 0;
 	private Pattern qsiOrs = Pattern.compile(".+;QS[IS]=(\\d+);.+");
 	private boolean printSpreadsheet = false;
 	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
@@ -40,8 +41,9 @@ public class StrelkaVCFParser {
 		processArgs(args);
 		
 		System.out.println("Thresholds for Tumor and Normal:");
-		System.out.println(minimumTumorReadDepth+"\tMin T alignment depth");
 		System.out.println(minimumNormalReadDepth+"\tMin N alignment depth");
+		System.out.println(minimumTumorReadDepth+"\tMin T alignment depth");
+		System.out.println(minimumAltReadDepth+"\tMin T alt count");
 		System.out.println(minimumTNFractionDiff+"\tMin T-N allelic fraction diff");
 		System.out.println(minimumTNRatio+"\tMin T/N allelic fraction ratio");
 		System.out.println(maximumNormalAltFraction+"\tMax N allelic fraction");
@@ -139,6 +141,10 @@ public class StrelkaVCFParser {
 				int tumDepth = normTum[1].getReadDepthDP();
 				
 				if (normDepth < minimumNormalReadDepth || tumDepth < minimumTumorReadDepth) pass = false;
+				
+				//check alt counts
+				int altCounts = Integer.parseInt(normTum[1].getAlternateCounts());
+				if (altCounts < minimumAltReadDepth) pass = false;
 				
 				//check allelic ratio diff
 				if (pass && minimumTNFractionDiff != 0){
@@ -281,6 +287,7 @@ public class StrelkaVCFParser {
 					case 't': minimumTumorAltFraction = Double.parseDouble(args[++i]); break;
 					case 'n': maximumNormalAltFraction = Double.parseDouble(args[++i]); break;
 					case 'u': minimumTumorReadDepth = Integer.parseInt(args[++i]); break;
+					case 'a': minimumAltReadDepth = Integer.parseInt(args[++i]); break;
 					case 'o': minimumNormalReadDepth = Integer.parseInt(args[++i]); break;
 					case 'd': minimumTNFractionDiff = Double.parseDouble(args[++i]); break;
 					case 'r': minimumTNRatio = Double.parseDouble(args[++i]); break;
@@ -313,7 +320,7 @@ public class StrelkaVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Strelka VCF Parser: April 2018                       **\n" +
+				"**                             Strelka VCF Parser: May 2018                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS\n"+
 				"score. Also filters for read depth, T/N alt allelic ratio and diff, ref/alt with '.',\n"+
@@ -325,6 +332,7 @@ public class StrelkaVCFParser {
 				"-t Minimum tumor allele frequency (AF), defaults to 0.\n"+
 				"-n Maximum normal AF, defaults to 1.\n"+
 				"-u Minimum tumor alignment depth, defaults to 0.\n"+
+				"-a Minimum tumor alt count, defaults to 0.\n"+
 				"-o Minimum normal alignment depth, defaults to 0.\n"+
 				"-d Minimum T-N AF difference, defaults to 0.\n"+
 				"-r Minimum T/N AF ratio, defaults to 0.\n"+
@@ -333,7 +341,7 @@ public class StrelkaVCFParser {
 				"-f Directory in which to save the parsed files, defaults to the parent dir of the vcfs.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -t 0.05\n"+
-				"        -n 0.5 -u 100 -o 20 -d 0.05 -r 2 -f ParsedVcfs \n\n"+
+				"        -n 0.5 -u 100 -o 20 -d 0.05 -r 2 -a 4 -f ParsedVcfs \n\n"+
 
 
 				"**************************************************************************************\n");
