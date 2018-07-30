@@ -1258,6 +1258,20 @@ public class Num {
 	public static double antiLog(double loggedValue, double base){
 		return Math.pow(base, loggedValue);
 	}
+	
+	/**Calculate m and b given two points for interpolation.
+	 * @return double[]{m,b}*/
+	public static double[] calculateSlopeAndYIntercept(double x1, double y1, double x2, double y2){
+		double m = (y2-y1)/(x2-x1);
+		double b = y2 - (m * x2);
+		return new double[]{m,b};
+	}
+	
+	/**Calculate interpolated Y given the slope m and y intercept
+	 * @return Y*/
+	public static double calculateYGivenX(double[] mb, double x){
+		return (mb[0] * x) + mb[1];
+	}
 
 	/**Converts a -10Log10(val) back to the val.*/
 	public static double antiNeg10log10(float fredScore){

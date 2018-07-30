@@ -2464,4 +2464,12 @@ public class IO {
 		}
 	}
 
+	public static void closeNoException(BufferedReader in) {
+		try {
+			in.close();
+		} catch (IOException e) {
+		}
+		
+	}
+
 }
