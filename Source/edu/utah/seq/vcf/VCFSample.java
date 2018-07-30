@@ -66,7 +66,8 @@ public class VCFSample {
 						}
 					}
 					else if (format[i].equals("AF")) {
-						alleleFreqAF = Double.parseDouble(data[i]);
+						if (data[i].equals(".")) alleleFreqAF = 0.0;
+						else alleleFreqAF = Double.parseDouble(data[i]);
 					}
 					else if (format[i].equals("GQ")) {
 						if (data[i].equals(".")) {
