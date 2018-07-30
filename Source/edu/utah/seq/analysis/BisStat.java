@@ -101,7 +101,7 @@ public class BisStat {
 		scan();
 
 		//print contexts
-		printBaseContexts();
+		//printBaseContexts();
 		printGenomicContextStats();
 		
 		//convert to useq archives
@@ -200,8 +200,8 @@ public class BisStat {
 
 		//scan each chromosome for significance
 		System.out.println("\nRescanning data...\n");
-		System.out.println("Stranded chromosome per base fraction methylation stats:");
-		System.out.println("Chr\t#NonCon\t#Con\tMean\tMedian\tStdDev\tMin\tMax\t10th\t90th");
+		//System.out.println("Stranded chromosome per base fraction methylation stats:");
+		//System.out.println("Chr\t#NonCon\t#Con\tMean\tMedian\tStdDev\tMin\tMax\t10th\t90th");
 
 
 		for (int i=0; i< chromosomes.length; i++){			
@@ -237,15 +237,15 @@ public class BisStat {
 						pd[1].writePointData(fdrNonConvertedDirectory);
 					}
 					//chrom stats
-					System.out.println();
-					float[] fracs = pd[0].getScores();
-					Arrays.sort(fracs);
-					String stats = "";
-					if (fracs.length > 10) stats = Num.statFloatArray(fracs);
-					System.out.println(chromosome +".\t"+ (int)nonConvertedChrom.getInfo().getScoreTotal() +"\t"+(int)convertedChrom.getInfo().getScoreTotal() +"\t"+stats );
-					Histogram histogram = new Histogram(0, 1.1, 11);
-					histogram.countAll(fracs);
-					histogram.printScaledHistogram();
+					System.out.print(chromosome+" ");
+					//float[] fracs = pd[0].getScores();
+					//Arrays.sort(fracs);
+					//String stats = "";
+					//if (fracs.length > 10) stats = Num.statFloatArray(fracs);
+					//System.out.println(chromosome +".\t"+ (int)nonConvertedChrom.getInfo().getScoreTotal() +"\t"+(int)convertedChrom.getInfo().getScoreTotal() +"\t"+stats );
+					//Histogram histogram = new Histogram(0, 1.1, 11);
+					//histogram.countAll(fracs);
+					//histogram.printScaledHistogram();
 				}
 			}
 
@@ -287,9 +287,10 @@ public class BisStat {
 					double numConMinus = convertedMergedChromMinus.getInfo().getScoreTotal();
 
 					//calc for plus
-					System.out.println();
+					System.out.print(chromosome+" ");
+					/*
 					float[] fracs = plusPD[0].getScores();
-					//enought to stat?
+					//Enough to stat?
 					if (fracs.length<10) System.out.println(chromosome+"+\tskipping, too few observations");
 					else {
 						Arrays.sort(fracs);
@@ -307,7 +308,7 @@ public class BisStat {
 						Histogram histogram = new Histogram(0, 1.1, 11);
 						histogram.countAll(fracs);
 						histogram.printScaledHistogram();
-					}
+					}*/
 				}
 				else if (plusStrandPresent) processStrand(plusPD, nonConvertedMergedChromPlus, convertedMergedChromPlus, "+");
 				else processStrand(minusPD, nonConvertedMergedChromMinus, convertedMergedChromMinus, "-");
@@ -1510,7 +1511,7 @@ public class BisStat {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 BisStat: May 2014                                **\n" +
+				"**                                 BisStat: June 2018                               **\n" +
 				"**************************************************************************************\n" +
 				"Takes PointData from converted and non-converted C bisulfite sequencing data parsed\n" +
 				"using the NovoalignBisulfiteParser and generates several xxCxx context statistics and\n" +
