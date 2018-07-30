@@ -19,6 +19,7 @@ public class MutectVCFParser {
 	private int minimumTumorReadDepth = 0;
 	private int minimumNormalReadDepth = 0;
 	private double minimumTNFractionDiff = 0;
+	private double minTLOD = 0;
 	private int minimumAltReadDepth = 0;
 	private double minimumTNRatio = 0;
 	private double maximumNormalAltFraction = 1;
@@ -27,6 +28,7 @@ public class MutectVCFParser {
 	private boolean printSpreadsheet = false;
 	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
 	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
+	private Pattern tLod = Pattern.compile(".+;TLOD=(\\d+\\.\\d+).*");
 	private File saveDirectory = null;
 	
 	public MutectVCFParser (String[] args) {
@@ -41,6 +43,7 @@ public class MutectVCFParser {
 		System.out.println(minimumTNRatio+"\tMin T/N allelic fraction ratio");
 		System.out.println(maximumNormalAltFraction+"\tMax N allelic fraction");
 		System.out.println(minimumTumorAltFraction+"\tMin T allelic fraction");
+		System.out.println(minTLOD+"\tMin TLOD score");
 		System.out.println(excludeNonPass+"\tRemove non PASS FILTER field records.");
 		System.out.println(printSpreadsheet+"\tPrint spreadsheet output.");
 		System.out.println(saveDirectory+"\tSave directory.");
@@ -71,6 +74,13 @@ public class MutectVCFParser {
 				double normRto = tumNorm[1].getAltRatio();
 				double tumRto = tumNorm[0].getAltRatio();
 				
+				//check TLOD
+				Matcher mat = tLod.matcher(r.getOriginalRecord());
+				if (mat.matches() == false) Misc.printErrAndExit("TLOD doesn't appear to be present in the record? "+r.getOriginalRecord());
+				float score = Float.parseFloat(mat.group(1));
+				r.setQuality(score);
+				if (score < minTLOD) pass = false;
+				
 				//check depth
 				int normDepth = tumNorm[1].getReadDepthDP();
 				int tumDepth = tumNorm[0].getReadDepthDP();
@@ -100,6 +110,7 @@ public class MutectVCFParser {
 				if (pass && minimumTumorAltFraction !=0){
 					if (tumRto < minimumTumorAltFraction) pass = false;
 				}
+				
 				//check PASS?
 				if (pass && excludeNonPass && r.getFilter().toLowerCase().contains("pass") == false){
 					pass = false;
@@ -146,7 +157,7 @@ public class MutectVCFParser {
 			//watch out for #CHROM line, switch TUMOR NORMAL to NORMAL and TUMOR to match others
 			if (h.startsWith("#CHROM")){
 				String[] t = Misc.TAB.split(h);
-				if (t[10].equals("NORMAL") == false || t[9].equals("TUMOR") == false) Misc.printErrAndExit("Problem, #CHROM doesn't end with TUMOR and NORMAL? "+t);
+				if (t[10].equals("NORMAL") == false || t[9].equals("TUMOR") == false) System.err.println("\nWARNING, #CHROM doesn't end with TUMOR and NORMAL? "+h);
 				String tu = t[9];
 				String no = t[10];
 				t[9] = no;
@@ -179,6 +190,10 @@ public class MutectVCFParser {
 				t[10] = tu;
 				numPass++;
 				t[2] = "Mutect_"+numPass;
+				
+				//seq qual
+				t[5] = Num.formatNumber(vcf.getQuality(), 2);
+				
 				out.println(Misc.stringArrayToString(t, "\t"));
 			}
 		}
@@ -214,6 +229,7 @@ public class MutectVCFParser {
 					case 'd': minimumTNFractionDiff = Double.parseDouble(args[++i]); break;
 					case 'a': minimumAltReadDepth = Integer.parseInt(args[++i]); break;
 					case 'r': minimumTNRatio = Double.parseDouble(args[++i]); break;
+					case 'l': minTLOD = Double.parseDouble(args[++i]); break;
 					case 'p': excludeNonPass = true; break;
 					case 's': printSpreadsheet = true; break;
 					case 'f': saveDirectory = new File(args[++i]); break;
@@ -246,7 +262,7 @@ public class MutectVCFParser {
 				"**************************************************************************************\n" +
 				"Parses Mutect2 VCF files, filtering for read depth, allele frequency diff ratio, etc.\n"+
 				"Inserts AF and DP into for the tumor sample into the INFO field. Changes the sample\n"+
-				"order to Normal and Tumor and updates the #CHROM line.\n"+
+				"order to Normal and Tumor and updates the #CHROM line. Replaces the QUAL with TLOD.\n"+
 
 				"\nOptions:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).\n" +
@@ -258,6 +274,7 @@ public class MutectVCFParser {
 				"-o Minimum normal alignment depth, defaults to 0.\n"+
 				"-d Minimum T-N AF difference, defaults to 0.\n"+
 				"-r Minimum T/N AF ratio, defaults to 0.\n"+
+				"-t Minimum TLOD score, defaults to 0.\n"+
 				"-p Remove non PASS filter field records.\n"+
 				"-s Print spreadsheet variant summary.\n"+
 				
