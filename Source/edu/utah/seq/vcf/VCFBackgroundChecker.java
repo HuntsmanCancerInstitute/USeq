@@ -116,11 +116,11 @@ public class VCFBackgroundChecker {
 				writeOutModifiedVcf (finalVcfs, new File(saveDir, name+".vcf.gz"));
 				
 				//print summary stats
-				if (tooFewSamples.size() !=0){
+				/*if (tooFewSamples.size() !=0){
 					System.err.println("WARNING, the following did not have any mpileup lines (e.g. outside the compiled regions?) or enough background "
 							+ "samples passing thresholds to calculate a z-score. ");
 					System.err.println(Misc.stringArrayListToString(tooFewSamples, "\n"));
-				}
+				}*/
 				System.out.println("\t#Rec="+numRecords+" #Saved="+numSaved+" #NotScored="+numNotScored+" #FailingBKZ="+numFailingZscore+"\n");
 			}
 			
@@ -252,9 +252,7 @@ public class VCFBackgroundChecker {
 					vcfHeader.add("##FILTER=<ID=BKAF,Description=\"One or more background control sample AFs are >= 0.9 x variant AF.\">");
 					vcfHeader.add("##INFO=<ID=BKZ,Number=1,Type=Float,Description=\"Smallest AF z-score calculated from background AFs over effected bases. "
 							+ "Values < ~4 are suspicous, non reference observations are likely present in the background samples.\">");
-					vcfHeader.add("##INFO=<ID=BKAF,Number=1,Type=String,Description=\"Sorted list (largest to smallest) of background non-reference AFs used to calculate the BKZ.\">");
-//vcfHeader.add("##INFO=<ID=BKP,Number=1,Type=Float,Description=\"-10Log10(B&H AdjPval) estimate based on an EM binomial mixture model of background normal observations.\">");
-					
+					vcfHeader.add("##INFO=<ID=BKAF,Number=1,Type=String,Description=\"Sorted list (largest to smallest) of background non-reference AFs used to calculate the BKZ.\">");					
 					addInfo = false;
 				}
 				vcfHeader.add(record);
@@ -383,7 +381,7 @@ public class VCFBackgroundChecker {
 				"-s Path to directory in which to save the modified vcf file(s)\n"+
 						
 				"\nOptional:\n" +
-				"-z Minimum vcf z-score, defaults to 0, no filtering\n"+
+				"-z Minimum vcf z-score, defaults to 0, no filtering. Unscored vars are kept.\n"+
 				"-q Minimum mpileup sample bp quality, defaults to 20\n"+
 				"-c Minimum mpileup sample read coverge, defaults to 20\n"+
 				"-f Maximum mpileup sample AF, defaults to 0.3\n"+
