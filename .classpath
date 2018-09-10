@@ -69,5 +69,6 @@
 	<classpathentry kind="lib" path="LibraryJars/mongo-java-driver-2.14.2.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/json-20140107.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/commons-codec-1.10.jar"/>
+	<classpathentry kind="lib" path="LibraryJars/sqljdbc41.jar"/>
 	<classpathentry kind="output" path="Classes"/>
 </classpath>
