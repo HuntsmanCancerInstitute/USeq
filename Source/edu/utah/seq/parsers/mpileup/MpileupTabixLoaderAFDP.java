@@ -57,7 +57,7 @@ public class MpileupTabixLoaderAFDP implements Runnable{
 	}
 
 	private void score(String record) throws Exception {
-		if (verbose) IO.p("\n"+record);
+		if (verbose) IO.pl("\n"+record);
 
 		//#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NORMAL	TUMOR
 		String[] fields = Misc.TAB.split(record);
@@ -116,12 +116,12 @@ public class MpileupTabixLoaderAFDP implements Runnable{
 				if (afDp[0] > maxAfDp[0]) maxAfDp = afDp;
 
 				if (verbose) {
-					IO.p("\t"+afDp[0]+"\t"+afDp[1]);
+					IO.pl("\t"+afDp[0]+"\t"+afDp[1]);
 					toExamine.debug();
 				}
 			}
 		}
-		else if (verbose) IO.p("\tFound no mpileup records, appending AF=0;DP=0;");
+		else if (verbose) IO.pl("\tFound no mpileup records, appending AF=0;DP=0;");
 
 		//append vcf info
 		String modInfo = modifyInfo(maxAfDp, fields[7]);

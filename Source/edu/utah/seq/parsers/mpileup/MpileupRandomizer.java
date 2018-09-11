@@ -32,18 +32,18 @@ public class MpileupRandomizer{
 			long startTime = System.currentTimeMillis();
 			
 			processArgs(args);
-			IO.p("Thresholds:");
-			IO.p(minReadDepth+"\tMinimum sample read depth");
-			IO.p(minNumSamples+"\tMinimum num passing samples to save");
-			IO.p(minGap+"\tMinimum bp gap to trigger sample reordering\n");
+			IO.pl("Thresholds:");
+			IO.pl(minReadDepth+"\tMinimum sample read depth");
+			IO.pl(minNumSamples+"\tMinimum num passing samples to save");
+			IO.pl(minGap+"\tMinimum bp gap to trigger sample reordering\n");
 			
 			parse();
 
-			IO.p(numPrintedLines+"\tLines saved\n"+numSkippedLines+"\tLines failing thresholds\n"+numBlocks+"\tRandomized blocks");
+			IO.pl(numPrintedLines+"\tLines saved\n"+numSkippedLines+"\tLines failing thresholds\n"+numBlocks+"\tRandomized blocks");
 
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
-			IO.p("\nDone! "+Math.round(diffTime)+" Min\n");
+			IO.pl("\nDone! "+Math.round(diffTime)+" Min\n");
 		} catch (Exception e){
 			e.printStackTrace();
 		}
@@ -167,7 +167,7 @@ public class MpileupRandomizer{
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
-		IO.p("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
+		IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -208,7 +208,7 @@ public class MpileupRandomizer{
 
 
 	public static void printDocs(){
-		IO.p("\n" +
+		IO.pl("\n" +
 				"**************************************************************************************\n" +
 				"**                             Mpileup Randomizer: May 2018                         **\n" +
 				"**************************************************************************************\n" +

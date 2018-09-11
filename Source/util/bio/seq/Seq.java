@@ -567,8 +567,7 @@ public class Seq {
 				case 'H': rcSeq.append('D'); break;
 				case 'v': rcSeq.append('b'); break;
 				case 'V': rcSeq.append('B'); break;
-				default: rcSeq.append(test); System.err.println("\nWarning: odd base in revComp-> '"+test+
-				"' from "+seq+" Reverse Complement possibly incorrect!\n");
+				default: rcSeq.append(test); 
 			}
 		}
 		return rcSeq.toString();
@@ -621,8 +620,7 @@ public class Seq {
 				case 'H': rcSeq.append('D'); break;
 				case 'v': rcSeq.append('b'); break;
 				case 'V': rcSeq.append('B'); break;
-				default: rcSeq.append(test); System.err.println("\nWarning: odd base in revComp-> '"+test+
-				"' from "+seq+" Reverse Complement possibly incorrect!\n");
+				default: rcSeq.append(test); 
 			}
 		}
 		return rcSeq.toString();

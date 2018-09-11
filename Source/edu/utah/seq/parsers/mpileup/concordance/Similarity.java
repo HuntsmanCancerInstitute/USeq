@@ -43,10 +43,10 @@ public 	class Similarity implements Comparable<Similarity>{
 	}
 	
 	public void toStringMismatch(String[] sampleNames) {
-		IO.p(sampleNames[sampleA] +" <-> "+ sampleNames[sampleB]);
-		IO.p(sampleNames[sampleA] +" mismatches ");
+		IO.pl(sampleNames[sampleA] +" <-> "+ sampleNames[sampleB]);
+		IO.pl(sampleNames[sampleA] +" mismatches ");
 		sampleAMisMatchAFs.printScaledHistogram();
-		IO.p(sampleNames[sampleB] +" mismatches ");
+		IO.pl(sampleNames[sampleB] +" mismatches ");
 		sampleBMisMatchAFs.printScaledHistogram();
 	}
 	

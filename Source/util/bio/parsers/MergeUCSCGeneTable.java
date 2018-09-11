@@ -22,6 +22,7 @@ public class MergeUCSCGeneTable {
 		processArgs(args);
 		
 		//load models
+		IO.pl("Loading gene models...");
 		UCSCGeneModelTableReader reader = new UCSCGeneModelTableReader (ucscGeneFile, 0);
 		UCSCGeneLine[] lines = reader.getGeneLines();
 
@@ -34,7 +35,13 @@ public class MergeUCSCGeneTable {
 
 
 		//merge
+		IO.p(lines.length+ " transcripts to consider merging ");
+		int counter = 0;
 		for (int i=0; i< lines.length; i++){
+			if (counter++ > 1000){
+				counter = 0;
+				IO.p(".");
+			}
 			//does it exist
 			if (genes.containsKey(lines[i].getName())){
 				//merge exons
@@ -51,7 +58,7 @@ public class MergeUCSCGeneTable {
 			else genes.put(lines[i].getName(), lines[i]);
 		}
 		
-		System.out.println(lines.length + " transcripts collapsed to "+genes.size()+" genes.\n");
+		System.out.println("\n\n"+lines.length + " transcripts collapsed to "+genes.size()+" genes.\n");
 
 		//print
 		try {
@@ -109,7 +116,7 @@ public class MergeUCSCGeneTable {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Merge UCSC Gene Table: Feb  2013                       **\n" +
+				"**                           Merge UCSC Gene Table: Aug  2018                       **\n" +
 				"**************************************************************************************\n" +
 				"Merges transcript models that share the same gene name (in column 0). Maximizes exons,\n" +
 				"minimizes introns. Assumes interbase coordinates.\n\n" +

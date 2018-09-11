@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import util.gen.Gzipper;
@@ -38,16 +39,20 @@ public class VCFCallFrequency {
 	private String bedSearchUrl = null;
 	private String fetchOptionsUrl = null;
 	private double[] idBedCount = null;
+	private double[] idVcfCount;
 	private double maxCallFreq = 1.0;
+	private int minBedCount = 8;
+	private boolean appendFilter = false;
 
 	private boolean debug = false;
 	private HttpClient client = new HttpClient();
 	private Histogram hist = new Histogram(0,1,20);
-	private int numToQueries;
 	private int totalQueries = 0;
 	private int totalQueriesWithHits = 0;
 	private int numFailingCallFreq = 0;
 	private int numPassingCallFreq = 0;
+	private int numWithLowBedCount = 0;
+	
 
 	public VCFCallFrequency (String[] args) {
 		long startTime = System.currentTimeMillis();
@@ -60,14 +65,14 @@ public class VCFCallFrequency {
 			annotate(vcf);
 		}
 		//print stats
-		IO.p("\nTotal Vcf Queries: "+ totalQueries +", with matches: "+totalQueriesWithHits+", passing callFreq: "+numPassingCallFreq+", failing callFreq: "+numFailingCallFreq);
-		IO.p("\nHistogram of call frequencies");
+		IO.pl("\nTotal Vcf Queries: "+ totalQueries +", with matches: "+totalQueriesWithHits+", passing callFreq: "+numPassingCallFreq+", failing callFreq: "+numFailingCallFreq+ ", too low bed count: "+numWithLowBedCount);
+		IO.pl("\nHistogram of call frequencies meeting the minimum bed count:");
 		hist.printScaledHistogram();
 
 		//finish and calc run time
 
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
-		IO.p("\nDone! "+Math.round(diffTime)+" Sec\n");
+		IO.pl("\nDone! "+Math.round(diffTime)+" Sec\n");
 
 	}
 
@@ -79,10 +84,11 @@ public class VCFCallFrequency {
 		vcfSearchUrl = queryURL+"search?key="+ queryKey+"&regExAll=.vcf.gz;"+fileFilter+"&matchVcf=true&vcf=";
 		bedSearchUrl = queryURL+"search?key="+ queryKey+"&regExAll=.bed.gz;"+fileFilter+"&bed=";
 		fetchOptionsUrl = queryURL+"search?key="+ queryKey+"&fetchOptions=true";
-		IO.p("fetchOptions:\t"+fetchOptionsUrl);
-		IO.p("VcfSearchUrl:\t"+vcfSearchUrl);
-		IO.p("BedSearchUrl:\t"+bedSearchUrl);
-		IO.p();
+		IO.pl("fetchOptions:\t"+fetchOptionsUrl);
+		IO.pl("\tCall this in a browser to pick an appropriate file filter for your analysis. Only those data files with the file filter in their path will be queried.");
+		IO.pl("VcfSearchUrl:\t"+vcfSearchUrl);
+		IO.pl("BedSearchUrl:\t"+bedSearchUrl);
+		IO.pl();
 	}
 
 	public void fetchEncodedQueryKey() {
@@ -110,12 +116,14 @@ public class VCFCallFrequency {
 	}
 
 	public void annotate(File vcfFile){
-		System.out.print("\t");
+
 		File modVcf = new File (saveDirectory, Misc.removeExtension(vcfFile.getName())+".callFreq.vcf.gz");
 		String line = null;
 		Gzipper out = null;
 		BufferedReader in = null;
 		boolean addInfo = true;
+		boolean addFilter = true;
+		if (maxCallFreq == 1.0) addFilter = false;
 		try {
 			out = new Gzipper(modVcf);
 			in = IO.fetchBufferedReader(vcfFile);
@@ -127,13 +135,19 @@ public class VCFCallFrequency {
 				if (line.startsWith("#")) {
 					out.println(line);
 					if (addInfo && line.startsWith("##INFO")){
-						out.println("##INFO=<ID=CallFreq,Number=1,Type=Float,Description=\"Frequency the variant has been observed in '"+fileFilter
-								+ "' variant datasets.\">");
+						out.println("##INFO=<ID=CF,Number=1,Type=String,Description=\"Frequency the variant has been observed in '"+fileFilter
+								+ "' variant datasets, number vcf matches, number bed matches.\">");
 						addInfo = false;
+					}
+					else if (addFilter && line.startsWith("##FILTER")){
+						out.println("##FILTER=<ID=CallFreq,Description=\"Variant exceeded a call frequency of "+maxCallFreq+
+								" from querying vcf and callable region bed files in '"+fileFilter+"'\">");
+						addFilter = false;
 					}
 				}
 				else {
 					vcfRecords[counter] = Misc.TAB.split(line);
+					totalQueries++;
 					//check length
 					if (vcfRecords[counter].length < 8) throw new Exception ("This vcf record is missing 8 manditory fields?! "+line);
 					counter++;
@@ -146,7 +160,7 @@ public class VCFCallFrequency {
 			}
 			//process last
 			processRecordBlock(vcfRecords, out);
-			IO.p();
+			IO.pl();
 
 			out.close();
 			in.close();
@@ -170,69 +184,48 @@ public class VCFCallFrequency {
 			//IO.p("VCF RETURN\n"+jsonResultsVcf);			
 			JsonObject joVcf = JsonObject.readFrom(jsonResultsVcf);
 			JsonValue jvVcf = joVcf.get("queryResults");
+			loadVcfResults(jvVcf);
 
-			//any results?
-			if (jvVcf != null){
-				JsonArray ja = jvVcf.asArray();
-				int numWithHits = ja.size();
-				System.out.print(numToQueries+"->"+numWithHits+", ");
-				totalQueries+= numToQueries;
-				totalQueriesWithHits+= numWithHits;
+			//execute bed query
+			String jsonBedResults = query(searchStrings[1]);
+			//IO.p("BED RETURN\n"+jsonBedResults);
+			JsonObject joBed = JsonObject.readFrom(jsonBedResults);
+			JsonValue jvBed = joBed.get("queryResults");
+			loadBedResults(jvBed);
 
-
-				//execute bed query, only do with vcf queries that return hits
-				String jsonBedResults = query(searchStrings[1]);
-				//IO.p("BED RETURN\n"+jsonBedResults);
-				JsonObject joBed = JsonObject.readFrom(jsonBedResults);
-				JsonValue jvBed = joBed.get("queryResults");
-				loadBedResults(jvBed);
-
-				//for each vcf query hit
-				for (int i=0; i< numWithHits; i++){
-					JsonObject joq = ja.get(i).asObject();
-					// get vcf's index
-					JsonValue input = joq.get("input");
-					String vcfRecord = input.asString();
-
-					String[] splitVcf = Misc.TAB.split(vcfRecord);
-					int vcfIndex = Integer.parseInt(splitVcf[2]);
-					// get number of intersecting vcf files
-					double numVcfHits = (double)joq.get("numberHits").asInt();
-
-					//get bed count and calc ratio
-					double callRatio = 0;
-					double bedCount = idBedCount[vcfIndex];
-					if (bedCount > 0) callRatio = numVcfHits/bedCount;
-
-					//modify INFO field of each record
-					vcfRecords[vcfIndex][7] = "CallFreq="+Num.formatNumber(callRatio, 3)+";"+vcfRecords[vcfIndex][7];
-					if (debug) IO.p("\nVCFRecord:"+vcfRecord+"\n\tNumVcfHits:"+numVcfHits+" NumBedHits:"+bedCount+" VcfIndex:"+ vcfIndex +
-							"\n\tModVCFRec:"+Misc.stringArrayToString(vcfRecords[vcfIndex], "_"));
-
-					//add info to histogram
-					hist.count(callRatio);
-
-					//fail it?
-					if (callRatio > maxCallFreq) vcfRecords[vcfIndex][0] = "Failed";
-				}
-			}
-
-			//add CallFreq=0 to those without any hits
+			//for each record
 			for (int i=0; i< vcfRecords.length; i++){
+				//pull counts and calc ratio
 				String[] vcf = vcfRecords[i];
 				if (vcf == null) break;
-				if (vcf[7].startsWith("CallFreq=") == false) {
-					if (vcf[7].equals("Failed")){
-						vcf[7] = "CallFreq=0;"+vcf[7];
-						hist.count(0);
-						if (debug) IO.p("\nVCFRecordNoHit:"+Misc.stringArrayToString(vcf, "_"));
-					}
+				double vcfCount = idVcfCount[i];
+				double bedCount = idBedCount[i];
+				double ratio = 0;
+				if (bedCount > 0) {
+					ratio = vcfCount/bedCount;
+					if (ratio > 1.0) ratio = 1.0;
 				}
+				String cf = "CF="+Num.formatNumber(ratio, 3)+","+(int)vcfCount+","+(int)bedCount;
+				
+				//modify INFO field of each record
+				vcfRecords[i][7] = cf+";"+vcfRecords[i][7];
+				boolean printMe = true;
+				
+				//check bed count, must pass this before any filtering is applied.
+				if (bedCount >= minBedCount) {
+					hist.count(ratio);
+					if (ratio > maxCallFreq){
+						//just append or skip
+						if (appendFilter) vcfRecords[i][6] = modifyFilter(vcfRecords[i][6]);
+						else printMe = false;
+						numFailingCallFreq++;
+					}
+					else numPassingCallFreq++;
+				}
+				else numWithLowBedCount++;
 
-				//print it to file?
-				if (vcf[0].equals("Failed")) numFailingCallFreq++;
-				else {
-					numPassingCallFreq++;
+				//print it?
+				if (printMe){
 					out.print(vcf[0]);
 					for (int x=1; x< vcf.length; x++){
 						out.print("\t");
@@ -240,17 +233,50 @@ public class VCFCallFrequency {
 					}
 					out.println();
 				}
-
 			}
+			
+			
+			
+			
+
+			
 		}
+		else throw new IOException("Error! Failed to generate search urls?! Aborting.");
+		System.out.print(".");
 
 	}
 
+	private String modifyFilter(String filter) {
+		if (filter.equals(".") || filter.toUpperCase().equals("PASS")) return "CallFreq";
+		return "CallFreq;"+filter;
+	}
+
+	/**Loads the number of hits returned to each vcf query. Some won't be returned and thus will be zero.*/
+	private void loadVcfResults(JsonValue jvVcf) {
+		//clear prior
+		idVcfCount = new double[numberRecordsPerQuery];
+		
+		JsonArray ja = jvVcf.asArray();
+		int numWithHits = ja.size();
+		totalQueriesWithHits+= numWithHits;
+		
+		for (int i=0; i< numWithHits; i++){
+			JsonObject joq = ja.get(i).asObject();
+			double numHits = joq.get("numberHits").asInt();
+			JsonValue input = joq.get("input");
+			String vcfRecord = input.asString();
+			String[] splitVcf = Misc.TAB.split(vcfRecord);
+			int index = Integer.parseInt(splitVcf[2]);
+			//set in array
+			idVcfCount[index] = numHits;
+		}
+	}
+
+	/**Loads the number of hits returned to each bed query. Some may be returned and thus will be zero.*/
 	private void loadBedResults(JsonValue jvBed) {
 		//clear prior
 		idBedCount = new double[numberRecordsPerQuery];
 
-		// TODO pull bed input line and the corresponding vcf id from the bed name field
 		JsonArray ja = jvBed.asArray();
 		int numWithHits = ja.size();
 
@@ -264,7 +290,6 @@ public class VCFCallFrequency {
 
 			//set in array
 			idBedCount[index] = numHits;
-			//if (debug) IO.p("Bed "+input +" vcfIndex:"+index+ " numFileHits:"+ numHits);
 		}
 	}
 
@@ -287,24 +312,22 @@ public class VCFCallFrequency {
 	private String[] makeSearchUrls(String[][] vcfRecords) {
 		StringBuilder[] vcfBed = pullVcfsBedsToQuery(vcfRecords);
 		if (vcfBed[0].length() == 0) return null;
-		if (debug) IO.p("VcfBedToQuery:\n\t"+vcfBed[0]+"\n\t"+vcfBed[1]);
+		if (debug) IO.pl("VcfBedToQuery:\n\t"+vcfBed[0]+"\n\t"+vcfBed[1]);
 
 		//make cmd with key
 		String urlVcfStr = vcfBed[0].insert(0, vcfSearchUrl).toString();
 		String urlBedStr = vcfBed[1].insert(0, bedSearchUrl).toString();
-		if (debug) IO.p("SearchURL:\n\t"+urlVcfStr+"\n\t"+urlBedStr);
+		if (debug) IO.pl("SearchURL:\n\t"+urlVcfStr+"\n\t"+urlBedStr);
 		return new String[]{urlVcfStr,urlBedStr};
 	}
 
 	private StringBuilder[] pullVcfsBedsToQuery(String[][] vcfRecords) {
-		numToQueries = 0;
 		//pull vcfs to query
 		StringBuilder sbVcf = new StringBuilder();
 		StringBuilder sbBed = new StringBuilder();
 		for (int i=0; i< vcfRecords.length; i++){
 			String[] vcf = vcfRecords[i];
 			if (vcf == null) break;
-			numToQueries++;
 			//build vcf query
 			//pull chr, pos, ref, alt
 			sbVcf.append(vcf[0]); sbVcf.append("%09");
@@ -355,6 +378,7 @@ public class VCFCallFrequency {
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		File forExtraction = null;
+		File configFile = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -363,15 +387,14 @@ public class VCFCallFrequency {
 				try{
 					switch (test){
 					case 'v': forExtraction = new File(args[++i]); break;
-					case 'q': queryURL = args[++i]; break;
-					case 'h': host = args[++i]; break;
-					case 'r': realm = args[++i]; break;
-					case 'u': userName = args[++i]; break;
-					case 'p': password = args[++i]; break;
 					case 'f': fileFilter = args[++i]; break;
+					case 'a': appendFilter = true; break;
+					case 'c': configFile = new File(args[++i]); break;
 					case 'm': maxCallFreq = Double.parseDouble(args[++i]); break;
+					case 'b': minBedCount = Integer.parseInt(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'd': debug = true; break;
+					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -380,16 +403,30 @@ public class VCFCallFrequency {
 				}
 			}
 		}
-		IO.p("\n"+IO.fetchUSeqVersion()+" Arguments:");
-		IO.p("\t-v "+forExtraction);
-		IO.p("\t-s "+saveDirectory);
-		IO.p("\t-q "+queryURL);
-		IO.p("\t-h "+host);
-		IO.p("\t-r "+realm);
-		IO.p("\t-f "+fileFilter);
-		IO.p("\t-m "+maxCallFreq);
-		IO.p("\t-d "+forExtraction);
-		IO.p();
+		
+		//config file
+		if (configFile == null || configFile.canRead() == false) Misc.printErrAndExit("\nSorry, cannot find or read your config file: "+configFile+"\n");
+		HashMap<String, String> config = IO.loadFileIntoHashMapLowerCaseKey(configFile);
+		if (config.containsKey("queryurl")) queryURL = config.get("queryurl");
+		if (config.containsKey("host")) host = config.get("host");
+		if (config.containsKey("realm")) realm = config.get("realm");
+		if (config.containsKey("username")) userName = config.get("username");
+		if (config.containsKey("password")) password = config.get("password");
+		
+		
+		IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments:");
+		IO.pl("\t-v Vcfs "+forExtraction);
+		IO.pl("\t-s SaveDir "+saveDirectory);
+		IO.pl("\t-f File Filter "+fileFilter);
+		IO.pl("\t-m MaxCallFreq "+maxCallFreq);
+		IO.pl("\t-b MinBedCount "+minBedCount);
+		IO.pl("\t-a Append FILTER "+appendFilter);
+		IO.pl("\t-d Verbose "+debug);
+		IO.pl("\tQueryUrl "+queryURL);
+		IO.pl("\tHost "+host);
+		IO.pl("\tRealm "+realm);
+		IO.pl("\tUserName "+userName);
+		IO.pl();
 
 
 		//pull vcf files
@@ -404,14 +441,14 @@ public class VCFCallFrequency {
 
 
 		//check params
-
-		if (queryURL == null) Misc.printErrAndExit("\nError: provide a query URL, e.g. http://hci-clingen1.hci.utah.edu:8080/Query/");
+		if (queryURL == null) Misc.printErrAndExit("\nError: failed to find a queryUrl in the config file, e.g. queryUrl http://hci-clingen1.hci.utah.edu:8080/Query/");
 		if (queryURL.endsWith("/") == false) queryURL = queryURL+"/";
-		if (host == null) Misc.printErrAndExit("\nError: provide a host, e.g. hci-clingen1.hci.utah.edu");
-		if (realm == null) Misc.printErrAndExit("\nError: provide a realm, e.g. QueryAPI");
-		if (userName == null) Misc.printErrAndExit("\nError: provide a user name");
-		if (password == null) Misc.printErrAndExit("\nError: provide a password");
+		if (host == null) Misc.printErrAndExit("\nError: failed to find a host in the config file, e.g. host hci-clingen1.hci.utah.edu");
+		if (realm == null) Misc.printErrAndExit("\nError: failed to find a realm in the config file, e.g. realm QueryAPI");
+		if (userName == null) Misc.printErrAndExit("\nError: failed to find a userName in the config file, e.g. userName FCollins");
+		if (password == null) Misc.printErrAndExit("\nError: failed to find a password in the config file, e.g. password g0QueryAP1");
 		if (fileFilter == null) Misc.printErrAndExit("\nError: provide a fileFilter, e.g. /B37/Somatic/Avatar/ ");
+		
 
 
 		if (saveDirectory == null) Misc.printErrAndExit("\nError: provide a directory to save the annotated vcf files.");
@@ -420,12 +457,12 @@ public class VCFCallFrequency {
 	}	
 
 	public static void printDocs(){
-		IO.p("\n" +
+		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Call Frequency: March 2018                      **\n" +
+				"**                            VCF Call Frequency: August 2018                       **\n" +
 				"**************************************************************************************\n" +
 				"Calculates a vcf call frequency for each variant when pointed at a genomic Query\n"+
-				"sevice (https://github.com/HuntsmanCancerInstitute/Query). CallFreq's are calculated \n"+
+				"service (https://github.com/HuntsmanCancerInstitute/Query). CallFreq's are calculated \n"+
 				"by first counting the number of exact vcf matches present and dividing it by the\n"+
 				"number of intersecting bed files. Use this to flag variants with high call rates that\n"+
 				"are potential false positives. Use the file filter to limit which files to use in the\n"+
@@ -436,16 +473,24 @@ public class VCFCallFrequency {
 				"\nRequired Options:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s)\n" +
 				"-s Directory to save the annotated vcf files\n"+
-				"-h Query service host, e.g. hci-clingen1.hci.utah.edu\n"+
-				"-q Query service url, e.g. http://hci-clingen1.hci.utah.edu:8080/Query/\n"+
-				"-r Query service realm, e.g. QueryAPI\n"+
-				"-u Query service username\n"+
-				"-p Query service password\n"+
 				"-f Query service file filter, e.g. /B37/Somatic/Avatar/\n"+
-				"-d Debug output\n"+
+				"-c Config txt file containing two tab delimited columns with host, queryUrl, realm, \n"+
+				"     userName, and password. 'chmod 600' the file! e.g.: \n"+
+				"     host hci-clingen1.hci.utah.edu\n"+
+				"     queryUrl http://hci-clingen1.hci.utah.edu:8080/Query/\n"+
+				"     realm QueryAPI\n"+
+				"     userName FColins\n"+
+				"     password g0QueryAP1\n"+
+				
+				"\nOptions:\n"+
+				"-m Maximum call frequency, defaults to 1, no filtering.\n"+
+				"-b Minimum bed call count before applying a max call freq filter, defaults to 8.\n"+
+				"-a Keep failing records and append CallFreq to the FILTER field.\n"+
+				"-d Print verbose debugging output.\n"+
 
 
-				"\nExample: java -jar pathToUSeq/Apps/VCFCallFrequency -v VCFss/ -s Annotated \n\n" +
+				"\nExample: java -jar pathToUSeq/Apps/VCFCallFrequency -v Vcfs/ -s CFVcfs -f \n"+
+				"    /B37/Somatic/Avatar/ -m 0.2 -a -c vcfCFConfig.txt \n\n" +
 				"**************************************************************************************\n");
 
 	}

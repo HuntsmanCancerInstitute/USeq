@@ -106,7 +106,7 @@ public class BamConcordance {
         
         //write out mismatch bed file
         String name= Misc.removeExtension(bamFiles[0].getParentFile().getName());
-        File misMatchBed = new File(bamFiles[0].getParentFile(), name+"_MisMatch.bed.gz");
+        File misMatchBed = new File(bamFiles[0].getParentFile().getCanonicalFile(), name+"_MisMatch.bed.gz");
         IO.concatinateFiles(toMerge, misMatchBed);
         
         aggregateStats(runners);
@@ -141,16 +141,16 @@ public class BamConcordance {
 	}
 
 	public void printThresholds(){
-		IO.p("Settings:");
-		IO.p(minSnvDP+"\tMinSnvDP");
-		IO.p(minAFForHom+"\tMinAFForHom");
-		IO.p(minAFForMatch+"\tminAFForMatch");
-		IO.p(minAFForHis+"\tMinAFForHis");
-		IO.p(minBaseQuality+"\tMinBaseQuality");
-		IO.p(minMappingQuality+"\tMinMappingQuality");
-		IO.p(maxIndel+"\tMaxIndel");
-		if (commonSnvBed!= null) IO.p(commonSnvBed.getName()+ "\tCommon SNV exclusion file");
-		else IO.p("All SNVs counted, common and uncommon.");
+		IO.pl("Settings:");
+		IO.pl(minSnvDP+"\tMinSnvDP");
+		IO.pl(minAFForHom+"\tMinAFForHom");
+		IO.pl(minAFForMatch+"\tminAFForMatch");
+		IO.pl(minAFForHis+"\tMinAFForHis");
+		IO.pl(minBaseQuality+"\tMinBaseQuality");
+		IO.pl(minMappingQuality+"\tMinMappingQuality");
+		IO.pl(maxIndel+"\tMaxIndel");
+		if (commonSnvBed!= null) IO.pl(commonSnvBed.getName()+ "\tCommon SNV exclusion file");
+		else IO.pl("All SNVs counted, common and uncommon.");
 	}
 
 	public void printStats(){
@@ -162,12 +162,12 @@ public class BamConcordance {
 	}
 
 	public void printGenderRatios(){
-		IO.p("Het/Hom histogram AF count ratios for AllChrs, ChrX, log2(All/X)");
+		IO.pl("Het/Hom histogram AF count ratios for AllChrs, ChrX, log2(All/X)");
 		for (int i=0; i< afHist.length; i++){
 			double allChr = ratioCenterVsLast(afHist[i]);
 			double chrX = ratioCenterVsLast(chrXAfHist[i]);
 			double lgrto = Num.log2(allChr/chrX);
-			IO.p(sampleNames[i] +"\t"+Num.formatNumber(allChr, 3)+"\t"+Num.formatNumber(chrX, 3)+"\t"+Num.formatNumber(lgrto, 3));
+			IO.pl(sampleNames[i] +"\t"+Num.formatNumber(allChr, 3)+"\t"+Num.formatNumber(chrX, 3)+"\t"+Num.formatNumber(lgrto, 3));
 		}
 	}
 	
@@ -193,7 +193,7 @@ public class BamConcordance {
 	}
 	
 	public void printHist(){
-		IO.p("\nHistograms of AFs observed:");
+		IO.pl("\nHistograms of AFs observed:");
 		for (int i=0; i< afHist.length; i++){
 			System.out.println("Sample\t"+sampleNames[i]);
 			System.out.println("All NonRef AFs >= "+minAFForHis+":");
@@ -202,7 +202,7 @@ public class BamConcordance {
 			chrXAfHist[i].printScaledHistogram();
 			System.out.println();
 		}
-		IO.p("\nHistograms of the AFs for mis matched homozygous variants - contamination check:");
+		IO.pl("\nHistograms of the AFs for mis matched homozygous variants - contamination check:");
 		for (int i=0; i< similarities.length; i++) {
 			similarities[i].toStringMismatch(sampleNames);
 			System.out.println();

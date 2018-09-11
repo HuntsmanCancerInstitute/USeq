@@ -2,6 +2,7 @@ package edu.utah.seq.vcf;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.TreeMap;
@@ -87,10 +88,10 @@ public class AnnotatedVcfParser {
 		long startTime = System.currentTimeMillis();
 		processArgs(args);
 		if (somaticProcessing) modifySettingsForFoundation();
-		IO.p("Parsing (#pass #fail):");
+		IO.pl("Parsing (#pass #fail):");
 		for (File vcf: vcfFiles){
 			System.out.print("\t"+vcf.getName());
-			if (verbose) IO.p();
+			if (verbose) IO.pl();
 			parse(vcf);
 		}
 		printSettings();
@@ -125,7 +126,7 @@ public class AnnotatedVcfParser {
 					continue;
 				}
 				numRecords++;
-				if (verbose) IO.p("\n"+vcfLine);
+				if (verbose) IO.pl("\n"+vcfLine);
 
 				//#CHROM POS ID REF ALT QUAL FILTER INFO ......
 				//   0    1   2  3   4   5     6      7
@@ -160,11 +161,11 @@ public class AnnotatedVcfParser {
 					failVcf.println(vcfLine);
 					numFailingVcf++;
 				}
-				if (verbose) IO.p("\tPass all filters\t"+pass);	
+				if (verbose) IO.pl("\tPass all filters\t"+pass);	
 			}
 			numPass+=numPassingVcf;
 			
-			if (verbose == false) IO.p("\t"+numPassingVcf+"\t"+numFailingVcf);
+			if (verbose == false) IO.pl("\t"+numPassingVcf+"\t"+numFailingVcf);
 			
 			//close io
 			in.close();
@@ -261,18 +262,18 @@ public class AnnotatedVcfParser {
 		for (String key: passingIDKeys){
 			if (lcId.contains(key)){
 				numPassIDs++;
-				if (verbose) IO.p("\tID Check\ttrue"+key+"\t"+lcId);
+				if (verbose) IO.pl("\tID Check\ttrue"+key+"\t"+lcId);
 				return true;
 			}
 		}
-		if (verbose) IO.p("\tID Check\tNA\t"+lcId);
+		if (verbose) IO.pl("\tID Check\tNA\t"+lcId);
 		return false;
 	}
 
 	private boolean checkSplice(String info, String[] splitInfo) throws Exception {
 		//any splice info
 		if (info.contains("VCFSS=") == false){
-			if (verbose) IO.p("\tSplice Check\tfalse\tNo VCFSS");
+			if (verbose) IO.pl("\tSplice Check\tfalse\tNo VCFSS");
 			return false;
 		}
 		numWithSplice++;
@@ -305,7 +306,7 @@ public class AnnotatedVcfParser {
 		}
 		
 		boolean passSplice = maxDelta >= minimumVCFSSDiff;
-		if (verbose) IO.p("\tSplice Check\t"+passSplice+"\t"+maxDelta+"\t"+vcfSSLine);	
+		if (verbose) IO.pl("\tSplice Check\t"+passSplice+"\t"+maxDelta+"\t"+vcfSSLine);	
 		if (passSplice) {
 			numPassingSplice++;
 			return true;
@@ -333,11 +334,11 @@ public class AnnotatedVcfParser {
 				for (double af: afs) if (af>= obsAF) numFailing++;
 				double fractFailing = numFailing/(double)afs.length;
 				boolean passingBkaf = fractFailing <= maxFracBKAFs; 
-				if (verbose) IO.p("\tBKAF Check\t"+passingBkaf+"\t"+fractFailing+"\t"+bkafs);
+				if (verbose) IO.pl("\tBKAF Check\t"+passingBkaf+"\t"+fractFailing+"\t"+bkafs);
 				if (passingBkaf) passBKs = true;
 			}
 			else {
-				if (verbose) IO.p("\tBKAF Check\tNA\tNo BKAFs");
+				if (verbose) IO.pl("\tBKAF Check\tNA\tNo BKAFs");
 			}
 		}
 		
@@ -347,7 +348,7 @@ public class AnnotatedVcfParser {
 			if (mat.find()){
 				double bkz = Double.parseDouble(mat.group(1));
 				boolean pass = bkz >= minimumBKZ;
-				if (verbose) IO.p("\tBKZ Check\t"+pass+"\t"+bkz);
+				if (verbose) IO.pl("\tBKZ Check\t"+pass+"\t"+bkz);
 				//prior not scored?
 				if (foundBK == false && pass == true) passBKs = true;
 				//prior scored but this failed
@@ -355,10 +356,10 @@ public class AnnotatedVcfParser {
 				foundBK = true;
 			}
 			else {
-				if (verbose) IO.p("\tBKZ Check\tNA\tNo BKZ");
+				if (verbose) IO.pl("\tBKZ Check\tNA\tNo BKZ");
 			}
 		}
-		if (verbose) IO.p("\tBKZ Checks\t"+foundBK+"\t"+passBKs);
+		if (verbose) IO.pl("\tBKZ Checks\t"+foundBK+"\t"+passBKs);
 		if (foundBK) numWithBKAFs++;
 		if (passBKs) numPassingBKAFs++;
 		return new boolean[]{foundBK, passBKs};
@@ -383,7 +384,7 @@ public class AnnotatedVcfParser {
 			if (passingClinSig != null){
 				for (String cs: cTerms){
 					passClinSig = passingClinSig.contains(cs.toLowerCase());
-					if (verbose) IO.p("\tCLINSIG For Check\t"+passClinSig+"\t"+cs);
+					if (verbose) IO.pl("\tCLINSIG For Check\t"+passClinSig+"\t"+cs);
 					if (passClinSig) {
 						numPassingClinSing++;
 						break;
@@ -396,7 +397,7 @@ public class AnnotatedVcfParser {
 			if (excludeClinSig != null){
 				for (String cs: cTerms){
 					passClinSigAgainst = excludeClinSig.contains(cs.toLowerCase());
-					if (verbose) IO.p("\tCLINSIG Against Check\t"+passClinSigAgainst+"\t"+cs);
+					if (verbose) IO.pl("\tCLINSIG Against Check\t"+passClinSigAgainst+"\t"+cs);
 					if (passClinSigAgainst) {
 						numPassingExcludeClinSing++;
 						break;
@@ -406,7 +407,7 @@ public class AnnotatedVcfParser {
 			return new boolean[]{passClinSig, passClinSigAgainst};
 		}
 		else {
-			if (verbose) IO.p("\tCLINSIG Check\tfalse\tNo CLINSIG");
+			if (verbose) IO.pl("\tCLINSIG Check\tfalse\tNo CLINSIG");
 			return null;
 		}
 	}
@@ -429,7 +430,7 @@ public class AnnotatedVcfParser {
 			}
 		}
 		if (annValue == null) {
-			if (verbose) IO.p("\tImpact Check\tfalse\tNo ANN");
+			if (verbose) IO.pl("\tImpact Check\tfalse\tNo ANN");
 			return false;
 		}
 		numWithAnn++;
@@ -457,7 +458,7 @@ public class AnnotatedVcfParser {
 				String[] splitAnn = Misc.PIPE.split(ann);
 				String impact = splitAnn[2];
 				boolean passImpact = passingAnnImpact.contains(impact.toLowerCase());
-				if (verbose) IO.p("\tImpact Check\t"+passImpact+"\t"+impact);
+				if (verbose) IO.pl("\tImpact Check\t"+passImpact+"\t"+impact);
 				if (passImpact) {
 					numPassingAnnImpact++;
 					//Annotation effect
@@ -491,7 +492,7 @@ public class AnnotatedVcfParser {
 			}
 		}
 		if (annValue == null) {
-			if (verbose) IO.p("\tGermline Check\tNA\tNo ANN");
+			if (verbose) IO.pl("\tGermline Check\tNA\tNo ANN");
 			return false;
 		}
 
@@ -521,11 +522,11 @@ public class AnnotatedVcfParser {
 		
 		//for each annotation
 		if (foundGermlineGene!= null){
-			if (verbose) IO.p("\tGermGene Check\ttrue\t"+foundGermlineGene);
+			if (verbose) IO.pl("\tGermGene Check\ttrue\t"+foundGermlineGene);
 			return true;
 		}
 		//none found so return false
-		if (verbose) IO.p("\tGermGene Check\tNA\t"+genes);
+		if (verbose) IO.pl("\tGermGene Check\tNA\t"+genes);
 		return false;
 	}
 
@@ -542,7 +543,7 @@ public class AnnotatedVcfParser {
 				foundPop = true;
 				double popAF = Double.parseDouble(mat.group(1));
 				if (popAF > maximumPopAF) passExAC = false;
-				if (verbose) IO.p("\tExAC Check\t"+passExAC+"\t"+popAF);
+				if (verbose) IO.pl("\tExAC Check\t"+passExAC+"\t"+popAF);
 			}
 		}
 
@@ -553,7 +554,7 @@ public class AnnotatedVcfParser {
 				foundPop = true;
 				double popAF = Double.parseDouble(mat.group(1));
 				if (popAF > maximumPopAF) pass1K = false;
-				if (verbose) IO.p("\t1KG Check\t"+pass1K+"\t"+popAF);
+				if (verbose) IO.pl("\t1KG Check\t"+pass1K+"\t"+popAF);
 			}
 		}
 		
@@ -568,7 +569,7 @@ public class AnnotatedVcfParser {
 			else return new boolean[]{true, false};
 		}
 		else {
-			if (verbose) IO.p("\tPopFreq Check\tNA\tNo dbNSFP_1000Gp3_AF or dbNSFP_ExAC_AF");
+			if (verbose) IO.pl("\tPopFreq Check\tNA\tNo dbNSFP_1000Gp3_AF or dbNSFP_ExAC_AF");
 			return new boolean[]{false, false};
 		}
 		
@@ -581,7 +582,7 @@ public class AnnotatedVcfParser {
 			int obsDP = Integer.parseInt(mat.group(1));
 			if (obsDP < dps.length) dps[obsDP]++;
 			boolean passDP = obsDP >= minimumDP;
-			if (verbose) IO.p("\tDP Check\t"+passDP+"\t"+obsDP);
+			if (verbose) IO.pl("\tDP Check\t"+passDP+"\t"+obsDP);
 			if (passDP == false) return false;
 			else {
 				numPassingDP++;
@@ -589,7 +590,7 @@ public class AnnotatedVcfParser {
 			}
 		}
 		else {
-			if (verbose) IO.p("\tDP Check\tfalse\tNo DP");
+			if (verbose) IO.pl("\tDP Check\tfalse\tNo DP");
 			return false;
 		}
 	}
@@ -603,8 +604,8 @@ public class AnnotatedVcfParser {
 				boolean passMinAF = obsAF >= minimumAF;
 				boolean passMaxAF = obsAF <= maximumAF;
 				if (verbose) {
-					IO.p("\tAF Min Check\t"+passMinAF+"\t"+obsAF);
-					if( passGermlineGene == false) IO.p("\tAF Max Check\t"+passMaxAF+"\t"+obsAF);
+					IO.pl("\tAF Min Check\t"+passMinAF+"\t"+obsAF);
+					if( passGermlineGene == false) IO.pl("\tAF Max Check\t"+passMaxAF+"\t"+obsAF);
 				}
 				if (passMinAF) numPassingMinAF++;
 				if (passMaxAF) numPassingMaxAF++;
@@ -613,11 +614,11 @@ public class AnnotatedVcfParser {
 				else return false;
 			}
 			else {
-				if (verbose) IO.p("\tAF Check\tfalse\tNo AF");
+				if (verbose) IO.pl("\tAF Check\tfalse\tNo AF");
 				return false;
 			}
 		} catch (NumberFormatException e){
-			if (verbose) IO.p("\tAF Check\tfalse\tCan't parse AF");
+			if (verbose) IO.pl("\tAF Check\tfalse\tCan't parse AF");
 			return false;
 		}
 	}
@@ -673,35 +674,35 @@ public class AnnotatedVcfParser {
 	}
 
 	public void printSettings(){
-		IO.p("\nSettings:");
+		IO.pl("\nSettings:");
 		if (somaticProcessing) {
-			IO.p("\tFoundation processing, unset fields are set to Foundation defaults and the following logic is used to pass or fail each record.\n"
+			IO.pl("\tSomatic processing, unset fields are set to Somatic defaults and the following logic is used to pass or fail each record.\n"
 					+ "\t\tIf ID matches pass irregardless of other settings.\n"
 					+ "\t\tFail it if DP or AF are false.\n"
 					+ "\t\tFail it if ClinSig, Splice, and Impact are all false.\n"
 					+ "\t\tFail it if Pop or BKAF are present and they are false.\n");
 		}
-		if (minimumDP != 0) IO.p("\t"+ minimumDP+"\t: Minimum DP read depth");
+		if (minimumDP != 0) IO.pl("\t"+ minimumDP+"\t: Minimum DP read depth");
 		if (minimumAF != 0 || maximumAF != 1 || maxFracBKAFs != 0) {
-			IO.p("\t"+ minimumAF+"\t: Minimum AF allele frequency");
-			IO.p("\t"+ maximumAF+"\t: Maximum AF allele frequency");
+			IO.pl("\t"+ minimumAF+"\t: Minimum AF allele frequency");
+			IO.pl("\t"+ maximumAF+"\t: Maximum AF allele frequency");
 		}
-		if (maximumPopAF != 0) IO.p("\t"+ maximumPopAF+"\t: Maximum population AF from dbNSFP_ExAC_AF or dbNSFP_1000Gp3_AF");
-		if (maxFracBKAFs != 0) IO.p("\t"+ maxFracBKAFs+"\t: Maximum fraction of background samples with an AF >= observed AF");
-		if (minimumBKZ != 0) IO.p("\t"+ minimumBKZ+"\t: Minimum BKZ quality score");
-		if (passingAnnImpact != null) IO.p("\n\t"+Misc.treeSetToString(passingAnnImpact, ",")+"\t: ANN impact keys");
-		if (passingClinSig != null) IO.p("\n\t"+Misc.treeSetToString(passingClinSig, ",")+"\t: CLINSIG keep keys");
-		if (excludeClinSig != null) IO.p("\t"+Misc.treeSetToString(excludeClinSig, ",")+"\t: CLINSIG exclude keys");
+		if (maximumPopAF != 0) IO.pl("\t"+ maximumPopAF+"\t: Maximum population AF from dbNSFP_ExAC_AF or dbNSFP_1000Gp3_AF");
+		if (maxFracBKAFs != 0) IO.pl("\t"+ maxFracBKAFs+"\t: Maximum fraction of background samples with an AF >= observed AF");
+		if (minimumBKZ != 0) IO.pl("\t"+ minimumBKZ+"\t: Minimum BKZ quality score");
+		if (passingAnnImpact != null) IO.pl("\n\t"+Misc.treeSetToString(passingAnnImpact, ",")+"\t: ANN impact keys");
+		if (passingClinSig != null) IO.pl("\n\t"+Misc.treeSetToString(passingClinSig, ",")+"\t: CLINSIG keep keys");
+		if (excludeClinSig != null) IO.pl("\t"+Misc.treeSetToString(excludeClinSig, ",")+"\t: CLINSIG exclude keys");
 		if (passingVCFSS != null) {
-			IO.p("\n\t"+Misc.stringArrayToString(passingVCFSS, ",")+"\t: Splice junction types to scan");
-			IO.p("\t"+ minimumVCFSSDiff+"\t: Minimum difference in MaxEnt scan scores for a splice junction effect");
+			IO.pl("\n\t"+Misc.stringArrayToString(passingVCFSS, ",")+"\t: Splice junction types to scan");
+			IO.pl("\t"+ minimumVCFSSDiff+"\t: Minimum difference in MaxEnt scan scores for a splice junction effect");
 		}
-		if (somaticProcessing ==false) IO.p("\t"+ orAnnos+"\t: Require that only one need pass: ANN Impact or Clinvar or Splice Effect");
-		if (passingIDKeys != null) IO.p("\n\t"+Misc.stringArrayToString(passingIDKeys, ",")+"\t: VCF ID keys that if present pass it regardless of any filter settings");
-		if (passingGermlineGenes != null) IO.p("\n\t"+acmgGenes+"\t: ACMG Genes that cause the maxAF filter to be skipped for intersecting variants");
+		if (somaticProcessing ==false) IO.pl("\t"+ orAnnos+"\t: Require that only one need pass: ANN Impact or Clinvar or Splice Effect");
+		if (passingIDKeys != null) IO.pl("\n\t"+Misc.stringArrayToString(passingIDKeys, ",")+"\t: VCF ID keys that if present pass it regardless of any filter settings");
+		if (passingGermlineGenes != null) IO.pl("\n\t"+acmgGenes+"\t: ACMG Genes that cause the maxAF filter to be skipped for intersecting variants");
 		if (somaticProcessing ==false) 
-		IO.p("\n\t"+verbose+"\t: Verbose output");
-		IO.p("\t"+ saveDirectory+"\t: Save directory");
+		IO.pl("\n\t"+verbose+"\t: Verbose output");
+		IO.pl("\t"+ saveDirectory+"\t: Save directory");
 	}
 	
 	public String format(double numerator, double denominator){
@@ -711,60 +712,60 @@ public class AnnotatedVcfParser {
 	
 	public void printStats(){
 		
-		IO.p("\nProcessing statistics for all files:");
-		IO.p("\t"+ numRecords+"\tNumber of VCF Records");
-		if (minimumDP != 0) IO.p("\t"+ format(numPassingDP, numRecords)+"Passing DP");
+		IO.pl("\nProcessing statistics for all files:");
+		IO.pl("\t"+ numRecords+"\tNumber of VCF Records");
+		if (minimumDP != 0) IO.pl("\t"+ format(numPassingDP, numRecords)+"Passing DP");
 		if (minimumAF != 0 || maximumAF != 1 || maxFracBKAFs != 0) {
-			IO.p("\t"+ format(numPassingMinAF, numRecords)+"Passing MinAF");
-			IO.p("\t"+ format(numPassingMaxAF, numRecords)+"Passing MaxAF");
+			IO.pl("\t"+ format(numPassingMinAF, numRecords)+"Passing MinAF");
+			IO.pl("\t"+ format(numPassingMaxAF, numRecords)+"Passing MaxAF");
 		}
 		if (maximumPopAF != 0){
-			IO.p("\t"+ format(numWithPopAF, numRecords)+"With Pop AF");
-			IO.p("\t"+ format(numPassingPopAF, numWithPopAF)+"Passing Pop AF");
+			IO.pl("\t"+ format(numWithPopAF, numRecords)+"With Pop AF");
+			IO.pl("\t"+ format(numPassingPopAF, numWithPopAF)+"Passing Pop AF");
 		}
 		if (passingAnnImpact != null) {
-			IO.p("\t"+ format(numWithAnn, numRecords)+"With Ann");
-			IO.p("\t"+ format(numPassingAnnImpact, numWithAnn)+"Passing Ann Impact");
+			IO.pl("\t"+ format(numWithAnn, numRecords)+"With Ann");
+			IO.pl("\t"+ format(numPassingAnnImpact, numWithAnn)+"Passing Ann Impact");
 		}
 		if (maxFracBKAFs != 0) {
-			IO.p("\t"+ format(numWithBKAFs, numRecords)+"With BKAFs BKZs");
-			IO.p("\t"+ format(numPassingBKAFs, numWithBKAFs)+"Passing BKAFs BKZs");
+			IO.pl("\t"+ format(numWithBKAFs, numRecords)+"With BKAFs BKZs");
+			IO.pl("\t"+ format(numPassingBKAFs, numWithBKAFs)+"Passing BKAFs BKZs");
 		}
 		if (passingClinSig != null){
-			IO.p("\t"+ format(numWithClin, numRecords)+"With Clin");
-			IO.p("\t"+ format(numPassingClinSing, numWithClin)+"Passing ClinSig");
+			IO.pl("\t"+ format(numWithClin, numRecords)+"With Clin");
+			IO.pl("\t"+ format(numPassingClinSing, numWithClin)+"Passing ClinSig");
 		}
 		if (passingVCFSS != null){
-			IO.p("\t"+ format(numWithSplice, numRecords)+"With Splice");
-			IO.p("\t"+ format(numPassingSplice, numWithSplice)+"Passing Splice");
+			IO.pl("\t"+ format(numWithSplice, numRecords)+"With Splice");
+			IO.pl("\t"+ format(numPassingSplice, numWithSplice)+"Passing Splice");
 		}
-		if (passingIDKeys != null) IO.p("\t"+ format(numPassIDs, numRecords)+"Pass IDs");
-		IO.p("\t"+ format(numPass, numRecords)+"Records passing all filters");
+		if (passingIDKeys != null) IO.pl("\t"+ format(numPassIDs, numRecords)+"Pass IDs");
+		IO.pl("\t"+ format(numPass, numRecords)+"Records passing all filters");
 	}
 	
 	public void printDistributions(){
 		if (passingClinSig != null){
-			IO.p("\nObserved CLINSIG annotations:" );
-			for (String key: clinsig.keySet()) IO.p("\t"+key+"\t"+clinsig.get(key));
+			IO.pl("\nObserved CLINSIG annotations:" );
+			for (String key: clinsig.keySet()) IO.pl("\t"+key+"\t"+clinsig.get(key));
 		}
 		if (passingAnnImpact != null){
-			IO.p("\nObserved ANN impacts:");
-			for (String key: impacts.keySet()) IO.p("\t"+key+"\t"+impacts.get(key));
+			IO.pl("\nObserved ANN impacts:");
+			for (String key: impacts.keySet()) IO.pl("\t"+key+"\t"+impacts.get(key));
 		}
 		if (true){
-			IO.p("\nObserved ANN effects for passing Impacts:");
-			for (String key: effects.keySet()) IO.p("\t"+key+"\t"+effects.get(key));
+			IO.pl("\nObserved ANN effects for passing Impacts:");
+			for (String key: effects.keySet()) IO.pl("\t"+key+"\t"+effects.get(key));
 		}
 		if (passingGermlineGenes != null){
-			IO.p("\nObserved ACMG germline genes:");
-			for (String key: observedGermlineGenes.keySet()) IO.p("\t"+key+"\t"+observedGermlineGenes.get(key));
+			IO.pl("\nObserved ACMG germline genes:");
+			for (String key: observedGermlineGenes.keySet()) IO.pl("\t"+key+"\t"+observedGermlineGenes.get(key));
 		}
 		if (minimumAF != 0 || maximumAF != 1 || maxFracBKAFs != 0){
-			IO.p("\nAF Allele Frequency distribution:");
+			IO.pl("\nAF Allele Frequency distribution:");
 			afs.printScaledHistogram();
 		}
 		if (minimumDP != 0) {
-			IO.p("\nDP Read Depth distribution:");
+			IO.pl("\nDP Read Depth distribution:");
 			makeReadDepthHistogram().printScaledHistogram();
 		}
 	}
@@ -776,16 +777,36 @@ public class AnnotatedVcfParser {
 			System.exit(0);
 		}
 		new AnnotatedVcfParser(args);
-	}		
+	}
+	
+	public static String[] appendConfigArgs(String[] args, String configArg){
+		for (int i=0; i< args.length; i++){
+			if (args[i].equals(configArg)){
+				File config = new File(args[++i]);
+				String[] lines = IO.loadFile(config);
+				if (lines == null || lines.length == 0) Misc.printErrAndExit("\nProblem with your config file, this should contain one or more lines of parameteres, none should contain whitespace "+config);
+				ArrayList<String> otherArgs = new ArrayList<String>();
+				for (String line: lines){
+					String[] t = Misc.WHITESPACE.split(line);
+					for (String a: t) otherArgs.add(a);
+				}
+				return Misc.copyAndMerge(args, Misc.stringArrayListToStringArray(otherArgs));
+			}
+		}
+		return args;
+	}
 
 
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
+		//look for a config file and append
+		args = appendConfigArgs(args,"-y");
 		Pattern pat = Pattern.compile("-[a-z]");
 		File forExtraction = null;
 		String impactString = null;
 		String clinString = null;
 		String clinStringExclude = null;
+		IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -811,7 +832,7 @@ public class AnnotatedVcfParser {
 					case 'r': verbose = true; break;
 					case 'f': somaticProcessing = true; break;
 					case 's': saveDirectory = new File(args[++i]); break;
-					
+					case 'y': new File(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -820,7 +841,6 @@ public class AnnotatedVcfParser {
 				}
 			}
 		}
-		IO.p("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 
 		//pull vcf files
 		if (forExtraction == null || forExtraction.exists() == false) Misc.printErrAndExit("\nError: please enter a path to a vcf file or directory containing such.\n");
@@ -854,17 +874,15 @@ public class AnnotatedVcfParser {
 			excludeClinSig = new TreeSet<String>();
 			for (String s: Misc.COMMA.split(clinStringExclude)) excludeClinSig.add(s);
 		}
-		
-		
 		if (minimumVCFSSDiff !=0 && passingVCFSS == null) Misc.printErrAndExit("\nError: please provide a comma delimited list of splice junction types (e.g. D5S,D3S,G5S,G3S) to examine.\n");
 		
 	}
 	
 
 	public static void printDocs(){
-		IO.p("\n" +
+		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                              Annotated Vcf Parser  Feb 2018                      **\n" +
+				"**                              Annotated Vcf Parser  Aug 2018                      **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff w/ dbNSFP and clinvar, plus the\n"+
 				"VCFBackgroundChecker and VCFSpliceScanner USeq apps into passing and failing records.\n"+
@@ -889,10 +907,11 @@ public class AnnotatedVcfParser {
                 "-c Comma delimited list of CLINSIG terms to select for.\n"+
                 "-e Comma delimited list of CLINSIG terms to select against.\n"+
                 "-i Comma delimited list of VCF ID keys to select for. If the VCF ID contains one or\n"+
-                "       more, the record is passed regardless of other filters. The match is not exact.\n "+
+                "       more, the record is passed regardless of other filters. The match is not exact.\n"+
                 "-o Only require, if set or present, SnpEff ANN or CLINSIG or Splice to be true to pass.\n"+
                 "       Defaults to require that all set pass.\n"+
 				"-r Verbose per record output.\n"+ 
+                "-y Path to a config txt file for setting the above.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/\n"+
 				"        -d 75 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -g D5S,D3S,G5S,G3S -n 3.5 -a\n"+

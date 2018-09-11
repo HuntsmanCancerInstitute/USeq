@@ -60,7 +60,7 @@ public class ParseDRSSOutput{
 			//Chr Start Stop qValFDR TotalRegionBPs tTotal cTotal tRPKM cRPKM log2Rto tRPKM cRPKM log2Rto
 			for (String[] cells: sortedLines.values()){
 				if (cells.length != 19) {
-					IO.p("Incorrect number of fields, skipping "+Misc.stringArrayToString(cells, "\t"));
+					IO.pl("Incorrect number of fields, skipping "+Misc.stringArrayToString(cells, "\t"));
 					continue;
 				}
 				

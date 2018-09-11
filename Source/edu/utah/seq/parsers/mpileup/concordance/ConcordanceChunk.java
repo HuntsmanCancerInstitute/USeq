@@ -163,17 +163,22 @@ public class ConcordanceChunk implements Runnable{
 		boolean common;
 	}
 	
-	private void loadIntervalTree(String chr) throws Exception{
-		currCommonChr = chr;
-		if (commonSnvBed == null) return;
-		commonSnvRegions = new IntervalST<String>();
-		TabixReader.Iterator it = tabixReader.query(chr);
-		String hit;
-		while ((hit = it.next()) != null) {
-			String[] t = Misc.TAB.split(hit);
-			int start = Integer.parseInt(t[1]);
-			int stop = Integer.parseInt(t[2]);
-			commonSnvRegions.put(new Interval1D(start, stop-1), chr);
+	private boolean loadIntervalTree(String chr) {
+		try {
+			currCommonChr = chr;
+			if (commonSnvBed == null) return false;
+			commonSnvRegions = new IntervalST<String>();
+			TabixReader.Iterator it = tabixReader.query(chr);
+			String hit;
+			while ((hit = it.next()) != null) {
+				String[] t = Misc.TAB.split(hit);
+				int start = Integer.parseInt(t[1]);
+				int stop = Integer.parseInt(t[2]);
+				commonSnvRegions.put(new Interval1D(start, stop-1), chr);
+			}
+			return true;
+		} catch (Exception e){
+			return false;
 		}
 	}
 

@@ -610,7 +610,8 @@ public class IO {
 	/**Copies a given directory and it's contents to the destination directory.
 	 * Use a extension (e.g. "class$|properties$") to limit the files copied over or set to null for all.*/
 	public static boolean copyDirectoryRecursive (File sourceDir, File destDir, String extension){
-		Pattern pat = Pattern.compile(extension);
+		Pattern pat = null;
+		if(extension != null) pat = Pattern.compile(extension);
 		if (destDir.exists() == false) destDir.mkdir();
 		//for each file in source copy to destDir		
 		File[] files = IO.extractFiles(sourceDir);
@@ -619,8 +620,14 @@ public class IO {
 				copyDirectoryRecursive(files[i], new File (destDir, files[i].getName()), extension);
 			}
 			else {
-				Matcher mat = pat.matcher(files[i].getName());
-				if (extension == null || mat.find()){
+				if (pat != null){
+					Matcher mat = pat.matcher(files[i].getName());
+					if (mat.find()){
+						File copied = new File (destDir, files[i].getName());					
+						if (copyViaFileChannel(files[i], copied) == false ) return false;
+					}
+				}
+				else {
 					File copied = new File (destDir, files[i].getName());					
 					if (copyViaFileChannel(files[i], copied) == false ) return false;
 				}
@@ -1171,10 +1178,13 @@ public class IO {
 		else return new File[]{directory};
 	}
 	
-	public static void p(Object obj){
+	public static void pl(Object obj){
 		System.out.println(obj.toString());
 	}
-	public static void p(){
+	public static void p(Object obj){
+		System.out.print(obj.toString());
+	}
+	public static void pl(){
 		System.out.println();
 	}
 	
@@ -1826,6 +1836,26 @@ public class IO {
 				keyValue = line.split("\\s+");
 				if (keyValue.length !=2 || keyValue[0].startsWith("#")) continue;
 				names.put(keyValue[0].trim(), keyValue[1].trim());
+			}
+		}catch(Exception e){
+			System.out.println("Prob loadFileInttoHash()");
+			e.printStackTrace();
+		}
+		return names;
+	}
+	
+	/**Loads a file's lines into a hash first column is the key, second the value.
+	 * */
+	public static HashMap<String,String> loadFileIntoHashMapLowerCaseKey(File file){
+		HashMap<String,String> names = new HashMap<String,String>(1000);
+		try{
+			BufferedReader in = IO.fetchBufferedReader(file);
+			String line;
+			String[] keyValue;
+			while ((line = in.readLine())!=null){
+				keyValue = line.trim().split("\\s+");
+				if (keyValue.length !=2 || keyValue[0].startsWith("#")) continue;
+				names.put(keyValue[0].trim().toLowerCase(), keyValue[1].trim());
 			}
 		}catch(Exception e){
 			System.out.println("Prob loadFileInttoHash()");

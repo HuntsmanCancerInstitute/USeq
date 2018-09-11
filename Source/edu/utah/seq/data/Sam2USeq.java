@@ -11,6 +11,7 @@ import edu.utah.seq.useq.ArchiveInfo;
 import edu.utah.seq.useq.SliceInfo;
 import edu.utah.seq.useq.USeqUtilities;
 import edu.utah.seq.useq.data.*;
+import edu.utah.seq.vcf.AnnotatedVcfParser;
 import htsjdk.samtools.*;
 import htsjdk.samtools.SAMRecord.SAMTagAndValue;
 import util.bio.annotation.Bed;
@@ -800,6 +801,9 @@ public class Sam2USeq {
 
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
+		//look for a config file and append args if present
+		args = AnnotatedVcfParser.appendConfigArgs(args,"-w");
+		
 		Pattern pat = Pattern.compile("-[a-z]");
 		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		File forExtraction = null;
@@ -831,6 +835,7 @@ public class Sam2USeq {
 					case 'j': jsonOutputFile = new File(args[++i]); break;
 					case 'z': flipStrandSecondRead = true; break;
 					case 'y': includeNs = true; break;
+					case 'w': ++i; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -1078,7 +1083,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  Sam 2 USeq : Jan 2018                           **\n" +
+				"**                                  Sam 2 USeq : Aug 2018                           **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
@@ -1118,6 +1123,7 @@ public class Sam2USeq {
 				"-j Write summary stats in json format to this file, requires -b and -c.\n"+
 				"-y Include CIGAR Ns in read coverage, defaults to just M values.\n"+
 				"-z Flip the strand of the 2nd of pair alignments.\n"+
+				"-w Path to a config txt file for setting the above.\n"+
 				
 
 				"\n"+

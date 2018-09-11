@@ -123,12 +123,12 @@ public class VCF2Tsv {
 	}
 
 	public void printSettings(){
-		IO.p("Thresholds:");
-		IO.p("Save Dir:\t"+saveDirectory);
-		IO.p("Min Qual:\t"+minimumQual);
-		IO.p("Ignore NoBKZ:\t"+ignoreNoBKZThresholding);
-		IO.p("Max BKAF Frac:\t"+maxBKAF);
-		IO.p("Keep ID String:\t"+keepIdString);
+		IO.pl("Thresholds:");
+		IO.pl("Save Dir:\t"+saveDirectory);
+		IO.pl("Min Qual:\t"+minimumQual);
+		IO.pl("Ignore NoBKZ:\t"+ignoreNoBKZThresholding);
+		IO.pl("Max BKAF Frac:\t"+maxBKAF);
+		IO.pl("Keep ID String:\t"+keepIdString);
 	}
 
 

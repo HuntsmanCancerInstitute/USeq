@@ -508,6 +508,7 @@ public class QueryIndexer {
 			TreeSet<String> skippedFileNames = new TreeSet<String>();
 
 			for (File f: parsedFiles){
+				//Hmm, this only works with actual files, not soft links!
 				String trimmedName = f.toString().substring(toSkip);
 
 				//save trmmed name : id ?
@@ -642,7 +643,7 @@ public class QueryIndexer {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Query Indexer: Feb 2017                           **\n" +
+				"**                                Query Indexer: May 2018                           **\n" +
 				"**************************************************************************************\n" +
 				"Builds index files for Query by recursing through a data directory looking for bgzip\n"+
 				"compressed and tabix indexed genomic data files (e.g. vcf, bed, maf, and custom).\n"+
@@ -663,7 +664,8 @@ public class QueryIndexer {
 				"-d A data directory containing bgzipped and tabix indexed data files. Known file types\n"+
 				"     include xxx.vcf.gz, xxx.bed.gz, xxx.bedGraph.gz, and xxx.maf.txt.gz. Others will\n"+
 				"     be parsed using info from the xxx.gz.tbi index. Be sure to normalize and\n"+
-				"     decompose_blocksub all VCF records, see http://genome.sph.umich.edu/wiki/Vt\n"+
+				"     decompose_blocksub all VCF records, see http://genome.sph.umich.edu/wiki/Vt.\n"+
+				"     Files may be hard linked but not soft.\n"+
 				"-t Full path directory containing the compiled bgzip and tabix executables. See\n" +
 				"     https://github.com/samtools/htslib\n"+
 				"-i A directory in which to save the index files\n"+

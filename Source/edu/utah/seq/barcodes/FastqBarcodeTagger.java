@@ -107,13 +107,9 @@ public class FastqBarcodeTagger{
 		}
 	}
 	
+	
 	/**For parsing IDTs 3N,skip2,insert from read 1 and 2 and creating the 6mer UMI*/
 	private void extract3MerUMI() {
-		IO.p("\nStarting\nFirst");
-		Misc.printArray(first);
-		IO.p("Second");
-		Misc.printArray(second);
-		
 		//line 0, name
 		barcode[0] = first[0];
 		
@@ -134,18 +130,10 @@ public class FastqBarcodeTagger{
 		barcode[3] = readOneQual + readTwoQual;
 		//change first and second quals
 		first[3] = first[3].substring(5);
-		second[3] = second[3].substring(5);
-		
-		IO.p("Parsed\nFirst");
-		Misc.printArray(first);
-		IO.p("Second");
-		Misc.printArray(second);
-		IO.p("UMI");
-		Misc.printArray(barcode);
+		second[3] = second[3].substring(5);	
 	}
 
-	public void parse() throws IOException {
-		
+	public void parse() throws IOException {		
 		if (extract3Mer == false){
 			while (loadARead()){
 				checkAndAssignFastqNames();
@@ -158,7 +146,6 @@ public class FastqBarcodeTagger{
 				printReads();
 			}
 		}
-			
 	}
 	
 	private void printReads() throws IOException {
@@ -243,15 +230,12 @@ public class FastqBarcodeTagger{
 		firstFastqIn.close();
 		secondFastqIn.close();
 		if (extract3Mer == false) barcodeFastqIn.close();
-
 		//close writers
 		if (interlace == false){
 			firstFastqOut.close();
 			secondFastqOut.close();
 		}
 	}
-
-
 
 	public static void main(String[] args) {
 		if (args.length ==0){
@@ -260,8 +244,6 @@ public class FastqBarcodeTagger{
 		}
 		new FastqBarcodeTagger(args);
 	}		
-
-
 
 	/**This method will process each argument and assign new varibles*/
 	public void processArgs(String[] args){
@@ -287,7 +269,6 @@ public class FastqBarcodeTagger{
 				catch (Exception e) {
 					Misc.printErrAndExit("\nSorry, something doesn't look right with this parameter: -"+test+"\n");
 				}
-				
 			}
 		}
 		
@@ -324,20 +305,21 @@ public class FastqBarcodeTagger{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Fastq Barcode Tagger: July 2018                        **\n" +
+				"**                          Fastq Barcode Tagger: August 2018                       **\n" +
 				"**************************************************************************************\n" +
 				"Takes 2 or 3 fastq files (paired end reads and possibly a third containing unique \n"+
 				"molecular barcodes/ indexes), appends the barcode and quality to the fastq header, and\n"+
 				"writes out the modified records. For IDT inline 2 fastq UMI data sets, the barcode is\n"+
-				"parsed from the beginning of each fastq.\n"+
+				"parsed from the beginning of each fastq. Be sure to clip 5Ns from the 3' end when\n"+
+				"adapter trimming.\n"+
 
 				"\nOptions:\n"+
 				"-f First fastq file, .gz/.zip OK.\n" +
 				"-s Second fastq file, .gz/.zip OK.\n" +
+				"-b Barcode fastq file, .gz/.zip OK, or set -e\n" + 
 				"-e Parse barcodes from the first 3bp of each read and combine the two 3mers into a\n"+
-				"      6mer barcode. 5bp are trimmed from each read to remove the UMI and 2bp constant\n"+
-				"      seq. IDT's current strategy.\n"+
-				"-b Barcode fastq file, .gz/.zip OK.\n" + 
+				"      6mer barcode. 5bp are trimmed from the ends of each read to remove the UMI and\n"+
+				"      2bp constant seq as well as an potential read through. IDT's current strategy.\n"+
 				"-i Write interlaced fastq to stdout for direct piping to other apps\n"+
 				"-r Directory to save the modified fastqs, defaults to the parent of -f\n"+
 				"-l Max length of barcode, defaults to all. Use to trim 3' end.\n"+

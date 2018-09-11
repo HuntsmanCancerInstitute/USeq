@@ -36,12 +36,12 @@ public class PermitRipper {
 	
 	//URLs to call, must add a date to each
 	//Name, URL
-	private String[] calls = {
-			//"Deso", "http://www.recreation.gov/entranceDetails.do?permitTypeId=1267601734&entrancePermitTypeId=1267621042&entranceId=331126&useTypeId=0&offset=1&entryType=1&contractCode=NRSO&parkId=72440&arvdate=",
+	private String[] calls = {    
+			"Deso", "https://www.recreation.gov/entranceDetails.do?permitTypeId=1267601734&entrancePermitTypeId=1267621042&entranceId=331126&useTypeId=0&offset=0&entryType=1&contractCode=NRSO&parkId=72440&arvdate=",
 			//"Yampa", "http://www.recreation.gov/entranceDetails.do?permitTypeId=2102428458&entrancePermitTypeId=1781929176&entranceId=356818&useTypeId=0&offset=2&entryType=1&contractCode=NRSO&parkId=115139&arvdate=",
-			"GatesOfLodore", "http://www.recreation.gov/entranceDetails.do?permitTypeId=2102427966&entrancePermitTypeId=1781929176&entranceId=356817&useTypeId=0&offset=2&entryType=1&contractCode=NRSO&parkId=115139&arvdate=",
-			"MiddleFrkSalmon", "http://www.recreation.gov/entranceDetails.do?permitTypeId=523879550&entrancePermitTypeId=524203764&entranceId=292685&useTypeId=0&offset=1&entryType=1&contractCode=NRSO&parkId=75534&arvdate=",
-			//"MainSalmon", "http://www.recreation.gov/entranceDetails.do?permitTypeId=523898830&entrancePermitTypeId=524869336&entranceId=292735&useTypeId=0&offset=0&entryType=1&contractCode=NRSO&parkId=75533&arvdate=",
+			//"GatesOfLodore", "http://www.recreation.gov/entranceDetails.do?permitTypeId=2102427966&entrancePermitTypeId=1781929176&entranceId=356817&useTypeId=0&offset=2&entryType=1&contractCode=NRSO&parkId=115139&arvdate=",
+			"MiddleFrkSalmon", "https://www.recreation.gov/entranceDetails.do?permitTypeId=523879550&entrancePermitTypeId=524203764&entranceId=292685&useTypeId=0&offset=0&entryType=1&contractCode=NRSO&parkId=75534&arvdate=",
+			"MainSalmon", "https://www.recreation.gov/entranceDetails.do?permitTypeId=523898830&entrancePermitTypeId=524869336&entranceId=292735&useTypeId=0&offset=0&entryType=1&contractCode=NRSO&parkId=75533&arvdate=",
 			//"Selway", "http://www.recreation.gov/entranceDetails.do?permitTypeId=523888682&entrancePermitTypeId=524874968&entranceId=292736&useTypeId=0&offset=6&entryType=1&contractCode=NRSO&parkId=75535&arvdate=",
 			//"SanJuan", "http://www.recreation.gov/entranceDetails.do?permitTypeId=1782381178&entrancePermitTypeId=1782408288&entranceId=382420&useTypeId=0&offset=0&entryType=1&contractCode=NRSO&parkId=75510&pGroupSize=1&arvdate=",
 			//"Snake", "http://www.recreation.gov/entranceDetails.do?permitTypeId=523907650&entrancePermitTypeId=524873263&entranceId=292785&useTypeId=0&offset=0&entryType=1&contractCode=NRSO&parkId=75536&arvdate=",
@@ -51,9 +51,9 @@ public class PermitRipper {
 	//Dino http://www.freeyampa.org/dates/dinoupdates.js  rip it!
 	
 	//dates to search, 13 days apart   Aug 13th through 16th
-	private String[] dates = {"9/12/2016", "9/25/2016"};
-	private String[] datesUnderscore = {"9_12_2016", "9_25_2016"};
-	private double maxDaysOld = 3;
+	private String[] dates = {"6/9/2018","7/9/2018","7/22/2018","8/4/2018","8/17/2018"};
+	private String[] datesUnderscore = {"6_9_2018","7_9_2018","7_22_2018","8_4_2018","8_17_2018"};
+	private double maxDaysOld = 5;
 	
 	public PermitRipper(String[] args){
 		long startTime = System.currentTimeMillis();
@@ -71,6 +71,7 @@ public class PermitRipper {
 		//build script
 		System.out.println("Building shell script...");
 		String cmd = buildShellScript();
+		System.out.println("\n"+cmd+"\n");
 
 		//execute
 		System.out.println("Executing...");
@@ -108,9 +109,7 @@ public class PermitRipper {
 			//too old?
 			double daysOld = IO.numberDaysOld(hashFile);
 			System.out.println("Loading emailed dates hash, "+daysOld+" ...");
-			if (daysOld < maxDaysOld) {
-				emailedDates = (HashSet<String>)IO.fetchObject(hashFile);
-			}
+			if (daysOld < maxDaysOld) emailedDates = (HashSet<String>)IO.fetchObject(hashFile);
 			else hashFile.delete();
 		}
 	}
