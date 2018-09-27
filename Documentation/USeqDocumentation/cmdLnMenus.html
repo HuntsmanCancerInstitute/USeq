@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.1.5
+			<html><head><title>USeq Command Line Menus 9.2.0
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -33,6 +33,8 @@
 				
 					<a href="#ArupPipelineWrapper">ArupPipelineWrapper</a><br>
 				
+					<a href="#AvatarAssembler">AvatarAssembler</a><br>
+				
 					<a href="#BamConcordance">BamConcordance</a><br>
 				
 					<a href="#BamContextInspector">BamContextInspector</a><br>
@@ -50,6 +52,8 @@
 					<a href="#Bed2Bar">Bed2Bar</a><br>
 				
 					<a href="#BedStats">BedStats</a><br>
+				
+					<a href="#BedTabix">BedTabix</a><br>
 				
 					<a href="#Bed2UCSCRefFlat">Bed2UCSCRefFlat</a><br>
 				
@@ -120,6 +124,8 @@
 					<a href="#FastqBarcodeTagger">FastqBarcodeTagger</a><br>
 				
 					<a href="#FastqInterlacer">FastqInterlacer</a><br>
+				
+					<a href="#FastqRenamer">FastqRenamer</a><br>
 				
 					<a href="#FetchGenomicSequences">FetchGenomicSequences</a><br>
 				
@@ -212,6 +218,8 @@
 					<a href="#MiRNACorrelator">MiRNACorrelator</a><br>
 				
 					<a href="#MpileupParser">MpileupParser</a><br>
+				
+					<a href="#MpileupRandomizer">MpileupRandomizer</a><br>
 				
 					<a href="#MultipleReplicaScanSeqs">MultipleReplicaScanSeqs</a><br>
 				
@@ -321,6 +329,8 @@
 				
 					<a href="#Telescriptor">Telescriptor</a><br>
 				
+					<a href="#TNRunner">TNRunner</a><br>
+				
 					<a href="#UCSCBig2USeq">UCSCBig2USeq</a><br>
 				
 					<a href="#USeq2UCSCBig">USeq2UCSCBig</a><br>
@@ -331,19 +341,21 @@
 				
 					<a href="#VCFBackgroundChecker">VCFBackgroundChecker</a><br>
 				
-					<a href="#VCFBackgroundCheckerGraphite">VCFBackgroundCheckerGraphite</a><br>
-				
 					<a href="#VCFBamAnnotator">VCFBamAnnotator</a><br>
 				
 					<a href="#VCF2Bed">VCF2Bed</a><br>
 				
 					<a href="#VCFAnnotator">VCFAnnotator</a><br>
 				
+					<a href="#VCFCallFrequency">VCFCallFrequency</a><br>
+				
 					<a href="#VCFComparator">VCFComparator</a><br>
 				
 					<a href="#VCFConsensus">VCFConsensus</a><br>
 				
 					<a href="#VCFMerger">VCFMerger</a><br>
+				
+					<a href="#VCFMpileupAnnotator">VCFMpileupAnnotator</a><br>
 				
 					<a href="#VCFVariantMaker">VCFVariantMaker</a><br>
 				
@@ -359,7 +371,7 @@
 				
 					<a href="#VCFTabix">VCFTabix</a><br>
 				
-					<a href="#VCF2Tvs">VCF2Tvs</a><br>
+					<a href="#VCF2Tsv">VCF2Tsv</a><br>
 				
 					<a href="#Wig2Bar">Wig2Bar</a><br>
 				
@@ -636,7 +648,7 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/AnnotateBedWithGenes -p 100 -g -i 1,2
 </pre><br><p>
 				
 					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                              Annotated Vcf Parser  Feb 2018                      **
+**                             Annotated Vcf Parser  Sept 2018                      **
 **************************************************************************************
 Splits VCF files that have been annotated with SnpEff w/ dbNSFP and clinvar, plus the
 VCFBackgroundChecker and VCFSpliceScanner USeq apps into passing and failing records.
@@ -662,9 +674,10 @@ Options:
 -e Comma delimited list of CLINSIG terms to select against.
 -i Comma delimited list of VCF ID keys to select for. If the VCF ID contains one or
        more, the record is passed regardless of other filters. The match is not exact.
- -o Only require, if set or present, SnpEff ANN or CLINSIG or Splice to be true to pass.
+-o Only require, if set or present, SnpEff ANN or CLINSIG or Splice to be true to pass.
        Defaults to require that all set pass.
 -r Verbose per record output.
+-y Path to a config txt file for setting the above.
 
 Example: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/
         -d 75 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -g D5S,D3S,G5S,G3S -n 3.5 -a
@@ -710,8 +723,23 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/ArupPipelineWrapper -o MyJobNix3 -m D
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="AvatarAssembler"><pre>**************************************************************************************
+**                                TNRunner  September 2018                          **
+**************************************************************************************
+Tool for assembling fastq avatar datasets based on the results of three sql queries.
+Beta!
+
+Options:
+-i info.
+-d diagnosis.
+-g gender.
+-p path to Exp dir, e.g. /Repository/PersonData/2018/
+-r results file.
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="BamConcordance"><pre>**************************************************************************************
-**                               Bam Concordance: Feb  2018                         **
+**                               Bam Concordance: Sept  2018                        **
 **************************************************************************************
 BC calculates sample level concordance based on uncommon homozygous SNVs found in bam
 files. Samples from the same person will show high similarity (>0.9). Run BC on
@@ -741,12 +769,13 @@ Options:
 -m Minimum allele frequency to count a homozygous match, defaults to 0.9
 -q Minimum base quality, defaults to 20.
 -u Minimum mapping quality, defaults to 20.
+-j Write gzipped summary stats in json format to this file.
 -t Number of threads to use.  If not set, determines this based on the number of
       threads and memory available to the JVM so set the -Xmx value to the max.
 
-Example: java -Xmx120G -jar pathTo/USeq/Apps/BamConcordance -r ~/exomeTargets.bed
+Example: java -Xmx100G -jar pathTo/USeq/Apps/BamConcordance -r ~/exomeTargets.bed
       -s ~/Samtools1.3.1/bin/samtools -b ~/Patient7Bams -d 10 -a 0.9 -m 0.8 -f
-      ~/B37/human_g1k_v37.fasta -c ~/B37/b38ComSnps.bed.gz
+      ~/B37/human_g1k_v37.fasta -c ~/B37/b38ComSnps.bed.gz -j bc.json.gz 
 
 **************************************************************************************
 </pre><br><p>
@@ -794,29 +823,33 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/BamHg19B37Converter -b . -e ~/b37.b
 </pre><br><p>
 				
 					<a name="BamBlaster"><pre>**************************************************************************************
-**                               Bam Blaster : June 2014                            **
+**                              Bam Blaster : May 2018                              **
 **************************************************************************************
 Injects SNVs and INDELs from a vcf file into bam alignments. These and their mates are
 extracted as fastq for realignment. For SNVs, only alignment bases that match the
 reference and have a CIGAR of M are modified. Not all alignments can be modified.
-Secondary/supplemental are skipped. Only one variant per alignment. Variants within a
+Secondary/supplemental/not proper are skipped. One var per alignment. Variants within
 read length distance of prior are ignored and saved to file for iterative processing.
 Be sure to normalize and decompose your vcf file (e.g.https://github.com/atks/vt).
-Use the BamMixer to add proportions of your realignments (e.g. 10%) with the
-unmodified.bams (e.g. 90%). Use the VCFVariantMaker to generate random vcf variants.
+INDELs first base must be reference. Use the BamMixer to add proportions of your
+realignments (e.g. 10%) with the unmodified.bams (e.g. 90%). Use the VCFVariantMaker
+to generate random vcf variants or pull a VCF from Clinvar/ Cosmic.
 
 Required:
 -b Path to a coordinate sorted bam file with index.
 -v Path to a trimmed, normalized, decomposed vcf variant file, zip/gz OK.
 -r Full path to a directory to save the results.
+-s Max size INDEL, defaults to 50
+-d Min alignment depth, defaults to 25
+
 Example: java -Xmx10G -jar pathTo/USeq/Apps/BamBlaster -b ~/BMData/na12878.bam
-    -r ~/BMData/BB1 -v ~/BMData/clinvar.pathogenic.SnvIndel.vcf.gz 
+    -r ~/BMData/BB0 -v ~/BMData/clinvar.pathogenic.SnvIndel.vcf.gz 
 
 **************************************************************************************
 </pre><br><p>
 				
 					<a name="BamMixer"><pre>**************************************************************************************
-**                               Bam Mixer : June 2014                              **
+**                               Bam Mixer : April 2018                             **
 **************************************************************************************
 Combines bam alignment files in different fractions to simulate multiple variant
 frequencies. Run BamBlaster first.
@@ -916,6 +949,25 @@ Options:
 -r Reverse complement sequences before calculating stats and trimming.
 
 Example: java -Xmx1500M -jar pathToUSeq/Apps/BedStats -b /Res/ex1.bed.gz -s 9 -t 10
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="BedTabix"><pre>**************************************************************************************
+**                                BedTabix: Jan 2013                                **
+**************************************************************************************
+Converts bed files to a SAMTools compressed bed tabix format. Recursive.
+
+Required Options:
+-v Full path file or directory containing xxx.bed(.gz/.zip OK) file(s). Recursive!
+-t Full path tabix directory containing the compiled bgzip and tabix executables. See
+      http://sourceforge.net/projects/samtools/files/tabix/
+-f Force overwriting of existing indexed bed files, defaults to skipping.
+-d Do not delete non gzipped bed files after successful indexing, defaults to deleting.
+-e Only print error messages.
+
+Example: java -jar pathToUSeq/Apps/BedTabix -v /VarScan2/BEDFiles/
+     -t /Samtools/Tabix/tabix-0.2.6/ 
 
 **************************************************************************************
 </pre><br><p>
@@ -1057,7 +1109,7 @@ Example: java -Xmx12G -jar pathTo/USeq/Apps/BisSeqErrorAdder -c /Data/Sperm/Conv
 </pre><br><p>
 				
 					<a name="BisStat"><pre>**************************************************************************************
-**                                 BisStat: May 2014                                **
+**                                 BisStat: June 2018                               **
 **************************************************************************************
 Takes PointData from converted and non-converted C bisulfite sequencing data parsed
 using the NovoalignBisulfiteParser and generates several xxCxx context statistics and
@@ -1829,19 +1881,25 @@ Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportTrimmedGenes -u -g
 </pre><br><p>
 				
 					<a name="FastqBarcodeTagger"><pre>**************************************************************************************
-**                           Fastq Barcode Tagger: Jan 2017                         **
+**                          Fastq Barcode Tagger: August 2018                       **
 **************************************************************************************
-Takes three fastq files (paired end reads and a third containing barcodes), appends
-the barcode and quality to the fastq header, and writes out the modified records. 
+Takes 2 or 3 fastq files (paired end reads and possibly a third containing unique 
+molecular barcodes/ indexes), appends the barcode and quality to the fastq header, and
+writes out the modified records. For IDT inline 2 fastq UMI data sets, the barcode is
+parsed from the beginning of each fastq. Be sure to clip 5Ns from the 3' end when
+adapter trimming.
 
 Options:
 -f First fastq file, .gz/.zip OK.
 -s Second fastq file, .gz/.zip OK.
--b Barcode fastq file, .gz/.zip OK.
--i (Optional) Write interlaced fastq to stdout for direct piping to other apps
--r (Optional) Directory to save the modified fastqs, defaults to the parent of -f
--l (Optional) Max length of barcode, defaults to all. Use to trim 3' end.
--a (Optional) Append the line number to the read name to uniquify.
+-b Barcode fastq file, .gz/.zip OK, or set -e
+-e Parse barcodes from the first 3bp of each read and combine the two 3mers into a
+      6mer barcode. 5bp are trimmed from the ends of each read to remove the UMI and
+      2bp constant seq as well as an potential read through. IDT's current strategy.
+-i Write interlaced fastq to stdout for direct piping to other apps
+-r Directory to save the modified fastqs, defaults to the parent of -f
+-l Max length of barcode, defaults to all. Use to trim 3' end.
+-a Append the line number to the read name to uniquify.
 
 Example: java -Xmx1G -jar pathToUSeq/Apps/FastqBarcodeTagger -f lob_1.fastq.gz
      -s lob_2.fastq.gz -b lob_barcode.fastq.gz -i | bwa mem -p /ref/hg19.fa 
@@ -1860,6 +1918,22 @@ Options:
 
 Example: java -Xmx1G -jar pathToUSeq/Apps/FastqInterlacer -f lob_1.fastq.gz
      -s lob_2.fastq.gz | cutadapt | bwa | samblaster .... 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="FastqRenamer"><pre>**************************************************************************************
+**                            Fastq Renamer: April 2018                             **
+**************************************************************************************
+Takes paired fastq files and replaces the header with the record count. 
+
+Options:
+-f First fastq file, .gz/.zip OK.
+-s Second fastq file, .gz/.zip OK.
+-d Path to a directory for saving the modified fastq files.
+
+Example: java -Xmx1G -jar pathToUSeq/Apps/FastqRenamer -f lob_1.fastq.gz
+     -s lob_2.fastq.gz -d UniquifiedFastq/ 
 
 **************************************************************************************
 </pre><br><p>
@@ -2130,26 +2204,28 @@ Example: java -jar pathToUSeq/Apps/FreebayesVCFParser -v /VCFFiles/ -t 0.05 -n 0
 </pre><br><p>
 				
 					<a name="GatkRunner"><pre>**************************************************************************************
-**                               Gatk Runner: Feb 2018                              **
+**                               Gatk Runner: March 2018                            **
 **************************************************************************************
 Takes a bed file of target regions, splits it by the number of threads, writes out
-each, executes the GATK Gatktype caller, and merges the results. 
+each, executes the GATK Gatktype caller, and merges the results. Set the -Xmx to the
+maximum available on the machine to enable correct cpu thread usage.
 
 Options:
 -r A regions bed file (chr, start, stop,...) to intersect, see
        http://genome.ucsc.edu/FAQ/FAQformat#format1 , gz/zip OK.
 -s Path to a directory for saving the results.
--t Number concurrent threads to run, will need > 4G RAM each.
+-t Number concurrent thread override. Sets itself based on the memory and cpus 
+     available to the JVM.
 -c GATK command to execute, see the example below, modify to match your enviroment.
      Most resources require full paths. Don't set -o or -L
 -l Use lowercased l for Lofreq compatability.
 -b Add a -bamout argument and merge bam chunks.
 
-Example: java -Xmx24G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -t 8 -s
+Example: java -Xmx24G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -s
      /SS/HC/ -c 'java -Xmx4G -jar /SS/GenomeAnalysisTK.jar -T MuTect2 
     -R /SS/human_g1k_v37.fasta --dbsnp /SS/dbsnp_138.b37.vcf 
-    --cosmic /SS/v76_GRCh37_CosmicCodingMuts.vcf.gz -I:tumor /SS/sarc.bam -I:normal 
-    /SS/norm.bam'
+    --cosmic /SS/v76_GRCh37_CosmicCodingMuts.vcf.gz -I:tumor /SS/sar.bam -I:normal 
+    /SS/normal.bam'
 
 **************************************************************************************
 </pre><br><p>
@@ -2403,7 +2479,7 @@ Example: java -Xmx10G -jar ~/USeq/Apps/KnownSpliceJunctionScanner -f ~/Hg19/hg19
 </pre><br><p>
 				
 					<a name="LofreqVCFParser"><pre>**************************************************************************************
-**                             Lofreq VCF Parser: March 2017                        **
+**                             Lofreq VCF Parser: May 2018                          **
 **************************************************************************************
 Parses Lofreq vcf files with options for filtering for minimum QUAL, modifying the
 FILTER field, removing non SNVs, and appending FORMAT info for downstream merging.
@@ -2416,13 +2492,14 @@ Optional Params:
 -m Minimum QUAL score, defaults to 0
 -d Minimum DP read depth, defaults to 0
 -t Minimum AF allele freq, defaults to 0
+-r Minimum Alt count, defaults to 0
 -i Remove non SNV records
 -f Replace the FILTER field with '.'
 -a Append FORMAT NORMAL TUMOR to #CHROM line and add empty columns to records
 -n Mark variants failing thresholds FAIL instead of not printing
 
 Example: java -jar pathToUSeq/Apps/LofreqVCFParser -v VCFFiles/ -m 32 -i -f -a
-      -s FilteredLofreqVcfs/ 
+      -s FilteredLofreqVcfs/ -r 3 
 
 **************************************************************************************
 </pre><br><p>
@@ -2732,7 +2809,7 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/MergeSams -f /Novo/Run7/
 </pre><br><p>
 				
 					<a name="MergeUCSCGeneTable"><pre>**************************************************************************************
-**                           Merge UCSC Gene Table: Feb  2013                       **
+**                           Merge UCSC Gene Table: Aug  2018                       **
 **************************************************************************************
 Merges transcript models that share the same gene name (in column 0). Maximizes exons,
 minimizes introns. Assumes interbase coordinates.
@@ -2889,6 +2966,25 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MpileupParser -p /Pileups/N2.mpileup.
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="MpileupRandomizer"><pre>**************************************************************************************
+**                             Mpileup Randomizer: May 2018                         **
+**************************************************************************************
+Upon finding a gap in the coverage, the sample order is randomized and maintained. Use
+this app to 'de-identify' a multi sample mpileup file while maintaining INDEL blocks.
+
+Required Options:
+-m Path to a Samtools mpileup file (gz/zip OK).
+
+Default Options:
+-r Minimum read depth to pass a sample, default 10
+-s Minimum number of samples that must pass to save line, default 3
+-g Minimum gap, defaults to 125
+
+Example: java -Xmx4G -jar pathToUSeq/Apps/MpileupRandomizer -m normExo.mpileup.gz
+    -r 20 -s 4 
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="MultipleReplicaScanSeqs"><pre>**************************************************************************************
 **                        Multiple Replica Scan Seqs: May 2014                      **
 **************************************************************************************
@@ -2982,11 +3078,11 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/MultiSampleVCFFilter
 </pre><br><p>
 				
 					<a name="MutectVCFParser"><pre>**************************************************************************************
-**                               Mutect VCF Parser: March 2018                      **
+**                               Mutect VCF Parser: May 2018                        **
 **************************************************************************************
 Parses Mutect2 VCF files, filtering for read depth, allele frequency diff ratio, etc.
 Inserts AF and DP into for the tumor sample into the INFO field. Changes the sample
-order to Normal and Tumor and updates the #CHROM line.
+order to Normal and Tumor and updates the #CHROM line. Replaces the QUAL with TLOD.
 
 Options:
 -v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
@@ -2994,14 +3090,16 @@ Options:
 -t Minimum tumor allele frequency (AF), defaults to 0.
 -n Maximum normal AF, defaults to 1.
 -u Minimum tumor alignment depth, defaults to 0.
+-a Minimum tumor alt count, defaults to 0.
 -o Minimum normal alignment depth, defaults to 0.
 -d Minimum T-N AF difference, defaults to 0.
 -r Minimum T/N AF ratio, defaults to 0.
+-t Minimum TLOD score, defaults to 0.
 -p Remove non PASS filter field records.
 -s Print spreadsheet variant summary.
 
 Example: java -jar pathToUSeq/Apps/MutectVCFParser -v /VCFFiles/ -t 0.05 -n 0.5 -u 100
-        -o 20 -d 0.05 -r 2
+        -o 20 -d 0.05 -r 2 -a 3 
 
 **************************************************************************************
 </pre><br><p>
@@ -3437,7 +3535,7 @@ Example: java -Xmx1500M -jar pathTo/USeqs/Apps/QCSeqs -d /Solexa/PolII/Rep1PntDa
 </pre><br><p>
 				
 					<a name="QueryIndexer"><pre>**************************************************************************************
-**                                Query Indexer: Feb 2017                           **
+**                                Query Indexer: May 2018                           **
 **************************************************************************************
 Builds index files for Query by recursing through a data directory looking for bgzip
 compressed and tabix indexed genomic data files (e.g. vcf, bed, maf, and custom).
@@ -3457,7 +3555,8 @@ Required Params:
 -d A data directory containing bgzipped and tabix indexed data files. Known file types
      include xxx.vcf.gz, xxx.bed.gz, xxx.bedGraph.gz, and xxx.maf.txt.gz. Others will
      be parsed using info from the xxx.gz.tbi index. Be sure to normalize and
-     decompose_blocksub all VCF records, see http://genome.sph.umich.edu/wiki/Vt
+     decompose_blocksub all VCF records, see http://genome.sph.umich.edu/wiki/Vt.
+     Files may be hard linked but not soft.
 -t Full path directory containing the compiled bgzip and tabix executables. See
      https://github.com/samtools/htslib
 -i A directory in which to save the index files
@@ -3750,16 +3849,20 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/S3UrlMaker -b aruplab -t 24
 </pre><br><p>
 				
 					<a name="Sam2Fastq"><pre>**************************************************************************************
-**                                 Sam 2 Fastq: July 2016                           **
+**                                Sam 2 Fastq: May 2018                              **
 **************************************************************************************
-Given a queryname sorted bam/sam alignment file, writes out fastq data for paired and 
-unpaired alignemnts. Any non primary, secondary, supplemental or vendor failing QC
+Given a query name sorted alignment file, S2F writes out fastq data for paired and 
+unpaired alignemnts. Any non-primary, secondary, or supplemental 
 alignments are written to a failed sam file.  This app doesn't have the memory leak
-found in Picard, writes gzipped fastq, and error checks the reads.
+found in Picard, writes gzipped fastq, and error checks the reads. Provide an
+unfiltered fastq-bam to use in retrieving missing mates. S2F will remove pre and
+post naming info from the BamBlaster restoring the original fragment names.
 
 Options:
--s Path to a directory for saving parsed data..
+-s Path to a directory for saving parsed data.
 -a Path to a query name sorted bam/sam alignment file. 
+-u (Optional) Path to a query name sorted unfiltered bam/sam alignment file for use
+      in fetching missing mates of the first bam. Convert fastq to bam, then qn sort.
 
 Example: java -Xmx2G -jar pathTo/USeq/Apps/Sam2Fastq -a myQNSorted.bam -s S2F/
 
@@ -3785,7 +3888,7 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/Sam2Fastq -a /SAM/unaligned.sam.gz -f
 </pre><br><p>
 				
 					<a name="Sam2USeq"><pre>**************************************************************************************
-**                                  Sam 2 USeq : Jan 2018                           **
+**                                  Sam 2 USeq : Aug 2018                           **
 **************************************************************************************
 Generates per base read depth stair-step graph files for genome browser visualization.
 By default, values are scaled per million mapped reads with no score thresholding. Can
@@ -3825,6 +3928,7 @@ Default Options:
 -j Write summary stats in json format to this file, requires -b and -c.
 -y Include CIGAR Ns in read coverage, defaults to just M values.
 -z Flip the strand of the 2nd of pair alignments.
+-w Path to a config txt file for setting the above.
 
 Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r
      -v H_sapiens_Feb_2009 -b ccdsExons.bed.gz 
@@ -3833,7 +3937,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r
 </pre><br><p>
 				
 					<a name="SamAlignmentExtractor"><pre>**************************************************************************************
-**                         Sam Alignment Extractor: Jan 2018                        **
+**                        Sam Alignment Extractor: April 2018                       **
 **************************************************************************************
 Splits an alignment file into those that pass or fail thresholds and intersects
 regions of interest. Calculates a variety of QC statistics.
@@ -3855,6 +3959,7 @@ Default Options:
 -x Save secondary, supplemental, and non primary alignments, that pass the thresholds
        defaults to fail.
 -w Skip writing failing alignments. Speeds up processing but kills the stats.
+-u Write unmapped alignments to the pass file, defaults to writing to fail.
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/SamAlignmentExtractor -q 20 -a 0.75 -d -b
       /Data/raw.bwaMem.bam -r /Data/targetsPad25bp.bed.gz -s/Data/SAE/ 
@@ -4509,6 +4614,57 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="TNRunner"><pre>**************************************************************************************
+**                                TNRunner  September 2018                          **
+**************************************************************************************
+TNRunner is designed to execute several dockerized snakmake workflows on human tumor
+normal datasets via a slurm cluster.  Based on the availability of fastq, Hg38
+alignments are run, somatic and germline variants are called, and concordance measured
+between sample bams. To execute TNRunner, create the following directory structure and
+link or copy in the corresponding paired end Illumina gzipped fastq files.
+MyPatientSampleDatasets
+   MyPatient1
+      Fastq
+         NormalExome
+         TumorExome
+         TumorTranscriptome
+   MyPatient2
+      Fastq
+         TumorExome
+         TumorTranscriptome
+   MyPatient3....
+The Fastq directory and sub directories must match this naming. Only include those
+for which you have fastq.  Change the MyXXX to something relevant. TNRunner is
+stateless so as more Fastq becomes available or issues are addressed, relaunch the
+app. This won't effect running or queued slurm jobs. Relaunch periodically to assess
+the current processing status and queue additional tasks. Download the latest
+workflows from https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38 
+and the matching resource bundle from
+https://hci-bio-app.hci.utah.edu/gnomex/gnomexFlex.jsp?analysisNumber=A5578
+
+Options:
+-p Directory containing one or more patient data directories to process.
+-e Workflow docs for launching exome alignments.
+-t Workflow docs for launching transcriptome alignments.
+-c Workflow docs for launching somatic variant calling.
+-a Workflow docs for launching variant annotation.
+-b Workflow docs for launching bam concordance.
+-j Workflow docs for launching joint genotyping.
+-g Germline AnnotatedVcfParser options, defaults to '-d 10 -m 0.2 -x 1 -p 0.01 -g 
+      D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign'
+-s Somatic AnnotatedVcfParser options, defaults to '-d 20 -f'
+-f Force a restart of all uncompleted jobs.
+-q Quite output.
+
+Example: java -jar pathToUSeq/Apps/TNRunner -p AvatarPatients -e 
+     ~/Hg38/ExomeAlignQC/WorkflowDocs/ -c ~/Hg38/SomExoCaller/WorkflowDocs/ -a 
+     ~/Hg38/Annotator/WorkflowDocs/ -b ~/Hg38/BamConcordance/WorkflowDocs/ -j
+     ~/Hg38/JointGenotyping/WorkflowDocs/ -t ~/Hg38/TranscriptomeAlignQC/WorkflowDocs/ 
+     -s '-d 30 -f' 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="UCSCBig2USeq"><pre>**************************************************************************************
 **                              UCSC Big 2 USeq: Jan 2013                           **
 **************************************************************************************
@@ -4595,7 +4751,7 @@ Example: java -jar pathToUSeq/Apps/VarScanVCFParser -v /VarScan2/VCFFiles/
 </pre><br><p>
 				
 					<a name="VCFBackgroundChecker"><pre>**************************************************************************************
-**                         VCF Background Checker : Dec 2017                        **
+**                         VCF Background Checker : May 2018                        **
 **************************************************************************************
 VBC calculates non-reference allele frequencies (AF) from a background multi-sample 
 mpileup file over each vcf record. It then calculates a z-score for the vcf AF and 
@@ -4610,13 +4766,14 @@ Required:
 -m Path to a bgzip compressed and tabix indexed multi-sample mpileup file. e.g.:
       1) Mpileup: 'echo "#SampleOrder: "$(ls *bam) > bkg.mpileup; samtools mpileup
              -B -q 13 -d 1000000 -f $fastaIndex -l $bedFile *.bam >> bkg.mpileup'
-      2) Bgzip: 'tabix-0.2.6/bgzip bkg.mpileup'
-         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bkg.mpileup.gz'
+      2) (Optional) MpileupRandomizer: java -jar -Xmx10G ~/USeqApps/MpileupRandomizer
+             -r 20 -s 3 -m bkg.mpileup
+      3) Bgzip: 'tabix-0.2.6/bgzip bkg.mpileup_DP20MS3.txt'
+         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bkg.mpileup_DP20MS3.txt.gz'
 -s Path to directory in which to save the modified vcf file(s)
 
 Optional:
--b BP padding, defaults to 0
--z Minimum vcf z-score, defaults to 0, no filtering
+-z Minimum vcf z-score, defaults to 0, no filtering. Unscored vars are kept.
 -q Minimum mpileup sample bp quality, defaults to 20
 -c Minimum mpileup sample read coverge, defaults to 20
 -f Maximum mpileup sample AF, defaults to 0.3
@@ -4627,48 +4784,7 @@ Optional:
 -t Number of threads to use, defaults to all
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundChecker -v SomaticVcfs/ -z 3
--m bkg.mpileup.gz -s BkgFiltVcfs/ -b 1 -q 13 -u 
-
-**************************************************************************************
-</pre><br><p>
-				
-					<a name="VCFBackgroundCheckerGraphite"><pre>**************************************************************************************
-**                         VCF Background Checker : April 2016                      **
-**************************************************************************************
-VBC calculates non-ref allele frequencies (AF) from a normal background multi-sample 
-mpileup file over each snv or using normal bams and graphite for indel and multi alts.
-It then calculates a z-score for the vcf AF and appends it to the INFO field. Z-scores
-< ~4 are indicative of non reference bps in the background samples. Note, VBC requires
-an AF tag in the INFO field of each record. 
-
-Required:
--v Path to a xxx.vcf(.gz/.zip OK) file or directory containing such.
--m Path to a bgzip compressed and tabix indexed multi-sample mpileup file. e.g.:
-      1) Mpileup: 'echo "#SampleOrder: "$(ls *bam) > bkg.mpileup; samtools mpileup
-             -B -q 13 -d 1000000 -f $fastaIndex -l $bedFile *.bam >> bkg.mpileup'
-      2) Bgzip: 'tabix-0.2.6/bgzip bkg.mpileup'
-         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bkg.mpileup.gz'
--g Path to graphite executable, see https://github.com/dillonl/graphite.
--n Directory containing normal background indexed bams for graphite AF estimation.
--i Indexed fasta file used to align the normal bams.
--s Path to a directory to save the modified vcf file(s)
-
-Optional:
--z Minimum vcf z-score, defaults to 0, no filtering
--q Minimum mpileup sample bp quality, defaults to 20
--c Minimum sample read coverge, defaults to 20
--f Maximum sample AF, defaults to 0.3
--a Minimum # samples for z-score calculation, defaults to 3
--e Exclude vcf records that could not be z-scored
--r Replace QUAL value with z-score. Un scored vars will be assigned 0
--d Print verbose debugging output
--t Number of threads to use, defaults to all
--o Additional bash shell commands before executing graphite,e.g. 'module load gcc/4.9'
--b BP intersection radius for pushing SNVs to graphite for AF estimation, default 125
-
-Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundChecker -v SomaticVcfs/ -z 3
--m bkg.mpileup.gz -s BkgFiltVcfs/ -b 50 -q 13 -e -r -g ~/Graphite/bin/graphite -n
-~/BkgrndNormalBams/ -o 'module load gcc/4.9.2' -i ~/B37/b37.fa 
+-m bkg.mpileup.gz -s BkgFiltVcfs/ -q 13 -u 
 
 **************************************************************************************
 </pre><br><p>
@@ -4767,6 +4883,49 @@ Example: java -Xmx20G -jar pathTo/USeq/Apps/VCFAnnotator -v 9908R.vcf
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="VCFCallFrequency"><pre>**************************************************************************************
+**                            VCF Call Frequency: Sept 2018                         **
+**************************************************************************************
+Calculates a vcf call frequency for each variant when pointed at a genomic Query
+service (https://github.com/HuntsmanCancerInstitute/Query) or the Data and Index
+directories the service is accessing. CallFreq's are calculated 
+by first counting the number of exact vcf matches present and dividing it by the
+number of intersecting bed files. Use this to flag variants with high call rates that
+are potential false positives. Some are not, e.g. BRAF V600E occurs in 58% of cancers
+with a BRAF mutation. So treate the call freq as an annotation requiring context level
+interpretation. Use the file filter to limit which files are included in the call freq
+calculations. Only file paths containing the file filter will be included. Be sure to
+place both the sample vcf and associated callable region bed files in the same Query
+index folder path as defined by -f. 
+
+Required Options:
+-v Full path to a file or directory containing xxx.vcf(.gz/.zip OK) file(s)
+-s Directory to save the annotated vcf files
+-f Query service file filter, e.g. /B37/Somatic/Avatar/
+-c Config txt file containing two tab delimited columns with host, queryUrl, realm, 
+     userName, password, and (optionally) fileFilter and or maxCallFreq. 'chmod 600'
+     the file! e.g.: 
+     host hci-clingen1.hci.utah.edu
+     queryUrl http://hci-clingen1.hci.utah.edu:8080/Query/
+     realm QueryAPI
+     userName FColins
+     password g0QueryAP1
+-i (Alternative to -c), provide a path to the Index directory generated by the USeq 
+     QueryIndexer app.
+-d (Alternative to -c), provide a path to the Data directory used in creating the Index.
+
+Options:
+-m Maximum call freq, defaults to 1, before appending 'CallFreq' to the FILTER field.
+-x Remove failing max call freq records, not recommended.
+-b Minimum bed call count before applying a max call freq filter, defaults to 8.
+-e Print verbose debugging output.
+
+Example: java -jar pathToUSeq/Apps/VCFCallFrequency -v Vcf/ -s CFVcfs -f 
+    /B37/Somatic/Avatar/ -m 0.05 -c vcfCFConfig.txt 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="VCFComparator"><pre>**************************************************************************************
 **                              VCF Comparator : March 2017                         **
 **************************************************************************************
@@ -4842,6 +5001,34 @@ Optional:
 -o Full path to an output vcf file, defaults to merged.vcf.gz in parent -v dir.
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFMerger -v /CancerSamples/
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCFMpileupAnnotator"><pre>**************************************************************************************
+**                          VCF Mpileup Annotator : April 2018                      **
+**************************************************************************************
+VMA estimates the AF and DP of a vcf record from a single sample mpileup file.  It 
+replaces the AF or DP INFO values in the vcf records if present. For INDELs, the
+region effected is scanned and the maximum AF and DP assigned. Provide the max memory
+available to the app to maximize cpu usage.
+
+Required:
+-v Path to a xxx.vcf(.gz/.zip OK) file.
+-m Path to a bgzip compressed and tabix indexed single sample mpileup file. e.g.:
+      1) Mpileup: 'samtools mpileup -B -q 1 -d 1000000 -f $fastaIndex -l $bedFile
+      $indexedBamFile > bam.mpileup'
+      2) Bgzip: 'tabix-0.2.6/bgzip bam.mpileup'
+         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bam.mpileup.gz'
+-o Path to a xxx.vcf.gz file to save the modified vcf records.
+
+Optional:
+-q Minimum mpileup sample bp quality, defaults to 0
+-d Print verbose debugging output.
+-t Number of threads to use, defaults to all/ 5GB.
+
+Example: java -Xmx64G -jar pathTo/USeq/Apps/VCFMpileupAnnotator -v spikes.vcf -q 13
+-m bam.mpileup.gz -o spikes.mod.vcf.gz
 
 **************************************************************************************
 </pre><br><p>
@@ -4979,13 +5166,13 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFReporter -v 9908R.vcf
 </pre><br><p>
 				
 					<a name="VCFSpliceScanner"><pre>**************************************************************************************
-**                             VCF Splice Scanner : Dec 2017                        **
+**                            VCF Splice Scanner : Sept 2018                        **
 **************************************************************************************
 Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and
 Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice
 acceptors and donors are scored for loss of a junction.  Exonic, intronic, and splice
 bases are scanned for novel junctions in a window around each variant. See the vcf
-INFO header for a description of the output. Use this information to identify likely
+INFO header for a description of the output. Use this information to identify 
 snv and indel variants that may effect splicing.
 
 Required Options:
@@ -5037,10 +5224,10 @@ Example: java -jar pathToUSeq/Apps/VCFTabix -v /VarScan2/VCFFiles/
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="VCF2Tvs"><pre>**************************************************************************************
-**                                 VCF 2 Tvs: March 2018                            **
+					<a name="VCF2Tsv"><pre>**************************************************************************************
+**                                 VCF 2 Tsv: March 2018                            **
 **************************************************************************************
-Converts vcf files' SNVs and INDELs to tvs Illumina CE/CA format. 
+Converts vcf files' SNVs and INDELs to tsv Illumina CE/CA format. 
 
 Required Options:
 -v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
@@ -5050,7 +5237,7 @@ Required Options:
 -b Max frac BKAFs >= AF, defaults to 1, no threshold.
 -i ID column string forcing export. Case insensitive.
 
-Example: java -jar pathToUSeq/Apps/VCF2Tvs -v VCFss/ -q 3 -z -b 0.2 -i Foundation 
+Example: java -jar pathToUSeq/Apps/VCF2Tsv -v VCFss/ -q 3 -z -b 0.2 -i Foundation 
 
 **************************************************************************************
 </pre><br><p>
@@ -5187,18 +5374,24 @@ Example: java -jar pathToUSeq/Apps/SomaticSniperVCFParser -v /VCFFiles/ -m 32 -a
 </pre><br><p>
 				
 					<a name="StrelkaVCFParser"><pre>**************************************************************************************
-**                             Strelka VCF Parser: Feb 2018                         **
+**                            Strelka VCF Parser: June 2018                         **
 **************************************************************************************
 Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS
-score. Also filters for read depth, T/N alt allelic ratio and diff,
+score. Also filters for read depth, T/N alt allelic ratio and diff, ref/alt with '.',
 and tumor and normal alt allelic ratios. Lastly, it inserts the tumor DP and AF info.
+For somatic exome datasets sequenced at >100X unique observation read depth, try the 
+tier filtering to select for lists with approx 1%, 3-5%, and 9-15% FDR. Follow the
+example.
 
 Required Params:
 -v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
 -m Minimum QSI or QSS score, defaults to 0.
+-e Apply a tuned 100X exome QSI/S stringency tier: 1 (9-15%FDR), 2 (4-6%FDR),
+         3 (1-2%FDR), defaults to 0, no tiered filtiering (37-63%FDR).
 -t Minimum tumor allele frequency (AF), defaults to 0.
 -n Maximum normal AF, defaults to 1.
 -u Minimum tumor alignment depth, defaults to 0.
+-a Minimum tumor alt count, defaults to 0.
 -o Minimum normal alignment depth, defaults to 0.
 -d Minimum T-N AF difference, defaults to 0.
 -r Minimum T/N AF ratio, defaults to 0.
@@ -5206,8 +5399,8 @@ Required Params:
 -s Print spreadsheet variant summary.
 -f Directory in which to save the parsed files, defaults to the parent dir of the vcfs.
 
-Example: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -m 32 -t 0.05
-        -n 0.5 -u 100 -o 20 -d 0.05 -r 2 -f ParsedVcfs 
+Example: java -jar pathToUSeq/Apps/StrelkaVCFParser -v /VCFFiles/ -t 0.03 -n 0.6 
+-u 30 -o 10 -a 3 -d 0.03 -r 2 -e 1 
 
 **************************************************************************************
 </pre><br><p>

@@ -650,7 +650,6 @@ public class AnnotatedVcfParser {
 	private void modifySettingsForFoundation() {
 		if (minimumDP == 0) minimumDP = 50;
 		if (minimumAF == 0) minimumAF = 0.01;
-		if (maximumAF == 1) maximumAF = 0.5;
 		if (maxFracBKAFs == 0) maxFracBKAFs = 0.1;
 		if (maximumPopAF == 0) maximumPopAF = 0.01;
 		if (passingAnnImpact == null) {
@@ -882,7 +881,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                              Annotated Vcf Parser  Aug 2018                      **\n" +
+				"**                             Annotated Vcf Parser  Sept 2018                      **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff w/ dbNSFP and clinvar, plus the\n"+
 				"VCFBackgroundChecker and VCFSpliceScanner USeq apps into passing and failing records.\n"+

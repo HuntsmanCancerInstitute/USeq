@@ -17,7 +17,6 @@ public class Gzipper {
 		if (gzipFile.getName().endsWith(".gz") == false) this.gzipFile = new File (gzipFile+".gz");
 		else this.gzipFile = gzipFile;
 		out = new GZIPOutputStream(new FileOutputStream(this.gzipFile));
-		
 	}
 	
 	public Gzipper(OutputStream gzipFile) throws IOException {
@@ -27,6 +26,12 @@ public class Gzipper {
 	/**Be sure to call this to clear the final buffer when done!*/
 	public void close() throws IOException{
 		out.close();
+	}
+	
+	/**Flush the stream
+	 * @throws IOException */
+	public void flush() throws IOException{
+		out.flush();
 	}
 	
 	/**Attempts a close, no exceptions thrown or warnings.*/
@@ -110,6 +115,24 @@ public class Gzipper {
 		if (addComma) out.write(rtnComma);
 		else out.write(rtn);
 	}
+	/**Calls toString on each object in the array.*/
+	public void printJson(String key, Object[] values, boolean addComma) throws IOException {
+		StringBuilder sb = new StringBuilder();
+		sb.append("\"");
+		sb.append(key);
+		sb.append("\"");
+		sb.append(": [");
+		sb.append(values[0].toString());
+		for (int i=1; i< values.length; i++){
+			sb.append(", ");
+			sb.append(values[i].toString());
+		}
+		sb.append("]");
+		out.write(sb.toString().getBytes());
+		if (addComma) out.write(rtnComma);
+		else out.write(rtn);
+	}
+
 	public void printJson(String key, double value, boolean addComma) throws IOException {
 		StringBuilder sb = new StringBuilder();
 		sb.append("\"");

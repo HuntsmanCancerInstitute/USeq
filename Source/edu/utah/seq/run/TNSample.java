@@ -249,12 +249,12 @@ public class TNSample {
 			new File(jobDir, "tumorExome.bai").delete();
 		}
 		if (normalExomeBamBedGvcf != null) {
-			new File(jobDir, "tumorTranscriptome.bam").delete();
-			new File(jobDir, "tumorTranscriptome.bai").delete();
-		}
-		if (tumorTranscriptomeBam != null) {
 			new File(jobDir, "normalExome.bam").delete();
 			new File(jobDir, "normalExome.bai").delete();
+		}
+		if (tumorTranscriptomeBam != null) {
+			new File(jobDir, "tumorTranscriptome.bam").delete();
+			new File(jobDir, "tumorTranscriptome.bai").delete();
 		}
 	}
 
@@ -754,20 +754,14 @@ public class TNSample {
 	private boolean checkFastq() throws IOException {
 		info.add("Checking Fastq availability...");
 		File fastqDir = makeCheckFile(rootDir, "Fastq");
-		tumorExomeFastq = new FastqDataset(fastqDir, "TumorExome");
-		normalExomeFastq = new FastqDataset(fastqDir, "NormalExome");
-		tumorTransFastq = new FastqDataset(fastqDir, "TumorTranscriptome");
+		tumorExomeFastq = new FastqDataset(fastqDir, "TumorExome", info);
+		normalExomeFastq = new FastqDataset(fastqDir, "NormalExome", info);
+		tumorTransFastq = new FastqDataset(fastqDir, "TumorTranscriptome", info);
 		if (tumorExomeFastq.isFastqDirExists()) info.add("\tTumorExome\t"+ (tumorExomeFastq.getFastqs() != null));
 		if (normalExomeFastq.isFastqDirExists()) info.add("\tNormalExome\t"+ (normalExomeFastq.getFastqs() != null));
 		if (tumorTransFastq.isFastqDirExists()) info.add("\tTumorTranscriptome\t"+ (tumorTransFastq.getFastqs() != null));
 		if (tumorExomeFastq.getFastqs() != null || normalExomeFastq.getFastqs() != null || tumorTransFastq.getFastqs() != null) return true;
 		return false;
-	}
-	
-	public static File[] checkNumberFiles(File dir, String extension, int requiredNumberFiles) throws IOException {
-		File[] f = IO.extractFiles(dir, extension);
-		if (f.length != requiredNumberFiles) throw new IOException("Failed to find "+requiredNumberFiles+ " "+extension+ " files in "+dir);
-		return f;
 	}
 
 	public static File makeCheckFile(File parentDir, String fileName) throws IOException {

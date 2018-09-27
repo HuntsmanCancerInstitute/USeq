@@ -1904,6 +1904,26 @@ public class IO {
 		}
 		return names;
 	}
+	
+	/**Loads a file's lines into a hash set, counts duplicates.*/
+	public static HashMap<String, Integer> loadFileIntoHashMapCounter(File file){
+		HashMap<String,Integer> names = new HashMap<String,Integer>(10000);
+		try{
+			BufferedReader in = fetchBufferedReader(file);
+			String line;
+			while ((line = in.readLine())!=null){
+				line = line.trim();
+				if (line.length() ==0) continue;
+				Integer i = names.get(line);
+				if (i == null) names.put(line, new Integer(1));
+				else names.put(line, new Integer(i.intValue() + 1));
+			}
+		}catch(Exception e){
+			System.out.println("Prob loadFileInttoHash()");
+			e.printStackTrace();
+		}
+		return names;
+	}
 
 
 

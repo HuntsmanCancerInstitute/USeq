@@ -29,6 +29,7 @@ public class BamConcordance {
 	private double minAFForHis = 0.05;
 	private int minBaseQuality = 20;
 	private int minMappingQuality = 20;
+	private File jsonOutputFile = null;
 
 	//internal fields
 	private File tempDirectory;
@@ -39,6 +40,8 @@ public class BamConcordance {
 	private Similarity[] similarities;
 	private String[] sampleNames = null;
 	private String bamNames = null;
+	private String[] similarityForJson = null;
+	private String[] genderForJson = null;
 	
 	//internal fields
 	ConcordanceChunk[] runners;
@@ -60,6 +63,8 @@ public class BamConcordance {
 			printGenderRatios();
 
 			printHist();
+			
+			saveJson();
 			
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
@@ -154,20 +159,26 @@ public class BamConcordance {
 	}
 
 	public void printStats(){
+		similarityForJson = new String[similarities.length];
 		//calculate max match and sort
 		for (int i=0; i< similarities.length; i++) similarities[i].calculateMaxMatch();
 		Arrays.sort(similarities);
 		System.out.println("\nStats:");
-		for (int i=0; i< similarities.length; i++) System.out.println(similarities[i].toString(sampleNames));
+		for (int i=0; i< similarities.length; i++) {
+			similarityForJson[i] = similarities[i].toString(sampleNames);
+			System.out.println(similarityForJson[i]);
+		}
 	}
 
 	public void printGenderRatios(){
+		genderForJson = new String[afHist.length];
 		IO.pl("Het/Hom histogram AF count ratios for AllChrs, ChrX, log2(All/X)");
 		for (int i=0; i< afHist.length; i++){
 			double allChr = ratioCenterVsLast(afHist[i]);
 			double chrX = ratioCenterVsLast(chrXAfHist[i]);
 			double lgrto = Num.log2(allChr/chrX);
-			IO.pl(sampleNames[i] +"\t"+Num.formatNumber(allChr, 3)+"\t"+Num.formatNumber(chrX, 3)+"\t"+Num.formatNumber(lgrto, 3));
+			genderForJson[i] = sampleNames[i] +"\t"+Num.formatNumber(allChr, 3)+"\t"+Num.formatNumber(chrX, 3)+"\t"+Num.formatNumber(lgrto, 3);
+			IO.pl(genderForJson[i]);
 		}
 	}
 	
@@ -208,6 +219,28 @@ public class BamConcordance {
 			System.out.println();
 		}
 	}
+	
+	@SuppressWarnings("unchecked")
+	private void saveJson() {
+		if (jsonOutputFile == null) return;
+		
+		try {
+			String[] names = new String[bamFiles.length];
+			for (int i=0; i< names.length; i++) names[i] = Misc.removeExtension(bamFiles[i].getName());
+			//output simple json, DO NOT change the key names without updated downstream apps that read this file!
+			Gzipper gz = new Gzipper(jsonOutputFile);
+			gz.println("{");
+			gz.printJson("bamFileNames", names, true);
+			gz.printJson("similarities", similarityForJson, true);
+			gz.printJson("genderChecks", genderForJson, false);
+			gz.println("}");
+			gz.close();
+			
+		} catch (Exception e){
+			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem writing json file! "+jsonOutputFile);
+		}
+	}
 
 
 	public static void main(String[] args) {
@@ -241,6 +274,7 @@ public class BamConcordance {
 					case 'm': minAFForMatch = Double.parseDouble(args[++i]); break;
 					case 'q': minBaseQuality = Integer.parseInt(args[++i]); break;
 					case 'u': minMappingQuality = Integer.parseInt(args[++i]); break;
+					case 'j': jsonOutputFile = new File(args[++i]); break;
 					case 't': numberThreads = Integer.parseInt(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -259,9 +293,10 @@ public class BamConcordance {
 		if (fasta == null || fasta.canRead() == false) Misc.printErrAndExit("\nError: cannot find your indexed fasta reference file "+fasta);
 		//check bams
 		if (bamFiles == null || bamFiles.length == 0) Misc.printErrAndExit("\nError: cannot find your bam files to parse? ");
+		
 		//threads to use
 		double gigaBytesAvailable = ((double)Runtime.getRuntime().maxMemory())/ 1073741824.0;
-		int numPossCores = (int)Math.round(gigaBytesAvailable/5.0);
+		int numPossCores = (int)Math.round(gigaBytesAvailable/5);
 		if (numPossCores < 1) numPossCores = 1;
 		int numPossThreads = Runtime.getRuntime().availableProcessors();
 		if (numberThreads == 0){
@@ -291,7 +326,7 @@ public class BamConcordance {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Bam Concordance: Feb  2018                         **\n" +
+				"**                               Bam Concordance: Sept  2018                        **\n" +
 				"**************************************************************************************\n" +
 				"BC calculates sample level concordance based on uncommon homozygous SNVs found in bam\n"+
 				"files. Samples from the same person will show high similarity (>0.9). Run BC on\n"+
@@ -321,12 +356,13 @@ public class BamConcordance {
 				"-m Minimum allele frequency to count a homozygous match, defaults to 0.9\n"+
 				"-q Minimum base quality, defaults to 20.\n"+
 				"-u Minimum mapping quality, defaults to 20.\n"+
+				"-j Write gzipped summary stats in json format to this file.\n"+
 				"-t Number of threads to use.  If not set, determines this based on the number of\n"+
 				"      threads and memory available to the JVM so set the -Xmx value to the max.\n\n"+
 
-				"Example: java -Xmx120G -jar pathTo/USeq/Apps/BamConcordance -r ~/exomeTargets.bed\n"+
+				"Example: java -Xmx100G -jar pathTo/USeq/Apps/BamConcordance -r ~/exomeTargets.bed\n"+
 				"      -s ~/Samtools1.3.1/bin/samtools -b ~/Patient7Bams -d 10 -a 0.9 -m 0.8 -f\n"+
-				"      ~/B37/human_g1k_v37.fasta -c ~/B37/b38ComSnps.bed.gz\n\n" +
+				"      ~/B37/human_g1k_v37.fasta -c ~/B37/b38ComSnps.bed.gz -j bc.json.gz \n\n" +
 
 				"**************************************************************************************\n");
 

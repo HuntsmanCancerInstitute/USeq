@@ -405,7 +405,7 @@ public class TNRunner {
 				"\nOptions:\n"+
 				"-p Directory containing one or more patient data directories to process.\n" +
 				"-e Workflow docs for launching exome alignments.\n"+
-				"-t Workflow docs for launching exome alignments.\n"+
+				"-t Workflow docs for launching transcriptome alignments.\n"+
 				"-c Workflow docs for launching somatic variant calling.\n"+
 				"-a Workflow docs for launching variant annotation.\n"+
 				"-b Workflow docs for launching bam concordance.\n"+

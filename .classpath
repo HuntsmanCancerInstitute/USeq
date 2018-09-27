@@ -70,5 +70,6 @@
 	<classpathentry kind="lib" path="LibraryJars/json-20140107.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/commons-codec-1.10.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/sqljdbc41.jar"/>
+	<classpathentry combineaccessrules="false" kind="src" path="/Query"/>
 	<classpathentry kind="output" path="Classes"/>
 </classpath>

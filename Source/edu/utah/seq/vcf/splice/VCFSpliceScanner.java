@@ -329,7 +329,8 @@ public class VCFSpliceScanner {
 	}
 
 	public void loadAndModifyHeader(BufferedReader in) throws IOException{
-		File header = new File(tempDirectory, "headerPlusUnAnnotated.vcf.gz");
+		File header = new File(tempDirectory, "headerPlusUnAnnotated.vcf.gz").getCanonicalFile();
+		header.createNewFile();
 		gzippedToConcat.add(header);
 		
 		vcfOut = new Gzipper(header);
@@ -373,6 +374,7 @@ public class VCFSpliceScanner {
 				else vcfOut.println(line);
 			}
 		}
+		vcfOut.flush();
 		if (foundChrom == false) throw new IOException("\tError: Failed to find the #CHROM header line? Aborting.\n");
 		if (addedInfo == false) throw new IOException("\tError: Failed to find any ##INFO header lines? Aborting.\n");
 	}
@@ -446,7 +448,7 @@ public class VCFSpliceScanner {
 		
 		//threads to use
 		double totalGbAvailable = (double)(Runtime.getRuntime().maxMemory()/1000000000.0);
-		int numPossCores = (int)Math.round(totalGbAvailable/5.0);
+		int numPossCores = (int)Math.round(totalGbAvailable/10.0);
 		if (numPossCores < 1) numPossCores = 1;
 		int numPossThreads = Runtime.getRuntime().availableProcessors();
 		
@@ -456,7 +458,7 @@ public class VCFSpliceScanner {
 		
 		System.out.println("Core usage:\n\tTotal GB available to Java:\t"+ Num.formatNumber(totalGbAvailable, 1));
 		System.out.println("\tTotal available cores:\t"+numPossThreads);
-		System.out.println("\tNumber cores to use @ 5GB/core:\t"+numberThreads+"\n");
+		System.out.println("\tNumber cores to use @ 10GB/core:\t"+numberThreads+"\n");
 		
 		
 		//flip booleans?
@@ -593,13 +595,13 @@ public class VCFSpliceScanner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             VCF Splice Scanner : Dec 2017                        **\n" +
+				"**                            VCF Splice Scanner : Sept 2018                        **\n" +
 				"**************************************************************************************\n" +
 				"Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and\n"+
 				"Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice\n"+
 				"acceptors and donors are scored for loss of a junction.  Exonic, intronic, and splice\n"+
 				"bases are scanned for novel junctions in a window around each variant. See the vcf\n"+
-				"INFO header for a description of the output. Use this information to identify likely\n"+
+				"INFO header for a description of the output. Use this information to identify \n"+
 				"snv and indel variants that may effect splicing.\n\n" +
 
 				"Required Options:\n"+

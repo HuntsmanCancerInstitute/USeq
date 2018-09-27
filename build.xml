@@ -14,6 +14,7 @@
 		<!-- Copy base class files to the build directory -->
 		<echo>Unpacking base classes</echo>
 		<copy file="Misc/JavaxComOrgInfoNetClasses.zip" todir="${release.build.dir}"/>
+		<copy file="log4j.properties" todir="${release.build.dir}"/>
 		<unzip src="${release.build.dir}/JavaxComOrgInfoNetClasses.zip" dest="${release.build.dir}"/>
 		<move todir="${release.build.dir}">
 			<fileset dir="${release.build.dir}/JavaxComOrgInfoNetClasses"/>
