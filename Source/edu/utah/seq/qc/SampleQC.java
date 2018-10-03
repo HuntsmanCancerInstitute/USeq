@@ -35,6 +35,7 @@ public class SampleQC {
 
 	//MPA
 	private boolean mpaParsed = false;
+	private String mpaBamFileName;
 	private double fractionOverlappingBpsInPairedReads;
 	private double meanInsertSize;
 	private long numberPassingBps;
@@ -90,6 +91,8 @@ public class SampleQC {
 			}
 			else if (type.equals("mpa")){
 				mpaParsed = true;
+				//bam file name that was parsed
+				mpaBamFileName = jo.getString("bamFileName", "notFound");
 				//mean insert size, ideally big enough to have < 0.1 overlap
 				meanInsertSize = jo.getDouble("meanInsertSize", -1);
 				//fraction of bps that overlap each other in paired alignments, ideally < 0.1
@@ -129,7 +132,7 @@ public class SampleQC {
 		}
 	}
 	
-	public String fetchTabbedLine() {
+	public String fetchTabbedLine(BamConcordanceQC bc) {
 		ArrayList<String> al = new ArrayList<String>();
 		al.add(sampleName);
 		if (fastqParsed) al.add(new Long(numberFastqReads).toString());
@@ -152,10 +155,14 @@ public class SampleQC {
 			al.add(new Double(coverageAt095OfTargetBps).toString());
 			//al.add(new Long(numberLowCoverageBps).toString());
 		}
+		if (bc != null){
+			al.add(bc.getSimilarity());
+			al.add(bc.getGenderCheck());
+		}
 		return Misc.stringArrayListToString(al, "\t");
 	}
 	
-	public String fetchTabbedHeader(){
+	public String fetchTabbedHeader(boolean includeBC){
 		ArrayList<String> al = new ArrayList<String>();
 		al.add("Sample Name");
 		if (fastqParsed) al.add("# Fastq Reads");
@@ -178,14 +185,14 @@ public class SampleQC {
 			al.add("Coverage at 0.95 of Target BPs");
 			//al.add("# Low Coverage Target BPs");
 		}
+		if (includeBC){
+			al.add("Similarities Fwd Rev");
+			al.add("Het/Hom All ChrX Log2(All/ChrX)");
+		}
 		return Misc.stringArrayListToString(al, "\t");
 	}
 	
-	public void appendHtmlColumns(StringBuilder sb) {
-		//sb.append("	data.addColumn('string', '');\n");
-		//sb.append("	data.addColumn('number', '');\n");
-		//sb.append("	data.addColumn('boolean', '');\n");
-		
+	public void appendHtmlColumns(StringBuilder sb, boolean addBC) {
 		sb.append("	data.addColumn('string', 'Sample Name');\n");
 		if (fastqParsed) sb.append("	data.addColumn('number', '# Fastq Reads');\n"); 
 		if (saeParsed){
@@ -205,11 +212,14 @@ public class SampleQC {
 			sb.append("	data.addColumn('number', 'Mean on Target Coverage');\n");
 			sb.append("	data.addColumn('number', 'Coverage at 0.9 of Target BPs');\n");
 			sb.append("	data.addColumn('number', 'Coverage at 0.95 of Target BPs');\n");
-			//sb.append("	data.addColumn('number', '# Low Coverage Target BPs');\n");
+		}
+		if (addBC){
+			sb.append("	data.addColumn('string', 'Similarities Fwd Rev');\n");
+			sb.append("	data.addColumn('string', 'Het/Hom All ChrX Log2(All/ChrX)');\n");
 		}
 	}
 	
-	public void appendHtmlDataRow(StringBuilder sb, boolean skipComma) {
+	public void appendHtmlDataRow(StringBuilder sb, boolean skipComma, HashMap<String, BamConcordanceQC> bamFileNameBCR) throws IOException {
 		//sb.append("		['Mike',  100.3, true],\n");
 		//sb.append("		['Jim',   {v:8000,   f: '$8,000'},  false],\n");
 		//sb.append("		['Alice', {v: 12500, f: '$12,500'}, true],\n");
@@ -241,6 +251,12 @@ public class SampleQC {
 			al.add(f.format(coverageAt095OfTargetBps) );
 			//al.add(new Long(numberLowCoverageBps).toString());
 		}
+		if (bamFileNameBCR != null){
+			BamConcordanceQC bc = bamFileNameBCR.get(mpaBamFileName);
+			if (bc == null) throw new IOException("Failed to find a BamConcordanceQC object for "+mpaBamFileName);
+			al.add("'"+bc.getSimilarity()+"'");
+			al.add("'"+bc.getGenderCheck()+"'");
+		}
 		sb.append("\t\t[");
 		sb.append(Misc.stringArrayListToString(al, ","));
 		if (skipComma) sb.append("]\n");
@@ -262,7 +278,7 @@ public class SampleQC {
 	}
 	
 	/**begin, divide, end*/
-	public String fetchDescriptions(String b, String d, String e){
+	public String fetchDescriptions(String b, String d, String e, boolean addBC){
 		ArrayList<String> al = new ArrayList<String>();
 		al.add(b+ "Sample Name"+ d+ "Name parsed from the json.gz files.");
 		if (fastqParsed) al.add(b+ "# Fastq Reads"+ d+ "Total number of fastq reads passed to the aligner, not pairs of reads, all.");
@@ -283,13 +299,16 @@ public class SampleQC {
 			al.add(b+ "Mean on Target Coverage"+ d+ "Traditional measure of coverage over target BPs.");
 			al.add(b+ "Coverage at 0.9 of Target BPs"+ d+ "Better measure of coverage, calculated by asking what fraction of target BPs have 0x, 1x, 2x or more coverage. Stop when it hits 0.9.");
 			al.add(b+ "Coverage at 0.95 of Target BPs"+ d+ "Better measure of coverage, calculated by asking what fraction of target BPs have 0x, 1x, 2x or more coverage. Stop when it hits 0.95.");
-
 			//al.add(b+ "# Low Coverage Target BPs"+ d+ "Number of target BPs with less than the minimum coverage threshold.");
+		}
+		if (addBC){
+			al.add(b+ "Similarities Fwd Rev"+ d+ "BamConcordance similarity estimates for each sample set in the forward and reverse direction.");
+			al.add(b+ "Het/Hom All ChrX Log2(All/ChrX)"+ d+ "BamConcordance gender check for each sample, ratio of Het/Hom for All, chrX, and log2(All/ChrX).");
 		}
 		return Misc.stringArrayListToString(al, e);
 	}
 	
-	public String[] parseStringArray(JsonValue jv){
+	public static String[] parseStringArray(JsonValue jv){
 		JsonArray ja = jv.asArray();
 		int size = ja.size();
 		String[] values = new String[size];
@@ -405,6 +424,10 @@ public class SampleQC {
 
 	public String getTargetRegionsFileNameSAE() {
 		return targetRegionsFileNameSAE;
+	}
+
+	public String getMpaBamFileName() {
+		return mpaBamFileName;
 	}
 
 

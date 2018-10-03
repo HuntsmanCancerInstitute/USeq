@@ -263,6 +263,7 @@ public class MergePairedAlignments {
 			//save json obj, DO NOT change the key names without updated downstream apps that read this file!
 			Gzipper gz = new Gzipper(jsonOutputFile);
 			gz.println("{");
+			gz.printJson("bamFileName", bamFile.getCanonicalFile().getName(), true);
 			gz.printJson("fractionOverlappingBpsInPairedReads", numberOverlappingBases/(numberNonOverlappingBases + numberOverlappingBases), true);
 			gz.printJson("meanInsertSize", insertSize.getStandardDeviation().getMean(), true);
 			gz.printJson("numberPassingBps", (long)numberPassingBases, true);
@@ -388,7 +389,7 @@ public class MergePairedAlignments {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Merge Paired Alignments: Oct 2017                     **\n" +
+				"**                            Merge Paired Alignments: Oct 2018                     **\n" +
 				"**************************************************************************************\n" +
 				"Merges proper paired alignments that pass a variety of checks and thresholds. Only\n" +
 				"unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps\n" +

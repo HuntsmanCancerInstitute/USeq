@@ -115,19 +115,19 @@ public class Gzipper {
 		if (addComma) out.write(rtnComma);
 		else out.write(rtn);
 	}
-	/**Calls toString on each object in the array.*/
+	/**Calls toString on each object in the array, surrounds with "". No tabs or returns!*/
 	public void printJson(String key, Object[] values, boolean addComma) throws IOException {
 		StringBuilder sb = new StringBuilder();
 		sb.append("\"");
 		sb.append(key);
 		sb.append("\"");
-		sb.append(": [");
+		sb.append(": [\"");
 		sb.append(values[0].toString());
 		for (int i=1; i< values.length; i++){
-			sb.append(", ");
+			sb.append("\",\"");
 			sb.append(values[i].toString());
 		}
-		sb.append("]");
+		sb.append("\"]");
 		out.write(sb.toString().getBytes());
 		if (addComma) out.write(rtnComma);
 		else out.write(rtn);
@@ -231,6 +231,13 @@ public class Gzipper {
 
 	public File getGzipFile() {
 		return gzipFile;
+	}
+	
+	public static void main(String[] args) throws FileNotFoundException, IOException{
+		String[] x = {"Go", "Fish", "Larry"};
+		Gzipper g = new Gzipper(new File("/Users/u0028003/Downloads/delme.txt.gz"));
+		g.printJson("ziper", x, false);
+		g.close();
 	}
 
 	

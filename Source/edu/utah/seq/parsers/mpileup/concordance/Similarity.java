@@ -42,6 +42,14 @@ public 	class Similarity implements Comparable<Similarity>{
 		return ab+ba;
 	}
 	
+	public String toStringShort(String[] sampleNames){
+		double fracMatchAB = (double)numMatchesAB/(double)(numMatchesAB+ numMisMatchesAB);
+		String ab = sampleNames[sampleA]+"->"+ sampleNames[sampleB]+" "+ Num.formatNumberMinOne(fracMatchAB, 3)+"("+(int)numMatchesAB+"/"+(int)(numMatchesAB+numMisMatchesAB)+")";
+		double fracMatchBA = (double)numMatchesBA/(double)(numMatchesBA+ numMisMatchesBA);
+		String ba = Num.formatNumberMinOne(fracMatchBA, 3)+"("+(int)numMatchesBA+"/"+(int)(numMatchesBA+numMisMatchesBA)+")";
+		return ab+" "+ba;
+	}
+	
 	public void toStringMismatch(String[] sampleNames) {
 		IO.pl(sampleNames[sampleA] +" <-> "+ sampleNames[sampleB]);
 		IO.pl(sampleNames[sampleA] +" mismatches ");

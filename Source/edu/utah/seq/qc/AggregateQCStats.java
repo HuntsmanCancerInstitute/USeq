@@ -1,11 +1,17 @@
 package edu.utah.seq.qc;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import com.eclipsesource.json.JsonObject;
+
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -20,13 +26,17 @@ public class AggregateQCStats {
 	private String saeMatch = "(.+)_SamAlignmentExtractor.json.gz";
 	private String mpaMatch = "(.+)_MergePairedAlignments.json.gz";
 	private String s2uMatch = "(.+)_Sam2USeq.json.gz";
+	private String bcMatch = "(.+)_BamConcordance.json.gz";
 
 	private TreeMap<String, SampleQC> samples;
+	private ArrayList<File> bamConcordanceFiles = new ArrayList<File>();
+	private HashMap<String, BamConcordanceQC> bamFileNameBCR = null;
 	private Pattern fastqPattern;
 	private Pattern saePattern;
 	private Pattern mpaPattern;
 	private Pattern s2uPattern;
-	
+	private Pattern bcPattern;
+
 	private boolean debug = false;
 
 
@@ -35,21 +45,24 @@ public class AggregateQCStats {
 
 		long startTime = System.currentTimeMillis();
 		processArgs(args);
-		
+
 		System.out.print("Loading samples");
 		loadSamples();
-		
+
 		System.out.print("\nChecking samples");
 		checkSamples();
-		
+
+		if (bamConcordanceFiles.size() != 0) parseBamConcordances();
+
 		System.out.println("\nSaving aggregated data...");
 		System.out.println("\tStats");
 		printStatsTxtSheet();
+
 		System.out.println("\tRead coverage");
 		printReadCoverageTxtSheet();
 		System.out.println("\tTargets");
 		printTargetsTxtSheet();
-		
+
 		System.out.println("Building html reports...");
 		printHtmlTable();
 		printReadCoverageHtml("Coverage Over Target BPs", "Unique Observation Fold Coverage", "Fraction Target BPs");
@@ -58,50 +71,70 @@ public class AggregateQCStats {
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" Sec\n");
 	}
-	
-	private void printHtmlTable(){
-		SampleQC sqc = samples.values().iterator().next();
-		StringBuilder sb = new StringBuilder();
-		sb.append("<html>  \n");
-		sb.append("<head>  \n");
-		sb.append("    <style> #table_main { width: 100%; height: 100%;} </style>  \n");
-		sb.append("<script type='text/javascript' src='https://www.gstatic.com/charts/loader.js'></script>   \n");
-		sb.append("<script> \n");
-		sb.append("google.charts.load('current', {'packages':['table']}); \n");
-		sb.append("google.charts.setOnLoadCallback(drawTable); \n");
-		sb.append("function drawTable() { \n");
-		sb.append("	var data = new google.visualization.DataTable(); \n");
-		
-		//add columns
-		sqc.appendHtmlColumns(sb);
-		
-		sb.append("	data.addRows([\n");
-		
-		//for each sample
-		Iterator<SampleQC> it = samples.values().iterator();
-		while (it.hasNext()){
-			it.next().appendHtmlDataRow(sb, it.hasNext() == false);
+
+	private void parseBamConcordances() {
+		File f = null;
+		try {
+			bamFileNameBCR = new HashMap<String, BamConcordanceQC>();
+			for (int i=0; i< bamConcordanceFiles.size(); i++) {
+				f= bamConcordanceFiles.get(i);
+				new BamConcordanceQC(f, bamFileNameBCR);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem parsing bam concordance files! "+f);
 		}
 
-		sb.append("	]); \n");
-		sb.append("	var table = new google.visualization.Table(document.getElementById('table_main')); \n");
-		sb.append("	table.draw(data, {title:'Summary Stats', showRowNumber: false, cssClassNames:{headerCell: 'googleHeaderCell'}}); \n");
-		sb.append("	window.addEventListener('resize', function() { \n");
-		sb.append("		table.draw(rcData, options);  \n");
-		sb.append("        }, false); \n");
-		sb.append("} \n");
-		sb.append("</script>  \n");
-		sb.append("</head> \n");
-		sb.append("<body> \n");
-		sb.append("<div id='table_main'></div><body> \n");
-		sb.append("</body> \n");
-		sb.append("</html> \n");
-		
-		File html = new File(saveDirectory, prependString+"qcReport_Stats.html");
-		IO.writeString(sb.toString(), html);
 	}
-	
-	
+
+	private void printHtmlTable(){
+		try {
+			SampleQC sqc = samples.values().iterator().next();
+			StringBuilder sb = new StringBuilder();
+			sb.append("<html>  \n");
+			sb.append("<head>  \n");
+			sb.append("    <style> #table_main { width: 100%; height: 100%;} </style>  \n");
+			sb.append("<script type='text/javascript' src='https://www.gstatic.com/charts/loader.js'></script>   \n");
+			sb.append("<script> \n");
+			sb.append("google.charts.load('current', {'packages':['table']}); \n");
+			sb.append("google.charts.setOnLoadCallback(drawTable); \n");
+			sb.append("function drawTable() { \n");
+			sb.append("	var data = new google.visualization.DataTable(); \n");
+
+			//add columns
+			sqc.appendHtmlColumns(sb, bamFileNameBCR!=null);
+
+			sb.append("	data.addRows([\n");
+
+			//for each sample
+			Iterator<SampleQC> it = samples.values().iterator();
+			while (it.hasNext()){
+				it.next().appendHtmlDataRow(sb, it.hasNext() == false, bamFileNameBCR);
+			}
+
+			sb.append("	]); \n");
+			sb.append("	var table = new google.visualization.Table(document.getElementById('table_main')); \n");
+			sb.append("	table.draw(data, {title:'Summary Stats', showRowNumber: false, cssClassNames:{headerCell: 'googleHeaderCell'}}); \n");
+			sb.append("	window.addEventListener('resize', function() { \n");
+			sb.append("		table.draw(rcData, options);  \n");
+			sb.append("        }, false); \n");
+			sb.append("} \n");
+			sb.append("</script>  \n");
+			sb.append("</head> \n");
+			sb.append("<body> \n");
+			sb.append("<div id='table_main'></div><body> \n");
+			sb.append("</body> \n");
+			sb.append("</html> \n");
+
+			File html = new File(saveDirectory, prependString+"qcReport_Stats.html");
+			IO.writeString(sb.toString(), html);
+		} catch (IOException e){
+			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem saving html table");
+		}
+	}
+
+
 	private void printReadCoverageHtml(String title, String hAxis, String vAxis){
 		StringBuilder sb = new StringBuilder();
 		sb.append("<html> \n");
@@ -114,7 +147,7 @@ public class AggregateQCStats {
 
 		sb.append("function drawChart() { \n");
 		sb.append("	var rcData = new google.visualization.DataTable(); \n");
-		
+
 		//how many X axis numbers 0x, 1x, 2x, 3x, 4x,...
 		int max25 = 0;
 		//for each sample
@@ -123,14 +156,14 @@ public class AggregateQCStats {
 			if (hit25> max25) max25= hit25;
 		}
 		if (max25 < 10) max25 = 10;
-		
+
 		//add 1st index X column
 		sb.append("\trcData.addColumn('number','X')\n");
 		//add one for each sample
 		for (SampleQC s: samples.values()){
 			sb.append("\trcData.addColumn('number','"+ s.getSampleName() +"')\n");
 		}
-		
+
 		//add the data rows
 		sb.append("\trcData.addRows([\n");
 		int last = max25-1;
@@ -147,7 +180,7 @@ public class AggregateQCStats {
 			else sb.append("]");
 		}
 		sb.append("	]);\n");
-		
+
 		//add options
 		sb.append("\tvar options={ title:'"+title+"', hAxis:{title:'"+hAxis+"'}, vAxis:{title:'"+vAxis+"'}}; \n");
 		sb.append("\tvar chart = new google.visualization.LineChart(document.getElementById('gChart')); \n");
@@ -166,7 +199,7 @@ public class AggregateQCStats {
 		sb.append("</body> \n");
 		sb.append("</html>  \n");
 		sb.append(" \n");
-		
+
 		File html = new File(saveDirectory, prependString+"qcReport_ReadCoverage.html");
 		IO.writeString(sb.toString(), html);
 	}
@@ -174,26 +207,28 @@ public class AggregateQCStats {
 
 	private void printStatsTxtSheet() {
 		StringBuilder sb = new StringBuilder();
-		
+
 		//add header
 		SampleQC sqc = samples.values().iterator().next();
-		sb.append(sqc.fetchTabbedHeader()); sb.append("\n");
-		
+		sb.append(sqc.fetchTabbedHeader(bamFileNameBCR != null) ); sb.append("\n");
+
 		//for each sample
 		for (SampleQC s: samples.values()){
-			sb.append(s.fetchTabbedLine());
+			String bamFileName = s.getMpaBamFileName();
+			if (bamFileName != null && bamFileNameBCR != null) sb.append(s.fetchTabbedLine(bamFileNameBCR.get(bamFileName)));
+			else sb.append(s.fetchTabbedLine(null));
 			sb.append("\n");
 		}
 		sb.append("\n");
-		
+
 		//add thresholds
 		sb.append("Thresholds:\n");
 		sb.append(sqc.fetchThresholds("\t", "\n"));
 		sb.append("\n\n");
-		
+
 		//add descriptions 
 		sb.append("Descriptions:\n");
-		sb.append(sqc.fetchDescriptions("", "\t", "\n"));
+		sb.append(sqc.fetchDescriptions("", "\t", "\n", bamFileNameBCR != null));
 
 		File txt = new File(saveDirectory, prependString+ "qcReport_Stats.xls");
 		IO.writeString(sb.toString(), txt);
@@ -231,7 +266,7 @@ public class AggregateQCStats {
 		File txt = new File(saveDirectory, prependString+ "qcReport_ReadCoverage.xls");
 		IO.writeString(sb.toString(), txt);
 	}
-	
+
 	private void printTargetsTxtSheet() {
 		if (debug) System.out.println();
 		SampleQC sqc = samples.values().iterator().next();
@@ -256,7 +291,7 @@ public class AggregateQCStats {
 			//add em
 			counts[counter++] = testRegions[1];
 		}
-		
+
 		//write em out
 		for (int i=0; i< regions.length; i++){
 			sb.append(regions[i]);
@@ -310,19 +345,26 @@ public class AggregateQCStats {
 		saePattern = Pattern.compile(saeMatch, Pattern.CASE_INSENSITIVE);
 		mpaPattern = Pattern.compile(mpaMatch, Pattern.CASE_INSENSITIVE);
 		s2uPattern = Pattern.compile(s2uMatch, Pattern.CASE_INSENSITIVE);
+		bcPattern = Pattern.compile(bcMatch, Pattern.CASE_INSENSITIVE);
 
 		//for each json file
+		Matcher mat = null;
 		for (File j: jsonFiles){
 			System.out.print(".");
-			//fetch name and type
-			String[] nameType = parseSampleName(j.getName());
-			//fetch SampleQC
-			SampleQC sqc = samples.get(nameType[0]);
-			if (sqc == null){
-				sqc = new SampleQC(nameType[0]);
-				samples.put(nameType[0], sqc);
+			//bam concordance?
+			mat = bcPattern.matcher(j.getName());
+			if (mat.matches()) bamConcordanceFiles.add(j);
+			else {
+				//fetch name and type
+				String[] nameType = parseSampleName(j.getName());
+				//fetch SampleQC
+				SampleQC sqc = samples.get(nameType[0]);
+				if (sqc == null){
+					sqc = new SampleQC(nameType[0]);
+					samples.put(nameType[0], sqc);
+				}
+				sqc.loadJson(j, nameType[1]);
 			}
-			sqc.loadJson(j, nameType[1]);
 		}
 	}
 
@@ -341,7 +383,7 @@ public class AggregateQCStats {
 					System.out.println(tn+" MQ\t" +test.getMappingQualityThreshold());
 					System.out.println(sn+" AS\t" +s.getAlignmentScoreThreshold());
 					System.out.println(sn+" MQ\t" +s.getMappingQualityThreshold());
-					
+
 					Misc.printErrAndExit("\nERROR: this sample's AS, MQ, or AS proc settings differ? Are you changing thresholds between runs? "+s.getSampleName());
 				}
 				//check json files
@@ -350,24 +392,24 @@ public class AggregateQCStats {
 				}
 			}
 		}
-		
+
 	}
 
 
 	private String[] parseSampleName(String name) {
-		
+
 		Matcher mat = fastqPattern.matcher(name);
 		if (mat.matches()) return new String[]{mat.group(1), "fastq"};
-		
+
 		mat = saePattern.matcher(name);
 		if (mat.matches()) return new String[]{mat.group(1), "sae"};
-		
+
 		mat = mpaPattern.matcher(name);
 		if (mat.matches()) return new String[]{mat.group(1), "mpa"};
-		
+
 		mat = s2uPattern.matcher(name);
 		if (mat.matches()) return new String[]{mat.group(1), "s2u"};
-		
+
 		Misc.printErrAndExit("\nERROR: failed to parse the sample name from "+name +"\nLooking for "+
 				saePattern.pattern()+" or "+mpaPattern.pattern()+" or "+s2uPattern.pattern());
 		return null;
@@ -421,14 +463,14 @@ public class AggregateQCStats {
 		if (jsonFiles == null || jsonFiles.length ==0 || jsonFiles[0].canRead() == false) Misc.printExit("\nError: cannot find any xxx.json.gz file(s) to parse!\n");
 
 	}	
-	
+
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Aggregate QC Stats: Feb 2018                          **\n" +
+				"**                            Aggregate QC Stats: Oct 2018                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from json files produced by the\n"+
-				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, and Fastq counter.\n"+
+				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, BamConcordance and Fastq rule.\n"+
 
 				"\nOptions:\n"+
 				"-j Directory containing xxx.json.gz files for parsing. Recurses through all other\n"+
@@ -437,10 +479,11 @@ public class AggregateQCStats {
 
 				"\nDefault Options:\n"+
 				"-f FastqCount regex for parsing sample name, note the name must be identical across\n"+
-				     "the json files, defaults to (.+)_FastqCount.json.gz, case insensitive.\n"+
+				"the json files, defaults to (.+)_FastqCount.json.gz, case insensitive.\n"+
 				"-s SAE regex, defaults to (.+)_SamAlignmentExtractor.json.gz\n"+
 				"-m MPA regex, defaults to (.+)_MergePairedAlignments.json.gz\n"+
 				"-u S2U regex, defaults to (.+)_Sam2USeq.json.gz\n"+
+				"-b BC regex, defaults to (.+)_BamConcordance.json.gz\n"+
 				"-p String to prepend onto output file names.\n"+
 				"-v Print verbose debugging output.\n"+
 				"\n"+

@@ -39,9 +39,10 @@ public class BamConcordance {
 	private Histogram[] chrXAfHist;
 	private Similarity[] similarities;
 	private String[] sampleNames = null;
-	private String bamNames = null;
 	private String[] similarityForJson = null;
 	private String[] genderForJson = null;
+	private String[] bamFileNamesForJson = null;
+	private String bamNames = null;
 	
 	//internal fields
 	ConcordanceChunk[] runners;
@@ -165,8 +166,8 @@ public class BamConcordance {
 		Arrays.sort(similarities);
 		System.out.println("\nStats:");
 		for (int i=0; i< similarities.length; i++) {
-			similarityForJson[i] = similarities[i].toString(sampleNames);
-			System.out.println(similarityForJson[i]);
+			System.out.println(similarities[i].toString(sampleNames));
+			similarityForJson[i] = similarities[i].toStringShort(sampleNames);
 		}
 	}
 
@@ -177,8 +178,9 @@ public class BamConcordance {
 			double allChr = ratioCenterVsLast(afHist[i]);
 			double chrX = ratioCenterVsLast(chrXAfHist[i]);
 			double lgrto = Num.log2(allChr/chrX);
-			genderForJson[i] = sampleNames[i] +"\t"+Num.formatNumber(allChr, 3)+"\t"+Num.formatNumber(chrX, 3)+"\t"+Num.formatNumber(lgrto, 3);
-			IO.pl(genderForJson[i]);
+			String g = sampleNames[i] +"\t"+Num.formatNumber(allChr, 3)+"\t"+Num.formatNumber(chrX, 3)+"\t"+Num.formatNumber(lgrto, 3);
+			IO.pl(g);
+			genderForJson[i] = Misc.TAB.matcher(g).replaceAll(" ");
 		}
 	}
 	
@@ -225,12 +227,11 @@ public class BamConcordance {
 		if (jsonOutputFile == null) return;
 		
 		try {
-			String[] names = new String[bamFiles.length];
-			for (int i=0; i< names.length; i++) names[i] = Misc.removeExtension(bamFiles[i].getName());
 			//output simple json, DO NOT change the key names without updated downstream apps that read this file!
 			Gzipper gz = new Gzipper(jsonOutputFile);
 			gz.println("{");
-			gz.printJson("bamFileNames", names, true);
+			gz.printJson("sampleNames", sampleNames, true);
+			gz.printJson("bamFileNames", bamFileNamesForJson, true);
 			gz.printJson("similarities", similarityForJson, true);
 			gz.printJson("genderChecks", genderForJson, false);
 			gz.println("}");
@@ -308,15 +309,16 @@ public class BamConcordance {
 		}
 				
 		//make temp dir
-		File workingDir = new File (System.getProperty("user.dir"));
-		tempDirectory = new File (workingDir, "TempDirBCC_"+Misc.getRandomString(6));
+		tempDirectory = new File (bamFiles[0].getCanonicalFile().getParentFile(), "TempDirBCC_"+Misc.getRandomString(6)).getCanonicalFile();
 		tempDirectory.mkdirs();
 		
 		//sample names
 		sampleNames = new String[bamFiles.length];
+		bamFileNamesForJson = new String[bamFiles.length];
 		StringBuilder sb = new StringBuilder();
 		for (int i=0; i< bamFiles.length; i++) {
 			sampleNames[i] = bamFiles[i].getName().replace(".bam", "");
+			bamFileNamesForJson[i] = bamFiles[i].getCanonicalFile().getName();
 			sb.append(bamFiles[i].getCanonicalPath()); sb.append(" ");
 		}
 		bamNames = sb.toString();
@@ -326,7 +328,7 @@ public class BamConcordance {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Bam Concordance: Sept  2018                        **\n" +
+				"**                               Bam Concordance: Oct  2018                         **\n" +
 				"**************************************************************************************\n" +
 				"BC calculates sample level concordance based on uncommon homozygous SNVs found in bam\n"+
 				"files. Samples from the same person will show high similarity (>0.9). Run BC on\n"+
@@ -336,7 +338,7 @@ public class BamConcordance {
 				"threaded, BC runs slowly with more that a few bams. Use the USeq ClusterMultiSampleVCF\n"+
 				"app to check large batches of vcfs to identify the likely mismatched sample pairs.\n\n"+
 				
-				"WARNING! Mpileup does not check that the chr order is the same across samples and the\n"+
+				"WARNING: Mpileup does not check that the chr order is the same across samples and the\n"+
 				"fasta reference, be certain they are or mpileup will produce incorrect counts. Use\n"+
 				"Picard's ReorderSam app if in doubt.\n\n"+
 				
@@ -349,8 +351,9 @@ public class BamConcordance {
 				"-f Path to an indexed reference fasta file.\n"+
 				"-b Path to a directory containing indexed bam files.\n"+
 				"-c Path to a tabix indexed bed file of common dbSNPs. Download 00-common_all.vcf.gz \n"+
-				"       from ftp://ftp.ncbi.nih.gov/snp/organisms/, run VCF2Bed, bgzip and tabix it\n"+
-				"       with https://github.com/samtools/htslib, defaults to no exclusion from calcs. \n"+
+				"       from ftp://ftp.ncbi.nih.gov/snp/organisms/, grep for 'G5;' containing lines, \n"+
+				"       run VCF2Bed, bgzip and tabix it with https://github.com/samtools/htslib,\n"+
+				"       defaults to no exclusion from calcs. \n"+
 				"-d Minimum read depth, defaults to 25.\n"+
 				"-a Minimum allele frequency to count as a homozygous variant, defaults to 0.95\n"+
 				"-m Minimum allele frequency to count a homozygous match, defaults to 0.9\n"+
@@ -404,10 +407,6 @@ public class BamConcordance {
 		return fasta;
 	}
 
-	public String getBamNames() {
-		return bamNames;
-	}
-
 	public File[] getBamFiles() {
 		return bamFiles;
 	}
@@ -418,6 +417,10 @@ public class BamConcordance {
 
 	public File getCommonSnvBed() {
 		return commonSnvBed;
+	}
+
+	public String getBamNames() {
+		return bamNames;
 	}
 
 	

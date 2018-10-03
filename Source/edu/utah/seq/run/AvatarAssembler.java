@@ -37,6 +37,7 @@ public class AvatarAssembler {
 	private int numTt = 0;
 	private HashSet<String> links = new HashSet<String>();
 	private ArrayList<AvatarPatient> toLink = new ArrayList<AvatarPatient>();
+	private boolean linkOnlyTN = true;
 
 	
 	private void incrementSampleCounters(AvatarPatient ap) {

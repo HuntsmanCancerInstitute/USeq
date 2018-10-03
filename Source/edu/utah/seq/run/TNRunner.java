@@ -29,7 +29,6 @@ public class TNRunner {
 	private TNSample[] tNSamples = null;
 	private String germlineAnnotatedVcfParser = null;
 	private String somaticAnnotatedVcfParser = null;
-	private File doneDir = null;
 	private ArrayList<String> info = new ArrayList<String>();
 	private boolean groupProcessingComplete = false;
 	private boolean groupProcessingFailed = false;

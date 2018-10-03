@@ -2,6 +2,7 @@ package edu.utah.seq.parsers.mpileup.concordance;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.ArrayList;
 
@@ -62,14 +63,13 @@ public class ConcordanceChunk implements Runnable{
 		try {	
 			//write out bed
 			tempBed = new File (bcc.getTempDirectory(), chunkName+"_temp.bed");
-			Bed.writeToFile(regions, tempBed);
+			if (Bed.writeToFile(regions, tempBed) == false) Misc.printErrAndExit("\nERROR: failed to write bed regions to "+tempBed);
 			
 			//make gzipper
 			misMatchBed = new Gzipper(new File (bcc.getTempDirectory(), chunkName+"_MisMatch.bed.gz"));
 
 			//build and execute samtools call
 			cmd = bcc.getSamtools()+" mpileup -B -Q "+ minBaseQuality +" -q "+ minMapQuality +" -d 1000000 -f "+bcc.getFasta()+" -l "+tempBed+" "+bcc.getBamNames();
-
 			ProcessBuilder pb = new ProcessBuilder(Misc.WHITESPACE.split(cmd));
 
 			Process proc = pb.start();
@@ -138,6 +138,7 @@ public class ConcordanceChunk implements Runnable{
 			data.close();
 			misMatchBed.close();
 			if (commonSnvBed != null) tabixReader.close();
+			if (numMpileupLinesProc == 0) throw new IOException("Failed to parse any mpileup lines? "+chunkName);
 			complete = true;
 			failed = false;
 			System.out.println(chunkName+ " job complete. "+numMpileupLinesProc+" bases parsed.");

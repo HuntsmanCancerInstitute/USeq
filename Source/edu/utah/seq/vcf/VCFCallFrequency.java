@@ -74,7 +74,7 @@ public class VCFCallFrequency {
 			annotate(vcf);
 		}
 		//print stats
-		IO.pl("\nTotal Vcf Queries: "+ totalQueries +", with matches: "+totalQueriesWithHits+", passing callFreq: "+numPassingCallFreq+", failing callFreq: "+numFailingCallFreq+ ", too low bed count: "+numWithLowBedCount);
+		IO.pl("\nTotal Vcf Queries: "+ totalQueries +", with matches: "+totalQueriesWithHits+", passing callFreq: "+numPassingCallFreq+", failing callFreq: "+numFailingCallFreq+ ", too low bed count to score: "+numWithLowBedCount);
 		IO.pl("\nHistogram of call frequencies meeting the minimum bed count:");
 		hist.printScaledHistogram();
 
@@ -472,7 +472,8 @@ public class VCFCallFrequency {
 			if (config.containsKey("maxcallfreq")) maxCallFreq = Double.parseDouble(config.get("maxcallfreq"));
 			if (config.containsKey("filefilter")) fileFilter = config.get("filefilter");
 		}
-		else {
+		//local search?
+		if (queryURL == null){
 			if (dataDir == null || indexDir == null || dataDir.isDirectory()== false || indexDir.isDirectory() == false) {
 				Misc.printErrAndExit("\nProvide either a configuration file for remotely accessing a genomic query service or "
 						+ "two directory paths to the Data and Index directories uses by the USeq QueryIndexer app.\n");;
@@ -487,7 +488,7 @@ public class VCFCallFrequency {
 		IO.pl("\t-b MinBedCount "+minBedCount);
 		IO.pl("\t-a Append FILTER "+appendFilter);
 		IO.pl("\t-d Verbose "+debug);
-		if (configFile != null){
+		if (queryURL != null){
 			IO.pl("\tQueryUrl "+queryURL);
 			IO.pl("\tHost "+host);
 			IO.pl("\tRealm "+realm);
@@ -530,7 +531,7 @@ public class VCFCallFrequency {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Call Frequency: Sept 2018                         **\n" +
+				"**                            VCF Call Frequency: Oct 2018                          **\n" +
 				"**************************************************************************************\n" +
 				"Calculates a vcf call frequency for each variant when pointed at a genomic Query\n"+
 				"service (https://github.com/HuntsmanCancerInstitute/Query) or the Data and Index\n"+
