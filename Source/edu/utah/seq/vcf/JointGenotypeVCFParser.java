@@ -87,8 +87,9 @@ public class JointGenotypeVCFParser {
 			int numSamples = sampleNames.length;
 
 			out = new Gzipper[numSamples];
+			//sampleName 1218982_NormalExome_Hg38 plus _JointGenotyped.vcf.gz
 			for (int i=0; i< numSamples; i++){
-				out[i] = new Gzipper( new File(saveDirectory, sampleNames[i]+"_"+vcfFile.getName()));
+				out[i] = new Gzipper( new File(saveDirectory, sampleNames[i]+"_JointGenotyped.vcf.gz"));
 				out[i].println(workingHeader+sampleNames[i]);
 			}
 			numPass = new int[numSamples];
@@ -276,7 +277,7 @@ public class JointGenotypeVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Joint Genotype VCF Parser: Dec 2017                     **\n" +
+				"**                          Joint Genotype VCF Parser: Oct 2018                     **\n" +
 				"**************************************************************************************\n" +
 				"Splits and filters GATK joint genotyped multi sample vcf files. Use vt to decompose \n"+
 				"the multi alts. See https://genome.sph.umich.edu/wiki/Vt#Decompose . Replaces the AF\n"+

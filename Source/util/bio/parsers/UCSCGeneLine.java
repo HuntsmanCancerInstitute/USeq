@@ -236,6 +236,12 @@ public class UCSCGeneLine {
 		if (displayName == null) return name;
 		return name+ divider+ displayName;
 	}
+	
+	public String getNamesCollapsed(String divider){
+		if (displayName == null) return name;
+		if (displayName.equals(name)) return name;
+		return name+ divider+ displayName;
+	}
 
 	public String scoresToString(){
 		StringBuilder sb = new StringBuilder();

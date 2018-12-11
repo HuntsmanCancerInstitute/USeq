@@ -1,6 +1,5 @@
 package edu.utah.seq.qc;
 
-import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -10,7 +9,7 @@ import java.util.TreeMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import com.eclipsesource.json.JsonObject;
+import org.json.JSONObject;
 
 import util.gen.IO;
 import util.gen.Misc;
@@ -27,16 +26,19 @@ public class AggregateQCStats {
 	private String mpaMatch = "(.+)_MergePairedAlignments.json.gz";
 	private String s2uMatch = "(.+)_Sam2USeq.json.gz";
 	private String bcMatch = "(.+)_BamConcordance.json.gz";
+	private String aiMatch = "(.+)_AvatarInfo.json.gz";
 
 	private TreeMap<String, SampleQC> samples;
 	private ArrayList<File> bamConcordanceFiles = new ArrayList<File>();
 	private HashMap<String, BamConcordanceQC> bamFileNameBCR = null;
+	private HashMap<String, JSONObject> avatarInfo = new HashMap<String, JSONObject>();
 	private Pattern fastqPattern;
 	private Pattern saePattern;
 	private Pattern mpaPattern;
 	private Pattern s2uPattern;
 	private Pattern bcPattern;
-
+	private Pattern aiPattern;
+	
 	private boolean debug = false;
 
 
@@ -51,7 +53,7 @@ public class AggregateQCStats {
 
 		System.out.print("\nChecking samples");
 		checkSamples();
-
+		
 		if (bamConcordanceFiles.size() != 0) parseBamConcordances();
 
 		System.out.println("\nSaving aggregated data...");
@@ -210,10 +212,19 @@ public class AggregateQCStats {
 
 		//add header
 		SampleQC sqc = samples.values().iterator().next();
-		sb.append(sqc.fetchTabbedHeader(bamFileNameBCR != null) ); sb.append("\n");
+		sb.append(sqc.fetchTabbedHeader(avatarInfo.size() !=0, bamFileNameBCR != null) ); sb.append("\n");
 
 		//for each sample
 		for (SampleQC s: samples.values()){
+			
+			//attempt to parse id from the first field in the sampleName XXX_XXX to pull avatarInfo
+			if (avatarInfo.size() !=0){
+				String[] tokens = Misc.UNDERSCORE.split(s.sampleName);
+				JSONObject jo = avatarInfo.get(tokens[0]);
+				if (jo != null) s.setAvatarInfo(jo);
+				else s.setAvatarInfo(new JSONObject());
+			}
+			
 			String bamFileName = s.getMpaBamFileName();
 			if (bamFileName != null && bamFileNameBCR != null) sb.append(s.fetchTabbedLine(bamFileNameBCR.get(bamFileName)));
 			else sb.append(s.fetchTabbedLine(null));
@@ -346,24 +357,36 @@ public class AggregateQCStats {
 		mpaPattern = Pattern.compile(mpaMatch, Pattern.CASE_INSENSITIVE);
 		s2uPattern = Pattern.compile(s2uMatch, Pattern.CASE_INSENSITIVE);
 		bcPattern = Pattern.compile(bcMatch, Pattern.CASE_INSENSITIVE);
+		aiPattern = Pattern.compile(aiMatch, Pattern.CASE_INSENSITIVE);
 
 		//for each json file
 		Matcher mat = null;
 		for (File j: jsonFiles){
 			System.out.print(".");
+
 			//bam concordance?
 			mat = bcPattern.matcher(j.getName());
 			if (mat.matches()) bamConcordanceFiles.add(j);
+
+			//avatar info?
 			else {
-				//fetch name and type
-				String[] nameType = parseSampleName(j.getName());
-				//fetch SampleQC
-				SampleQC sqc = samples.get(nameType[0]);
-				if (sqc == null){
-					sqc = new SampleQC(nameType[0]);
-					samples.put(nameType[0], sqc);
+				mat = aiPattern.matcher(j.getName());
+				if (mat.matches()) {
+					JSONObject jo = new JSONObject(IO.loadFile(j, " ", true));
+					avatarInfo.put(mat.group(1), jo);
 				}
-				sqc.loadJson(j, nameType[1]);
+				//must be a sample
+				else {
+					//fetch name and type
+					String[] nameType = parseSampleName(j.getName());
+					//fetch SampleQC
+					SampleQC sqc = samples.get(nameType[0]);
+					if (sqc == null){
+						sqc = new SampleQC(nameType[0]);
+						samples.put(nameType[0], sqc);
+					}
+					sqc.loadJson(j, nameType[1]);
+				}
 			}
 		}
 	}
@@ -460,6 +483,7 @@ public class AggregateQCStats {
 		//pull json files
 		if (forExtraction == null || forExtraction.canRead() == false) Misc.printExit("\nError: please provide a directory to recurse through to find xxx.json.gz files.\n");
 		jsonFiles = IO.fetchFilesRecursively(forExtraction, ".json.gz");
+
 		if (jsonFiles == null || jsonFiles.length ==0 || jsonFiles[0].canRead() == false) Misc.printExit("\nError: cannot find any xxx.json.gz file(s) to parse!\n");
 
 	}	

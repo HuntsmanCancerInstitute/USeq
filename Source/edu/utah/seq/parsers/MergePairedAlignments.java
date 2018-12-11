@@ -11,6 +11,7 @@ import edu.utah.seq.analysis.OverdispersedRegionScanSeqs;
 import edu.utah.seq.data.ChromDataSave;
 import edu.utah.seq.parsers.mpileup.MpileupTabixLoader;
 import edu.utah.seq.useq.data.Region;
+import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMSequenceRecord;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
@@ -78,9 +79,9 @@ public class MergePairedAlignments {
 	private Histogram insertSize = new Histogram(0,2001,400);
 	private String programArguments;
 	private ArrayList<String> chromosomes = null;
-	private String samHeader;
 	private ArrayList<PairedAlignmentChrParser> parsers;
 	private HashMap<String,Region[]> regions = null;
+	private ArrayList<File> samsToConcat = new ArrayList<File>();
 
 	//constructors
 	public MergePairedAlignments(String[] args){
@@ -113,8 +114,8 @@ public class MergePairedAlignments {
 	public void doWork() throws IOException{
 
 		//fetch file header and chromosomes
-		System.out.println("\nFetching header and chroms...");
-		fetchChromosomesAndHeader();
+		System.out.println("\nFetching chroms...");
+		fetchChromosomes();
 
 		//for each chromosome, create a thread object but don't start
 		parsers = new ArrayList<PairedAlignmentChrParser>();
@@ -149,6 +150,10 @@ public class MergePairedAlignments {
 			File countsFile = new File (saveDirectory, "count.obj");
 			IO.saveObject(countsFile, new Long(numberPrintedAlignments));
 		}
+		else {
+			System.out.println("\n\nConcatinating final unsorted gzipped sam...");
+			IO.concatinateFiles(samsToConcat, new File(saveDirectory, Misc.removeExtension(bamFile.getName())+"_Merged.sam.gz"  ));
+		}
 		printStats();
 		if (jsonOutputFile != null) saveJson();
 	}
@@ -163,6 +168,7 @@ public class MergePairedAlignments {
 			//check loaders 
 			for (PairedAlignmentChrParser p : parsers) {
 				if (p.isFailed()) throw new Exception("ERROR: Alignment parser thread issue! \n");
+				if (p.getNumberPrintedAlignments() !=0) samsToConcat.add(p.getSamFile());
 			}
 		} catch (Exception ie) {
 			ie.printStackTrace();
@@ -283,15 +289,11 @@ public class MergePairedAlignments {
 		return (long)stat +"\t"+Num.formatNumber(frac, 4);
 	}
 
-	public void fetchChromosomesAndHeader(){
+	public void fetchChromosomes(){
 		try {
 			//get reader 
 			SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
 			SamReader samReader = factory.open(bamFile);
-
-			//fetch header
-			samHeader = samReader.getFileHeader().getTextHeader().trim();
-			samHeader = samHeader+"\n@PG\tID:MergePairedAlignments\tCL: "+programArguments;
 
 			//get chromosomes
 			List<SAMSequenceRecord> chrs = samReader.getFileHeader().getSequenceDictionary().getSequences();
@@ -320,8 +322,10 @@ public class MergePairedAlignments {
 		new MergePairedAlignments(args);
 	}		
 
-	/**This method will process each argument and assign new varibles*/
-	public void processArgs(String[] args){
+	/**This method will process each argument and assign new varibles
+	 * @throws IOException 
+	 * @throws FileNotFoundException */
+	public void processArgs(String[] args) throws FileNotFoundException, IOException{
 		Pattern pat = Pattern.compile("-[a-z]");
 		String useqVersion = IO.fetchUSeqVersion();
 		programArguments = useqVersion+" "+Misc.stringArrayToString(args, " ");
@@ -371,6 +375,9 @@ public class MergePairedAlignments {
 		//any regions?
 		if (bedRegionFile != null) regions = Region.parseStartStops(bedRegionFile, 0, 0, 1);
 		
+		//save header?
+		if (saveSams) saveHeader();
+		
 		//print info
 		System.out.println("Settings:");
 		if (bedRegionFile != null) System.out.println("Select region file\t"+bedRegionFile);
@@ -385,6 +392,28 @@ public class MergePairedAlignments {
 		System.out.println(saveSams +"\tSave sam alignments.");
 		System.out.println(onlyMergeOverlappingAlignments +"\tOnly merge overlapping alignments.");
 	}	
+
+	private void saveHeader() throws FileNotFoundException, IOException {
+		SamReaderFactory readerFactory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+		SamReader bamReader = readerFactory.open(bamFile);
+		SAMFileHeader h = bamReader.getFileHeader();
+		String[] shLines = Misc.RETURN.split(h.getTextHeader()); //this gets the original header, setting SamSort.unsorted doesn't change it. Ugg.
+		bamReader.close();
+		for (int i=0; i< shLines.length; i++){
+			if (shLines[i].contains("SO:coordinate")){
+				shLines[i] = shLines[i].replace("SO:coordinate", "SO:unsorted");
+				break;
+			}
+		}
+		
+		File header = new File(saveDirectory, "samHeader.sam.gz");
+		header.deleteOnExit();
+		Gzipper hOut = new Gzipper(header);
+		for (String line: shLines) hOut.println(line);
+		hOut.println("@PG\tID:MergePairedAlignments\tCL: "+programArguments);
+		hOut.close();
+		samsToConcat.add(header);
+	}
 
 	public static void printDocs(){
 		System.out.println("\n" +
@@ -402,7 +431,7 @@ public class MergePairedAlignments {
 				"-d Path to a directory for saving the results.\n"+
 
 				"\nDefault Options:\n"+
-				"-s Save merged xxx.sam.gz alignments instead of binary ChromData. Either can be used\n"+
+				"-s Save merged xxx.sam.gz alignments instead of binary ChromData. Either works\n"+
 				"      in Sam2USeq for read coverage analysis, the ChromData is much faster.\n"+
 				"-e Only process and save alignments overlapping this bed format region file.\n"+
 				"-u Remove all alignments marked as duplicates, defaults to keeping.\n"+
@@ -435,10 +464,6 @@ public class MergePairedAlignments {
 
 	public int getNumberAlignmentsToLoad() {
 		return numberAlignmentsToLoad;
-	}
-
-	public String getSamHeader() {
-		return samHeader;
 	}
 
 	public boolean isCrossCheckMateCoordinates() {

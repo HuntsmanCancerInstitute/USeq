@@ -19,7 +19,7 @@ public class Text2USeq {
 	private int beginningColumnIndex = -1;
 	private int endingColumnIndex = -1;
 	private int textColumnIndexs[] = null;
-	private int scoreColumnIndex = -1;
+	private int[] scoreColumnIndex = null;
 	private int rowChunkSize = 10000;
 	private File[] inputFiles;
 	private String versionedGenome = null;
@@ -72,7 +72,7 @@ public class Text2USeq {
 		beginningColumnIndex = 1;
 		endingColumnIndex = 2;
 		textColumnIndexs = new int[]{3,6,7,8,9,10,11};
-		scoreColumnIndex = 4;
+		scoreColumnIndex = new int[]{4};
 		strandColumnIndex = 5;
 		if (hexColor != null ) color = hexColor;
 		convert(bed12);
@@ -179,7 +179,7 @@ public class Text2USeq {
 			//Region or Position data
 			if (endingColumnIndex == -1){
 				//Position!
-				if (scoreColumnIndex == -1){
+				if (scoreColumnIndex == null){
 					if (textColumnIndexs == null) sliceWritePositionData();
 					else sliceWritePositionTextData();
 				}
@@ -190,7 +190,7 @@ public class Text2USeq {
 			}
 			else {
 				//Region
-				if (scoreColumnIndex == -1){
+				if (scoreColumnIndex == null){
 					if (textColumnIndexs == null) sliceWriteRegionData();
 					else sliceWriteRegionTextData();
 				}
@@ -632,7 +632,8 @@ public class Text2USeq {
 			BufferedReader in = new BufferedReader (new FileReader(file));
 			while ((line = in.readLine()) != null){
 				tokens = PATTERN_TAB.split(line);
-				al.add(new PositionScore(Integer.parseInt(tokens[beginningColumnIndex]), Float.parseFloat(tokens[scoreColumnIndex])));
+				float score = parseValue(tokens);
+				al.add(new PositionScore(Integer.parseInt(tokens[beginningColumnIndex]), score));
 			}
 			in.close();
 			PositionScore[] d = new PositionScore[al.size()];
@@ -644,6 +645,20 @@ public class Text2USeq {
 			e.printStackTrace();
 			return null;
 		}
+	}
+
+	private float parseValue(String[] tokens) throws Exception{
+		float score = 0;
+		if (scoreColumnIndex.length == 1) score = Float.parseFloat(tokens[scoreColumnIndex[0]]);
+		else {
+			float first = Float.parseFloat(tokens[scoreColumnIndex[0]]);
+			if (first != 0.0f) {
+				float second = Float.parseFloat(tokens[scoreColumnIndex[1]]);
+				score = first/(first+second);
+			}
+		}
+		if (minus10Log10TransformScore && score !=0) score = (float)Num.minus10log10(score);
+		return score;
 	}
 
 	/**Parses a PositionText[]*/
@@ -678,7 +693,8 @@ public class Text2USeq {
 			BufferedReader in = new BufferedReader (new FileReader(file));
 			while ((line = in.readLine()) != null){
 				tokens = PATTERN_TAB.split(line);
-				al.add(new PositionScoreText(Integer.parseInt(tokens[beginningColumnIndex]), Float.parseFloat(tokens[scoreColumnIndex]), concatinateTextColumns(tokens)));
+				float score = parseValue(tokens);
+				al.add(new PositionScoreText(Integer.parseInt(tokens[beginningColumnIndex]), score, concatinateTextColumns(tokens)));
 			}
 			in.close();
 			PositionScoreText[] d = new PositionScoreText[al.size()];
@@ -730,7 +746,7 @@ public class Text2USeq {
 				try {
 					int start = Integer.parseInt(tokens[beginningColumnIndex]);
 					int stop = Integer.parseInt(tokens[endingColumnIndex]);
-					float score = Float.parseFloat(tokens[scoreColumnIndex]);
+					float score = parseValue(tokens);
 					al.add(new RegionScore(start, stop, score));
 				} catch (NumberFormatException e){
 					if (badLines++ > 100) throw new Exception ("\nToo many malformed lines!\n");
@@ -780,7 +796,8 @@ public class Text2USeq {
 			BufferedReader in = new BufferedReader (new FileReader(file));
 			while ((line = in.readLine()) != null){
 				tokens = PATTERN_TAB.split(line);
-				al.add(new RegionScoreText(Integer.parseInt(tokens[beginningColumnIndex]), Integer.parseInt(tokens[endingColumnIndex]), Float.parseFloat(tokens[scoreColumnIndex]), concatinateTextColumns(tokens)));
+				float score = parseValue(tokens);
+				al.add(new RegionScoreText(Integer.parseInt(tokens[beginningColumnIndex]), Integer.parseInt(tokens[endingColumnIndex]), score, concatinateTextColumns(tokens)));
 			}
 			in.close();
 			RegionScoreText[] d = new RegionScoreText[al.size()];
@@ -865,9 +882,6 @@ public class Text2USeq {
 					//parse chromosome
 					String chromosome = tokens[chromosomeColumnIndex];
 
-					//check for splice junction
-					//if (this.skipSpliceJunctions && spliceJunction.matcher(chromosome).matches()) continue;
-
 					//convert bad chrMt MTDNA MtDNA, etc
 					if (convertM) {
 						if (m.matcher(chromosome).matches()) chromosome = "chrM";
@@ -880,14 +894,8 @@ public class Text2USeq {
 					String chromStrand = chromosome+strand;
 
 					//check modify score?
-					if (minus10Log10TransformScore){
-						double score = Double.parseDouble(tokens[scoreColumnIndex]);
-						score = Num.minus10log10(score);
-						tokens[scoreColumnIndex] = new Float((float)score).toString();
-						rebuildLine = true;
-					}
-					else if (scoreColumnIndex != -1) Double.parseDouble(tokens[scoreColumnIndex]);
-
+					if (scoreColumnIndex != null) parseValue(tokens);
+						
 					//check start
 					int pos = Integer.parseInt(tokens[beginningColumnIndex]);
 					if (subtractOneFromStart){
@@ -927,6 +935,7 @@ public class Text2USeq {
 					System.out.println("\t\tSkipping malformed line -> "+line);
 					if (counter++ == 100) {
 						System.out.println("Too many malformed lines.  Aborting.");
+						e.printStackTrace();
 						return null;
 					}
 				}
@@ -965,7 +974,7 @@ public class Text2USeq {
 					case 'f': inputFiles = USeqUtilities.extractFiles(new File(args[++i])); break;
 					case 'b': beginningColumnIndex = Integer.parseInt(args[++i]); break;
 					case 'e': endingColumnIndex = Integer.parseInt(args[++i]); break;
-					case 'v': scoreColumnIndex = Integer.parseInt(args[++i]); break;
+					case 'v': scoreColumnIndex = USeqUtilities.stringArrayToInts(args[++i],","); break;
 					case 't': textColumnIndexs = USeqUtilities.stringArrayToInts(args[++i],","); break;
 					case 's': strandColumnIndex = Integer.parseInt(args[++i]); break;
 					case 'c': chromosomeColumnIndex = Integer.parseInt(args[++i]); break;
@@ -990,8 +999,7 @@ public class Text2USeq {
 		if (inputFiles == null || inputFiles.length ==0) USeqUtilities.printErrAndExit("\nCannot find your input files?\n");
 		if (chromosomeColumnIndex == -1 || beginningColumnIndex == -1) USeqUtilities.printErrAndExit("\nPlease enter a chromosome and or position column indexes\n");
 		if (versionedGenome == null) USeqUtilities.printErrAndExit("\nPlease enter a genome version following DAS/2 notation (e.g. H_sapiens_Mar_2006, M_musculus_Jul_2007, C_elegans_May_2008).\n");
-		if (minus10Log10TransformScore && scoreColumnIndex == -1) USeqUtilities.printErrAndExit("\nPlease indicate what column your values/ scores fall into if you want to transform them.\n");
-
+		if (minus10Log10TransformScore && scoreColumnIndex == null) USeqUtilities.printErrAndExit("\nPlease indicate what column your values/ scores fall into if you want to transform them.\n");
 
 		//check color
 		if (color !=null){
@@ -1014,7 +1022,7 @@ public class Text2USeq {
 		}
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Text 2 USeq: June 2012                            **\n" +
+				"**                                 Text 2 USeq: Nov 2018                            **\n" +
 				"**************************************************************************************\n" +
 				"Converts text genomic data files (e.g. xxx.bed, xxx.gff, xxx.sgr, etc.) to\n" +
 				"binary USeq archives (xxx.useq).  Assumes interbase coordinates. Only select\n" +
@@ -1033,9 +1041,9 @@ public class Text2USeq {
 				"\nOptional Parameters:\n"+
 				"-s Strand column index (+, -, or .; NOT F, R)\n" +
 				"-e End column index\n"+
-				"-v Value column index\n"+
 				"-t Text column index(s), comma delimited, no spaces, defines which columns\n" +
 				"      to join using a tab.\n"+
+				"-v Value column index(s), ditto. One or two, if two, i[0]/(i[0]+i[1]) is calculated.\n"+
 				"-i Index size for slicing split chromosome data (e.g. # rows per slice),\n" +
 				"      defaults to 10000.\n"+
 				"-r For graphs, select a style, defaults to 0\n"+ sb+
@@ -1103,12 +1111,12 @@ public class Text2USeq {
 		this.textColumnIndexs = textColumnIndexs;
 	}
 
-	public int getScoreColumnIndex() {
+	public int[] getScoreColumnIndex() {
 		return scoreColumnIndex;
 	}
 
-	public void setScoreColumnIndex(int scoreColumnIndex) {
-		this.scoreColumnIndex = scoreColumnIndex;
+	public void setScoreColumnIndex(int[] scoreColumnIndexs) {
+		this.scoreColumnIndex = scoreColumnIndexs;
 	}
 
 	public String getVersionedGenome() {

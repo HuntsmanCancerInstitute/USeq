@@ -16,6 +16,7 @@ public class SampleInfo {
 	private String diseaseOntology;
 	private String pathologyDiagnosis;
 	private String tissueOfOrigin;
+	private String qualityControl;
 	
 	public SampleInfo(LinkedHashMap<String,String> ra){
 		sampleName= ra.get("test-request");
@@ -25,6 +26,7 @@ public class SampleInfo {
 		diseaseOntology= ra.get("disease-ontology");
 		pathologyDiagnosis= ra.get("pathology-diagnosis");
 		tissueOfOrigin= ra.get("tissue-of-origin");
+		qualityControl= ra.get("quality-control");
 		
 		if (submittedDiagnosis != null) submittedDiagnosis = submittedDiagnosis.toLowerCase();
 		if (specSite != null) specSite = specSite.toLowerCase();
@@ -33,18 +35,20 @@ public class SampleInfo {
 		if (diseaseOntology != null) diseaseOntology = diseaseOntology.toLowerCase();
 		if (pathologyDiagnosis != null) pathologyDiagnosis = pathologyDiagnosis.toLowerCase();
 		if (tissueOfOrigin != null) tissueOfOrigin = tissueOfOrigin.toLowerCase();
+		if (qualityControl != null) qualityControl = qualityControl.toLowerCase();
 	}
 	
 	public boolean allLoaded(){
 		if (sampleName == null || submittedDiagnosis == null || specSite == null || 
 				disease == null || diseaseOntology == null | pathologyDiagnosis == null 
-				|| tissueOfOrigin == null) return false;
+				|| tissueOfOrigin == null || qualityControl == null) return false;
 		return true;
 	}
 	
 	public String toString(){
 		StringBuilder sb = new StringBuilder();
 		sb.append("Name\t"+sampleName); sb.append("\n");
+		sb.append("QualityControl\t"+qualityControl); sb.append("\n");
 		sb.append("SubmittedDiagnosis\t"+submittedDiagnosis); sb.append("\n");
 		sb.append("SpecSite\t"+specSite); sb.append("\n");
 		sb.append("Disease\t"+disease); sb.append("\n");
@@ -62,6 +66,7 @@ public class SampleInfo {
 		TreeMap<String, ArrayList<String>> diseaseOntologyTM = new TreeMap<String, ArrayList<String>>();
 		TreeMap<String, ArrayList<String>> pathologyDiagnosisTM = new TreeMap<String, ArrayList<String>>();
 		TreeMap<String, ArrayList<String>> tissueOfOriginTM = new TreeMap<String, ArrayList<String>>();
+		TreeMap<String, ArrayList<String>> qualityControlTM = new TreeMap<String, ArrayList<String>>();
 		
 		for (SampleInfo si: sampleInfo){
 			if (si.getSubmittedDiagnosis() != null) {
@@ -117,6 +122,15 @@ public class SampleInfo {
 				}
 				samples.add(si.getSampleName());
 			}
+			
+			if (si.getQualityControl() != null) {
+				ArrayList<String> samples = qualityControlTM.get(si.getQualityControl());
+				if (samples == null) {
+					samples = new ArrayList<String>();
+					qualityControlTM.put(si.getQualityControl(), samples);
+				}
+				samples.add(si.getSampleName());
+			}
 		}
 		
 		
@@ -128,6 +142,7 @@ public class SampleInfo {
 		addInfo(sb, "PathologyDiagnosis", pathologyDiagnosisTM);
 		addInfo(sb, "TissueOfOrigin", tissueOfOriginTM);
 		addInfo(sb, "SpecSite", specSiteTM);
+		addInfo(sb, "QualityControl", qualityControlTM);
 		
 		return sb.toString();
 	}
@@ -171,6 +186,10 @@ public class SampleInfo {
 	}
 	public String getTissueOfOrigin() {
 		return tissueOfOrigin;
+	}
+
+	public String getQualityControl() {
+		return qualityControl;
 	}
 	
 }

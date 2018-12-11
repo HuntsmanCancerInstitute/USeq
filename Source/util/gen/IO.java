@@ -5,6 +5,8 @@ import javax.servlet.http.*;
 
 import java.nio.*;
 import java.nio.channels.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.*;
 import java.util.jar.JarFile;
 import java.util.jar.Manifest;
@@ -1188,8 +1190,22 @@ public class IO {
 		System.out.println();
 	}
 	
-	public static void e(Object obj){
+	public static void el(Object obj){
 		System.err.println(obj.toString());
+	}
+	
+	/**Creates symbolicLinks in the destinationDir*/
+	public static void createSymbolicLinks(File[] filesToLink, File destinationDir) throws IOException {
+		//remove any linked files
+		File f = destinationDir.getCanonicalFile();
+		for (File fn: filesToLink) new File(f, fn.getName()).delete();
+
+		//soft link in the new ones
+		for (File fn: filesToLink) {
+			Path real = fn.toPath();
+			Path link = new File(f, fn.getName()).toPath();
+			Files.createSymbolicLink(link, real);
+		}
 	}
 
 	/**Extracts the full path file names of all the files in a given directory with a given extension (ie txt or .txt).
@@ -1822,6 +1838,24 @@ public class IO {
 		String[] strings = new String[a.size()];
 		a.toArray(strings);
 		return strings;
+	}
+	
+	/**Loads a file's lines into a String, will save blank lines. gz/zip OK.*/
+	public static String loadFile(File file, String seperator, boolean trimLeadingTrailing){
+		StringBuilder sb = new StringBuilder();
+		try{
+			BufferedReader in = IO.fetchBufferedReader(file);
+			String line;
+			while ((line = in.readLine())!=null){
+				if (trimLeadingTrailing) line = line.trim();
+				sb.append(line);
+				sb.append(seperator);
+			}
+		}catch(Exception e){
+			System.out.println("Prob loadFileInto String "+file);
+			e.printStackTrace();
+		}
+		return sb.toString();
 	}
 
 	/**Loads a file's lines into a hash first column is the key, second the value.

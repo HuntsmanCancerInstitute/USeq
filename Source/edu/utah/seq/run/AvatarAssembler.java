@@ -13,6 +13,8 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.json.JSONObject;
+
 import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
@@ -189,8 +191,10 @@ public class AvatarAssembler {
 				if (samplesInfo.justSingle() == false) IO.pl("Needs custom:"+this.toString());
 
 				//create dir to put linked files
-				patFastqDir = new File (linkDir, hciId+"/Fastq/");
+				File patientDir = new File (linkDir, new Integer(hciId).toString());
+				patFastqDir = new File (patientDir, "Fastq");
 				patFastqDir.mkdirs();
+
 				//for each sample
 				for (AvatarSample as: avatarSamples){
 					//Source? Tumor or Normal
@@ -209,11 +213,16 @@ public class AvatarAssembler {
 						}
 					}
 				}
+				
+				//write out info
+				File info = new File(patientDir, hciId+"_AvatarInfo.json.gz");
+				Gzipper gz = new Gzipper(info);
+				gz.println(this.toJson().toString(4));
+				gz.close();
+				
 			} catch (IOException e) {
 				e.printStackTrace();
 				System.exit(1);
-				//IO.pl("Duplicate/ broken links? "+this.toString()+"BadLink "+link+"\n");
-				//IO.deleteDirectory(patFastqDir);
 			}
 		}
 		
@@ -236,6 +245,19 @@ public class AvatarAssembler {
 			for (AvatarSample as: avatarSamples) sb.append(as.toString());
 			return sb.toString();
 		}
+		public JSONObject toJson(){
+			JSONObject fo = new JSONObject();
+			fo.put("HciId", new Integer(hciId).toString());
+			fo.put("ExperimentId", gExperimentId+"R");
+			fo.put("AnalysisId", "A"+gAnalysisId);
+			fo.put("Gender", gender);
+			
+			ArrayList<JSONObject> al = new ArrayList<JSONObject>();
+			for (AvatarSample as: avatarSamples) al.add(as.toJson());
+			fo.put("Samples", al);
+			return fo;
+		}
+		
 		public SamplesInfo createSamplesInfo(){
 			samplesInfo = new SamplesInfo(avatarSamples);
 			return samplesInfo;
@@ -322,6 +344,20 @@ public class AvatarAssembler {
 			}
 			return sb.toString();
 		}
+		
+		public JSONObject toJson(){
+			JSONObject fo = new JSONObject();
+			fo.put("SampleName", sampleName);
+			fo.put("SampleId", sampleId);
+			fo.put("Diagnosis", diagnosis);
+			fo.put("SampleType", sampleType);
+			fo.put("SampleSource", sampleSource);
+			String[] fileNames = new String[fastq.size()];
+			int counter = 0;
+			for (File f: fastq) fileNames[counter++] = f.toString();
+			fo.put("Fastq", fileNames);
+			return fo;
+		}
 	}
 
 	
@@ -363,7 +399,7 @@ public class AvatarAssembler {
 		}
 		File[] files = new File[]{gender, diagnosis, info, path, results};
 		for (File f: files) if (f== null) Misc.printErrAndExit("Error: missing one of the required five files (-g -d -i -p -r).");
-		linkDir = new File(results.getParentFile(), "PatientBatch"+Misc.getDateNoSpaces()).getCanonicalFile();
+		linkDir = new File(results.getParentFile(), "PatientFastq").getCanonicalFile();
 		IO.deleteDirectoryViaCmdLine(linkDir);
 		linkDir.mkdirs();
 	}
@@ -372,18 +408,21 @@ public class AvatarAssembler {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                TNRunner  September 2018                          **\n" +
+				"**                              AvatarAssembler  October 2018                       **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling fastq avatar datasets based on the results of three sql queries.\n"+
-				"Beta!\n"+
+				"See https://ri-confluence.hci.utah.edu/x/KwBFAg   Run as root on hci-clingen1\n"+
 
 				"\nOptions:\n"+
-				"-i info.\n" +
-				"-d diagnosis.\n"+
-				"-g gender.\n"+
-				"-p path to Exp dir, e.g. /Repository/PersonData/2018/\n"+
-				"-r results file.\n"+
+				"-i Info\n" +
+				"-d Diagnosis\n"+
+				"-g Gender\n"+
+				"-p Path to Exp dir, e.g. /Repository/PersonData/2018/\n"+
+				"-r Patient stats output file.\n\n"+
 				
+                "Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/2018/\n"+
+                "    -r avatarAssembler.log.gz -i sampleInfo.txt -d sampleDiagnosis.txt -g \n"+
+                "    sampleGender.txt > avatarAssemblerProblemSamples.txt\n\n"+
 
 
 				"**************************************************************************************\n");

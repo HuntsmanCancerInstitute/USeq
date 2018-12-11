@@ -114,6 +114,38 @@ public class Bed extends Coordinate implements Serializable{
 		return bed;
 	}
 
+	/**Splits an Bed[] into chunks containing the minNumEach. Any remainder is evenly distributed over the prior.
+	 * Note this is by reference, the array is not copied. */
+	public static Bed[][] chunk (Bed[] s, int minNumEach){
+		//watch out for cases where the min can't be met
+		int numChunks = s.length/minNumEach;
+		if (numChunks == 0) return new Bed[][]{s};
+		
+		double numLeftOver = (double)s.length % (double)minNumEach;
+		
+		int[] numInEach = new int[numChunks];
+		for (int i=0; i< numChunks; i++) numInEach[i] = minNumEach;
+		
+		while (numLeftOver > 0){
+			for (int i=0; i< numChunks; i++) {
+				numInEach[i]++;
+				numLeftOver--;
+				if (numLeftOver == 0) break;
+			}
+		}
+		//build chunk array
+		Bed[][] chunks = new Bed[numChunks][];
+		int index = 0;
+		//for each chunk
+		for (int i=0; i< numChunks; i++){
+			//create container and fill it
+			Bed[] sub = new Bed[numInEach[i]];
+			for (int j=0; j< sub.length; j++) sub[j] = s[index++];
+			chunks[i] = sub;
+		}
+		return chunks;
+	}
+
 	
 	/**Chunks the Bed[] by number of bp, then sorts each.*/
 	public static ArrayList<Bed[]> splitByBp(Bed[] regions, int numBpsPerSplit) {

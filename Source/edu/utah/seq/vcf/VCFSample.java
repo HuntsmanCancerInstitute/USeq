@@ -190,4 +190,8 @@ public class VCFSample {
 	public void setAlternateCounts(String alternateCounts) {
 		this.alternateCounts = alternateCounts;
 	}
+
+	public void setAlleleFreqAF(double alleleFreqAF) {
+		this.alleleFreqAF = alleleFreqAF;
+	}
 }

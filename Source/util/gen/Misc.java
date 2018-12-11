@@ -18,6 +18,7 @@ public class Misc {
 	public static final Pattern PATTERN_EQUALS = Pattern.compile("=");
 	public static final Pattern FORWARD_SLASH = Pattern.compile("/");
 	public static final Pattern TAB = Pattern.compile("\t");
+	public static final Pattern RETURN = Pattern.compile("\n");
 	public static final Pattern WHITESPACE = Pattern.compile("\\s+");
 	public static final Pattern UNDERSCORE = Pattern.compile("_");
 	public static final Pattern COLON = Pattern.compile(":");

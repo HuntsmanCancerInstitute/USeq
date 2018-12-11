@@ -22,6 +22,8 @@ public class FoundationVcfComparator {
 	private SimpleVcf[] rVcfs;	
 	private int bpPaddingForOverlap = 2;
 	private boolean noModifyFoundation = true;
+	private boolean excludeFoundationContig = false;
+	private boolean appendChr = false;
 
 	//counters
 	private int numberShortFoundation = 0;
@@ -37,6 +39,7 @@ public class FoundationVcfComparator {
 	private ArrayList<String> headerLines = new ArrayList<String>();
 	
 	
+	
 
 	//constructors
 	public FoundationVcfComparator(String[] args){
@@ -45,8 +48,8 @@ public class FoundationVcfComparator {
 			processArgs(args);
 
 			//load vcf files
-			fVcfs = load(foundationVcf);
-			rVcfs = load(recallVcf);
+			fVcfs = load(foundationVcf, excludeFoundationContig);
+			rVcfs = load(recallVcf, false);
 			numberRecall = rVcfs.length;
 
 			compareVcfs();
@@ -302,12 +305,20 @@ public class FoundationVcfComparator {
 
 
 
-	private SimpleVcf[] load(File vcf) {
+	private SimpleVcf[] load(File vcf, boolean excludeContig) {
 		String[] lines = IO.loadFileIntoStringArray(vcf);
 		ArrayList<SimpleVcf> al = new ArrayList<SimpleVcf>();
 		for (String v: lines){
-			if (v.startsWith("#") == false) al.add(new SimpleVcf(v, bpPaddingForOverlap));
-			else headerLines.add(v);
+			if (v.startsWith("#") == false) {
+				if (appendChr && v.startsWith("chr") == false) v = "chr"+v;
+				al.add(new SimpleVcf(v, bpPaddingForOverlap));
+			}
+			else {
+				if (excludeContig){
+					if (v.startsWith("##contig") == false) headerLines.add(v);
+				}
+				else headerLines.add(v);
+			}
 		}
 		SimpleVcf[] svs = new SimpleVcf[al.size()];
 		al.toArray(svs);
@@ -341,6 +352,8 @@ public class FoundationVcfComparator {
 					case 'r': recallVcf = new File(args[++i]); break;
 					case 'm': mergedVcf = new File(args[++i]); break;
 					case 'k': noModifyFoundation = false; break;
+					case 'c': appendChr = true; break;
+					case 'e': excludeFoundationContig = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -360,7 +373,7 @@ public class FoundationVcfComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Foundation Vcf Comparator: Oct 2017                    **\n" +
+				"**                           Foundation Vcf Comparator: Nov 2018                    **\n" +
 				"**************************************************************************************\n" +
 				"FVC compares a Foundation vcf generated with the FoundationXml2Vcf to a recalled vcf.\n"+
 				"Exact recall vars are so noted and removed. Foundation vcf with no exact but one\n"+
@@ -371,11 +384,13 @@ public class FoundationVcfComparator {
 				"-f Path to a FoundationOne vcf file, see the FoundationXml2Vcf app.\n"+
 				"-r Path to a recalled snv/indel vcf file.\n"+
 				"-m Path to named vcf file for saving the results.\n"+
+				"-c Append chr if absent in chromosome name.\n"+
+				"-e Exclude Foundation ##contig header lines.\n"+
 				"-k Attempt to merge Foundation records that overlap a recall and are the same type. \n"+
 				"     Defaults to printing both.\n"+
 
 				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/FoundationVcfComparator -f /F1/TRF145.vcf\n" +
-				"     -r /F1/TRF145_recall.vcf.gz -s /F1/TRF145_merged.vcf.gz -k \n\n" +
+				"     -r /F1/TRF145_recall.vcf.gz -e -c -m /F1/TRF145_merged.vcf.gz -k \n\n" +
 
 				"**************************************************************************************\n");
 

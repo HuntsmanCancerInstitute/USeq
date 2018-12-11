@@ -18,8 +18,10 @@ public class TNSample {
 	private File rootDir;
 	private TNRunner tnRunner;
 	private boolean forceRestart;
+	private boolean restartFailedJobs;
 	private static final Pattern slurmJobId = Pattern.compile("slurm-(\\d+).out");
 	private ArrayList<String> info = new ArrayList<String>();
+	private boolean deleteBamConcordance = false;
 	
 	//Fastq
 	private FastqDataset tumorExomeFastq = null;
@@ -34,6 +36,9 @@ public class TNSample {
 	//Somatic variant Vcf calls
 	private File somaticVariants = null;
 	
+	//Joint genotyping
+	private File[] germlineVcf = null;
+	
 	//Job status
 	private boolean failed = false;
 	private boolean running = false;
@@ -43,6 +48,7 @@ public class TNSample {
 		this.rootDir = rootDir;
 		this.tnRunner = tnRunner;
 		this.forceRestart = tnRunner.isForceRestart();
+		this.restartFailedJobs = tnRunner.isRestartFailed();
 		
 		//assign id
 		id = rootDir.getName();
@@ -55,8 +61,8 @@ public class TNSample {
 		if (foundFastq) checkAlignments();
 		else return;
 		
-		//launch t/n somatic exome?
-		if (tumorExomeBamBedGvcf != null && normalExomeBamBedGvcf != null) somExomeCall();
+		//launch t/n somatic exome and copy ratio analysis?
+		if (tumorExomeBamBedGvcf != null) somExomeCall();
 		
 		//annotate somatic vcf?
 		if (somaticVariants != null) annotateSomaticVcf();
@@ -66,6 +72,9 @@ public class TNSample {
 		
 		//Annotate normal vcf
 		annotateGermlineVcf();
+		
+		//copy ratio/ number
+		copyRatioAnalysis();
 		
 		//print messages?
 		if (failed || tnRunner.isVerbose()) {
@@ -77,8 +86,9 @@ public class TNSample {
 	
 	public void annotateGermlineVcf() throws IOException {
 		//look for genotyped vcf
-		File vcf = new File (rootDir, "GermlineVariantCalling/"+id+"_NormalExome/"+id+"_NormalExome_Hg38_JointGenotyping_Hg38.vcf.gz");
+		File vcf = new File (rootDir, "GermlineVariantCalling/"+id+"_NormalExome/"+id+"_NormalExome_Hg38_JointGenotyped.vcf.gz");
 		if (vcf.exists() == false) return;
+		germlineVcf = new File[]{vcf, new File(rootDir, "GermlineVariantCalling/"+id+"_NormalExome/"+id+"_NormalExome_Hg38_JointGenotyped.vcf.gz.tbi") };
 
 		info.add("Checking germline variant annotation...");		
 		
@@ -101,7 +111,7 @@ public class TNSample {
 		}
 		
 		//force a restart?
-		else if (forceRestart){
+		else if (forceRestart || restartFailedJobs && nameFile.containsKey("FAILED")){
 			//cancel any slurm jobs and delete the directory
 			cancelDeleteJobDir(nameFile, jobDir, info);
 			//launch it
@@ -132,6 +142,14 @@ public class TNSample {
 
 	private void bamConcordance() throws IOException {
 		info.add("Checking bam concordance...");
+		File jobDir = new File (rootDir, "SampleConcordance/"+id+"_BamConcordance");
+		
+		//Started a new alignment? then delete the concordance if it exists
+		if (deleteBamConcordance && jobDir.exists()){
+			info.add("\t\tNew alignments started.");
+			cancelDeleteJobDir(IO.fetchNamesAndFiles(jobDir), jobDir, info);
+			return;
+		}
 		
 		//check to see if the alignments are present, sometimes these datasets are never coming
 		boolean goT = false;
@@ -157,7 +175,6 @@ public class TNSample {
 		if (goT == false || goN == false || goTT == false) return;
 		
 		//make dir, ok if it already exists
-		File jobDir = new File (rootDir, "SampleConcordance/"+id+"_BamConcordance");
 		jobDir.mkdirs();
 		
 		//any files?
@@ -172,7 +189,7 @@ public class TNSample {
 			info.add("\t\tCOMPLETE "+jobDir);
 		}
 		//force a restart?
-		else if (forceRestart){
+		else if (forceRestart || restartFailedJobs && nameFile.containsKey("FAILED")){
 			//cancel any slurm jobs and delete the directory
 			cancelDeleteJobDir(nameFile, jobDir, info);
 			//launch it
@@ -226,36 +243,59 @@ public class TNSample {
 	}
 	
 	private void createBamConcordanceLinks(File jobDir) throws IOException{
+		File canJobDir = jobDir.getCanonicalFile();
 		if (tumorExomeBamBedGvcf != null) {
 			File index = fetchBamIndex(tumorExomeBamBedGvcf[0]);
-			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "tumorExome.bam").toPath(), tumorExomeBamBedGvcf[0].toPath());
-			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "tumorExome.bai").toPath(), index.toPath());
+			Files.createSymbolicLink(new File(canJobDir, "tumorExome.bam").toPath(), tumorExomeBamBedGvcf[0].toPath());
+			Files.createSymbolicLink(new File(canJobDir, "tumorExome.bai").toPath(), index.toPath());
 		}
 		if (normalExomeBamBedGvcf != null) {
 			File index = fetchBamIndex(normalExomeBamBedGvcf[0]);
-			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "normalExome.bam").toPath(), normalExomeBamBedGvcf[0].toPath());
-			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "normalExome.bai").toPath(), index.toPath());
+			Files.createSymbolicLink(new File(canJobDir, "normalExome.bam").toPath(), normalExomeBamBedGvcf[0].toPath());
+			Files.createSymbolicLink(new File(canJobDir, "normalExome.bai").toPath(), index.toPath());
 		}
 		if (tumorTranscriptomeBam != null) {
 			File index = fetchBamIndex(tumorTranscriptomeBam);
-			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "tumorTranscriptome.bam").toPath(), tumorTranscriptomeBam.toPath());
-			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "tumorTranscriptome.bai").toPath(), index.toPath());
+			Files.createSymbolicLink(new File(canJobDir, "tumorTranscriptome.bam").toPath(), tumorTranscriptomeBam.toPath());
+			Files.createSymbolicLink(new File(canJobDir, "tumorTranscriptome.bai").toPath(), index.toPath());
+		}
+		//pull in Foundation bams?
+		ArrayList<File> toLink = fetchOtherBams();
+		if (toLink != null && toLink.size() != 0){
+			for (File f: toLink) Files.createSymbolicLink(new File(canJobDir, "F_"+f.getName()).toPath(), f.toPath());
 		}
 	}
 	
+	private ArrayList<File> fetchOtherBams() throws IOException {
+		HashMap<String, File> otherPatientDatasets = tnRunner.getOtherBams();
+		if (otherPatientDatasets != null){
+			File matchedPatientDir = otherPatientDatasets.get(id);
+			if (matchedPatientDir == null) return null;
+			ArrayList<File> otherBams = IO.fetchAllFilesRecursively(matchedPatientDir, ".bam");
+			
+			//watch out for dups due to linking and failed jobs
+			HashMap<String, File> uniqueFiles = new HashMap<String, File>();
+			for (File ob: otherBams) uniqueFiles.put(ob.getCanonicalPath(), ob.getCanonicalFile());
+			
+			ArrayList<File> toLink = new ArrayList<File>();
+			for (File ob: uniqueFiles.values()){
+				//DNA bam and RNA bam
+				if (ob.getName().endsWith("_final.bam") || ob.getName().endsWith("_Hg38.bam")) {
+					File index = fetchBamIndex(ob);
+					if (index != null){
+						toLink.add(ob);
+						toLink.add(index);
+					}
+				}
+			}
+			return toLink;
+		}
+		return null;
+	}
+
 	private void removeBamConcordanceLinks(File jobDir) throws IOException{
-		if (tumorExomeBamBedGvcf != null) {
-			new File(jobDir, "tumorExome.bam").delete();
-			new File(jobDir, "tumorExome.bai").delete();
-		}
-		if (normalExomeBamBedGvcf != null) {
-			new File(jobDir, "normalExome.bam").delete();
-			new File(jobDir, "normalExome.bai").delete();
-		}
-		if (tumorTranscriptomeBam != null) {
-			new File(jobDir, "tumorTranscriptome.bam").delete();
-			new File(jobDir, "tumorTranscriptome.bai").delete();
-		}
+		IO.deleteFiles(jobDir, ".bam");
+		IO.deleteFiles(jobDir, ".bai");
 	}
 
 	private void annotateSomaticVcf() throws IOException {
@@ -280,7 +320,7 @@ public class TNSample {
 		}
 		
 		//force a restart?
-		else if (forceRestart){
+		else if (forceRestart  || restartFailedJobs && nameFile.containsKey("FAILED")){
 			//cancel any slurm jobs and delete the directory
 			cancelDeleteJobDir(nameFile, jobDir, info);
 			//launch it
@@ -326,7 +366,7 @@ public class TNSample {
 			//find the final vcf file
 			File[] vcf = IO.extractFiles(new File(somDir, "Vcfs"), "_final.vcf.gz");
 			if (vcf == null || vcf.length !=1) {
-				info.add("\tThe somatic variant calling was marked COMPLETE but failed to find the final vcf file in the Bam/ in "+somDir);
+				info.add("\tThe somatic variant calling was marked COMPLETE but failed to find the final vcf file in the Vcfs/ in "+somDir);
 				failed = true;
 				return;
 			}
@@ -337,7 +377,7 @@ public class TNSample {
 		}
 		
 		//force a restart?
-		else if (forceRestart){
+		else if (forceRestart  || restartFailedJobs && nameFile.containsKey("FAILED")){
 			//cancel any slurm jobs and delete the directory
 			cancelDeleteJobDir(nameFile, somDir, info);
 			//launch it
@@ -364,6 +404,137 @@ public class TNSample {
 			new File(somDir, "FAILED").createNewFile();
 			failed = true;
 		}
+	}
+	
+	private void copyRatioAnalysis() throws IOException {
+		if (tnRunner.getCopyRatioDocs() == null) return;
+		
+		//look for genotyped vcf
+		File vcf = new File (rootDir, "GermlineVariantCalling/"+id+"_NormalExome/"+id+"_NormalExome_Hg38_JointGenotyped.vcf.gz");
+		if (germlineVcf == null || tumorExomeBamBedGvcf == null || normalExomeBamBedGvcf == null) return;
+		
+		info.add("Checking copy ratio calling...");		
+		
+		//make dir, ok if it already exists
+		File jobDir = new File (rootDir,"CopyRatio");
+		jobDir.mkdirs();
+		
+		//any files?
+		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+		if (nameFile.size() == 0) launchCopyRatio(jobDir);
+		
+		//OK some files are present
+		//COMPLETE
+		else if (nameFile.containsKey("COMPLETE")){
+			//find the final vcf file
+			File[] segs = IO.extractFiles(new File(jobDir, "Results"), ".called.seg.xls");
+			if (segs == null || segs.length !=1) {
+				info.add("\tThe copy ratio calling was marked COMPLETE but failed to find the final seg file in the Results/ dir in "+jobDir);
+				failed = true;
+				return;
+			}
+			//remove the linked fastq
+			removeCopyRatioLinks(jobDir);
+			info.add("\t\tCOMPLETE "+jobDir);
+		}
+		
+		//force a restart?
+		else if (forceRestart  || restartFailedJobs && nameFile.containsKey("FAILED")){
+			//cancel any slurm jobs and delete the directory
+			cancelDeleteJobDir(nameFile, jobDir, info);
+			//launch it
+			launchCopyRatio(jobDir);
+		}
+		//QUEUED
+		else if (nameFile.containsKey("QUEUED")){
+			info.add("\t\tQUEUED "+jobDir);
+			running = true;
+		}
+		//STARTED
+		else if (nameFile.containsKey("STARTED")) {
+			if (checkQueue(nameFile, jobDir, info) == false) failed = true;
+			else running = true;
+		}
+		//FAILED but no forceRestart
+		else if (nameFile.containsKey("FAILED")){
+			info.add("\t\tFAILED "+jobDir);
+			failed = true;
+		}
+		//hmm no status files, probably something went wrong on the culster? mark it as FAILED
+		else {
+			info.add("\t\tMarking as FAILED, no job status files in "+jobDir);
+			new File(jobDir, "FAILED").createNewFile();
+			failed = true;
+		}
+	}
+
+	private void launchCopyRatio(File jobDir) throws IOException {
+		info.add("\t\tLaunching "+jobDir);
+		running = true;
+		
+		//want to replace the soft links
+		createCopyRatioLinks(jobDir);
+		
+		//replace any launch scripts with the current
+		File shellScript = copyInWorkflowDocs(tnRunner.getCopyRatioDocs(), jobDir);
+		
+		//clear any progress files
+		removeProgressFiles(jobDir);
+		
+		//squeue the shell script
+		new File(jobDir, "QUEUED").createNewFile();
+		String alignDirPath = jobDir.getCanonicalPath();
+		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
+		for (String o: output) info.add("\t\t"+o);
+	}
+	
+	private void createCopyRatioLinks(File jobDir) throws IOException {
+		//remove any linked files
+		removeCopyRatioLinks(jobDir);
+		
+		//pull gender from the _AvatarInfo.json.gz file in the root dir
+		File[] info = IO.extractFiles(rootDir, "_AvatarInfo.json.gz");
+		if (info == null || info.length !=1) throw new IOException("ERROR: failed to find the xxx_AvatarInfo.json.gz file in "+rootDir);
+		String[] lines = IO.loadFile(info[0]);
+		int gender = 0;
+		for (String s: lines){
+			if (s.contains("Gender")){
+				if (s.contains("M")) gender = 1;
+				else if (s.contains("F")) gender =2;
+			}
+		}
+		if (gender == 0) throw new IOException("ERROR: failed to find the xxx_AvatarInfo.json.gz file in "+rootDir);
+		Path bkg = null;
+		if (gender == 1) bkg = tnRunner.getMaleBkg().toPath();
+		else if (gender == 2 ) bkg = tnRunner.getFemaleBkg().toPath();
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"bkgPoN.hdf5").toPath(), bkg);
+		
+		//soft link in the new ones
+		Path tumorBam = tumorExomeBamBedGvcf[0].toPath();
+		Path tumorBai = fetchBamIndex(tumorExomeBamBedGvcf[0]).toPath();
+		Path normalBam = normalExomeBamBedGvcf[0].toPath();
+		Path normalBai = fetchBamIndex(normalExomeBamBedGvcf[0]).toPath();
+		
+		Path normalVcf = germlineVcf[0].toPath();
+		Path normalTbi = germlineVcf[1].toPath();
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bam").toPath(), tumorBam);
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bai").toPath(), tumorBai);
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.bam").toPath(), normalBam);
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.bai").toPath(), normalBai);
+		
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.vcf.gz").toPath(), normalVcf);
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.vcf.gz.tbi").toPath(), normalTbi);
+	}
+	
+	private void removeCopyRatioLinks(File jobDir) throws IOException{
+		File f = jobDir.getCanonicalFile();
+		new File(f, "tumor.bam").delete();
+		new File(f, "tumor.bai").delete();
+		new File(f, "bkgPoN.hdf5").delete();
+		new File(f, "normal.bam").delete();
+		new File(f, "normal.bai").delete();
+		new File(f, "normal.vcf.gz").delete();
+		new File(f, "normal.vcf.gz.tbi").delete();
 	}
 
 	private void checkAlignments() throws IOException {
@@ -412,7 +583,7 @@ public class TNSample {
 		}
 		
 		//force a restart?
-		else if (forceRestart){
+		else if (forceRestart  || restartFailedJobs && nameFile.containsKey("FAILED")){
 			//cancel any slurm jobs and delete the directory
 			cancelDeleteJobDir(nameFile, alignDir, info);
 			//launch it
@@ -460,6 +631,8 @@ public class TNSample {
 		String alignDirPath = alignDir.getCanonicalPath();
 		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
 		for (String o: output) info.add("\t\t"+o);
+		
+		deleteBamConcordance = true;
 	}
 
 
@@ -515,7 +688,7 @@ public class TNSample {
 		}
 		
 		//force a restart?
-		else if (forceRestart){
+		else if (forceRestart  || restartFailedJobs && nameFile.containsKey("FAILED")){
 			//cancel any slurm jobs and delete the directory
 			cancelDeleteJobDir(nameFile, alignDir, info);
 			//launch it
@@ -619,6 +792,9 @@ public class TNSample {
 		String alignDirPath = alignDir.getCanonicalPath();
 		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
 		for (String o: output) info.add("\t\t"+o);
+		
+		//delete BamConcordance if it exists
+		deleteBamConcordance = true;
 	}
 	
 	private void createExomeAlignLinks(File[] fastq, File alignDir) throws IOException {

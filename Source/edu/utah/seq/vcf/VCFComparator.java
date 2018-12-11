@@ -7,7 +7,6 @@ import java.util.regex.*;
 import edu.utah.seq.its.Interval;
 import edu.utah.seq.its.IntervalTree;
 import edu.utah.seq.useq.data.RegionScoreText;
-import edu.utah.seq.useq.data.RegionScoreTextData;
 import util.bio.annotation.Bed;
 import util.bio.annotation.ExportIntergenicRegions;
 import util.gen.*;

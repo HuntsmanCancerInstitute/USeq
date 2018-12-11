@@ -210,8 +210,10 @@ public class FoundationXml2Vcf {
 			sb.append(Misc.stringArrayToString(Misc.setToStringArray(alt), "\n")); 
 			sb.append("\n");
 		}
-		sb.append(Misc.stringArrayToString(Misc.setToStringArray(info), "\n")); 
-		sb.append("\n");
+		if (info.size()!=0) {
+			sb.append(Misc.stringArrayToString(Misc.setToStringArray(info), "\n")); 
+			sb.append("\n");
+		}
 		
 		//chrom line
 		sb.append("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\n");
@@ -225,15 +227,44 @@ public class FoundationXml2Vcf {
 
 			//Iterating through the nodes and extract the data
 			NodeList nodeList = document.getDocumentElement().getChildNodes();
+			boolean foundFinalReport = false;
+			boolean foundVariantReport = false;
 			for (int i = 0; i < nodeList.getLength(); i++) {
 				Node node = nodeList.item(i);
-				if (node instanceof Element) {
+				if (node instanceof Element) {	
 					//Is it the FinalReport?
-					if (node.getNodeName().equals("FinalReport")) parseFinalReport(node);
+					if (node.getNodeName().equals("FinalReport")) {
+						foundFinalReport = true;
+						parseFinalReport(node);
+					}
 					//Is it the variant-report?
-					if (node.getNodeName().equals("variant-report")) parseVariantReport(node);
+					else if (node.getNodeName().equals("variant-report")) {
+						foundVariantReport = true;
+						parseVariantReport(node);
+					}
+					//must watch out for new style reports
+					else if (node.getNodeName().equals("rr:ResultsPayload")) {
+						NodeList nodeList2 = node.getChildNodes();
+						for (int x = 0; x < nodeList2.getLength(); x++) {
+							Node node2 = nodeList2.item(x);
+							if (node2 instanceof Element) {	
+								//Is it the FinalReport?
+								if (node2.getNodeName().equals("FinalReport")) {
+									foundFinalReport = true;
+									parseFinalReport(node2);
+								}
+								//Is it the variant-report?
+								else if (node2.getNodeName().equals("variant-report")) {
+									foundVariantReport = true;
+									parseVariantReport(node2);
+								}
+							}
+						}
+						break;
+					}
 				}
 			}
+			if (foundFinalReport == false || foundVariantReport == false) throw new Exception("Failed to find the FinalReport("+foundFinalReport+") or the variant-report("+foundVariantReport+")");
 		} catch (Exception e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError parsing this xml file "+workingXmlFile);
@@ -325,6 +356,7 @@ public class FoundationXml2Vcf {
 				else if (name.equals("short-variants")) parseShortVariants(cNode);
 				else if (name.equals("copy-number-alterations")) parseCopyVariants(cNode);
 				else if (name.equals("rearrangements")) parseRearrangementVariants(cNode);
+				else if (name.equals("quality-control")) reportAttributes.put("quality-control", cNode.getAttributes().getNamedItem("status").getNodeValue());
 			}
 		}
 	}
@@ -469,11 +501,12 @@ public class FoundationXml2Vcf {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Foundation Xml 2 Vcf: Nov 2017                       **\n" +
+				"**                             Foundation Xml 2 Vcf: Nov 2018                       **\n" +
 				"**************************************************************************************\n" +
 				"Attempts to parse xml foundation reports to vcf. This is an inprecise process with\n"+
 				"some insertions, multi snv, and multi vars. VCF variants have not been normalized.\n"+
-				"Consider left aligning and demultiplexing.\n"+
+				"Consider left aligning and demultiplexing with vt. Remove PHI elements first with grep: \n"+
+				"grep -vwE '(MRN|FullName|FirstName|LastName|ReportPDF)' TRF123.xml > clnTRF123.xml\n"+
 
 				"\nOptions:\n"+
 				"-x Path to a FoundationOne xml report or directory containing such.\n"+

@@ -183,11 +183,11 @@ public class VCFCallFrequency {
 	}
 
 	private void processRecordBlock(String[][] vcfRecords, Gzipper out) throws IOException {
-		
+
 		//run queries
 		JSONObject jsonResultsVcf = null;
 		JSONObject jsonResultsBed = null;
-		
+
 		//remote service?
 		if (queryURL != null){
 			//create search strings, any vcfs to query?
@@ -210,13 +210,13 @@ public class VCFCallFrequency {
 
 		//parse and annotate
 		if (jsonResultsVcf != null && jsonResultsBed != null) {
-			
+
 			if (debug) IO.p("VCF RETURN\n"+jsonResultsVcf.toString(1));			
 			loadVcfResults(jsonResultsVcf);
-			
+
 			if (debug) IO.p("BED RETURN\n"+jsonResultsBed.toString(1));
 			loadBedResults(jsonResultsBed);
-			
+
 			//for each record
 			for (int i=0; i< vcfRecords.length; i++){
 				//pull counts and calc ratio
@@ -268,42 +268,50 @@ public class VCFCallFrequency {
 		if (filter.equals(".") || filter.toUpperCase().equals("PASS")) return "CallFreq";
 		return "CallFreq;"+filter;
 	}
-	
+
 	/**Loads the number of hits returned to each vcf query. Some won't be returned and thus will be zero.*/
 	private void loadVcfResults(JSONObject results) {
-		//clear prior
+		//clear prior, all set to zero
 		idVcfCount = new double[numberRecordsPerQuery];
 
-		JSONArray ja = results.getJSONArray("queryResults");
-		int numWithHits = ja.length();
-		totalQueriesWithHits+= numWithHits;
+		//any results?
+		if (results.has("queryResults")){
+			JSONArray ja = results.getJSONArray("queryResults");
 
-		for (int i=0; i< numWithHits; i++){
-			JSONObject jo = ja.getJSONObject(i);
-			double numHits = jo.getDouble("numberHits");
-			String vcfRecord = jo.getString("input");
-			String[] splitVcf = Misc.TAB.split(vcfRecord);
-			int index = Integer.parseInt(splitVcf[2]);
-			//set in array
-			idVcfCount[index] = numHits;
+			int numWithHits = ja.length();
+			totalQueriesWithHits+= numWithHits;
+
+			for (int i=0; i< numWithHits; i++){
+				JSONObject jo = ja.getJSONObject(i);
+				double numHits = jo.getDouble("numberHits");
+				String vcfRecord = jo.getString("input");
+				String[] splitVcf = Misc.TAB.split(vcfRecord);
+				int index = Integer.parseInt(splitVcf[2]);
+				//set in array
+				idVcfCount[index] = numHits;
+			}
 		}
 	}
 
 
 	/**Loads the number of hits returned to each bed query. Some may be returned and thus will be zero.*/
 	private void loadBedResults(JSONObject results) {
-		//clear prior
+		//clear prior, set to zero
 		idBedCount = new double[numberRecordsPerQuery];
-		JSONArray ja = results.getJSONArray("queryResults");
-		int numWithHits = ja.length();
-		for (int i=0; i< numWithHits; i++){
-			JSONObject jo = ja.getJSONObject(i);
-			double numHits = jo.getDouble("numberHits");
-			String bedRecord = jo.getString("input");
-			String[] splitbed = Misc.TAB.split(bedRecord);
-			int index = Integer.parseInt(splitbed[3]);
-			//set in array
-			idBedCount[index] = numHits;
+
+		//any results?
+		if (results.has("queryResults")){
+			JSONArray ja = results.getJSONArray("queryResults");
+			int numWithHits = ja.length();
+			for (int i=0; i< numWithHits; i++){
+				JSONObject jo = ja.getJSONObject(i);
+				double numHits = jo.getDouble("numberHits");
+				String bedRecord = jo.getString("input");
+				String[] splitbed = Misc.TAB.split(bedRecord);
+				int index = Integer.parseInt(splitbed[3]);
+				//set in array
+				idBedCount[index] = numHits;
+			}
 		}
 	}
 
@@ -369,12 +377,12 @@ public class VCFCallFrequency {
 		}
 		return new StringBuilder[]{sbVcf, sbBed};
 	}
-	
+
 	private boolean loadVcfsBedsToQuery(String[][] vcfRecords) {
 		boolean loaded = false;
 		userQueryVcf.clearResultsRegionsRecords();
 		userQueryBed.clearResultsRegionsRecords();
-		
+
 		for (int i=0; i< vcfRecords.length; i++){
 			String[] vcf = vcfRecords[i];
 			if (vcf == null) break;
@@ -486,8 +494,8 @@ public class VCFCallFrequency {
 		IO.pl("\t-f File Filter "+fileFilter);
 		IO.pl("\t-m MaxCallFreq "+maxCallFreq);
 		IO.pl("\t-b MinBedCount "+minBedCount);
-		IO.pl("\t-a Append FILTER "+appendFilter);
-		IO.pl("\t-d Verbose "+debug);
+		IO.pl("\t-x Remove failing "+appendFilter);
+		IO.pl("\t-e Verbose "+debug);
 		if (queryURL != null){
 			IO.pl("\tQueryUrl "+queryURL);
 			IO.pl("\tHost "+host);
@@ -523,7 +531,7 @@ public class VCFCallFrequency {
 		if (saveDirectory == null) Misc.printErrAndExit("\nError: provide a directory to save the annotated vcf files.");
 		else saveDirectory.mkdirs();
 		if (saveDirectory.exists() == false) Misc.printErrAndExit("\nError: could not find your save directory? "+saveDirectory);
-		
+
 		userQueryVcf = new UserQuery().addRegexAll(".vcf.gz").addRegexAll(fileFilter).matchVcf();
 		userQueryBed = new UserQuery().addRegexAll(".bed.gz").addRegexAll(fileFilter);
 	}	

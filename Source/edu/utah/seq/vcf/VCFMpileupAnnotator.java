@@ -26,6 +26,7 @@ public class VCFMpileupAnnotator {
 	private int minBaseQuality = 0;
 	private boolean verbose = false;
 	private int numberThreads = 0;
+	private int numDecimals = 3;
 	
 	//internal
 	private static final int numVcfToProc = 100;
@@ -204,6 +205,7 @@ public class VCFMpileupAnnotator {
 					case 'o': vcfOut = new File(args[++i]); break;
 					case 'm': mpileup = new File(args[++i]); break;
 					case 'q': minBaseQuality = Integer.parseInt(args[++i]); break;
+					case 'e': numDecimals = Integer.parseInt(args[++i]); break;
 					case 'd': verbose = true; break;
 					case 't': numberThreads = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
@@ -244,7 +246,7 @@ public class VCFMpileupAnnotator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          VCF Mpileup Annotator : April 2018                      **\n" +
+				"**                          VCF Mpileup Annotator : Oct 2018                        **\n" +
 				"**************************************************************************************\n" +
 				"VMA estimates the AF and DP of a vcf record from a single sample mpileup file.  It \n"+
 				"replaces the AF or DP INFO values in the vcf records if present. For INDELs, the\n"+
@@ -262,6 +264,7 @@ public class VCFMpileupAnnotator {
 						
 				"\nOptional:\n" +
 				"-q Minimum mpileup sample bp quality, defaults to 0\n"+
+				"-e Number of decimals in the AF, defaults to 3\n"+
 				"-d Print verbose debugging output.\n" +
 				"-t Number of threads to use, defaults to all/ 5GB.\n"+
 				
@@ -282,5 +285,9 @@ public class VCFMpileupAnnotator {
 
 	public boolean isVerbose() {
 		return verbose;
+	}
+
+	public int getNumDecimals() {
+		return numDecimals;
 	}
 }

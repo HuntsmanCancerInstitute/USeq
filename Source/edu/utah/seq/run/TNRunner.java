@@ -23,6 +23,9 @@ public class TNRunner {
 	private File[] bamConcordanceDocs = null;
 	private File[] varAnnoDocs = null;
 	private File[] jointGenotypingDocs = null;
+	private File[] copyRatioDocs = null;
+	private File maleBkg = null;
+	private File femaleBkg = null;
 	private boolean forceRestart = false;
 	private int minReadCoverageTumor = 20;
 	private int minReadCoverageNormal = 10;
@@ -32,6 +35,8 @@ public class TNRunner {
 	private ArrayList<String> info = new ArrayList<String>();
 	private boolean groupProcessingComplete = false;
 	private boolean groupProcessingFailed = false;
+	private boolean restartFailed = false;
+	private HashMap<String, File> otherBams = null;
 
 	private String pathToTrim = null;
 
@@ -64,11 +69,12 @@ public class TNRunner {
 
 	private void processSampleGroup() {
 		try {
-			if (verbose) IO.pl("\nChecking group processing...");
-			else IO.pl("\nChecking group processing");
+			IO.pl("\nChecking group processing...");
+
 			
 			//for each sample with a fastq germline component are the alignments ready?
 			ArrayList<File> toGeno = new ArrayList<File>();
+			boolean allPresent = true;
 			for (TNSample tns: tNSamples){
 				//JointGenotyping already run?
 				File gVcfDir = new File(tns.getRootDir(), "GermlineVariantCalling");
@@ -82,14 +88,18 @@ public class TNRunner {
 				if (tns.getNormalExomeFastq().isFastqDirExists()) {
 					File[] ab = tns.getNormalExomeBamBedGvcf();
 					if (ab == null) {
-						if (verbose) IO.pl("\tWaiting for germline gvcfs");
-						return;
+						if (verbose) IO.pl("\tWaiting for germline gvcfs from "+tns.getId());
+						allPresent = false;
 					}
-					//add the vcf and matched index
-					toGeno.add(ab[2]);
-					toGeno.add(ab[3]);
+					else {
+						//add the vcf and matched index
+						toGeno.add(ab[2]);
+						toGeno.add(ab[3]);
+					}
 				}
 			}
+			if (allPresent == false) return;
+			
 			//launch it
 			checkJointGenotyping(toGeno);
 			if (groupProcessingFailed || verbose) Misc.printArray(info);
@@ -143,6 +153,8 @@ public class TNRunner {
 				
 				//Extract the sample name 
 				//HCI_P1_NormalExome_Hg38_JointGenotyping_Hg38.vcf.gz
+				//1218982_NormalExome_Hg38_JointGenotyped.vcf.gz
+				//1218982_Pancreas_NormalExome_Hg38_JointGenotyped.vcf.gz
 				String fileName = genoVcfs[i].getName();
 				File sampleDir = null;
 				String id = null;
@@ -159,8 +171,10 @@ public class TNRunner {
 				}
 				if (sampleDir == null) throw new IOException("\nERROR: Failed to find the sampleDir by parsing the JointGenotyping vcf names. "+fileName);
 				if (verbose) IO.pl("\t\t\tMoving genotyped vcfs to "+sampleDir);
+				//delete any existing germline folder
+				IO.deleteDirectoryViaCmdLine(new File(sampleDir, "GermlineVariantCalling"));
 				//create a folder for the incoming genotyped vcf in the sample folder
-				File resDir = new File(sampleDir, "GermlineVariantCalling/"+fileName.replace("_Hg38_JointGenotyping_Hg38.vcf.gz", ""));
+				File resDir = new File(sampleDir, "GermlineVariantCalling/"+fileName.replace("_Hg38_JointGenotyped.vcf.gz", ""));
 				resDir.mkdirs();
 				
 				//copy and move over relevant files
@@ -181,7 +195,7 @@ public class TNRunner {
 		}
 
 		//force a restart?
-		else if (forceRestart){
+		else if (forceRestart || restartFailed && nameFile.containsKey("FAILED")){
 			//cancel any slurm jobs and delete the directory
 			TNSample.cancelDeleteJobDir(nameFile, jobDir, info);
 			//launch it
@@ -273,6 +287,9 @@ public class TNRunner {
 			File bamConWorkflowDir = null;
 			File jointGenoWorklfowDir = null;
 			File transWorkflowDir = null;
+			File copyRatioDocsDir = null;
+			File copyRatioBkgDir = null;
+			File otherDir = null;
 			for (int i = 0; i<args.length; i++){
 				String lcArg = args[i].toLowerCase();
 				Matcher mat = pat.matcher(lcArg);
@@ -287,10 +304,14 @@ public class TNRunner {
 						case 'a': annoWorkflowDir = new File(args[++i]); break;
 						case 'b': bamConWorkflowDir = new File(args[++i]); break;
 						case 'j': jointGenoWorklfowDir = new File(args[++i]); break;
+						case 'y': copyRatioDocsDir = new File(args[++i]); break;
+						case 'k': copyRatioBkgDir = new File(args[++i]); break;
+						case 'o': otherDir = new File(args[++i]); break;
 						case 'u': minReadCoverageTumor = Integer.parseInt(args[++i]); break;
 						case 'n': minReadCoverageNormal = Integer.parseInt(args[++i]); break;
 						case 'q': verbose = false; break;
 						case 'f': forceRestart = true; break;
+						case 'r': restartFailed = true; break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 						}
 					}
@@ -333,12 +354,31 @@ public class TNRunner {
 			varAnnoDocs = IO.extractFiles(annoWorkflowDir);
 
 			//bam concordance
-			if (bamConWorkflowDir == null || bamConWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing bam concordance workflow docs? "+annoWorkflowDir);
+			if (bamConWorkflowDir == null || bamConWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing bam concordance workflow docs? "+bamConWorkflowDir);
 			bamConcordanceDocs = IO.extractFiles(bamConWorkflowDir);
 
 			//joint genotyping
 			if (jointGenoWorklfowDir == null || jointGenoWorklfowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing joint genotyping workflow docs? "+jointGenoWorklfowDir);
-			this.jointGenotypingDocs = IO.extractFiles(jointGenoWorklfowDir);
+			jointGenotypingDocs = IO.extractFiles(jointGenoWorklfowDir);
+
+			//copy ratio analysis
+			if (copyRatioDocsDir == null || copyRatioDocsDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing copy ratio analysis workflow docs? "+copyRatioDocsDir);
+			copyRatioDocs = IO.extractFiles(copyRatioDocsDir);
+			
+			//copy ratio analysis
+			if (copyRatioBkgDir == null || copyRatioBkgDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing copy ratio background files? "+copyRatioBkgDir);
+			File[] f = IO.extractFiles(copyRatioBkgDir, "PoN.hdf5");
+			if (f == null || f.length != 2) Misc.printErrAndExit("Error: failed to find two copy ratio background xxxPoN.hdf5 files in "+copyRatioBkgDir);
+			String name = f[0].getName().toLowerCase();
+			if (name.contains("female")) {
+				femaleBkg = f[0];
+				maleBkg = f[1];
+			}
+			else {
+				femaleBkg = f[1];
+				maleBkg = f[0];
+			}
+			if (maleBkg == null || femaleBkg == null) Misc.printErrAndExit("Error: failed to find male "+maleBkg+" and female "+femaleBkg+" background xxxFemalePoN.hdf5 or xxxMalePoN.hdf5 files in "+copyRatioBkgDir);
 			
 			//AnnotatedVcfParser options for germline and somatic filtering
 			if (germlineAnnotatedVcfParser == null) germlineAnnotatedVcfParser = "-d "+minReadCoverageNormal+" -m 0.2 -x 1 -p 0.01 -g D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign";
@@ -346,6 +386,16 @@ public class TNRunner {
 
 			//set path to trim
 			pathToTrim = sampleDir.getCanonicalFile().getParentFile().getCanonicalPath()+"/";
+			
+			//any Foundation datasets?
+			if (otherDir != null){
+				File[] p = IO.extractOnlyDirectories(otherDir);
+				if (p != null && p.length !=0){
+					otherBams = new HashMap<String, File>();
+					for (File i: p) otherBams.put(i.getName(), i);
+				}
+				
+			}
 			
 			if (verbose){
 				IO.pl("Run parameters:");
@@ -356,14 +406,17 @@ public class TNRunner {
 				IO.pl("Variant annotation workflow directory\t"+annoWorkflowDir);
 				IO.pl("Bam concordance workflow directory\t"+bamConWorkflowDir);
 				IO.pl("Joint genotyping workflow directory\t"+jointGenoWorklfowDir);
+				IO.pl("Copy ratio workflow directory\t"+copyRatioDocsDir);
+				IO.pl("Copy ratio background directory\t"+copyRatioBkgDir);
+				IO.pl("Other patient sample directory for concordance\t"+otherDir);
 				IO.pl("Min tumor read coverage\t"+minReadCoverageTumor);
 				IO.pl("Min normal read coverage\t"+minReadCoverageNormal);
 				IO.pl("Germline Annotated Vcf Parser options\t"+germlineAnnotatedVcfParser);
 				IO.pl("Somatic Annotated Vcf Parser options\t"+somaticAnnotatedVcfParser);
+				IO.pl("Restart failed jobs\t"+restartFailed);
 				IO.pl("Force restart\t"+forceRestart);
 				IO.pl("Verbose logging\t"+verbose);
 			}
-			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -373,7 +426,7 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                TNRunner  September 2018                          **\n" +
+				"**                               TNRunner  December 2018                            **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several dockerized snakmake workflows on human tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, Hg38\n"+
@@ -381,16 +434,16 @@ public class TNRunner {
 				"between sample bams. To execute TNRunner, create the following directory structure and\n"+
 				"link or copy in the corresponding paired end Illumina gzipped fastq files.\n"+
 				"MyPatientSampleDatasets\n"+
-				"   MyPatient1\n"+
+				"   MyPatientA\n"+
 				"      Fastq\n"+
 				"         NormalExome\n"+
 				"         TumorExome\n"+
 				"         TumorTranscriptome\n"+
-				"   MyPatient2\n"+
+				"   MyPatientB\n"+
 				"      Fastq\n"+
 				"         TumorExome\n"+
 				"         TumorTranscriptome\n"+
-				"   MyPatient3....\n"+
+				"   MyPatientC....\n"+
 				"The Fastq directory and sub directories must match this naming. Only include those\n"+
 				"for which you have fastq.  Change the MyXXX to something relevant. TNRunner is\n"+
 				"stateless so as more Fastq becomes available or issues are addressed, relaunch the\n"+
@@ -400,9 +453,13 @@ public class TNRunner {
 				"and the matching resource bundle from\n"+
 				"https://hci-bio-app.hci.utah.edu/gnomex/gnomexFlex.jsp?analysisNumber=A5578\n"+
 					
-
 				"\nOptions:\n"+
 				"-p Directory containing one or more patient data directories to process.\n" +
+				"-o Other patient's directory, containing additional xxx_final.bam files to include in\n"+
+				"   sample concordance. The patient directory naming must match.\n"+
+				"-k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio\n"+
+				"      background files.\n"+
+				"-y Workflow docs for launching copy ratio analysis.\n"+
 				"-e Workflow docs for launching exome alignments.\n"+
 				"-t Workflow docs for launching transcriptome alignments.\n"+
 				"-c Workflow docs for launching somatic variant calling.\n"+
@@ -412,14 +469,14 @@ public class TNRunner {
 				"-g Germline AnnotatedVcfParser options, defaults to '-d 10 -m 0.2 -x 1 -p 0.01 -g \n"+
 				"      D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign'\n"+
 				"-s Somatic AnnotatedVcfParser options, defaults to '-d 20 -f'\n"+
+				"-r Restart FAILED jobs.\n"+
 				"-f Force a restart of all uncompleted jobs.\n"+
 				"-q Quite output.\n"+
 
-				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p AvatarPatients -e \n"+
-				"     ~/Hg38/ExomeAlignQC/WorkflowDocs/ -c ~/Hg38/SomExoCaller/WorkflowDocs/ -a \n"+
-				"     ~/Hg38/Annotator/WorkflowDocs/ -b ~/Hg38/BamConcordance/WorkflowDocs/ -j\n"+
-				"     ~/Hg38/JointGenotyping/WorkflowDocs/ -t ~/Hg38/TranscriptomeAlignQC/WorkflowDocs/ \n"+
-				"     -s '-d 30 -f' \n\n"+
+				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p AvatarPatients -o ~/FoundationPatients/\n"+
+				"     -e ~/Hg38/ExomeAlignQC/ -c ~/Hg38/SomExoCaller/ -a ~/Hg38/Annotator/ -b \n"+
+				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/TranscriptomeAlignQC/\n"+
+				"     -y /Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r'  \n\n"+
 
 
 				"**************************************************************************************\n");
@@ -460,5 +517,20 @@ public class TNRunner {
 	}
 	public File[] getTranscriptomeAlignQCDocs() {
 		return transcriptomeAlignQCDocs;
+	}
+	public boolean isRestartFailed() {
+		return restartFailed;
+	}
+	public HashMap<String, File> getOtherBams() {
+		return otherBams;
+	}
+	public File[] getCopyRatioDocs() {
+		return copyRatioDocs;
+	}
+	public File getMaleBkg() {
+		return maleBkg;
+	}
+	public File getFemaleBkg() {
+		return femaleBkg;
 	}
 }

@@ -1,5 +1,8 @@
 package util.gen;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.IOException;
 import java.io.Serializable;
 
 /**Uses running totals to calculate the variance and standard deviation of an array of numbers.*/
@@ -67,6 +70,25 @@ public class StandardDeviation implements Serializable {
 			getStandardDeviation();
 		}
 		return (score - mean) / standardDeviation;
+	}
+	
+	/**For calculating mean and std from USeq Histogram output.*/
+	public static void main(String[] args) throws IOException{
+		StandardDeviation sd = new StandardDeviation();
+		File f = new File(args[0]);
+		String line;
+		String[] fields;
+		BufferedReader in = IO.fetchBufferedReader(f);
+		while ((line=in.readLine())!=null){
+			line = line.trim();
+			if (line.length() == 0) continue;
+			fields = Misc.WHITESPACE.split(line);
+			double size = Double.parseDouble(fields[0]);
+			int numObs = Integer.parseInt(fields[1]);
+			for (int i=0; i< numObs; i++) sd.count(size);
+		}
+		IO.pl(sd.toString());
+		
 	}
 	
 }

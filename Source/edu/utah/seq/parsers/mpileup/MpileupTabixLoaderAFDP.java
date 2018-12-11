@@ -23,6 +23,7 @@ public class MpileupTabixLoaderAFDP implements Runnable{
 	private ArrayList<String> modVcfRecords = new ArrayList<String>();
 	private int minBaseQuality;
 	private boolean verbose;
+	private int numDecimals = 0;
 
 	//internal
 	public static final Pattern AF = Pattern.compile("AF=[\\d\\.]+;*");
@@ -33,6 +34,7 @@ public class MpileupTabixLoaderAFDP implements Runnable{
 		minBaseQuality = vbc.getMinBaseQuality();
 		verbose = vbc.isVerbose();
 		tabixReader = new TabixReader(mpileupFile.getCanonicalPath());
+		numDecimals = vbc.getNumDecimals();
 	}
 
 	public void run() {	
@@ -136,7 +138,7 @@ public class MpileupTabixLoaderAFDP implements Runnable{
 		Matcher pat = DP.matcher(modInfo);
 		String mod2Info = pat.replaceFirst("");
 		if (afDp[0] == -1) return "AF=0;DP=0;" +mod2Info;
-		return "AF="+Num.formatNumber(afDp[0], 3)+";DP="+(int)afDp[1]+";"+mod2Info;
+		return "AF="+Num.formatNumber(afDp[0], numDecimals)+";DP="+(int)afDp[1]+";"+mod2Info;
 	}
 
 	private static double[] fetchAfDp(MpileupSample sample, String[] fields, int type) throws IOException {

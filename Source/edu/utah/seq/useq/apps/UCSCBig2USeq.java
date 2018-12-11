@@ -117,12 +117,12 @@ public class UCSCBig2USeq extends Thread{
 			if (bed12){
 				//-t 3,6,7,8,9,10,11 -v 4 -s 5
 				t2u.setTextColumnIndexs(new int[] {3,6,7,8,9,10,11});
-				t2u.setScoreColumnIndex(4);
+				t2u.setScoreColumnIndex(new int[] {4});
 				t2u.setStrandColumnIndex(5);
 			}
 			else {
 				if (stranded) t2u.setStrandColumnIndex(5);
-				if (scored) t2u.setScoreColumnIndex(4);
+				if (scored) t2u.setScoreColumnIndex(new int[] {4});
 				if (named) t2u.setTextColumnIndexs(new int[]{3});
 			}
 			t2u.convert(tempTxtFile);

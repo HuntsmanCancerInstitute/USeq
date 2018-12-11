@@ -88,6 +88,10 @@ public class FilterIntersectingRegions {
 			double fract = numberIntersecting/(numberIntersecting+numberNonIntersecting);
 			System.out.println(Num.formatNumber(fract, 3) +"\tFraction intersecting");
 			System.out.println();
+			
+			//reset
+			numberIntersecting = 0;
+			numberNonIntersecting = 0;
 		}
 		System.out.println("\nDone!\n");
 	}
@@ -345,7 +349,7 @@ public class FilterIntersectingRegions {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Filter Intersecting Regions: Feb 2015                     **\n" +
+				"**                        Filter Intersecting Regions: Dec 2018                     **\n" +
 				"**************************************************************************************\n" +
 				"Flattens the mask regions and uses it to split the split file(s) into intersecting\n" +
 				"and non intersecting regions based on the minimum fraction intersection. For UCSC gene\n"+

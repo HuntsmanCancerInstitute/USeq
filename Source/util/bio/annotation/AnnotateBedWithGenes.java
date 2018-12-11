@@ -19,9 +19,10 @@ public class AnnotateBedWithGenes {
 	private HashMap<String,UCSCGeneLine[]> chrGenes;
 	private HashMap<String,Bed[]> chrBed;
 	private int bpPad = 0;
-	private Gzipper out;
+	private Gzipper out = null;
 	private boolean intersectExons = true;
 	private int[] coorIndexes = {0,1,2};
+	boolean verbose = true;
 
 	public AnnotateBedWithGenes (String[] args){
 		try {
@@ -40,20 +41,43 @@ public class AnnotateBedWithGenes {
 			if (out != null) out.getGzipFile().delete();
 			e.printStackTrace();
 		}
+	}
+	
+	/**Adds genes that intersect onto the Bed.name as name+"\t"+gene1,gene2...*/
+	public AnnotateBedWithGenes(File ucscTableFile, Bed[] bed, boolean intersectExons){
+		try {
+			verbose = false;
+			this.intersectExons = intersectExons;
+			
+			UCSCGeneModelTableReader tr = new UCSCGeneModelTableReader(ucscTableFile, 0);
+			chrGenes = tr.getChromSpecificGeneLines();
 
+			Arrays.sort(bed);
+			chrBed = Bed.splitBedByChrom(bed);
+
+			intersect();
+			
+		} catch (Exception e) {
+			System.err.println("\nError annotating regions!");
+			e.printStackTrace();
+		}
 	}
 
 	private void intersect() throws IOException {
 		HashSet<String> toAdd = new HashSet<String>();
-		System.out.print("\n\t");
+		if (verbose)  System.out.print("\n\t");
+		
 		//for each chrom of bed regions
 		for (String chr: chrBed.keySet()){
-			System.out.print(chr+" ");
+			if (verbose)  System.out.print(chr+" ");
 			Bed[] bed = chrBed.get(chr);
 			UCSCGeneLine[] genes = chrGenes.get(chr);
 			if (genes == null) {
-				System.err.print("\nWARNING: No genes for chrom "+chr+", skipping.\n\t");
-				for (Bed region: bed) out.println(region.getName()+"\t.");
+				if (verbose) System.err.print("\nWARNING: No genes for chrom "+chr+", skipping.\n\t");
+				for (Bed region: bed) {
+					region.setName(region.getName()+"\t.");
+					if (out != null) out.println(region.getName());
+				}
 				continue;
 			}
 
@@ -72,16 +96,17 @@ public class AnnotateBedWithGenes {
 					ArrayList<UCSCGeneLine> g = exonTree.get(x);
 					//for each gen line extract wanted info and collapse with the Hash
 					for (UCSCGeneLine gl: g){
-						toAdd.add(gl.getNames(":"));
+						toAdd.add(gl.getNamesCollapsed(":"));
 					}
 				}
 				//print it
 				String anno = ".";
 				if (toAdd.size() !=0) anno = Misc.hashSetToString(toAdd, ",");
-				out.println(region.getName()+"\t"+anno);
+				region.setName(region.getName()+"\t"+anno);
+				if (out != null) out.println(region.getName());
 			}	
 		}
-		System.out.println("\n\nDone!");
+		if (verbose)  System.out.println("\n\nDone!");
 	}
 	
 
@@ -130,13 +155,13 @@ public class AnnotateBedWithGenes {
 	private void parseFiles() throws Exception {
 		UCSCGeneModelTableReader tr = new UCSCGeneModelTableReader(ucscTableFile, 0);
 		chrGenes = tr.getChromSpecificGeneLines();
-		System.out.println(tr.getGeneLines().length+"\tGenes parsed");
+		if (verbose)  System.out.println(tr.getGeneLines().length+"\tGenes parsed");
 
 		//parse bed
-		Bed[] regions = Bed.parseFilePutLineInNameNoScoreOrStrand(bedFile, bpPad, bpPad, coorIndexes);
+		Bed[] regions = Bed.parseFilePutLineInNameNoScoreOrStrand(bedFile, bpPad, (-1*bpPad), coorIndexes);
 		Arrays.sort(regions);
-		chrBed = Bed.splitBedByChrom(regions);
-		System.out.println(regions.length+"\tRegions to intersect");
+		chrBed = Bed.splitBedByChrom(regions);		
+		if (verbose)  System.out.println(regions.length+"\tRegions to intersect");
 
 		//make writer
 		out = new Gzipper(resultsFile);
@@ -191,7 +216,7 @@ public class AnnotateBedWithGenes {
 	public static void printDocs(){ 
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Annotate Bed With Genes   Jan 2017                     **\n" +
+				"**                           Annotate Bed With Genes   Nov 2018                     **\n" +
 				"**************************************************************************************\n" +
 				"Takes a bed like file and a UCSC gene table, intersects them and adds a new column to\n"+
 				"the file with the gene names that intersect the gene exons or regions. \n\n"+

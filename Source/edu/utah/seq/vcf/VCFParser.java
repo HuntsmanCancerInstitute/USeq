@@ -779,6 +779,25 @@ public class VCFParser {
 		//keep pass
 		filterVCFRecords(VCFRecord.PASS);
 	}
+	
+	/**Returns snvs, indels, other.*/
+	public VCFRecord[][] splitVCFRecordsBySnvIndelOther() {
+		ArrayList<VCFRecord> snvAL = new ArrayList<VCFRecord>();
+		ArrayList<VCFRecord> indelAL = new ArrayList<VCFRecord>();
+		ArrayList<VCFRecord> otherAL = new ArrayList<VCFRecord>();
+		for (VCFRecord rec: vcfRecords){
+			if (rec.isSNP()) snvAL.add(rec);
+			else if (rec.isDeletion() || rec.isInsertion()) indelAL.add(rec);
+			else otherAL.add(rec);
+		}
+		VCFRecord[] snvs = new VCFRecord[snvAL.size()];
+		VCFRecord[] indels = new VCFRecord[indelAL.size()];
+		VCFRecord[] other = new VCFRecord[otherAL.size()];
+		snvAL.toArray(snvs);
+		indelAL.toArray(indels);
+		otherAL.toArray(other);
+		return new VCFRecord[][]{snvs, indels, other};
+	}
 
 	public VCFRecord[] getVcfRecords() {
 		return vcfRecords;
@@ -818,6 +837,8 @@ public class VCFParser {
 		if (chromosomeVCFRecords == null) splitVCFRecordsByChromosome();
 		return chromosomeVCFRecords;
 	}
+
+
 
 
 

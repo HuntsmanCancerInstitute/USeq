@@ -42,6 +42,7 @@ public class PairedAlignmentChrParser implements Runnable{
 	private boolean saveSams = false;
 	private boolean removeDuplicates = false;
 	private boolean onlyMergeOverlappingAlignments = true;
+	private File samFile = null;
 
 	//local counters
 	private int numberAlignments = 0;
@@ -602,9 +603,9 @@ public class PairedAlignmentChrParser implements Runnable{
 			//create gzipper?
 			if (saveSams){
 				String name = Misc.removeExtension(mpa.getBamFile().getName());
-				samOut = new Gzipper (new File (mpa.getSaveDirectory(), chromosome+"_"+name+".sam.gz"));
-				//add header to results file
-				samOut.println(mpa.getSamHeader());
+				samFile = new File (mpa.getSaveDirectory(), chromosome+"_"+name+".sam.gz");
+				samOut = new Gzipper (samFile);
+				samFile.deleteOnExit();
 			}
 
 			ArrayList<SamAlignment> alignmentsToMerge = null;
@@ -801,6 +802,10 @@ public class PairedAlignmentChrParser implements Runnable{
 
 	public double getNumberPassingQ30Bases() {
 		return numberPassingQ30Bases;
+	}
+
+	public File getSamFile() {
+		return samFile;
 	}
 
 

@@ -309,8 +309,8 @@ public class BamConcordance {
 		}
 				
 		//make temp dir
-		tempDirectory = new File (bamFiles[0].getCanonicalFile().getParentFile(), "TempDirBCC_"+Misc.getRandomString(6)).getCanonicalFile();
-		tempDirectory.mkdirs();
+		tempDirectory = new File ("TempDirBCC_"+Misc.getRandomString(6));
+		tempDirectory.mkdir();
 		
 		//sample names
 		sampleNames = new String[bamFiles.length];
@@ -328,7 +328,7 @@ public class BamConcordance {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Bam Concordance: Oct  2018                         **\n" +
+				"**                            Bam Concordance: October 2018                         **\n" +
 				"**************************************************************************************\n" +
 				"BC calculates sample level concordance based on uncommon homozygous SNVs found in bam\n"+
 				"files. Samples from the same person will show high similarity (>0.9). Run BC on\n"+
