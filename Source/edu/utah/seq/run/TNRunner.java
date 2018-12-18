@@ -37,6 +37,7 @@ public class TNRunner {
 	private boolean groupProcessingFailed = false;
 	private boolean restartFailed = false;
 	private HashMap<String, File> otherBams = null;
+	private int maxNumJobsToSubmit = 40;
 
 	private String pathToTrim = null;
 
@@ -45,14 +46,17 @@ public class TNRunner {
 
 		processArgs(args);
 
-		processIndividualSamples();
-
-		processSampleGroup();
-		
-		if (complete()) {
-			//TODO: aggregateQCForGroup();
-			IO.pl("\nALL COMPLETE!");
+		if (processIndividualSamples()){
+			
+			processSampleGroup();
+			
+			if (complete()) {
+				//TODO: aggregateQCForGroup();
+				IO.pl("\nALL COMPLETE!");
+			}
 		}
+
+		
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
@@ -251,20 +255,28 @@ public class TNRunner {
 		}
 	}
 
-	private void processIndividualSamples() {
+	private boolean processIndividualSamples() {
 		try {
 			if (verbose) IO.pl("\nChecking individual samples...");
 			else IO.pl("\nChecking individual samples (SampleID RunningJobs)");
 			
+			int numJobsLaunched = 0;
 			tNSamples = new TNSample[rootDirs.length];
 			for (int i=0; i< rootDirs.length; i++){
 				if (verbose == false) IO.p("\t"+rootDirs[i].getName());
 				tNSamples[i] = new TNSample(rootDirs[i].getCanonicalFile(), this);
 				if (verbose == false) IO.pl("\t"+tNSamples[i].isRunning());
+				numJobsLaunched += tNSamples[i].getNumJobsLaunched();
+				if (numJobsLaunched > maxNumJobsToSubmit) {
+					IO.pl("\nMaximum number jobs launched, skipping remaining samples.");
+					return false;
+				}
 			}
+			return true;
 		} catch (IOException e) {
 			System.err.println("\n\nProblem processing individual sample:");
 			e.printStackTrace();
+			return false;
 		}
 	}
 
@@ -309,6 +321,7 @@ public class TNRunner {
 						case 'o': otherDir = new File(args[++i]); break;
 						case 'u': minReadCoverageTumor = Integer.parseInt(args[++i]); break;
 						case 'n': minReadCoverageNormal = Integer.parseInt(args[++i]); break;
+						case 'x': maxNumJobsToSubmit = Integer.parseInt(args[++i]); break;
 						case 'q': verbose = false; break;
 						case 'f': forceRestart = true; break;
 						case 'r': restartFailed = true; break;
@@ -416,6 +429,7 @@ public class TNRunner {
 				IO.pl("Restart failed jobs\t"+restartFailed);
 				IO.pl("Force restart\t"+forceRestart);
 				IO.pl("Verbose logging\t"+verbose);
+				IO.pl("Max # jobs to launch\t"+maxNumJobsToSubmit);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -472,6 +486,7 @@ public class TNRunner {
 				"-r Restart FAILED jobs.\n"+
 				"-f Force a restart of all uncompleted jobs.\n"+
 				"-q Quite output.\n"+
+				"-x Maximum # jobs to launch, defaults to 40.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p AvatarPatients -o ~/FoundationPatients/\n"+
 				"     -e ~/Hg38/ExomeAlignQC/ -c ~/Hg38/SomExoCaller/ -a ~/Hg38/Annotator/ -b \n"+

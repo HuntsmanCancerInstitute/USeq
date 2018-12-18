@@ -42,6 +42,7 @@ public class TNSample {
 	//Job status
 	private boolean failed = false;
 	private boolean running = false;
+	private int numJobsLaunched = 0;
 	
 
 	public TNSample(File rootDir, TNRunner tnRunner) throws IOException{
@@ -240,6 +241,7 @@ public class TNSample {
 		String jobDirPath = jobDir.getCanonicalPath();
 		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", jobDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", jobDirPath, shellScript.getCanonicalPath()}, false);
 		for (String o: output) info.add("\t\t"+o);
+		numJobsLaunched++;
 	}
 	
 	private void createBamConcordanceLinks(File jobDir) throws IOException{
@@ -486,6 +488,7 @@ public class TNSample {
 		String alignDirPath = jobDir.getCanonicalPath();
 		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
 		for (String o: output) info.add("\t\t"+o);
+		numJobsLaunched++;
 	}
 	
 	private void createCopyRatioLinks(File jobDir) throws IOException {
@@ -631,6 +634,7 @@ public class TNSample {
 		String alignDirPath = alignDir.getCanonicalPath();
 		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
 		for (String o: output) info.add("\t\t"+o);
+		numJobsLaunched++;
 		
 		deleteBamConcordance = true;
 	}
@@ -748,6 +752,7 @@ public class TNSample {
 		String jobDirPath = jobDir.getCanonicalPath();
 		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", jobDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", jobDirPath, shellScript.getCanonicalPath()}, false);
 		for (String o: output) info.add("\t\t"+o);
+		numJobsLaunched++;
 	}
 
 	
@@ -769,6 +774,7 @@ public class TNSample {
 		String jobDirPath = jobDir.getCanonicalPath();
 		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", jobDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", jobDirPath, shellScript.getCanonicalPath()}, false);
 		for (String o: output) info.add("\t\t"+o);
+		numJobsLaunched++;
 	}
 
 	private void launchExomeAlignQC(File[] fastq, File alignDir, int minReadCoverage) throws IOException {
@@ -792,6 +798,7 @@ public class TNSample {
 		String alignDirPath = alignDir.getCanonicalPath();
 		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
 		for (String o: output) info.add("\t\t"+o);
+		numJobsLaunched++;
 		
 		//delete BamConcordance if it exists
 		deleteBamConcordance = true;
@@ -976,5 +983,9 @@ public class TNSample {
 
 	public boolean isRunning() {
 		return running;
+	}
+
+	public int getNumJobsLaunched() {
+		return numJobsLaunched;
 	}
 }
