@@ -25,15 +25,17 @@ public class TRunner {
 	private String somaticAnnotatedVcfParser = "-d 50 -f";
 	private boolean restartFailed = false;
 	private String pathToTrim = null;
+	private int maxNumJobsToSubmit = 40;
 
 	public TRunner (String[] args) {
 		long startTime = System.currentTimeMillis();
 
 		processArgs(args);
 
-		processIndividualSamples();
-		
-		if (complete()) IO.pl("\nALL COMPLETE!");
+		if (processIndividualSamples()){
+			if (complete()) IO.pl("\nALL COMPLETE!");
+			else IO.pl("\nNOT COMPLETE!");
+		}
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
@@ -47,20 +49,28 @@ public class TRunner {
 		return true;
 	}
 
-	private void processIndividualSamples() {
+	private boolean processIndividualSamples() {
 		try {
 			if (verbose) IO.pl("\nChecking individual samples...");
 			else IO.pl("\nChecking individual samples (SampleID RunningJobs)");
 			
+			int numJobsLaunched = 0;
 			tSamples = new TSample[rootDirs.length];
 			for (int i=0; i< rootDirs.length; i++){
 				if (verbose == false) IO.p("\t"+rootDirs[i].getName());
 				tSamples[i] = new TSample(rootDirs[i].getCanonicalFile(), this);
 				if (verbose == false) IO.pl("\t"+tSamples[i].isRunning());
+				numJobsLaunched += tSamples[i].getNumJobsLaunched();
+				if (numJobsLaunched > maxNumJobsToSubmit) {
+					IO.pl("\nMaximum number jobs launched, skipping remaining samples.");
+					return false;
+				}
 			}
+			return true;
 		} catch (IOException e) {
 			System.err.println("\n\nProblem processing individual sample:");
 			e.printStackTrace();
+			return false;
 		}
 	}
 
@@ -96,6 +106,7 @@ public class TRunner {
 						case 'a': annoWorkflowDir = new File(args[++i]); break;
 						case 'v': vcfIntegrationDir = new File(args[++i]); break;
 						case 's': somaticAnnotatedVcfParser = args[++i]; break;
+						case 'x': maxNumJobsToSubmit = Integer.parseInt(args[++i]); break;
 						case 'q': verbose = false; break;
 						case 'f': forceRestart = true; break;
 						case 'r': restartFailed = true; break;

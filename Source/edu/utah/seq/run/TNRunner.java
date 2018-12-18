@@ -54,6 +54,7 @@ public class TNRunner {
 				//TODO: aggregateQCForGroup();
 				IO.pl("\nALL COMPLETE!");
 			}
+			else IO.pl("\nNOT COMPLETE!");
 		}
 
 		

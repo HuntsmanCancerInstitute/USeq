@@ -42,6 +42,7 @@ public class TSample {
 	//Job status
 	private boolean failed = false;
 	private boolean running = false;
+	private int numJobsLaunched = 0;
 	
 
 	public TSample(File rootDir, TRunner TRunner) throws IOException{
@@ -156,6 +157,7 @@ public class TSample {
 		String alignDirPath = jobDir.getCanonicalPath();
 		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(tRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
 		for (String o: output) info.add("\t\t"+o);
+		numJobsLaunched++;
 	}
 
 	private void annotateSomaticVariants() throws IOException {
@@ -361,5 +363,9 @@ public class TSample {
 
 	public boolean isRunning() {
 		return running;
+	}
+
+	public int getNumJobsLaunched() {
+		return numJobsLaunched;
 	}
 }
