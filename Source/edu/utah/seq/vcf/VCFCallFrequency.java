@@ -79,7 +79,6 @@ public class VCFCallFrequency {
 		hist.printScaledHistogram();
 
 		//finish and calc run time
-
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		IO.pl("\nDone! "+Math.round(diffTime)+" Sec\n");
 
@@ -182,7 +181,7 @@ public class VCFCallFrequency {
 		} 
 	}
 
-	private void processRecordBlock(String[][] vcfRecords, Gzipper out) throws IOException {
+	private void processRecordBlock(String[][] vcfRecords, Gzipper out) throws Exception {
 
 		//run queries
 		JSONObject jsonResultsVcf = null;
