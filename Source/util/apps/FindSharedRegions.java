@@ -27,6 +27,8 @@ public class FindSharedRegions {
 		//for each chromosome
 		try {
 			PrintWriter bedOut = new PrintWriter( new FileWriter (saveFile));
+			long lenSharedRegions = 0;
+			long numSharedRegions = 0;
 			for (String chrom : regionsHash1.keySet()){
 
 				//get regions 
@@ -64,11 +66,18 @@ public class FindSharedRegions {
 				
 				//write out blocks
 				int[][] blocks = ExportIntergenicRegions.fetchFalseBlocks(commonBPs, 0, minimumLength);
+				
 				for (int j=0; j< blocks.length; j++){
 					bedOut.println(chrom+"\t"+ blocks[j][0]+ "\t"+ (blocks[j][1]+1));
+					lenSharedRegions+= ((blocks[j][1]+1) - blocks[j][0]);
 				}
+				numSharedRegions+= blocks.length;
 			}
 			bedOut.close();
+			
+			IO.pl();
+			IO.pl(numSharedRegions+"\tNumber of shared regions");
+			IO.pl(lenSharedRegions+"\tTotal BP length of shared regions");
 			System.out.println("\nDone!\n");
 		} catch (Exception e){
 			System.out.println();
@@ -124,7 +133,7 @@ public class FindSharedRegions {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Find Shared Regions: Dec 2011                         **\n" +
+				"**                            Find Shared Regions: Dec 2018                         **\n" +
 				"**************************************************************************************\n" +
 				"Writes out a bed file of shared regions. Interbase coordinates.\n\n"+
 
