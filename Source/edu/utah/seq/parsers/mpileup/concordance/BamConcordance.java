@@ -2,11 +2,7 @@ package edu.utah.seq.parsers.mpileup.concordance;
 
 import java.io.*;
 import java.util.regex.*;
-
-import edu.utah.seq.its.Interval1D;
-import edu.utah.seq.its.IntervalST;
 import util.bio.annotation.Bed;
-import util.bio.parsers.UCSCGeneLine;
 import util.gen.*;
 import java.util.*;
 import java.util.concurrent.ExecutorService;
@@ -27,9 +23,14 @@ public class BamConcordance {
 	private double minAFForHom = 0.95;
 	private double minAFForMatch = 0.90;
 	private double minAFForHis = 0.05;
+	private double minFracSim = 0.85;
 	private int minBaseQuality = 20;
 	private int minMappingQuality = 20;
 	private File jsonOutputFile = null;
+	private String toIgnoreForCall = "Transcriptome";
+	private double minMale = 2.5;
+	private double maxFemale = 1.5;
+	
 
 	//internal fields
 	private File tempDirectory;
@@ -43,6 +44,8 @@ public class BamConcordance {
 	private String[] genderForJson = null;
 	private String[] bamFileNamesForJson = null;
 	private String bamNames = null;
+	private String concordanceCheck = "";
+	private String genderCheck = "";
 	
 	//internal fields
 	ConcordanceChunk[] runners;
@@ -155,6 +158,10 @@ public class BamConcordance {
 		IO.pl(minBaseQuality+"\tMinBaseQuality");
 		IO.pl(minMappingQuality+"\tMinMappingQuality");
 		IO.pl(maxIndel+"\tMaxIndel");
+		IO.pl(minFracSim+"\tMinFractionSimilarity");
+		IO.pl(maxFemale+"\tMaxFemale");
+		IO.pl(minMale+"\tMinMale");
+		IO.pl(toIgnoreForCall+"\tSample name to ignore in passing");
 		if (commonSnvBed!= null) IO.pl(commonSnvBed.getName()+ "\tCommon SNV exclusion file");
 		else IO.pl("All SNVs counted, common and uncommon.");
 	}
@@ -165,23 +172,61 @@ public class BamConcordance {
 		for (int i=0; i< similarities.length; i++) similarities[i].calculateMaxMatch();
 		Arrays.sort(similarities);
 		System.out.println("\nStats:");
+		boolean failConcordance = false;
+		boolean warnConcordance = false;
 		for (int i=0; i< similarities.length; i++) {
 			System.out.println(similarities[i].toString(sampleNames));
 			similarityForJson[i] = similarities[i].toStringShort(sampleNames);
+			String comp = similarities[i].passSimilarity(sampleNames);
+			if (comp.equals("FAIL")) failConcordance = true;
+			else if (comp.equals("WARNING")) warnConcordance = true; 
 		}
+		//set concordance check
+		if (failConcordance) concordanceCheck = "FAIL";
+		else if (warnConcordance) concordanceCheck = "WARNING";
+		else concordanceCheck = "PASS";
+		
+		IO.pl(concordanceCheck+"\tConcordance Check (warning samples containing '"+toIgnoreForCall+"' that fail)\n");
 	}
 
 	public void printGenderRatios(){
 		genderForJson = new String[afHist.length];
 		IO.pl("Het/Hom histogram AF count ratios for AllChrs, ChrX, log2(All/X)");
+		boolean maleFound = false;
+		boolean femaleFound = false;
+		boolean indeterminant = false;
 		for (int i=0; i< afHist.length; i++){
 			double allChr = ratioCenterVsLast(afHist[i]);
 			double chrX = ratioCenterVsLast(chrXAfHist[i]);
 			double lgrto = Num.log2(allChr/chrX);
-			String g = sampleNames[i] +"\t"+Num.formatNumber(allChr, 3)+"\t"+Num.formatNumber(chrX, 3)+"\t"+Num.formatNumber(lgrto, 3);
+			//check gender?
+			String genderCall = "\tSKIPPED";
+			if (sampleNames[i].contains(toIgnoreForCall)==false && Double.isNaN(lgrto)==false && Double.isInfinite(lgrto)==false){
+				if (lgrto > minMale) {
+					maleFound = true;
+					genderCall = "\tMALE";
+				}
+				else if (lgrto < maxFemale) {
+					femaleFound = true;
+					genderCall = "\tFEMALE";
+				}
+				else {
+					indeterminant = true;
+					genderCall = "\tINDETERMINANT";
+				}
+			}
+			String g = sampleNames[i] +"\t"+Num.formatNumber(allChr, 3)+"\t"+Num.formatNumber(chrX, 3)+"\t"+Num.formatNumber(lgrto, 3)+genderCall;
 			IO.pl(g);
 			genderForJson[i] = Misc.TAB.matcher(g).replaceAll(" ");
 		}
+		//set for whole sample set
+		if (indeterminant) genderCheck = "INDETERMINANT";
+		else if (maleFound==true && femaleFound==true) genderCheck = "CONFLICTING";
+		else if (maleFound) genderCheck = "MALE";
+		else if (femaleFound) genderCheck = "FEMALE";
+		else genderCheck = "NA";
+		
+		IO.pl("\n"+genderCheck+"\tGender Check");
 	}
 	
 	/**Sums the num of middle and end bins, returns the ratio. Hard coded!*/
@@ -233,7 +278,9 @@ public class BamConcordance {
 			gz.printJson("sampleNames", sampleNames, true);
 			gz.printJson("bamFileNames", bamFileNamesForJson, true);
 			gz.printJson("similarities", similarityForJson, true);
-			gz.printJson("genderChecks", genderForJson, false);
+			gz.printJson("concordanceCheck", concordanceCheck, true);
+			gz.printJson("genderChecks", genderForJson, true);
+			gz.printJson("genderCall", genderCheck, false);
 			gz.println("}");
 			gz.close();
 			
@@ -272,10 +319,14 @@ public class BamConcordance {
 					case 'b': bamFiles = IO.extractFiles(new File(args[++i]), ".bam"); break;
 					case 'd': minSnvDP = Integer.parseInt(args[++i]); break; 
 					case 'a': minAFForHom = Double.parseDouble(args[++i]); break;
+					case 'x': maxFemale = Double.parseDouble(args[++i]); break;
+					case 'y': minMale = Double.parseDouble(args[++i]); break;
 					case 'm': minAFForMatch = Double.parseDouble(args[++i]); break;
 					case 'q': minBaseQuality = Integer.parseInt(args[++i]); break;
 					case 'u': minMappingQuality = Integer.parseInt(args[++i]); break;
 					case 'j': jsonOutputFile = new File(args[++i]); break;
+					case 'n': minFracSim = Double.parseDouble(args[++i]); break;
+					case 'e': toIgnoreForCall = args[++i]; break;
 					case 't': numberThreads = Integer.parseInt(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -328,7 +379,7 @@ public class BamConcordance {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Bam Concordance: October 2018                         **\n" +
+				"**                            Bam Concordance: January 2019                         **\n" +
 				"**************************************************************************************\n" +
 				"BC calculates sample level concordance based on uncommon homozygous SNVs found in bam\n"+
 				"files. Samples from the same person will show high similarity (>0.9). Run BC on\n"+
@@ -359,6 +410,10 @@ public class BamConcordance {
 				"-m Minimum allele frequency to count a homozygous match, defaults to 0.9\n"+
 				"-q Minimum base quality, defaults to 20.\n"+
 				"-u Minimum mapping quality, defaults to 20.\n"+
+				"-n Minimum fraction similarity to pass sample set, defaults to 0.85\n"+
+				"-x Maximum log2Rto score for calling a sample female, defaults to 1.5\n"+
+				"-y Minimum log2Rto score for calling a sample male, defaults to 2.5\n"+
+				"-e Sample name to ignore in scoring similarity and gender, defaults to 'Transcriptome'\n"+
 				"-j Write gzipped summary stats in json format to this file.\n"+
 				"-t Number of threads to use.  If not set, determines this based on the number of\n"+
 				"      threads and memory available to the JVM so set the -Xmx value to the max.\n\n"+
@@ -421,6 +476,14 @@ public class BamConcordance {
 
 	public String getBamNames() {
 		return bamNames;
+	}
+
+	public String getToIgnoreForCall() {
+		return toIgnoreForCall;
+	}
+
+	public double getMinFracSim() {
+		return minFracSim;
 	}
 
 	

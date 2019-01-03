@@ -235,7 +235,7 @@ public class ConcordanceChunk implements Runnable{
 		ArrayList<Similarity> al = new ArrayList<Similarity>();
 		for (int i=0; i< numSamples; i++){
 			for (int j=i+1; j< numSamples; j++){
-				al.add(new Similarity(i,j,minAFForHom, minAFForMatch));
+				al.add(new Similarity(i,j,bcc));
 			}
 		}
 		similarities = new Similarity[al.size()];

@@ -17,6 +17,10 @@ public 	class Similarity implements Comparable<Similarity>{
 	private double maxMatch = 0;
 	private Histogram sampleAMisMatchAFs = new Histogram(0,1,101);
 	private Histogram sampleBMisMatchAFs = new Histogram(0,1,101);
+	private double fracMatchAB = -1;
+	private double fracMatchBA = -1;
+	private double minSim = 0;
+	private String toIgnoreForSim;
 	
 	public void add(Similarity other) throws Exception {
 		this.numMatchesAB += other.numMatchesAB;
@@ -27,19 +31,34 @@ public 	class Similarity implements Comparable<Similarity>{
 		this.sampleBMisMatchAFs.addCounts(other.sampleBMisMatchAFs);
 	}
 	
-	Similarity(int a, int b, double minAFForHom, double minAFForMatch){
+	public Similarity(int a, int b, BamConcordance bc){ //double minAFForHom, double minAFForMatch, double minSim, String toIgnoreForSim){
 		sampleA = a;
 		sampleB = b;
-		this.minAFForHom = minAFForHom;
-		this.minAFForMatch = minAFForMatch;
+		minAFForHom = bc.getMinAFForHom();
+		minAFForMatch = bc.getMinAFForMatch();
+		minSim = bc.getMinFracSim();
+		toIgnoreForSim = bc.getToIgnoreForCall();
+	}
+	
+	public String passSimilarity(String[] sampleNames){
+		if (fracMatchBA == -1) fracMatchBA = (double)numMatchesBA/(double)(numMatchesBA+ numMisMatchesBA);
+		if (fracMatchAB == -1) fracMatchAB = (double)numMatchesAB/(double)(numMatchesAB+ numMisMatchesAB);
+		boolean pass = true;
+		if (fracMatchBA < minSim) pass = false;
+		if (fracMatchAB < minSim) pass = false;
+		if (pass == false){
+			if (sampleNames[sampleA].contains(toIgnoreForSim) || sampleNames[sampleB].contains(toIgnoreForSim)) return "WARNING";
+			return "FAIL";
+		}
+		return "PASS";
 	}
 
 	public String toString(String[] sampleNames){
-		double fracMatchAB = (double)numMatchesAB/(double)(numMatchesAB+ numMisMatchesAB);
+		if (fracMatchAB == -1) fracMatchAB = (double)numMatchesAB/(double)(numMatchesAB+ numMisMatchesAB);
 		String ab = sampleNames[sampleA]+"->"+ sampleNames[sampleB]+"\t"+ Num.formatNumberMinOne(fracMatchAB, 3)+" ("+(int)numMatchesAB+"/"+(int)(numMatchesAB+numMisMatchesAB)+")\n";
-		double fracMatchBA = (double)numMatchesBA/(double)(numMatchesBA+ numMisMatchesBA);
+		if (fracMatchBA == -1) fracMatchBA = (double)numMatchesBA/(double)(numMatchesBA+ numMisMatchesBA);
 		String ba = sampleNames[sampleB]+"->"+ sampleNames[sampleA]+"\t"+ Num.formatNumberMinOne(fracMatchBA, 3)+" ("+(int)numMatchesBA+"/"+(int)(numMatchesBA+numMisMatchesBA)+")\n";
-		return ab+ba;
+		return ab+ba+passSimilarity(sampleNames)+"\n";
 	}
 	
 	public String toStringShort(String[] sampleNames){
@@ -47,7 +66,7 @@ public 	class Similarity implements Comparable<Similarity>{
 		String ab = sampleNames[sampleA]+"->"+ sampleNames[sampleB]+" "+ Num.formatNumberMinOne(fracMatchAB, 3)+"("+(int)numMatchesAB+"/"+(int)(numMatchesAB+numMisMatchesAB)+")";
 		double fracMatchBA = (double)numMatchesBA/(double)(numMatchesBA+ numMisMatchesBA);
 		String ba = Num.formatNumberMinOne(fracMatchBA, 3)+"("+(int)numMatchesBA+"/"+(int)(numMatchesBA+numMisMatchesBA)+")";
-		return ab+" "+ba;
+		return ab+" "+ba+" "+ passSimilarity(sampleNames);
 	}
 	
 	public void toStringMismatch(String[] sampleNames) {
@@ -59,8 +78,8 @@ public 	class Similarity implements Comparable<Similarity>{
 	}
 	
 	public void calculateMaxMatch(){
-		double fracMatchAB = (double)numMatchesAB/(double)(numMatchesAB+ numMisMatchesAB);
-		double fracMatchBA = (double)numMatchesBA/(double)(numMatchesBA+ numMisMatchesBA);
+		if (fracMatchBA == -1) fracMatchBA = (double)numMatchesBA/(double)(numMatchesBA+ numMisMatchesBA);
+		if (fracMatchAB == -1) fracMatchAB = (double)numMatchesAB/(double)(numMatchesAB+ numMisMatchesAB);
 		if (fracMatchAB >= fracMatchBA) maxMatch = fracMatchAB;
 		else maxMatch = fracMatchBA;
 	}
