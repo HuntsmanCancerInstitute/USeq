@@ -14,6 +14,7 @@ public class TSample {
 	private TRunner tRunner;
 	private boolean forceRestart;
 	private boolean restartFailedJobs;
+	private boolean softRestart;
 	private ArrayList<String> info = new ArrayList<String>();
 	
 	//Input datasets
@@ -50,6 +51,7 @@ public class TSample {
 		this.tRunner = TRunner;
 		this.forceRestart = TRunner.isForceRestart();
 		this.restartFailedJobs = TRunner.isRestartFailed();
+		this.softRestart = TRunner.isSoftRestart();
 		
 		//assign id
 		id = rootDir.getName();
@@ -115,11 +117,22 @@ public class TSample {
 	
 	private void checkJob(HashMap<String, File> nameFile, File jobDir, File[] toSoftLink, File[] runDocs) throws IOException {
 		//force a restart?
-		if (forceRestart  || restartFailedJobs && nameFile.containsKey("FAILED")){
-			//cancel any slurm jobs and delete the directory
-			TNSample.cancelDeleteJobDir(nameFile, jobDir, info);
-			//launch it
-			launch(jobDir, toSoftLink, runDocs);
+		if (nameFile.containsKey("FAILED")){
+			if (forceRestart  || restartFailedJobs ){
+				//cancel any slurm jobs and delete the directory
+				TNSample.cancelDeleteJobDir(nameFile, jobDir, info, true);
+				restart(jobDir, toSoftLink, runDocs);
+			}
+			else if (softRestart){
+				//cancel any slurm jobs and delete the directory
+				TNSample.cancelDeleteJobDir(nameFile, jobDir, info, false);
+				restart(jobDir, toSoftLink, runDocs);
+			}
+			//FAILED but no restart
+			else if (nameFile.containsKey("FAILED")){
+				info.add("\t\tFAILED "+jobDir);
+				failed = true;
+			}
 		}
 		//QUEUED
 		else if (nameFile.containsKey("QUEUED")){
@@ -131,17 +144,19 @@ public class TSample {
 			if (TNSample.checkQueue(nameFile, jobDir, info) == false) failed = true;
 			else running = true;
 		}
-		//FAILED but no forceRestart
-		else if (nameFile.containsKey("FAILED")){
-			info.add("\t\tFAILED "+jobDir);
-			failed = true;
-		}
 		//hmm no status files, probably something went wrong on the cluster? mark it as FAILED
 		else {
 			info.add("\t\tMarking as FAILED, no job status files in "+jobDir);
 			new File(jobDir, "FAILED").createNewFile();
 			failed = true;
 		}
+	}
+	
+	private void restart(File jobDir, File[] toSoftLink, File[] runDocs) throws IOException{
+		//launch it
+		launch(jobDir, toSoftLink, runDocs);
+		new File(jobDir, "RESTARTED").createNewFile();
+		info.add("\t\tRESTARTED");
 	}
 	
 	private void launch(File jobDir, File[] toLink, File[] docs) throws IOException{

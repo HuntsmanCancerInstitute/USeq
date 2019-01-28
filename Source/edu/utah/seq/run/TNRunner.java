@@ -27,6 +27,7 @@ public class TNRunner {
 	private File maleBkg = null;
 	private File femaleBkg = null;
 	private boolean forceRestart = false;
+	private boolean softRestart = false;
 	private int minReadCoverageTumor = 20;
 	private int minReadCoverageNormal = 10;
 	private TNSample[] tNSamples = null;
@@ -47,21 +48,26 @@ public class TNRunner {
 		processArgs(args);
 
 		if (processIndividualSamples()){
-			
 			processSampleGroup();
-			
-			if (complete()) {
-				//TODO: aggregateQCForGroup();
-				IO.pl("\nALL COMPLETE!");
-			}
+			if (complete()) IO.pl("\nALL COMPLETE!");
 			else IO.pl("\nNOT COMPLETE!");
 		}
-
+		else IO.pl("\nNOT COMPLETE!");
+		
+		printSamplesWithFastqIssues();
 		
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		IO.pl("\nDone! "+Math.round(diffTime)+" Sec\n");
+	}
+
+	private void printSamplesWithFastqIssues() {
+		ArrayList<String> issues = new ArrayList<String>();
+		for (TNSample t: tNSamples){
+			if (t.isFastqIssue()) issues.add(t.getId());
+		}
+		if (issues.size() != 0 && verbose) IO.pl("\nThe following have been skipped due to fastq file count issues: "+issues);
 	}
 
 	private boolean complete() {
@@ -202,7 +208,7 @@ public class TNRunner {
 		//force a restart?
 		else if (forceRestart || restartFailed && nameFile.containsKey("FAILED")){
 			//cancel any slurm jobs and delete the directory
-			TNSample.cancelDeleteJobDir(nameFile, jobDir, info);
+			TNSample.cancelDeleteJobDir(nameFile, jobDir, info, true);
 			//launch it
 			launchJointGenotyping(toGeno, jobDir);
 		}
@@ -325,7 +331,8 @@ public class TNRunner {
 						case 'x': maxNumJobsToSubmit = Integer.parseInt(args[++i]); break;
 						case 'q': verbose = false; break;
 						case 'f': forceRestart = true; break;
-						case 'r': restartFailed = true; break;
+						case 'd': restartFailed = true; break;
+						case 'r': softRestart = true; break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 						}
 					}
@@ -427,7 +434,8 @@ public class TNRunner {
 				IO.pl("Min normal read coverage\t"+minReadCoverageNormal);
 				IO.pl("Germline Annotated Vcf Parser options\t"+germlineAnnotatedVcfParser);
 				IO.pl("Somatic Annotated Vcf Parser options\t"+somaticAnnotatedVcfParser);
-				IO.pl("Restart failed jobs\t"+restartFailed);
+				IO.pl("Restart failed jobs\t"+softRestart);
+				IO.pl("Delete and restart failed jobs\t"+restartFailed);
 				IO.pl("Force restart\t"+forceRestart);
 				IO.pl("Verbose logging\t"+verbose);
 				IO.pl("Max # jobs to launch\t"+maxNumJobsToSubmit);
@@ -441,14 +449,15 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                               TNRunner  December 2018                            **\n" +
+				"**                                  TNRunner : Jan 2019                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several dockerized snakmake workflows on human tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, Hg38\n"+
 				"alignments are run, somatic and germline variants are called, and concordance measured\n"+
 				"between sample bams. To execute TNRunner, create the following directory structure and\n"+
 				"link or copy in the corresponding paired end Illumina gzipped fastq files.\n"+
-				"MyPatientSampleDatasets\n"+
+				
+				"\nMyPatientSampleDatasets\n"+
 				"   MyPatientA\n"+
 				"      Fastq\n"+
 				"         NormalExome\n"+
@@ -459,12 +468,13 @@ public class TNRunner {
 				"         TumorExome\n"+
 				"         TumorTranscriptome\n"+
 				"   MyPatientC....\n"+
-				"The Fastq directory and sub directories must match this naming. Only include those\n"+
+				
+				"\nThe Fastq directory and sub directories must match this naming. Only include those\n"+
 				"for which you have fastq.  Change the MyXXX to something relevant. TNRunner is\n"+
 				"stateless so as more Fastq becomes available or issues are addressed, relaunch the\n"+
 				"app. This won't effect running or queued slurm jobs. Relaunch periodically to assess\n"+
-				"the current processing status and queue additional tasks. Download the latest\n"+
-				"workflows from https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38 \n"+
+				"the current processing status and queue additional tasks. Download the latest from \n"+
+				"https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38RunnerWorkflows \n"+
 				"and the matching resource bundle from\n"+
 				"https://hci-bio-app.hci.utah.edu/gnomex/gnomexFlex.jsp?analysisNumber=A5578\n"+
 					
@@ -474,7 +484,7 @@ public class TNRunner {
 				"   sample concordance. The patient directory naming must match.\n"+
 				"-k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio\n"+
 				"      background files.\n"+
-				"-y Workflow docs for launching copy ratio analysis.\n"+
+				"-y Workflow docs for launching copy analysis.\n"+
 				"-e Workflow docs for launching exome alignments.\n"+
 				"-t Workflow docs for launching transcriptome alignments.\n"+
 				"-c Workflow docs for launching somatic variant calling.\n"+
@@ -484,15 +494,16 @@ public class TNRunner {
 				"-g Germline AnnotatedVcfParser options, defaults to '-d 10 -m 0.2 -x 1 -p 0.01 -g \n"+
 				"      D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign'\n"+
 				"-s Somatic AnnotatedVcfParser options, defaults to '-d 20 -f'\n"+
-				"-r Restart FAILED jobs.\n"+
-				"-f Force a restart of all uncompleted jobs.\n"+
+				"-r Attempt to restart FAILED jobs from last successfully completed rule.\n"+
+				"-d Delete and restart FAILED jobs.\n"+
+				"-f Force a restart of all running and uncompleted jobs.\n"+
 				"-q Quite output.\n"+
 				"-x Maximum # jobs to launch, defaults to 40.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p AvatarPatients -o ~/FoundationPatients/\n"+
 				"     -e ~/Hg38/ExomeAlignQC/ -c ~/Hg38/SomExoCaller/ -a ~/Hg38/Annotator/ -b \n"+
 				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/TranscriptomeAlignQC/\n"+
-				"     -y /Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r'  \n\n"+
+				"     -y /Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 20 \n\n"+
 
 
 				"**************************************************************************************\n");
@@ -548,5 +559,8 @@ public class TNRunner {
 	}
 	public File getFemaleBkg() {
 		return femaleBkg;
+	}
+	public boolean isSoftRestart() {
+		return softRestart;
 	}
 }

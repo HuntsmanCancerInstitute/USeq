@@ -6,7 +6,10 @@ import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.TreeSet;
 
+import org.json.JSONArray;
 import org.json.JSONObject;
 
 import com.eclipsesource.json.JsonArray;
@@ -58,6 +61,7 @@ public class SampleQC {
 	
 	//AvatarInfo
 	JSONObject avatarInfo = null;
+	String diagnosis = null;
 
 	//constructor
 	public SampleQC( String sampleName){
@@ -137,53 +141,79 @@ public class SampleQC {
 		}
 	}
 	
+	/**Loads all of the sample diagnosis.*/
+	public String getDiagnosis(){
+		if (diagnosis != null) return diagnosis;
+		JSONArray ja = avatarInfo.getJSONArray("Samples");
+		int numSamples = ja.length();
+		TreeSet<String> d = new TreeSet<String>();
+		for (int i=0; i< numSamples; i++){
+			JSONObject jo = ja.getJSONObject(i);
+			if (jo.has("Diagnosis")) d.add(jo.getString("Diagnosis"));
+		}
+		if (d.size() == 0) diagnosis = "NA";
+		else diagnosis = Misc.treeSetToString(d, ",");
+		return diagnosis;
+	}
+	
 	public String fetchTabbedLine(BamConcordanceQC bc) {
-		ArrayList<String> al = new ArrayList<String>();
-		//add sample name
-		al.add(sampleName);
-		//add Analysis ID?
-		if (avatarInfo != null){
-			String analysisId = avatarInfo.getString("AnalysisId");
-			if (analysisId == null) analysisId = "NA";
-			al.add(analysisId);
+		try {
+			ArrayList<String> al = new ArrayList<String>();
+			//add sample name
+			al.add(sampleName);
+			//add Analysis ID?
+			if (avatarInfo != null){
+				al.add(getDiagnosis());
+				//Add analysis ID
+				String analysisId = avatarInfo.getString("AnalysisId");
+				if (analysisId == null) analysisId = "NA";
+				al.add(analysisId);
+			}
+			if (fastqParsed) al.add(new Long(numberFastqReads).toString());
+			if (saeParsed){
+				al.add(new Long(numberUnfilteredAlignments).toString());
+				al.add(new Double(fractionAlignmentsPassQCScoreFilters).toString());
+				al.add(new Double(fractionOnTargetAndPassQCScoreFilters).toString());
+				al.add(new Double(estimatedFractionDuplicateAlignments).toString());
+			}
+			if (mpaParsed){
+				al.add(new Double(meanInsertSize).toString());
+				al.add(new Double(fractionOverlappingBpsInPairedReads).toString());
+				al.add(new Long(numberPassingBps).toString());
+				al.add(new Double(fractionPassingQ20bps).toString());
+				al.add(new Double(fractionPassingQ30bps).toString());
+			}
+			if (s2uParsed){
+				al.add(new Double(meanOnTargetCoverage).toString());
+				al.add(new Double(coverageAt090OfTargetBps).toString());
+				al.add(new Double(coverageAt095OfTargetBps).toString());
+				//al.add(new Long(numberLowCoverageBps).toString());
+			}
+			if (bc != null){
+				al.add(bc.getSimilarity());
+				al.add(bc.getGenderCheck());
+			}
+			//add gender?
+			if (avatarInfo != null){
+				String gender = avatarInfo.getString("Gender");
+				if (gender == null) gender = "NA";
+				al.add(gender);
+			}
+			return Misc.stringArrayListToString(al, "\t");
+		} catch (Exception e){
+			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem parsing sample "+sampleName);
 		}
-		if (fastqParsed) al.add(new Long(numberFastqReads).toString());
-		if (saeParsed){
-			al.add(new Long(numberUnfilteredAlignments).toString());
-			al.add(new Double(fractionAlignmentsPassQCScoreFilters).toString());
-			al.add(new Double(fractionOnTargetAndPassQCScoreFilters).toString());
-			al.add(new Double(estimatedFractionDuplicateAlignments).toString());
-		}
-		if (mpaParsed){
-			al.add(new Double(meanInsertSize).toString());
-			al.add(new Double(fractionOverlappingBpsInPairedReads).toString());
-			al.add(new Long(numberPassingBps).toString());
-			al.add(new Double(fractionPassingQ20bps).toString());
-			al.add(new Double(fractionPassingQ30bps).toString());
-		}
-		if (s2uParsed){
-			al.add(new Double(meanOnTargetCoverage).toString());
-			al.add(new Double(coverageAt090OfTargetBps).toString());
-			al.add(new Double(coverageAt095OfTargetBps).toString());
-			//al.add(new Long(numberLowCoverageBps).toString());
-		}
-		if (bc != null){
-			al.add(bc.getSimilarity());
-			al.add(bc.getGenderCheck());
-		}
-		//add gender?
-		if (avatarInfo != null){
-			String gender = avatarInfo.getString("Gender");
-			if (gender == null) gender = "NA";
-			al.add(gender);
-		}
-		return Misc.stringArrayListToString(al, "\t");
+		return null;
 	}
 	
 	public String fetchTabbedHeader(boolean includeAvatarInfo, boolean includeBC){
 		ArrayList<String> al = new ArrayList<String>();
 		al.add("Sample Name");
-		if (includeAvatarInfo) al.add("AnalysisId");
+		if (includeAvatarInfo) {
+			al.add("Diagnosis");
+			al.add("AnalysisId");
+		}
 		if (fastqParsed) al.add("# Fastq Reads");
 		if (saeParsed){
 			al.add("# Unfiltered Alignments");
@@ -216,7 +246,10 @@ public class SampleQC {
 	
 	public void appendHtmlColumns(StringBuilder sb, boolean addBC) {
 		sb.append("	data.addColumn('string', 'Sample Name');\n");
-		if (avatarInfo != null) sb.append("	data.addColumn('string', 'AnalysisId');\n");
+		if (avatarInfo != null) {
+			sb.append("	data.addColumn('string', 'Diagnosis');\n");
+			sb.append("	data.addColumn('string', 'AnalysisId');\n");
+		}
 		if (fastqParsed) sb.append("	data.addColumn('number', '# Fastq Reads');\n"); 
 		
 		if (saeParsed){
@@ -244,6 +277,8 @@ public class SampleQC {
 		if (avatarInfo != null) sb.append("	data.addColumn('string', 'Gender');\n");
 	}
 	
+	
+	
 	public void appendHtmlDataRow(StringBuilder sb, boolean skipComma, HashMap<String, BamConcordanceQC> bamFileNameBCR) throws IOException {
 		//sb.append("		['Mike',  100.3, true],\n");
 		//sb.append("		['Jim',   {v:8000,   f: '$8,000'},  false],\n");
@@ -256,11 +291,15 @@ public class SampleQC {
 		f.setGroupingUsed(false); //no commas!
 		
 		al.add("'"+sampleName+"'");
+		
 		if (avatarInfo != null) {
+			al.add("'"+getDiagnosis()+"'");
+			//Add Analysis ID
 			String aId = null;
 			aId = avatarInfo.getString("AnalysisId");
 			if (aId == null) aId = "NA";
 			al.add("'"+aId+"'");
+			
 		}
 		if (fastqParsed) al.add(new Long(numberFastqReads).toString());
 		if (saeParsed){
@@ -318,7 +357,10 @@ public class SampleQC {
 	public String fetchDescriptions(String b, String d, String e, boolean addBC){
 		ArrayList<String> al = new ArrayList<String>();
 		al.add(b+ "Sample Name"+ d+ "Name parsed from the json.gz files.");
-		if (avatarInfo != null) al.add(b+ "AnalysisId"+ d+ "GNomEx Analysis ID.");
+		if (avatarInfo != null) {
+			al.add(b+ "Diagnosis"+ d+ "Submitted diagnosis, typically tumor type.");
+			al.add(b+ "AnalysisId"+ d+ "GNomEx Analysis ID.");
+		}
 		if (fastqParsed) al.add(b+ "# Fastq Reads"+ d+ "Total number of fastq reads passed to the aligner, not pairs of reads, all.");
 		if (saeParsed){
 			al.add(b+ "# Unfiltered Alignments"+ d+ "Number of unfiltered alignments.");

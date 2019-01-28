@@ -21,11 +21,12 @@ public class TRunner {
 	private File[] vcfIntegrationDocs = null;
 	private File[] varAnnoDocs = null;
 	private boolean forceRestart = false;
+	private boolean softRestart = false;
 	private TSample[] tSamples = null;
 	private String somaticAnnotatedVcfParser = "-d 50 -f";
 	private boolean restartFailed = false;
 	private String pathToTrim = null;
-	private int maxNumJobsToSubmit = 40;
+	private int maxNumJobsToSubmit = 0;
 
 	public TRunner (String[] args) {
 		long startTime = System.currentTimeMillis();
@@ -36,6 +37,7 @@ public class TRunner {
 			if (complete()) IO.pl("\nALL COMPLETE!");
 			else IO.pl("\nNOT COMPLETE!");
 		}
+		else IO.pl("\nNOT COMPLETE!");
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
@@ -61,7 +63,8 @@ public class TRunner {
 				tSamples[i] = new TSample(rootDirs[i].getCanonicalFile(), this);
 				if (verbose == false) IO.pl("\t"+tSamples[i].isRunning());
 				numJobsLaunched += tSamples[i].getNumJobsLaunched();
-				if (numJobsLaunched > maxNumJobsToSubmit) {
+				//hit max?
+				if (maxNumJobsToSubmit!=0 && numJobsLaunched > maxNumJobsToSubmit) {
 					IO.pl("\nMaximum number jobs launched, skipping remaining samples.");
 					return false;
 				}
@@ -109,7 +112,8 @@ public class TRunner {
 						case 'x': maxNumJobsToSubmit = Integer.parseInt(args[++i]); break;
 						case 'q': verbose = false; break;
 						case 'f': forceRestart = true; break;
-						case 'r': restartFailed = true; break;
+						case 'd': restartFailed = true; break;
+						case 'r': softRestart = true; break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 						}
 					}
@@ -157,9 +161,12 @@ public class TRunner {
 				IO.pl("Somatic Annotated Vcf Parser options\t"+somaticAnnotatedVcfParser);
 				IO.pl("Vcf integration workflow directory\t"+vcfIntegrationDir);
 				IO.pl("Variant annotation workflow docs\t"+annoWorkflowDir);
-				IO.pl("Restart failed jobs\t"+restartFailed);
+				IO.pl("Restart failed jobs\t"+softRestart);
+				IO.pl("Delete and restart failed jobs\t"+restartFailed);
 				IO.pl("Force restart\t"+forceRestart);
 				IO.pl("Verbose logging\t"+verbose);
+				if (maxNumJobsToSubmit!=0) IO.pl("Max # jobs to launch\t"+maxNumJobsToSubmit);
+				else IO.pl("Max # jobs to launch\tno limit");
 			}
 			
 		} catch (IOException e) {
@@ -171,7 +178,7 @@ public class TRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TRunner November 2018                            **\n" +
+				"**                                 TRunner December 2018                            **\n" +
 				"**************************************************************************************\n" +
 				"TRunner is designed to execute several dockerized snakmake workflows on human tumor\n"+
 				"only datasets via a slurm cluster.  Based on the availability of the bams and xml,\n"+
@@ -187,7 +194,6 @@ public class TRunner {
 				"   MyPatient2\n"+
 				"      Bam\n"+
 				"         TumorDNA\n"+
-				"         TumorRNA\n"+
 				"      Xml"+
 				"   MyPatient3....\n"+
 				
@@ -195,8 +201,8 @@ public class TRunner {
 				"something relevant. As more files becomes available or issues are addressed, relaunch\n"+
 				"the app. This won't effect running slurm jobs. Relaunch periodically to assess\n"+
 				"the current processing status and queue additional tasks. Download the latest\n"+
-				"workflows from https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38 \n"+
-				"and the matching resource bundle from\n"+
+				"workflows from https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/\n"+
+				"Hg38RunnerWorkflows/Foundation and the matching resource bundle from\n"+
 				"https://hci-bio-app.hci.utah.edu/gnomex/gnomexFlex.jsp?analysisNumber=A5578\n"+
 					
 				"\nOptions:\n"+
@@ -207,15 +213,17 @@ public class TRunner {
 				"-a Workflow docs for launching variant annotation.\n"+
 				"-v Workflow docs for launching xml variant integration.\n"+
 				"-s Somatic AnnotatedVcfParser options, defaults to '-d 50 -f'\n"+
-				"-r Restart FAILED jobs.\n"+
+				"-r Attempt to restart FAILED jobs from last successfully completed rule.\n"+
+				"-d Delete and restart FAILED jobs.\n"+
 				"-f Force a restart of all running and uncompleted jobs.\n"+
 				"-q Quite output.\n"+
+				"-x Maximum # jobs to launch, defaults to 0, no limit\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/TRunner -p FoundationPatients -e \n"+
 				"     ~/Hg38/CaptureAlignQC/WorkflowDocs/ -c ~/Hg38/SomExoCaller/WorkflowDocs/ -a \n"+
 				"     ~/Hg38/Annotator/WorkflowDocs/ -b ~/Hg38/BamConcordance/WorkflowDocs/ -j\n"+
 				"     ~/Hg38/JointGenotyping/WorkflowDocs/ -t ~/Hg38/TranscriptomeAlignQC/WorkflowDocs/ \n"+
-				"     -s '-d 100 -f' \n\n"+
+				"     -s '-d 100 -f' -x 20 \n\n"+
 
 
 				"**************************************************************************************\n");
@@ -250,5 +258,9 @@ public class TRunner {
 	}
 	public File[] getVcfIntegrationDocs() {
 		return vcfIntegrationDocs;
+	}
+
+	public boolean isSoftRestart() {
+		return softRestart;
 	}
 }

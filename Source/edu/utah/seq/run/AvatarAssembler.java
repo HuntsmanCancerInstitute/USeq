@@ -26,7 +26,7 @@ public class AvatarAssembler {
 	private File info = null;
 	private File path = null;
 	private File results = null;
-	private File linkDir = null;
+	private File jobDir = null;
 	private TreeMap<Integer, AvatarPatient> hciId2AvatarPatient = new TreeMap<Integer, AvatarPatient>();
 	private HashMap<String, AvatarPatient> experimentId2AvatarPatient = new HashMap<String, AvatarPatient>(); 
 	private HashMap<String, AvatarSample> sampleId2AvatarPatient = new HashMap<String, AvatarSample>();
@@ -40,6 +40,7 @@ public class AvatarAssembler {
 	private HashSet<String> links = new HashSet<String>();
 	private ArrayList<AvatarPatient> toLink = new ArrayList<AvatarPatient>();
 	private boolean linkOnlyTN = true;
+	private String diagnosisFilter = null;
 
 	
 	private void incrementSampleCounters(AvatarPatient ap) {
@@ -69,6 +70,8 @@ public class AvatarAssembler {
 			loadGender();
 			
 			loadDiagnosis();
+			
+			filterPatients();
 
 			outputStatPatients();
 			
@@ -84,6 +87,21 @@ public class AvatarAssembler {
 		IO.pl("\nDone! "+Math.round(diffTime)+" Sec\n");
 	}
 	
+	private void filterPatients() {
+		if (diagnosisFilter == null) return;
+		TreeMap<Integer, AvatarPatient> keep = new TreeMap<Integer, AvatarPatient>();
+		for (Integer i: hciId2AvatarPatient.keySet()) {
+			AvatarPatient ap = hciId2AvatarPatient.get(i);
+			for (AvatarSample as: ap.avatarSamples){
+				if (as.diagnosis.contains(diagnosisFilter)){
+					keep.put(i, ap);
+					break;
+				}
+			}
+		}
+		hciId2AvatarPatient = keep;
+	}
+
 	private void outputStatPatients() throws FileNotFoundException, IOException {
 		Gzipper out = new Gzipper(results);
 		for (AvatarPatient ap: hciId2AvatarPatient.values()) {
@@ -191,7 +209,7 @@ public class AvatarAssembler {
 				if (samplesInfo.justSingle() == false) IO.pl("Needs custom:"+this.toString());
 
 				//create dir to put linked files
-				File patientDir = new File (linkDir, new Integer(hciId).toString());
+				File patientDir = new File (jobDir, new Integer(hciId).toString());
 				patFastqDir = new File (patientDir, "Fastq");
 				patFastqDir.mkdirs();
 
@@ -213,13 +231,11 @@ public class AvatarAssembler {
 						}
 					}
 				}
-				
 				//write out info
 				File info = new File(patientDir, hciId+"_AvatarInfo.json.gz");
 				Gzipper gz = new Gzipper(info);
 				gz.println(this.toJson().toString(4));
 				gz.close();
-				
 			} catch (IOException e) {
 				e.printStackTrace();
 				System.exit(1);
@@ -303,7 +319,7 @@ public class AvatarAssembler {
 		AvatarPatient avatarPatient = null;
 		String sampleId = null;
 		String sampleName = null;
-		String diagnosis = null;
+		String diagnosis = "";
 		
 		//Exome or Transcriptome
 		String sampleType = null;
@@ -388,6 +404,8 @@ public class AvatarAssembler {
 					case 'i': info = new File(args[++i]); break;
 					case 'p': path = new File(args[++i]); break;
 					case 'r': results = new File(args[++i]); break;
+					case 'f': diagnosisFilter = args[++i]; break;
+					case 'j': jobDir = new File(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -397,18 +415,17 @@ public class AvatarAssembler {
 				}
 			}
 		}
-		File[] files = new File[]{gender, diagnosis, info, path, results};
-		for (File f: files) if (f== null) Misc.printErrAndExit("Error: missing one of the required five files (-g -d -i -p -r).");
-		linkDir = new File(results.getParentFile(), "PatientFastq").getCanonicalFile();
-		IO.deleteDirectoryViaCmdLine(linkDir);
-		linkDir.mkdirs();
+		File[] files = new File[]{gender, diagnosis, info, path, results, jobDir};
+		for (File f: files) if (f== null) Misc.printErrAndExit("Error: missing one of the required five files (-g -d -i -p -r -j).");
+		
+		jobDir.mkdirs();
 	}
 
 
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                              AvatarAssembler  October 2018                       **\n" +
+				"**                              AvatarAssembler  January 2019                       **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling fastq avatar datasets based on the results of three sql queries.\n"+
 				"See https://ri-confluence.hci.utah.edu/x/KwBFAg   Run as root on hci-clingen1\n"+
@@ -418,11 +435,13 @@ public class AvatarAssembler {
 				"-d Diagnosis\n"+
 				"-g Gender\n"+
 				"-p Path to Exp dir, e.g. /Repository/PersonData/2018/\n"+
+				"-j Job dir to place linked fastq\n"+
+				"-f Only keep patients with a diagnosis containing this String, defaults to all.\n"+
 				"-r Patient stats output file.\n\n"+
 				
                 "Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/2018/\n"+
                 "    -r avatarAssembler.log.gz -i sampleInfo.txt -d sampleDiagnosis.txt -g \n"+
-                "    sampleGender.txt > avatarAssemblerProblemSamples.txt\n\n"+
+                "    sampleGender.txt > avatarAssemblerProblemSamples.txt -f HEM \n\n"+
 
 
 				"**************************************************************************************\n");

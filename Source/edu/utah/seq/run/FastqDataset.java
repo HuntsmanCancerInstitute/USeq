@@ -12,6 +12,7 @@ public class FastqDataset{
 	private boolean fastqDirExists = false;
 	private File[] fastqs = null;
 	private String name = null;
+	private boolean incorrectNumberFastq = false;
 
 	public FastqDataset (File fastqDir, String name, ArrayList<String> info) throws IOException{
 		if (fastqDir != null) {
@@ -21,7 +22,10 @@ public class FastqDataset{
 				fastqDirExists = true;
 				//ok it exits check that there are two files
 				fastqs = checkNumberFiles(dir, ".gz", 2);
-				if (fastqs == null) info.add("\t\tSkipping "+name+". Failed to find two fastq files within "+fastqDir);
+				if (fastqs == null) {
+					info.add("\t\tSkipping "+name+". Failed to find two fastq files within "+fastqDir);
+					incorrectNumberFastq = true;
+				}
 			}
 		}
 	}
@@ -42,5 +46,9 @@ public class FastqDataset{
 	}
 	public String getName() {
 		return name;
+	}
+
+	public boolean isIncorrectNumberFastq() {
+		return incorrectNumberFastq;
 	}
 }
