@@ -17,20 +17,17 @@ public class UCSCGeneModelTableReader {
 	private HashMap<String,UCSCGeneLine[]> chromSpecificGeneLines = null;
 	
 	//test main
-	public static void main(String[] args){
-		//(new UCSCGeneModelTableReader (new File (args[0]), 1)).readOutHash();
-		UCSCGeneModelTableReader reader = new UCSCGeneModelTableReader (new File (args[0]), 0);
+	public static void main(String[] args) throws FileNotFoundException, IOException{
+		IO.pl("Loading");
+		UCSCGeneModelTableReader reader = new UCSCGeneModelTableReader (new File ("/Users/u0028003/Downloads/hg38RefSeq8Aug2018_Merged.ucsc.gz"), 0);
 		System.out.println("Num lines "+reader.getGeneLines().length);
-		//reader.removeOverlappingExons();
-		/*
 		UCSCGeneLine[] genes = reader.getGeneLines();
-		//print introns
+		Gzipper out = new Gzipper(new File ("/Users/u0028003/Downloads/hg38RefSeq8Aug2018_Merged.txt.gz"));
 		for (int i=0; i< genes.length; i++){
-			if (genes[i].getIntrons()!= null) {
-				genes[i].setExons(null);
-				System.out.println(genes[i].toStringAll());
-			}
-		}*/
+			out.println(genes[i].getDisplayNameThenName()+"\t"+genes[i].getLength());
+		}
+		out.close();
+		IO.pl("Done");
 	}
 	
 	//constructors

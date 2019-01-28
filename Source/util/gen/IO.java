@@ -1156,6 +1156,17 @@ public class IO {
 			return null;
 		}
 	}
+	
+	/**Returns a hash of the directory name and its File object.*/
+	public static HashMap<String, File> extractDirectories(File directory){
+		File[] fileNames = directory.listFiles();
+		HashMap<String, File> toReturn = new HashMap<String, File>();
+		for (int i=0; i< fileNames.length; i++)  {
+			if (fileNames[i].isDirectory() == false) continue;
+			toReturn.put(fileNames[i].getName(), fileNames[i]);
+		}
+		return toReturn;
+	}
 
 	/**Returns directories or null if none found. Not recursive.
 	 * Skips those beginning with a period.*/

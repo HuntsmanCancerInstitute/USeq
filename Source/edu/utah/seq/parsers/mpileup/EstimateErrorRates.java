@@ -407,7 +407,7 @@ public class EstimateErrorRates{
 				//"       library(samr); library(gplots)' in R to see if they are installed. \n"+
 
 				"\nExample: java -Xmx4G -jar pathToUSeq/Apps/EstimateErrorRates -m normExo.mpileup.gz\n" +
-				"     -r 200 -i 0.15 -f 2 -s 0,3,4 -c countTable.txt.gz\n" +
+				"     -r 200 -i 0.15 -f 2 -s 0,3,4 -c countTable.txt\n" +
 
 				"**************************************************************************************\n");
 

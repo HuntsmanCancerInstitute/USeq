@@ -27,8 +27,10 @@ public class StrelkaVCFParser {
 	private Pattern somEVS = Pattern.compile(".+;SomaticEVS=(\\d+).*");
 	private Pattern dp = Pattern.compile("DP=\\d+;*");
 	private boolean printSpreadsheet = false;
-	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
-	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
+	private String afInfo = "##INFO=<ID=T_AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
+	private String dpInfo = "##INFO=<ID=T_DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
+	private String nafInfo = "##INFO=<ID=N_AF,Number=1,Type=Float,Description=\"Allele Frequency for normal\">";
+	private String ndpInfo = "##INFO=<ID=N_DP,Number=1,Type=Integer,Description=\"Read depth for normal\">";
 	private String afFormat = "##FORMAT=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency\">";
 	private String gtFormat = "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">";
 	private double minimumTumorAltFraction = 0;
@@ -259,8 +261,12 @@ public class StrelkaVCFParser {
 				fields[10] = "./.:"+ fields[10]+ ":"+ tumorAf;
 				//remove existing DP
 				fields[7] = dp.matcher(fields[7]).replaceFirst("");
+				
+				//modify INFO
+				String normalAf = formatAf (vcf.getSample()[0].getAltRatio());
+				
 				//add DP and AF for tumor to INFO
-				fields[7] = "DP=" + vcf.getSample()[1].getReadDepthDP()+ ";AF=" + tumorAf + ";"+ fields[7] ;
+				fields[7] = "T_DP=" + vcf.getSample()[1].getReadDepthDP()+ ";T_AF=" + tumorAf+ ";N_DP=" + vcf.getSample()[0].getReadDepthDP()+ ";N_AF=" + normalAf + ";"+ fields[7] ;
 				
 				out.println(Misc.stringArrayToString(fields, "\t"));
 			}
@@ -282,6 +288,8 @@ public class StrelkaVCFParser {
 			if (added == false && h.startsWith("##FORMAT")) {
 				out.println(afInfo);
 				out.println(dpInfo);
+				out.println(nafInfo);
+				out.println(ndpInfo);
 				out.println(gtFormat);
 				out.println(afFormat);
 				added = true;
@@ -397,7 +405,7 @@ public class StrelkaVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Strelka VCF Parser: June 2018                         **\n" +
+				"**                            Strelka VCF Parser: Dec 2018                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS\n"+
 				"score. Also filters for read depth, T/N alt allelic ratio and diff, ref/alt with '.',\n"+

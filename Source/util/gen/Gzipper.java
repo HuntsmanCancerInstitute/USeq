@@ -9,6 +9,7 @@ public class Gzipper {
 	//fields
 	private GZIPOutputStream out;
 	private static final byte[] rtn = "\n".getBytes();
+	private static final byte[] tab = "\t".getBytes();
 	private static final byte[] rtnComma = ",\n".getBytes();
 	private File gzipFile;
 	
@@ -45,6 +46,10 @@ public class Gzipper {
 	public void println(String line) throws IOException{
 		out.write(line.getBytes());
 		out.write(rtn);
+	}
+	public void printTab(String line) throws IOException{
+		out.write(line.getBytes());
+		out.write(tab);
 	}
 	
 	/**Adds a return onto the line*/
