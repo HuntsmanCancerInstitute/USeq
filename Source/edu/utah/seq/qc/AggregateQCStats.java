@@ -40,6 +40,7 @@ public class AggregateQCStats {
 	private Pattern aiPattern;
 	
 	private boolean debug = false;
+	private boolean calcReadCoverage = true;
 
 
 	//constructors
@@ -60,14 +61,16 @@ public class AggregateQCStats {
 		System.out.println("\tStats");
 		printStatsTxtSheet();
 
-		System.out.println("\tRead coverage");
-		printReadCoverageTxtSheet();
-		System.out.println("\tTargets");
-		printTargetsTxtSheet();
+		if (calcReadCoverage){
+			System.out.println("\tRead coverage");
+			printReadCoverageTxtSheet();
+			System.out.println("\tTargets");
+			printTargetsTxtSheet();
+		}
 
 		System.out.println("Building html reports...");
 		printHtmlTable();
-		printReadCoverageHtml("Coverage Over Target BPs", "Unique Observation Fold Coverage", "Fraction Target BPs");
+		if (calcReadCoverage) printReadCoverageHtml("Coverage Over Target BPs", "Unique Observation Fold Coverage", "Fraction Target BPs");
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
@@ -382,7 +385,7 @@ public class AggregateQCStats {
 					//fetch SampleQC
 					SampleQC sqc = samples.get(nameType[0]);
 					if (sqc == null){
-						sqc = new SampleQC(nameType[0]);
+						sqc = new SampleQC(nameType[0], calcReadCoverage);
 						samples.put(nameType[0], sqc);
 					}
 					sqc.loadJson(j, nameType[1]);
@@ -468,6 +471,7 @@ public class AggregateQCStats {
 					case 'u': s2uMatch = args[++i]; break;
 					case 'p': prependString = args[++i]; break;
 					case 'v': debug = true; break;
+					case 'c': calcReadCoverage = false; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -509,6 +513,7 @@ public class AggregateQCStats {
 				"-u S2U regex, defaults to (.+)_Sam2USeq.json.gz\n"+
 				"-b BC regex, defaults to (.+)_BamConcordance.json.gz\n"+
 				"-p String to prepend onto output file names.\n"+
+				"-c Don't calculate detailed region read coverage statistics, saves memory and time.\n"+
 				"-v Print verbose debugging output.\n"+
 				"\n"+
 
@@ -516,5 +521,9 @@ public class AggregateQCStats {
 
 				"**************************************************************************************\n");
 
+	}
+
+	public boolean isCalcReadCoverage() {
+		return calcReadCoverage;
 	}	
 }

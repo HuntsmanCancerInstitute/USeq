@@ -56,16 +56,18 @@ public class SampleQC {
 	private float[] fractionTargetBpsWithIndexedCoverage;
 	private String[] lowCoverageRegions; 
 	private String[] exonicMedianPerBpCoverage;
-	//private long numberLowCoverageBps;
+	private long numberLowCoverageBps;
 	private String targetRegionsFileNameS2U;
 	
 	//AvatarInfo
 	JSONObject avatarInfo = null;
 	String diagnosis = null;
+	boolean parseReadCoverageStats = true;
 
 	//constructor
-	public SampleQC( String sampleName){
+	public SampleQC( String sampleName, boolean parseReadCoverageStats){
 		this.sampleName = sampleName;
+		this.parseReadCoverageStats = parseReadCoverageStats;
 	}
 
 	@SuppressWarnings("deprecation")
@@ -117,18 +119,20 @@ public class SampleQC {
 				s2uParsed = true;
 				//the traditional view of coverage, mean per bp coverage over captured regions, note with all of these stats, overlapping alignments have been merged so no double counting
 				meanOnTargetCoverage= jo.getDouble("meanOnTargetCoverage", -1);
-				//this is the fraction of target bps with >=0x, >=1x, >=2x .....
-				fractionTargetBpsWithIndexedCoverage = parseFloatArray(jo.get("fractionTargetBpsWithIndexedCoverage"));
+				if (parseReadCoverageStats) {
+					//this is the fraction of target bps with >=0x, >=1x, >=2x .....
+					fractionTargetBpsWithIndexedCoverage = parseFloatArray(jo.get("fractionTargetBpsWithIndexedCoverage"));
+					//this is the median of the per bp coverage across each region supplied to S2U
+					exonicMedianPerBpCoverage = parseStringArray(jo.get("exonicMedianPerBpCoverage"));
+					//bps that fail the minimum coverage threshold
+					lowCoverageRegions = parseStringArray(jo.get("lowCoverageRegions"));
+				}
 				//the coverage # found at 0.90 of target bps, calculate by asking what fraction of target bps have at minimum, 0x 1x, 2x, 3x, ... stop when fraction hits 0.90.
 				coverageAt090OfTargetBps = jo.getDouble("coverageAt0.90OfTargetBps", -1);
 				//the coverage # found at 0.95 of target bps, calculate by asking what fraction of target bps have at minimum, 0x 1x, 2x, 3x, ... stop when fraction hits 0.95.
 				coverageAt095OfTargetBps = jo.getDouble("coverageAt0.95OfTargetBps", -1);
-				//this is the median of the per bp coverage across each region supplied to S2U
-				exonicMedianPerBpCoverage = parseStringArray(jo.get("exonicMedianPerBpCoverage"));
 				//the threshold, typically 20-30x for germline, 300x for somatic
 				minimumCoverageThreshold = jo.getInt("minimumCoverageThreshold", -1);
-				//bps that fail the minimum coverage threshold
-				lowCoverageRegions = parseStringArray(jo.get("lowCoverageRegions"));
 				//number of target bps failing the coverage threshold
 				//numberLowCoverageBps = jo.getLong("numberLowCoverageBps", -1);
 				//name of targets
@@ -407,6 +411,7 @@ public class SampleQC {
 	
 	/**At what index does the fraction hit or fall below 0.25?*/
 	public int whenHit25ReadCoverage() {
+		if (parseReadCoverageStats == false) return -1; 
 		for (int i=0; i< fractionTargetBpsWithIndexedCoverage.length; i++){
 			if (fractionTargetBpsWithIndexedCoverage[i] <= 0.25) return i;
 		}
@@ -494,23 +499,18 @@ public class SampleQC {
 	public boolean isDivideAlignmentScoreByCigarM() {
 		return divideAlignmentScoreByCigarM;
 	}
-
 	public boolean isFastqParsed() {
 		return fastqParsed;
 	}
-
 	public String getTargetRegionsFileNameS2U() {
 		return targetRegionsFileNameS2U;
 	}
-
 	public String getTargetRegionsFileNameSAE() {
 		return targetRegionsFileNameSAE;
 	}
-
 	public String getMpaBamFileName() {
 		return mpaBamFileName;
 	}
-
 	public void setAvatarInfo(JSONObject avatarInfo) {
 		this.avatarInfo = avatarInfo;
 	}
