@@ -37,6 +37,8 @@ public class VCFBackgroundChecker {
 	private double maxSampleAF = 0.3;
 	private boolean replaceQualScore = false;
 	private int numberThreads = 0;
+	private String afInfoName = "T_AF";
+	private String dpInfoName = "T_DP";
 	
 	//internal
 	private static final int numVcfToProc = 100;
@@ -70,7 +72,7 @@ public class VCFBackgroundChecker {
 //BinomialMixture bm = new BinomialMixture(fullPathToR, saveDir, deleteTempFiles);
 
 			//for each vcf file
-			System.out.println("\nParsing vcf files...");
+			IO.pl("\nParsing vcf files...");
 			for (int i=0; i< vcfFiles.length; i++){
 				//set values and clear past data
 				vcfFile = vcfFiles[i];
@@ -81,7 +83,7 @@ public class VCFBackgroundChecker {
 				tooFewSamples.clear();
 				vcfRecords.clear();
 				
-				System.out.println(vcfFile.getName());
+				IO.pl(vcfFile.getName());
 				String name = Misc.removeExtension(vcfFile.getName());
 				createReaderSaveHeader();
 				File tempRData = new File(saveDir, name+"_RObs.txt");
@@ -121,7 +123,7 @@ public class VCFBackgroundChecker {
 							+ "samples passing thresholds to calculate a z-score. ");
 					System.err.println(Misc.stringArrayListToString(tooFewSamples, "\n"));
 				}*/
-				System.out.println("\t#Rec="+numRecords+" #Saved="+numSaved+" #NotScored="+numNotScored+" #FailingBKZ="+numFailingZscore+"\n");
+				IO.pl("\t#Rec="+numRecords+" #Saved="+numSaved+" #NotScored="+numNotScored+" #FailingBKZ="+numFailingZscore+"\n");
 			}
 			
 		} catch (Exception e) {
@@ -133,7 +135,7 @@ public class VCFBackgroundChecker {
 			
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
-			System.out.println("\nDone! "+Math.round(diffTime)+" min\n");
+			IO.pl("\nDone! "+Math.round(diffTime)+" min\n");
 		}
 	}
 
@@ -282,7 +284,7 @@ public class VCFBackgroundChecker {
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
-		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
+		IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		File forExtraction = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -302,6 +304,8 @@ public class VCFBackgroundChecker {
 					case 'd': verbose = true; break;
 					case 'u': replaceQualScore = true; break;
 					case 't': numberThreads = Integer.parseInt(args[++i]); break;
+					case 'f': afInfoName = args[++i]; break;
+					case 'p': dpInfoName = args[++i]; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -342,24 +346,26 @@ public class VCFBackgroundChecker {
 
 	
 	public void printSettings(){
-		System.out.println("Settings:\nBackground\t"+mpileup);
-		System.out.println("Save dir\t"+saveDir);
-		System.out.println(minReadCoverage+"\tMin mpileup sample read coverage");
-		System.out.println(minBaseQuality+"\tMin mpileup sample base quality");
-		System.out.println(maxSampleAF+"\tMax mpileup sample AF");
-		System.out.println(minNumSamples+"\tMin # samples for z-score calc");
-		System.out.println(minimumZScore+"\tMin vcf AF z-score to save");
-		System.out.println(numberThreads+"\tCPUs");
-		System.out.println(removeNonZScoredRecords+ "\tExclude vcf records that could not be z-scored");
-		System.out.println(verbose+"\tVerbose");
-		System.out.println(replaceQualScore+"\tReplace QUAL score with z-score and set non scored records to 0");
+		IO.pl("Settings:\nBackground\t"+mpileup);
+		IO.pl("Save dir\t"+saveDir);
+		IO.pl(afInfoName+ "\tTumor AF INFO name");
+		IO.pl(dpInfoName+ "\tTumor DP INFO name");
+		IO.pl(minReadCoverage+"\tMin mpileup sample read coverage");
+		IO.pl(minBaseQuality+"\tMin mpileup sample base quality");
+		IO.pl(maxSampleAF+"\tMax mpileup sample AF");
+		IO.pl(minNumSamples+"\tMin # samples for z-score calc");
+		IO.pl(minimumZScore+"\tMin vcf AF z-score to save");
+		IO.pl(numberThreads+"\tCPUs");
+		IO.pl(removeNonZScoredRecords+ "\tExclude vcf records that could not be z-scored");
+		IO.pl(verbose+"\tVerbose");
+		IO.pl(replaceQualScore+"\tReplace QUAL score with z-score and set non scored records to 0");
 	}
 
 	
 	public static void printDocs(){
-		System.out.println("\n" +
+		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                         VCF Background Checker : May 2018                        **\n" +
+				"**                         VCF Background Checker : Jan 2019                        **\n" +
 				"**************************************************************************************\n" +
 				"VBC calculates non-reference allele frequencies (AF) from a background multi-sample \n"+
 				"mpileup file over each vcf record. It then calculates a z-score for the vcf AF and \n"+
@@ -367,7 +373,7 @@ public class VCFBackgroundChecker {
 				"provided, the lowest bp z-score is appended. Z-scores < ~4 are indicative of non\n"+
 				"reference bps in the background samples. A flag is appended the FILTER field if a\n"+
 				"background AF was found within 10% of the vcf AF. Note, VBC requires AF and DP tags\n"+
-				"in the INFO field of each record to use in the z-score calculation. \n"+
+				"in the INFO field of each record to use in the z-score calculation, see -f and -p. \n"+
 
 				"\nRequired:\n"+
 				"-v Path to a xxx.vcf(.gz/.zip OK) file or directory containing such.\n" +
@@ -381,6 +387,8 @@ public class VCFBackgroundChecker {
 				"-s Path to directory in which to save the modified vcf file(s)\n"+
 						
 				"\nOptional:\n" +
+				"-f Tumor AF INFO name, defaults to T_AF\n"+
+				"-p Tumor DP INFO name, defaults to T_DP\n"+
 				"-z Minimum vcf z-score, defaults to 0, no filtering. Unscored vars are kept.\n"+
 				"-q Minimum mpileup sample bp quality, defaults to 20\n"+
 				"-c Minimum mpileup sample read coverge, defaults to 20\n"+
@@ -432,5 +440,13 @@ public class VCFBackgroundChecker {
 
 	public boolean isVerbose() {
 		return verbose;
+	}
+
+	public String getAFInfoName() {
+		return afInfoName;
+	}
+
+	public String getDPInfoName() {
+		return dpInfoName;
 	}
 }

@@ -74,8 +74,13 @@ public class VCF2Tsv {
 						parse = false;
 					}
 
+					//pull tumor AF
+					String afString = vcf.getInfoObject().getInfo("AF");
+					if (afString == null) afString = vcf.getInfoObject().getInfo("T_AF");
+					if (afString == null) throw new Exception("\nFailed to find the AF or T_AF in the INFO field?\n");
+					af = Double.parseDouble(afString);
+					
 					//check frac BKAF?
-					af = vcf.getInfoObject().getInfoFloat("AF");
 					if (parse == true && maxBKAF !=1){
 						String bkafs = vcf.getInfoObject().getInfo("BKAF");
 						if (bkafs != null){
@@ -187,7 +192,7 @@ public class VCF2Tsv {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 VCF 2 Tsv: March 2018                            **\n" +
+				"**                               VCF 2 Tsv: February 2019                           **\n" +
 				"**************************************************************************************\n" +
 				"Converts vcf files' SNVs and INDELs to tsv Illumina CE/CA format. \n"+
 

@@ -493,7 +493,7 @@ public class VCFCallFrequency {
 		IO.pl("\t-f File Filter "+fileFilter);
 		IO.pl("\t-m MaxCallFreq "+maxCallFreq);
 		IO.pl("\t-b MinBedCount "+minBedCount);
-		IO.pl("\t-x Remove failing "+appendFilter);
+		IO.pl("\t-x Remove failing "+(appendFilter==false));
 		IO.pl("\t-e Verbose "+debug);
 		if (queryURL != null){
 			IO.pl("\tQueryUrl "+queryURL);
@@ -538,7 +538,7 @@ public class VCFCallFrequency {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Call Frequency: Oct 2018                          **\n" +
+				"**                            VCF Call Frequency: Jan 2019                          **\n" +
 				"**************************************************************************************\n" +
 				"Calculates a vcf call frequency for each variant when pointed at a genomic Query\n"+
 				"service (https://github.com/HuntsmanCancerInstitute/Query) or the Data and Index\n"+
