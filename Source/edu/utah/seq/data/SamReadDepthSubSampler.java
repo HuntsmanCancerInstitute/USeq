@@ -2,6 +2,8 @@ package edu.utah.seq.data;
 
 import java.io.*;
 import java.util.regex.*;
+
+import util.bio.annotation.Bed;
 import util.gen.*;
 import java.util.*;
 import htsjdk.samtools.SAMFileHeader;
@@ -14,13 +16,15 @@ import edu.utah.seq.analysis.DefinedRegionDifferentialSeq;
 import edu.utah.seq.data.sam.ComparatorSamAlignmentName;
 import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.data.sam.SamAlignment;
+import edu.utah.seq.useq.data.RegionScoreText;
 
 /**
  * @author david.nix@hci.utah.edu 
  **/
 public class SamReadDepthSubSampler{
 	//user defined fields
-	private File[] samFiles;
+	private File bamFile;
+	private File bedRegionsFile;
 	private float minimumPosteriorProbability = 13;
 	private float maximumAlignmentScore = 300;
 	private String adapter = "chrAdapt";
@@ -33,6 +37,7 @@ public class SamReadDepthSubSampler{
 	private Gzipper out = null;
 	private File workingGzippedFile = null;
 	private File workingBamFile = null;
+	private HashMap<String, RegionScoreText[]> chrRegions;
 	
 	//alignment counts for sam files
 	private long numberAlignmentsFailingQualityScore = 0;
@@ -41,7 +46,6 @@ public class SamReadDepthSubSampler{
 	private long numberAlignmentsFailingQC = 0;
 	private long numberAlignmentsUnmapped = 0;
 	private long numberPassingAlignments = 0;
-	private File workingFile = null;
 	private long numberAlignmentsSaved = 0;
 	
 
@@ -50,21 +54,15 @@ public class SamReadDepthSubSampler{
 	public SamReadDepthSubSampler(String[] args){
 		long startTime = System.currentTimeMillis();
 		processArgs(args);
-		System.out.println("Parsing alignments...");
 		
-			//for each file, filter, split into numberChunks chunks
-			for (int i=0; i< samFiles.length; i++){
-				workingFile = samFiles[i];
-				System.out.print("\t"+workingFile.getName());
-				//parse it
-				if (parseWorkingSAMFile() == false) Misc.printExit("\n\tError: failed to parse, aborting.\n");
-				//sort results by coordinate
-				System.out.println(" Sorting");
-				new PicardSortSam(workingGzippedFile, workingBamFile);
-				//print stats
-				printStats();
-			}
-				
+		System.out.println("Parsing alignments...");
+		parseWorkingSAMFile();
+		
+		System.out.println("\n\nSorting...");
+		new PicardSortSam(workingGzippedFile, workingBamFile);
+
+		printStats();
+
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/(1000*60);
 		System.out.println("\nDone! "+Math.round(diffTime)+" min\n");
@@ -83,128 +81,102 @@ public class SamReadDepthSubSampler{
 		System.out.println(numberPassingAlignments +"\tPassed filters ("+Num.formatPercentOneFraction(((double)numberPassingAlignments)/ total)+")");
 		System.out.println(numberAlignmentsSaved +"\tPassed read depth filter ("+Num.formatPercentOneFraction(((double)numberAlignmentsSaved)/ (double)numberPassingAlignments)+") and saved");
 		System.out.println();
-		
-		//reset counters
-		samHeader = null;
-		numberAlignmentsFailingQualityScore = 0;
-		numberAlignmentsFailingAlignmentScore = 0;
-		numberControlAlignments = 0;
-		numberAlignmentsFailingQC = 0;
-		numberAlignmentsUnmapped = 0;
-		numberPassingAlignments = 0;
-		numberAlignmentsSaved = 0;
 	}
 
 
-	public boolean parseWorkingSAMFile(){
+	public void parseWorkingSAMFile(){
 		try{
 			//make reader
-			SAMFileReader reader = new SAMFileReader(workingFile);	
+			SAMFileReader reader = new SAMFileReader(bamFile);	
 			reader.setValidationStringency(ValidationStringency.SILENT);
 			SAMFileHeader sfh = reader.getFileHeader();
 			SortOrder so = sfh.getSortOrder();
 			if (so.equals(SortOrder.coordinate) == false) {
-				System.err.println("\n\tSAM file does not appear to be sorted by coordinate? Aborting.\n");
-				reader.close();
-				System.exit(1);
+				throw new Exception("\n\tSAM file does not appear to be sorted by coordinate? Aborting.\n");
 			}
 			
 			//make gzipper and write out header
-			String fileName = Misc.removeExtension(workingFile.getName()) + "RDSub"+targetReadDepth;
-			workingGzippedFile = new File(workingFile.getParentFile(), fileName+".sam.gz");
-			workingBamFile = new File(workingFile.getParentFile(), fileName+".bam");
+			String fileName = Misc.removeExtension(bamFile.getName()) + "RDSub"+targetReadDepth;
+			workingGzippedFile = new File(bamFile.getParentFile(), fileName+".sam.gz");
+			workingBamFile = new File(bamFile.getParentFile(), fileName+".bam");
 			workingGzippedFile.deleteOnExit();
 			out = new Gzipper(workingGzippedFile);
 			samHeader = sfh.getTextHeader().trim();
 			out.println(samHeader);
 			
-			SAMRecordIterator iterator = reader.iterator();
-			String chrom = null;
-			int numBadLines = 0;
-			int min = Integer.MAX_VALUE; 
-			int max = Integer.MIN_VALUE;
-			ArrayList<SamAlignment> samAL = new ArrayList<SamAlignment>();
-			
-			//for each record, load all of a particular chrom and process
-			while (iterator.hasNext()){
-				SAMRecord samRecord = iterator.next();
-				//print status blip
-				//this is a bit inefficient but gives absolute control on the sam data
-				SamAlignment sa;
-				String samLine = samRecord.getSAMString().trim();
-				try {
-					sa = new SamAlignment(samLine, false);
-				} catch (Exception e) {
-					System.out.println("\nSkipping malformed sam alignment ->\n"+samRecord.getSAMString()+"\n"+e.getMessage());
-					if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
-					continue;
+			//for each chrom
+			for (String chr: chrRegions.keySet()){
+				//for each region
+				RegionScoreText[] regions = chrRegions.get(chr);
+				IO.p(chr+" ");
+				for (RegionScoreText region: regions){
+					SAMRecordIterator iterator = reader.queryOverlapping(chr, region.getStart(), region.getStop());
+					if (iterator.hasNext()) loadParse(iterator);
+					iterator.close();
 				}
-				
-				//new chrom?
-				if (chrom == null || chrom.equals(sa.getReferenceSequence()) == false){
-					//process old
-					processChromAlignments(samAL, min, max);
-					//reset
-					min = Integer.MAX_VALUE; 
-					max = Integer.MIN_VALUE;
-					chrom = sa.getReferenceSequence();
-					samAL = new ArrayList<SamAlignment>();
-					System.out.print(" "+chrom);
-					
-				}
-				
-				//is it aligned?
-				if (sa.isUnmapped()) {
-					numberAlignmentsUnmapped++;
-					continue;
-				}
-				
-				//does it pass the vendor qc?
-				if (sa.failedQC()) {
-					numberAlignmentsFailingQC++;
-					continue;
-				}
-				
-				//skip phiX, adapter, lambda
-				String chr = sa.getReferenceSequence();
-				if (chr.startsWith(phiX) || chr.startsWith(adapter)) {
-					numberControlAlignments++;
-					continue;
-				}
-
-				//does it pass the scores threshold?
-				if (sa.getAlignmentScore() > maximumAlignmentScore) {
-					numberAlignmentsFailingAlignmentScore++;
-					continue;
-				}
-				if (sa.getMappingQuality() < minimumPosteriorProbability) {
-					numberAlignmentsFailingQualityScore++;
-					continue;
-				}
-
-				//increment counter, save, and check start and stop
-				numberPassingAlignments++;
-				samAL.add(sa);
-				if (sa.getUnclippedStart() < min) min = sa.getUnclippedStart();
-				int end = sa.countLengthOfAlignment() + sa.getPosition();
-				if (end > max) max = end;	
 			}
-			//process last
-			System.out.print(" "+chrom);
-			processChromAlignments(samAL, min, max);
-			
-			//cleanup
-			out.close();
 			reader.close();
-			
+			out.close();
 		} catch (Exception e){
-			System.err.println("\nError parsing Novoalign file or writing split binary chromosome files.\nToo many open files? Too many chromosomes? " +
-			"If so then login as root and set the default higher using the ulimit command (e.g. ulimit -n 10000)\n");
 			e.printStackTrace();
-			return false;
+			Misc.printErrAndExit("\nError parsing alignment file\n");
 		}
-		return true;
 	}
+
+	private void loadParse(SAMRecordIterator iterator) throws IOException {
+		int numBadLines = 0;
+		int min = Integer.MAX_VALUE; 
+		int max = Integer.MIN_VALUE;
+		ArrayList<SamAlignment> samAL = new ArrayList<SamAlignment>();
+		
+		//check and load records
+		while (iterator.hasNext()){
+			SAMRecord samRecord = iterator.next();
+			//this is a bit inefficient but gives absolute control on the sam data
+			SamAlignment sa;
+			String samLine = samRecord.getSAMString().trim();
+			try {
+				sa = new SamAlignment(samLine, false);
+			} catch (Exception e) {
+				System.out.println("\nSkipping malformed sam alignment ->\n"+samRecord.getSAMString()+"\n"+e.getMessage());
+				if (numBadLines++ > 1000) Misc.printErrAndExit("\nAboring: too many malformed SAM alignments.\n");
+				continue;
+			}
+			//is it aligned?
+			if (sa.isUnmapped()) {
+				numberAlignmentsUnmapped++;
+				continue;
+			}
+			//does it pass the vendor qc?
+			if (sa.failedQC()) {
+				numberAlignmentsFailingQC++;
+				continue;
+			}
+			//skip phiX, adapter, lambda
+			String chr = sa.getReferenceSequence();
+			if (chr.startsWith(phiX) || chr.startsWith(adapter)) {
+				numberControlAlignments++;
+				continue;
+			}
+			//does it pass the scores threshold?
+			if (sa.getAlignmentScore() > maximumAlignmentScore) {
+				numberAlignmentsFailingAlignmentScore++;
+				continue;
+			}
+			if (sa.getMappingQuality() < minimumPosteriorProbability) {
+				numberAlignmentsFailingQualityScore++;
+				continue;
+			}
+			//increment counter, save, and check start and stop
+			numberPassingAlignments++;
+			samAL.add(sa);
+			if (sa.getUnclippedStart() < min) min = sa.getUnclippedStart();
+			int end = sa.countLengthOfAlignment() + sa.getPosition();
+			if (end > max) max = end;	
+		}
+		processChromAlignments(samAL, min, max);
+	}
+
 
 	private void processChromAlignments(ArrayList<SamAlignment> samAL, int min, int max) throws IOException {
 		if (samAL.size() == 0) return;
@@ -245,13 +217,13 @@ public class SamReadDepthSubSampler{
 		if (keepPairsTogether){
 			for (int i=0; i< rgs.length; i++){
 				ArrayList<SamAlignment> sas = rgs[i].alignments;
-				//check each alignment in the group, print all if pass
+				//check first alignment in the group, print all if pass
 				for (SamAlignment sa : sas){
 					if (checkSetDepth(sa, rd, min)){
 						for (SamAlignment s : sas) out.println(s.getUnmodifiedSamRecord());
 						numberAlignmentsSaved += sas.size();
-						break;
 					}
+					break;
 				}
 			}
 		}
@@ -267,41 +239,40 @@ public class SamReadDepthSubSampler{
 				}
 			}
 		}
-		
 		//call garbage collection
 		rd = null;
 		rgs = null;
 		System.gc(); System.gc(); System.gc();
 	}
+
 	
 	private boolean checkSetDepth(SamAlignment sa, short[] rd, int minPos) {
 		int zeroPos = sa.getPosition()- minPos;
 		//fetch alignment blocks
 		ArrayList<int[]> blocks = DefinedRegionDifferentialSeq.fetchAlignmentBlocks(sa.getCigar(), zeroPos);
-		boolean increment = false;
-		//scan bases
-		for (int[] startStop: blocks){
-			for (int i= startStop[0]; i< startStop[1]; i++){
-				if (rd[i] < targetReadDepth) {
-					increment = true;
-					break;
-				}
-			}
-		}
-		if (increment){
+		if (incrementCounters(blocks, rd)){
 			//increment read depth counters
 			for (int[] startStop: blocks){
 				for (int i= startStop[0]; i< startStop[1]; i++) rd[i]++;
 			}
 			return true;
 		}
-		
 		return false;
+	}
+	
+	private boolean incrementCounters(ArrayList<int[]> blocks, short[] rd){
+		for (int[] startStop: blocks){
+			for (int i= startStop[0]; i< startStop[1]; i++){
+				if (rd[i] >= targetReadDepth) {
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 
 	private class ReadGroup{
 		ArrayList<SamAlignment> alignments = new ArrayList<SamAlignment>();
-		
 		public ReadGroup(SamAlignment sam){
 			alignments.add(sam);
 		}
@@ -327,11 +298,12 @@ public class SamReadDepthSubSampler{
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'a': samFiles = IO.extractFiles(new File(args[++i]),".bam"); break;
+					case 'a': bamFile = new File(args[++i]); break;
 					case 'x': maximumAlignmentScore = Float.parseFloat(args[++i]); break;
 					case 'q': minimumPosteriorProbability = Float.parseFloat(args[++i]); break;
 					case 't': targetReadDepth = Integer.parseInt(args[++i]); break;
 					case 'p': keepPairsTogether = true; break;
+					case 'b': bedRegionsFile = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -341,21 +313,25 @@ public class SamReadDepthSubSampler{
 				}
 			}
 		}
-		if (samFiles == null || samFiles.length ==0 || samFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.bam file(s)!\n");
+		if (bamFile == null || bamFile.exists() == false) Misc.printExit("\nError: cannot find your xxx.bam file!\n");
 		if (targetReadDepth < 0) Misc.printErrAndExit("\nPlease provide a target read depth.\n");
+		if (bedRegionsFile == null || bedRegionsFile.exists() == false) Misc.printErrAndExit("\nError: cannot find your bed regions file? "+bedRegionsFile);
+		
+		chrRegions = Bed.parseBedFile(bedRegionsFile, true, false);
+	
 	}	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              SamReadDepthSubSampler: Feb 2014                    **\n" +
+				"**                         Sam Read Depth Sub Sampler: Feb 2019                     **\n" +
 				"**************************************************************************************\n" +
-				"Filters, randomizes, subsamples each coordinate sorted bam alignment file to a target\n"+
-				"base level read depth. Useful for reducing extreem read depths over localized areas.\n"+
+				"Filters, randomizes, and subsamples a coordinate sorted bam alignment file to a target\n"+
+				"base level read depth over each of the provided regions.\n"+
 
 				"\nOptions:\n"+
-				"-a Alignment file or directory containing coordinate sorted xxx.bam files. Each is \n" +
-				"      processed independently.\n" +
+				"-a Alignment xxx.bam file, coordinate sorted with index.\n" +
+				"-b Bed file of regions to subsample (e.g. use Sam2USeq -c 1 -b hg38StdChrms.bed)\n"+
 				"-t Target read depth.\n"+
 				
 				"\nDefault Options:\n"+
@@ -365,7 +341,7 @@ public class SamReadDepthSubSampler{
 				"      For RNASeq data, set this to 0.\n" +
 
 				"\nExample: java -Xmx25G -jar pathToUSeq/Apps/SamReadDepthSubSampler -x 240 -q 20 -a\n" +
-				"      /Novo/Run7/ -n 100 \n\n" +
+				"      /Novo/Run7/full.bam -n 100 -b regionsWith1PlusAlignment.bed.gz \n\n" +
 
 
 		"**************************************************************************************\n");

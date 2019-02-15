@@ -51,7 +51,7 @@ public class SamAlignmentDepthLoader implements Runnable{
 					IO.p(".");
 					counter = 0;
 				}
-				//fetch count of alignments to match
+				//fetch count of alignments to match, number of alignments including first and second reads
 				Bed bed = regions[i];
 				double alignmentCountToMatch = fetchCount(bed);
 				//if zero then no need to print anything
