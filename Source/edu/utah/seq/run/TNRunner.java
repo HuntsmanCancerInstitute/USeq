@@ -10,15 +10,15 @@ import java.util.regex.Pattern;
 import util.gen.IO;
 import util.gen.Misc;
 
-/**Runs multiple workflows on paired T N exome and transcriptiome datasets.*/
+/**Runs multiple workflows on paired T N DNA and transcriptiome datasets.*/
 public class TNRunner {
 
 	//user defined fields
 	private File sampleDir = null;
 	private File[] rootDirs = null;
 	private boolean verbose = true;
-	private File[] exomeAlignQCDocs = null;
-	private File[] transcriptomeAlignQCDocs = null;
+	private File[] DNAAlignQCDocs = null;
+	private File[] RNAAlignQCDocs = null;
 	private File[] somaticVarCallDocs = null;
 	private File[] bamConcordanceDocs = null;
 	private File[] varAnnoDocs = null;
@@ -29,7 +29,7 @@ public class TNRunner {
 	private boolean forceRestart = false;
 	private boolean softRestart = false;
 	private int minReadCoverageTumor = 20;
-	private int minReadCoverageNormal = 10;
+	private int minReadCoverageNormal = 15;
 	private TNSample[] tNSamples = null;
 	private String germlineAnnotatedVcfParser = null;
 	private String somaticAnnotatedVcfParser = null;
@@ -39,6 +39,8 @@ public class TNRunner {
 	private boolean restartFailed = false;
 	private HashMap<String, File> otherBams = null;
 	private int maxNumJobsToSubmit = 40;
+	private boolean loop = false;
+	private int numMinToSleep = 60;
 
 	private String pathToTrim = null;
 
@@ -47,12 +49,28 @@ public class TNRunner {
 
 		processArgs(args);
 
-		if (processIndividualSamples()){
-			processSampleGroup();
-			if (complete()) IO.pl("\nALL COMPLETE!");
+		//loop?
+		int iterations = 1;
+		int i=0;
+		if (loop) iterations = 1000;
+		
+		for (; i< iterations; i++){
+			if (processIndividualSamples()){
+				processSampleGroup();
+				if (complete()) {
+					IO.pl("\nALL COMPLETE!");
+					break;
+				}
+				else IO.pl("\nNOT COMPLETE!");
+			}
 			else IO.pl("\nNOT COMPLETE!");
+			if (iterations !=1){
+				try {
+					IO.pl("\nWaiting... "+i);
+					Thread.sleep(1000*60*numMinToSleep);
+				} catch (InterruptedException e) {}
+			}
 		}
-		else IO.pl("\nNOT COMPLETE!");
 		
 		printSamplesWithFastqIssues();
 		
@@ -96,8 +114,8 @@ public class TNRunner {
 				}
 				
 				//if it exists then wait until all gvcfs become available
-				if (tns.getNormalExomeFastq().isFastqDirExists()) {
-					File[] ab = tns.getNormalExomeBamBedGvcf();
+				if (tns.getNormalDNAFastq().isFastqDirExists()) {
+					File[] ab = tns.getNormalDNABamBedGvcf();
 					if (ab == null) {
 						if (verbose) IO.pl("\tWaiting for germline gvcfs from "+tns.getId());
 						allPresent = false;
@@ -163,9 +181,9 @@ public class TNRunner {
 			for (int i=0; i< genoVcfs.length; i++){
 				
 				//Extract the sample name 
-				//HCI_P1_NormalExome_Hg38_JointGenotyping_Hg38.vcf.gz
-				//1218982_NormalExome_Hg38_JointGenotyped.vcf.gz
-				//1218982_Pancreas_NormalExome_Hg38_JointGenotyped.vcf.gz
+				//HCI_P1_NormalDNA_Hg38_JointGenotyping_Hg38.vcf.gz
+				//1218982_NormalDNA_Hg38_JointGenotyped.vcf.gz
+				//1218982_Pancreas_NormalDNA_Hg38_JointGenotyped.vcf.gz
 				String fileName = genoVcfs[i].getName();
 				File sampleDir = null;
 				String id = null;
@@ -300,7 +318,7 @@ public class TNRunner {
 		try {
 			IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 			Pattern pat = Pattern.compile("-[a-z]");
-			File exomeWorkflowDir = null;
+			File DNAWorkflowDir = null;
 			File somVarCallWorkflowDir = null;
 			File annoWorkflowDir = null;
 			File bamConWorkflowDir = null;
@@ -317,7 +335,7 @@ public class TNRunner {
 					try{
 						switch (test){
 						case 'p': sampleDir = new File(args[++i]).getCanonicalFile(); break;
-						case 'e': exomeWorkflowDir = new File(args[++i]); break;
+						case 'e': DNAWorkflowDir = new File(args[++i]); break;
 						case 't': transWorkflowDir = new File(args[++i]); break;
 						case 'c': somVarCallWorkflowDir = new File(args[++i]); break;
 						case 'a': annoWorkflowDir = new File(args[++i]); break;
@@ -331,6 +349,7 @@ public class TNRunner {
 						case 'x': maxNumJobsToSubmit = Integer.parseInt(args[++i]); break;
 						case 'q': verbose = false; break;
 						case 'f': forceRestart = true; break;
+						case 'l': loop = true; break;
 						case 'd': restartFailed = true; break;
 						case 'r': softRestart = true; break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
@@ -357,49 +376,65 @@ public class TNRunner {
 			rootDirs = new File[toKeep.size()];
 			toKeep.toArray(rootDirs);
 			
-			//exome align qc docs
-			if (exomeWorkflowDir == null || exomeWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing exome alignment workflow docs? "+exomeWorkflowDir);
-			exomeAlignQCDocs = IO.extractFiles(exomeWorkflowDir);
+			//DNA align qc docs
+			if (DNAWorkflowDir != null){
+				if (DNAWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing DNA alignment workflow docs? "+DNAWorkflowDir);
+				DNAAlignQCDocs = IO.extractFiles(DNAWorkflowDir);
+			}
 
-			//transcriptome align qc docs
-			if (transWorkflowDir == null || transWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing transcriptome alignment workflow docs? "+transWorkflowDir);
-			transcriptomeAlignQCDocs = IO.extractFiles(transWorkflowDir);
-
+			//RNA align qc docs
+			if (transWorkflowDir != null) {
+				if (transWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing RNA alignment workflow docs? "+transWorkflowDir);
+				RNAAlignQCDocs = IO.extractFiles(transWorkflowDir);
+			}
 			
 			//variant calling docs
-			if (somVarCallWorkflowDir == null || somVarCallWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing somatic variant calling workflow docs? "+somVarCallWorkflowDir);
-			somaticVarCallDocs = IO.extractFiles(somVarCallWorkflowDir);
-
+			if (somVarCallWorkflowDir != null){
+				if(somVarCallWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing somatic variant calling workflow docs? "+somVarCallWorkflowDir);
+				somaticVarCallDocs = IO.extractFiles(somVarCallWorkflowDir);
+			}
+			
 			//variant annotation
-			if (annoWorkflowDir == null || annoWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing variant annotation workflow docs? "+annoWorkflowDir);
-			varAnnoDocs = IO.extractFiles(annoWorkflowDir);
+			if (annoWorkflowDir != null){
+				if (annoWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing variant annotation workflow docs? "+annoWorkflowDir);
+				varAnnoDocs = IO.extractFiles(annoWorkflowDir);
+			}
+			
 
 			//bam concordance
-			if (bamConWorkflowDir == null || bamConWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing bam concordance workflow docs? "+bamConWorkflowDir);
-			bamConcordanceDocs = IO.extractFiles(bamConWorkflowDir);
+			if (bamConWorkflowDir != null){
+				if (bamConWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing bam concordance workflow docs? "+bamConWorkflowDir);
+				bamConcordanceDocs = IO.extractFiles(bamConWorkflowDir);
+			}
+			
 
 			//joint genotyping
-			if (jointGenoWorklfowDir == null || jointGenoWorklfowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing joint genotyping workflow docs? "+jointGenoWorklfowDir);
-			jointGenotypingDocs = IO.extractFiles(jointGenoWorklfowDir);
-
-			//copy ratio analysis
-			if (copyRatioDocsDir == null || copyRatioDocsDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing copy ratio analysis workflow docs? "+copyRatioDocsDir);
-			copyRatioDocs = IO.extractFiles(copyRatioDocsDir);
+			if (jointGenoWorklfowDir != null){
+				if (jointGenoWorklfowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing joint genotyping workflow docs? "+jointGenoWorklfowDir);
+				jointGenotypingDocs = IO.extractFiles(jointGenoWorklfowDir);
+			}
 			
-			//copy ratio analysis
-			if (copyRatioBkgDir == null || copyRatioBkgDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing copy ratio background files? "+copyRatioBkgDir);
-			File[] f = IO.extractFiles(copyRatioBkgDir, "PoN.hdf5");
-			if (f == null || f.length != 2) Misc.printErrAndExit("Error: failed to find two copy ratio background xxxPoN.hdf5 files in "+copyRatioBkgDir);
-			String name = f[0].getName().toLowerCase();
-			if (name.contains("female")) {
-				femaleBkg = f[0];
-				maleBkg = f[1];
+
+			//copy ratio analysis?
+			if (copyRatioDocsDir !=null){
+				if (copyRatioDocsDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing copy ratio analysis workflow docs? "+copyRatioDocsDir);
+				copyRatioDocs = IO.extractFiles(copyRatioDocsDir);
+				//copy ratio analysis
+				if (copyRatioBkgDir == null || copyRatioBkgDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing copy ratio background files? "+copyRatioBkgDir);
+				File[] f = IO.extractFiles(copyRatioBkgDir, "PoN.hdf5");
+				if (f == null || f.length != 2) Misc.printErrAndExit("Error: failed to find two copy ratio background xxxPoN.hdf5 files in "+copyRatioBkgDir);
+				String name = f[0].getName().toLowerCase();
+				if (name.contains("female")) {
+					femaleBkg = f[0];
+					maleBkg = f[1];
+				}
+				else {
+					femaleBkg = f[1];
+					maleBkg = f[0];
+				}
+				if (maleBkg == null || femaleBkg == null) Misc.printErrAndExit("Error: failed to find male "+maleBkg+" and female "+femaleBkg+" background xxxFemalePoN.hdf5 or xxxMalePoN.hdf5 files in "+copyRatioBkgDir);
 			}
-			else {
-				femaleBkg = f[1];
-				maleBkg = f[0];
-			}
-			if (maleBkg == null || femaleBkg == null) Misc.printErrAndExit("Error: failed to find male "+maleBkg+" and female "+femaleBkg+" background xxxFemalePoN.hdf5 or xxxMalePoN.hdf5 files in "+copyRatioBkgDir);
+			
 			
 			//AnnotatedVcfParser options for germline and somatic filtering
 			if (germlineAnnotatedVcfParser == null) germlineAnnotatedVcfParser = "-d "+minReadCoverageNormal+" -m 0.2 -x 1 -p 0.01 -g D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign";
@@ -421,8 +456,8 @@ public class TNRunner {
 			if (verbose){
 				IO.pl("Run parameters:");
 				IO.pl("Patient sample directory\t"+rootDirs[0].getParent());
-				IO.pl("Exome alignment workflow directory\t"+exomeWorkflowDir);
-				IO.pl("Transcriptome alignment workflow directory\t"+transWorkflowDir);
+				IO.pl("DNA alignment workflow directory\t"+DNAWorkflowDir);
+				IO.pl("RNA alignment workflow directory\t"+transWorkflowDir);
 				IO.pl("Somatic variant workflow directory\t"+somVarCallWorkflowDir);
 				IO.pl("Variant annotation workflow directory\t"+annoWorkflowDir);
 				IO.pl("Bam concordance workflow directory\t"+bamConWorkflowDir);
@@ -439,6 +474,7 @@ public class TNRunner {
 				IO.pl("Force restart\t"+forceRestart);
 				IO.pl("Verbose logging\t"+verbose);
 				IO.pl("Max # jobs to launch\t"+maxNumJobsToSubmit);
+				IO.pl("Relaunch jobs until complete\t"+loop);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -449,7 +485,7 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                  TNRunner : Jan 2019                             **\n" +
+				"**                                  TNRunner : March 2019                           **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several dockerized snakmake workflows on human tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, Hg38\n"+
@@ -460,13 +496,13 @@ public class TNRunner {
 				"\nMyPatientSampleDatasets\n"+
 				"   MyPatientA\n"+
 				"      Fastq\n"+
-				"         NormalExome\n"+
-				"         TumorExome\n"+
-				"         TumorTranscriptome\n"+
+				"         NormalDNA\n"+
+				"         TumorDNA\n"+
+				"         TumorRNA\n"+
 				"   MyPatientB\n"+
 				"      Fastq\n"+
-				"         TumorExome\n"+
-				"         TumorTranscriptome\n"+
+				"         TumorDNA\n"+
+				"         TumorRNA\n"+
 				"   MyPatientC....\n"+
 				
 				"\nThe Fastq directory and sub directories must match this naming. Only include those\n"+
@@ -484,14 +520,14 @@ public class TNRunner {
 				"   sample concordance. The patient directory naming must match.\n"+
 				"-k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio\n"+
 				"      background files.\n"+
-				"-y Workflow docs for launching copy analysis.\n"+
-				"-e Workflow docs for launching exome alignments.\n"+
-				"-t Workflow docs for launching transcriptome alignments.\n"+
+				"-e Workflow docs for launching DNA alignments.\n"+
+				"-t (Optional) Workflow docs for launching RNA alignments.\n"+
 				"-c Workflow docs for launching somatic variant calling.\n"+
 				"-a Workflow docs for launching variant annotation.\n"+
 				"-b Workflow docs for launching bam concordance.\n"+
 				"-j Workflow docs for launching joint genotyping.\n"+
-				"-g Germline AnnotatedVcfParser options, defaults to '-d 10 -m 0.2 -x 1 -p 0.01 -g \n"+
+				"-y (Optional) Workflow docs for launching copy analysis.\n"+
+				"-g Germline AnnotatedVcfParser options, defaults to '-d 15 -m 0.2 -x 1 -p 0.01 -g \n"+
 				"      D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign'\n"+
 				"-s Somatic AnnotatedVcfParser options, defaults to '-d 20 -f'\n"+
 				"-r Attempt to restart FAILED jobs from last successfully completed rule.\n"+
@@ -499,11 +535,12 @@ public class TNRunner {
 				"-f Force a restart of all running and uncompleted jobs.\n"+
 				"-q Quite output.\n"+
 				"-x Maximum # jobs to launch, defaults to 40.\n"+
+				"-l Check and launch jobs every hour until all are complete, defaults to launching once.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p AvatarPatients -o ~/FoundationPatients/\n"+
-				"     -e ~/Hg38/ExomeAlignQC/ -c ~/Hg38/SomExoCaller/ -a ~/Hg38/Annotator/ -b \n"+
-				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/TranscriptomeAlignQC/\n"+
-				"     -y /Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 20 \n\n"+
+				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+
+				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/\n"+
+				"     -y /Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 20 -l \n\n"+
 
 
 				"**************************************************************************************\n");
@@ -512,8 +549,8 @@ public class TNRunner {
 	public boolean isVerbose() {
 		return verbose;
 	}
-	public File[] getExomeAlignQCDocs() {
-		return exomeAlignQCDocs;
+	public File[] getDNAAlignQCDocs() {
+		return DNAAlignQCDocs;
 	}
 	public boolean isForceRestart() {
 		return forceRestart;
@@ -542,8 +579,8 @@ public class TNRunner {
 	public String getSomaticAnnotatedVcfParser() {
 		return somaticAnnotatedVcfParser;
 	}
-	public File[] getTranscriptomeAlignQCDocs() {
-		return transcriptomeAlignQCDocs;
+	public File[] getRNAAlignQCDocs() {
+		return RNAAlignQCDocs;
 	}
 	public boolean isRestartFailed() {
 		return restartFailed;

@@ -186,6 +186,15 @@ public class Misc {
 		}
 	}
 	
+	/**Prints key + seperator + value+ return to out.*/
+	public static void printTreeMap(TreeMap hash, String seperator, String prepender){
+		Iterator it = hash.keySet().iterator();
+		while (it.hasNext()){
+			String key = (String) it.next();
+			System.out.println(prepender+key+seperator+hash.get(key));
+		}
+	}
+	
 	public static void printCollection(Collection hash){
 		Iterator it = hash.iterator();
 		while (it.hasNext()){

@@ -11,6 +11,7 @@ public class TempusReport {
 	private String signout_date = null;
 	private String bioInfPipeline = null;
 	private String notes = null;
+	private String reportStatus = null;
 	
 	/*
     "report": {
@@ -34,6 +35,10 @@ public class TempusReport {
 		bioInfPipeline = Json.getStringAttribute(report, "bioInfPipeline");
 		notes = Json.getStringAttribute(report, "notes");
 		TempusJson2Vcf.add(bioInfPipeline, tempusJson2Vcf.bioInfPipelines);
+		
+		JSONObject workflow = report.getJSONObject("workflow");
+		reportStatus = Json.getStringAttribute(workflow, "reportStatus");
+		TempusJson2Vcf.add(reportStatus, tempusJson2Vcf.reportStatus);
 	}
 
 	public String getReportId() {

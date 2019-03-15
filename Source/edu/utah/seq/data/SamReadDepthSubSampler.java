@@ -38,6 +38,7 @@ public class SamReadDepthSubSampler{
 	private File workingGzippedFile = null;
 	private File workingBamFile = null;
 	private HashMap<String, RegionScoreText[]> chrRegions;
+	private String[] toSkip = {"Un", "random", "decoy", "alt", "HLA"};
 	
 	//alignment counts for sam files
 	private long numberAlignmentsFailingQualityScore = 0;
@@ -106,13 +107,15 @@ public class SamReadDepthSubSampler{
 			
 			//for each chrom
 			for (String chr: chrRegions.keySet()){
-				//for each region
-				RegionScoreText[] regions = chrRegions.get(chr);
-				IO.p(chr+" ");
-				for (RegionScoreText region: regions){
-					SAMRecordIterator iterator = reader.queryOverlapping(chr, region.getStart(), region.getStop());
-					if (iterator.hasNext()) loadParse(iterator);
-					iterator.close();
+				if (passChrCheck(chr)){
+					//for each region
+					RegionScoreText[] regions = chrRegions.get(chr);
+					IO.p(chr+" ");
+					for (RegionScoreText region: regions){
+						SAMRecordIterator iterator = reader.queryOverlapping(chr, region.getStart(), region.getStop());
+						if (iterator.hasNext()) loadParse(iterator);
+						iterator.close();
+					}
 				}
 			}
 			reader.close();
@@ -122,6 +125,17 @@ public class SamReadDepthSubSampler{
 			Misc.printErrAndExit("\nError parsing alignment file\n");
 		}
 	}
+
+	private boolean passChrCheck(String chr) {
+		for (int i=0; i< toSkip.length; i++) {
+			if (chr.contains(toSkip[i])){
+				IO.p("Skipping-"+chr+" ");
+				return false;
+			}
+		}
+		return true;
+	}
+
 
 	private void loadParse(SAMRecordIterator iterator) throws IOException {
 		int numBadLines = 0;
@@ -327,7 +341,8 @@ public class SamReadDepthSubSampler{
 				"**                         Sam Read Depth Sub Sampler: Feb 2019                     **\n" +
 				"**************************************************************************************\n" +
 				"Filters, randomizes, and subsamples a coordinate sorted bam alignment file to a target\n"+
-				"base level read depth over each of the provided regions.\n"+
+				"base level read depth over each of the provided regions. Depending on the gaps between\n"+
+				"your regions, you may need to remove duplicate lines, e.g. 'sort -u body.sam > uni.sam'\n"+
 
 				"\nOptions:\n"+
 				"-a Alignment xxx.bam file, coordinate sorted with index.\n" +

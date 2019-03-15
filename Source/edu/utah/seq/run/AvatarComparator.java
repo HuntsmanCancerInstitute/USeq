@@ -77,7 +77,7 @@ public class AvatarComparator {
 				continue;
 			}
 			
-			//pull dirs in Fastq: NormalExome  TumorExome  TumorTranscriptome
+			//pull dirs in Fastq: NormalDNA  TumorDNA  TumorRNA
 			File[] fastqDirs = IO.extractOnlyDirectories(fastqDir);
 			if (fastqDirs == null || fastqDirs.length == 0) {
 				IO.pl(name+"\tERROR: Failed to find one or more FastqDirs in "+name+"/Fastq/");
@@ -103,7 +103,7 @@ public class AvatarComparator {
 				continue;
 			}
 			
-			//pull AlignmentDirs: 1218022_NormalExome  1218022_TumorExome  1218022_TumorTranscriptome
+			//pull AlignmentDirs: 1218022_NormalDNA  1218022_TumorDNA  1218022_TumorRNA
 			File[] alignDirs = IO.extractOnlyDirectories(alignDir);
 			if (alignDirs == null || alignDirs.length == 0) {
 				IO.pl(name+"\tERROR: Failed to find one or more Alignment dirs in "+name+"/Alignment/");
@@ -126,11 +126,10 @@ public class AvatarComparator {
 			
 			//tumor and normal present?
 			String alignDirNames = Misc.stringArrayToString(IO.fetchFileNames(alignDirs), ",");
-			if (alignDirNames.contains("_NormalExome") && alignDirNames.contains("_TumorExome")){
+			if (alignDirNames.contains("_NormalDNA") && alignDirNames.contains("_TumorDNA")){
 
-//need to update this when you make the rename
-File cr = new File(patientDir, "CopyRatio"); 
-
+				//need to update this when you make the rename
+				File cr = new File(patientDir, "CopyAnalysis"); 
 				File gc = new File(patientDir, "GermlineVariantCalling");
 				File sc = new File(patientDir, "SampleConcordance");
 				File sv = new File(patientDir, "SomaticVariantCalls");
@@ -201,7 +200,7 @@ File cr = new File(patientDir, "CopyRatio");
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Avatar Comparator : Jan 2019                           **\n" +
+				"**                           Avatar Comparator : Feb 2019                           **\n" +
 				"**************************************************************************************\n" +
 				"Tool for identifying AVATAR datasets that are ready for analysis or need attention.\n"+
 

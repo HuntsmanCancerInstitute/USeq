@@ -1407,6 +1407,27 @@ public class IO {
 		}
 		return files;
 	}
+	
+	/**Fetches files that don't start with a '.' from a directory recursing through sub directories.*/
+	public static ArrayList<File> fetchFilesDirsRecursively (File directory){
+		ArrayList<File> files = new ArrayList<File>(); 
+		File[] list = directory.listFiles();
+		if (list != null){
+			for (int i=0; i< list.length; i++){
+				if (list[i].isDirectory()) {
+					ArrayList<File> al = fetchAllFilesRecursively (list[i]);
+					al.add(list[i]);
+					int size = al.size();
+					for (int x=0; x< size; x++){
+						File test = al.get(x);
+						if (test.getName().startsWith(".") == false) files.add(test);
+					}
+				}
+				else if (list[i].getName().startsWith(".") == false) files.add(list[i]);				
+			}
+		}
+		return files;
+	}
 
 	/**Fetches all files with a given extension in a directory recursing through sub directories.
 	 * Will return a file if a file is given with the appropriate extension, or null.*/

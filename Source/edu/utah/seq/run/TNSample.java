@@ -25,15 +25,15 @@ public class TNSample {
 	private boolean deleteBamConcordance = false;
 
 	//Fastq
-	private FastqDataset tumorExomeFastq = null;
-	private FastqDataset normalExomeFastq = null;
+	private FastqDataset tumorDNAFastq = null;
+	private FastqDataset normalDNAFastq = null;
 	private FastqDataset tumorTransFastq = null;
 	private boolean fastqIssue = false;
 
 	//Alignment and passing region bed files
-	private File[] tumorExomeBamBedGvcf = null;
-	private File[] normalExomeBamBedGvcf = null;
-	private File tumorTranscriptomeBam = null;
+	private File[] tumorDNABamBedGvcf = null;
+	private File[] normalDNABamBedGvcf = null;
+	private File tumorRNABam = null;
 
 	//Somatic variant Vcf calls
 	private File somaticVariants = null;
@@ -68,20 +68,20 @@ public class TNSample {
 			return;
 		}
 
-		//launch t/n somatic exome analysis?
-		if (tumorExomeBamBedGvcf != null && normalExomeBamBedGvcf != null) somExomeCall();
+		//launch t/n somatic DNA analysis?
+		if (tumorDNABamBedGvcf != null && normalDNABamBedGvcf != null && tnRunner.getSomaticVarCallDocs() != null) somDNACall();
 
 		//annotate somatic vcf?
-		if (somaticVariants != null) annotateSomaticVcf();
+		if (somaticVariants != null && tnRunner.getVarAnnoDocs() != null) annotateSomaticVcf();
 
 		//bam concordance?
-		bamConcordance();
+		if (tnRunner.getBamConcordanceDocs() != null) bamConcordance();
 
 		//Annotate normal vcf
-		annotateGermlineVcf();
+		if (tnRunner.getVarAnnoDocs() != null) annotateGermlineVcf();
 
 		//copy ratio/ number
-		copyRatioAnalysis();
+		if (tnRunner.getCopyRatioDocs() != null) copyRatioAnalysis();
 
 		//print messages?
 		if (failed || tnRunner.isVerbose()) {
@@ -93,14 +93,14 @@ public class TNSample {
 
 	public void annotateGermlineVcf() throws IOException {
 		//look for genotyped vcf
-		File vcf = new File (rootDir, "GermlineVariantCalling/"+id+"_NormalExome/"+id+"_NormalExome_Hg38_JointGenotyped.vcf.gz");
+		File vcf = new File (rootDir, "GermlineVariantCalling/"+id+"_NormalDNA/"+id+"_NormalDNA_Hg38_JointGenotyped.vcf.gz");
 		if (vcf.exists() == false) return;
-		germlineVcf = new File[]{vcf, new File(rootDir, "GermlineVariantCalling/"+id+"_NormalExome/"+id+"_NormalExome_Hg38_JointGenotyped.vcf.gz.tbi") };
+		germlineVcf = new File[]{vcf, new File(rootDir, "GermlineVariantCalling/"+id+"_NormalDNA/"+id+"_NormalDNA_Hg38_JointGenotyped.vcf.gz.tbi") };
 
 		info.add("Checking germline variant annotation...");		
 
 		//make dir, ok if it already exists
-		File jobDir = new File (rootDir.getCanonicalFile(), "GermlineVariantCalling/"+id+"_NormalExomeAnno");
+		File jobDir = new File (rootDir.getCanonicalFile(), "GermlineVariantCalling/"+id+"_NormalDNAAnno");
 		jobDir.mkdirs();
 
 		//any files?
@@ -142,18 +142,18 @@ public class TNSample {
 		boolean goN = false;
 		boolean goTT = false;
 		int numExist = 0;
-		if (tumorExomeFastq.isFastqDirExists()){
-			if (tumorExomeBamBedGvcf != null) goT = true;
+		if (tumorDNAFastq.isFastqDirExists()){
+			if (tumorDNABamBedGvcf != null) goT = true;
 			numExist++;
 		}
 		else goT = true;
-		if (normalExomeFastq.isFastqDirExists()){
-			if (normalExomeBamBedGvcf != null) goN = true;
+		if (normalDNAFastq.isFastqDirExists()){
+			if (normalDNABamBedGvcf != null) goN = true;
 			numExist++;
 		}
 		else goN = true;
 		if (tumorTransFastq.isFastqDirExists()){
-			if (tumorTranscriptomeBam != null) goTT = true;
+			if (tumorRNABam != null) goTT = true;
 			numExist++;
 		}
 		else goTT = true;
@@ -189,20 +189,20 @@ public class TNSample {
 
 	private void createBamConcordanceLinks(File jobDir) throws IOException{
 		File canJobDir = jobDir.getCanonicalFile();
-		if (tumorExomeBamBedGvcf != null) {
-			File index = fetchBamIndex(tumorExomeBamBedGvcf[0]);
-			Files.createSymbolicLink(new File(canJobDir, "tumorExome.bam").toPath(), tumorExomeBamBedGvcf[0].toPath());
-			Files.createSymbolicLink(new File(canJobDir, "tumorExome.bai").toPath(), index.toPath());
+		if (tumorDNABamBedGvcf != null) {
+			File index = fetchBamIndex(tumorDNABamBedGvcf[0]);
+			Files.createSymbolicLink(new File(canJobDir, "tumorDNA.bam").toPath(), tumorDNABamBedGvcf[0].toPath());
+			Files.createSymbolicLink(new File(canJobDir, "tumorDNA.bai").toPath(), index.toPath());
 		}
-		if (normalExomeBamBedGvcf != null) {
-			File index = fetchBamIndex(normalExomeBamBedGvcf[0]);
-			Files.createSymbolicLink(new File(canJobDir, "normalExome.bam").toPath(), normalExomeBamBedGvcf[0].toPath());
-			Files.createSymbolicLink(new File(canJobDir, "normalExome.bai").toPath(), index.toPath());
+		if (normalDNABamBedGvcf != null) {
+			File index = fetchBamIndex(normalDNABamBedGvcf[0]);
+			Files.createSymbolicLink(new File(canJobDir, "normalDNA.bam").toPath(), normalDNABamBedGvcf[0].toPath());
+			Files.createSymbolicLink(new File(canJobDir, "normalDNA.bai").toPath(), index.toPath());
 		}
-		if (tumorTranscriptomeBam != null) {
-			File index = fetchBamIndex(tumorTranscriptomeBam);
-			Files.createSymbolicLink(new File(canJobDir, "tumorTranscriptome.bam").toPath(), tumorTranscriptomeBam.toPath());
-			Files.createSymbolicLink(new File(canJobDir, "tumorTranscriptome.bai").toPath(), index.toPath());
+		if (tumorRNABam != null) {
+			File index = fetchBamIndex(tumorRNABam);
+			Files.createSymbolicLink(new File(canJobDir, "tumorRNA.bam").toPath(), tumorRNABam.toPath());
+			Files.createSymbolicLink(new File(canJobDir, "tumorRNA.bai").toPath(), index.toPath());
 		}
 		//pull in Foundation bams?
 		ArrayList<File> toLink = fetchOtherBams();
@@ -276,7 +276,7 @@ public class TNSample {
 		}
 	}
 
-	private void somExomeCall() throws IOException {
+	private void somDNACall() throws IOException {
 		info.add("Checking somatic variant calling...");		
 
 		//make dir, ok if it already exists
@@ -315,7 +315,7 @@ public class TNSample {
 		if (tnRunner.getCopyRatioDocs() == null) return;
 
 		//look for genotyped vcf
-		if (germlineVcf == null || tumorExomeBamBedGvcf == null || normalExomeBamBedGvcf == null) return;
+		if (germlineVcf == null || tumorDNABamBedGvcf == null || normalDNABamBedGvcf == null) return;
 
 		info.add("Checking copy ratio calling...");		
 
@@ -355,28 +355,28 @@ public class TNSample {
 		//remove any linked files
 		removeCopyRatioLinks(jobDir);
 
-		//pull gender from the _AvatarInfo.json.gz file in the root dir
-		File[] info = IO.extractFiles(rootDir, "_AvatarInfo.json.gz");
-		if (info == null || info.length !=1) throw new IOException("ERROR: failed to find the xxx_AvatarInfo.json.gz file in "+rootDir);
+		//pull gender from the xxxInfo.json.gz file in the root dir
+		File[] info = IO.extractFiles(rootDir, "Info.json.gz");
+		if (info == null || info.length !=1) throw new IOException("ERROR: failed to find the xxx_Info.json.gz file in "+rootDir);
 		String[] lines = IO.loadFile(info[0]);
 		int gender = 0;
 		for (String s: lines){
 			if (s.contains("Gender")){
-				if (s.contains("M")) gender = 1;
-				else if (s.contains("F")) gender =2;
+				if (s.contains("F")) gender = 2;
+				else if (s.contains("M")) gender = 1;
 			}
 		}
-		if (gender == 0) throw new IOException("ERROR: failed to find the xxx_AvatarInfo.json.gz file in "+rootDir);
+		if (gender == 0) throw new IOException("ERROR: failed to find the xxxInfo.json.gz file in "+rootDir);
 		Path bkg = null;
 		if (gender == 1) bkg = tnRunner.getMaleBkg().toPath();
 		else if (gender == 2 ) bkg = tnRunner.getFemaleBkg().toPath();
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"bkgPoN.hdf5").toPath(), bkg);
 
 		//soft link in the new ones
-		Path tumorBam = tumorExomeBamBedGvcf[0].toPath();
-		Path tumorBai = fetchBamIndex(tumorExomeBamBedGvcf[0]).toPath();
-		Path normalBam = normalExomeBamBedGvcf[0].toPath();
-		Path normalBai = fetchBamIndex(normalExomeBamBedGvcf[0]).toPath();
+		Path tumorBam = tumorDNABamBedGvcf[0].toPath();
+		Path tumorBai = fetchBamIndex(tumorDNABamBedGvcf[0]).toPath();
+		Path normalBam = normalDNABamBedGvcf[0].toPath();
+		Path normalBai = fetchBamIndex(normalDNABamBedGvcf[0]).toPath();
 
 		Path normalVcf = germlineVcf[0].toPath();
 		Path normalTbi = germlineVcf[1].toPath();
@@ -403,14 +403,14 @@ public class TNSample {
 	private void checkAlignments() throws IOException {
 		info.add("Checking alignments...");
 		//fastq available, align
-		tumorExomeBamBedGvcf = exomeAlignQC(tumorExomeFastq, tnRunner.getMinReadCoverageTumor());
-		normalExomeBamBedGvcf = exomeAlignQC(normalExomeFastq, tnRunner.getMinReadCoverageNormal());
-		transcriptomeAlignQC(tumorTransFastq);
+		tumorDNABamBedGvcf = DNAAlignQC(tumorDNAFastq, tnRunner.getMinReadCoverageTumor());
+		normalDNABamBedGvcf = DNAAlignQC(normalDNAFastq, tnRunner.getMinReadCoverageNormal());
+		RNAAlignQC(tumorTransFastq);
 	}
 
 	/**For RNASeq Alignments and Picard CollectRNASeqMetrics*/
-	private void transcriptomeAlignQC(FastqDataset fd) throws IOException {
-		if (fd.getFastqs() == null) return;
+	private void RNAAlignQC(FastqDataset fd) throws IOException {
+		if (fd.getFastqs() == null || tnRunner.getRNAAlignQCDocs() == null) return;
 		info.add("\t"+fd.getName()+":");
 
 		//make dir, ok if it already exists
@@ -420,8 +420,8 @@ public class TNSample {
 		//any files?
 		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
 		if (nameFile.size() == 0) {
-			createExomeAlignLinks(fd.getFastqs(), jobDir);
-			launch(jobDir, null, tnRunner.getTranscriptomeAlignQCDocs());
+			createDNAAlignLinks(fd.getFastqs(), jobDir);
+			launch(jobDir, null, tnRunner.getRNAAlignQCDocs());
 		}
 
 		//OK some files are present
@@ -439,13 +439,13 @@ public class TNSample {
 				new File(jobDir, "1.fastq.gz").delete();
 				new File(jobDir, "2.fastq.gz").delete();
 				info.add("\t\tCOMPLETE "+jobDir);
-				tumorTranscriptomeBam = finalBam[0];
+				tumorRNABam = finalBam[0];
 			}
 		}
 		
 		else {
-			if (checkJob(nameFile, jobDir, null, tnRunner.getTranscriptomeAlignQCDocs())){
-				createExomeAlignLinks(fd.getFastqs(), jobDir);
+			if (checkJob(nameFile, jobDir, null, tnRunner.getRNAAlignQCDocs())){
+				createDNAAlignLinks(fd.getFastqs(), jobDir);
 			}
 		}
 	}
@@ -458,10 +458,10 @@ public class TNSample {
 	}
 
 
-	/**For Exomes, diff read coverage for passing bed generation
+	/**For DNAs, diff read coverage for passing bed generation
 	 * @throws IOException */
-	private File[] exomeAlignQC(FastqDataset fd, int minReadCoverage) throws IOException {
-		if (fd.getFastqs() == null) return null;
+	private File[] DNAAlignQC(FastqDataset fd, int minReadCoverage) throws IOException {
+		if (fd.getFastqs() == null || tnRunner.getDNAAlignQCDocs() == null) return null;
 		info.add("\t"+fd.getName()+":");
 
 		//make dir, ok if it already exists
@@ -471,10 +471,10 @@ public class TNSample {
 		//any files?
 		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
 		if (nameFile.size() == 0) {
-			createExomeAlignLinks(fd.getFastqs(), jobDir);
+			createDNAAlignLinks(fd.getFastqs(), jobDir);
 			deleteBamConcordance = true;
 			IO.writeString("-c "+ minReadCoverage, new File(jobDir, "sam2USeq.config.txt"));
-			launch(jobDir, null, tnRunner.getExomeAlignQCDocs());
+			launch(jobDir, null, tnRunner.getDNAAlignQCDocs());
 		}
 
 		//COMPLETE
@@ -510,8 +510,8 @@ public class TNSample {
 		}
 		
 		else {
-			if (checkJob(nameFile, jobDir, null, tnRunner.getExomeAlignQCDocs())){
-				createExomeAlignLinks(fd.getFastqs(), jobDir);
+			if (checkJob(nameFile, jobDir, null, tnRunner.getDNAAlignQCDocs())){
+				createDNAAlignLinks(fd.getFastqs(), jobDir);
 				deleteBamConcordance = true;
 				IO.writeString("-c "+ minReadCoverage, new File(jobDir, "sam2USeq.config.txt"));
 			}
@@ -519,7 +519,7 @@ public class TNSample {
 		return null;
 	}
 
-	private void createExomeAlignLinks(File[] fastq, File alignDir) throws IOException {
+	private void createDNAAlignLinks(File[] fastq, File alignDir) throws IOException {
 		//remove any linked fastq files
 		File f = alignDir.getCanonicalFile();
 		new File(f, "1.fastq.gz").delete();
@@ -537,12 +537,12 @@ public class TNSample {
 		removeSomaticLinks(jobDir);
 
 		//soft link in the new ones
-		Path tumorBam = tumorExomeBamBedGvcf[0].toPath();
-		Path tumorBai = fetchBamIndex(tumorExomeBamBedGvcf[0]).toPath();
-		Path tumorBed = tumorExomeBamBedGvcf[1].toPath();
-		Path normalBam = normalExomeBamBedGvcf[0].toPath();
-		Path normalBai = fetchBamIndex(normalExomeBamBedGvcf[0]).toPath();
-		Path normalBed = normalExomeBamBedGvcf[1].toPath();
+		Path tumorBam = tumorDNABamBedGvcf[0].toPath();
+		Path tumorBai = fetchBamIndex(tumorDNABamBedGvcf[0]).toPath();
+		Path tumorBed = tumorDNABamBedGvcf[1].toPath();
+		Path normalBam = normalDNABamBedGvcf[0].toPath();
+		Path normalBai = fetchBamIndex(normalDNABamBedGvcf[0]).toPath();
+		Path normalBed = normalDNABamBedGvcf[1].toPath();
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bam").toPath(), tumorBam);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bai").toPath(), tumorBai);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bed.gz").toPath(), tumorBed);
@@ -657,13 +657,13 @@ public class TNSample {
 	private boolean checkFastq() throws IOException {
 		info.add("Checking Fastq availability...");
 		File fastqDir = makeCheckFile(rootDir, "Fastq");
-		tumorExomeFastq = new FastqDataset(fastqDir, "TumorExome", info);
-		normalExomeFastq = new FastqDataset(fastqDir, "NormalExome", info);
-		tumorTransFastq = new FastqDataset(fastqDir, "TumorTranscriptome", info);
-		if (tumorExomeFastq.isFastqDirExists()) info.add("\tTumorExome\t"+ (tumorExomeFastq.getFastqs() != null));
-		if (normalExomeFastq.isFastqDirExists()) info.add("\tNormalExome\t"+ (normalExomeFastq.getFastqs() != null));
-		if (tumorTransFastq.isFastqDirExists()) info.add("\tTumorTranscriptome\t"+ (tumorTransFastq.getFastqs() != null));
-		if (tumorExomeFastq.getFastqs() != null || normalExomeFastq.getFastqs() != null || tumorTransFastq.getFastqs() != null) return true;
+		tumorDNAFastq = new FastqDataset(fastqDir, "TumorDNA", info);
+		normalDNAFastq = new FastqDataset(fastqDir, "NormalDNA", info);
+		tumorTransFastq = new FastqDataset(fastqDir, "TumorRNA", info);
+		if (tumorDNAFastq.isFastqDirExists()) info.add("\tTumorDNA\t"+ (tumorDNAFastq.getFastqs() != null));
+		if (normalDNAFastq.isFastqDirExists()) info.add("\tNormalDNA\t"+ (normalDNAFastq.getFastqs() != null));
+		if (tumorTransFastq.isFastqDirExists()) info.add("\tTumorRNA\t"+ (tumorTransFastq.getFastqs() != null));
+		if (tumorDNAFastq.getFastqs() != null || normalDNAFastq.getFastqs() != null || tumorTransFastq.getFastqs() != null) return true;
 		return false;
 	}
 
@@ -738,20 +738,20 @@ public class TNSample {
 		numJobsLaunched++;
 	}
 
-	public FastqDataset getTumorExomeFastq() {
-		return tumorExomeFastq;
+	public FastqDataset getTumorDNAFastq() {
+		return tumorDNAFastq;
 	}
 
-	public FastqDataset getNormalExomeFastq() {
-		return normalExomeFastq;
+	public FastqDataset getNormalDNAFastq() {
+		return normalDNAFastq;
 	}
 
-	public File getTumorTranscriptomeBamBed() {
-		return tumorTranscriptomeBam;
+	public File getTumorRNABamBed() {
+		return tumorRNABam;
 	}
 
-	public File[] getNormalExomeBamBedGvcf() {
-		return normalExomeBamBedGvcf;
+	public File[] getNormalDNABamBedGvcf() {
+		return normalDNABamBedGvcf;
 	}
 
 	public File getRootDir() {

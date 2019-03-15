@@ -33,7 +33,7 @@ public class BamConcordanceQC {
 
 		//load hash
 		for (String bfn: bamFileNames){
-			if (bamFileNameBCR.containsKey(bfn)) throw new IOException("This file name with associated bam concordance has already been seen. Are your bam file names unique? Look for "+bfn);
+			if (bamFileNameBCR.containsKey(bfn)) throw new IOException("This file name with associated bam concordance has already been seen. Are your bam file names unique? Look for "+bfn+" and "+bcj);
 			bamFileNameBCR.put(bfn, this);
 		}
 

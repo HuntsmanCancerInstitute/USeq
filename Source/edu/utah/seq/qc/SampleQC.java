@@ -147,19 +147,23 @@ public class SampleQC {
 	
 	/**Loads all of the sample diagnosis.*/
 	public String getDiagnosis(){
-		if (diagnosis != null) return diagnosis;
-		JSONArray ja = avatarInfo.getJSONArray("Samples");
-		int numSamples = ja.length();
+		if (diagnosis != null && diagnosis.equals("NA") == false) return diagnosis;
 		TreeSet<String> d = new TreeSet<String>();
-		for (int i=0; i< numSamples; i++){
-			JSONObject jo = ja.getJSONObject(i);
-			if (jo.has("Diagnosis")) d.add(jo.getString("Diagnosis"));
+		try {
+			JSONArray ja = avatarInfo.getJSONArray("Samples");
+			int numSamples = ja.length();
+			for (int i=0; i< numSamples; i++){
+				JSONObject jo = ja.getJSONObject(i);
+				if (jo.has("Diagnosis")) d.add(jo.getString("Diagnosis"));
+			}
 		}
+		catch (Exception e){}
+
 		if (d.size() == 0) diagnosis = "NA";
 		else diagnosis = Misc.treeSetToString(d, ",");
 		return diagnosis;
 	}
-	
+
 	public String fetchTabbedLine(BamConcordanceQC bc) {
 		try {
 			ArrayList<String> al = new ArrayList<String>();
@@ -169,7 +173,10 @@ public class SampleQC {
 			if (avatarInfo != null){
 				al.add(getDiagnosis());
 				//Add analysis ID
-				String analysisId = avatarInfo.getString("AnalysisId");
+				String analysisId = null;
+				try {
+					analysisId = avatarInfo.getString("AnalysisId");
+				} catch (Exception e){}
 				if (analysisId == null) analysisId = "NA";
 				al.add(analysisId);
 			}
@@ -197,9 +204,16 @@ public class SampleQC {
 				al.add(bc.getSimilarity());
 				al.add(bc.getGenderCheck());
 			}
+			else {
+				al.add("NA");
+				al.add("NA");
+			}
 			//add gender?
 			if (avatarInfo != null){
-				String gender = avatarInfo.getString("Gender");
+				String gender = null;
+				try {
+					gender = avatarInfo.getString("Gender");
+				} catch (Exception e){}
 				if (gender == null) gender = "NA";
 				al.add(gender);
 			}
@@ -300,7 +314,9 @@ public class SampleQC {
 			al.add("'"+getDiagnosis()+"'");
 			//Add Analysis ID
 			String aId = null;
-			aId = avatarInfo.getString("AnalysisId");
+			try {
+				aId = avatarInfo.getString("AnalysisId");
+			} catch (Exception e){}
 			if (aId == null) aId = "NA";
 			al.add("'"+aId+"'");
 			
@@ -327,13 +343,20 @@ public class SampleQC {
 		}
 		if (bamFileNameBCR != null){
 			BamConcordanceQC bc = bamFileNameBCR.get(mpaBamFileName);
-			if (bc == null) throw new IOException("Failed to find a BamConcordanceQC object for "+mpaBamFileName);
-			al.add("'"+bc.getSimilarity()+"'");
-			al.add("'"+bc.getGenderCheck()+"'");
+			if (bc == null) {
+				al.add("'NA'");
+				al.add("'NA'");
+			}
+			else {
+				al.add("'"+bc.getSimilarity()+"'");
+				al.add("'"+bc.getGenderCheck()+"'");
+			}
 		}
 		if (avatarInfo != null) {
 			String gender = null;
-			gender = avatarInfo.getString("Gender");
+			try {
+				gender = avatarInfo.getString("Gender");
+			} catch (Exception e){}
 			if (gender == null) gender = "NA";
 			al.add("'"+gender+"'");
 		}

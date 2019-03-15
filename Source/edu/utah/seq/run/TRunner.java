@@ -190,11 +190,11 @@ public class TRunner {
 				"      Bam\n"+
 				"         TumorDNA\n"+
 				"         TumorRNA\n"+
-				"      Xml"+
+				"      Xml\n"+
 				"   MyPatient2\n"+
 				"      Bam\n"+
 				"         TumorDNA\n"+
-				"      Xml"+
+				"      Xml\n"+
 				"   MyPatient3....\n"+
 				
 				"\nThe Bam directory and sub directories must match this naming. Change MyXXX to \n"+

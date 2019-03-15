@@ -13,6 +13,7 @@ import edu.utah.seq.query.QueryIndexFileLoader;
 import edu.utah.seq.vcf.VCFBackgroundChecker;
 import edu.utah.seq.vcf.VCFBackgroundCheckerGraphite;
 import htsjdk.tribble.readers.TabixReader;
+import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
@@ -39,8 +40,8 @@ public class MpileupTabixLoader implements Runnable{
 	private boolean verbose;
 	
 	//internal
-	public static final Pattern AF = Pattern.compile(".*AF=([\\d\\.]+).*");
-	public static final Pattern DP = Pattern.compile(".*DP=([\\d\\.]+).*");
+	public Pattern AF = null;
+	public Pattern DP = null;
 	private static final NumberFormat fourDecimalMax = NumberFormat.getNumberInstance();
 
 	
@@ -57,6 +58,9 @@ public class MpileupTabixLoader implements Runnable{
 		verbose = vbc.isVerbose();
 		tabixReader = new TabixReader(mpileupFile.getCanonicalPath());
 		fourDecimalMax.setMaximumFractionDigits(4);
+		//Set patterns
+		AF = Pattern.compile( vbc.getAFInfoName()+"=([\\d\\.]+)");
+		DP = Pattern.compile( vbc.getDPInfoName()+"=([\\d\\.]+)");
 	}
 	
 	public void run() {	
@@ -94,24 +98,24 @@ public class MpileupTabixLoader implements Runnable{
 	
 	private void score(String record) throws Exception {
 		//#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NORMAL	TUMOR
-		String[] fields = Misc.TAB.split(record);
+		String[] fields = Misc.TAB.split(record);		
 		
 		//fetch DP and AF
 		Matcher mat = AF.matcher(fields[7]);
-		if (mat.matches() == false) {
+		if (mat.find() == false) {
 			System.err.println ("WARNING: Failed to parse AF= number from the INFO field in this variant -> "+record+" skipping.");
 			printFailingRecord(fields, record);
 			return;
 		}
 		double freq = Double.parseDouble(mat.group(1));
 		mat = DP.matcher(fields[7]);
-		if (mat.matches() == false) {
+		if (mat.find() == false) {
 			System.err.println ("WARNING: Failed to parse DP= number from the INFO field in this variant:\n"+record);
 			printFailingRecord(fields, record);
 			return;
 		}
 		double depth = Double.parseDouble(mat.group(1));
-		int numNonRef = (int)Math.round(depth*freq);
+		int numNonRef = (int)Math.round(depth*freq);	
 		
 		//interbase coor of effected bps
 		int[] startStop = QueryIndexFileLoader.fetchEffectedBps(fields, true);
@@ -144,7 +148,7 @@ public class MpileupTabixLoader implements Runnable{
 		MpileupSample[] minZScoreSamples = null;
 
 		while ((mpileupLine = it.next()) != null){
-			
+
 			//parse mpilup line and pull filtered set of samples
 			MpileupLine ml = new MpileupLine(mpileupLine, minBaseQuality);
 			if (ml.getChr() == null) throw new IOException ("Failed to parse the mpileup line:\n"+mpileupLine);
@@ -152,7 +156,7 @@ public class MpileupTabixLoader implements Runnable{
 			if (toExamine.length < minNumSamples) continue;
 			
 			//calculate zscore
-			double[] meanStd = calcMeanStdev(toExamine);
+			double[] meanStd = calcMeanStdev(toExamine);			
 			double zscore = (freq-meanStd[0])/meanStd[1];
 			if (Double.isInfinite(zscore)) zscore = VCFBackgroundChecker.zscoreForInfinity;
 			if (zscore < VCFBackgroundChecker.zscoreLessThanZero) zscore = VCFBackgroundChecker.zscoreLessThanZero;
@@ -183,6 +187,7 @@ public class MpileupTabixLoader implements Runnable{
 			String bkafString = fetchFormattedAFs(bkgAFs);
 			String bkzString = Num.formatNumberNoComma(minZScore, 2);
 			fields[7] = "BKZ="+bkzString+";BKAF="+bkafString+";"+fields[7];
+			
 			if (replaceQualScore) fields[5] = bkzString;
 			String modRecord = Misc.stringArrayToString(fields, "\t");
 			
@@ -201,7 +206,7 @@ public class MpileupTabixLoader implements Runnable{
 					baseCounts.add(counts);
 				}
 			}
-		}
+		}	
 	}
 	
 	/**Adds a BKAF fail to the FILTER field.*/

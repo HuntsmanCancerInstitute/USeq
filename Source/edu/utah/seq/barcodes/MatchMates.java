@@ -274,8 +274,6 @@ public class MatchMates {
 		//look for save file, can be null
 		if (saveDirectory == null ) Misc.printErrAndExit("\nError: please provide a directory to save the passing and failing bam alignments.\n");
 		saveDirectory.mkdirs();
-		
-		if (jsonOutputFile == null) jsonOutputFile = new File (saveDirectory, "matchMates.json.gz");
 
 		//make IO
 		makeIO();
@@ -325,7 +323,7 @@ public class MatchMates {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 MatchMates: March 2016                           **\n" +
+				"**                              MatchMates: February 2019                           **\n" +
 				"**************************************************************************************\n" +
 				"This app attaches mates of aligned first of pair reads to the attributes and modifies\n"+
 				"the start position to enable sorting by unclipped start. Call Consensus to cluster and\n"+
@@ -334,7 +332,7 @@ public class MatchMates {
 				"\nOptions:\n"+
 				"-s (Required) Provide a directory path for saving the modified alignments.\n"+
 				"-b Path to a query name sorted bam/sam alignment file, defaults to reading from STDIN. \n"+
-				"-j Write summary stats in json format to this file, defaults to save directory.\n"+
+				"-j Write summary stats in json format to this file.\n"+
 
 				"\n"+
 

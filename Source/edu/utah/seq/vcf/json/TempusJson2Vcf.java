@@ -27,14 +27,12 @@ public class TempusJson2Vcf {
 	
 	//internal fields
 	private IndexedFastaSequenceFile fasta; 
-	private long numSnvs = 0;
-	private long numIndels = 0;
-	private long numCopyNumber = 0;
-	private long numRearrangements = 0;
 	private String source = null;
+	private static final String acceptedReferenceGenome = "GRCh37/hg19";
 	
-	//counters
+	//counters across all datasets
 	TreeMap<String, Integer> bioInfPipelines = new TreeMap<String, Integer>();
+	TreeMap<String, Integer> reportStatus = new TreeMap<String, Integer>();
 	TreeMap<String, Integer> physicians = new TreeMap<String, Integer>();
 	TreeMap<String, Integer> testCodes = new TreeMap<String, Integer>();
 	TreeMap<String, Integer> testDescriptions = new TreeMap<String, Integer>();
@@ -43,12 +41,24 @@ public class TempusJson2Vcf {
 	TreeMap<String, Integer> sampleSites = new TreeMap<String, Integer>();
 	TreeMap<String, Integer> sampleTypes = new TreeMap<String, Integer>();
 	TreeMap<String, Integer> somaticGenes = new TreeMap<String, Integer>();
+	
 	Histogram tumorPercentages = new Histogram(0,100, 20);
 	Histogram tumorAF = new Histogram(0,100, 20);
 	Histogram tumorDP = new Histogram(0,5000, 50);
 	
+	private int numSomaticPotentiallyActionableMutations = 0;
+	private int numSomaticVariantsOfUnknownSignificance = 0;
+	private int numInheritedRelevantVariants = 0;
+	private int numInheritedIncidentalFindings = 0;
+	private int numInheritedVariantsOfUnknownSignificance = 0;
+	
 	//working data for a particular report
 	private File workingJsonFile;
+	private int workingNumSomaticPotentiallyActionableMutations = 0;
+	private int workingNumSomaticVariantsOfUnknownSignificance = 0;
+	private int workingNumInheritedRelevantVariants = 0;
+	private int workingNumInheritedIncidentalFindings = 0;
+	private int workingNumInheritedVariantsOfUnknownSignificance = 0;
 
 	//constructors
 	public TempusJson2Vcf(String[] args){
@@ -58,12 +68,7 @@ public class TempusJson2Vcf {
 
 			doWork();
 			
-			//stats
-			/*System.out.println("\nParsing stats for "+jsonFiles.length+" files:");
-			System.out.println(numSnvs+ "\t# Short Pass");
-			System.out.println(numIndels+ "\t# Short Fail");
-			System.out.println(numCopyNumber+ "\t# CNV Pass");
-			System.out.println(numRearrangements+ "\t# CNV Fail");*/
+			printStats();
 			
 			//sampleInfo
 			//printSampleInfo();
@@ -84,12 +89,18 @@ public class TempusJson2Vcf {
 		//fasta = new IndexedFastaSequenceFile(indexedFasta);
 		//if (fasta.isIndexed() == false) Misc.printErrAndExit("\nError: cannot find your xxx.fai index or the multi fasta file isn't indexed\n"+ indexedFasta);
 
-		System.out.println("Parsing and coverting...\n");
+		IO.pl("Parsing and coverting...\n");
+		IO.pl("Name\t"
+				+ "numSomPotActMuts\t"
+				+ "numSomVUS\t"
+				+ "numInhRelVars\t"
+				+ "numInhIncFinds\t"
+				+ "numInhVUS");
 		for (int i=0; i< jsonFiles.length; i++){
 			
 			//process file
 			workingJsonFile = jsonFiles[i];
-			System.out.println(workingJsonFile.getName());
+			IO.p(workingJsonFile.getName());
 			convert();
 			
 			//build vcf
@@ -106,13 +117,37 @@ public class TempusJson2Vcf {
 			sampleInfo.add(si);
 			
 			if (problemParsing) failingFiles.add(workingXmlFile.getName());*/
+			
+			//finnish line and output counters for this json file
+			IO.pl("\t"+
+					workingNumSomaticPotentiallyActionableMutations+"\t"+
+					workingNumSomaticVariantsOfUnknownSignificance+"\t"+
+					workingNumInheritedRelevantVariants+"\t"+
+					workingNumInheritedIncidentalFindings+"\t"+
+					workingNumInheritedVariantsOfUnknownSignificance);
+			
+			resetWorkingCounters();
 		}
 		
 		//close the fasta lookup fetcher
 		//fasta.close();
-	
-		printStats();
 
+	}
+
+	private void resetWorkingCounters() {
+		//increment master counters
+		numSomaticPotentiallyActionableMutations+= workingNumSomaticPotentiallyActionableMutations;
+		numSomaticVariantsOfUnknownSignificance+= workingNumSomaticVariantsOfUnknownSignificance;
+		numInheritedRelevantVariants+= workingNumInheritedRelevantVariants;
+		numInheritedIncidentalFindings+= workingNumInheritedIncidentalFindings;
+		numInheritedVariantsOfUnknownSignificance+= workingNumInheritedVariantsOfUnknownSignificance;
+		
+		//reset working counters
+		workingNumSomaticPotentiallyActionableMutations = 0;
+		workingNumSomaticVariantsOfUnknownSignificance = 0;
+		workingNumInheritedRelevantVariants = 0;
+		workingNumInheritedIncidentalFindings = 0;
+		workingNumInheritedVariantsOfUnknownSignificance = 0;
 	}
 
 	private void writeVcf() {
@@ -234,6 +269,7 @@ public class TempusJson2Vcf {
 	        
 	        //results
 	        TempusResults results = new TempusResults(object, this); 
+	        if (results.getVariants().size()!=0) IO.pl(results.getVariants().get(0));
 	        
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -243,10 +279,21 @@ public class TempusJson2Vcf {
 	
 	public void printStats(){
 		IO.pl("\nSummary Stats:\n");
-		IO.pl("BioInfPipelines");
+		
+		IO.pl(jsonFiles.length+ "\tNum Json files parsed");
+		
+		IO.pl(numSomaticPotentiallyActionableMutations+  "\tNum Somatic Potentially Actionable Mutations");
+		IO.pl(numSomaticVariantsOfUnknownSignificance+   "\tNum Somatic Variants Of Unknown Significance");
+		IO.pl(numInheritedRelevantVariants+              "\tNum Inherited Relevant Variants");
+		IO.pl(numInheritedIncidentalFindings+            "\tNum Inherited Incidental Findings");
+		IO.pl(numInheritedVariantsOfUnknownSignificance+ "\tNum Inherited Variants Of Unknown Significance");
+		
+		IO.pl("\nBioInfPipelines");
 		Misc.printTreeMap(bioInfPipelines, "\t", "\t");
 		IO.pl("\nPhysicians:");
 		Misc.printTreeMap(physicians, "\t", "\t");
+		IO.pl("\nReportStatus (qns is failed):");
+		Misc.printTreeMap(reportStatus, "\t", "\t");
 		IO.pl("\nTestCodes:");
 		Misc.printTreeMap(testCodes, "\t", "\t");
 		IO.pl("\nTestDescriptions:");
@@ -356,6 +403,26 @@ public class TempusJson2Vcf {
 	
 	public IndexedFastaSequenceFile getFasta() {
 		return fasta;
+	}
+
+	public void setWorkingNumSomaticPotentiallyActionableMutations(int workingNumSomaticPotentiallyActionableMutations) {
+		this.workingNumSomaticPotentiallyActionableMutations = workingNumSomaticPotentiallyActionableMutations;
+	}
+
+	public void setWorkingNumSomaticVariantsOfUnknownSignificance(int workingNumSomaticVariantsOfUnknownSignificance) {
+		this.workingNumSomaticVariantsOfUnknownSignificance = workingNumSomaticVariantsOfUnknownSignificance;
+	}
+
+	public void setWorkingNumInheritedRelevantVariants(int workingNumInheritedRelevantVariants) {
+		this.workingNumInheritedRelevantVariants = workingNumInheritedRelevantVariants;
+	}
+
+	public void setWorkingNumInheritedIncidentalFindings(int workingNumInheritedIncidentalFindings) {
+		this.workingNumInheritedIncidentalFindings = workingNumInheritedIncidentalFindings;
+	}
+
+	public void setWorkingNumInheritedVariantsOfUnknownSignificance(int workingNumInheritedVariantsOfUnknownSignificance) {
+		this.workingNumInheritedVariantsOfUnknownSignificance = workingNumInheritedVariantsOfUnknownSignificance;
 	}
 	
 }

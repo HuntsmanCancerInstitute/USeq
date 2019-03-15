@@ -53,11 +53,27 @@ public class AvatarAssembler {
 			toLink.add(ap);
 			numTeNe++;
 		}
-		else if (is.tEPresent && is.tTPresent) numTeTt++;
-		else if (is.nEPresent && is.tTPresent) numNeTt++;
-		else if (is.nEPresent) numNe++;
-		else if (is.tEPresent) numTe++;
-		else if (is.tTPresent) numTt++;
+		else if (is.tEPresent && is.tTPresent) {
+			numTeTt++;
+			if (linkOnlyTN == false) toLink.add(ap);
+		}
+		else if (is.nEPresent && is.tTPresent) {
+			numNeTt++;
+			if (linkOnlyTN == false) toLink.add(ap);
+		}
+		else if (is.nEPresent) {
+			numNe++;
+			if (linkOnlyTN == false) toLink.add(ap);
+		}
+		else if (is.tEPresent) {
+			numTe++;
+			if (linkOnlyTN == false) toLink.add(ap);
+		}
+		else if (is.tTPresent) {
+			numTt++;
+			if (linkOnlyTN == false) toLink.add(ap);
+		}
+		
 	}
 	
 	public AvatarAssembler (String[] args){
@@ -163,14 +179,11 @@ public class AvatarAssembler {
 			ap.gender = fields[1];
 		}
 		in.close();
-
-		
 	}
 
 	private void loadHciIdHash() throws IOException {
 		BufferedReader in = IO.fetchBufferedReader(info);
 		String line = in.readLine();
-		
 		while ((line = in.readLine()) != null){
 			String[] fields = Misc.TAB.split(line);
 			if (fields.length != 7) throw new IOException("Incorrect number "+fields.length+" of fields in "+line);
@@ -183,7 +196,6 @@ public class AvatarAssembler {
 			}
 			ap.addSample(fields);
 		}
-		
 		in.close();
 	}
 
@@ -215,20 +227,20 @@ public class AvatarAssembler {
 
 				//for each sample
 				for (AvatarSample as: avatarSamples){
+					String type = null;
+					if (as.sampleType == "Exome") type = "DNA";
+					else if (as.sampleType == "Transcriptome") type = "RNA";
+					else throw new IOException("\nFailed to identify the sampleType from -> "+as.sampleType);
 					//Source? Tumor or Normal
-					String dirName = as.sampleSource+ as.sampleType;
+					String dirName = as.sampleSource+ type;
 					File fastqDir = new File (patFastqDir, dirName);
 					fastqDir.mkdirs();
 					//make soft links
 					for (File oriF: as.fastq){
 						link = new File(fastqDir, dirName+"_"+oriF.getName());
-						if (links.contains(link.toString())){
-							IO.pl("Already exists "+link.toString());
-						}
-						else {
-							Files.createSymbolicLink(link.toPath(), oriF.toPath());
-							links.add(link.toString());
-						}
+						if (links.contains(link.toString()) || link.exists()) IO.pl("Already exists "+link.toString());
+						else Files.createSymbolicLink(link.toPath(), oriF.toPath());
+						links.add(link.toString());
 					}
 				}
 				//write out info
@@ -406,6 +418,7 @@ public class AvatarAssembler {
 					case 'r': results = new File(args[++i]); break;
 					case 'f': diagnosisFilter = args[++i]; break;
 					case 'j': jobDir = new File(args[++i]); break;
+					case 'l': linkOnlyTN = false; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -425,7 +438,7 @@ public class AvatarAssembler {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                              AvatarAssembler  January 2019                       **\n" +
+				"**                              AvatarAssembler : March 2019                        **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling fastq avatar datasets based on the results of three sql queries.\n"+
 				"See https://ri-confluence.hci.utah.edu/x/KwBFAg   Run as root on hci-clingen1\n"+
@@ -437,6 +450,8 @@ public class AvatarAssembler {
 				"-p Path to Exp dir, e.g. /Repository/PersonData/2018/\n"+
 				"-j Job dir to place linked fastq\n"+
 				"-f Only keep patients with a diagnosis containing this String, defaults to all.\n"+
+				"-l Create Fastq links for all patient datasets, defaults to just those with both a\n"+
+				"    Tumor and Normal exome.\n"+
 				"-r Patient stats output file.\n\n"+
 				
                 "Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/2018/\n"+

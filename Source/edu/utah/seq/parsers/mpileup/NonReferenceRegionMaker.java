@@ -183,7 +183,7 @@ public class NonReferenceRegionMaker{
 
 
 				"\nExample: samtools mpileup -B -d 1000000 -f $faIndex -l $bed $bam | java\n"+
-				"     -Xmx4G -jar pathToUSeq/Apps/NonReferenceRegionMaker -b 13 -r 20 -a 0.025 -b \n"+
+				"     -Xmx4G -jar pathToUSeq/Apps/NonReferenceRegionMaker -q 13 -r 20 -a 0.025 -b \n"+
 				"     0.025normExoNonRefMask.bed.gz -c 4 \n" +
 
 				"**************************************************************************************\n");
