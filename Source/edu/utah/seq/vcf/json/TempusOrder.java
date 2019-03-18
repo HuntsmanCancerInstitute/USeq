@@ -1,8 +1,8 @@
 package edu.utah.seq.vcf.json;
 
+import java.util.LinkedHashMap;
 import org.json.JSONException;
 import org.json.JSONObject;
-
 import util.gen.Json;
 
 public class TempusOrder {
@@ -36,6 +36,13 @@ public class TempusOrder {
 		TempusJson2Vcf.add(physician, tempusJson2Vcf.physicians);
 		TempusJson2Vcf.add(testCode, tempusJson2Vcf.testCodes);
 		TempusJson2Vcf.add(testDescription, tempusJson2Vcf.testDescriptions);
+	}
+	
+	public void addMetaData(LinkedHashMap<String, String> meta) {
+		meta.put("tempusPhysician", physician);
+		meta.put("tempusTestCode", testCode);
+		meta.put("tempusTestDescription", testDescription);
+		meta.put("tempusAccessionId", accessionId);
 	}
 
 	public String getPhysician() {

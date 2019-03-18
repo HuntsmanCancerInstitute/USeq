@@ -1,8 +1,9 @@
 package edu.utah.seq.vcf.json;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import org.json.JSONException;
 import org.json.JSONObject;
-
 import util.gen.Json;
 
 public class TempusReport {
@@ -12,6 +13,7 @@ public class TempusReport {
 	private String bioInfPipeline = null;
 	private String notes = null;
 	private String reportStatus = null;
+	private ArrayList<String> warningMessages = new ArrayList<String>();
 	
 	/*
     "report": {
@@ -37,7 +39,10 @@ public class TempusReport {
 		TempusJson2Vcf.add(bioInfPipeline, tempusJson2Vcf.bioInfPipelines);
 		
 		JSONObject workflow = report.getJSONObject("workflow");
+		
+		//report status, watch this one, if qns then expect junk results
 		reportStatus = Json.getStringAttribute(workflow, "reportStatus");
+		if (reportStatus.contains("qns")) warningMessages.add("Report Status indicates quality control problem. View results with caution.");
 		TempusJson2Vcf.add(reportStatus, tempusJson2Vcf.reportStatus);
 	}
 
@@ -55,5 +60,21 @@ public class TempusReport {
 
 	public String getNotes() {
 		return notes;
+	}
+
+	public ArrayList<String> getWarningMessages() {
+		return warningMessages;
+	}
+
+	public void setWarningMessages(ArrayList<String> warningMessages) {
+		this.warningMessages = warningMessages;
+	}
+
+	public void addMetaData(LinkedHashMap<String, String> meta) {
+		meta.put("tempusReportId", reportId);
+		meta.put("tempusReportStatus", reportStatus);
+		meta.put("tempusSignoutDate", signout_date);
+		meta.put("tempusBioInfPipeline", bioInfPipeline);
+		if (notes != null) meta.put("tempusReportNotes", notes);
 	}
 }

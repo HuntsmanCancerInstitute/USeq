@@ -1,5 +1,6 @@
 package edu.utah.seq.vcf.json;
 
+import java.util.LinkedHashMap;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -64,6 +65,13 @@ public class TempusSpecimen {
 		TempusJson2Vcf.add(sampleType, tempusJson2Vcf.sampleTypes);
 		
 
+	}
+	
+	public void addMetaData(LinkedHashMap<String, String> meta, int id) {
+		if (sampleCategory != null) meta.put("tempusSampleCategory_"+id, sampleCategory);
+		if (sampleSite != null) meta.put("tempusSampleSite_"+id, sampleSite);
+		if (sampleType != null) meta.put("tempusSampleType_"+id, sampleType);
+		if (tumorPercentage != null) meta.put("tempusTumorPercentage_"+id, tumorPercentage.toString());	
 	}
 	
 	public static TempusSpecimen[] getSpecimens(JSONObject object, TempusJson2Vcf tempusJson2Vcf) throws JSONException{

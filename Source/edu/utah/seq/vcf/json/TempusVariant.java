@@ -1,13 +1,19 @@
 package edu.utah.seq.vcf.json;
 
+import java.io.IOException;
+import java.util.HashMap;
 import org.json.JSONException;
 import org.json.JSONObject;
+import htsjdk.samtools.reference.IndexedFastaSequenceFile;
+import htsjdk.samtools.reference.ReferenceSequence;
+import util.bio.annotation.Bed;
 import util.gen.Json;
 import util.gen.Misc;
+import util.gen.Num;
 
 public class TempusVariant{
 	
-	//many of these fields will remain null
+	//This is a composite of all of the variant fields in the 80 json reports we've received. Many of these fields will remain null
 	private String variantSource = null;
 	private String gene = null;
 	private String transcript = null;
@@ -32,6 +38,11 @@ public class TempusVariant{
 	private String fusionType = null;
 	private String gene3 = null;
 	private String gene5 = null;
+	
+	//for CNV
+	private int start;
+	private int end;
+	private int svLen; //will be negative if deletion
 		
 	/**Object to represent a Tempus variant, SNV/ INDEL/ CNV/ Fusion*/
 	public TempusVariant(String variantSource, String geneName, JSONObject object, TempusJson2Vcf tempusJson2Vcf) throws JSONException {
@@ -79,9 +90,73 @@ public class TempusVariant{
 			alt = t[3];
 		}
 		
-		//increment histograms
-		if (allelicFraction !=null) tempusJson2Vcf.tumorAF.count(Double.parseDouble(allelicFraction));
-		if (coverage !=null) tempusJson2Vcf.tumorDP.count(Double.parseDouble(coverage));
+		//increment counters
+		incrementCounters(tempusJson2Vcf);
+		
+	}
+	
+	private void incrementCounters(TempusJson2Vcf t) {
+		//these only get added if not null
+		TempusJson2Vcf.add(gene, t.genes);
+		TempusJson2Vcf.add(referenceGenome, t.referenceGenome);
+		TempusJson2Vcf.add(variantType, t.variantType);
+		TempusJson2Vcf.add(variantDescription, t.variantDescription);
+		//histograms
+		if (allelicFraction !=null) t.tumorAF.count(Double.parseDouble(allelicFraction));
+		if (coverage !=null) t.tumorDP.count(Double.parseDouble(coverage));
+	}
+	
+	/** Returns CHROM POS ID REF ALT QUAL FILTER INFO (EG FE ST PE DP AF)*/
+	public String toVcf(int id){
+		if (chromosome==null || pos==null || ref==null || alt==null) return null;
+		StringBuilder sb = new StringBuilder();
+		//CHROM
+		sb.append(chromosome); sb.append("\t");
+		//POS
+		sb.append(pos); sb.append("\tTempus_");
+		//ID
+		sb.append(id);
+		sb.append("\t");
+		//REF
+		sb.append(ref); sb.append("\t");
+		//ALT
+		sb.append(alt); sb.append("\t");
+		//QUAL
+		sb.append(".\t");
+		//FILTER
+		sb.append(".\t");
+		//INFO (EG CL FE DP AF)
+		sb.append("EG=");
+		sb.append(gene);
+		sb.append(";CL=");
+		sb.append(variantSource);
+		if (variantDescription != null) {
+			sb.append(";FE=");
+			sb.append(variantDescription.replaceAll(" ", "_"));
+		}
+		if (coverage !=null) {
+			sb.append(";DP=");
+			sb.append(coverage);
+		}
+		if (allelicFraction !=null) {
+			double ap = Double.parseDouble(allelicFraction);
+			double af = ap/100.0;
+			sb.append(";AF=");
+			sb.append(Num.formatNumber(af, 2));
+		}
+		//cnv?
+		if (end !=0) {
+			sb.append(";IMPRECISE;SVTYPE=CNV");
+			if (copyNumber != null) {
+				sb.append(";CN=");
+				sb.append(copyNumber);
+			}
+			sb.append(";END=");
+			sb.append(end);
+			sb.append(";SVLEN=");
+			sb.append(svLen);
+		}
+		return sb.toString();
 	}
 	
 	/**Returns all non null values*/
@@ -114,6 +189,24 @@ public class TempusVariant{
 		return sb.toString();
 	}
 
+	public void addCnvInfo(HashMap<String, Bed> cnvGeneNameBed, IndexedFastaSequenceFile fasta) throws IOException {
+		Bed b = cnvGeneNameBed.get(gene);
+		if (b == null) throw new IOException("Failed to find gene info in CNV lookup hash for "+ toString());
+		chromosome = b.getChromosome();
+		start = b.getStart();
+		pos = new Integer(start).toString();
+		end = b.getStop();
+		alt = "<CNV>";
+		svLen = b.getLength();
+		if (variantType.contains("deletion") || variantDescription.toLowerCase().contains("loss")) {
+			svLen = -1*svLen;
+			variantDescription = "CNV_LOSS";
+		}
+		else variantDescription = "CNV_GAIN";
+		//find ref
+		ReferenceSequence rs = fasta.getSubsequenceAt(chromosome, start, start);
+		ref = new String(rs.getBases());
+	}
 
 	public String getVariantSource() {
 		return variantSource;
@@ -210,5 +303,7 @@ public class TempusVariant{
 	public String getGene5() {
 		return gene5;
 	}
+
+
 	
 }
