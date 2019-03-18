@@ -11,7 +11,6 @@ import java.util.*;
 
 /**
  * Takes one or more patient json reports from Tempus tests and converts the variants into vcf format. This is a mix of somatic, inherited, snv/indel, and cnvs.
- * 
  * @author david.nix@hci.utah.edu 
  **/
 public class TempusJson2Vcf {
@@ -98,9 +97,6 @@ public class TempusJson2Vcf {
 			doWork();
 			
 			printStats();
-			
-			//sampleInfo
-			//printSampleInfo();
 
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
@@ -194,7 +190,7 @@ public class TempusJson2Vcf {
 		try {
 			String name = Misc.removeExtension(workingJsonFile.getName());
 			Gzipper out = new Gzipper(new File (saveDirectory, name+".vcf.gz"));
-			Gzipper outTxt = new Gzipper(new File (saveDirectory, name+".txt.gz"));
+			//Gzipper outTxt = new Gzipper(new File (saveDirectory, name+".txt.gz"));
 			
 			//add header
 			out.println(buildVcfHeader());
@@ -203,7 +199,7 @@ public class TempusJson2Vcf {
 			ArrayList<Bed> bedVcfs = new ArrayList<Bed>();
 			int counter = 0;
 			for (TempusVariant tv: workingResults.getVariants()) {
-				outTxt.println(tv.toString());
+				//outTxt.println(tv.toString());
 				String vcf = tv.toVcf(counter);
 				if (vcf != null) {
 					counter++;
@@ -216,7 +212,7 @@ public class TempusJson2Vcf {
 			for (Bed t: b) out.println(t.getName());
 			
 			out.close();
-			outTxt.close();
+			//outTxt.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError: issue writing out vcf for "+workingJsonFile);
@@ -250,7 +246,6 @@ public class TempusJson2Vcf {
 		for (TempusVariant tv: workingResults.getVariants()) {
 			if (tv.getReferenceGenome() != null) meta.put("referenceGenome", tv.getReferenceGenome());
 		}
-		
 		for (String key: meta.keySet()){
 			String value = meta.get(key).trim();
 			sb.append("##");
@@ -282,7 +277,6 @@ public class TempusJson2Vcf {
 		sb.append(infoEND+"\n");
 		sb.append(infoCN+"\n");
 
-		
 		//chrom line
 		sb.append("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO");
 		return sb.toString();
@@ -461,8 +455,9 @@ public class TempusJson2Vcf {
 				"**************************************************************************************\n" +
 				"**                             Tempus Json 2 Vcf: March 2019                        **\n" +
 				"**************************************************************************************\n" +
-				"Attempts to parse json Tempus reports to vcf. Leave in PHI to enable calculating age\n"+
-				"at diagnosis. Summary statistics calculated for all reports. \n"+
+				"Parses json Tempus reports to vcf. Leave in PHI to enable calculating age at\n"+
+				"diagnosis. Summary statistics calculated for all reports. Vcfs will contain a mix of \n"+
+				"somatic and inherited snvs, indels, and cnvs.\n"+
 
 				"\nOptions:\n"+
 				"-j Path to Tempus json report or directory containing such, xxx.json(.gz/.zip OK)\n"+
@@ -472,7 +467,7 @@ public class TempusJson2Vcf {
 				"-f Path to the reference fasta with xxx.fai index. Required for CNV conversions.\n"+
 				
 				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/TempusJson2Vcf -j /F1/TempusJsons\n" +
-				"     -f /Ref/human_g1k_v37.fasta -s /F1/VCF/ \n\n" +
+				"     -f /Ref/human_g1k_v37.fasta -s /F1/VCF/ -b /Ref/b37TempusGeneRegions.bed.gz \n\n" +
 
 				"**************************************************************************************\n");
 

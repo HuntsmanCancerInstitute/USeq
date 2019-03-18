@@ -303,7 +303,4 @@ public class TempusVariant{
 	public String getGene5() {
 		return gene5;
 	}
-
-
-	
 }
