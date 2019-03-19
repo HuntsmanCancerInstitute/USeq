@@ -21,6 +21,7 @@ public class Misc {
 	public static final Pattern RETURN = Pattern.compile("\n");
 	public static final Pattern WHITESPACE = Pattern.compile("\\s+");
 	public static final Pattern UNDERSCORE = Pattern.compile("_");
+	public static final Pattern DASH = Pattern.compile("-");
 	public static final Pattern COLON = Pattern.compile(":");
 	public static final Pattern COMMA = Pattern.compile(",");
 	public static final Pattern SEMI_COLON = Pattern.compile(";");

@@ -41,6 +41,25 @@ public class Bed extends Coordinate implements Serializable{
 	}
 
 
+	public Bed(String[] tokens) {
+		super (tokens[0], Integer.parseInt(tokens[1]), Integer.parseInt(tokens[2]));
+		double score = 0;
+		char strand = '.';
+		if (tokens.length >= 6) {
+			name = tokens[3];
+			score = Double.parseDouble(tokens[4]);
+			strand = tokens[5].charAt(0);
+		}
+		else if (tokens.length == 5){
+			name = tokens[3];
+			score = Double.parseDouble(tokens[4]);
+		}
+		else if (tokens.length == 4){
+			name = tokens[3];
+		}
+		
+	}
+
 	/**Parses a tab delimited bed file: chrom, start, stop, text, score, strand. Only the first three are required.
 	 * @param subStart - bases to be subtracted from region starts
 	 * @param subEnd - bases to be subtracted from region ends
@@ -553,6 +572,31 @@ public class Bed extends Coordinate implements Serializable{
 		return chrSpec;
 	}
 
+	/**Splits a vcf file by chromosome into a HashMap of RegionScoreText[] for variants that contain an END=xxx String.
+	 * Places the record number in the bed score column and the vcf ID in the bed name column.*/
+	public static HashMap<String,Bed> parseBedForNames(File bedFile){
+		HashMap<String,Bed> geneNameBed = new HashMap<String,Bed>();
+		String line = null;
+		String[] tokens;
+		try{
+			BufferedReader in = IO.fetchBufferedReader(bedFile);
+			while ((line = in.readLine()) !=null) {
+				line = line.trim();
+				if (line.length() ==0 || line.startsWith("#")) continue;
+				tokens = Misc.TAB.split(line);
+				if (tokens.length < 3) {
+					System.err.println("Error: skipping the following bed line, it does not contain requisit number of tab delimited columns (chr, start, stop...)\n\t-> "+line);
+					continue;
+				}
+				Bed b = new Bed(tokens);
+				geneNameBed.put(b.getName(), b);
+			}
+		}catch (Exception e){
+			e.printStackTrace();
+			Misc.printErrAndExit("\nMalformed bed line? -> "+line+"\n Aborting!");
+		}
+		return geneNameBed;
+	}
 	
 	/**Splits a vcf file by chromosome into a HashMap of RegionScoreText[]. Use the padding to expand the 
 	 * size of the variant. SNV, INS, or DEL is assigned to the name field, QUAL to the score field.*/

@@ -16,15 +16,14 @@ import java.util.*;
 public class TempusJson2Vcf {
 
 	//user defined fields
-	private File[] jsonFiles;
+	private File[] jsonFiles = null;
 	private File indexedFasta = null;
-	private File saveDirectory;
+	private File saveDirectory = null;
 	private String acceptedSchema = "1.3";
 	
 	//internal fields
-	private IndexedFastaSequenceFile fasta; 
+	private IndexedFastaSequenceFile fasta = null;
 	private String source = null;
-	private static final String acceptedReferenceGenome = "GRCh37/hg19";
 	private HashMap<String, Bed> cnvGeneNameBed = null;
 	
 	//counters across all datasets
@@ -83,7 +82,7 @@ public class TempusJson2Vcf {
 	private static String infoAF = "##INFO=<ID=AF,Number=A,Type=Float,Description=\"Allele Frequency\">";
 	private static String infoIMPRECISE = "##INFO=<ID=IMPRECISE,Number=0,Type=Flag,Description=\"Imprecise structural variation\">";
 	private static String infoSVTYPE = "##INFO=<ID=SVTYPE,Number=1,Type=String,Description=\"Type of structural variant\">";
-	private static String infoSVLEN = "##INFO=<ID=SVLEN,Number=-1,Type=Integer,Description=\"Difference in length between REF and ALT alleles. Negative values for deletions, positive for amplifications.\">";
+	private static String infoSVLEN = "##INFO=<ID=SVLEN,Number=1,Type=Integer,Description=\"Difference in length between REF and ALT alleles. Negative values for deletions, positive for amplifications.\">";
 	private static String infoEND = "##INFO=<ID=END,Number=1,Type=Integer,Description=\"End position of the variant described in this record\">";
 	private static String infoCN = "##INFO=<ID=CN,Number=1,Type=Integer,Description=\"Copy Number\">";
 
