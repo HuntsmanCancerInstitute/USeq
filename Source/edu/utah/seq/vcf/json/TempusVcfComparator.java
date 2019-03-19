@@ -22,7 +22,6 @@ public class TempusVcfComparator {
 	private SimpleVcf[] fVcfs;
 	private SimpleVcf[] rVcfs;	
 	private int bpPaddingForOverlap = 2;
-	private boolean noModifyTempus = true;
 	private boolean appendChr = false;
 	private boolean excludeInherited = false;
 
@@ -35,6 +34,7 @@ public class TempusVcfComparator {
 	private int numberModifiedTempusCalls = 0;
 	private int numberTempusWithNoMatch = 0;
 	private int numberPassingRecallWithNoMatch = 0;
+	private int numberInherited = 0;
 	
 	private ArrayList<SimpleVcf> vcfToPrint = new ArrayList<SimpleVcf>();
 	private ArrayList<String> headerLines = new ArrayList<String>();
@@ -78,10 +78,10 @@ public class TempusVcfComparator {
 		System.out.println( numberRecall +"\t# Recall variants");
 		System.out.println( numberShortTempus +"\t# Short Tempus variants");
 		System.out.println( numberOtherTempus +"\t# Other Tempus variants");
+		System.out.println( numberInherited +"\t# Inherited Tempus variants, skippped? "+excludeInherited);
 		System.out.println( numberExactMatches +"\t# Short with an exact match");
 		System.out.println( numberTempusWithOnlyOverlap +"\t# Short with overlap recal variants");
-		if (noModifyTempus) System.out.println( numberModifiedTempusCalls +"\t# Short recommended for modification");
-		else System.out.println( numberModifiedTempusCalls +"\t# Short modified using overlapping recal variant info");
+		System.out.println( numberModifiedTempusCalls +"\t# Short recommended for modification");
 		System.out.println( numberTempusWithNoMatch +"\t# Short with no match"); 
 		System.out.println( numberPassingRecallWithNoMatch +"\t# Passing recall variants with no Short match");
 	}
@@ -114,14 +114,11 @@ public class TempusVcfComparator {
 		for (SimpleVcf r:rVcfs){
 			//print it?
 			if (r.isPrint() && r.getFilter().toLowerCase().contains("fail") == false) {
-				//mark Filter NR not reported
-				r.appendFilter("NR");
 				vcfToPrint.add(r);
-				numberPassingRecallWithNoMatch++;
+				if (r.getMatch() == null) numberPassingRecallWithNoMatch++;
 			}
 		}
 	}
-
 	
 	/**Merges header lines eliminating duplicates.  Does a bad ID name collision checking, silently keeps first one. 
 	 * Returns null if CHROM lines differ. */
@@ -164,11 +161,6 @@ public class TempusVcfComparator {
 
 		//add in filter lines
 		filter.add(SimpleVcf.ncFilter);
-		filter.add(SimpleVcf.nrFilter);
-		filter.add(SimpleVcf.mdFilter);
-		
-		//add info lines
-		info.add(SimpleVcf.infoRAF);
 
 		//remove ID dups from contig, filter, format, info
 		ArrayList<String> contigAL = VCFParser.mergeHeaderIds(contig);
@@ -188,8 +180,6 @@ public class TempusVcfComparator {
 		return Misc.stringArrayListToStringArray(lines);
 	}
 
-
-
 	private void processTempusVcfs() {
 		//for each Tempus record
 		for (SimpleVcf f: fVcfs){
@@ -198,82 +188,34 @@ public class TempusVcfComparator {
 			if (f.isShortVariant() == false) {
 				vcfToPrint.add(f);
 				numberOtherTempus++;
-				continue;
 			}
-
-			numberShortTempus++;
-
-			//exact match? 
-			if (f.getMatch() != null) {
-				//exact match then just print it
-				f.appendRAF(f.getMatch());
-				f.appendID(f.getMatch());
-				vcfToPrint.add(f);
-				numberExactMatches++;
-				f.getMatch().setPrint(false);
-				continue;
-			}
-
-			//So no exact match any overlap?
-			if (f.getOverlap().size()!=0){
-				//always print the tempus vcf record with a NC FILTER field, not confirmed.
-				//question is what to do about the overlapping records? print with NR FILTER field, not reported by tempus?
-				numberTempusWithOnlyOverlap++;
-				
-				//more than one overlap? print tempus and the multiple with NC and NR's
-				if (f.getOverlap().size()!=1){
-					//System.err.println("Multiple overlap. Printing the Tempus and Recall variants:");
-					//System.err.println("F:\t"+f.getOriginalRecord());
-					//for (SimpleVcf r: f.getOverlap()) System.err.println("R:\t"+r.getOriginalRecord());
-					f.appendFilter("NC");
+			else {
+				numberShortTempus++;
+				//exact match? 
+				if (f.getMatch() != null) {
+					numberExactMatches++;
+					//exact match then add tempus info to recall
+					SimpleVcf vcf = f.getMatch();
+					vcf.appendID(f);
+					vcf.appendINFO(f);
+					f.setPrint(false);
 				}
-				
-				//ok so only one overlap, do the types match?
 				else {
-					int lenFRef = f.getRef().length();
-					int lenFAlt = f.getAlt().length();
-					SimpleVcf r = f.getOverlap().get(0);
-					int lenRRef = r.getRef().length();
-					int lenRAlt = r.getAlt().length();
-					
-					//types match and it's a good recal variant, modify the tempus call and print, don't print the recal variant
-					if (lenFRef == lenRRef && lenFAlt == lenRAlt && r.getFilter().toLowerCase().contains("fail") == false){
-						if (noModifyTempus){
-							System.err.println("WARNING: One overlap and types match, recommend modifying the Tempus record. Will print both with no chr, pos, alt, ref modifications.");
-							f.appendFilter("NC");
-							System.err.println("R:\t"+r.getOriginalRecord());
-							System.err.println("F:\t"+f.getOriginalRecord());
-							numberModifiedTempusCalls++;
-						}
-						else {
-							System.err.println("WARNING: One overlap and types match thus MODIFYING the Tempus pos, ref, alt info and printing it. Not printing the recall.");
-							f.swapInfoWithOverlap(r);
-							f.appendFilter("MD");
-							System.err.println("R:\t"+r.getOriginalRecord());
-							System.err.println("F:\t"+f.getOriginalRecord());
-							System.err.println("M:\t"+f.getVcfLine());
-							numberModifiedTempusCalls++;
-							//set recall to not print
-							r.setPrint(false);
-						}
-					}
-					//types don't match so print tempus and recal
+					//So no exact match any overlap?
+					if (f.getOverlap().size()!=0) numberTempusWithOnlyOverlap++;
+
+					//No exact or overlap
 					else {
-						//System.err.println("One overlap, but diff types. Printing Tempus and Recall vars.");
-						f.appendFilter("NC");
+						System.err.println("WARNING: No match to this Tempus variant.");
+						System.err.println("F:\t"+f.getVcfLine());
+						numberTempusWithNoMatch++;
 					}
+					//always print it
+					f.appendFilter("NC");
+					vcfToPrint.add(f);
 				}
-				//in all cases print the tempus var
-				vcfToPrint.add(f);
-				continue;
+
 			}
-			
-			//No exact or overlap, flag and print
-			System.err.println("WARNING: No match to this Tempus variant.");
-			numberTempusWithNoMatch++;
-			f.appendFilter("NC");
-			vcfToPrint.add(f);
-			System.err.println("F:\t"+f.getVcfLine());
 		}
 	}
 
@@ -305,7 +247,10 @@ public class TempusVcfComparator {
 		ArrayList<SimpleVcf> al = new ArrayList<SimpleVcf>();
 		for (String v: lines){
 			if (v.startsWith("#") == false) {
-				if (excludeInherited && v.contains("inherited")) continue;
+				if (v.contains("inherited")) {
+					numberInherited++;
+					if (excludeInherited) continue;
+				}
 				if (appendChr && v.startsWith("chr") == false) v = "chr"+v;
 				al.add(new SimpleVcf(v, bpPaddingForOverlap));
 			}
@@ -322,7 +267,6 @@ public class TempusVcfComparator {
 	}
 
 	public static void main(String[] args) {
-		IO.pl("Trying...");
 		if (args.length ==0){
 			printDocs();
 			System.exit(0);
@@ -346,7 +290,6 @@ public class TempusVcfComparator {
 					case 't': tempusVcf = new File(args[++i]); break;
 					case 'r': recallVcf = new File(args[++i]); break;
 					case 'm': mergedVcf = new File(args[++i]); break;
-					case 'k': noModifyTempus = false; break;
 					case 'c': appendChr = true; break;
 					case 'e': excludeInherited = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
@@ -377,8 +320,6 @@ public class TempusVcfComparator {
 				"-r Path to a recalled snv/indel vcf file.\n"+
 				"-m Path to named vcf file for saving the results.\n"+
 				"-c Append chr if absent in chromosome name.\n"+
-				"-k Attempt to merge Tempus records that overlap a recall and are the same type.\n"+
-				"     Defaults to printing both.\n"+
 				"-e Exclude 'inherited' germline Tempus records from the comparison and merged output.\n"+
 
 				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/TempusVcfComparator -f TL-18-03CFD6.vcf\n" +

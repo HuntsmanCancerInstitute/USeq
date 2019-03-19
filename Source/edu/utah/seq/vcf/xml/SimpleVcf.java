@@ -36,9 +36,9 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	private ArrayList<SimpleVcf> overlap = new ArrayList<SimpleVcf>();
 	private static final Pattern endPat = Pattern.compile(".+END=(\\d+);.+");
 	private static final Pattern afPat = Pattern.compile(".+AF=([\\d+\\.]+).*");
-	public static final String ncFilter = "##FILTER=<ID=NC,Description=\"This Foundation variant was not confirmed in subsequent recalling.\">";
+	public static final String ncFilter = "##FILTER=<ID=NC,Description=\"This clinical test variant was not confirmed in subsequent recalling.\">";
 	public static final String nrFilter = "##FILTER=<ID=NR,Description=\"This variant was not reported by Foundation.\">";
-	public static final String mdFilter = "##FILTER=<ID=MD,Description=\"This Foundation variant overlapped a recall, had the same type, and was modified using info from the recall.\">";
+	public static final String mdFilter = "##FILTER=<ID=MD,Description=\"This clinical variant overlapped a recall, had the same type, and was modified using info from the recall.\">";
 	public static String infoRAF = "##INFO=<ID=RAF,Number=A,Type=Float,Description=\"Recalled variant allele frequency\">";
 	
 	//#CHROM POS ID REF ALT QUAL FILTER INFO
@@ -116,6 +116,10 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	
 	public void appendID(SimpleVcf o) {
 		if (o.getId().equals(".") == false) id = id+";"+o.getId();
+	}
+	
+	public void appendINFO(SimpleVcf o) {
+		info = info+";"+o.info;
 	}
 	
 	public String toString(){
