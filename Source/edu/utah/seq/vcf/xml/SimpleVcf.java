@@ -28,6 +28,7 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	private int length;
 	private int padPos;
 	private int padEnd;
+	private double score;
 	private boolean insertion = false;
 	private boolean deletion = false;
 	private boolean shortVariant = true;
@@ -243,6 +244,30 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 
 	public String getId() {
 		return id;
+	}
+
+	public double getScore() {
+		return score;
+	}
+
+	public void setScore(double score) {
+		this.score = score;
+	}
+
+	public int getPadPos() {
+		return padPos;
+	}
+
+	public void setPadPos(int padPos) {
+		this.padPos = padPos;
+	}
+
+	public int getPadEnd() {
+		return padEnd;
+	}
+
+	public void setPadEnd(int padEnd) {
+		this.padEnd = padEnd;
 	}
 
 

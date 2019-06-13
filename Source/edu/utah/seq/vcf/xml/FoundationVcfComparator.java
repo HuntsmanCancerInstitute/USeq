@@ -24,6 +24,7 @@ public class FoundationVcfComparator {
 	private boolean noModifyFoundation = true;
 	private boolean excludeFoundationContig = false;
 	private boolean appendChr = false;
+	private boolean insertMockSample = false;
 
 	//counters
 	private int numberShortFoundation = 0;
@@ -93,13 +94,30 @@ public class FoundationVcfComparator {
 		
 		try {
 			Gzipper out = new Gzipper(mergedVcf);
+			//add in format for mock?
+			String sampleId= Misc.removeExtension(mergedVcf.getName());
+			if (insertMockSample) {
+				headerLines.add(0,"#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t"+sampleId);
+				headerLines.add("##FORMAT=<ID=SID,Number=1,Type=String,Description=\"SampleID_RecordNumber\">");
+			}
+			
 			//fetch merged header
 			String[] header = mergeHeaders(headerLines);
 			
 			for (String h: header) out.println(h);
+			
+			int counter=0;
 			for (SimpleVcf v: vcf) {
-				if (v.getFilter().toLowerCase().contains("fail") == false) out.println(v.getVcfLine());
+				if (v.getFilter().toLowerCase().contains("fail") == false) {
+					if (insertMockSample) {
+						out.println(v.getVcfLine()+"\tSID\t"+sampleId+"_"+counter);
+						counter++;
+					}
+					else out.println(v.getVcfLine());
+				}
 			}
+			
+			
 			
 			out.close();
 		} catch (IOException e) {
@@ -353,6 +371,7 @@ public class FoundationVcfComparator {
 					case 'm': mergedVcf = new File(args[++i]); break;
 					case 'k': noModifyFoundation = false; break;
 					case 'c': appendChr = true; break;
+					case 'v': insertMockSample = true; break; 
 					case 'e': excludeFoundationContig = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -373,7 +392,7 @@ public class FoundationVcfComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Foundation Vcf Comparator: Nov 2018                    **\n" +
+				"**                           Foundation Vcf Comparator: May 2019                    **\n" +
 				"**************************************************************************************\n" +
 				"FVC compares a Foundation vcf generated with the FoundationXml2Vcf to a recalled vcf.\n"+
 				"Exact recall vars are so noted and removed. Foundation vcf with no exact but one\n"+
@@ -386,6 +405,7 @@ public class FoundationVcfComparator {
 				"-m Path to named vcf file for saving the results.\n"+
 				"-c Append chr if absent in chromosome name.\n"+
 				"-e Exclude Foundation ##contig header lines.\n"+
+				"-v Insert mock sample info for VarSeq filtering.\n"+
 				"-k Attempt to merge Foundation records that overlap a recall and are the same type. \n"+
 				"     Defaults to printing both.\n"+
 
