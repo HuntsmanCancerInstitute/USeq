@@ -50,7 +50,7 @@ public class BamBlaster {
 	private HashMap<String, VCFLookUp> chromVariant;
 	private HashSet<String> modifiedNames = new HashSet<String>();
 	private PrintWriter varReportOut = null;
-	private int readLength = -1;
+	private int minVarDist = 150;
 	private static Pattern CIGAR_SUB = Pattern.compile("(\\d+)([MSDHN])");
 	
 	//per chrom fields
@@ -68,9 +68,6 @@ public class BamBlaster {
 		long startTime = System.currentTimeMillis();
 
 		processArgs(args);
-		
-		//find max read length from bam
-		readLength = estimateReadLength() + maxSizeIndel;
 
 		//for each chromosome of variants
 		System.out.println("Processing variants....");
@@ -80,7 +77,7 @@ public class BamBlaster {
 			processVars();
 		}
 		System.out.println("\t"+numberProcessedVcf +"\t# Processed Vcf records");
-		if (numberExcludedVcf !=0) System.out.println("\t"+numberExcludedVcf +"\t# Vcf records excluded (too close (<"+readLength+"bp), too big (>"+maxSizeIndel+"), lacking reference first base, or not a SNV/INDEL)");
+		if (numberExcludedVcf !=0) System.out.println("\t"+numberExcludedVcf +"\t# Vcf records excluded (too close (<"+minVarDist+"bp), too big (>"+maxSizeIndel+"), lacking reference first base, or not a SNV/INDEL)");
 		else excludedVCF.getGzipFile().deleteOnExit(); 
 			
 		//clear hashes and close temBamWriter
@@ -286,7 +283,7 @@ public class BamBlaster {
 					numberExcludedVcf++;
 				}
 				//check distance
-				else if ((vcf.getPosition() - priorEnd) <= readLength){
+				else if ((vcf.getPosition() - priorEnd) <= minVarDist){
 					excludedVCF.println(vcf.getOriginalRecord());
 					numberExcludedVcf++;
 				}
@@ -311,20 +308,6 @@ public class BamBlaster {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nERROR printing excluded vcfs to file.\n");
 		}
-	}
-	
-	private int estimateReadLength(){
-		int max = 0;
-		int counter = 0;
-		SAMRecordIterator it = bamReader.iterator();
-		while (it.hasNext()) {
-			SAMRecord sam = it.next();
-			int seqLen = sam.getReadLength();
-			if (seqLen > max) max= seqLen;
-			if (counter++ > 10000) break;
-		}
-		it.close();
-		return max;
 	}
 	
 	/**Assumes read names are the same.*/
@@ -564,6 +547,7 @@ public class BamBlaster {
 					case 'r': saveDirectory = new File(args[++i]); break;
 					case 'v': vcfFile = new File(args[++i]); break;
 					case 's': maxSizeIndel = Integer.parseInt(args[++i]); break;
+					case 'm': minVarDist = Integer.parseInt(args[++i]); break;
 					case 'd': minAlignmentDepth = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
@@ -659,7 +643,7 @@ public class BamBlaster {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              Bam Blaster : May 2018                              **\n" +
+				"**                              Bam Blaster : April 2019                            **\n" +
 				"**************************************************************************************\n" +
 				"Injects SNVs and INDELs from a vcf file into bam alignments. These and their mates are\n"+
 				"extracted as fastq for realignment. For SNVs, only alignment bases that match the\n"+
@@ -667,7 +651,7 @@ public class BamBlaster {
 				"Secondary/supplemental/not proper are skipped. One var per alignment. Variants within\n"+
 				"read length distance of prior are ignored and saved to file for iterative processing.\n"+
 				"Be sure to normalize and decompose your vcf file (e.g.https://github.com/atks/vt).\n" +
-				"INDELs first base must be reference. Use the BamMixer to add proportions of your\n"+
+				"INDELs first base must be reference. Use the ExactBamMixer or BamMixer to add\n"+
 				"realignments (e.g. 10%) with the unmodified.bams (e.g. 90%). Use the VCFVariantMaker\n"+
 				"to generate random vcf variants or pull a VCF from Clinvar/ Cosmic.\n\n"+
 
@@ -677,6 +661,7 @@ public class BamBlaster {
 				"-r Full path to a directory to save the results.\n" +
 				"-s Max size INDEL, defaults to 50\n"+
 				"-d Min alignment depth, defaults to 25\n"+
+				"-m Min distance between variants, defaults to 150\n"+
 
 				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/BamBlaster -b ~/BMData/na12878.bam\n"+
 				"    -r ~/BMData/BB0 -v ~/BMData/clinvar.pathogenic.SnvIndel.vcf.gz \n\n" +
