@@ -31,7 +31,7 @@
 	  		 Note, Excel won't work here. (e.g. java -jar -Xmx2G ~/AppsUSeq/PrintSelectColumns -i 10,0,1,2,3,4,5,6,7,8,9 -f mm9EnsTrans.ucsc) . Either remove the header line or place a # at it's start.
 		<li> Run the USeq <a href="cmdLnMenus.html#MakeTranscriptome">MakeTranscriptome</a> app to generate extended splice junctions. The splice junction radius should be set to your read length minus 4. 
 	   		This is a time and memory intensive.  If needed, split by chromosome and run on a cluster.  
-	   		(e.g. java -jar -Xmx22G ~/USeqApps/MakeTranscriptome -f /Genomes/Mm9/Fastas -u mm9EnsTrans_Corr.ucsc -r 46)
+	   		(e.g. java -jar -Xmx22G ~/USeqApps/MakeTranscriptome -n 10000 -m 5 -f /Genomes/Mm10/Fastas -u mm10EnsTrans_Corr.ucsc -r 46)
 	</ol>
 <li> Place the splice junction fasta file in the fasta genome directory and run novoindex.  It is a good idea to include a chromosome with adapter 
        sequence combinations as well as a chromosome with phiX sequence. It is also recommended to exclude non standard chromosomes that could potentially provided duplicate identical sequence causing unique matches to look non unique.
@@ -48,9 +48,8 @@ see <a href="https://bioserver.hci.utah.edu:443/gnomex/gnomexGuestFlex.jsp?topic
 <li> Align your fastq data using novoalign and the read length matched extended splice junction novoindex.  Output the reads in SAM format and allow for 50 
        repeat matches for each read. Limit the maximum alignment quality to 120 ~ 4 mismatches per alignment. Use grep to toss @SQ lines and those reads that don't align.
        Also, be sure to test your gzip compressed fastq files.  Novoalign doesn't throw an error when encountering a broken gzip file.
-       (e.g.  gunzip -t *gz && ~/novocraft/novoalign -o SAM -r All 50 -t 120  
-       -d /scratch/local/mm9EnsTransRad46Num100kMin10SplicesChrPhiXAdaptr.novoindex -f /scratch/local/7410X6_s_5_1_sequence.txt.gz 
-       /scratch/local/7410X6_s_5_2_sequence.txt.gz | grep -v ^@SQ  | grep chr | gzip > 7410X6_s_5_raw.sam.gz )
+       (e.g.  gunzip -t *gz && ~/novocraft/novoalign -o SAM -r All 50 -t 120 -a  
+       -d ~/mm9EnsTransRad46Num10kMin5SplicesChrPhiXAdaptr.novoindex -f *fastq.gz | grep -v ^@SQ  | grep chr | gzip > raw.sam.gz )
 
 </ol>
 Note, these alignments are not ready for use.  The splice-junction coordinates need to be converted to genomic coordinates by running the 
