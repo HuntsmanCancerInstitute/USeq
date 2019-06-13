@@ -23,6 +23,13 @@ public class AnnotateBedWithGenes {
 	private boolean intersectExons = true;
 	private int[] coorIndexes = {0,1,2};
 	boolean verbose = true;
+	boolean addGeneFeature = false;
+	private int numIntersectingRegions = 0;
+	private int totalNumberRegions = 0;
+	private int numIntersecting5UTRs = 0;
+	private int numIntersecting3UTRs = 0;
+	private int numIntersectingExons = 0;
+	private int numIntersectingIntrons = 0;
 
 	public AnnotateBedWithGenes (String[] args){
 		try {
@@ -34,6 +41,19 @@ public class AnnotateBedWithGenes {
 
 			//for each bed chrom
 			intersect();
+			
+			//sumary stats
+			if (verbose)  {
+				IO.pl("\n\nIntersection stats:");
+				IO.pl("\t"+numIntersectingRegions+"\tNum intersecting regions");
+				IO.pl("\t"+(totalNumberRegions-numIntersectingRegions)+"\tNum non intersecting regions");
+				if (addGeneFeature) {
+					IO.pl("\t"+numIntersecting5UTRs+"\tNum intersecting 5pUTRs");
+					IO.pl("\t"+numIntersecting3UTRs+"\tNum intersecting 3pUTRs");
+					IO.pl("\t"+numIntersectingExons+"\tNum intersecting Exons");
+					IO.pl("\t"+numIntersectingIntrons+"\tNum intersecting Introns");
+				}
+			}
 
 			out.close();
 		} catch (Exception e) {
@@ -96,20 +116,31 @@ public class AnnotateBedWithGenes {
 					ArrayList<UCSCGeneLine> g = exonTree.get(x);
 					//for each gen line extract wanted info and collapse with the Hash
 					for (UCSCGeneLine gl: g){
-						toAdd.add(gl.getNamesCollapsed(":"));
+						if (addGeneFeature) {
+							String feature = gl.getIntGeneFeature(start, stop);
+							if (feature != null) {
+								toAdd.add(gl.getNamesCollapsed(":")+"_"+feature);
+								if (feature.equals("Exon")) numIntersectingExons++;
+								else if (feature.equals("Intron")) numIntersectingIntrons++;
+								else if (feature.equals("5pUTR")) numIntersecting5UTRs++;
+								else if (feature.equals("3pUTR")) numIntersecting3UTRs++;
+							}
+							else toAdd.add(gl.getNamesCollapsed(":"));
+						}
+						else toAdd.add(gl.getNamesCollapsed(":"));
 					}
 				}
 				//print it
 				String anno = ".";
-				if (toAdd.size() !=0) anno = Misc.hashSetToString(toAdd, ",");
+				if (toAdd.size() !=0) {
+					anno = Misc.hashSetToString(toAdd, ",");
+					numIntersectingRegions++;
+				}
 				region.setName(region.getName()+"\t"+anno);
 				if (out != null) out.println(region.getName());
 			}	
 		}
-		if (verbose)  System.out.println("\n\nDone!");
 	}
-	
-
 
 	private IntervalST<ArrayList<UCSCGeneLine>> buildTree(UCSCGeneLine[] genes){
 		IntervalST<ArrayList<UCSCGeneLine>> exonTree = new IntervalST<ArrayList<UCSCGeneLine>>();
@@ -155,13 +186,14 @@ public class AnnotateBedWithGenes {
 	private void parseFiles() throws Exception {
 		UCSCGeneModelTableReader tr = new UCSCGeneModelTableReader(ucscTableFile, 0);
 		chrGenes = tr.getChromSpecificGeneLines();
-		if (verbose)  System.out.println(tr.getGeneLines().length+"\tGenes parsed");
+		if (verbose)  IO.pl(tr.getGeneLines().length+"\tGenes parsed");
 
 		//parse bed
 		Bed[] regions = Bed.parseFilePutLineInNameNoScoreOrStrand(bedFile, bpPad, (-1*bpPad), coorIndexes);
 		Arrays.sort(regions);
-		chrBed = Bed.splitBedByChrom(regions);		
-		if (verbose)  System.out.println(regions.length+"\tRegions to intersect");
+		chrBed = Bed.splitBedByChrom(regions);	
+		totalNumberRegions = regions.length;
+		if (verbose)  IO.pl(totalNumberRegions+"\tRegions to intersect");
 
 		//make writer
 		out = new Gzipper(resultsFile);
@@ -183,7 +215,7 @@ public class AnnotateBedWithGenes {
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
-		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
+		IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -196,9 +228,10 @@ public class AnnotateBedWithGenes {
 					case 'r': resultsFile = new File (args[++i]); break;
 					case 'p': bpPad = Integer.parseInt(args[++i]); break;
 					case 'g': intersectExons = false; break;
+					case 'f': addGeneFeature = true; break;
 					case 'i': coorIndexes = Num.parseInts(args[++i], Misc.COMMA); break;
 					case 'h': printDocs(); System.exit(0);
-					default: System.out.println("\nProblem, unknown option! " + mat.group());
+					default: IO.pl("\nProblem, unknown option! " + mat.group());
 					}
 				}
 				catch (Exception e){
@@ -210,13 +243,12 @@ public class AnnotateBedWithGenes {
 		if (ucscTableFile == null || ucscTableFile.canRead() == false) Misc.printExit("\nError: cannot find your UCSC table file!\n");
 		if (bedFile == null || bedFile.canRead() == false) Misc.printExit("\nError: cannot find your bed file!\n");
 		if (resultsFile == null) Misc.printExit("\nError: please provide a file path to save the gzipped results.\n");
-
 	}	
 
 	public static void printDocs(){ 
-		System.out.println("\n" +
+		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Annotate Bed With Genes   Nov 2018                     **\n" +
+				"**                           Annotate Bed With Genes   May 2019                     **\n" +
 				"**************************************************************************************\n" +
 				"Takes a bed like file and a UCSC gene table, intersects them and adds a new column to\n"+
 				"the file with the gene names that intersect the gene exons or regions. \n\n"+
@@ -230,15 +262,13 @@ public class AnnotateBedWithGenes {
 				"-r Gzipped results file.\n"+
 				"-p Bp padding to expand the bed regions when intersecting with genes.\n"+
 				"-g Intersect gene regions with bed, not gene exons.\n"+
+				"-f Include gene feature in annotations (5pUTR->3pUTR->All Exons->Intron)\n"+
 				
 
 				"\nExample: java -Xmx2G -jar pathTo/USeq/Apps/AnnotateBedWithGenes -p 100 -g -i 1,2,3\n" +
-				"      -b targetRegions.bed -r targetRegionsWithGenes.txt.gz -u hg19EnsGenes.ucsc.gz\n"+
+				"      -b targetRegions.bed -r targetsWithGenes.txt.gz -u hg19EnsGenes.ucsc.gz -f\n"+
 
 				"**************************************************************************************\n");		
 	}		
-
-
-
 }
 

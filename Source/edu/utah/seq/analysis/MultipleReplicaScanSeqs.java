@@ -302,6 +302,7 @@ public class MultipleReplicaScanSeqs {
 			
 			sb.append("sampleInfo = data.frame(condition=as.factor(c("+groups+")))\n");
 			sb.append("rownames(sampleInfo) = c("+replicas+")\n");
+			sb.append("colnames(countTable) = c("+replicas+")\n");
 			sb.append("cds = DESeqDataSetFromMatrix(countData=countTable, colData=sampleInfo, design = ~condition)\n");
 			sb.append("cds = DESeq(cds)\n");
 			sb.append("rld = rlog(cds)\n");
@@ -705,16 +706,16 @@ chr1:137696787:137697038	26.28706518	-4.834058806	0.477129062	-10.1315539	4.00E-
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Multiple Replica Scan Seqs: May 2014                      **\n" +
+				"**                        Multiple Replica Scan Seqs: May 2019                      **\n" +
 				"**************************************************************************************\n" +
-				"MRSS uses a sliding window and Ander's DESeq negative binomial pvalue -> Benjamini & \n" +
+				"MRSS uses a sliding window and Love et al's DESeq2 negative binomial -> Benjamini & \n" +
 				"Hochberg AdjP statistics to identify enriched and reduced regions in a genome. Both\n" +
-				"treatment and control PointData sets are required, one or more biological replicas.\n" +
+				"treatment and control PointData sets are required, two or more biological replicas.\n" +
 				"MRSS generates window level differential count tracks for the AdjP and normalized\n" +
 				"log2Ratio as well as a binary window objec xxx.swi file for downstream use by the\n" +
-				"EnrichedRegionMaker. MRSS also makes use of DESeq's variance corrected count data to\n" +
-				"cluster your biological replics. Given R's poor memory management, running DESeq\n" +
-				"requires lots of RAM, 64bit R, and 1-3 hrs.\n"+
+				"EnrichedRegionMaker. MRSS also makes use of DESeq2's variance corrected count data to\n" +
+				"cluster your biological replics. Given R's poor memory management, running DESeq2\n" +
+				"requires lots of RAM, 64bit R, and patience.\n"+
 
 				"\nOptions:\n"+
 				"-s Save directory, full path.\n"+

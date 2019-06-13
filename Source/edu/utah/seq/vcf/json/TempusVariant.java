@@ -198,7 +198,7 @@ public class TempusVariant{
 		end = b.getStop();
 		alt = "<CNV>";
 		svLen = b.getLength();
-		if (variantType.contains("deletion") || variantDescription.toLowerCase().contains("loss")) {
+		if ((variantType!=null && variantType.contains("deletion")) || (variantDescription!=null && variantDescription.toLowerCase().contains("loss"))) {
 			svLen = -1*svLen;
 			variantDescription = "CNV_LOSS";
 		}

@@ -237,6 +237,84 @@ public class Coordinate implements Comparable<Coordinate>, Serializable{
 		} 
 	}
 	
+	public static Coordinate[] insertGaps(Coordinate[] sortedNonOverlappingRegions, int bpPad) {
+		ArrayList<Coordinate> toReturn = new ArrayList<Coordinate>();
+		Coordinate left = sortedNonOverlappingRegions[0];
+		
+		for (int i=1; i< sortedNonOverlappingRegions.length; i++) {
+			Coordinate right = sortedNonOverlappingRegions[i];
+			
+			Coordinate[] tLR = insertGapInPair(left, right, bpPad);
+			
+			//is left not null? save it
+			if (tLR[0] != null) toReturn.add(tLR[0]);
+			
+			//is right not null? make it the new left
+			if (tLR[1] != null) left = tLR[1];
+	
+			else {
+				//right was deleted so pull next right
+				i++;
+				if (i< sortedNonOverlappingRegions.length) left = sortedNonOverlappingRegions[i];
+				else left = null;
+			}
+		}
+		
+		//add last?
+		if (left!=null) toReturn.add(left);
+		
+		Coordinate[] cor = new Coordinate[toReturn.size()];
+		toReturn.toArray(cor);
+		return cor;
+	}
+	
+	public static void main(String[] args) {
+		
+		Coordinate a = new Coordinate("chrX", 100, 200);
+		Coordinate b = new Coordinate("chrX", 400, 500);
+		Coordinate c = new Coordinate("chrX", 600, 700);
+		Coordinate d = new Coordinate("chrX", 900, 1000);
+		
+		Coordinate[] cor = new Coordinate[] {a,b,c,d};
+		Coordinate[] trm = insertGaps(cor, 150);
+		
+		for (Coordinate cs: trm) IO.pl(cs);
+		
+	}
+	
+	/**Inserts the bpPad gap, may lead to complete deletion of the left or right region. 
+	 * Assumes they don't overlap and are the same chr.*/
+	private static Coordinate[] insertGapInPair(Coordinate left, Coordinate right, int bpPad) {
+
+		int halfBpPad = (int)Math.round((double)bpPad/ 2.0);
+		Coordinate trimmedLeft = null;
+		Coordinate trimmedRight = null;
+		
+		//calc gap
+		int leftStop = left.getStop();
+		int rightStart = right.getStart();
+		int diff = rightStart-leftStop;
+		//far apart? if so the just return unaltered
+		if (diff > bpPad) return new Coordinate[] {left, right};
+		
+		int midPos = (int)Math.round((double)diff/2.0)+ leftStop;
+		
+		//trim left
+		int testLeftStop = midPos-halfBpPad;
+		//OK?
+		if (left.getStart() < testLeftStop) trimmedLeft = new Coordinate(left.getChromosome(), left.getStart(), testLeftStop);
+		else return new Coordinate[] {null, right};
+		
+		//trim right
+		int testRightStart = midPos+halfBpPad;
+		if (testRightStart< right.getStop()) trimmedRight = new Coordinate(right.getChromosome(), testRightStart, right.getStop()); 
+		else return new Coordinate[] {left, null};
+		
+		return new Coordinate[] {trimmedLeft, trimmedRight};
+		
+		
+	}
+	
 	public String getChromosome() {
 		return chromosome;
 	}
@@ -272,6 +350,7 @@ public class Coordinate implements Comparable<Coordinate>, Serializable{
 	public int getLength(){
 		return stop - start;
 	}
+
 	
 }
 

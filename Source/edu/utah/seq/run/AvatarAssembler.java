@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -27,6 +28,8 @@ public class AvatarAssembler {
 	private File path = null;
 	private File results = null;
 	private File jobDir = null;
+	private String[] yearDirNames = new String[] {"2017", "2018", "2019", "2020", "2021"};
+	private File[] yearDirs = null;
 	private TreeMap<Integer, AvatarPatient> hciId2AvatarPatient = new TreeMap<Integer, AvatarPatient>();
 	private HashMap<String, AvatarPatient> experimentId2AvatarPatient = new HashMap<String, AvatarPatient>(); 
 	private HashMap<String, AvatarSample> sampleId2AvatarPatient = new HashMap<String, AvatarSample>();
@@ -238,9 +241,11 @@ public class AvatarAssembler {
 					//make soft links
 					for (File oriF: as.fastq){
 						link = new File(fastqDir, dirName+"_"+oriF.getName());
-						if (links.contains(link.toString()) || link.exists()) IO.pl("Already exists "+link.toString());
-						else Files.createSymbolicLink(link.toPath(), oriF.toPath());
-						links.add(link.toString());
+						//try to create it, catch errors here
+						try {
+							Files.createSymbolicLink(link.toPath(), oriF.toPath());
+							links.add(link.toString());
+						} catch (FileAlreadyExistsException ex) {}
 					}
 				}
 				//write out info
@@ -262,7 +267,19 @@ public class AvatarAssembler {
 				sampleId2AvatarPatient.put(fields[0], as);
 				avatarSamples.add(as);
 			}
-			else as.fastq.add(new File(path, fields[6]));
+			else {
+				//look for fastq in each year
+				boolean notFound = true;
+				for (File p: yearDirs) {
+					File f = new File (p, fields[6]);
+					if (f.exists()) {
+						as.fastq.add(f);
+						notFound = false;
+						break;
+					}
+				}
+				if (notFound) System.err.println("\nFailed to find the fastq file "+fields[6]+" associated with\n"+this);
+			}
 		}
 		public String toString(){
 			StringBuilder sb = new StringBuilder();
@@ -355,7 +372,17 @@ public class AvatarAssembler {
 				sampleType = "Transcriptome";
 				sampleSource = "Tumor";
 			}
-			fastq.add(new File(path, fields[6]));
+			//look for fastq in each year
+			boolean notFound = true;
+			for (File p: yearDirs) {
+				File f = new File (p, fields[6]);
+				if (f.exists()) {
+					fastq.add(f);
+					notFound = false;
+					break;
+				}
+			}
+			if (notFound) System.err.println("\nFailed to find the fastq file "+fields[6]+" associated with patient "+avatarPatient.hciId);
 		}
 		
 		public String toString(){
@@ -416,6 +443,7 @@ public class AvatarAssembler {
 					case 'i': info = new File(args[++i]); break;
 					case 'p': path = new File(args[++i]); break;
 					case 'r': results = new File(args[++i]); break;
+					case 'y': yearDirNames = Misc.splitString(args[++i], ",");
 					case 'f': diagnosisFilter = args[++i]; break;
 					case 'j': jobDir = new File(args[++i]); break;
 					case 'l': linkOnlyTN = false; break;
@@ -431,35 +459,40 @@ public class AvatarAssembler {
 		File[] files = new File[]{gender, diagnosis, info, path, results, jobDir};
 		for (File f: files) if (f== null) Misc.printErrAndExit("Error: missing one of the required five files (-g -d -i -p -r -j).");
 		
+		int numYearDirs = yearDirNames.length;
+		yearDirs = new File[numYearDirs];
+		for (int i=0; i< numYearDirs; i++) yearDirs[i] = new File(path, yearDirNames[i]);
+		
 		jobDir.mkdirs();
 	}
 
 
 	public static void printDocs(){
+		
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                              AvatarAssembler : March 2019                        **\n" +
+				"**                              Avatar Assembler : April 2019                       **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling fastq avatar datasets based on the results of three sql queries.\n"+
-				"See https://ri-confluence.hci.utah.edu/x/KwBFAg   Run as root on hci-clingen1\n"+
+				"See https://ri-confluence.hci.utah.edu/x/KwBFAg   Login as root on hci-clingen1\n"+
 
 				"\nOptions:\n"+
 				"-i Info\n" +
 				"-d Diagnosis\n"+
 				"-g Gender\n"+
-				"-p Path to Exp dir, e.g. /Repository/PersonData/2018/\n"+
+				"-p Path to Exp dir w/o Year, e.g. /Repository/PersonData/\n"+
+				"-y Year dirs to examine for fastq linking, defaults to 2017,2018,2019,2020,2021\n"+
 				"-j Job dir to place linked fastq\n"+
 				"-f Only keep patients with a diagnosis containing this String, defaults to all.\n"+
 				"-l Create Fastq links for all patient datasets, defaults to just those with both a\n"+
 				"    Tumor and Normal exome.\n"+
 				"-r Patient stats output file.\n\n"+
 				
-                "Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/2018/\n"+
+                "Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/\n"+
                 "    -r avatarAssembler.log.gz -i sampleInfo.txt -d sampleDiagnosis.txt -g \n"+
-                "    sampleGender.txt > avatarAssemblerProblemSamples.txt -f HEM \n\n"+
+                "    sampleGender.txt > avatarAssemblerProblemSamples.txt -f HEM -y 2018,2019\n\n"+
 
 
 				"**************************************************************************************\n");
 	}
-
 }

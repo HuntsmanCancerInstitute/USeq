@@ -37,6 +37,7 @@ public class TNSample {
 
 	//Somatic variant Vcf calls
 	private File somaticVariants = null;
+	private File mergedSomaticVariants = null;
 
 	//Joint genotyping
 	private File[] germlineVcf = null;
@@ -70,6 +71,9 @@ public class TNSample {
 
 		//launch t/n somatic DNA analysis?
 		if (tumorDNABamBedGvcf != null && normalDNABamBedGvcf != null && tnRunner.getSomaticVarCallDocs() != null) somDNACall();
+		
+		//merge somatic vars with clinical test results?
+		if (tnRunner.getClinicalVcfDocs()!= null && somaticVariants != null) parseMergeClinicalVars();
 
 		//annotate somatic vcf?
 		if (somaticVariants != null && tnRunner.getVarAnnoDocs() != null) annotateSomaticVcf();
@@ -90,6 +94,46 @@ public class TNSample {
 			IO.pl("Running jobs? "+running);
 		}
 	}
+
+	
+		private void parseMergeClinicalVars() throws IOException {
+			info.add("Checking clinical variant integration...");
+			
+			//look for json file
+			File[] jsonTestResults = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".json");
+			if (jsonTestResults == null || jsonTestResults.length !=1) {
+				info.add("\t\tJsonReport\tFAILED to find one xxx.json clinical test report file");
+				failed = true;
+				return;
+			}
+			
+			//make dir, ok if it already exists
+			File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_ClinicalVars");
+			jobDir.mkdirs();
+			
+			File[] toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), jsonTestResults[0]};
+
+			//any files?
+			HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+			if (nameFile.size() == 0) launch(jobDir, toLink, tnRunner.getClinicalVcfDocs());
+
+			//OK some files are present
+			//COMPLETE
+			else if (nameFile.containsKey("COMPLETE")){
+				//find the final vcf file
+				File[] vcf = IO.extractFiles(new File(jobDir, "Vcfs"), "_final.vcf.gz");
+				if (vcf == null || vcf.length !=1) {
+					clearAndFail(jobDir, "\tThe clinical variant parsing and merging workflow was marked COMPLETE but failed to find the xxx_final.vcf.gz file in the Vcfs/ in "+jobDir);
+					return;
+				}
+				mergedSomaticVariants = vcf[0];
+				//remove the linked files
+				for (File f: toLink) new File(jobDir, f.getName()).delete();
+				info.add("\t\tCOMPLETE "+jobDir);
+			}
+			
+			else checkJob(nameFile, jobDir, toLink, tnRunner.getClinicalVcfDocs());
+		}
 
 	public void annotateGermlineVcf() throws IOException {
 		//look for genotyped vcf
@@ -148,7 +192,11 @@ public class TNSample {
 		}
 		else goT = true;
 		if (normalDNAFastq.isFastqDirExists()){
-			if (normalDNABamBedGvcf != null) goN = true;
+			if (normalDNABamBedGvcf != null) {
+				goN = true;
+				//skip the mock normal
+				if (normalDNABamBedGvcf[0].getName().equals("NA12878_NormalDNA_Hg38_final.bam")) numExist--;
+			}
 			numExist++;
 		}
 		else goN = true;
@@ -194,7 +242,8 @@ public class TNSample {
 			Files.createSymbolicLink(new File(canJobDir, "tumorDNA.bam").toPath(), tumorDNABamBedGvcf[0].toPath());
 			Files.createSymbolicLink(new File(canJobDir, "tumorDNA.bai").toPath(), index.toPath());
 		}
-		if (normalDNABamBedGvcf != null) {
+		//don't include NA12878_NormalDNA_Hg38_final.bam, this is used as a mock normal 
+		if (normalDNABamBedGvcf != null && normalDNABamBedGvcf[0].getName().equals("NA12878_NormalDNA_Hg38_final.bam")==false) {
 			File index = fetchBamIndex(normalDNABamBedGvcf[0]);
 			Files.createSymbolicLink(new File(canJobDir, "normalDNA.bam").toPath(), normalDNABamBedGvcf[0].toPath());
 			Files.createSymbolicLink(new File(canJobDir, "normalDNA.bai").toPath(), index.toPath());
@@ -244,13 +293,22 @@ public class TNSample {
 	}
 
 	private void annotateSomaticVcf() throws IOException {
-		info.add("Checking somatic variant annotation...");		
+		info.add("Checking somatic variant annotation...");	
+		
+		//waiting on clinical vars?
+		if (tnRunner.getClinicalVcfDocs() != null && mergedSomaticVariants == null) {
+			running = true;
+			return;
+		}
 		
 		//make dir, ok if it already exists
-		File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_IlluminaAnno");
+		File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_Anno");
 		jobDir.mkdirs();
 		
-		File[] toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi")};
+		File[] toLink = null;
+		if (mergedSomaticVariants != null)toLink = new File[]{mergedSomaticVariants, new File(mergedSomaticVariants+".tbi")};
+		else toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi")};
+		
 
 		//any files?
 		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
@@ -263,8 +321,7 @@ public class TNSample {
 		//COMPLETE
 		else if (nameFile.containsKey("COMPLETE")){
 			//remove the linked vcfs and the config file
-			new File(jobDir, somaticVariants.getName()).delete();
-			new File(jobDir, somaticVariants.getName()+".tbi").delete();
+			for (File f: toLink) new File(jobDir, f.getName()).delete();
 			new File(jobDir, "annotatedVcfParser.config.txt").delete();
 			info.add("\t\tCOMPLETE "+jobDir);
 		}
@@ -355,18 +412,10 @@ public class TNSample {
 		//remove any linked files
 		removeCopyRatioLinks(jobDir);
 
-		//pull gender from the xxxInfo.json.gz file in the root dir
-		File[] info = IO.extractFiles(rootDir, "Info.json.gz");
-		if (info == null || info.length !=1) throw new IOException("ERROR: failed to find the xxx_Info.json.gz file in "+rootDir);
-		String[] lines = IO.loadFile(info[0]);
-		int gender = 0;
-		for (String s: lines){
-			if (s.contains("Gender")){
-				if (s.contains("F")) gender = 2;
-				else if (s.contains("M")) gender = 1;
-			}
-		}
-		if (gender == 0) throw new IOException("ERROR: failed to find the xxxInfo.json.gz file in "+rootDir);
+		//pull gender from the xxxInfo.json.gz or .json info files
+		int gender = fetchGender(jobDir);
+		
+		if (gender == 0) throw new IOException("ERROR: failed to find or parse the gender/sex info from the .json file in "+rootDir);
 		Path bkg = null;
 		if (gender == 1) bkg = tnRunner.getMaleBkg().toPath();
 		else if (gender == 2 ) bkg = tnRunner.getFemaleBkg().toPath();
@@ -388,6 +437,32 @@ public class TNSample {
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.vcf.gz").toPath(), normalVcf);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.vcf.gz.tbi").toPath(), normalTbi);
 	}
+
+	//throw new IOException("ERROR: failed to find the xxx_Info.json.gz file in "+rootDir);
+	private int fetchGender(File jobDir) throws IOException {
+		int gender = 0;
+	
+		//is it from Avatar?
+		File[] info = IO.extractFiles(rootDir, "Info.json.gz");
+		if (info == null || info.length !=1) {
+			//try to fetch from Tempus
+			File d = new File(rootDir, "ClinicalReport");
+			if (d.exists() == false) return 0;
+			info = IO.extractFiles(d, ".json");
+			if (info == null || info.length !=1) return 0;
+		}
+		String[] lines = IO.loadFile(info[0]);
+		
+		for (String s: lines){
+			if (s.contains("Gender") || s.contains("\"sex\"")){
+				if (s.contains("F")) gender = 2;
+				else if (s.contains("M")) gender = 1;
+			}
+		}
+		
+		return gender;
+	}
+
 
 	private void removeCopyRatioLinks(File jobDir) throws IOException{
 		File f = jobDir.getCanonicalFile();
@@ -698,6 +773,12 @@ public class TNSample {
 		}
 		//QUEUED
 		else if (nameFile.containsKey("QUEUED")){
+			if (forceRestart) {
+				//cancel any slurm jobs and delete the directory
+				TNSample.cancelDeleteJobDir(nameFile, jobDir, info, true);
+				restart(jobDir, toSoftLink, runDocs);
+				return true;
+			}
 			info.add("\t\tQUEUED "+jobDir);
 			running = true;
 		}

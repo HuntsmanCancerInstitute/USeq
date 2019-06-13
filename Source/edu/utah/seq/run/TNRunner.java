@@ -24,6 +24,7 @@ public class TNRunner {
 	private File[] varAnnoDocs = null;
 	private File[] jointGenotypingDocs = null;
 	private File[] copyRatioDocs = null;
+	private File[] clinicalVcfDocs = null;
 	private File maleBkg = null;
 	private File femaleBkg = null;
 	private boolean forceRestart = false;
@@ -98,6 +99,12 @@ public class TNRunner {
 
 	private void processSampleGroup() {
 		try {
+			//any joint genotyping workflow files? If none then they want to skip this, e.g. no matched normal
+			if (jointGenotypingDocs == null) {
+				groupProcessingFailed = false;
+				groupProcessingComplete = true;
+				return;
+			}
 			IO.pl("\nChecking group processing...");
 
 			
@@ -120,7 +127,8 @@ public class TNRunner {
 						if (verbose) IO.pl("\tWaiting for germline gvcfs from "+tns.getId());
 						allPresent = false;
 					}
-					else {
+					//skip adding the mock NA12878 normal used in unpaired analysis
+					else if (ab[2].getName().equals("NA12878_NormalDNA_Hg38_Haplo.g.vcf.gz") == false) {
 						//add the vcf and matched index
 						toGeno.add(ab[2]);
 						toGeno.add(ab[3]);
@@ -326,6 +334,7 @@ public class TNRunner {
 			File transWorkflowDir = null;
 			File copyRatioDocsDir = null;
 			File copyRatioBkgDir = null;
+			File clinicalVcfDir = null;
 			File otherDir = null;
 			for (int i = 0; i<args.length; i++){
 				String lcArg = args[i].toLowerCase();
@@ -343,6 +352,7 @@ public class TNRunner {
 						case 'j': jointGenoWorklfowDir = new File(args[++i]); break;
 						case 'y': copyRatioDocsDir = new File(args[++i]); break;
 						case 'k': copyRatioBkgDir = new File(args[++i]); break;
+						case 'v': clinicalVcfDir = new File(args[++i]); break;
 						case 'o': otherDir = new File(args[++i]); break;
 						case 'u': minReadCoverageTumor = Integer.parseInt(args[++i]); break;
 						case 'n': minReadCoverageNormal = Integer.parseInt(args[++i]); break;
@@ -400,20 +410,23 @@ public class TNRunner {
 				varAnnoDocs = IO.extractFiles(annoWorkflowDir);
 			}
 			
-
 			//bam concordance
 			if (bamConWorkflowDir != null){
 				if (bamConWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing bam concordance workflow docs? "+bamConWorkflowDir);
 				bamConcordanceDocs = IO.extractFiles(bamConWorkflowDir);
 			}
 			
-
 			//joint genotyping
 			if (jointGenoWorklfowDir != null){
 				if (jointGenoWorklfowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing joint genotyping workflow docs? "+jointGenoWorklfowDir);
 				jointGenotypingDocs = IO.extractFiles(jointGenoWorklfowDir);
 			}
 			
+			//clinical vcf merging workflow
+			if (clinicalVcfDir != null){
+				if (clinicalVcfDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing workflow docs for merging and comparing clinical test reports and vcfs? "+clinicalVcfDocs);
+				clinicalVcfDocs = IO.extractFiles(clinicalVcfDir);
+			}
 
 			//copy ratio analysis?
 			if (copyRatioDocsDir !=null){
@@ -485,7 +498,7 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                  TNRunner : March 2019                           **\n" +
+				"**                                  TNRunner : May 2019                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several dockerized snakmake workflows on human tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, Hg38\n"+
@@ -509,10 +522,12 @@ public class TNRunner {
 				"for which you have fastq.  Change the MyXXX to something relevant. TNRunner is\n"+
 				"stateless so as more Fastq becomes available or issues are addressed, relaunch the\n"+
 				"app. This won't effect running or queued slurm jobs. Relaunch periodically to assess\n"+
-				"the current processing status and queue additional tasks. Download the latest from \n"+
+				"the current processing status and queue additional tasks or set option -l. Download the\n"+
+				"latest workflows from \n"+
 				"https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38RunnerWorkflows \n"+
 				"and the matching resource bundle from\n"+
-				"https://hci-bio-app.hci.utah.edu/gnomex/gnomexFlex.jsp?analysisNumber=A5578\n"+
+				"https://hci-bio-app.hci.utah.edu/gnomex/gnomexFlex.jsp?analysisNumber=A5578 .\n"+
+				"All workflow docs are optional although some require output from prior Analysis.\n"+
 					
 				"\nOptions:\n"+
 				"-p Directory containing one or more patient data directories to process.\n" +
@@ -521,29 +536,32 @@ public class TNRunner {
 				"-k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio\n"+
 				"      background files.\n"+
 				"-e Workflow docs for launching DNA alignments.\n"+
-				"-t (Optional) Workflow docs for launching RNA alignments.\n"+
+				"-t Workflow docs for launching RNA alignments.\n"+
 				"-c Workflow docs for launching somatic variant calling.\n"+
 				"-a Workflow docs for launching variant annotation.\n"+
 				"-b Workflow docs for launching bam concordance.\n"+
 				"-j Workflow docs for launching joint genotyping.\n"+
-				"-y (Optional) Workflow docs for launching copy analysis.\n"+
+				"-y Workflow docs for launching copy analysis.\n"+
+				"-v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder to\n"+
+				"      each patient dir containing the json formatted clinical information.\n"+
 				"-g Germline AnnotatedVcfParser options, defaults to '-d 15 -m 0.2 -x 1 -p 0.01 -g \n"+
 				"      D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign'\n"+
 				"-s Somatic AnnotatedVcfParser options, defaults to '-d 20 -f'\n"+
 				"-r Attempt to restart FAILED jobs from last successfully completed rule.\n"+
 				"-d Delete and restart FAILED jobs.\n"+
-				"-f Force a restart of all running and uncompleted jobs.\n"+
+				"-f Force a restart of all running, queued, failed, and uncompleted jobs.\n"+
 				"-q Quite output.\n"+
 				"-x Maximum # jobs to launch, defaults to 40.\n"+
 				"-l Check and launch jobs every hour until all are complete, defaults to launching once.\n"+
 
-				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p AvatarPatients -o ~/FoundationPatients/\n"+
+				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/\n"+
 				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+
 				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/\n"+
-				"     -y /Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 20 -l \n\n"+
+				"     -y /Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l \n"+
+				"     -v /Hg38/Tempus/TempusVcf -l\n"+
 
 
-				"**************************************************************************************\n");
+				"\n**************************************************************************************\n");
 	}
 
 	public boolean isVerbose() {
@@ -599,5 +617,9 @@ public class TNRunner {
 	}
 	public boolean isSoftRestart() {
 		return softRestart;
+	}
+
+	public File[] getClinicalVcfDocs() {
+		return clinicalVcfDocs;
 	}
 }

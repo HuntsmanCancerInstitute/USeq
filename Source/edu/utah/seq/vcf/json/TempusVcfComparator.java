@@ -24,6 +24,7 @@ public class TempusVcfComparator {
 	private int bpPaddingForOverlap = 2;
 	private boolean appendChr = false;
 	private boolean excludeInherited = false;
+	private boolean excludeSomatic = false;
 
 	//counters
 	private int numberShortTempus = 0;
@@ -35,6 +36,7 @@ public class TempusVcfComparator {
 	private int numberTempusWithNoMatch = 0;
 	private int numberPassingRecallWithNoMatch = 0;
 	private int numberInherited = 0;
+	private int numberSomatic = 0;
 	
 	private ArrayList<SimpleVcf> vcfToPrint = new ArrayList<SimpleVcf>();
 	private ArrayList<String> headerLines = new ArrayList<String>();
@@ -78,7 +80,8 @@ public class TempusVcfComparator {
 		System.out.println( numberRecall +"\t# Recall variants");
 		System.out.println( numberShortTempus +"\t# Short Tempus variants");
 		System.out.println( numberOtherTempus +"\t# Other Tempus variants");
-		System.out.println( numberInherited +"\t# Inherited Tempus variants, skippped? "+excludeInherited);
+		System.out.println( numberInherited +"\t# Germline Tempus variants, skippped? "+excludeInherited);
+		System.out.println( numberSomatic +"\t# Somatic Tempus variants, skippped? "+excludeSomatic);
 		System.out.println( numberExactMatches +"\t# Short with an exact match");
 		System.out.println( numberTempusWithOnlyOverlap +"\t# Short with overlap recal variants");
 		System.out.println( numberModifiedTempusCalls +"\t# Short recommended for modification");
@@ -251,6 +254,10 @@ public class TempusVcfComparator {
 					numberInherited++;
 					if (excludeInherited) continue;
 				}
+				if (v.contains("somatic")) {
+					numberSomatic++;
+					if (excludeSomatic) continue;
+				}
 				if (appendChr && v.startsWith("chr") == false) v = "chr"+v;
 				al.add(new SimpleVcf(v, bpPaddingForOverlap));
 			}
@@ -291,7 +298,8 @@ public class TempusVcfComparator {
 					case 'r': recallVcf = new File(args[++i]); break;
 					case 'm': mergedVcf = new File(args[++i]); break;
 					case 'c': appendChr = true; break;
-					case 'e': excludeInherited = true; break;
+					case 'g': excludeInherited = true; break;
+					case 's': excludeSomatic = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -320,10 +328,11 @@ public class TempusVcfComparator {
 				"-r Path to a recalled snv/indel vcf file.\n"+
 				"-m Path to named vcf file for saving the results.\n"+
 				"-c Append chr if absent in chromosome name.\n"+
-				"-e Exclude 'inherited' germline Tempus records from the comparison and merged output.\n"+
+				"-g Exclude 'inherited' germline Tempus records from the comparison and merged output.\n"+
+				"-s Exclude 'somatic' tumor Tempus records from the comparison and merged output.\n"+
 
 				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/TempusVcfComparator -f TL-18-03CFD6.vcf\n" +
-				"     -r /F1/TL-18-03CFD6_recall.vcf.gz -e -c -m /F1/TL-18-03CFD6_merged.vcf.gz -k \n\n" +
+				"     -r /F1/TL-18-03CFD6_recall.vcf.gz -g -c -m /F1/TL-18-03CFD6_merged.vcf.gz -k \n\n" +
 
 				"**************************************************************************************\n");
 	}

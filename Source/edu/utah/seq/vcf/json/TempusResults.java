@@ -88,10 +88,12 @@ public class TempusResults {
 		}
 		//any fusionVariants, none seen so this might fail
 		if (results.has("fusionVariants")) {
+			/*  These are just so far large chromosome rearrangements, no gene specific coordinates
 			JSONArray ja = results.getJSONArray("fusionVariants");
 			if (ja.length() !=0) Misc.printErrAndExit("\nFound fusion variants!!! Contact Nix to fix parser\n");
 			for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("fusionVariant", null, ja.getJSONObject(i), tempusJson2Vcf) );
 			tempusJson2Vcf.setWorkingNumFusionVariants(ja.length());
+			*/
 		}
 		//any inheritedRelevantVariants
 		if (results.has("inheritedRelevantVariants")) {
@@ -119,7 +121,10 @@ public class TempusResults {
 	private void addCoordinatesToCNVs(HashMap<String, Bed> cnvGeneNameBed, IndexedFastaSequenceFile fasta) throws IOException {
 		if (cnvGeneNameBed == null) return;
 		for (TempusVariant tv: variants) {
-			if (tv.getChromosome() == null && (tv.getVariantType().contains("CNV") || tv.getVariantDescription().contains("Copy"))) tv.addCnvInfo(cnvGeneNameBed, fasta);
+			if (tv.getChromosome() == null) {
+				if ((tv.getVariantType()!= null && tv.getVariantType().contains("CNV")) || 
+						(tv.getVariantDescription()!=null && tv.getVariantDescription().contains("Copy"))) tv.addCnvInfo(cnvGeneNameBed, fasta);
+			}
 		}
 		
 	}

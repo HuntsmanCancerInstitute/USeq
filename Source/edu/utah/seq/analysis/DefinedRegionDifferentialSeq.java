@@ -40,6 +40,7 @@ public class DefinedRegionDifferentialSeq {
 	private String genomeVersion;
 	private float minAdjP = 20;
 	private float minLog2Ratio = 1f;
+	private int minimimMappingQuality = 0;
 	private boolean scoreIntrons = false;
 	private boolean removeOverlappingRegions = false;
 	private int minimumCounts = 10;
@@ -509,6 +510,8 @@ public class DefinedRegionDifferentialSeq {
 	private boolean alignmentFails(SAMRecord sam){
 		//aligned?
 		if (sam.getReadUnmappedFlag()) return true;
+		//alignment quality?
+		if (sam.getMappingQuality() < minimimMappingQuality) return true;
 		//limit to max matches?
 		if (maxNumAlignments !=0){
 			Object o = sam.getAttribute("NH");
@@ -1926,6 +1929,7 @@ public class DefinedRegionDifferentialSeq {
 					case 'n': maxNumAlignments = Integer.parseInt(args[++i]); break;
 					case 'x': maxAlignmentsDepth = Integer.parseInt(args[++i]); break;
 					case 'p': performStrandedAnalysis = true; break;
+					case 'q': minimimMappingQuality = Integer.parseInt(args[++i]); break;
 					case 'i': scoreIntrons = true; break;
 					case 't': deleteTempFiles = false; break;
 					case 'g': genomeVersion = args[++i]; break;
@@ -2008,7 +2012,7 @@ public class DefinedRegionDifferentialSeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                     Defined Region Differential Seq: Aug 2016                    **\n" +
+				"**                     Defined Region Differential Seq: May 2019                    **\n" +
 				"**************************************************************************************\n" +
 				"DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two\n" +
 				"conditions (e.g. treatment and control or a time course/ multiple conditions) and\n" +
@@ -2049,6 +2053,7 @@ public class DefinedRegionDifferentialSeq {
 				"-n Max number alignments per read. Defaults to 1, unique.  Assumes 'NH' tags have\n"+
 				"      been set by processing raw alignments with the SamTranscriptomeProcessor.\n"+
 				"-e Minimum number alignments per gene-region per replica, defaults to 10.\n"+
+				"-q Minimum alignment mapping quality, defaults to 0, no filtering.\n"+
 				"-i Score introns instead of exons.\n"+
 				"-p Perform a stranded analysis. Only collect reads from the same strand as the\n" +
 				"      annotation.\n" +
@@ -2069,7 +2074,7 @@ public class DefinedRegionDifferentialSeq {
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/DefinedRegionDifferentialSeq -c\n" +
 				"      /Data/TimeCourse/ESCells/ -s /Data/TimeCourse/DRDS -g H_sapiens_Feb_2009\n" +
-				"     -u /Anno/mergedHg19EnsemblGenes.ucsc.gz -w 0.322,0.585,1 -y \n\n" +
+				"     -u /Anno/mergedHg19EnsemblGenes.ucsc.gz -w 0.322,0.585,1 -y -q 13 \n\n" +
 
 				"**************************************************************************************\n");
 
