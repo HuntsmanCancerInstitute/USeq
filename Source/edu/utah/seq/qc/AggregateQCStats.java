@@ -41,6 +41,7 @@ public class AggregateQCStats {
 	
 	private boolean debug = false;
 	private boolean calcReadCoverage = true;
+	private boolean swapExomeForDNA = false;
 
 
 	//constructors
@@ -83,7 +84,7 @@ public class AggregateQCStats {
 			bamFileNameBCR = new HashMap<String, BamConcordanceQC>();
 			for (int i=0; i< bamConcordanceFiles.size(); i++) {
 				f= bamConcordanceFiles.get(i);
-				new BamConcordanceQC(f, bamFileNameBCR);
+				new BamConcordanceQC(f, bamFileNameBCR, swapExomeForDNA);
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -219,7 +220,7 @@ public class AggregateQCStats {
 
 		//for each sample
 		for (SampleQC s: samples.values()){
-			
+
 			//attempt to parse id from the first field in the sampleName XXX_XXX to pull avatarInfo
 			if (avatarInfo.size() !=0){
 				String[] tokens = Misc.UNDERSCORE.split(s.sampleName);
@@ -229,7 +230,11 @@ public class AggregateQCStats {
 			}
 			
 			String bamFileName = s.getMpaBamFileName();
-			if (bamFileName != null && bamFileNameBCR != null) sb.append(s.fetchTabbedLine(bamFileNameBCR.get(bamFileName)));
+			if (bamFileName != null && bamFileNameBCR != null) {
+				BamConcordanceQC bc = bamFileNameBCR.get(bamFileName);
+				sb.append(s.fetchTabbedLine(bc));
+				if (bc == null) IO.pl("WARNING: Null bam concordance found for "+bamFileName);
+			}
 			else sb.append(s.fetchTabbedLine(null));
 			sb.append("\n");
 		}
@@ -385,7 +390,7 @@ public class AggregateQCStats {
 					//fetch SampleQC
 					SampleQC sqc = samples.get(nameType[0]);
 					if (sqc == null){
-						sqc = new SampleQC(nameType[0], calcReadCoverage);
+						sqc = new SampleQC(nameType[0], calcReadCoverage, swapExomeForDNA);
 						samples.put(nameType[0], sqc);
 					}
 					sqc.loadJson(j, nameType[1]);
@@ -471,6 +476,7 @@ public class AggregateQCStats {
 					case 'u': s2uMatch = args[++i]; break;
 					case 'p': prependString = args[++i]; break;
 					case 'v': debug = true; break;
+					case 'e': swapExomeForDNA = true; break;
 					case 'c': calcReadCoverage = false; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -495,7 +501,7 @@ public class AggregateQCStats {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Aggregate QC Stats: Jan 2019                          **\n" +
+				"**                            Aggregate QC Stats: May 2019                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from json files produced by the\n"+
 				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, BamConcordance and Fastq rule.\n"+
@@ -515,6 +521,7 @@ public class AggregateQCStats {
 				"-p String to prepend onto output file names.\n"+
 				"-c Don't calculate detailed region read coverage statistics, saves memory and time.\n"+
 				"-v Print verbose debugging output.\n"+
+				"-e Replace Exome with DNA in all file reference names.\n"+
 				"\n"+
 
 				"Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -r QCStats/ -p TR774_ \n\n" +

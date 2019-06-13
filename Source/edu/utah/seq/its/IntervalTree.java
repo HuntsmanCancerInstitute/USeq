@@ -165,7 +165,7 @@ public class IntervalTree<T> implements java.io.Serializable {
 		return obtlst;
 	}
 	
-	/* This method is almost identical to standard serach.  The interval must be completely contained
+	/* This method is almost identical to standard search.  The interval must be completely contained
 	 * within in the mode.
 	 */
 	public ArrayList<T> searchContains(int low, int high) {

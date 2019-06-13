@@ -13,9 +13,9 @@ public class Histogram implements Serializable {
 	private double increment;
 	private int numberOfBins;
 	private Bin[] bins;
-	private int numLessThanMin = 0;
+	private long numLessThanMin = 0;
 	private double numLessThanMinTotalScore = 0;
-	private int numMoreThanMax = 0;
+	private long numMoreThanMax = 0;
 	private double numMoreThanMaxTotalScore = 0;
 	private double totalBinHits = -1;
 	private double totalBinHitsLeftOfZero = -1;
@@ -461,7 +461,7 @@ public class Histogram implements Serializable {
 	public float getTotalBinCountsFloat(){
 		float totalBinHits = 0;
 		for (int i=0; i< numberOfBins; i++){
-			totalBinHits += bins[i].getHitsFloat();
+			totalBinHits += (float)bins[i].getHits();
 		}
 		totalBinHits += numMoreThanMax;
 		totalBinHits += numLessThanMin;
@@ -479,7 +479,7 @@ public class Histogram implements Serializable {
 	public float[] getBinCountsFloat() {
 		float[] counts = new float[numberOfBins];
 		for (int i=0; i< numberOfBins; i++){
-			counts[i] = bins[i].getHitsFloat();
+			counts[i] = (float)bins[i].getHits();
 		}
 		return counts;
 	}
@@ -589,11 +589,11 @@ public class Histogram implements Serializable {
 		this.numberOfBins = numberOfBins;
 	}
 
-	public int getNumLessThanMin() {
+	public long getNumLessThanMin() {
 		return numLessThanMin;
 	}
 
-	public int getNumMoreThanMax() {
+	public long getNumMoreThanMax() {
 		return numMoreThanMax;
 	}
 

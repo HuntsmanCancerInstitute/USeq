@@ -17,13 +17,16 @@ public class BamConcordanceQC {
 	private String similarity;
 	private String genderCheck;
 	
-	public BamConcordanceQC(File bcj, HashMap<String, BamConcordanceQC> bamFileNameBCR) throws IOException {
+	public BamConcordanceQC(File bcj, HashMap<String, BamConcordanceQC> bamFileNameBCR, boolean swapExomeForDNA) throws IOException {
 		
 		//load json objects
 		BufferedReader in = IO.fetchBufferedReader(bcj);
 		JsonObject jo = JsonObject.readFrom(in);
 		sampleNames = SampleQC.parseStringArray(jo.get("sampleNames"));
 		bamFileNames = SampleQC.parseStringArray(jo.get("bamFileNames"));
+		if (swapExomeForDNA) {
+			for (int i=0; i< bamFileNames.length; i++) bamFileNames[i]= bamFileNames[i].replace("Exome", "DNA");
+		}
 		similarities = SampleQC.parseStringArray(jo.get("similarities"));
 		genderChecks = SampleQC.parseStringArray(jo.get("genderChecks"));
 		in.close();
@@ -33,8 +36,10 @@ public class BamConcordanceQC {
 
 		//load hash
 		for (String bfn: bamFileNames){
-			if (bamFileNameBCR.containsKey(bfn)) throw new IOException("This file name with associated bam concordance has already been seen. Are your bam file names unique? Look for "+bfn+" and "+bcj);
 			bamFileNameBCR.put(bfn, this);
+			// think it is ok to skip the warnings here
+			//if (bamFileNameBCR.containsKey(bfn)) System.err.println("This file name with associated bam concordance has already been seen. Are your bam file names unique? Look for "+bfn+" and "+bcj+" and \n"+jo.toString());
+			//else bamFileNameBCR.put(bfn, this);
 		}
 
 		//make similarity and gender strings

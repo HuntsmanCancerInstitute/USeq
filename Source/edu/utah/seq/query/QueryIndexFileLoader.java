@@ -205,9 +205,10 @@ public class QueryIndexFileLoader implements Runnable {
 		else if (lenAlt > lenRef) {
 			begin = iPos;
 			end = iPos+ lenRef +1;
+			//C->TTAAT
 			if (ref.charAt(0) != alt.charAt(0)) {
-				if (verbose) System.err.println("\tWARNING: Odd INS vcf record, the first base in the ref and alt should be the same, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
-				return null;
+				begin--;
+				if (verbose) System.err.println("\tWARNING: Odd INS vcf record, the first base in the ref and alt should be the same, -> "+Misc.stringArrayToString(vcf, "\t")+ " effected bps "+begin+" "+end);
 			}
 
 		}
@@ -215,9 +216,10 @@ public class QueryIndexFileLoader implements Runnable {
 		else if (lenRef > lenAlt) {
 			begin = iPos;
 			end = iPos + lenRef;
+			//AT->C
 			if (ref.charAt(0) != alt.charAt(0)) {
-				if (verbose) System.err.println("\tWARNING: Odd DEL vcf record, the first base in the ref and alt should be the same, skipping -> "+Misc.stringArrayToString(vcf, "\t"));
-				return null;
+				begin--;
+				if (verbose) System.err.println("\tWARNING: Odd DEL vcf record, the first base in the ref and alt should be the same -> "+Misc.stringArrayToString(vcf, "\t")+ " effected bps "+begin+" "+end);
 			}
 		}
 		//odd, shouldn't hit this

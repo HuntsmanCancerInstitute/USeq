@@ -724,6 +724,16 @@ public class IO {
 			e.printStackTrace();
 		}
 	}
+	
+	/**Executes rm -f file.getCanonicalPath() 
+	 * Don't use this on soft links, will destroy the original file.*/
+	public static void deleteFileViaCmdLine(File file){
+		try {
+			IO.executeCommandLine(new String[]{"rm","-f", file.getCanonicalPath()});
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
 
 	/**Attempts to delete a file.*/
 	public static boolean deleteFile(File file) {
@@ -1223,7 +1233,7 @@ public class IO {
 	 * If the dirFile is a file and ends with the extension then it returns a File[] with File[0] the
 	 * given directory. Returns null if nothing found. Case insensitive.*/
 	public static File[] extractFiles(File dirOrFile, String extension){
-		if (dirOrFile == null) return null;
+		if (dirOrFile == null || dirOrFile.exists() == false) return null;
 		File[] files = null;
 		Pattern p = Pattern.compile(".*"+extension+"$", Pattern.CASE_INSENSITIVE);
 		Matcher m;

@@ -325,8 +325,8 @@ public class Sam2USeq {
 	private void saveJson() {
 		try {
 			//find max coverage just at or over 0.95 and 0.9
-			int coverageAt95 = 0;
-			int coverageAt90 = -1;
+			long coverageAt95 = 0;
+			long coverageAt90 = -1;
 			for (int i=fractionTargetBpsAL.size()-1; i >=0; i--){
 				double cov = fractionTargetBpsAL.get(i).doubleValue();
 				if (cov >= 0.9 && coverageAt90 == -1) coverageAt90 = i;
@@ -994,8 +994,8 @@ public class Sam2USeq {
 				System.setOut(new PrintStream(new BufferedOutputStream(new FileOutputStream(logFile))));		
 			}
 			System.out.println("\nInterrogated region read depth coverage statistics");
-			float[] counts = histogram.getBinCountsFloat();
-			float total = histogram.getTotalBinCountsFloat();
+			long[] counts = histogram.getBinCounts();
+			double total = histogram.getTotalBinCounts();
 
 			System.out.println("BaseCoverage\tObservedBasesWithGivenCoverage\tFractionObserved\tFractionObservedWithGivenOrMoreCoverage");
 			double numCounts = 0;
@@ -1083,7 +1083,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  Sam 2 USeq : Aug 2018                           **\n" +
+				"**                                Sam 2 USeq : April 2019                           **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +

@@ -63,11 +63,13 @@ public class SampleQC {
 	JSONObject avatarInfo = null;
 	String diagnosis = null;
 	boolean parseReadCoverageStats = true;
+	boolean swapExomeForDNA = false;
 
 	//constructor
-	public SampleQC( String sampleName, boolean parseReadCoverageStats){
+	public SampleQC( String sampleName, boolean parseReadCoverageStats, boolean swapExomeForDNA){
 		this.sampleName = sampleName;
 		this.parseReadCoverageStats = parseReadCoverageStats;
+		this.swapExomeForDNA = swapExomeForDNA;
 	}
 
 	@SuppressWarnings("deprecation")
@@ -102,8 +104,9 @@ public class SampleQC {
 			}
 			else if (type.equals("mpa")){
 				mpaParsed = true;
-				//bam file name that was parsed
+				//bam file name that was parsed, fix issue with prior naming?
 				mpaBamFileName = jo.getString("bamFileName", "notFound");
+				if (swapExomeForDNA) mpaBamFileName = mpaBamFileName.replace("Exome", "DNA");
 				//mean insert size, ideally big enough to have < 0.1 overlap
 				meanInsertSize = jo.getDouble("meanInsertSize", -1);
 				//fraction of bps that overlap each other in paired alignments, ideally < 0.1
@@ -200,23 +203,40 @@ public class SampleQC {
 				al.add(new Double(coverageAt095OfTargetBps).toString());
 				//al.add(new Long(numberLowCoverageBps).toString());
 			}
+			String genderCheck = null;
 			if (bc != null){
 				al.add(bc.getSimilarity());
-				al.add(bc.getGenderCheck());
+				genderCheck = bc.getGenderCheck();
+				al.add(genderCheck);
 			}
 			else {
 				al.add("NA");
 				al.add("NA");
 			}
 			//add gender?
+			String gender = null;
 			if (avatarInfo != null){
-				String gender = null;
 				try {
 					gender = avatarInfo.getString("Gender");
 				} catch (Exception e){}
-				if (gender == null) gender = "NA";
-				al.add(gender);
+				
+				if (gender == null) al.add("NA");
+				else if (genderCheck == null) al.add(gender);
+				else {
+					//ok both genderCheck and gender are present
+					if (gender.equals("F")){
+						if (genderCheck.contains(" MALE"))al.add(gender+" FAIL");
+						else al.add(gender+" PASS");
+					}
+					else if (gender.equals("M")) {
+						if (genderCheck.contains(" FEMALE"))al.add(gender+" FAIL");
+						else al.add(gender+" PASS");
+					}
+					else al.add(gender);
+				}
 			}
+			
+			
 			return Misc.stringArrayListToString(al, "\t");
 		} catch (Exception e){
 			e.printStackTrace();
@@ -257,7 +277,7 @@ public class SampleQC {
 			al.add("Het/Hom All ChrX Log2(All/ChrX)");
 		}
 		if (includeAvatarInfo){
-			al.add("Gender");
+			al.add("Gender Check");
 		}
 		return Misc.stringArrayListToString(al, "\t");
 	}
@@ -292,7 +312,7 @@ public class SampleQC {
 			sb.append("	data.addColumn('string', 'Similarities Fwd Rev');\n");
 			sb.append("	data.addColumn('string', 'Het/Hom All ChrX Log2(All/ChrX)');\n");
 		}
-		if (avatarInfo != null) sb.append("	data.addColumn('string', 'Gender');\n");
+		if (avatarInfo != null) sb.append("	data.addColumn('string', 'Gender Check');\n");
 	}
 	
 	

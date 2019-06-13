@@ -1,15 +1,7 @@
 package edu.utah.seq.barcodes;
 
-import java.io.File;
 import java.io.IOException;
-
-import util.bio.seq.Seq;
-import util.gen.Misc;
 import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SAMRecordIterator;
-import htsjdk.samtools.SamReader;
-import htsjdk.samtools.SamReaderFactory;
-import htsjdk.samtools.ValidationStringency;
 
 /**This calls consensus on SAMRecord[] returning a fastq record for realignment.
  * No checks are made on the input sams.  They are assumed to have the same strand and read first/ second order.

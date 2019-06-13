@@ -126,6 +126,48 @@ public class MultiFastaParser {
 		fastas = null;
 
 	}
+	
+	
+	/**Writes out split fastq.*/
+	public static void writeSplitFastq (File file){  
+		try {
+
+
+			String seqName = null;
+			String line = null;
+			File saveDir = new File(file.getParent(), Misc.removeExtension(file.getName()+"_Split"));
+			saveDir.mkdirs();
+
+			BufferedReader in = IO.fetchBufferedReader(file);
+			Gzipper out = null;
+			
+			//for each line
+			while ((line = in.readLine()) !=null) {
+				line = line.trim();                     //kill whitespace and test if exists
+				if (line.length() == 0) continue;       //skip blank lines
+				if (line.startsWith(">")){          //if a comment line
+					//prior exists?
+					if (out != null) out.close();
+					
+					//create new
+					String[] nameLine = Misc.WHITESPACE.split(line);
+					seqName = nameLine[0].substring(1);
+					out = new Gzipper(new File(saveDir,seqName+".fastq.gz"));
+					out.println(line);
+				}   
+				else out.println(line);
+			}
+			
+			//close IO
+			in.close();
+			out.close();
+		}
+		catch (IOException e) {
+			e.printStackTrace();
+		}
+
+	}
+
 
 	public void printFasta() {
 		int num = seqsAL.size();
@@ -183,21 +225,7 @@ public class MultiFastaParser {
 
 	public static void main (String[] args){
 		try {
-			MultiFastaParser m = new MultiFastaParser(args[0]);
-			System.out.println("Found seq? "+m.isFastaFound());
-			System.out.println("Num seqs "+m.getSeqs().length);
-			File parent = new File (args[0]).getParentFile();
-			//print em?
-			for (int i=0; i<m.getSeqs().length; i++){
-				String nameLine = m.getNames()[i];
-				String name = Misc.WHITESPACE.split(nameLine)[0];
-				Gzipper out = new Gzipper(new File(parent, name+".fasta.gz"));
-
-				out.println(">"+nameLine);
-
-				out.println(m.getSeqs()[i]);
-				out.close();
-			}
+			MultiFastaParser.writeSplitFastq(new File(args[0]).getCanonicalFile()); 
 		} catch (IOException e) {
 			e.printStackTrace();
 		}

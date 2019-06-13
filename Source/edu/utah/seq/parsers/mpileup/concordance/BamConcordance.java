@@ -27,7 +27,7 @@ public class BamConcordance {
 	private int minBaseQuality = 20;
 	private int minMappingQuality = 20;
 	private File jsonOutputFile = null;
-	private String toIgnoreForCall = "Transcriptome";
+	private String toIgnoreForCall = "RNA";
 	private double minMale = 2.5;
 	private double maxFemale = 1.5;
 	
@@ -379,7 +379,7 @@ public class BamConcordance {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Bam Concordance: January 2019                         **\n" +
+				"**                             Bam Concordance: April 2019                          **\n" +
 				"**************************************************************************************\n" +
 				"BC calculates sample level concordance based on uncommon homozygous SNVs found in bam\n"+
 				"files. Samples from the same person will show high similarity (>0.9). Run BC on\n"+
@@ -413,7 +413,7 @@ public class BamConcordance {
 				"-n Minimum fraction similarity to pass sample set, defaults to 0.85\n"+
 				"-x Maximum log2Rto score for calling a sample female, defaults to 1.5\n"+
 				"-y Minimum log2Rto score for calling a sample male, defaults to 2.5\n"+
-				"-e Sample name to ignore in scoring similarity and gender, defaults to 'Transcriptome'\n"+
+				"-e Sample name to ignore in scoring similarity and gender, defaults to 'RNA'\n"+
 				"-j Write gzipped summary stats in json format to this file.\n"+
 				"-t Number of threads to use.  If not set, determines this based on the number of\n"+
 				"      threads and memory available to the JVM so set the -Xmx value to the max.\n\n"+

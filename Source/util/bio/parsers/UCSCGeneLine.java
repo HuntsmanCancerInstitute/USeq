@@ -573,6 +573,70 @@ public class UCSCGeneLine {
 		return false;
 	}
 	
+	/**Returns null if no intersection otherwise checks first for intersection with 5'UTRs, 3'UTRs, Coding, and lastly Introns.*/
+	public String getIntGeneFeature(int start, int stop) {
+		//int 5'UTR?
+		for (ExonIntron e: get5PrimeUtrs()) {
+			if (e.intersects(start, stop)) return "5pUTR";
+		}
+		//int 3'UTR?
+		for (ExonIntron e: get3PrimeUtrs()) {
+			if (e.intersects(start, stop)) return "3pUTR";
+		}
+		//int exon?
+		for (ExonIntron e: exons) {
+			if (e.intersects(start, stop)) return "Exon";
+		}
+		//int intron?
+		for (ExonIntron e: introns) {
+			if (e.intersects(start, stop)) return "Intron";
+		}
+		return null;
+	}
+	
+	private ExonIntron[] getLeftSideUtrs() {
+		ArrayList<ExonIntron> utrs = new ArrayList<ExonIntron>();
+		for (int i=0; i< exons.length; i++) {
+			//left of css?
+			if (exons[i].getEnd() < cdsStart) utrs.add(exons[i]);
+			//contained css
+			else if (exons[i].getStart() < cdsStart && exons[i].getEnd()>= cdsStart) utrs.add(new ExonIntron (exons[i].getStart(), cdsStart));
+			//past cdsStart
+			else break;
+		}
+
+		//IO.pl("LeftSide " + utrs);
+		ExonIntron[] utrExons = new ExonIntron[utrs.size()];
+		utrs.toArray(utrExons);
+		return utrExons;
+	}
+	
+	private ExonIntron[] getRightSideUtrs() {
+		ArrayList<ExonIntron> utrs = new ArrayList<ExonIntron>();
+		for (int i=0; i< exons.length; i++) {
+			//left of cse?
+			if (exons[i].getEnd() <= cdsEnd) {}
+			//contained cse
+			else if (exons[i].getStart() <= cdsEnd && exons[i].getEnd()> cdsEnd) utrs.add(new ExonIntron (cdsEnd, exons[i].getEnd()));
+			//right of cse
+			else if (exons[i].getStart() >= cdsEnd) utrs.add(exons[i]);
+		}
+		//IO.pl("RightSide " + utrs);
+		ExonIntron[] utrExons = new ExonIntron[utrs.size()];
+		utrs.toArray(utrExons);
+		return utrExons;
+	}
+	
+	public ExonIntron[] get5PrimeUtrs() {
+		if (strand.equals("+")) return getLeftSideUtrs();
+		return getRightSideUtrs();
+	}
+	
+	public ExonIntron[] get3PrimeUtrs() {
+		if (strand.equals("-")) return getLeftSideUtrs();
+		return getRightSideUtrs();
+	}
+	
 	public int getLength(){
 		return txEnd-txStart;
 	}
@@ -793,4 +857,5 @@ public class UCSCGeneLine {
 		if (strand.equals("-")) return true;
 		return false;
 	}
+
 }

@@ -38,6 +38,7 @@ public class MpileupTabixLoader implements Runnable{
 	private int numNotScored = 0;
 	private int numFailingZscore = 0;
 	private boolean verbose;
+	private int bpPad = 0;
 	
 	//internal
 	public Pattern AF = null;
@@ -58,6 +59,7 @@ public class MpileupTabixLoader implements Runnable{
 		verbose = vbc.isVerbose();
 		tabixReader = new TabixReader(mpileupFile.getCanonicalPath());
 		fourDecimalMax.setMaximumFractionDigits(4);
+		bpPad = vbc.getBpPad();
 		//Set patterns
 		AF = Pattern.compile( vbc.getAFInfoName()+"=([\\d\\.]+)");
 		DP = Pattern.compile( vbc.getDPInfoName()+"=([\\d\\.]+)");
@@ -125,10 +127,11 @@ public class MpileupTabixLoader implements Runnable{
 			return;
 		}
 		
+		
 		//pull mpileup records, if none then warn and save vcf record
-		int start = startStop[0]+1;
+		int start = startStop[0] + 1 - bpPad;
 		if (start < 1) start = 1;
-		String tabixCoor = fields[0]+":"+start+"-"+(startStop[1]);
+		String tabixCoor = fields[0]+":"+start+"-"+(startStop[1]+bpPad);
 		TabixReader.Iterator it = fetchInteratorOnCoordinates(tabixCoor);
 		if (it == null) {
 			printFailingRecord(fields, record);

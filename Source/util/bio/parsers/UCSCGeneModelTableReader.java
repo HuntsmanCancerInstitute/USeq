@@ -19,14 +19,17 @@ public class UCSCGeneModelTableReader {
 	//test main
 	public static void main(String[] args) throws FileNotFoundException, IOException{
 		IO.pl("Loading");
-		UCSCGeneModelTableReader reader = new UCSCGeneModelTableReader (new File ("/Users/u0028003/Downloads/hg38RefSeq8Aug2018_Merged.ucsc.gz"), 0);
+		UCSCGeneModelTableReader reader = new UCSCGeneModelTableReader (new File ("/Users/u0028003/HCI/Labs/Cazalla_Demian/RNASeqEnrichment15955R/CalJac3.2/GeneTables/calJac3.2EnsemblGenes1May2019.ucsc.gz"), 0);
 		System.out.println("Num lines "+reader.getGeneLines().length);
 		UCSCGeneLine[] genes = reader.getGeneLines();
-		Gzipper out = new Gzipper(new File ("/Users/u0028003/Downloads/hg38RefSeq8Aug2018_Merged.txt.gz"));
-		for (int i=0; i< genes.length; i++){
-			out.println(genes[i].getDisplayNameThenName()+"\t"+genes[i].getLength());
+		
+		for (int i=20; i< 40; i++){
+			IO.pl(i);
+			IO.pl(genes[i].toStringAll());
+			
+			IO.pl();
 		}
-		out.close();
+
 		IO.pl("Done");
 	}
 	

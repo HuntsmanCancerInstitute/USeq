@@ -10,8 +10,7 @@ public class Bin implements Serializable{
 	private double stop;
 	private double middle;
 	private long hits =0;
-	private float hitsFloat = 0;
-	private ArrayList scores = new ArrayList();
+	private ArrayList<Double> scores = new ArrayList<Double>();
 	private Histogram histogram;
 	
 	public Bin (double start, double stop, Histogram histogram){
@@ -31,7 +30,6 @@ public class Bin implements Serializable{
 	public boolean count( double value){
 		if (contains(value)) {
 			hits ++;
-			hitsFloat ++;
 			return true;
 		}
 		return false;
@@ -41,7 +39,6 @@ public class Bin implements Serializable{
 	public boolean count( double value, double score){
 		if (contains(value)) {
 			hits ++;
-			hitsFloat ++;
 			scores.add(new Double (score));
 			return true;
 		}
@@ -83,10 +80,6 @@ public class Bin implements Serializable{
 
 	public long getHits() {
 		return hits;
-	}
-	
-	public float getHitsFloat() {
-		return hitsFloat;
 	}
 	
 	public double getStart() {

@@ -215,8 +215,10 @@ public class QueryIndexer {
 
 
 	private void createFileIdHash() {
-		int counter = 0;
-		for (File f: dataFilesToParse) fileId.put(f, counter++);
+		for (int i=0; i< dataFilesToParse.length; i++) {
+			fileId.put(dataFilesToParse[i], i);
+		}
+		//contains 0 thru final no interruptions
 	}
 
 
@@ -513,7 +515,10 @@ public class QueryIndexer {
 
 				//save trmmed name : id ?
 				Integer id = fileId.get(f);
-				fileStringId.put(trimmedName, id);
+				if (fileStringId.containsKey(trimmedName)){
+					Misc.printErrAndExit("Duplicate trimmedName! "+trimmedName);
+				}
+				else fileStringId.put(trimmedName, id);
 
 				//save trimmed name: json header, have to use string rep since JSONObject is not serializable
 				ArrayList<String> header = parseHeader(f, headerStarts);
@@ -643,7 +648,7 @@ public class QueryIndexer {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Query Indexer: May 2018                           **\n" +
+				"**                               Query Indexer: June 2019                           **\n" +
 				"**************************************************************************************\n" +
 				"Builds index files for Query by recursing through a data directory looking for bgzip\n"+
 				"compressed and tabix indexed genomic data files (e.g. vcf, bed, maf, and custom).\n"+
