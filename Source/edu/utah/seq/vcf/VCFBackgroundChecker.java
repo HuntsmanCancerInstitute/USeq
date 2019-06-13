@@ -39,6 +39,7 @@ public class VCFBackgroundChecker {
 	private int numberThreads = 0;
 	private String afInfoName = "T_AF";
 	private String dpInfoName = "T_DP";
+	private int bpPad = 0;
 	
 	//internal
 	private static final int numVcfToProc = 100;
@@ -300,6 +301,7 @@ public class VCFBackgroundChecker {
 					case 'q': minBaseQuality = Integer.parseInt(args[++i]); break;
 					case 'c': minReadCoverage = Integer.parseInt(args[++i]); break;
 					case 'a': minNumSamples = Integer.parseInt(args[++i]); break;
+					case 'b': bpPad = Integer.parseInt(args[++i]); break;
 					case 'e': removeNonZScoredRecords = true; break;
 					case 'd': verbose = true; break;
 					case 'u': replaceQualScore = true; break;
@@ -355,6 +357,7 @@ public class VCFBackgroundChecker {
 		IO.pl(maxSampleAF+"\tMax mpileup sample AF");
 		IO.pl(minNumSamples+"\tMin # samples for z-score calc");
 		IO.pl(minimumZScore+"\tMin vcf AF z-score to save");
+		IO.pl(bpPad+"\tBP padding +/- to vcf record for mpileup scanning");
 		IO.pl(numberThreads+"\tCPUs");
 		IO.pl(removeNonZScoredRecords+ "\tExclude vcf records that could not be z-scored");
 		IO.pl(verbose+"\tVerbose");
@@ -365,7 +368,7 @@ public class VCFBackgroundChecker {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                         VCF Background Checker : Jan 2019                        **\n" +
+				"**                         VCF Background Checker : May 2019                        **\n" +
 				"**************************************************************************************\n" +
 				"VBC calculates non-reference allele frequencies (AF) from a background multi-sample \n"+
 				"mpileup file over each vcf record. It then calculates a z-score for the vcf AF and \n"+
@@ -394,6 +397,7 @@ public class VCFBackgroundChecker {
 				"-c Minimum mpileup sample read coverge, defaults to 20\n"+
 				"-f Maximum mpileup sample AF, defaults to 0.3\n"+
 				"-a Minimum # mpileup samples for z-score calculation, defaults to 3\n" +
+				"-b Pad the size of each vcf record, defaults to 0 bp\n"+
 				"-e Exclude vcf records that could not be z-scored\n"+
 				"-u Replace QUAL value with z-score. Un scored vars will be assigned 0\n"+
 				"-d Print verbose debugging output\n" +
@@ -403,7 +407,7 @@ public class VCFBackgroundChecker {
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBackgroundChecker -v SomaticVcfs/ -z 3\n"+
-				"-m bkg.mpileup.gz -s BkgFiltVcfs/ -q 13 -u \n\n"+
+				"-m bkg.mpileup.gz -s BkgFiltVcfs/ -q 13 -u -b 2\n\n"+
 
 		        "**************************************************************************************\n");
 	}
@@ -448,5 +452,9 @@ public class VCFBackgroundChecker {
 
 	public String getDPInfoName() {
 		return dpInfoName;
+	}
+
+	public int getBpPad() {
+		return bpPad;
 	}
 }
