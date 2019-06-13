@@ -26,7 +26,7 @@ public class VCFMpileupAnnotator {
 	private int minBaseQuality = 0;
 	private boolean verbose = false;
 	private int numberThreads = 0;
-	private int numDecimals = 3;
+	private int numDecimals = 4;
 	
 	//internal
 	private static final int numVcfToProc = 100;
@@ -158,8 +158,8 @@ public class VCFMpileupAnnotator {
 			if (record.startsWith("#")){
 				//add new info?
 				if (addInfo && record.startsWith("##INFO=")) {
-					vcfHeader.add("##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele frequency estimated from mpileup data.\">");
-					vcfHeader.add("##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth estimated from mpileup data.\">");
+					vcfHeader.add("##INFO=<ID=AF,Number=1,Type=String,Description=\"Comma delimited list of allele frequencies for each sample in the mpileup data.\">");
+					vcfHeader.add("##INFO=<ID=DP,Number=1,Type=String,Description=\"Comma delimited list of read depths for each sample in the mpileup data.\">");
 					addInfo = false;
 				}
 				//skip prior AF and DP infos
@@ -246,7 +246,7 @@ public class VCFMpileupAnnotator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          VCF Mpileup Annotator : Oct 2018                        **\n" +
+				"**                          VCF Mpileup Annotator : April 2019                      **\n" +
 				"**************************************************************************************\n" +
 				"VMA estimates the AF and DP of a vcf record from a single sample mpileup file.  It \n"+
 				"replaces the AF or DP INFO values in the vcf records if present. For INDELs, the\n"+
@@ -256,15 +256,15 @@ public class VCFMpileupAnnotator {
 				"\nRequired:\n"+
 				"-v Path to a xxx.vcf(.gz/.zip OK) file.\n" +
 				"-m Path to a bgzip compressed and tabix indexed single sample mpileup file. e.g.:\n"+
-				"      1) Mpileup: 'samtools mpileup -B -q 1 -d 1000000 -f $fastaIndex -l $bedFile\n"+
-				"      $indexedBamFile > bam.mpileup'\n"+
+				"      1) Mpileup: 'samtools mpileup -B -R -A -d 1000000 -f $fastaIndex -l\n"+ 
+				"         $bedFile $indexedBamFile > bam.mpileup'\n"+
 				"      2) Bgzip: 'tabix-0.2.6/bgzip bam.mpileup'\n"+
                 "         Tabix: 'tabix-0.2.6/tabix -s 1 -b 2 -e 2 bam.mpileup.gz'\n"+
 				"-o Path to a xxx.vcf.gz file to save the modified vcf records.\n"+
 						
 				"\nOptional:\n" +
 				"-q Minimum mpileup sample bp quality, defaults to 0\n"+
-				"-e Number of decimals in the AF, defaults to 3\n"+
+				"-e Number of decimals in the AF, defaults to 4\n"+
 				"-d Print verbose debugging output.\n" +
 				"-t Number of threads to use, defaults to all/ 5GB.\n"+
 				
