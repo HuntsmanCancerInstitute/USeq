@@ -143,7 +143,7 @@ public class VCFCallFrequency {
 				if (line.startsWith("#")) {
 					out.println(line);
 					if (addInfo && line.startsWith("##INFO")){
-						out.println("##INFO=<ID=CF,Number=1,Type=String,Description=\"Frequency the variant has been observed in '"+fileFilter
+						out.println("##INFO=<ID=CF,Number=1,Type=Float,Description=\"Frequency the variant has been observed in '"+fileFilter
 								+ "' variant datasets, number vcf matches, number bed matches.\">");
 						addInfo = false;
 					}
@@ -538,7 +538,7 @@ public class VCFCallFrequency {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Call Frequency: Jan 2019                          **\n" +
+				"**                            VCF Call Frequency: June 2019                         **\n" +
 				"**************************************************************************************\n" +
 				"Calculates a vcf call frequency for each variant when pointed at a genomic Query\n"+
 				"service (https://github.com/HuntsmanCancerInstitute/Query) or the Data and Index\n"+
