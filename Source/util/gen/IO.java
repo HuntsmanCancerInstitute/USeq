@@ -2598,4 +2598,12 @@ public class IO {
 		
 	}
 
+	public static double gigaBytes(File file) {
+		double bytes = file.length();
+		double kilobytes = (bytes / 1024);
+		double megabytes = (kilobytes / 1024);
+		double gigabytes = (megabytes / 1024);
+		return gigabytes;
+	}
+
 }

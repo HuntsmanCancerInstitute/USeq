@@ -3,6 +3,8 @@ import java.util.*;
 import java.util.regex.Pattern;
 import java.text.*;
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.attribute.FileTime;
 
 import edu.utah.seq.data.ComparatorPointAscendingScore;
 import edu.utah.seq.data.ComparatorPointPosition;
@@ -686,6 +688,13 @@ public class Num {
 		return current;
 	}
 
+	public static int ageOfFileInDays (File f) throws IOException {
+		FileTime t = Files.getLastModifiedTime(f.toPath());
+		long ft = t.toMillis();
+		long now = System.currentTimeMillis();
+		long diff = ft - now;
+		return (int) Num.millisecToDays(diff);
+	}
 
 	/**Writes a binary int[][2] array.
 	 * @return true if sucessful, false if something bad happened.*/
@@ -3239,6 +3248,15 @@ public class Num {
 		int lenTreat = f.length;
 		for (int i=0; i< lenTreat; i++) tTot+=f[i];
 		return (double)tTot/(double)lenTreat;
+	}
+	
+	/**Calculates the harmonic mean of a double[] */
+	public static double harmonicMean(double[] data) {  
+		double sum = 0.0;
+		for (int i = 0; i < data.length; i++) { 
+			sum += 1.0 / data[i]; 
+		} 
+		return data.length / sum; 
 	}
 
 	/**Finds min and max values of a int array.*/
