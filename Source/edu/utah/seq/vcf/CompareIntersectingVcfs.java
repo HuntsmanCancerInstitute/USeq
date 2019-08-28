@@ -81,6 +81,7 @@ public class CompareIntersectingVcfs {
 			for (String c: cells){
 				out.print("\t");
 				if (c != null) out.print(c);
+				else out.print(".");
 			}
 			
 			//close the line
@@ -173,7 +174,7 @@ public class CompareIntersectingVcfs {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                       Compare Intersecting Vcfs : February 2019                  **\n" +
+				"**                        Compare Intersecting Vcfs : June 2019                     **\n" +
 				"**************************************************************************************\n" +
 				"Compares vcf files by creating a master list of variants and then scores each for the\n"+
 				"presense of the same CHROM POS ALT REF in each vcf file.\n\n" +
