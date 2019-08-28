@@ -43,9 +43,10 @@ public class MergeUCSCGeneTable {
 				IO.p(".");
 			}
 			//does it exist
-			if (genes.containsKey(lines[i].getName())){
+			String key = lines[i].getName()+"_"+lines[i].getChrom();
+			if (genes.containsKey(key)){
 				//merge exons
-				UCSCGeneLine old = genes.get(lines[i].getName());
+				UCSCGeneLine old = genes.get(key);
 				ExonIntron[] merged = ExonIntron.merge(old.getExons(), lines[i].getExons());
 				old.setExons(merged);
 				//reset tx start and stop
@@ -55,7 +56,7 @@ public class MergeUCSCGeneTable {
 				if (old.getCdsStart() > lines[i].getCdsStart()) old.setCdsStart(lines[i].getCdsStart());
 				if (old.getCdsEnd() < lines[i].getCdsEnd()) old.setCdsEnd(lines[i].getCdsEnd());
 			}
-			else genes.put(lines[i].getName(), lines[i]);
+			else genes.put(key, lines[i]);
 		}
 		
 		System.out.println("\n\n"+lines.length + " transcripts collapsed to "+genes.size()+" genes.\n");
@@ -116,10 +117,10 @@ public class MergeUCSCGeneTable {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Merge UCSC Gene Table: Aug  2018                       **\n" +
+				"**                           Merge UCSC Gene Table: Aug  2019                       **\n" +
 				"**************************************************************************************\n" +
-				"Merges transcript models that share the same gene name (in column 0). Maximizes exons,\n" +
-				"minimizes introns. Assumes interbase coordinates.\n\n" +
+				"Merges transcript models that share the same gene name(in column 0) and chromosome.\n" +
+				"Maximizes exons, minimizes introns. Assumes interbase coordinates.\n\n" +
 
 				"Options:\n"+
 				"-u UCSC RefFlat or RefSeq gene table file, full path. See,\n"+
