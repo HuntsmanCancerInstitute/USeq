@@ -81,6 +81,7 @@ public class VCFCallFrequency {
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		IO.pl("\nDone! "+Math.round(diffTime)+" Sec\n");
+		
 
 	}
 
