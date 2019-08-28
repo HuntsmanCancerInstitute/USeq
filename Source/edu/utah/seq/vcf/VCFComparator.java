@@ -53,6 +53,9 @@ public class VCFComparator {
 	private ArrayList<Float> tprAL = new ArrayList<Float>();
 	private ArrayList<Float> fdrAL = new ArrayList<Float>();
 	private ArrayList<ScoredCalls> scoredCallsAL = new ArrayList<ScoredCalls>();
+	private String[] fixedFdrLines = null;
+	double[] fixedFdr = new double[] {0.15, 0.05, 0.01};
+	private String headerLine = "QUALThreshold\tNumMatchTest\tNumNonMatchTest\tFDR= nonMatchTest/(matchTest+nonMatchTest)\tdecreasingFDR\tRecall TPR= matchTest/totalKey\tFPR= nonMatchTest/totalKey\tPrecision PPV= matchTest/(matchTest+nonMatchTest)\tF-score= harmonicMean(Precision, Recall)";
 
 	//constructor
 	public VCFComparator(String[] args){
@@ -100,6 +103,7 @@ public class VCFComparator {
 			if (saveDirectory != null) {
 				printParsedDatasets();
 				printIntersectingDatasets();
+				printFixedFdrLines();
 			}
 
 		}
@@ -184,12 +188,14 @@ public class VCFComparator {
 		
 		
 	}
+	
 
 	public void thresholdAndCompareCalls(){	
 		
 		//clear old results
 		tprAL.clear();
 		fdrAL.clear();
+		fixedFdrLines = new String[3];
 
 		//intersect and split test into matching and non matching
 		intersectVCF();
@@ -201,15 +207,17 @@ public class VCFComparator {
 		Arrays.sort(testNonMatchingVCF, new ComparatorVCFRecordScore());
 		Arrays.sort(testMatchingVCF);
 
-		results.append("QUALThreshold\tNumMatchTest\tNumNonMatchTest\tFDR=nonMatchTest/(matchTest+nonMatchTest)\tdecreasingFDR\tTPR=matchTest/totalKey\tFPR=nonMatchTest/totalKey\tPPV=matchTest/(matchTest+nonMatchTest)\n");
+		results.append(headerLine);
+		results.append("\n");
 
 		//first do without thresholds
 		float oldScore = 0;
 		if (testNonMatchingVCF.length !=0) oldScore = testNonMatchingVCF[0].getScore();
-		int numNonMatches = testNonMatchingVCF.length;
+		int numNonMatchesTest = testNonMatchingVCF.length;
 		int numMatches = testMatchingVCF.length;
-		float oldFDR = ((float)numNonMatches)/((float)(numMatches + numNonMatches));
-		String res = formatResults(Float.MIN_NORMAL, numberFilteredKeyVariants, oldFDR, numMatches, numNonMatches);
+		float oldFDR = ((float)numNonMatchesTest)/((float)(numMatches + numNonMatchesTest));
+		String res = formatResults(Float.MIN_NORMAL, numberFilteredKeyVariants, oldFDR, numMatches, numNonMatchesTest);
+		scoreFixedFdrs(oldFDR, res);
 		results.append(res.toString());
 		results.append("\n");
 
@@ -217,18 +225,26 @@ public class VCFComparator {
 		for (int i=0; i< testNonMatchingVCF.length; i++){
 			float score = testNonMatchingVCF[i].getScore();
 			if (score == oldScore) continue;
-			numNonMatches = testNonMatchingVCF.length - i;
+			numNonMatchesTest = testNonMatchingVCF.length - i;
 			numMatches = countNumberMatches(score);
-			float fdr = ((float)numNonMatches)/((float)(numMatches + numNonMatches));
+			float fdr = ((float)numNonMatchesTest)/((float)(numMatches + numNonMatchesTest));
 			if (fdr < oldFDR) oldFDR = fdr;
-			res = formatResults(score, numberFilteredKeyVariants, oldFDR, numMatches, numNonMatches);
+			res = formatResults(score, numberFilteredKeyVariants, oldFDR, numMatches, numNonMatchesTest);
 			results.append(res.toString());
 			results.append("\n");
-			if (numNonMatches == 0 || numMatches == 0) break;
+			if (numNonMatchesTest == 0 || numMatches == 0) break;
 			oldScore = score;
+			scoreFixedFdrs(oldFDR, res);
 		}
 
 		if (saveDirectory == null) System.out.println("\n"+results);
+	}
+
+	private void scoreFixedFdrs(float oldFDR, String resultsLine) {
+		double rounded = Num.round(oldFDR, 2);
+		if (fixedFdrLines[0] == null && rounded <= fixedFdr[0]) fixedFdrLines[0]= resultsLine;
+		if (fixedFdrLines[1] == null && rounded <= fixedFdr[1]) fixedFdrLines[1]= resultsLine;
+		if (fixedFdrLines[2] == null && rounded <= fixedFdr[2]) fixedFdrLines[2]= resultsLine;
 	}
 
 	private void saveMatchingScores() {
@@ -272,7 +288,7 @@ public class VCFComparator {
 		}
 	}
 
-	public String formatResults(float threshold, float totalKey, float ratchetFDR, float intTest, float nonIntTest ){
+	public String formatResults(float threshold, float totalKey, float ratchetFDR, float intTest, float nonIntTest){
 		StringBuilder sb = new StringBuilder();
 		//threshold
 		if (threshold == Float.MIN_NORMAL) sb.append("none");
@@ -292,7 +308,13 @@ public class VCFComparator {
 		//fpr nonIntTest/totalKey
 		sb.append(nonIntTest/totalKey); sb.append("\t");
 		//ppv intTest/totalTest
-		sb.append(intTest/(nonIntTest + intTest));
+		float ppv = intTest/(nonIntTest + intTest);
+		sb.append(ppv); sb.append("\t");
+		//Recall, TRUTH.TP / (TRUTH.TP + TRUTH.FN), same as tpr
+		//Precision, QUERY.TP / (QUERY.TP + QUERY.FP)
+		//F-score harmonic mean of tpr (recall) and ppv (precision)
+		double hm = Num.harmonicMean(new double[] {tpr, ppv});
+		sb.append((float)hm);
 		return sb.toString();
 	}
 
@@ -785,6 +807,24 @@ public class VCFComparator {
 		}
 	}
 	
+	public void printFixedFdrLines(){
+		try {
+			String testName = Misc.removeExtension(vcfTest.getName());
+
+			//print results 
+			File f = new File (saveDirectory, "fixedFDRLines_"+testName+".xls");
+			PrintWriter out = new PrintWriter( new FileWriter(f));
+			out.println("TargetFdr\tDataSet\t"+headerLine);
+			for (int i=0; i< fixedFdr.length; i++) {
+				out.println("tFdr_"+fixedFdr[i]+"_\t"+testName+"\t"+fixedFdrLines[i]);
+			}
+			out.close();
+		} catch (Exception e){
+			e.printStackTrace();
+		}
+	}
+	
+	
 	public void printIntersectingDatasets(){
 		//any to print?
 		if (testMatchingVCF == null || testMatchingVCF.length ==0) return;
@@ -961,7 +1001,7 @@ public class VCFComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Comparator : March 2017                         **\n" +
+				"**                             VCF Comparator : August 2019                         **\n" +
 				"**************************************************************************************\n" +
 				"Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls\n" +
 				"that fall in the common interrogated regions are compared. WARNING tabix gzipped files\n" +
