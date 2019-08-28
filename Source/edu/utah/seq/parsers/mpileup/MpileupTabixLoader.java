@@ -11,7 +11,6 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.utah.seq.query.QueryIndexFileLoader;
 import edu.utah.seq.vcf.VCFBackgroundChecker;
-import edu.utah.seq.vcf.VCFBackgroundCheckerGraphite;
 import htsjdk.tribble.readers.TabixReader;
 import util.gen.IO;
 import util.gen.Misc;
@@ -39,10 +38,12 @@ public class MpileupTabixLoader implements Runnable{
 	private int numFailingZscore = 0;
 	private boolean verbose;
 	private int bpPad = 0;
+	private int[] sampleIndexesToUse = null;
 	
 	//internal
 	public Pattern AF = null;
 	public Pattern DP = null;
+	private int numberSamples;
 	private static final NumberFormat fourDecimalMax = NumberFormat.getNumberInstance();
 
 	
@@ -60,6 +61,7 @@ public class MpileupTabixLoader implements Runnable{
 		tabixReader = new TabixReader(mpileupFile.getCanonicalPath());
 		fourDecimalMax.setMaximumFractionDigits(4);
 		bpPad = vbc.getBpPad();
+		sampleIndexesToUse = vbc.getSampleIndexesToUse();
 		//Set patterns
 		AF = Pattern.compile( vbc.getAFInfoName()+"=([\\d\\.]+)");
 		DP = Pattern.compile( vbc.getDPInfoName()+"=([\\d\\.]+)");
@@ -155,6 +157,8 @@ public class MpileupTabixLoader implements Runnable{
 			//parse mpilup line and pull filtered set of samples
 			MpileupLine ml = new MpileupLine(mpileupLine, minBaseQuality);
 			if (ml.getChr() == null) throw new IOException ("Failed to parse the mpileup line:\n"+mpileupLine);
+			if (numberSamples == 0) numberSamples = ml.getSamples().length;
+			else if (numberSamples != ml.getSamples().length) throw new IOException ("Failed to parse '"+numberSamples+"' samples from mpileup line:\n"+mpileupLine);
 			MpileupSample[] toExamine = fetchMpileupSamples(ml);
 			if (toExamine.length < minNumSamples) continue;
 			
@@ -301,14 +305,29 @@ public class MpileupTabixLoader implements Runnable{
 		//fetch samples to Examine
 		ArrayList<MpileupSample> al = new ArrayList<MpileupSample>();
 		MpileupSample[] allSamples = ml.getSamples();
-		for (int i=0; i< allSamples.length; i++){
-			//check depth
-			if (allSamples[i].getReadCoverageAll() < minReadCoverage) continue;
-			//check af for each base and ins del, if any exceed then skip, likely germline
-			if (allSamples[i].findMaxSnvAF() > maxSampleAF || allSamples[i].getAlleleFreqINDEL() > maxSampleAF) continue;
-			al.add(allSamples[i]);
-		}
 		
+		//examine all
+		if (sampleIndexesToUse == null) {
+			for (int i=0; i< allSamples.length; i++){
+				//check depth
+				if (allSamples[i].getReadCoverageAll() < minReadCoverage) continue;
+				//check af for each base and ins del, if any exceed then skip, likely germline
+				if (allSamples[i].findMaxSnvAF() > maxSampleAF || allSamples[i].getAlleleFreqINDEL() > maxSampleAF) continue;
+				al.add(allSamples[i]);
+			}
+		}
+		//examine just a subset
+		else {
+			for (int i=0; i< sampleIndexesToUse.length; i++){
+				int index = sampleIndexesToUse[i];
+				//check depth
+				if (allSamples[index].getReadCoverageAll() < minReadCoverage) continue;
+				//check af for each base and ins del, if any exceed then skip, likely germline
+				if (allSamples[index].findMaxSnvAF() > maxSampleAF || allSamples[index].getAlleleFreqINDEL() > maxSampleAF) continue;
+				al.add(allSamples[index]);
+			}
+		}
+
 		MpileupSample[] toExamine = new MpileupSample[al.size()];
 		al.toArray(toExamine);
 		return toExamine;
