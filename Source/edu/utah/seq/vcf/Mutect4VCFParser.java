@@ -184,7 +184,7 @@ public class Mutect4VCFParser {
 				t[2] = "Mutect_"+numPass;
 				
 				//seq qual
-				t[5] = Num.formatNumber(vcf.getQuality(), 2);
+				t[5] = new Float(vcf.getQuality()).toString();
 				
 				out.println(Misc.stringArrayToString(t, "\t"));
 			}
