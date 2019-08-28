@@ -55,6 +55,7 @@ public class GatkCalledSegmentAnnotator {
 			
 			saveSegResults();
 			saveSpreadsheetResults();
+			saveFilteredBedResults();
 			
 
 			
@@ -106,7 +107,7 @@ public class GatkCalledSegmentAnnotator {
 		out.close();
 
 		
-		IO.pl("Num Pass: "+numPass+"\tFail: "+numFail);
+		IO.pl("\nNumber Passing: "+numPass+"\tFailing: "+numFail);
 	}
 	
 	private void saveSpreadsheetResults() throws IOException {
@@ -122,6 +123,25 @@ public class GatkCalledSegmentAnnotator {
 			if (Math.abs(gs.getLgMeanTNRatios()) >= minCopyRatioMeanTNRatios && Math.abs(gs.getLogMeanNormalCopyRatios()) <= maxAbsLg2NormalCopyRatio && Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) passThres = true;
 			else passThres = false;
 			out.println(gs.toSpreadSheet(passThres));
+		}
+		out.close();
+	}
+	
+	private void saveFilteredBedResults() throws IOException {
+		File pass = new File(resultsDirectory, segFile.getName()+".pass.bed");
+		PrintWriter out = new PrintWriter( new FileWriter( pass));
+		
+		out.println("#Chr Start Stop Info Lg2(meanTumCRs/meanNormCRs) Call");
+		out.println("##Info numOb = number of copy ratio observations, typically exons");
+		out.println("##Info lg2Tum = log2 of mean tumor copy ratio observations");
+		out.println("##Info lg2Norm = log2 of mean normal copy ratio observations");
+		out.println("##Info genes = affected genes");
+		out.println("##Call + for amplification, - for loss");
+
+		for (GatkSegment gs : gatkSegments) {
+			if (Math.abs(gs.getLgMeanTNRatios()) >= minCopyRatioMeanTNRatios && Math.abs(gs.getLogMeanNormalCopyRatios()) <= maxAbsLg2NormalCopyRatio && Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) {
+				out.println(gs.toBed());
+			}
 		}
 		out.close();
 	}
@@ -355,7 +375,7 @@ public class GatkCalledSegmentAnnotator {
 		
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                      Gatk Called Segment Annotator: December 2018                **\n" +
+				"**                      Gatk Called Segment Annotator: August 2019                  **\n" +
 				"**************************************************************************************\n" +
 				"Annotates GATKs CallCopyRatioSegments output with denoised copy ratio and heterozygous\n"+
 				"allele frequency data from the tumor and matched normal samples. Enables filtering\n"+

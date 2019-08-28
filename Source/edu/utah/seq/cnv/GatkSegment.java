@@ -119,6 +119,24 @@ public class GatkSegment implements Comparable<GatkSegment>{
 		return sb.toString();
 	}
 	
+	public String toBed(){
+		StringBuilder sb = new StringBuilder();
+		sb.append(chr); sb.append("\t");
+		sb.append(start); sb.append("\t");
+		sb.append(end); sb.append("\t");
+		//name
+		sb.append("numOb="); sb.append(numPoints);
+		sb.append(";lg2Tum="); sb.append(f(logMeanTumorCopyRatios));
+		sb.append(";lg2Norm="); sb.append(f(logMeanNormalCopyRatios));
+		sb.append(";genes="); sb.append(bedRegion.getName().trim());
+		sb.append("\t");
+		//score
+		sb.append(f(lgMeanTNRatios)); sb.append("\t");
+		//call
+		sb.append(call); sb.append("\t");
+		return sb.toString();
+	}
+	
 	public String f(double num){
 		return Num.formatNumber(num, 4);
 	}
