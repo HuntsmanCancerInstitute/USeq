@@ -5,12 +5,10 @@ import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.utah.seq.query.QueryIndexFileLoader;
-import edu.utah.seq.vcf.VCFBackgroundChecker;
+import edu.utah.seq.vcf.VCFBkzDepreciated;
 import htsjdk.tribble.readers.TabixReader;
 import util.gen.IO;
 import util.gen.Misc;
@@ -21,7 +19,7 @@ public class MpileupTabixLoader implements Runnable{
 
 	//fields
 	private boolean failed = false;
-	private VCFBackgroundChecker vbc;
+	private VCFBkzDepreciated vbc;
 	private TabixReader tabixReader = null;
 	private ArrayList<String> vcfLines = new ArrayList<String>();
 	private ArrayList<String> modVcfRecords = new ArrayList<String>();
@@ -36,9 +34,11 @@ public class MpileupTabixLoader implements Runnable{
 	private boolean replaceQualScore;
 	private int numNotScored = 0;
 	private int numFailingZscore = 0;
+	private int numWithBKAF = 0;
 	private boolean verbose;
 	private int bpPad = 0;
 	private int[] sampleIndexesToUse = null;
+	private boolean excludeBKAFs = false;
 	
 	//internal
 	public Pattern AF = null;
@@ -48,7 +48,7 @@ public class MpileupTabixLoader implements Runnable{
 
 	
 
-	public MpileupTabixLoader (File mpileupFile, VCFBackgroundChecker vbc) throws IOException{
+	public MpileupTabixLoader (File mpileupFile, VCFBkzDepreciated vbc) throws IOException{
 		this.vbc = vbc;
 		minBaseQuality = vbc.getMinBaseQuality();
 		minReadCoverage = vbc.getMinReadCoverage();
@@ -62,6 +62,7 @@ public class MpileupTabixLoader implements Runnable{
 		fourDecimalMax.setMaximumFractionDigits(4);
 		bpPad = vbc.getBpPad();
 		sampleIndexesToUse = vbc.getSampleIndexesToUse();
+		excludeBKAFs = vbc.isExcludeBKAFs();
 		//Set patterns
 		AF = Pattern.compile( vbc.getAFInfoName()+"=([\\d\\.]+)");
 		DP = Pattern.compile( vbc.getDPInfoName()+"=([\\d\\.]+)");
@@ -82,10 +83,11 @@ public class MpileupTabixLoader implements Runnable{
 				baseCounts.clear();
 			}
 			//update
-			vbc.update(numNotScored, numFailingZscore, tooFewSamples);
+			vbc.update(numNotScored, numFailingZscore, tooFewSamples, numWithBKAF);
 			//reset
 			numNotScored = 0;
 			numFailingZscore = 0;
+			numWithBKAF = 0;
 			tooFewSamples.clear();
 		} catch (Exception e) {
 			failed = true;
@@ -165,8 +167,8 @@ public class MpileupTabixLoader implements Runnable{
 			//calculate zscore
 			double[] meanStd = calcMeanStdev(toExamine);			
 			double zscore = (freq-meanStd[0])/meanStd[1];
-			if (Double.isInfinite(zscore)) zscore = VCFBackgroundChecker.zscoreForInfinity;
-			if (zscore < VCFBackgroundChecker.zscoreLessThanZero) zscore = VCFBackgroundChecker.zscoreLessThanZero;
+			if (Double.isInfinite(zscore)) zscore = VCFBkzDepreciated.zscoreForInfinity;
+			if (zscore < VCFBkzDepreciated.zscoreLessThanZero) zscore = VCFBkzDepreciated.zscoreLessThanZero;
 			
 			
 			if (zscore < minZScore) {
@@ -188,31 +190,41 @@ public class MpileupTabixLoader implements Runnable{
 			double[] bkgAFs = fetchSortedAFs(minZScoreSamples);
 			
 			//was a background AF >= tum AF seen?
-			if ((0.9*freq <= bkgAFs[bkgAFs.length-1])) fields[6] = modifyFilterField(fields[6]);
+			boolean bkafFound = (freq <= bkgAFs[bkgAFs.length-1]);
 			
-			//fetch AFs
-			String bkafString = fetchFormattedAFs(bkgAFs);
-			String bkzString = Num.formatNumberNoComma(minZScore, 2);
-			fields[7] = "BKZ="+bkzString+";BKAF="+bkafString+";"+fields[7];
-			
-			if (replaceQualScore) fields[5] = bkzString;
-			String modRecord = Misc.stringArrayToString(fields, "\t");
-			
-			//build counts for R, first is the tumor sample, the latter are the normals
-			int[][] counts = fetchCountsForR(minZScoreSamples, numNonRef, depth);
-			
-			//threshold it?
-			if (minimumZScore == 0) {
-				modVcfRecords.add(modRecord);
-				baseCounts.add(counts);
+			if (bkafFound && excludeBKAFs) {
+				numWithBKAF++;
 			}
 			else {
-				if (minZScore < minimumZScore) numFailingZscore++;
-				else {
+				if (bkafFound) fields[6] = modifyFilterField(fields[6]);
+				
+				//fetch AFs
+				String bkafString = fetchFormattedAFs(bkgAFs);
+				String bkzString = Num.formatNumberNoComma(minZScore, 2);
+				fields[7] = "BKZ="+bkzString+";BKAF="+bkafString+";"+fields[7];
+				
+				if (replaceQualScore) fields[5] = bkzString;
+				String modRecord = Misc.stringArrayToString(fields, "\t");
+				
+				//build counts for R, first is the tumor sample, the latter are the normals
+				int[][] counts = fetchCountsForR(minZScoreSamples, numNonRef, depth);
+				
+				//threshold it?
+				if (minimumZScore == 0) {
 					modVcfRecords.add(modRecord);
 					baseCounts.add(counts);
 				}
+				else {
+					if (minZScore < minimumZScore) numFailingZscore++;
+					else {
+						modVcfRecords.add(modRecord);
+						baseCounts.add(counts);
+					}
+				}
 			}
+			
+			
+			
 		}	
 	}
 	
@@ -270,7 +282,7 @@ public class MpileupTabixLoader implements Runnable{
 		double[] d = new double[samples.length];
 		double mean = 0;
 		for (int i=0; i< samples.length; i++) {
-			d[i] = samples[i].getAlleleFreqNonRefPlusIndels();
+			d[i] = samples[i].getAlleleFreqNonRefPlusIndels();			
 			mean += d[i];
 		}
 		mean = mean/(double)samples.length;

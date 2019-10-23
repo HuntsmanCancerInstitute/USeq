@@ -12,6 +12,7 @@ public class SamLayoutForMutation{
 	private char[] call;
 	private int[] pos;
 	private SamAlignment sam;
+	private static final int BASE_QUAL_DELETION = 30;
 
 	public SamLayoutForMutation(SamAlignment sam){
 		this.sam = sam;
@@ -125,7 +126,7 @@ public class SamLayoutForMutation{
 				//layout Ds, deletion in the read
 				for (int i = 0; i< numberBases; i++){
 					seq[layoutIndex] = 'D';
-					qual[layoutIndex] = -1;
+					qual[layoutIndex] = BASE_QUAL_DELETION;
 					call[layoutIndex] = 'D';
 					pos[layoutIndex] = position;
 					position++;

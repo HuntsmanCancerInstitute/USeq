@@ -3,6 +3,7 @@ package edu.utah.seq.parsers.mpileup;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import util.bio.seq.Seq;
+import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
@@ -85,18 +86,24 @@ public class MpileupSample {
 	}
 	
 	public void debug(){
-		System.out.println("LN: "+record.getLine());
-		System.out.println("BS: "+baseSymbols);
-		System.out.println("MC: "+new String(maskedBaseCalls));
-		System.out.println("QS: "+qualitySymbols);
-		System.out.print("QV: "); Misc.printArray(Seq.convertSangerQualityScores(qualitySymbols));
-		System.out.println("INS: "+insertions);
-		System.out.println("DEL: "+deletions);
-		System.out.println("PQ: "+poorQualBases);
-		System.out.print("F: " ); Misc.printArray(forwardGATC);
-		System.out.print("R: " ); Misc.printArray(reverseGATC);
+		System.out.println(toString());
+	}
+	
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("LN: "+record.getLine());
+		sb.append("\nBS: "+baseSymbols);
+		sb.append("\nMC: "+new String(maskedBaseCalls));
+		sb.append("\nQS: "+qualitySymbols);
+		sb.append("\nQV: "); sb.append(Num.intArrayToString(Seq.convertSangerQualityScores(qualitySymbols), ","));
+		sb.append("\nINS: "+insertions);
+		sb.append("\nDEL: "+deletions);
+		sb.append("\nPQ: "+poorQualBases);
+		sb.append("\nF: " ); sb.append(Num.intArrayToString(forwardGATC, ","));
+		sb.append("\nR: " ); sb.append(Num.intArrayToString(reverseGATC, ","));
 		int total = deletions +poorQualBases+ readCoverageForwardBases + readCoverageReverseBases;
-		System.out.println("TOT: "+total +" from rec "+mpileupReadCount);
+		sb.append("\nTOT: "+total +" from rec "+mpileupReadCount);
+		return sb.toString();
 	}
 	
 	public void printMinInfo(){
@@ -106,10 +113,13 @@ public class MpileupSample {
 	
 	
 	public void scanBases(char[] bases){
+		
 		//fetch qualities
 		int[] qualScores = Seq.convertSangerQualityScores(qualitySymbols);
-		
+
 		int qsIndex = 0;
+		try {
+
 		for (int i=0; i< bases.length; i++){
 			switch (bases[i]){
 			case 'M': break; 
@@ -127,11 +137,17 @@ public class MpileupSample {
 			default: Misc.printErrAndExit("\nProblem, unknown base symbol! " + bases[i] +" in "+ record.getLine());
 			}
 		}
+		} catch (Exception e) {
+			e.printStackTrace();
+			debug();
+			System.exit(0);
+		}
+		
 		//check lengths, if masked its ok
 		if ((qualScores.length) != qsIndex) {
 			//debug();
 			//System.err.println("Quality score to masked base mismatch! "+qsIndex+" vs "+qualScores.length+" "+record.getLine()+"\n");
-			pass = false;
+			pass = false;	
 			return;
 		}
 		//compare with record
@@ -197,6 +213,10 @@ public class MpileupSample {
 	public double getAlleleFreqNonRefPlusIndels(){
 		double nonRefCounts = getNonRefBaseCounts()+ insertions + deletions;
 		return nonRefCounts/((double)(readCoverageAll));
+	}
+	
+	public double getAlleleFreqNs(){
+		return (double) poorQualBases/((double)(readCoverageAll + poorQualBases));
 	}
 	
 	/**Returns the forward + reverse base counts for the provided index.*/
@@ -348,6 +368,10 @@ public class MpileupSample {
 
 	public int getDeletions() {
 		return deletions;
+	}
+
+	public int getPoorQualBases() {
+		return poorQualBases;
 	}
 
 

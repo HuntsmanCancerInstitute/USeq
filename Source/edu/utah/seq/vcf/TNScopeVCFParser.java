@@ -24,11 +24,9 @@ public class TNScopeVCFParser {
 	private double minimumTNRatio = 0;
 	private double maximumNormalAltFraction = 1;
 	private double minimumTumorAltFraction = 0;
-	private boolean excludeNonPass = false;
 	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
 	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
-	private Pattern tLod = Pattern.compile(".+;TLOD=([\\d\\.]+).+"); 
-	private Pattern dp = Pattern.compile("DP=\\d+;");
+	private String[] filters = null;
 	private File saveDirectory = null;
 	
 	public TNScopeVCFParser (String[] args) {
@@ -44,8 +42,8 @@ public class TNScopeVCFParser {
 		System.out.println(maximumNormalAltFraction+"\tMax N allelic fraction");
 		System.out.println(minimumTumorAltFraction+"\tMin T allelic fraction");
 		System.out.println(minQual+"\tMin QUAL score");
-		System.out.println(excludeNonPass+"\tRemove non PASS FILTER field records.");
 		System.out.println(saveDirectory+"\tSave directory.");
+		if (filters != null) System.out.println(Misc.stringArrayToString(filters, ", ") +"\t Exclusion FILTERs");
 		
 		System.out.println("\nName\tPassing\tFailing");
 		for (File vcf: vcfFiles){
@@ -62,14 +60,17 @@ public class TNScopeVCFParser {
 				VCFSample[] tumorNormal = r.getSample();
 				if (tumorNormal.length !=2) Misc.printErrAndExit("\nLooks like there aren't two samples present in this VCF, aborting.\n");
 				
-				//check PASS?
-				if (excludeNonPass){
-					if (r.getFilter().toLowerCase().contains("pass") == false){
-						r.setFilter(VCFRecord.FAIL);
-						continue;
+				//check filters?
+				if (filters != null){
+					for (String f: filters) {
+						if (r.getFilter().contains(f)) {
+							r.setFilter(VCFRecord.FAIL);
+							break;
+						}
+						
 					}
 				}
-				
+				if (r.getFilter().equals(VCFRecord.FAIL)) continue;
 				r.setFilter(VCFRecord.PASS);
 
 				//check QUAL			
@@ -223,7 +224,7 @@ public class TNScopeVCFParser {
 					case 'a': minimumAltReadDepth = Integer.parseInt(args[++i]); break;
 					case 'r': minimumTNRatio = Double.parseDouble(args[++i]); break;
 					case 'l': minQual = Double.parseDouble(args[++i]); break;
-					case 'p': excludeNonPass = true; break;
+					case 'p': filters = Misc.COMMA.split(args[++i]); break;
 					case 'f': saveDirectory = new File(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -267,11 +268,12 @@ public class TNScopeVCFParser {
 				"-d Minimum T-N AF difference, defaults to 0.\n"+
 				"-r Minimum T/N AF ratio, defaults to 0.\n"+
 				"-t Minimum QUAL score, defaults to 0.\n"+
-				"-p Remove non PASS filter field records.\n"+
+				"-p Comma delimited list of FILTER keys to fail records.\n"+
 				
 
 				"\nExample: java -jar pathToUSeq/Apps/TNScopeVCFParser -v /VCFFiles/ -n 0.5 -u 100\n"+
-				"        -o 20 -d 0.05 -r 2 -a 3 -t 50 \n\n"+
+				"        -o 20 -d 0.05 -r 2 -a 3 -t 50 -p \n"+
+				"alt_allele_in_normal,triallelic_site,multi_event_alt_allele_in_normal,str_contraction \n\n"+
 
 
 				"**************************************************************************************\n");

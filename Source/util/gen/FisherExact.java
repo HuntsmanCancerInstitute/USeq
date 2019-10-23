@@ -205,9 +205,9 @@ public class FisherExact {
     public static void main(String[] args) {
 
         int[][] argInts = new int[15][4];
-        argInts[0] = new int[]{2, 3, 6, 4};
-        argInts[1] = new int[]{2, 1, 3, 0};
-        argInts[2] = new int[]{3, 0, 2, 1};
+        argInts[0] = new int[]{3011, 30, 2020, 20};
+        argInts[1] = new int[]{3011, 30, 2020, 5};
+        argInts[2] = new int[]{3011, 30, 2020, 60};
         argInts[3] = new int[]{1, 2, 0, 3};
         argInts[4] = new int[]{3, 1, 1, 3};
         argInts[5] = new int[]{1, 3, 3, 1};
@@ -221,7 +221,7 @@ public class FisherExact {
         argInts[13] = new int[]{8, 3, 3, 3};
         argInts[14] = new int[]{7, 4, 4, 2};
 
-        FisherExact fe = new FisherExact(500);
+        FisherExact fe = new FisherExact(6000);
 
         for (int i = 0; i < argInts.length; i++) {
             System.out.println("\na=" + argInts[i][0] + " b=" + argInts[i][1] + " c=" + argInts[i][2] + " d=" + argInts[i][3]);

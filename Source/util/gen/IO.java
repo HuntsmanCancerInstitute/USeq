@@ -2606,4 +2606,15 @@ public class IO {
 		return gigabytes;
 	}
 
+	/**Return's path or null, traps error, prints stacktrace.*/
+	public static String getCanonicalPath(File saveDir) {
+		// TODO Auto-generated method stub
+		try {
+			return saveDir.getCanonicalPath();
+		} catch (IOException e) {
+			e.printStackTrace();
+			return null;
+		}
+	}
+
 }

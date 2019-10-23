@@ -370,11 +370,22 @@ public class TNSample {
 
 	private void copyRatioAnalysis() throws IOException {
 		if (tnRunner.getCopyRatioDocs() == null) return;
+		info.add("Checking copy ratio calling...");	
+		
+		//look for germline vcf
+		if (germlineVcf == null) {
+			File vcf = new File (rootDir, "GermlineVariantCalling/"+id+"_NormalDNA/"+id+"_NormalDNA_Hg38_JointGenotyped.vcf.gz");
+			if (vcf.exists() == false) {
+				info.add("\tNo germline vcf.");
+				return;
+			};
+			germlineVcf = new File[]{vcf, new File(rootDir, "GermlineVariantCalling/"+id+"_NormalDNA/"+id+"_NormalDNA_Hg38_JointGenotyped.vcf.gz.tbi") };
+		}
 
-		//look for genotyped vcf
-		if (germlineVcf == null || tumorDNABamBedGvcf == null || normalDNABamBedGvcf == null) return;
+		//look for tumor normal alignments
+		if (tumorDNABamBedGvcf == null || normalDNABamBedGvcf == null) return;
 
-		info.add("Checking copy ratio calling...");		
+			
 
 		//make dir, ok if it already exists
 		File jobDir = new File (rootDir, "CopyAnalysis/"+id+"_GATKCopyRatio");
