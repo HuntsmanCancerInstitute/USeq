@@ -208,7 +208,7 @@ public class SimpleSomaticCaller {
 
 
 	private void addHeader(Gzipper out) throws IOException {
-		out.println("##SimpleSomaticCaller "+userArgs);
+		out.println("##SimpleSomaticCaller= "+userArgs);
 		out.println(afInfo);
 		out.println(dpInfo);
 		out.println(nafInfo);
