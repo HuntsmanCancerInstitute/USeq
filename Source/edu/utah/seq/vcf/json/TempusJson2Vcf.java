@@ -95,6 +95,8 @@ public class TempusJson2Vcf {
 
 			doWork();
 			
+			
+			
 			printStats();
 
 			//finish and calc run time

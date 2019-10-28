@@ -9,6 +9,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import htsjdk.samtools.reference.IndexedFastaSequenceFile;
 import util.bio.annotation.Bed;
+import util.gen.IO;
 import util.gen.Json;
 import util.gen.Misc;
 
@@ -103,9 +104,12 @@ public class TempusResults {
 		}
 		//any inheritedIncidentalFindings
 		if (results.has("inheritedIncidentalFindings")) {
-			JSONArray ja = results.getJSONArray("inheritedIncidentalFindings");
-			for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedIncidentalFinding", null, ja.getJSONObject(i), tempusJson2Vcf) );
-			tempusJson2Vcf.setWorkingNumInheritedIncidentalFindings(ja.length());
+			//need to silently trap a potential json issue with Tempus doc, their inserting a string instead of an object array when the patient elects to receive no germline info
+			try {
+				JSONArray ja = results.getJSONArray("inheritedIncidentalFindings");
+				for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedIncidentalFinding", null, ja.getJSONObject(i), tempusJson2Vcf) );
+				tempusJson2Vcf.setWorkingNumInheritedIncidentalFindings(ja.length());
+			} catch (JSONException e) {}
 		}
 		//any inheritedVariantsOfUnknownSignificance
 		if (results.has("inheritedVariantsOfUnknownSignificance")) {
