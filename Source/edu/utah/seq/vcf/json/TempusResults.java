@@ -19,6 +19,7 @@ public class TempusResults {
 	private Double tumorMutationBurdenPercentile = null;
 	private String msiStatus = null;
 	private ArrayList<TempusVariant> variants = new ArrayList<TempusVariant>();
+	private TempusJson2Vcf tempusJson2Vcf = null;
 	
 	/*
     "results": {
@@ -44,6 +45,7 @@ public class TempusResults {
     },
 	 */
 	public TempusResults(JSONObject object, TempusJson2Vcf tempusJson2Vcf) throws JSONException, IOException {
+		this.tempusJson2Vcf = tempusJson2Vcf;
 		JSONObject results = object.getJSONObject("results");
 		//messy tempus json output for tumorMutationBurden stuff
 		String tmb = Json.forceGetString(results, "tumorMutationalBurden");
@@ -96,27 +98,62 @@ public class TempusResults {
 			tempusJson2Vcf.setWorkingNumFusionVariants(ja.length());
 			*/
 		}
-		//any inheritedRelevantVariants
-		if (results.has("inheritedRelevantVariants")) {
-			JSONArray ja = results.getJSONArray("inheritedRelevantVariants");
-			for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedRelevantVariant", null, ja.getJSONObject(i), tempusJson2Vcf) );
-			tempusJson2Vcf.setWorkingNumInheritedRelevantVariants(ja.length());
+		
+		//OK change with 1.3.1, Tempus is providing objects instead of arrays for the inherited germline info
+		//1.3
+		if (tempusJson2Vcf.getJsonSchema().equals("1.3")) {
+			//any inheritedRelevantVariants
+			if (results.has("inheritedRelevantVariants")) {
+					JSONArray ja = results.getJSONArray("inheritedRelevantVariants");
+					for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedRelevantVariant", null, ja.getJSONObject(i), tempusJson2Vcf) );
+					tempusJson2Vcf.setWorkingNumInheritedRelevantVariants(ja.length());
+			}
+			//any inheritedIncidentalFindings
+			if (results.has("inheritedIncidentalFindings")) {
+				//need to silently trap a potential json issue with Tempus doc, their inserting a string instead of an object array
+				try {
+					JSONArray ja = results.getJSONArray("inheritedIncidentalFindings");
+					for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedIncidentalFinding", null, ja.getJSONObject(i), tempusJson2Vcf) );
+					tempusJson2Vcf.setWorkingNumInheritedIncidentalFindings(ja.length());
+				} catch (JSONException e) {}
+			}
+			//any inheritedVariantsOfUnknownSignificance
+			if (results.has("inheritedVariantsOfUnknownSignificance")) {
+				JSONArray ja = results.getJSONArray("inheritedVariantsOfUnknownSignificance");
+				for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedVariantsOfUnknownSignificance", null, ja.getJSONObject(i), tempusJson2Vcf) );
+				tempusJson2Vcf.setWorkingNumInheritedVariantsOfUnknownSignificance(ja.length());
+			}
 		}
-		//any inheritedIncidentalFindings
-		if (results.has("inheritedIncidentalFindings")) {
-			//need to silently trap a potential json issue with Tempus doc, their inserting a string instead of an object array when the patient elects to receive no germline info
-			try {
-				JSONArray ja = results.getJSONArray("inheritedIncidentalFindings");
+		//headache, none of the 1/2 dozen reports we have provide any of the following variants in 1.3.1!  So don't know what else they've done in the new schema! Frack!
+		else if (tempusJson2Vcf.getJsonSchema().equals("1.3.1")) {
+			//any inheritedRelevantVariants
+			if (results.has("inheritedRelevantVariants")) {
+				//1.3.1 this is a json object with a note and values
+				JSONObject jo = results.getJSONObject("inheritedRelevantVariants");
+				JSONArray ja = jo.getJSONArray("values");
+				for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedRelevantVariant", null, ja.getJSONObject(i), tempusJson2Vcf) );
+				tempusJson2Vcf.setWorkingNumInheritedRelevantVariants(ja.length());
+				
+			}
+			//any inheritedIncidentalFindings
+			if (results.has("inheritedIncidentalFindings")) {
+				//1.3.1 this is a json object with a note and values
+				JSONObject jo = results.getJSONObject("inheritedIncidentalFindings");
+				JSONArray ja = jo.getJSONArray("values");
 				for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedIncidentalFinding", null, ja.getJSONObject(i), tempusJson2Vcf) );
 				tempusJson2Vcf.setWorkingNumInheritedIncidentalFindings(ja.length());
-			} catch (JSONException e) {}
+				
+			}
+			//any inheritedVariantsOfUnknownSignificance
+			if (results.has("inheritedVariantsOfUnknownSignificance")) {
+				//1.3.1 this is a json object with a note and values
+				JSONObject jo = results.getJSONObject("inheritedVariantsOfUnknownSignificance");
+				JSONArray ja = jo.getJSONArray("values");			
+				for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedVariantsOfUnknownSignificance", null, ja.getJSONObject(i), tempusJson2Vcf) );
+				tempusJson2Vcf.setWorkingNumInheritedVariantsOfUnknownSignificance(ja.length());
+			}
 		}
-		//any inheritedVariantsOfUnknownSignificance
-		if (results.has("inheritedVariantsOfUnknownSignificance")) {
-			JSONArray ja = results.getJSONArray("inheritedVariantsOfUnknownSignificance");
-			for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedVariantsOfUnknownSignificance", null, ja.getJSONObject(i), tempusJson2Vcf) );
-			tempusJson2Vcf.setWorkingNumInheritedVariantsOfUnknownSignificance(ja.length());
-		}
+		
 		
 		//cnvs processing
 		addCoordinatesToCNVs(tempusJson2Vcf.getCnvGeneNameBed(), tempusJson2Vcf.getFasta());

@@ -19,12 +19,13 @@ public class TempusJson2Vcf {
 	private File[] jsonFiles = null;
 	private File indexedFasta = null;
 	private File saveDirectory = null;
-	private String acceptedSchema = "1.3";
 	
 	//internal fields
+	private String[] acceptedSchema = {"1.3", "1.3.1"};
 	private IndexedFastaSequenceFile fasta = null;
 	private String source = null;
 	private HashMap<String, Bed> cnvGeneNameBed = null;
+	private String jsonSchema = null;
 	
 	//counters across all datasets
 	TreeMap<String, Integer> bioInfPipelines = new TreeMap<String, Integer>();
@@ -94,9 +95,7 @@ public class TempusJson2Vcf {
 			processArgs(args);
 
 			doWork();
-			
-			
-			
+
 			printStats();
 
 			//finish and calc run time
@@ -242,13 +241,15 @@ public class TempusJson2Vcf {
 		workingReport.addMetaData(meta);
 		workingPatient.addMetaData(meta);
 		workingOrder.addMetaData(meta);
-		for (int i=0; i<workingSpecimens.length; i++)workingSpecimens[i].addMetaData(meta, i);
+		for (int i=0; i<workingSpecimens.length; i++) workingSpecimens[i].addMetaData(meta, i);
 		workingResults.addMetaData(meta);
 		for (TempusVariant tv: workingResults.getVariants()) {
 			if (tv.getReferenceGenome() != null) meta.put("referenceGenome", tv.getReferenceGenome());
 		}
 		for (String key: meta.keySet()){
-			String value = meta.get(key).trim();
+			String value = meta.get(key);
+			if (value == null) continue;
+			value = value.trim();
 			sb.append("##");
 			sb.append(key);
 			//any whitespace?
@@ -290,9 +291,7 @@ public class TempusJson2Vcf {
 	        JSONObject object = new JSONObject(jString);
 	        
 	        //schema
-	        JSONObject meta = object.getJSONObject("metadata");
-	        String jsonSchema = Json.getStringAttribute(meta, "schemaVersion");
-	        if (jsonSchema == null || jsonSchema.equals(acceptedSchema) == false) Misc.printErrAndExit("\nIncorrect schema! Aborting. Only works with "+ acceptedSchema+" found "+jsonSchema);
+	        checkSchema(object);
 	        
 	        //report
 	        workingReport = new TempusReport(object, this);
@@ -318,6 +317,22 @@ public class TempusJson2Vcf {
 		}
 	}	
 	
+	private void checkSchema(JSONObject object) {
+        JSONObject meta = object.getJSONObject("metadata");
+        jsonSchema = Json.getStringAttribute(meta, "schemaVersion");
+        if (jsonSchema == null) Misc.printErrAndExit("\nIncorrect schema! Aborting. Only works with "+ Misc.stringArrayToString(acceptedSchema, ", ")+" found "+jsonSchema);
+        boolean OK = false;
+        for (String s: acceptedSchema) {
+        	if (jsonSchema.equals(s)) {
+        		OK = true;
+        		break;
+        	}
+        }
+        if (OK == false) Misc.printErrAndExit("\nIncorrect schema! Aborting. Only works with "+ Misc.stringArrayToString(acceptedSchema, ", ")+" found "+jsonSchema);
+
+		
+	}
+
 	private void checkRefSeqs() throws Exception {
 		for (TempusVariant tv: workingResults.getVariants()) {
 			if (tv.getRef()!=null && tv.getChromosome()!=null && tv.getPos()!=null) {
@@ -454,7 +469,7 @@ public class TempusJson2Vcf {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Tempus Json 2 Vcf: March 2019                        **\n" +
+				"**                           Tempus Json 2 Vcf: October 2019                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses json Tempus reports to vcf. Leave in PHI to enable calculating age at\n"+
 				"diagnosis. Summary statistics calculated for all reports. Vcfs will contain a mix of \n"+
@@ -538,6 +553,10 @@ public class TempusJson2Vcf {
 
 	public IndexedFastaSequenceFile getFasta() {
 		return fasta;
+	}
+
+	public String getJsonSchema() {
+		return jsonSchema;
 	}
 	
 }

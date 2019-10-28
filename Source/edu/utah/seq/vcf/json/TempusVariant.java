@@ -7,6 +7,7 @@ import org.json.JSONObject;
 import htsjdk.samtools.reference.IndexedFastaSequenceFile;
 import htsjdk.samtools.reference.ReferenceSequence;
 import util.bio.annotation.Bed;
+import util.gen.IO;
 import util.gen.Json;
 import util.gen.Misc;
 import util.gen.Num;
@@ -84,10 +85,12 @@ public class TempusVariant{
 		//set coordinates from nucleotideAlteration?
 		if (nucleotideAlteration != null){
 			String[] t = Misc.COLON.split(nucleotideAlteration);
-			chromosome = t[0];
-			pos = t[1];
-			ref = t[2];
-			alt = t[3];
+			if (t.length == 4 ) {
+				chromosome = t[0];
+				pos = t[1];
+				ref = t[2];
+				alt = t[3];
+			}
 		}
 		
 		//increment counters
