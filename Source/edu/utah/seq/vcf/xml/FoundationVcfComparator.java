@@ -40,8 +40,6 @@ public class FoundationVcfComparator {
 	private ArrayList<String> headerLines = new ArrayList<String>();
 	
 	
-	
-
 	//constructors
 	public FoundationVcfComparator(String[] args){
 		try {
@@ -324,12 +322,19 @@ public class FoundationVcfComparator {
 
 
 	private SimpleVcf[] load(File vcf, boolean excludeContig) {
+		HashSet<String> uniqueKeys = new HashSet<String>();
 		String[] lines = IO.loadFileIntoStringArray(vcf);
 		ArrayList<SimpleVcf> al = new ArrayList<SimpleVcf>();
 		for (String v: lines){
 			if (v.startsWith("#") == false) {
 				if (appendChr && v.startsWith("chr") == false) v = "chr"+v;
-				al.add(new SimpleVcf(v, bpPaddingForOverlap));
+				SimpleVcf sv = new SimpleVcf(v, bpPaddingForOverlap);
+				String key = sv.getChr()+sv.getPos()+sv.getRef()+"_"+sv.getAlt();
+				//must watch for duplicates in foundation data
+				if (uniqueKeys.contains(key) == false) {
+					uniqueKeys.add(key);
+					al.add(sv);
+				}
 			}
 			else {
 				if (excludeContig){
