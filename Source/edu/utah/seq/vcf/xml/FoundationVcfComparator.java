@@ -383,7 +383,7 @@ public class FoundationVcfComparator {
 		}
 
 		//check files
-		if (foundationVcf == null || recallVcf == null) Misc.printErrAndExit("\nError: cannot find both of your vcf files to compare?!\n");
+		if (foundationVcf == null || recallVcf == null || foundationVcf.canRead()== false || recallVcf.canRead()== false) Misc.printErrAndExit("\nError: cannot find both of your vcf files to compare?!\n");
 		if (mergedVcf == null) Misc.printErrAndExit("\nError: please provide a named file for writing the merged vcf!\n");
 
 
@@ -392,7 +392,7 @@ public class FoundationVcfComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Foundation Vcf Comparator: May 2019                    **\n" +
+				"**                           Foundation Vcf Comparator: Nov 2019                    **\n" +
 				"**************************************************************************************\n" +
 				"FVC compares a Foundation vcf generated with the FoundationXml2Vcf to a recalled vcf.\n"+
 				"Exact recall vars are so noted and removed. Foundation vcf with no exact but one\n"+
