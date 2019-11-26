@@ -726,7 +726,7 @@ chr1:137696787:137697038	26.28706518	-4.834058806	0.477129062	-10.1315539	4.00E-
 				"       directory that contains multiple biological replical PointData directories.\n" +
 				"-c Control replica PointData directories, ditto. \n" +
 				"-r Full path to 64bit R loaded with DESeq library, defaults to '/usr/bin/R' file, see\n" +
-				"       http://www-huber.embl.de/users/anders/DESeq/ . Type 'library(DESeq)' in\n" +
+				"       http://www-huber.embl.de/users/anders/DESeq/ . Type 'library(DESeq2)' in\n" +
 				"       an R terminal to see if it is installed.\n"+
 				"-p Peak shift, average distance between + and - strand peaks for chIP-Seq data, see\n" +
 				"       PeakShiftFinder or set it to 100bp. For RNA-Seq set it to 0. It will be used\n" +

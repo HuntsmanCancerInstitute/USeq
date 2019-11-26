@@ -25,6 +25,7 @@ public class TNRunner {
 	private File[] jointGenotypingDocs = null;
 	private File[] copyRatioDocs = null;
 	private File[] clinicalVcfDocs = null;
+	private File[] msiDocs = null;
 	private File maleBkg = null;
 	private File femaleBkg = null;
 	private boolean forceRestart = false;
@@ -335,6 +336,7 @@ public class TNRunner {
 			File copyRatioDocsDir = null;
 			File copyRatioBkgDir = null;
 			File clinicalVcfDir = null;
+			File msiWorkflowDir = null;
 			File otherDir = null;
 			for (int i = 0; i<args.length; i++){
 				String lcArg = args[i].toLowerCase();
@@ -349,6 +351,7 @@ public class TNRunner {
 						case 'c': somVarCallWorkflowDir = new File(args[++i]); break;
 						case 'a': annoWorkflowDir = new File(args[++i]); break;
 						case 'b': bamConWorkflowDir = new File(args[++i]); break;
+						case 'm': msiWorkflowDir = new File(args[++i]); break;
 						case 'j': jointGenoWorklfowDir = new File(args[++i]); break;
 						case 'y': copyRatioDocsDir = new File(args[++i]); break;
 						case 'k': copyRatioBkgDir = new File(args[++i]); break;
@@ -422,6 +425,12 @@ public class TNRunner {
 				jointGenotypingDocs = IO.extractFiles(jointGenoWorklfowDir);
 			}
 			
+			//msi
+			if (msiWorkflowDir != null){
+				if (msiWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing msi workflow docs? "+msiWorkflowDir);
+				msiDocs = IO.extractFiles(msiWorkflowDir);
+			}
+			
 			//clinical vcf merging workflow
 			if (clinicalVcfDir != null){
 				if (clinicalVcfDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing workflow docs for merging and comparing clinical test reports and vcfs? "+clinicalVcfDocs);
@@ -474,6 +483,7 @@ public class TNRunner {
 				IO.pl("Somatic variant workflow directory\t"+somVarCallWorkflowDir);
 				IO.pl("Variant annotation workflow directory\t"+annoWorkflowDir);
 				IO.pl("Bam concordance workflow directory\t"+bamConWorkflowDir);
+				IO.pl("MSI workflow directory\t"+msiWorkflowDir);
 				IO.pl("Joint genotyping workflow directory\t"+jointGenoWorklfowDir);
 				IO.pl("Copy ratio workflow directory\t"+copyRatioDocsDir);
 				IO.pl("Copy ratio background directory\t"+copyRatioBkgDir);
@@ -498,7 +508,7 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                  TNRunner : Oct 2019                             **\n" +
+				"**                                  TNRunner : Nov 2019                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several dockerized snakmake workflows on human tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, Hg38\n"+
@@ -538,10 +548,11 @@ public class TNRunner {
 				"-e Workflow docs for launching DNA alignments.\n"+
 				"-t Workflow docs for launching RNA alignments.\n"+
 				"-c Workflow docs for launching somatic variant calling.\n"+
+				"-m Workflow docs for launching MSI status calling.\n"+
 				"-a Workflow docs for launching variant annotation.\n"+
 				"-b Workflow docs for launching bam concordance.\n"+
 				"-j Workflow docs for launching joint genotyping.\n"+
-				"-y Workflow docs for launching copy analysis.\n"+
+				"-y Workflow docs for launching somatic copy analysis.\n"+
 				"-v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder to\n"+
 				"      each patient dir containing the json formatted clinical information.\n"+
 				"-g Germline AnnotatedVcfParser options, defaults to '-d 15 -m 0.2 -x 1 -p 0.01 -g \n"+
@@ -557,8 +568,8 @@ public class TNRunner {
 				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/\n"+
 				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+
 				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/\n"+
-				"     -y /Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l \n"+
-				"     -v /Hg38/Tempus/TempusVcf -l\n"+
+				"     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l \n"+
+				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l\n"+
 
 
 				"\n**************************************************************************************\n");
@@ -621,5 +632,9 @@ public class TNRunner {
 
 	public File[] getClinicalVcfDocs() {
 		return clinicalVcfDocs;
+	}
+
+	public File[] getMsiDocs() {
+		return msiDocs;
 	}
 }

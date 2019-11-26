@@ -474,7 +474,7 @@ public class TempusJson2Vcf {
 				"Parses json Tempus reports to vcf. Leave in PHI to enable calculating age at\n"+
 				"diagnosis. Summary statistics calculated for all reports. Vcfs will contain a mix of \n"+
 				"somatic and inherited snvs, indels, and cnvs. Be sure to vt normalize the exported\n"+
-				"vcfs, https://github.com/atks/vt \n"+
+				"vcfs, https://github.com/atks/vt . Works with schemas 1.3 and 1.3.1\n"+
 
 				"\nOptions:\n"+
 				"-j Path to Tempus json report or directory containing such, xxx.json(.gz/.zip OK)\n"+

@@ -202,7 +202,7 @@ public class VCFBkz {
 			if (record.length() == 0) continue;
 			if (record.startsWith("#")){
 				if (addInfo && record.startsWith("##INFO=")) {
-					vcfHeader.add("##FILTER=<ID=BKAF,Description=\"One or more background sample AFs are >= variant AF.\">");
+					vcfHeader.add("##FILTER=<ID=BKAF,Description=\"Two or more background sample AFs are >= variant AF.\">");
 					vcfHeader.add("##INFO=<ID=BKZ,Number=1,Type=Float,Description=\"Smallest AF z-score calculated from background AFs over effected bases. "
 							+ "Values < ~4 are suspicous, non reference observations are likely present in the background samples.\">");
 					vcfHeader.add("##INFO=<ID=BKAF,Number=1,Type=String,Description=\"Sorted list (largest to smallest) of background non-reference AFs used to calculate the BKZ.\">");					

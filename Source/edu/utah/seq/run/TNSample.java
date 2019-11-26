@@ -86,6 +86,9 @@ public class TNSample {
 
 		//copy ratio/ number
 		if (tnRunner.getCopyRatioDocs() != null) copyRatioAnalysis();
+		
+		//msi
+		if (tnRunner.getMsiDocs() != null) msiAnalysis();
 
 		//print messages?
 		if (failed || tnRunner.isVerbose()) {
@@ -367,6 +370,68 @@ public class TNSample {
 		}
 
 	}
+	
+	private void msiAnalysis() throws IOException {
+		
+		info.add("Checking MSI status analysis...");
+		
+		//look for tumor and normal bam files
+		if (tumorDNABamBedGvcf == null || normalDNABamBedGvcf == null) {
+			info.add("\t\tMissing one or both T/N alignment files.");
+			return;
+		}
+
+		//make dir, ok if it already exists
+		File jobDir = new File (rootDir,"SomaticVariantCalls/"+id+"_Msi");
+		jobDir.mkdirs();
+
+		//any files?
+		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+		if (nameFile.size() == 0) {
+			createMsiLinks(jobDir);
+			launch(jobDir, null, tnRunner.getMsiDocs());
+		}
+		//COMPLETE
+		else if (nameFile.containsKey("COMPLETE")){
+			//find the final txt results file
+			File[] res = IO.extractFiles(jobDir, "_Mantis.txt");
+			if (res == null || res.length !=1) {
+				clearAndFail(jobDir, "\tThe msi status calling was marked COMPLETE but failed to find the final xxx_Mantis.txt file in "+jobDir);
+				return;
+			}
+			//remove the linked fastq
+			removeMsiLinks(jobDir);
+			info.add("\t\tCOMPLETE "+jobDir);
+		}
+		else {
+			if (checkJob(nameFile,jobDir,null, tnRunner.getMsiDocs())){
+				createMsiLinks(jobDir);
+			}
+		}
+	}
+	
+	private void createMsiLinks(File jobDir) throws IOException {
+		//remove any linked bam and bed files
+		removeMsiLinks(jobDir);
+		//soft link in the new ones
+		Path tumorBam = tumorDNABamBedGvcf[0].toPath();
+		Path tumorBai = fetchBamIndex(tumorDNABamBedGvcf[0]).toPath();
+		Path normalBam = normalDNABamBedGvcf[0].toPath();
+		Path normalBai = fetchBamIndex(normalDNABamBedGvcf[0]).toPath();
+		//must have index as xxx.bam.bai, won't work as xxx.bai
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bam").toPath(), tumorBam);
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bam.bai").toPath(), tumorBai);
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.bam").toPath(), normalBam);
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.bam.bai").toPath(), normalBai);
+	}
+	
+	private void removeMsiLinks(File jobDir) throws IOException{
+		File f = jobDir.getCanonicalFile();
+		new File(f, "tumor.bam").delete();
+		new File(f, "tumor.bam.bai").delete();
+		new File(f, "normal.bam").delete();
+		new File(f, "normal.bam.bai").delete();
+	}
 
 	private void copyRatioAnalysis() throws IOException {
 		if (tnRunner.getCopyRatioDocs() == null) return;
@@ -617,6 +682,8 @@ public class TNSample {
 		Files.createSymbolicLink(new File(alignDir.getCanonicalFile(),"1.fastq.gz").toPath(), real1);
 		Files.createSymbolicLink(new File(alignDir.getCanonicalFile(),"2.fastq.gz").toPath(), real2);
 	}
+	
+
 
 	private void createSomaticVariantLinks(File jobDir) throws IOException {
 		//remove any linked bam and bed files

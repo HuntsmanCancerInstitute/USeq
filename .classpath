@@ -63,7 +63,6 @@
 	<classpathentry kind="lib" path="LibraryJars/com.fasterxml.jackson.annotations.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/httpclient-4.5.2.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/httpcore-4.4.4.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/joda-time-2.9.2.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/jsch-0.1.53.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/minimal-json-0.9.4.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/mongo-java-driver-2.14.2.jar"/>
@@ -71,5 +70,6 @@
 	<classpathentry kind="lib" path="LibraryJars/commons-codec-1.10.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/sqljdbc41.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/QueryAPI28Sept2018.jar"/>
+	<classpathentry kind="lib" path="LibraryJars/joda-time-2.10.1.jar"/>
 	<classpathentry kind="output" path="Classes"/>
 </classpath>

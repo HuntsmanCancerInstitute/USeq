@@ -457,7 +457,8 @@ public class SimpleSomaticCaller {
 				"Takes vcf output from Bcftools mpileup and norm applications (http://www.htslib.org)\n"+
 				"run on a paired tumor and normal bam file set and filters the variants for somatic\n"+
 				"calls. Select -z to print an example bash script. A one-tailed Fisher's Exact test is\n"+
-				"performed on each alt allele count to select somatic variants.\n"+
+				"performed on each alt allele count to select somatic variants. Vt normalization isn't\n"+
+				"needed for the output vcfs.\n"+
 
 				"\nRequired Params:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).\n" +
