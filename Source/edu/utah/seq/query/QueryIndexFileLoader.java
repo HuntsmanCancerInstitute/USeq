@@ -81,10 +81,14 @@ public class QueryIndexFileLoader implements Runnable {
 								") to match the chrom length ("+indexLength+") -> "+record);
 					}
 					toAdd.add(new IndexRegion(startStop[0], startStop[1], fileId));
-					if (toAdd.size() > numToLoad) queryIndexer.addRegions(toAdd);
+					if (toAdd.size() > numToLoad) {
+						queryIndexer.addRegions(toAdd);
+						toAdd.clear();
+					}
 				}
 				//add last
 				queryIndexer.addRegions(toAdd);
+				toAdd.clear();
 				queryIndexer.incrementPassFail(numPassed, numFailed);
 				reader.close();
 			}	

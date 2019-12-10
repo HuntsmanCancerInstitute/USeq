@@ -178,7 +178,6 @@ public class QueryIndexer {
 			if (workingIndex[sIndex] == null) workingIndex[sIndex] = new ArrayList<IndexRegion>();
 			workingIndex[sIndex].add(region);
 		}
-		regions.clear();
 	}
 
 	/**Gets a file to parse containing records that match a particular chr. Thread safe.*/
