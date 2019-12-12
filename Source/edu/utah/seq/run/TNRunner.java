@@ -43,8 +43,10 @@ public class TNRunner {
 	private int maxNumJobsToSubmit = 40;
 	private boolean loop = false;
 	private int numMinToSleep = 60;
+	private boolean niceJobs = false;
 
 	private String pathToTrim = null;
+	private String nice = "";
 
 	public TNRunner (String[] args) {
 		long startTime = System.currentTimeMillis();
@@ -85,7 +87,7 @@ public class TNRunner {
 	private void printSamplesWithFastqIssues() {
 		ArrayList<String> issues = new ArrayList<String>();
 		for (TNSample t: tNSamples){
-			if (t.isFastqIssue()) issues.add(t.getId());
+			if (t!= null && t.isFastqIssue()) issues.add(t.getId());
 		}
 		if (issues.size() != 0 && verbose) IO.pl("\nThe following have been skipped due to fastq file count issues: "+issues);
 	}
@@ -274,7 +276,7 @@ public class TNRunner {
 		//squeue the shell script
 		new File(jobDir, "QUEUED").createNewFile();
 		String alignDirPath = jobDir.getCanonicalPath();
-		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
+		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", nice, "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
 		if (verbose) for (String o: output) IO.pl("\t\t"+o);
 	}
 
@@ -360,6 +362,7 @@ public class TNRunner {
 						case 'u': minReadCoverageTumor = Integer.parseInt(args[++i]); break;
 						case 'n': minReadCoverageNormal = Integer.parseInt(args[++i]); break;
 						case 'x': maxNumJobsToSubmit = Integer.parseInt(args[++i]); break;
+						case 'i': niceJobs = true; break;
 						case 'q': verbose = false; break;
 						case 'f': forceRestart = true; break;
 						case 'l': loop = true; break;
@@ -475,6 +478,8 @@ public class TNRunner {
 				
 			}
 			
+			if (niceJobs) nice = "--nice=20";
+			
 			if (verbose){
 				IO.pl("Run parameters:");
 				IO.pl("Patient sample directory\t"+rootDirs[0].getParent());
@@ -497,6 +502,7 @@ public class TNRunner {
 				IO.pl("Force restart\t"+forceRestart);
 				IO.pl("Verbose logging\t"+verbose);
 				IO.pl("Max # jobs to launch\t"+maxNumJobsToSubmit);
+				IO.pl("Nice jobs\t"+niceJobs);
 				IO.pl("Relaunch jobs until complete\t"+loop);
 			}
 		} catch (IOException e) {
@@ -563,13 +569,14 @@ public class TNRunner {
 				"-f Force a restart of all running, queued, failed, and uncompleted jobs.\n"+
 				"-q Quite output.\n"+
 				"-x Maximum # jobs to launch, defaults to 40.\n"+
+				"-i Nice jobs, defaults to not.\n"+
 				"-l Check and launch jobs every hour until all are complete, defaults to launching once.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/\n"+
 				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+
 				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/\n"+
 				"     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l \n"+
-				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l\n"+
+				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l -i\n"+
 
 
 				"\n**************************************************************************************\n");

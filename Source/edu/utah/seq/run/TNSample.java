@@ -377,7 +377,7 @@ public class TNSample {
 		
 		//look for tumor and normal bam files
 		if (tumorDNABamBedGvcf == null || normalDNABamBedGvcf == null) {
-			info.add("\t\tMissing one or both T/N alignment files.");
+			info.add("\tMissing one or both T/N alignment files.");
 			return;
 		}
 
