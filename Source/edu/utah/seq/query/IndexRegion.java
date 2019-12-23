@@ -4,16 +4,16 @@ package edu.utah.seq.query;
 public class IndexRegion implements Comparable<IndexRegion> {
 	protected int start;
 	protected int stop;
-	protected int fileId;
+	protected Integer fileId;
 	
-	public IndexRegion(int start, int stop, int fileId){
+	public IndexRegion(int start, int stop, Integer fileId){
 		this.start = start;
 		this.stop = stop;
 		this.fileId = fileId;
 	}
 	
 	public String toString(){
-		return start+"-"+stop+"i"+fileId;
+		return start+"-"+stop+":"+fileId;
 	}
 	
 	/**Sorts by start base, then by stop, then fileId, smaller to larger for all.*/

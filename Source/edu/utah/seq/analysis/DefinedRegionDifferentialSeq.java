@@ -390,9 +390,7 @@ public class DefinedRegionDifferentialSeq {
 		//assumes each read (first or second) has the same name
 
 		//make reader
-		SAMFileReader reader = new SAMFileReader(replica.getBamFile());	
-		reader.setValidationStringency(ValidationStringency.SILENT);
-
+		SamReader reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(replica.getBamFile());
 
 		//fetch chromName: length for all chroms
 		HashMap<String, Integer> chromLength = new HashMap<String, Integer>();
@@ -428,7 +426,11 @@ public class DefinedRegionDifferentialSeq {
 		}
 		//any data found?
 		if (bpNames == null) {
-			reader.close();
+			try {
+				reader.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 			return;
 		} 
 
@@ -500,7 +502,11 @@ public class DefinedRegionDifferentialSeq {
 			else loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases);
 		}
 
-		reader.close();
+		try {
+			reader.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		bpNames = null;
 		iterator = null;
 		seqs = null;

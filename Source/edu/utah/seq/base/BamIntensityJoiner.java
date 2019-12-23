@@ -71,10 +71,10 @@ public class BamIntensityJoiner {
 	}
 	
 	public void makeIO(){
-		SAMFileReader.setDefaultValidationStringency(ValidationStringency.SILENT);
-		SAMFileReader alignmentReader = new SAMFileReader(alignmentFile);
+		SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+		SamReader alignmentReader = factory.open(alignmentFile);
 		alignmentInterator = alignmentReader.iterator();
-		SAMFileReader intensityReader = new SAMFileReader(intensityFile);
+		SamReader intensityReader = factory.open(intensityFile);
 		intensityInterator = intensityReader.iterator();
 		outputSam = new SAMFileWriterFactory().makeSAMOrBAMWriter(alignmentReader.getFileHeader(), true, resultsFile);
 	}

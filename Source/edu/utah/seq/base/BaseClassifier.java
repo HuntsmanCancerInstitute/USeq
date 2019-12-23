@@ -51,7 +51,7 @@ public class BaseClassifier {
 
 	private Bed[] variants;
 	private VariantAlignment[][] variantAlignments;
-	private SAMFileReader[] bamReaders;
+	private SamReader[] bamReaders;
 
 	private long numberModels = 0;
 	private long numReads = 0;
@@ -86,10 +86,10 @@ public class BaseClassifier {
 		variantAlignments = new VariantAlignment[variants.length][];
 
 		//make alignment readers
-		bamReaders = new SAMFileReader[bamFiles.length];
+		SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+		bamReaders = new SamReader[bamFiles.length];
 		for (int i=0; i< bamReaders.length; i++) {
-			bamReaders[i] = new SAMFileReader(bamFiles[i]);
-			bamReaders[i].enableIndexMemoryMapping(false);
+			bamReaders[i] = factory.open(bamFiles[i]);
 		}
 
 		//load alignments for variants
@@ -122,7 +122,11 @@ public class BaseClassifier {
 		writeBAM();
 
 		//close alignment readers
-		for (int i=0; i< bamReaders.length; i++) bamReaders[i].close();
+		try {
+			for (int i=0; i< bamReaders.length; i++)bamReaders[i].close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 
 
 		//finish and calc run time
@@ -458,7 +462,7 @@ public class BaseClassifier {
 		int counter = 0;
 
 		//for each bam reader
-		for (SAMFileReader bamReader: bamReaders){
+		for (SamReader bamReader: bamReaders){
 			SAMRecordIterator it = bamReader.iterator();
 
 			while (it.hasNext()) {
@@ -724,7 +728,7 @@ public class BaseClassifier {
 	}
 
 	/**Checks that the alignment actually touches down on at least one base of the region to avoid spanners.*/
-	public ArrayList<SAMRecord> fetchAlignments (Bed ei, SAMFileReader reader){
+	public ArrayList<SAMRecord> fetchAlignments (Bed ei, SamReader reader){
 		ArrayList<SAMRecord> al = new ArrayList<SAMRecord>();
 		SAMRecordIterator i = reader.queryOverlapping(ei.getChromosome(), (ei.getStart()+1), ei.getStop());
 		while (i.hasNext()) {
@@ -748,7 +752,7 @@ public class BaseClassifier {
 	public ArrayList<SAMRecord> fetchAllAlignments(Bed variant){
 		ArrayList<SAMRecord> al = new ArrayList<SAMRecord>();
 		//for each bam reader
-		for (SAMFileReader bamReader: bamReaders){
+		for (SamReader bamReader: bamReaders){
 			ArrayList<SAMRecord> sub = fetchAlignments(variant, bamReader);
 			if (sub != null) al.addAll(sub);
 		}

@@ -48,14 +48,14 @@ public class PicardSortSam extends CommandLineProgram {
 
 	protected int doWork() {
 
-		SAMFileReader reader = new SAMFileReader(INPUT);
+		SamReader reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(INPUT);
 		reader.getFileHeader().setSortOrder(SORT_ORDER);
 		SAMFileWriter writer = new SAMFileWriterFactory().makeSAMOrBAMWriter(reader.getFileHeader(), false, OUTPUT);
 
 		Iterator<SAMRecord> iterator = reader.iterator();
 		while (iterator.hasNext()) writer.addAlignment(iterator.next());
 
-		reader.close();
+		try { reader.close(); } catch (IOException e) { e.printStackTrace();}
 		writer.close();
 
 		return 0;

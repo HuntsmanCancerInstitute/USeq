@@ -122,11 +122,12 @@ public class BamNMerIntensityParser {
 		for (File samFile: samFiles){
 			System.out.print("\t"+samFile.getName());
 
-			SAMFileReader samReader = null;
+			SamReader samReader = null;
 			int counter =0;
 
 			try {
-				samReader = new SAMFileReader(samFile);
+				samReader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(samFile);
+
 				SAMRecordIterator it = samReader.iterator();
 
 				while (it.hasNext()) {

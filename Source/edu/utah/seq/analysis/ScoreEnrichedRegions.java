@@ -10,7 +10,9 @@ import java.util.Random;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SAMSequenceRecord;
@@ -413,7 +415,7 @@ public class ScoreEnrichedRegions {
 		 */
 		
 		//make reader
-		SAMFileReader reader = new SAMFileReader(replica.getBamFile());
+		SamReader reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(replica.getBamFile());
 		
 		//initialize region list
 		GeneCountList regionGCL = new GeneCountList();
@@ -526,7 +528,11 @@ public class ScoreEnrichedRegions {
 			
 		}	
 		
-		reader.close();
+		try {
+			reader.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 		
 		//add gene list to final data
 		randomData.add(randomGCLA);

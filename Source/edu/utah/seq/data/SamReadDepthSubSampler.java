@@ -7,7 +7,8 @@ import util.bio.annotation.Bed;
 import util.gen.*;
 import java.util.*;
 import htsjdk.samtools.SAMFileHeader;
-import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SAMFileHeader.SortOrder;
@@ -88,8 +89,7 @@ public class SamReadDepthSubSampler{
 	public void parseWorkingSAMFile(){
 		try{
 			//make reader
-			SAMFileReader reader = new SAMFileReader(bamFile);	
-			reader.setValidationStringency(ValidationStringency.SILENT);
+			SamReader reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(bamFile);
 			SAMFileHeader sfh = reader.getFileHeader();
 			SortOrder so = sfh.getSortOrder();
 			if (so.equals(SortOrder.coordinate) == false) {

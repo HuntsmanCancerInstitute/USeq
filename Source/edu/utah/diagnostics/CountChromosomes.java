@@ -29,8 +29,7 @@ public class CountChromosomes {
 	public CountChromosomes(String[] args) {
 		this.parseArgs(args);
 		
-		SAMFileReader sr = new SAMFileReader(inputFile);
-		sr.setValidationStringency(ValidationStringency.SILENT);
+		SamReader sr = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(inputFile);
 		
 		header = sr.getFileHeader();
 		
@@ -75,7 +74,7 @@ public class CountChromosomes {
 		referenceChroms.get("hg19").add(phiX);
 		referenceChroms.get("hg19").add(adapter);
 		
-		sr.close();
+		try { sr.close(); } catch (IOException e) { e.printStackTrace();}
 		
 		
 	}

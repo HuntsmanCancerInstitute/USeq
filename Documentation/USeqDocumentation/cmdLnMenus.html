@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.2.4.beta
+			<html><head><title>USeq Command Line Menus 9.2.4
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -3787,7 +3787,7 @@ Example: java -Xmx1500M -jar pathTo/USeqs/Apps/QCSeqs -d /Solexa/PolII/Rep1PntDa
 </pre><br><p>
 				
 					<a name="QueryIndexer"><pre>**************************************************************************************
-**                               Query Indexer: June 2019                           **
+**                               Query Indexer: Jan 2019                            **
 **************************************************************************************
 Builds index files for Query by recursing through a data directory looking for bgzip
 compressed and tabix indexed genomic data files (e.g. vcf, bed, maf, and custom).
@@ -3818,12 +3818,14 @@ Optional Params:
      interval trees but make available for data source record retrieval. Useful for
      whole genome gVCFs and read coverage files that cover large genomic regions.
 -q Quiet output, no per record warnings.
+-u Update query index, defaults to building it anew. Only works when adding or
+     deleting files from the data dir. Any other changes requires a full rebuild.
 
 Example for generating the test index using the GitHub Query/TestResources files see
 https://github.com/HuntsmanCancerInstitute/Query
 
 d=/pathToYourLocalGitHubInstalled/Query/TestResources
-java -Xmx10G -jar pathToUSeq/Apps/QueryIndexer -c $d/b37Chr20-21ChromLen.bed -d $d/Data
+java -Xmx64G -jar pathToUSeq/Apps/QueryIndexer -c $d/b37Chr20-21ChromLen.bed -d $d/Data
 -i $d/Index -t ~/BioApps/HTSlib/1.3/bin/ -s $d/Data/Public/B37/GVCFs 
 
 **************************************************************************************
@@ -4990,7 +4992,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 </pre><br><p>
 				
 					<a name="TNRunner"><pre>**************************************************************************************
-**                                  TNRunner : Nov 2019                             **
+**                                  TNRunner : Dec 2019                             **
 **************************************************************************************
 TNRunner is designed to execute several dockerized snakmake workflows on human tumor
 normal datasets via a slurm cluster.  Based on the availability of fastq, Hg38
@@ -5040,18 +5042,21 @@ Options:
 -g Germline AnnotatedVcfParser options, defaults to '-d 15 -m 0.2 -x 1 -p 0.01 -g 
       D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign'
 -s Somatic AnnotatedVcfParser options, defaults to '-d 20 -f'
+-u Minimum read coverage for tumor DNA samples, defaults to 20
+-i Minimum read coverage for normal DNA samples, defaults to 15
 -r Attempt to restart FAILED jobs from last successfully completed rule.
 -d Delete and restart FAILED jobs.
 -f Force a restart of all running, queued, failed, and uncompleted jobs.
 -q Quite output.
 -x Maximum # jobs to launch, defaults to 40.
+-n Nice jobs to make them take a low priority (--nice=10000), defaults to not.
 -l Check and launch jobs every hour until all are complete, defaults to launching once.
 
 Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/
      -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b 
      ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/
      -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l 
-     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l
+     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l -n
 
 **************************************************************************************
 </pre><br><p>

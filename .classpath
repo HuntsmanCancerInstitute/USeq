@@ -26,7 +26,6 @@
 	<classpathentry kind="lib" path="LibraryJars/flanaganReComp.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/freehep-2.1.1.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/GDACFiles.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/htsjdk-1.114.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/jasper-compiler.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/jasper-runtime.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/jcommon-1.0.0.jar"/>
@@ -71,5 +70,6 @@
 	<classpathentry kind="lib" path="LibraryJars/sqljdbc41.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/QueryAPI28Sept2018.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/joda-time-2.10.1.jar"/>
+	<classpathentry kind="lib" path="LibraryJars/htsjdk-2.21.1-SNAPSHOT.jar"/>
 	<classpathentry kind="output" path="Classes"/>
 </classpath>

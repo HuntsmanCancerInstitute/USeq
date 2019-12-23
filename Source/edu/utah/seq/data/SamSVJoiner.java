@@ -11,7 +11,8 @@ import java.util.*;
 
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMFileHeader.SortOrder;
-import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.ValidationStringency;
@@ -87,10 +88,10 @@ public class SamSVJoiner{
 
 	public void parseOthers(){
 		try{
+			SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
 			for (File bamFile: bamOthers){
 				//make reader
-				SAMFileReader reader = new SAMFileReader(bamFile);	
-				reader.setValidationStringency(ValidationStringency.SILENT);
+				SamReader reader = factory.open(bamFile);	
 				SAMRecordIterator iterator = reader.iterator();
 
 				int counter =0;
@@ -127,8 +128,7 @@ public class SamSVJoiner{
 	public void loadSpanners(){
 		try{
 			//make reader
-			SAMFileReader reader = new SAMFileReader(bamSpanner);	
-			reader.setValidationStringency(ValidationStringency.SILENT);
+			SamReader reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(bamSpanner);
 			SAMRecordIterator iterator = reader.iterator();
 			
 			//make gzipper and write header to it

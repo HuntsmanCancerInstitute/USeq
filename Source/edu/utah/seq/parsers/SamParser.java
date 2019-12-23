@@ -8,9 +8,10 @@ import edu.utah.seq.data.sam.MalformedSamAlignmentException;
 import edu.utah.seq.data.sam.SamAlignment;
 import util.gen.*;
 import java.util.*;
-import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
+import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.SAMRecord.SAMTagAndValue;
 
@@ -258,12 +259,11 @@ public class SamParser{
 		points = null;
 	}
 
-	/**Uses picard's SAMFileReader to parse BAM file.  This requires a header.*/
+	/**Uses picard's SamReader to parse BAM file.  This requires a header.*/
 	public boolean parseWorkingBAMFile(){
-		SAMFileReader samReader = null;
+		SamReader samReader = null;
 		try {
-			samReader = new SAMFileReader(workingFile);
-			samReader.setValidationStringency(ValidationStringency.SILENT);
+			samReader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(workingFile);
 			SAMRecordIterator it = samReader.iterator();
 			while (it.hasNext()) {
 				SAMRecord sam = it.next();

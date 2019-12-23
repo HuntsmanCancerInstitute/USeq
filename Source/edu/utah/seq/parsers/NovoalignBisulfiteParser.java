@@ -9,11 +9,11 @@ import util.gen.*;
 
 import java.util.*;
 
-import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.ValidationStringency;
-import edu.utah.ames.bioinfo.PicardMarkDuplicates;
 import edu.utah.seq.data.*;
 import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.data.sam.SamAlignment;
@@ -92,12 +92,12 @@ public class NovoalignBisulfiteParser{
 					File metricsFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_metrics.txt"));
 
 					//call Picard's MarkDuplicates to remove duplicate reads
-					new PicardMarkDuplicates(sortFile, dupeFile, metricsFile);
-					File sortFileIndex = new File (sortFile.toString().replaceAll("_sort.bam", "_sort.bai")); 
+					//new PicardMarkDuplicates(sortFile, dupeFile, metricsFile);
+					//File sortFileIndex = new File (sortFile.toString().replaceAll("_sort.bam", "_sort.bai")); 
 
 					//delete intermediate bam/bai files
-					sortFile.delete();
-					sortFileIndex.delete();
+					//sortFile.delete();
+					//sortFileIndex.delete();
 				}
 			}
 		}
@@ -415,8 +415,7 @@ public class NovoalignBisulfiteParser{
 	public boolean parseWorkingSAMFile(){
 		try{
 			//make reader
-			SAMFileReader reader = new SAMFileReader(workingFile);	
-			reader.setValidationStringency(ValidationStringency.SILENT);
+			SamReader reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(workingFile);
 			SAMRecordIterator iterator = reader.iterator();
 			
 			int counter =0;

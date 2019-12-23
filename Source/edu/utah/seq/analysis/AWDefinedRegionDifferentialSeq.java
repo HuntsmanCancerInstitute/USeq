@@ -350,8 +350,7 @@ public class AWDefinedRegionDifferentialSeq {
 		//assumes each read (first or second) has the same name
 
 		//make reader
-		SAMFileReader reader = new SAMFileReader(replica.getBamFile());	
-		reader.setValidationStringency(ValidationStringency.SILENT);
+		SamReader reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(replica.getBamFile());
 
 		//fetch chromName: length for all chroms
 		HashMap<String, Integer> chromLength = new HashMap<String, Integer>();
@@ -447,7 +446,11 @@ public class AWDefinedRegionDifferentialSeq {
 		if (chromGenes.containsKey(sam.getReferenceName())) {
 			loadGeneCounts(replica, bpNames, chrStartBp, chrom, badBases); // Run it AGAIN -- but on different genes this time!
 		}
-		reader.close();
+		try {
+			reader.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 	private boolean alignmentFails(final SAMRecord sam) { // Returns true if the alignment FAILED

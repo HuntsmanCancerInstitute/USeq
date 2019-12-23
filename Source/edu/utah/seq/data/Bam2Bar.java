@@ -6,7 +6,9 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import edu.utah.seq.parsers.BarParser;
-import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SAMFileHeader.SortOrder;
@@ -86,7 +88,7 @@ public class Bam2Bar {
 
 	public void makeCoverageTrack(){		
 		//make a reader
-		SAMFileReader reader = new SAMFileReader(bamFile);
+		SamReader reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(bamFile);
 		//is it sorted
 		if (reader.getFileHeader().getSortOrder().compareTo(SortOrder.coordinate) !=0) Misc.printErrAndExit("\nPlease sort your bam files by coordinate. Note SAMtools sort is broken, use Picard's SortSam app.\n");
 		SAMRecordIterator it = reader.iterator();
@@ -127,7 +129,7 @@ public class Bam2Bar {
 		processAlignments(alignments);
 		closeChromosome(null);
 
-		reader.close();
+		try { reader.close(); } catch (IOException e) { e.printStackTrace();}
 	}
 
 	public static void printSam(SAMRecord sam){

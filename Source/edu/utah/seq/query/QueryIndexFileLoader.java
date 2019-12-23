@@ -3,9 +3,12 @@ package edu.utah.seq.query;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import htsjdk.tribble.readers.TabixReader;
+import util.gen.IO;
 import util.gen.Misc;
 
 public class QueryIndexFileLoader implements Runnable {
@@ -15,39 +18,42 @@ public class QueryIndexFileLoader implements Runnable {
 	private QueryIndexer queryIndexer;
 	private String chrom;
 	private TabixReader reader = null;
-	private long numPassed = 0;
-	private long numFailed = 0;
 	private File sourceFile = null;
-	private int indexLength = 0;
 	private boolean verbose;
 	private ArrayList<IndexRegion> toAdd = new ArrayList<IndexRegion>();
+	private HashMap<File, Integer> fileId = null;
 	private static final int numToLoad = 2500;
-	
+	private int start = 0;
+	private int stop = 0;
+
 	public static final Pattern END_POSITION = Pattern.compile(".*END=(\\d+).*", Pattern.CASE_INSENSITIVE);
-	
-	public QueryIndexFileLoader (QueryIndexer queryIndexer, String chrom) throws IOException{
+
+	public QueryIndexFileLoader (QueryIndexer queryIndexer, String chrom, int start, int stop) throws IOException{
 		this.queryIndexer = queryIndexer;
+		this.fileId = queryIndexer.getFileId();
 		this.chrom = chrom;
-		indexLength = queryIndexer.getWorkingIndex().length;
+		this.start = start;
+		this.stop = stop;
 		verbose = queryIndexer.isVerbose();
 	}
-	
+
 	public void run() {	
 		try {
 			//get next file to parse
 			while ((sourceFile = queryIndexer.getFileToParse()) != null){ 
-				numPassed = 0;
-				numFailed = 0;
 				toAdd.clear();
-				int fileId = queryIndexer.getFileId().get(sourceFile);
-				
+				Integer id = fileId.get(sourceFile);
+
 				//fetch a reader and iterator on the entire chr
 				reader = new TabixReader(sourceFile.toString());
-				TabixReader.Iterator it = fetchIterator(chrom);
+				String coor = chrom+":"+start+"-"+stop;
+				TabixReader.Iterator it = fetchIterator(coor);
 				if (it == null) {
 					reader.close();
+					IO.pl("No data "+coor+" "+sourceFile);
 					continue;
 				}
+				int numRec = 0;
 
 				//is it a vcf?
 				boolean vcf = sourceFile.getName().toLowerCase().endsWith(".vcf.gz");
@@ -56,52 +62,40 @@ public class QueryIndexFileLoader implements Runnable {
 
 				String record = null;
 				while ((record = it.next()) != null){
+					numRec++;
 					//parse start and stop bp positions
 					int[] startStop;
 					if (vcf) startStop = parseStartStopBpCoorVcf(record, verbose);
 					else startStop = parseStartStopBpCoor(record, startStopSubtract, verbose);
-					if (startStop == null) {
-						numFailed++;
-						continue;
-					}
-					numPassed++;
-
-					//check against the chrom length
-					boolean warn = false;
-					if (startStop[0] < 0) {
-						startStop[0] = 0;
-						warn = true;
-					}
-					if (startStop[1] > indexLength) {
-						startStop[1] = indexLength;
-						warn = true;
-					}
-					if (warn && verbose){
-						System.err.println("\tWARNING: This record's covered bps were trimmed ("+startStop[0]+" - "+startStop[1]+
-								") to match the chrom length ("+indexLength+") -> "+record);
-					}
-					toAdd.add(new IndexRegion(startStop[0], startStop[1], fileId));
-					if (toAdd.size() > numToLoad) {
-						queryIndexer.addRegions(toAdd);
-						toAdd.clear();
+					if (startStop != null) {
+						//check against the chrom seg
+						if (startStop[0] < start) startStop[0] = start;
+						if (startStop[1] > stop) startStop[1] = stop;
+						if ((startStop[1]-startStop[0]) > 0) {
+							toAdd.add(new IndexRegion(startStop[0]-start, startStop[1]-start, id));
+							if (toAdd.size() > numToLoad) {
+								queryIndexer.addRegions(toAdd);
+								toAdd.clear();
+							}
+						}
 					}
 				}
+				IO.pl("Data "+coor+" "+sourceFile+" "+numRec);
 				//add last
 				queryIndexer.addRegions(toAdd);
 				toAdd.clear();
-				queryIndexer.incrementPassFail(numPassed, numFailed);
 				reader.close();
 			}	
-			
+
 		} catch (IOException e) {
 			failed = true;
-			System.err.println("Error: loading "+chrom+" for "+sourceFile );
+			System.err.println("Error: loading "+chrom+":"+start+"-"+stop+" for "+sourceFile );
 			e.printStackTrace();
 		} finally {
 			if (reader != null) reader.close();
 		}
 	}
-	
+
 	/**Use to try to fetch an iterator without then with chr prepended to the coordinates.*/
 	private TabixReader.Iterator fetchIterator(String coor){
 		TabixReader.Iterator it = fetchInteratorOnCoordinates(coor);
@@ -109,13 +103,17 @@ public class QueryIndexFileLoader implements Runnable {
 		if (it == null) it = fetchInteratorOnCoordinates("chr"+coor);
 		return it;
 	}
-	
+
 	private TabixReader.Iterator fetchInteratorOnCoordinates(String coordinates) {
 		TabixReader.Iterator it = null;
 		//watch out for no retrieved data error from tabix
 		try {
 			it = reader.query(coordinates);
-		} catch (ArrayIndexOutOfBoundsException e){}
+		} catch (ArrayIndexOutOfBoundsException e){
+IO.pl("\nProb "+coordinates+" "+sourceFile);
+e.printStackTrace();
+System.exit(0);
+			}
 		return it;
 	}
 
@@ -235,9 +233,9 @@ public class QueryIndexFileLoader implements Runnable {
 		return new int[]{begin, end};
 	}
 
-	
+
 	public boolean isFailed() {
 		return failed;
 	}
-	
+
 }

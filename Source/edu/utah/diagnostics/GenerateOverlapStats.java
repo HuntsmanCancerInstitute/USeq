@@ -14,7 +14,9 @@ import java.util.LinkedHashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SAMFileHeader.SortOrder;
@@ -165,7 +167,7 @@ public class GenerateOverlapStats {
 		}
 
 		public boolean parseBamFile(File bamFile){
-			SAMFileReader samReader = null;
+			SamReader samReader = null;
 			int numBadLines = 0;
 			try {
 				String line;
@@ -174,7 +176,7 @@ public class GenerateOverlapStats {
 				int dotCounter = 0;
 				
 
-				samReader = new SAMFileReader(bamFile);
+				samReader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(bamFile);
 				
 				HashMap<String,SamAlignment> storedReads = new HashMap<String,SamAlignment>();
 				HashSet<String> skipped = new HashSet<String>();
@@ -264,7 +266,7 @@ public class GenerateOverlapStats {
 				e.printStackTrace();
 				return false;
 			} finally {
-				if (samReader != null) samReader.close();
+				if (samReader != null) try { samReader.close(); } catch (IOException e) { e.printStackTrace();}
 			}
 			return true;
 		}

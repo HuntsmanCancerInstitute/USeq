@@ -11,7 +11,8 @@ import java.util.*;
 
 import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMFileHeader.SortOrder;
-import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.ValidationStringency;
@@ -158,8 +159,7 @@ public class SamSVFilter{
 			zeroStats();
 			
 			//make reader, check sort order
-			SAMFileReader reader = new SAMFileReader(workingFile);	
-			reader.setValidationStringency(ValidationStringency.SILENT);
+			SamReader reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(workingFile);
 			SAMRecordIterator iterator = reader.iterator();
 			SAMFileHeader sfh = reader.getFileHeader();
 			SortOrder so = sfh.getSortOrder();

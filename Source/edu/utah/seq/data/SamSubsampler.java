@@ -9,7 +9,8 @@ import util.gen.*;
 
 import java.util.*;
 
-import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.ValidationStringency;
@@ -257,8 +258,7 @@ public class SamSubsampler{
 	public boolean parseWorkingSAMFile(File workingFile){
 		try{
 			//make reader
-			SAMFileReader reader = new SAMFileReader(workingFile);	
-			reader.setValidationStringency(ValidationStringency.SILENT);
+			SamReader reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(workingFile);
 			SAMRecordIterator iterator = reader.iterator();
 			if (samHeader == null) samHeader = reader.getFileHeader().getTextHeader().trim();
 

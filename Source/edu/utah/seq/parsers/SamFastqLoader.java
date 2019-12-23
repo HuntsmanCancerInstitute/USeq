@@ -3,17 +3,9 @@ package edu.utah.seq.parsers;
 
 import java.io.*;
 import java.util.regex.*;
-
-import edu.utah.seq.data.*;
 import edu.utah.seq.data.sam.MalformedSamAlignmentException;
 import edu.utah.seq.data.sam.SamAlignment;
 import util.gen.*;
-
-import java.util.*;
-import htsjdk.samtools.SAMFileReader;
-import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SAMRecordIterator;
-import htsjdk.samtools.SAMRecord.SAMTagAndValue;
 
 
 /**Takes an unsorted sam file and the original fastq files and pulls the original fastq data lines.  Assumes the order of the reads is preserved in all files.

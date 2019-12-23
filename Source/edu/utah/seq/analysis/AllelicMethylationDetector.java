@@ -39,7 +39,7 @@ public class AllelicMethylationDetector {
 	private HashMap<String, RegionScoreText[]> chromRegions; 
 	private String chromosome;
 	private String[] chromosomes;
-	private SAMFileReader[] samReaders;
+	private SamReader[] samReaders;
 	private String genomicSequence = null;
 	private NovoalignBisulfiteParser novoalignBisulfiteParser;
 	private ArrayList<PutativeImprintRegion> pirAL = new ArrayList<PutativeImprintRegion>();
@@ -131,16 +131,22 @@ public class AllelicMethylationDetector {
 			e.printStackTrace();
 		}
 	}
-
+	
 	public void makeSamReaders(){
-		samReaders = new SAMFileReader[bamFiles.length];
-		for (int i=0; i< samReaders.length; i++) samReaders[i] = new SAMFileReader(bamFiles[i]);
+		SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+
+		samReaders = new SamReader[bamFiles.length];
+		for (int i=0; i< samReaders.length; i++) samReaders[i] = factory.open(bamFiles[i]);
 	}
 
 	public void closeSamReaders(){
-		for (int i=0; i< samReaders.length; i++) samReaders[i].close();
+		try {
+			for (int i=0; i< samReaders.length; i++) samReaders[i].close();
+		}
+		catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
-
 
 	public void findRegions(){
 		//load regions
@@ -206,7 +212,7 @@ public class AllelicMethylationDetector {
 	}
 
 	/**Interbase coordinates!*/
-	public ArrayList<SAMRecord> fetchAlignments (ExonIntron ei, SAMFileReader reader){
+	public ArrayList<SAMRecord> fetchAlignments (ExonIntron ei, SamReader reader){
 		ArrayList<SAMRecord> al = new ArrayList<SAMRecord>();
 		SAMRecordIterator i = reader.queryOverlapping(chromosome, ei.getStart()+1, ei.getEnd());
 		while (i.hasNext()) al.add(i.next());
@@ -215,19 +221,19 @@ public class AllelicMethylationDetector {
 	}
 
 	/**Interbase coordinates!*/
-	public ArrayList<SAMRecord>[] fetchOverlappingAlignments (ExonIntron[] ei, SAMFileReader reader){
+	public ArrayList<SAMRecord>[] fetchOverlappingAlignments (ExonIntron[] ei, SamReader reader){
 		ArrayList<SAMRecord>[] als = new ArrayList[ei.length];
 		for (int i=0; i< ei.length; i++) als[i] = fetchAlignments( ei[i], reader);
 		return als;
 	}
 	/**Interbase coordinates!*/
-	public ArrayList<SAMRecord>[][] fetchOverlappingAlignments (ExonIntron[] ei, SAMFileReader[] readers){
+	public ArrayList<SAMRecord>[][] fetchOverlappingAlignments (ExonIntron[] ei, SamReader[] readers){
 		ArrayList<SAMRecord>[][] ohMy = new ArrayList[readers.length][];
 		for (int i=0; i< readers.length; i++) ohMy[i] = fetchOverlappingAlignments(ei, readers[i]);
 		return ohMy;
 	}
 	/**Interbase coordinates!*/
-	public ArrayList<SAMRecord> fetchOverlappingAlignmentsCombine (ExonIntron[] ei, SAMFileReader[] readers){
+	public ArrayList<SAMRecord> fetchOverlappingAlignmentsCombine (ExonIntron[] ei, SamReader[] readers){
 		ArrayList<SAMRecord> ohMy = new ArrayList<SAMRecord>();
 		HashSet<String> names = new HashSet<String>();
 		for (int i=0; i< readers.length; i++) {
@@ -247,7 +253,7 @@ public class AllelicMethylationDetector {
 
 
 	/**Interbase coordinates!*/
-	public void fetchAlignments (RegionScoreText region, SAMFileReader reader, ArrayList<SAMRecord> samRecordsAL){
+	public void fetchAlignments (RegionScoreText region, SamReader reader, ArrayList<SAMRecord> samRecordsAL){
 		SAMRecordIterator i = reader.queryOverlapping(chromosome, region.getStart()+1, region.getStop());
 		int readCount = 0;
 		while (i.hasNext()) {
@@ -273,7 +279,7 @@ public class AllelicMethylationDetector {
 	}
 
 	/**Interbase coordinates!*/
-	public ArrayList<SAMRecord> fetchOverlappingAlignments (RegionScoreText region, SAMFileReader[] readers){
+	public ArrayList<SAMRecord> fetchOverlappingAlignments (RegionScoreText region, SamReader[] readers){
 		ArrayList<SAMRecord> ohMy = new ArrayList<SAMRecord>();
 		for (int i=0; i< readers.length; i++)  fetchAlignments(region, readers[i], ohMy);
 		return ohMy;

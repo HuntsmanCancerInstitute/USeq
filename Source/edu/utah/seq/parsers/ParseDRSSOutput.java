@@ -6,11 +6,6 @@ import java.util.regex.*;
 
 import util.gen.*;
 import java.util.*;
-import htsjdk.samtools.SAMFileReader;
-import htsjdk.samtools.SAMRecord;
-import htsjdk.samtools.SAMRecordIterator;
-import htsjdk.samtools.SAMFileHeader.SortOrder;
-import edu.utah.seq.data.sam.*;
 
 /**
  * @author david.nix@hci.utah.edu 

@@ -360,9 +360,9 @@ public class TNRunner {
 						case 'v': clinicalVcfDir = new File(args[++i]); break;
 						case 'o': otherDir = new File(args[++i]); break;
 						case 'u': minReadCoverageTumor = Integer.parseInt(args[++i]); break;
-						case 'n': minReadCoverageNormal = Integer.parseInt(args[++i]); break;
+						case 'i': minReadCoverageNormal = Integer.parseInt(args[++i]); break;
 						case 'x': maxNumJobsToSubmit = Integer.parseInt(args[++i]); break;
-						case 'i': niceJobs = true; break;
+						case 'n': niceJobs = true; break;
 						case 'q': verbose = false; break;
 						case 'f': forceRestart = true; break;
 						case 'l': loop = true; break;
@@ -478,7 +478,7 @@ public class TNRunner {
 				
 			}
 			
-			if (niceJobs) nice = "--nice=20";
+			if (niceJobs) nice = "--nice=10000";
 			
 			if (verbose){
 				IO.pl("Run parameters:");
@@ -514,7 +514,7 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                  TNRunner : Nov 2019                             **\n" +
+				"**                                  TNRunner : Dec 2019                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several dockerized snakmake workflows on human tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, Hg38\n"+
@@ -564,19 +564,21 @@ public class TNRunner {
 				"-g Germline AnnotatedVcfParser options, defaults to '-d 15 -m 0.2 -x 1 -p 0.01 -g \n"+
 				"      D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign'\n"+
 				"-s Somatic AnnotatedVcfParser options, defaults to '-d 20 -f'\n"+
+				"-u Minimum read coverage for tumor DNA samples, defaults to 20\n"+
+				"-i Minimum read coverage for normal DNA samples, defaults to 15\n"+
 				"-r Attempt to restart FAILED jobs from last successfully completed rule.\n"+
 				"-d Delete and restart FAILED jobs.\n"+
 				"-f Force a restart of all running, queued, failed, and uncompleted jobs.\n"+
 				"-q Quite output.\n"+
 				"-x Maximum # jobs to launch, defaults to 40.\n"+
-				"-i Nice jobs, defaults to not.\n"+
+				"-n Nice jobs to make them take a low priority (--nice=10000), defaults to not.\n"+
 				"-l Check and launch jobs every hour until all are complete, defaults to launching once.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/\n"+
 				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+
 				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/\n"+
 				"     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l \n"+
-				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l -i\n"+
+				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l -n\n"+
 
 
 				"\n**************************************************************************************\n");

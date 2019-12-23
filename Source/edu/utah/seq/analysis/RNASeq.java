@@ -8,7 +8,9 @@ import java.util.regex.Pattern;
 import java.util.*;
 
 import htsjdk.samtools.SAMFileHeader;
-import htsjdk.samtools.SAMFileReader;
+import htsjdk.samtools.SamReader;
+import htsjdk.samtools.SamReaderFactory;
+import htsjdk.samtools.ValidationStringency;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SAMSequenceRecord;
 
@@ -608,12 +610,12 @@ public class RNASeq {
 	 * @return null if no problems, otherwise an error.*/
 	public static String checkBamFile(File bamFile) {
 		String message = null;
-		SAMFileReader reader = null;
+		SamReader reader = null;
 		Pattern oneTwoDigit = Pattern.compile("\\w{1,2}");
 		try {
-			reader = new SAMFileReader(bamFile);
+			reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(bamFile);
 			//index present?
-			if (reader.hasBrowseableIndex() == false) return bamFile+ " does not have an associated xxx.bai index? Use Picard's SortSam to sort and index your parsed sam files.";
+			if (reader.hasIndex() == false) return bamFile+ " does not have an associated xxx.bai index? Use Picard's SortSam to sort and index your parsed sam files.";
 			//check sort order
 			SAMFileHeader h = reader.getFileHeader();
 			if (h.getSortOrder().compareTo(SAMFileHeader.SortOrder.coordinate) !=0) return  bamFile+" does not appear to be sorted by coordinate. Did you sort with SAMTools?  Use Picard's SortSam instead."; 
@@ -636,7 +638,12 @@ public class RNASeq {
 		} catch (Exception e){
 			message = e.getMessage();
 		} finally {
-			if (reader != null) reader.close();
+			if (reader != null)
+				try {
+					reader.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 		}
 		return message;
 	}

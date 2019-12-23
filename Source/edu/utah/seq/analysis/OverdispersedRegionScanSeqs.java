@@ -43,8 +43,8 @@ public class OverdispersedRegionScanSeqs {
 	private ArrayList<UCSCGeneLine> geneLinesWithOutReadsAL = new ArrayList<UCSCGeneLine>();
 	private UCSCGeneLine[] geneLinesWithReads;
 	private String chromosome;
-	private SAMFileReader[] treatmentReaders;
-	private SAMFileReader[] controlReaders;
+	private SamReader[] treatmentReaders;
+	private SamReader[] controlReaders;
 	private boolean reverseStrand;
 	private boolean verbose = true;
 	private boolean pseudoMedianCalculated = false;
@@ -103,21 +103,25 @@ public class OverdispersedRegionScanSeqs {
 	}
 
 	public void makeSamReaders(){
-		treatmentReaders = new SAMFileReader[treatmentBamFiles.length];
+		SamReaderFactory factory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+		
+		treatmentReaders = new SamReader[treatmentBamFiles.length];
 		for (int i=0; i< treatmentReaders.length; i++) {
-			treatmentReaders[i] = new SAMFileReader(treatmentBamFiles[i]);
-			treatmentReaders[i].enableIndexMemoryMapping(false);
+			treatmentReaders[i] = factory.open(treatmentBamFiles[i]);
 		}
-		controlReaders = new SAMFileReader[controlBamFiles.length];
+		controlReaders = new SamReader[controlBamFiles.length];
 		for (int i=0; i< controlReaders.length; i++) {
-			controlReaders[i] = new SAMFileReader(controlBamFiles[i]);
-			controlReaders[i].enableIndexMemoryMapping(false);
+			controlReaders[i] = factory.open(controlBamFiles[i]);
 		}
 	}
 
 	public void closeSamReaders(){
-		for (int i=0; i< treatmentReaders.length; i++) treatmentReaders[i].close();
-		for (int i=0; i< controlReaders.length; i++) controlReaders[i].close();
+		try {
+			for (int i=0; i< treatmentReaders.length; i++) treatmentReaders[i].close();
+			for (int i=0; i< controlReaders.length; i++) controlReaders[i].close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
 	}
 
 
@@ -1006,7 +1010,7 @@ public class OverdispersedRegionScanSeqs {
 
 
 
-	public ArrayList<String> fetchAlignmentNames (ExonIntron ei, SAMFileReader reader){
+	public ArrayList<String> fetchAlignmentNames (ExonIntron ei, SamReader reader){
 		ArrayList<String> al = new ArrayList<String>();
 		SAMRecordIterator i = reader.queryOverlapping(chromosome, (ei.getStart()+1), ei.getEnd());
 		if (dataIsStranded){
@@ -1045,7 +1049,7 @@ public class OverdispersedRegionScanSeqs {
 		return al;
 	}
 
-	public ArrayList<String>[] fetchOverlappingAlignmentNames (ExonIntron[] ei, SAMFileReader reader){
+	public ArrayList<String>[] fetchOverlappingAlignmentNames (ExonIntron[] ei, SamReader reader){
 		ArrayList<String>[] als = new ArrayList[ei.length];
 		for (int i=0; i< ei.length; i++) { 
 			als[i] = fetchAlignmentNames( ei[i], reader);
@@ -1053,7 +1057,7 @@ public class OverdispersedRegionScanSeqs {
 		return als;
 	}
 
-	public ArrayList<String>[][] fetchOverlappingAlignmentNames (ExonIntron[] ei, SAMFileReader[] readers){
+	public ArrayList<String>[][] fetchOverlappingAlignmentNames (ExonIntron[] ei, SamReader[] readers){
 		ArrayList<String>[][] ohMy = new ArrayList[readers.length][];
 		for (int i=0; i< readers.length; i++) {
 			ohMy[i] = fetchOverlappingAlignmentNames(ei, readers[i]);

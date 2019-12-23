@@ -1,10 +1,8 @@
 package edu.utah.seq.analysis;
 
-import java.io.BufferedInputStream;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -12,9 +10,6 @@ import java.io.IOException;
 import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.ZipInputStream;
-
 
 import htsjdk.samtools.*;
 
@@ -46,19 +41,7 @@ public class PullMatchingAlignments {
 	private void findMatches(HashSet<String> readNames) {
 		try {
 			BufferedWriter bw = new BufferedWriter(new FileWriter(this.outputFile));
-			
-			SAMFileReader sfr = null;
-			if (this.alignmentFile.toString().endsWith(".sam") || this.alignmentFile.toString().endsWith(".bam")) {
-				sfr = new SAMFileReader(this.alignmentFile);
-			} else if (this.alignmentFile.toString().endsWith(".sam.gz")) {
-				sfr = new SAMFileReader(new GZIPInputStream(new FileInputStream(this.alignmentFile)));
-			}  else {
-				System.out.println("File does not end with a known suffix (bam, sam, sam.gz), exiting:  " + this.alignmentFile.toString() );
-				System.exit(1);
-			}
-			
-			 
-			sfr.setValidationStringency(ValidationStringency.SILENT);
+			SamReader sfr = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(alignmentFile);
 			
 			SAMRecordIterator sri = sfr.iterator();
 			SAMRecord sr = null;
