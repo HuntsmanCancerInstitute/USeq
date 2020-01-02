@@ -30,6 +30,7 @@ public class FastqBarcodeTagger{
 	private String[] barcode = new String[4];
 	private long lineNumber = 0;
 	private boolean extract3Mer = false;
+	private Pattern badEnding = Pattern.compile(".+/\\d");
 
 	//constructors
 	public FastqBarcodeTagger(String[] args){
@@ -128,6 +129,7 @@ public class FastqBarcodeTagger{
 		String readOneQual = first[3].substring(0, 3);
 		String readTwoQual = second[3].substring(0, 3);
 		barcode[3] = readOneQual + readTwoQual;
+
 		//change first and second quals
 		first[3] = first[3].substring(5);
 		second[3] = second[3].substring(5);	
@@ -186,7 +188,8 @@ public class FastqBarcodeTagger{
 		}
 		fn.append(":BMF:");
 		fn.append(barcode[1]);
-		fn.append(barcode[3]);
+		
+		fn.append(checkForBadEnds(barcode[3]));
 		String fragmentName = fn.toString();
 		
 		//make new header line for first
@@ -210,6 +213,17 @@ public class FastqBarcodeTagger{
 		//watch out for non + names for other 1/2 of fastq record
 		if (first[2].equals("+") == false) first[2] = first[0];
 		if (second[2].equals("+") == false) second[2] = second[0];
+	}
+
+	/* Must swap /0-9 with 00-9 otherwise bwa strips off the /0 /1 /2 etc
+	 */
+	private String checkForBadEnds(String seq) {
+		Matcher mat = badEnding.matcher(seq);
+		if (mat.matches()) {
+			int len = seq.length();
+			return seq.substring(0, len-2)+"0"+seq.substring(len-1);
+		}
+		return seq;
 	}
 
 	public void makeReadersAndWriters() throws IOException{
@@ -305,7 +319,7 @@ public class FastqBarcodeTagger{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Fastq Barcode Tagger: August 2018                       **\n" +
+				"**                          Fastq Barcode Tagger: Jan 2020                       **\n" +
 				"**************************************************************************************\n" +
 				"Takes 2 or 3 fastq files (paired end reads and possibly a third containing unique \n"+
 				"molecular barcodes/ indexes), appends the barcode and quality to the fastq header, and\n"+
