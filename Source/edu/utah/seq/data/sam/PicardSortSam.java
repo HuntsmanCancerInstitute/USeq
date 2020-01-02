@@ -83,7 +83,9 @@ public class PicardSortSam extends CommandLineProgram {
 					 "CREATE_INDEX=true",
 					 "TMP_DIR="+realOutputFile.getParent(),
 					 "QUIET=true",
-					 "VERBOSITY=WARNING",
+					 "USE_JDK_DEFLATER=true",
+					 "USE_JDK_INFLATER=true",
+					 "VERBOSITY=ERROR",
 					 "VALIDATION_STRINGENCY=SILENT"
 			 };
 
@@ -93,5 +95,13 @@ public class PicardSortSam extends CommandLineProgram {
 			 e.printStackTrace();
 		 }
 	 }
+	 /*
+	 public static void main(String[] args) {
+		 if (args.length == 3) {
+		 File sam = new File("/Users/u0028003/Downloads/BamPileup/snv0.05.bam");
+		 File samSorted = new File("/Users/u0028003/Downloads/delme.snv0.05.bam");
+		 new PicardSortSam(sam, samSorted);
+		 }
+	 }*/
 
 }
