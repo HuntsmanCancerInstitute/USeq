@@ -1,6 +1,5 @@
 package edu.utah.seq.query;
 
-
 public class IndexRegion implements Comparable<IndexRegion> {
 	protected int start;
 	protected int stop;
@@ -23,7 +22,7 @@ public class IndexRegion implements Comparable<IndexRegion> {
 		//same start, sort by stop, smaller to larger
 		if (stop<se.stop) return -1;
 		if (stop>se.stop) return 1;
-		//same stop, sort by fileId, smaller to larger
+		//same stop, sort by fileId[0], smaller to larger
 		if (fileId<se.fileId) return -1;
 		if (fileId>se.fileId) return 1;
 		return 0;

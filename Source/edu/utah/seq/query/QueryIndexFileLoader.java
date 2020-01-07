@@ -8,6 +8,7 @@ import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import htsjdk.tribble.readers.TabixReader;
+import htsjdk.tribble.readers.TabixReader.Iterator;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -22,10 +23,9 @@ public class QueryIndexFileLoader implements Runnable {
 	private boolean verbose;
 	private ArrayList<IndexRegion> toAdd = new ArrayList<IndexRegion>();
 	private HashMap<File, Integer> fileId = null;
-	private static final int numToLoad = 2500;
+	private static final int numToLoad = 10000;
 	private int start = 0;
 	private int stop = 0;
-
 	public static final Pattern END_POSITION = Pattern.compile(".*END=(\\d+).*", Pattern.CASE_INSENSITIVE);
 
 	public QueryIndexFileLoader (QueryIndexer queryIndexer, String chrom, int start, int stop) throws IOException{
@@ -42,52 +42,21 @@ public class QueryIndexFileLoader implements Runnable {
 			//get next file to parse
 			while ((sourceFile = queryIndexer.getFileToParse()) != null){ 
 				toAdd.clear();
-				Integer id = fileId.get(sourceFile);
-
-				//fetch a reader and iterator on the entire chr
+				//fetch a reader on slice, start must be > 0, end can be past chrom end
 				reader = new TabixReader(sourceFile.toString());
-				String coor = chrom+":"+start+"-"+stop;
-				TabixReader.Iterator it = fetchIterator(coor);
+				TabixReader.Iterator it = fetchTReader(chrom, start+1, stop);
 				if (it == null) {
 					reader.close();
-					IO.pl("No data "+coor+" "+sourceFile);
 					continue;
 				}
-				int numRec = 0;
 
-				//is it a vcf?
-				boolean vcf = sourceFile.getName().toLowerCase().endsWith(".vcf.gz");
-				int[] startStopSubtract = null;
-				if (vcf == false) startStopSubtract = queryIndexer.getSSS(sourceFile);
-
-				String record = null;
-				while ((record = it.next()) != null){
-					numRec++;
-					//parse start and stop bp positions
-					int[] startStop;
-					if (vcf) startStop = parseStartStopBpCoorVcf(record, verbose);
-					else startStop = parseStartStopBpCoor(record, startStopSubtract, verbose);
-					if (startStop != null) {
-						//check against the chrom seg
-						if (startStop[0] < start) startStop[0] = start;
-						if (startStop[1] > stop) startStop[1] = stop;
-						if ((startStop[1]-startStop[0]) > 0) {
-							toAdd.add(new IndexRegion(startStop[0]-start, startStop[1]-start, id));
-							if (toAdd.size() > numToLoad) {
-								queryIndexer.addRegions(toAdd);
-								toAdd.clear();
-							}
-						}
-					}
-				}
-				IO.pl("Data "+coor+" "+sourceFile+" "+numRec);
-				//add last
-				queryIndexer.addRegions(toAdd);
-				toAdd.clear();
+				parseDataFile(it);
+				
+				//add last and clear
+				if (toAdd.size()!=0) queryIndexer.addRegions(toAdd);
 				reader.close();
-			}	
-
-		} catch (IOException e) {
+			}
+		} catch (Exception e) {
 			failed = true;
 			System.err.println("Error: loading "+chrom+":"+start+"-"+stop+" for "+sourceFile );
 			e.printStackTrace();
@@ -96,25 +65,42 @@ public class QueryIndexFileLoader implements Runnable {
 		}
 	}
 
-	/**Use to try to fetch an iterator without then with chr prepended to the coordinates.*/
-	private TabixReader.Iterator fetchIterator(String coor){
-		TabixReader.Iterator it = fetchInteratorOnCoordinates(coor);
-		//null? try with chr
-		if (it == null) it = fetchInteratorOnCoordinates("chr"+coor);
-		return it;
+	private void parseDataFile(Iterator it) throws NumberFormatException, IOException {
+		//is it a vcf?
+		boolean vcf = sourceFile.getName().toLowerCase().endsWith(".vcf.gz");
+		int[] startStopSubtract = null;
+		if (vcf == false) startStopSubtract = queryIndexer.getSSS(sourceFile);
+
+		Integer id = fileId.get(sourceFile);
+		String record = null;
+		while ((record = it.next()) != null){
+			//parse start and stop bp positions
+			int[] startStop;
+			if (vcf) startStop = parseStartStopBpCoorVcf(record, verbose);
+			else startStop = parseStartStopBpCoor(record, startStopSubtract, verbose);
+			if (startStop != null) {
+				//check against the chrom seg
+				if (startStop[0] < start) startStop[0] = start;
+				if (startStop[1] >= stop) {
+					startStop[1] = stop;
+IO.pl("\n\t\tTrunc "+record+" "+sourceFile);
+				}
+				if ((startStop[1]-startStop[0]) > 0) {
+					toAdd.add(new IndexRegion(startStop[0]-start, startStop[1]-start, id));
+					if (toAdd.size() > numToLoad) {
+						queryIndexer.addRegions(toAdd);
+						toAdd.clear();
+					}
+				}
+			}
+		}
 	}
 
-	private TabixReader.Iterator fetchInteratorOnCoordinates(String coordinates) {
-		TabixReader.Iterator it = null;
-		//watch out for no retrieved data error from tabix
-		try {
-			it = reader.query(coordinates);
-		} catch (ArrayIndexOutOfBoundsException e){
-IO.pl("\nProb "+coordinates+" "+sourceFile);
-e.printStackTrace();
-System.exit(0);
-			}
-		return it;
+	private TabixReader.Iterator fetchTReader(String chrom, int start, int stop) throws Exception{
+		if (reader.getChromosomes().contains(chrom)) return reader.query(chrom, start, stop);
+		String chrChrom = "chr"+chrom;
+		if (reader.getChromosomes().contains(chrChrom)) return reader.query(chrChrom, start, stop);
+		return null;
 	}
 
 	private static int[] parseStartStopBpCoorVcf(String vcfRecord, boolean verbose) {
@@ -210,7 +196,7 @@ System.exit(0);
 			//C->TTAAT
 			if (ref.charAt(0) != alt.charAt(0)) {
 				begin--;
-				if (verbose) System.err.println("\tWARNING: Odd INS vcf record, the first base in the ref and alt should be the same, -> "+Misc.stringArrayToString(vcf, "\t")+ " effected bps "+begin+" "+end);
+				//if (verbose) System.err.println("\tWARNING: Odd INS vcf record, the first base in the ref and alt should be the same, -> "+Misc.stringArrayToString(vcf, "\t")+ " effected bps "+begin+" "+end);
 			}
 
 		}
@@ -221,7 +207,7 @@ System.exit(0);
 			//AT->C
 			if (ref.charAt(0) != alt.charAt(0)) {
 				begin--;
-				if (verbose) System.err.println("\tWARNING: Odd DEL vcf record, the first base in the ref and alt should be the same -> "+Misc.stringArrayToString(vcf, "\t")+ " effected bps "+begin+" "+end);
+				//if (verbose) System.err.println("\tWARNING: Odd DEL vcf record, the first base in the ref and alt should be the same -> "+Misc.stringArrayToString(vcf, "\t")+ " effected bps "+begin+" "+end);
 			}
 		}
 		//odd, shouldn't hit this

@@ -121,7 +121,7 @@ public class BedIndexLoader {
 						//not present or no id's
 						else {
 							//save region
-							IndexRegion ir = new IndexRegion(start, stop, id);
+							IndexRegion ir = null; //new IndexRegion(start, stop, id);
 //IO.pl("\t\t\tSaving "+ir);
 							numRegionsLoaded++;
 							//add start and stop irs
@@ -136,7 +136,7 @@ public class BedIndexLoader {
 					//save it?
 					if (saveIt) {
 						//save region
-						IndexRegion ir = new IndexRegion(start, stop, id);
+						IndexRegion ir = null; //new IndexRegion(start, stop, id);
 //IO.pl("\t\t\tSaving last "+ir);
 						numRegionsLoaded++;
 						//add start and stop irs
@@ -157,7 +157,7 @@ public class BedIndexLoader {
 		int start  = regionIds.start;
 		int stop = regionIds.stop;
 		while (iter.hasNext()) {
-			IndexRegion ir = new IndexRegion(start, stop, iter.next());
+			IndexRegion ir = null; //new IndexRegion(start, stop, iter.next());
 //IO.pl("\t\t\tSaving "+ir);
 			numRegionsLoaded++;
 			//add start and stop irs

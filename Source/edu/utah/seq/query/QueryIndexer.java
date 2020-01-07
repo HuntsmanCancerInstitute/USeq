@@ -30,12 +30,10 @@ public class QueryIndexer {
 	private File chrNameLength;
 	private File indexDir;
 	private boolean verbose = true;
-	private boolean updateIndex = false;
 	private File bgzip = null;
 	private File tabix = null;
 	private int numberThreads = 0;
 	private String[] skipDirs = null;
-	
 
 	//internal fields
 	private String email = "bioinformaticscore@utah.edu";
@@ -53,14 +51,10 @@ public class QueryIndexer {
 	private int toTruncatePoint = -1;
 	private HashMap<String, Integer> priorTruncFileNameId = null;
 	private HashMap<String, Long> priorTruncFileNameSize = null;
-	private ArrayList<File> oldDataSource = null;
-	private ArrayList<String> oldDataSourceTruncNamesToDelete = null;
-	private HashSet<Integer> oldDataSourceIDsToDelete = new HashSet<Integer>();
 
 	//per chr fields
-	//private ArrayList<IndexRegion>[] workingIndex = null; 
-	private int bpBlock = 10000000;
-	private ArrayList<Integer>[] workingIndex = null;
+	private ArrayList<IndexRegion>[] workingIndex = null; 
+	private int bpBlock = 250000000; //max size hg19 chr1 is 249,250,621
 	private ArrayList<File> workingFilesToParse = new ArrayList<File>();
 	private ArrayList<File> workingBedFilesToMerge = new ArrayList<File>();
 	private int workingFilesToParseIndex = 0;
@@ -81,33 +75,22 @@ public class QueryIndexer {
 		setKnownFileTypeSSS();
 		parseChromLengthFile();
 		
-		IO.pl("\nSearching for tabix indexes and bgzipped data sources...");
 		parseDataSources();
 		
-		if (priorTruncFileNameId!= null) {
-			IO.pl("\nComparing prior index with current data sources...");
-			contrastPriorWithCurrent();
-		}
+		if (priorTruncFileNameId!= null) contrastPriorWithCurrent();
+		else createFileIdHash();
 		
-		else {
-			IO.pl("\nCreating file id hash...");
-			createFileIdHash();
-		}
-
-		IO.pl("\nChecking tbi files for chr content...");
 		createChrFiles();
 		
 		createFileIdArray();
-		
-		IO.pl(fileId);
 
 		//for each chromosome
-		IO.pl("\nIndexing records by chr...\n\tchr\t#parsed");
+		IO.pl("\nIndexing records by chr...\n\tChrBlock\t#Parsed");
 		for (String chr: chrLengths.keySet()) {
 			workingChr = chr;
 			parseChr();
 		}
-
+ 
 		//bgzip and tabix
 		IO.pl("\nCompressing master index...");
 		bgzipAndTabixIndex();
@@ -116,7 +99,7 @@ public class QueryIndexer {
 		saveFileIds();
 
 		String diffTime = Num.formatNumberOneFraction(((double)(System.currentTimeMillis() -startTime))/1000/60);
-		IO.pl("\n"+ diffTime+" Min to parse "+ totalRecordsProcessed+" records and build the query index");
+		IO.pl("\n"+ diffTime+" Min to parse ~"+ totalRecordsProcessed+" records and build the query index");
 	}
 
 	private void createFileIdArray() {
@@ -126,116 +109,75 @@ public class QueryIndexer {
 		for (Integer i: fileId.values()) ids[i] = i;
 	}
 
+	private void createFileIdHash() {
+		IO.pl("\nCreating file id hash...");
+		for (int i=0; i< dataFilesToParse.length; i++) {
+			Integer id = new Integer(i);
+			fileId.put(dataFilesToParse[i], id);
+		}
+	}
+	
 	private void contrastPriorWithCurrent() {
+		IO.pl("\nComparing prior index with current data sources...");
 		
-		ArrayList<File> newDataSource = new ArrayList<File>();
-		oldDataSource = new ArrayList<File>();
-		ArrayList<File> newDataSourceDiffSize = new ArrayList<File>();
-		oldDataSourceTruncNamesToDelete = new ArrayList<String>();
-		oldDataSourceIDsToDelete = new HashSet<Integer>();
-		ArrayList<Integer> usedIDs = new ArrayList<Integer>();
+		int numOldDataSources = 0;
+		int numNewDataSources = 0;
+		int numNewDataSourcesDiffSize = 0;
+		int numOldDataSourcesMissingInNew = 0;
 
 		//walk current files to index
 		HashSet<String> currentTrimmedDataSourceNames = new HashSet<String>();
-		for (File f: dataFilesToParse) {
+		for (int i=0; i< dataFilesToParse.length; i++) {
+			
+			//add to fileId hash
+			Integer id = new Integer(i);
+			fileId.put(dataFilesToParse[i], id);
+			
 			//was it already parsed?
-			String trimmedName = f.toString().substring(toTruncatePoint);
+			String trimmedName = dataFilesToParse[i].toString().substring(toTruncatePoint);
 			currentTrimmedDataSourceNames.add(trimmedName);
-			Integer id = priorTruncFileNameId.get(trimmedName);
-//IO.pl("Checking "+trimmedName+" "+id);
-			if (id == null) newDataSource.add(f);
+			Integer idTest = priorTruncFileNameId.get(trimmedName);
+
+			if (idTest == null) numNewDataSources++;
 			else {
-				Long size = priorTruncFileNameSize.get(trimmedName);
 				//same size?
-				if (f.length() == size) {
-					oldDataSource.add(f);
-					//add to master File:ID hash
-					fileId.put(f, id);
-					usedIDs.add(id);
-				}
-				else {
-					newDataSourceDiffSize.add(f);
-					oldDataSourceTruncNamesToDelete.add(trimmedName);
-					oldDataSourceIDsToDelete.add(id);
-				}
+				Long size = priorTruncFileNameSize.get(trimmedName);
+				if (dataFilesToParse[i].length() == size) numOldDataSources++;
+				else numNewDataSourcesDiffSize++;
 			}
 		}
 		
 		//walk old Index and see which are missing in new and should be deleted
 		for (String oldTN: priorTruncFileNameId.keySet()) {
-			if (currentTrimmedDataSourceNames.contains(oldTN) == false) {
-				oldDataSourceTruncNamesToDelete.add(oldTN);
-				oldDataSourceIDsToDelete.add(priorTruncFileNameId.get(oldTN));
-			}
+			if (currentTrimmedDataSourceNames.contains(oldTN) == false) numOldDataSourcesMissingInNew++;
 		}
 		
 		
 		if (verbose) {
 			//old datasets already parsed and in index - skip
-			IO.pl("\n"+oldDataSource.size() +" Datasets already indexed :");
-			for (File f: oldDataSource) IO.pl("\t"+f);
-			
+			IO.pl("\t"+numOldDataSources +" Datasets present in index");
 			//entirely new datasets - to parse
-			IO.pl("\n"+newDataSource.size() +" New datasets ready for indexing :");
-			for (File f: newDataSource) IO.pl("\t"+f);
-			
+			IO.pl("\t"+numNewDataSources +" New datasets to add to index");
 			//new datasets with preexisting same named file but diff size, - delete old from index then parse
-			IO.pl("\n"+newDataSourceDiffSize.size() +" New datasets to replace a preexisting data source :");
-			for (File f: newDataSourceDiffSize) IO.pl("\t"+f);
-			
+			IO.pl("\t"+numNewDataSourcesDiffSize +" New datasets to replace an existing data source");
 			//old datasets to delete, either getting replace or were deleted from current datasource list
-			IO.pl("\n"+oldDataSourceTruncNamesToDelete.size()+" Datasets to delete from index (either getting replaced or deleted) :");
-			for (String f: oldDataSourceTruncNamesToDelete) IO.pl("\t"+priorTruncFileNameId.get(f)+"\t"+f);
-			
+			IO.pl("\t"+numOldDataSourcesMissingInNew+" Datasets missing from index ");
 		}
 		
 		//check if any work to do
-		int numNew = newDataSource.size()+ newDataSourceDiffSize.size();
-		if (numNew == 0 && oldDataSourceTruncNamesToDelete.size() == 0)  Misc.printExit("\nNo new datasets to parse or old datasets to delete, index is up to date.");
-		
-			
-		//create HashMap<File, Integer> fileId = new HashMap<File, Integer>(); with all of the old datasets
-		int[] inUseIds = Num.arrayListOfIntegerToInts(usedIDs);
-		Arrays.sort(inUseIds);
-		
-		//what ids are available?
-		int lastMaxId = inUseIds[inUseIds.length-1];
-		int usedIdIndex = 0;
-		ArrayList<Integer> availIds = new ArrayList<Integer>();
-		for (int i=0; i<lastMaxId; i++) {
-			if (inUseIds[usedIdIndex]== i) usedIdIndex++;
-			else availIds.add(i);
-		}
-		
-		//add in more ids?
-		int needed = numNew - availIds.size();
-		if (needed > 0) {
-			needed = needed + lastMaxId + 1;
-			for (int i=lastMaxId+1; i<needed; i++) availIds.add(i);
-		}
-		
-		//add in new datasets and the id
-		newDataSource.addAll(newDataSourceDiffSize);
-		for (int i=0; i< numNew; i++) {
-			Integer id = availIds.get(i);
-			fileId.put(newDataSource.get(i), id);
-		}
-		
-		//reset dataFilesToParse to just newDataSource and newDataSourceDiffSize
-		dataFilesToParse = new File[numNew];
-		newDataSource.toArray(dataFilesToParse);	
-
+		if (numNewDataSources==0 && numNewDataSourcesDiffSize==0 && numOldDataSourcesMissingInNew==0)  Misc.printExit("\nIndex is up to date. Exiting.");	
+		else IO.pl("\t\tRebuilding Index");
 	}
 
 	private void loadPrior() {
 		try {
-			if (updateIndex == false) return;
 			
 			//look for the fileIds.obj, fileSizes.obj
 			File ids = new File(indexDir, "fileIds.obj");
 			File sizes = new File(indexDir, "fileSizes.obj");
 			
-			if (ids.exists() == false || sizes.exists() == false) throw new IOException("\nFailed to find one or more of the xxx.obj files (fileIds.obj, fileSizes.obj) in your index directory? Are you sure you want to update the index?\n");
+			if (ids.exists() == false || sizes.exists() == false) return;
+			
 			IO.pl("Loading prior file objects...");
 			
 			priorTruncFileNameId = (HashMap<String, Integer>)IO.fetchObject(ids);
@@ -245,7 +187,7 @@ public class QueryIndexer {
 			if (priorChromIndexFiles == null || priorChromIndexFiles.length == 0) throw new IOException("\nFailed to find your chrXXX.bed.gz index files in your index directory?");
 			if (verbose) {
 				IO.pl("\t"+priorTruncFileNameId.size()+"\tIndexed data sources ");
-				IO.pl("\t"+priorChromIndexFiles.length+"\tIndexed chromosomes");
+				IO.pl("\t"+priorChromIndexFiles.length+"\tChromosome indexes");
 			}
 
 		} catch (Exception e){
@@ -265,7 +207,7 @@ public class QueryIndexer {
 			removeSkipDirs(workingFilesToParse);
 			
 			//any work to do?
-			if (workingFilesToParse.size() == 0 &&  oldDataSourceIDsToDelete.size() == 0) {
+			if (workingFilesToParse.size() == 0 ) {
 				IO.pl("\t"+workingChr+"\tNothing to do");
 				return;
 			}
@@ -283,7 +225,7 @@ public class QueryIndexer {
 				IO.p("\t"+workingChr+":"+workingStartBp+"-"+workingStopBp);
 				
 				//prep for new chr seg
-				for (ArrayList<Integer> al: workingIndex) if (al!=null) al.clear();
+				workingIndex = new ArrayList[workingStopBp-workingStartBp+1];
 				workingParsed = 0;
 				parseChrBlock();
 			}
@@ -298,10 +240,6 @@ public class QueryIndexer {
 
 
 	private void parseChrBlock() throws IOException {
-
-		
-		//load old?
-		loadPriorChromIndex();
 		
 		//load new datasets?
 		if (workingFilesToParse.size() !=0) {
@@ -328,28 +266,11 @@ public class QueryIndexer {
 		
 
 		//save the index for this chrom block
-		if (workingParsed !=0) {
-			//saveWorkingChrBlock();
-			out.println("NEW BLOCK");
-
-		}
-		System.exit(0);
-		
+		if (workingParsed !=0) saveWorkingChrBlock();
 
 		//stats
 		IO.pl("\t"+workingParsed);
 		totalRecordsProcessed+= workingParsed;
-	}
-
-	private void loadPriorChromIndex() throws IOException {
-		if (updateIndex == false) return;
-		
-		File chrBed = new File(indexDir, workingChr+".qi.bed.gz");
-		if (chrBed.exists() == false) return;
-		
-		//BedIndexLoader bil = new BedIndexLoader(chrBed, oldDataSourceIDsToDelete, workingIndex);
-		//if (verbose) IO.pl("\t"+workingChr+"\tLoaded "+bil.getNumRegionsLoaded()+" prior regions");
-		
 	}
 
 	/*Removes any files that are found in a skip dir*/
@@ -376,37 +297,6 @@ public class QueryIndexer {
 		} 
 	}
 	
-	
-	synchronized void addRegions (ArrayList<IndexRegion> regions) {
-		IndexRegion region = null;
-		try {
-		//for each region
-		int numRegions = regions.size();
-
-		for (int x=0; x< numRegions; x++) {
-			region = regions.get(x);
-			//add fileId for each covered bp, these are relative to the current workingStartBp, not the actual bp
-			for (int i=region.start; i< region.stop; i++) {
-//IO.pl("Adding Region "+region);
-				if (i>= workingIndex.length) {
-					IO.pl("\n\nIndexError "+workingIndex.length+" "+region);
-					System.exit(1);
-				}
-				if (workingIndex[i] == null) workingIndex[i] = new ArrayList<Integer>();
-				workingIndex[i].add(region.fileId);
-			}
-		}
-		//update numParsed
-		workingParsed+= regions.size();
-		} catch (Exception e) {
-			IO.el("\nProblem adding regions "+region);
-			System.exit(1);
-		}
-		
-
-	}
-	
-	/*
 	synchronized void addRegions (ArrayList<IndexRegion> regions) {
 		for (IndexRegion region: regions){
 			//add start
@@ -419,8 +309,9 @@ public class QueryIndexer {
 			if (workingIndex[sIndex] == null) workingIndex[sIndex] = new ArrayList<IndexRegion>();
 			workingIndex[sIndex].add(region);
 		}
+		workingParsed+= regions.size();
 		regions.clear();
-	}*/
+	}
 
 	/**Gets a file to parse containing records that match a particular chr. Thread safe.*/
 	synchronized File getFileToParse(){
@@ -429,6 +320,8 @@ public class QueryIndexer {
 	}
 
 	private void createChrFiles() {
+		IO.pl("\nChecking tbi files for chr content...");
+		
 		//load hash to hold files with a particular chr
 		for (String chr: chrLengths.keySet()) chrFiles.put(chr, new ArrayList<File>());
 
@@ -448,112 +341,40 @@ public class QueryIndexer {
 			Misc.printErrAndExit("\nERROR: problem with testing indexes for particular chroms\n");
 		}
 	}
-
-	private void createFileIdHash() {
-		for (int i=0; i< dataFilesToParse.length; i++) {
-			Integer id = new Integer(i);
-			fileId.put(dataFilesToParse[i], id);
-		}
-	}
-	
 	
 	public void saveWorkingChrBlock(){
-		try {
-			
-			String currentIDs = null;
-			int currentStart = -1;
-			TreeSet<Integer> idHash = new TreeSet<Integer>();
-			
-			//for each bp
-			for (int i=0; i< workingIndex.length; i++){
-				
-				if (workingIndex[i]== null || workingIndex[i].size()==0) {
-					if (currentIDs != null) {
-						//open block, nothing following so close it
-						out.println(workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingStartBp)+"\t"+currentIDs);
-IO.pl("Saving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingStartBp)+"\t"+currentIDs);
-						currentIDs = null;
-					}
-					continue;
-				}
-				
-				//convert to comma delimited String, sorted by number
-				int num = workingIndex[i].size();
-				String fileIds = null;
-				if (num == 1) fileIds = workingIndex[i].get(0).toString();
-				else {
-					idHash.clear();
-					idHash.addAll(workingIndex[i]);
-					fileIds = Misc.treeSetToString(idHash, ",");
-				}
-				
-				if (currentIDs == null) {
-					//star of new
-					currentIDs = fileIds;
-					currentStart = i;
-				}
-				else if (currentIDs.equals(fileIds) == false) {
-					//complete old
-					out.println(workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingStartBp)+"\t"+currentIDs);
-IO.pl("\tSaving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingStartBp)+"\t"+currentIDs);
-					//start new
-					currentIDs = fileIds;
-					currentStart = i;
 
+		HashSet<IndexRegion> openRegions = new HashSet<IndexRegion>();
+		int startPos = -1;
+		ArrayList<RegionToPrint> toSave = new ArrayList<RegionToPrint>();
+
+		for (int i=0; i< workingIndex.length; i++){
+			if (workingIndex[i]== null) continue;
+
+			//first in block?
+			if (openRegions.size() == 0){
+				openRegions.addAll(workingIndex[i]);
+				startPos = i;
+				if (toSave.size() != 0) saveRegions(toSave, out);
+			}
+
+			//must be adding a new so need to save old
+			else {
+				toSave.add(new RegionToPrint(startPos, i, fetchIds(openRegions)));
+				startPos = i;
+
+				//go through each of the current index regions
+				for (IndexRegion ir: workingIndex[i]){
+					//already in open then this must be an end so remove it
+					if (openRegions.contains(ir)) openRegions.remove(ir);
+					//not present so this is a beginning, add it
+					else openRegions.add(ir);
 				}
 			}
-			//save last? nope, will always hit a null at the end.
-
-		} catch (Exception e){
-			e.printStackTrace();
-			Misc.printErrAndExit("\nERROR: problem saving the index for "+workingChr+", aborting.\n");
 		}
-	} 
-	
-	/*
-	public void saveIndex(){
-		try {
-			File queryIndexFile = new File(indexDir, workingChr+".qi.bed");
-			PrintWriter out = new PrintWriter(new FileWriter((queryIndexFile)));
-			HashSet<IndexRegion> openRegions = new HashSet<IndexRegion>();
-			int startPos = -1;
-			ArrayList<RegionToPrint> toSave = new ArrayList<RegionToPrint>();
-			
-			for (int i=0; i< workingIndex.length; i++){
-				if (workingIndex[i]== null) continue;
-				//System.out.println(" xxxxxxxxxxxxxxxxxxxxxxxxxxxxx Index "+i);
-				
-				//first in block?
-				if (openRegions.size() == 0){
-					openRegions.addAll(workingIndex[i]);
-					startPos = i;
-					if (toSave.size() != 0) saveRegions(toSave, out);
-				}
-				
-				//must be adding a new so need to save old
-				else {
-					toSave.add(new RegionToPrint(startPos, i, fetchIds(openRegions)));
-					startPos = i;
-					
-					//go through each of the current index regions
-					for (IndexRegion ir: workingIndex[i]){
-						//already in open then this must be an end so remove it
-						if (openRegions.contains(ir)) openRegions.remove(ir);
-						//not present so this is a beginning, add it
-						else openRegions.add(ir);
-					}
-				}
-			}
-			//save last?
-			if (toSave.size() != 0) saveRegions(toSave, out);
-			
-			//close it
-			out.close();
-		} catch (IOException e){
-			e.printStackTrace();
-			Misc.printErrAndExit("\nERROR: problem saving the index for "+workingChr+", aborting.\n");
-		}
-	}*/
+		//save last?
+		if (toSave.size() != 0) saveRegions(toSave, out);
+	}
 	
 	private void saveRegions(ArrayList<RegionToPrint> al, PrintWriter out){
 		//set first
@@ -567,14 +388,14 @@ IO.pl("\tSaving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingS
 			if (next.ids.equals(rtp.ids)) rtp.stop = next.stop;
 			else {
 				StringBuilder sb = new StringBuilder(workingChr);
-				rtp.appendInfo(sb);
+				rtp.appendInfo(sb, workingStartBp);
 				out.println(sb);
 				rtp = next;
 			}
 		}
 		//print last
 		StringBuilder sb = new StringBuilder(workingChr);
-		rtp.appendInfo(sb);
+		rtp.appendInfo(sb, workingStartBp);
 		out.println(sb);
 		al.clear();
 		
@@ -591,15 +412,16 @@ IO.pl("\tSaving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingS
 			this.ids = ids;
 		}
 
-		public void appendInfo(StringBuilder sb) {
+		public void appendInfo(StringBuilder sb, int blockStartPosition) {
 			sb.append("\t");
-			sb.append(start);
+			sb.append(start+blockStartPosition);
 			sb.append("\t");
-			sb.append(stop);
+			sb.append(stop+blockStartPosition);
 			sb.append("\t");
 			sb.append(ids);
 		}
 	}
+	
 	
 	private static String fetchIds(HashSet<IndexRegion> al) {
 		//just one?
@@ -625,7 +447,7 @@ IO.pl("\tSaving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingS
 		File[] beds = IO.extractFiles(indexDir, ".qi.bed");
 		for (File bed: beds){
 			//compress with bgzip, this will replace any existing compressed file and delete the uncompressed
-			String[] cmd = { bgzip.toString(), "-f", bed.toString()};
+			String[] cmd = { bgzip.toString(), "-f", "--threads", numberThreads+"", bed.toString()};
 			String[] output = IO.executeViaProcessBuilder(cmd, false);
 			File compBed = new File (bed+".gz");
 			if (output.length != 0 || bed.exists() == true || compBed.exists() == false){
@@ -633,7 +455,9 @@ IO.pl("\tSaving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingS
 			}
 
 			//tabix
-			cmd = new String[]{ tabix.toString(), "-f", "-p", "bed", compBed.toString() };
+			//must use -0 --sequence 1 --begin 2 --end 3; -p bed doesn't work with java tabix!!!!
+			cmd = new String[]{ tabix.toString(), "-0", "--sequence", "1", "--begin", "2", "--end", "3", compBed.toString()};
+
 			output = IO.executeViaProcessBuilder(cmd, false);
 			File indexBed = new File (compBed+".tbi");
 			if (output.length != 0 || indexBed.exists() == false){
@@ -669,9 +493,9 @@ IO.pl("\tSaving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingS
 					case 'i': indexDir = new File(args[++i]); break;
 					case 's': skipDirs = Misc.COMMA.split(args[++i]); break;
 					case 'q': verbose = false; break;
-					case 'u': updateIndex = true; break;
 					case 't': tabixBinDirectory = new File(args[++i]); break;
 					case 'n': numberThreads = Integer.parseInt(args[++i]); break;
+					case 'b': bpBlock = Integer.parseInt(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -690,16 +514,14 @@ IO.pl("\tSaving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingS
 		if (dataDir == null || dataDir.isDirectory() == false) Misc.printErrAndExit("\nERROR: please provide a directory containing gzipped and tabix indexed bed, vcf, maf.txt, and bedGraph files to index." );
 		if (indexDir == null ) Misc.printErrAndExit("\nERROR: please provide a directory in which to write the master query index." );
 		
-		if (updateIndex == false) IO.deleteDirectory(indexDir);
 		if (indexDir.exists() == false) indexDir.mkdirs();
 
 		//threads to use
 		int numAvail = Runtime.getRuntime().availableProcessors();
 		if (numberThreads < 1 || numberThreads > numAvail) numberThreads =  numAvail - 1;
-		IO.pl(numAvail +" available processors, using "+numberThreads+"\n");
+		IO.pl(numAvail +" available processors, using "+numberThreads);
 		
 		toTruncatePoint = dataDir.getParentFile().toString().length()+1;
-		workingIndex = new ArrayList[bpBlock];
 	}	
 
 	private void parseSkipDirs(String[] skipDirs) {
@@ -778,15 +600,13 @@ IO.pl("\tSaving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingS
 		return startStopSubtract;
 	}
 
+	
 	private void saveFileIds(){
 		try {
 
 			//find all the parsed files
 			HashSet<File> parsedFiles = new HashSet<File>();
 			for (ArrayList<File> al: chrFiles.values()) parsedFiles.addAll(al);
-			
-			//add in prior
-			if (oldDataSource != null) parsedFiles.addAll(oldDataSource);
 
 			//save ids with truncated paths
 			int toSkip = dataDir.getParentFile().toString().length()+1;
@@ -812,7 +632,6 @@ IO.pl("\tSaving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingS
 			//save the trunk file name : id
 			File ids = new File(indexDir, "fileIds.obj");
 			IO.saveObject(ids, fileStringId);
-//IO.pl("\nSaving fileIds.obj "+fileStringId);
 			
 			//save the trunk file name : size
 			File sizes = new File(indexDir, "fileSizes.obj");
@@ -859,6 +678,7 @@ IO.pl("\tSaving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingS
 	}*/
 	
 	private void parseDataSources(){
+		IO.pl("\nSearching for tabix indexes and bgzipped data sources...");
 		try {
 			ArrayList<File> goodDataSources = new ArrayList<File>();
 			ArrayList<File> tbiMissingDataSources = new ArrayList<File>();
@@ -907,9 +727,7 @@ IO.pl("\tSaving "+workingChr+"\t"+(currentStart+workingStartBp)+"\t"+(i+workingS
 			goodDataSources.addAll(unrecognizedDataSource);
 			dataFilesToParse = new File[goodDataSources.size()];
 			goodDataSources.toArray(dataFilesToParse);
-			
-IO.pl("\nXXXXXXXXXXXXXXX NOT  SORTING ");
-//Arrays.sort(dataFilesToParse);
+			Arrays.sort(dataFilesToParse);
 			
 		} catch (IOException e){
 			e.printStackTrace();
@@ -968,13 +786,17 @@ IO.pl("\nXXXXXXXXXXXXXXX NOT  SORTING ");
 				"-q Quiet output, no per record warnings.\n"+
 				"-u Update query index, defaults to building it anew. Only works when adding or\n"+
 				"     deleting files from the data dir. Any other changes requires a full rebuild.\n"+
-
+				"-b BP block to process, defaults to 250000000. Reduce if out of memory issues occur.\n"+
+				"-n Number cores to use, defaults to all\n"+
+				
+				"\nWARNING: for bed file tabix indexing don't use -p/--preset option, it doesn't\n"+
+				"     work with the htsjdk java classes. Use '-0 --sequence 1 --begin 2 --end 3'\n"+
 
 				"\nExample for generating the test index using the GitHub Query/TestResources files see\n"+
 				"https://github.com/HuntsmanCancerInstitute/Query\n\n"+
 				
 				"d=/pathToYourLocalGitHubInstalled/Query/TestResources\n"+
-				"java -Xmx64G -jar pathToUSeq/Apps/QueryIndexer -c $d/b37Chr20-21ChromLen.bed -d $d/Data\n"+
+				"java -Xmx120G -jar pathToUSeq/Apps/QueryIndexer -c $d/b37Chr20-21ChromLen.bed -d $d/Data\n"+
 				"-i $d/Index -t ~/BioApps/HTSlib/1.3/bin/ -s $d/Data/Public/B37/GVCFs \n\n" +
 
 				"**************************************************************************************\n");
