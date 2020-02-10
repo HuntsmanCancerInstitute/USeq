@@ -136,7 +136,7 @@ public class SamSVJoiner{
 			File samRes = new File(bamResult.getParentFile(), sam);
 			samRes.deleteOnExit();
 			samOut = new Gzipper (samRes);
-			samOut.println(reader.getFileHeader().getTextHeader().trim());
+			samOut.println(reader.getFileHeader().getSAMString().trim());
 		
 			int counter =0;
 			//for each record, should be only two alignments per read name 

@@ -261,7 +261,7 @@ public class MergeBarcodedPairedAlignments {
 			SamReader samReader = factory.open(bamFile);
 
 			//fetch header
-			samHeader = samReader.getFileHeader().getTextHeader().trim();
+			samHeader = samReader.getFileHeader().getSAMString().trim();
 			samHeader = samHeader+"\n@PG\tID:MergePairedAlignments\tCL: "+programArguments;
 
 			//get chromosomes

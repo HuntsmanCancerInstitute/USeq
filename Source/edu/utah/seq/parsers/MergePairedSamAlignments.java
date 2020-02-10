@@ -263,7 +263,7 @@ public class MergePairedSamAlignments{
 			}
 
 			//load header 
-			String[] header = samReader.getFileHeader().getTextHeader().split("\\n");
+			String[] header = samReader.getFileHeader().getSAMString().split("\\n");
 			for (String h: header) samHeader.add(h);
 
 

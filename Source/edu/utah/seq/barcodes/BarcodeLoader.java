@@ -126,7 +126,7 @@ public class BarcodeLoader extends Thread{
 			}
 			
 			//set text header for thread writers
-			samHeader = samReader.getFileHeader().getTextHeader().trim();
+			samHeader = samReader.getFileHeader().getSAMString().trim();
 			
 			//create a writer for the failing records
 			failingSamFile = new File (consensus.getSaveDirectory(), "0_failing.sam.gz");

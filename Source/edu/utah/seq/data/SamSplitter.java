@@ -74,7 +74,7 @@ public class SamSplitter{
 
 		//add header
 		SamReader sr = factory.open(samFile);
-		samHeader = sr.getFileHeader().getTextHeader().trim();
+		samHeader = sr.getFileHeader().getSAMString().trim();
 		if (addPG) samHeader = samHeader+"\n"+ "@PG\tID:SplitSam\tCL: args "+programArguments;
 		samOut1.println(samHeader);
 		samOut2.println(samHeader);

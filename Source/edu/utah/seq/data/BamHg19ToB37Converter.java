@@ -47,7 +47,7 @@ public class BamHg19ToB37Converter{
 			SamReader in = readerFactory.open(sam);
 			File samFile = new File (sam.getParentFile(), "b37_"+Misc.removeExtension(sam.getName())+".sam.gz");
 			Gzipper out = new Gzipper(samFile);
-			String h = header.getFileHeader().getTextHeader().trim();
+			String h = header.getFileHeader().getSAMString().trim();
 			out.println(h);
 			parseSam(in, out);
 			in.close();

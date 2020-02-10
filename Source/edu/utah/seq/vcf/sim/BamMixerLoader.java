@@ -69,7 +69,7 @@ public class BamMixerLoader implements Runnable{
 		//save headers?
 		if (loaderId == 0) {
 			//sam
-			String samHeader = unModifiedReader.getFileHeader().getTextHeader();
+			String samHeader = unModifiedReader.getFileHeader().getSAMString();
 			for (int i=0; i< targetFractions.length; i++) {
 				samWriters[i].print(samHeader);
 				targetVarResults.print("TargetAF\tActualAF\t(Mod/UnModAlignPairs)\t");

@@ -81,10 +81,7 @@ public class QueryIndexFileLoader implements Runnable {
 			if (startStop != null) {
 				//check against the chrom seg
 				if (startStop[0] < start) startStop[0] = start;
-				if (startStop[1] >= stop) {
-					startStop[1] = stop;
-IO.pl("\n\t\tTrunc "+record+" "+sourceFile);
-				}
+				if (startStop[1] >= stop) startStop[1] = stop;
 				if ((startStop[1]-startStop[0]) > 0) {
 					toAdd.add(new IndexRegion(startStop[0]-start, startStop[1]-start, id));
 					if (toAdd.size() > numToLoad) {

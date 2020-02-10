@@ -383,6 +383,8 @@
 				
 					<a href="#VCFFdrEstimator">VCFFdrEstimator</a><br>
 				
+					<a href="#VCFFdrFilter">VCFFdrFilter</a><br>
+				
 					<a href="#VCFMerger">VCFMerger</a><br>
 				
 					<a href="#VCFMpileupAnnotator">VCFMpileupAnnotator</a><br>
@@ -1051,7 +1053,7 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/BedStats -b /Res/ex1.bed.gz -s 9 -t
 </pre><br><p>
 				
 					<a name="BedTabix"><pre>**************************************************************************************
-**                                BedTabix: Jan 2013                                **
+**                                BedTabix: Dec 2019                                **
 **************************************************************************************
 Converts bed files to a SAMTools compressed bed tabix format. Recursive.
 
@@ -2024,7 +2026,7 @@ Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportTrimmedGenes -u -g
 </pre><br><p>
 				
 					<a name="FastqBarcodeTagger"><pre>**************************************************************************************
-**                          Fastq Barcode Tagger: August 2018                       **
+**                          Fastq Barcode Tagger: Jan 2020                       **
 **************************************************************************************
 Takes 2 or 3 fastq files (paired end reads and possibly a third containing unique 
 molecular barcodes/ indexes), appends the barcode and quality to the fastq header, and
@@ -3820,12 +3822,17 @@ Optional Params:
 -q Quiet output, no per record warnings.
 -u Update query index, defaults to building it anew. Only works when adding or
      deleting files from the data dir. Any other changes requires a full rebuild.
+-b BP block to process, defaults to 250000000. Reduce if out of memory issues occur.
+-n Number cores to use, defaults to all
+
+WARNING: for bed file tabix indexing don't use -p/--preset option, it doesn't
+     work with the htsjdk java classes. Use '-0 --sequence 1 --begin 2 --end 3'
 
 Example for generating the test index using the GitHub Query/TestResources files see
 https://github.com/HuntsmanCancerInstitute/Query
 
 d=/pathToYourLocalGitHubInstalled/Query/TestResources
-java -Xmx64G -jar pathToUSeq/Apps/QueryIndexer -c $d/b37Chr20-21ChromLen.bed -d $d/Data
+java -Xmx120G -jar pathToUSeq/Apps/QueryIndexer -c $d/b37Chr20-21ChromLen.bed -d $d/Data
 -i $d/Index -t ~/BioApps/HTSlib/1.3/bin/ -s $d/Data/Public/B37/GVCFs 
 
 **************************************************************************************
@@ -4616,7 +4623,7 @@ Example: java -Xmx1500M -jar pathTo/Apps/Sgr2Bar -f /affy/sgrFiles/ -s + -t
 </pre><br><p>
 				
 					<a name="SimpleSomaticCaller"><pre>**************************************************************************************
-**                          Simple Somatic Caller: Oct 2019                         **
+**                          Simple Somatic Caller: Jan 2020                         **
 **************************************************************************************
 Takes vcf output from Bcftools mpileup and norm applications (http://www.htslib.org)
 run on a paired tumor and normal bam file set and filters the variants for somatic
@@ -5450,6 +5457,30 @@ Required Options:
 
 Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFFdrEstimator -b patient123Bkg.vcf.gz
        -v patient123Somatic.vcf.gz -r FinalVcfs/patient123SomaticFdr.vcf.gz
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCFFdrFilter"><pre>**************************************************************************************
+**                               VCF Fdr Filter : Jan 2020                          **
+**************************************************************************************
+Takes scored fdr values and applies a tuned thresholding based on regression to filter
+vcf files to reach a list with a targeted fdr. Each threshold is matched to a given 
+variant AF and variant type. For example, filtering snv vcf records with tumor AFs of
+0.05 with a QUAL score of 8.64 produces lists with a FDR of 5%
+
+Required:
+-v Path to a vcf file xxx.vcf(.gz/.zip OK) or directory containing such.
+-s Path to a directory to save the pass and fail vcf records.
+-q SNV QUAl thresholds that generate lists of variants with a specific FDR. Comma
+      delimited, no spaces.
+-a SNV Allele frequencies.
+-r INDEL QUAl thresholds.
+-b INDEL Allele frequencies.
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFFdrFilter -v Calls/ -s FDR5Calls -q 
+      8.75,8.63,8.62,8.64,8.85 -r 16.5,15.9,15.3,25.7,45.2 -a
+      0.005,0.0075,0.01,0.05,0.1 -b 0.005,0.0075,0.01,0.05,0.1 
 
 **************************************************************************************
 </pre><br><p>

@@ -75,7 +75,7 @@ public class VCFComparator {
 
 			//parse vcf file
 			System.out.println("Parsing and filtering variant data for common interrogated regions...");
-			parseFilterFiles();
+			if (parseFilterFiles() == false) continue;
 
 			//if useVQSLOD
 			if (useVQSLOD){
@@ -539,7 +539,7 @@ public class VCFComparator {
 		return numberCommonBases;
 	}
 
-	public void parseFilterFiles(){
+	public boolean parseFilterFiles(){
 
 		//key regions
 		if (keyRegions== null){
@@ -613,7 +613,8 @@ public class VCFComparator {
 
 		if (numberFilteredKeyVariants == 0) {
 			System.out.println(results);
-			Misc.printErrAndExit("\nNo key variants in shared regions? Aboring.\n");
+			IO.el("\nNo key variants in shared regions? Skipping.\n");
+			return false;
 		}
 		
 		//calc Ti/Tv for key if in vcf format
@@ -634,18 +635,21 @@ public class VCFComparator {
 		results.append(res);
 		if (testParser.getVcfRecords().length == 0){
 			System.out.println(results);
-			Misc.printErrAndExit("\nNo test vcf records found? Aborting!\n");
+			IO.el("\nNo test vcf records found? Skipping.\n");
+			return false;
 		}
 		testParser.filterVCFRecords(commonRegions);
 		res = testParser.getVcfRecords().length +"\tTest variants in shared regions\n";
 		results.append(res);
 		if (testParser.getVcfRecords().length == 0){
 			System.out.println(results);
-			Misc.printErrAndExit("\nNo test variants in shared regions? Aboring.\n");
+			IO.el("\nNo test variants in shared regions? Skipping.\n");
+			return false;
 		}
 		res = testParser.calculateTiTvRatio() +"\tShared test variants Ti/Tv\n";
 		results.append(res);
 		results.append("\n");
+		return true;
 		
 	}
 

@@ -86,7 +86,7 @@ public class MergeSams{
 		if (samHeader == null) {
 			for (int i=0; i< dataFiles.length; i++){
 				SamReader sr = factory.open(dataFiles[i]);
-				parseHeader(sr.getFileHeader().getTextHeader().trim());
+				parseHeader(sr.getFileHeader().getSAMString().trim());
 				sr.close();
 			}
 			samHeader = fetchSamHeader();

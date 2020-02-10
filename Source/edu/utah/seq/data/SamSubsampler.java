@@ -2,19 +2,13 @@ package edu.utah.seq.data;
 
 import java.io.*;
 import java.util.regex.*;
-
-import util.bio.parsers.MultiFastaParser;
-import util.bio.seq.Seq;
 import util.gen.*;
-
 import java.util.*;
-
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.ValidationStringency;
-import edu.utah.seq.data.*;
 import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.data.sam.SamAlignment;
 
@@ -260,7 +254,7 @@ public class SamSubsampler{
 			//make reader
 			SamReader reader = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT).open(workingFile);
 			SAMRecordIterator iterator = reader.iterator();
-			if (samHeader == null) samHeader = reader.getFileHeader().getTextHeader().trim();
+			if (samHeader == null) samHeader = reader.getFileHeader().getSAMString().trim();
 
 			int counter =0;
 			int numBadLines = 0;

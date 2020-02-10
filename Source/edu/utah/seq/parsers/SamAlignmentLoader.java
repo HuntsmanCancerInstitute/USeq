@@ -153,7 +153,7 @@ public class SamAlignmentLoader {
 		}	
 		Arrays.sort(regions);
 		//samReader.getFileHeader().setProgramRecords(new ArrayList<SAMProgramRecord>());
-		samHeader = samReader.getFileHeader().getTextHeader().trim();
+		samHeader = samReader.getFileHeader().getSAMString().trim();
 		
 		samReader.close();
 	}

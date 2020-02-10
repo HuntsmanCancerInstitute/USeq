@@ -1438,6 +1438,29 @@ public class IO {
 		}
 		return files;
 	}
+	
+	/**Fetches directories recursively.*/
+	public static ArrayList<File> fetchDirectoriesRecursively (File directory){
+		ArrayList<File> dirs = new ArrayList<File>(); 
+		File[] list = directory.listFiles();
+		if (list != null){
+			for (int i=0; i< list.length; i++){
+				if (list[i].isDirectory()) {
+					dirs.add(list[i]);
+					dirs.addAll(fetchDirectoriesRecursively(list[i]));
+				}				
+			}
+		}
+		return dirs;
+	}
+	
+	/**Fetches directories recursively.*/
+	public static File[] fetchDirsRecursively (File directory){
+		ArrayList<File> dirs = fetchDirectoriesRecursively (directory);
+		File[] list = new File[dirs.size()];
+		dirs.toArray(list);
+		return list;
+	}
 
 	/**Fetches all files with a given extension in a directory recursing through sub directories.
 	 * Will return a file if a file is given with the appropriate extension, or null.*/

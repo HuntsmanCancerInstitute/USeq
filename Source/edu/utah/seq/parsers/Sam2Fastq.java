@@ -381,7 +381,7 @@ public class Sam2Fastq {
 			failingSam = new Gzipper(fail);
 
 			//write header
-			String header = bamReader.getFileHeader().getTextHeader().trim();
+			String header = bamReader.getFileHeader().getSAMString().trim();
 			failingSam.println(header);
 			
 			//raw reader?

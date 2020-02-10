@@ -2,6 +2,7 @@ package edu.utah.seq.parsers;
 
 import java.io.*;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Set;
 import java.util.TreeMap;
@@ -10,15 +11,19 @@ import java.util.regex.Pattern;
 import util.gen.*;
 
 /**
-  * @author Nix
+ * @author Nix
  * */
 public class ParseFdrColumns {
 
 	//user defined fields
+	private File[] dirsToParse;
 	private File[] toParse;
 	private HashMap<String, FdrSet> fdrSets = new HashMap<String, FdrSet>();
-	private File pdfDirectory = null;
-	private Gzipper out = null;
+	private File pdfFile = null;
+	private PrintWriter out = null;
+	private int numRows = 2;
+	private int numColumns = 3;
+	private File fullPathToR = new File ("/usr/local/bin/R");
 
 	//constructors
 	/**Stand alone.*/
@@ -28,24 +33,60 @@ public class ParseFdrColumns {
 		//set fields
 		processArgs(args);
 
-		for (File f: toParse) {
-			IO.pl("Parsing "+f);
-			parse(f);
-		}
-
-		try {
-			out = new Gzipper(new File(pdfDirectory, "rScript.txt"));
-			//walk hash map
-			for (String setName: fdrSets.keySet()) {
-				//IO.pl(setName);
-				FdrSet fs = fdrSets.get(setName);
-				//fs.print();
-				//IO.pl("\t"+fs.numEmptySets());
-				fs.printPlot(setName, pdfDirectory);
+		//for each dir, say 0.1, 0.05, 0.001
+		for (File d: dirsToParse) {
+			IO.pl("\nProcessing "+d);
+			toParse = IO.extractFiles(d, ".txt");
+			if (toParse.length > (numRows * numColumns)) Misc.printErrAndExit("Adjust numRows or numColumns");
+			
+			//parse the FdrSets for each of the comps fdrTprSummary.txt
+			fdrSets.clear();
+			for (File f: toParse) {
+				IO.pl("\tParsing "+f);
+				parse(f);
 			}
-			out.close();
-		} catch (Exception e) {
-			e.printStackTrace();
+
+			//print script file to generate 5 plots, one for each caller app, Strelka, ssc, lofreq, ...
+			try {
+				File scriptFile = new File(d, "rScript.txt");
+				out = new PrintWriter(new FileWriter(scriptFile));
+				pdfFile = new File(d, d.getParentFile().getName()+"_"+d.getName()+".pdf");
+				//start printer and set grid
+				out.println("pdf(file='"+pdfFile+"', width=12, height=7)");
+				out.println("old.par = par(mfrow=c("+numRows+", "+numColumns+"))");
+
+				//walk hash map
+				for (String setName: fdrSets.keySet()) {
+					//IO.pl(setName);
+					FdrSet fs = fdrSets.get(setName);
+					fs.printPlot(setName);
+				}
+				//close the grid and printer
+				out.println("par(old.par)");
+				out.println("dev.off()");
+				out.close();
+
+				//make command
+				File rOut = new File(d, "rOutput.txt");
+				String[] command = new String[] {
+						fullPathToR.getCanonicalPath(),
+						"CMD",
+						"BATCH",
+						"--no-save",
+						"--no-restore",
+						scriptFile.getCanonicalPath(),
+						rOut.getCanonicalPath()};			
+				//execute
+				//Misc.printArray(command);
+				if (IO.executeCommandLine(command) == null) Misc.printErrAndExit("\nError executing R script.\n"+scriptFile);
+				String[] output = IO.loadFile(rOut);
+				for (String s: output) if (s.toLowerCase().contains("error")) Misc.printErrAndExit("\nError executing R script.\n"+scriptFile);
+				
+				
+				
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
 		}
 
 		//finish and calc run time
@@ -60,15 +101,23 @@ public class ParseFdrColumns {
 		BufferedReader in;
 		try {
 			in = IO.fetchBufferedReader(f);
-			
+
 			//pull first line
 			//dFDR	12_Snvs_0.1.lofreq	dFDR	12_Snvs_0.1.mutect	dFDR	12_Snvs_0.1.ssc	dFDR	12_Snvs_0.1.strelka	dFDR	12_Snvs_0.1.tnscope
-			String[] header = Misc.TAB.split(in.readLine());
-			
+			//dFDR	15352X1_Indels_0.1_Lofreq_low	dFDR	15352X1_Indels_0.1_Mutect_low	dFDR	15352X1_Indels_0.1_SSC_low	dFDR	15352X1_Indels_0.1_Strelka_low	dFDR	15352X1_Indels_0.1_TNscope_low
+
+
+			//remove 1534X? _low _moderate?
+			String hl = in.readLine();
+			hl = hl.replaceAll("15352X", "");
+			hl = hl.replaceAll("_mod", "");
+
+			String[] header = Misc.TAB.split(hl);
+
 			//make ArrayLists
 			ArrayList<Float>[] fAL = new ArrayList[header.length];
 			for (int i=0; i< header.length; i++) fAL[i] = new ArrayList<Float>();
-			
+
 			//for each line parse values
 			String line;
 			String[] values;
@@ -81,17 +130,17 @@ public class ParseFdrColumns {
 					}
 				}
 			}
-			
+
 			//load hash
 			for (int i=0; i< header.length; i++) {
 				ArrayList<Float> fdr = fAL[i];
 				i++;
 				ArrayList<Float> tpr = fAL[i];
-				
+
 				//parse set name, 12_Snvs_0.1.lofreq to Snvs_0.1.lofreq
 				String name = header[i];
 				String setName = name.substring(name.indexOf("_")+1);
-				
+
 				FdrSet fdrSet = fdrSets.get(setName);
 				if (fdrSet == null) {
 					fdrSet = new FdrSet();
@@ -99,28 +148,28 @@ public class ParseFdrColumns {
 				}
 				fdrSet.add(name, fdr, tpr);
 			}
-			
+
 			in.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 			System.exit(1);
 		}
-		
-		
-		
+
+
+
 	}
 
 	private class FdrSet {
 		ArrayList<String>  individualNames = new ArrayList<String>();
 		ArrayList<float[]> fdr = new ArrayList<float[]>();
 		ArrayList<float[]> tpr = new ArrayList<float[]>();
-		
+
 		public void add(String name, ArrayList<Float> fdrAL, ArrayList<Float> tprAL ) {
 			individualNames.add(Misc.UNDERSCORE.split(name)[0]);
 			fdr.add(Num.arrayListOfFloatToArray(fdrAL));
 			tpr.add(Num.arrayListOfFloatToArray(tprAL));
 		}
-		
+
 		public void print() {
 			for (int i=0; i< individualNames.size(); i++) {
 				IO.pl("\t"+individualNames.get(i));
@@ -128,22 +177,22 @@ public class ParseFdrColumns {
 				IO.pl("\tTPR "+Misc.floatArrayToString(tpr.get(i), ","));
 			}
 		}
-		
-		
+
+
 		String[] colors = {"#FE2712", "#FB9902",  "#FEFE33", "#B2D732", "#66B032", "#347C98", "#0247FE", "#FCCC1A", "#4424D6", "#8601AF", "#C21460", "#FC600A"};
 		int[] symbols = {15,16,17,18,19,20,21,22,23,24,25,1,2,3,4,5,6};
-		
-		public void printPlot(String title, File saveDir) throws IOException {
+
+		public void printPlot(String title) throws IOException {
 			TreeMap<Integer, String[]> ordered = fetchOrderedData();
 			Set<Integer> nameNumber = ordered.keySet();
 			ArrayList<Integer> al = new ArrayList<Integer>();
 			al.addAll(nameNumber);
-			
+
 			//save for legend
 			ArrayList<String> lNames = new ArrayList<String>();
 			ArrayList<String> lColors = new ArrayList<String>();
 			ArrayList<String> lSymbols = new ArrayList<String>();
-			
+
 			//find first good one
 			String[] first = null;
 			int i=0;
@@ -158,18 +207,18 @@ public class ParseFdrColumns {
 				}
 				else lNames.add(al.get(i)+" NA");
 			}
-			
-			if (first == null) out.println("# "+title+ " All Failed!\n");
+
+			if (first == null) IO.pl("\t\t# "+title+ " All Failed!");
 			else {
-				out.println("pdf('"+saveDir+"/"+title+".pdf')");
 				//print out data
 				for (String[] d: ordered.values()) if(d != null) out.println(d[0]);
-				
+
 				//print plot
-				out.println("plot("+first[1]+",pch="+symbols[i]+",col='"+colors[i]+"',main='"+title+"',type='b',bty='l',xlab='dFDR',ylab='TPR',lwd=3,xlim=c(0,1),ylim=c(0,1))");
-				
-				
-				
+				String parsedTitle = title.replaceAll("_", " ");
+				out.println("plot("+first[1]+",pch="+symbols[i]+",col='"+colors[i]+"',main='"+parsedTitle+"',type='b',bty='l',xlab='dFDR',ylab='TPR',lwd=3,xlim=c(0,1),ylim=c(0,1))");
+
+
+
 				//print lines
 				i++;
 				for (; i< al.size(); i++) {
@@ -182,20 +231,18 @@ public class ParseFdrColumns {
 					}
 					else lNames.add(al.get(i)+" NA");
 				}
-				
+
 				//print grid
 				out.println("abline(h=seq(0,1,0.1),v=seq(0,1,0.1),col='grey',lwd=0.8)");
-				
+
 				//print the legend
-				out.println("legend('bottomright',bty ='n',pt.cex=2,cex =1.2,text.col='black',horiz=F,inset=c(0.1, 0.1),");
+				out.println("legend('bottomright',bty ='n',pt.cex=1,cex=1,text.col='black',horiz=F,inset=c(0.05, 0.05),");
 				out.println("legend=c('"+ Misc.stringArrayListToString(lNames, "','")+ "'),");
 				out.println("col=c('"+ Misc.stringArrayListToString(lColors, "','")+ "'),");
 				out.println("pch=c("+ Misc.stringArrayListToString(lSymbols, ",")+ ") )");
-				out.println("dev.off()\n");
-				
 			}
 		}
-		
+
 		public TreeMap<Integer, String[]> fetchOrderedData() {
 			TreeMap<Integer, String[]> ordered = new TreeMap<Integer, String[]>();
 			for (int i=0; i< individualNames.size(); i++) {
@@ -211,14 +258,14 @@ public class ParseFdrColumns {
 			}
 			return ordered;
 		}
-		
+
 		public double numEmptySets() {
 			double num = 0;
 			for (int i=0; i< individualNames.size(); i++) {
 				float[] iFdr = fdr.get(i);
 				if (iFdr.length==3 && Num.sumArray(iFdr)==3.0f) num++;
 			}
-			
+
 			return num/(double)individualNames.size();
 		}
 	}
@@ -243,8 +290,7 @@ public class ParseFdrColumns {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'd': toParse = IO.fetchFilesRecursively(new File(args[++i]), ".txt"); break;
-					case 'p': pdfDirectory = new File(args[++i]); break;
+					case 'd': dirsToParse = IO.fetchDirsRecursively(new File(args[++i])); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group()+", Try -h");
 					}
@@ -254,7 +300,7 @@ public class ParseFdrColumns {
 				}
 			}
 		}
-		if (pdfDirectory.exists() == false) pdfDirectory.mkdirs();
+		Arrays.sort(dirsToParse);
 	}	
 
 	public static void printDocs(){
@@ -262,20 +308,6 @@ public class ParseFdrColumns {
 				"**************************************************************************************\n" +
 				"**                                Sam 2 Fastq: May 2018                              **\n" +
 				"**************************************************************************************\n" +
-				"Given a query name sorted alignment file, S2F writes out fastq data for paired and \n"+
-				"unpaired alignemnts. Any non-primary, secondary, or supplemental \n"+
-				"alignments are written to a failed sam file.  This app doesn't have the memory leak\n"+
-				"found in Picard, writes gzipped fastq, and error checks the reads. Provide an\n"+
-				"unfiltered fastq-bam to use in retrieving missing mates. S2F will remove pre and\n"+
-				"post naming info from the BamBlaster restoring the original fragment names.\n"+
-
-				"\nOptions:\n"+
-				"-s Path to a directory for saving parsed data.\n"+
-				"-a Path to a query name sorted bam/sam alignment file. \n"+
-				"-u (Optional) Path to a query name sorted unfiltered bam/sam alignment file for use\n"+
-				"      in fetching missing mates of the first bam. Convert fastq to bam, then qn sort.\n"+
-
-				"\n"+
 
 				"Example: java -Xmx2G -jar pathTo/USeq/Apps/Sam2Fastq -a myQNSorted.bam -s S2F/\n\n"+
 

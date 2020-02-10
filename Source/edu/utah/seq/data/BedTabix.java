@@ -95,7 +95,8 @@ public class BedTabix{
 			}
 
 			//tabix
-			cmd = new String[]{ tabix.getCanonicalPath(), "-f", "-p", "bed", compBED.getCanonicalPath() };
+			//must use -0 --sequence 1 --begin 2 --end 3, -p bed doesn't work with java tabix!!!!
+			cmd = new String[]{ tabix.getCanonicalPath(), "-0", "--sequence", "1", "--begin", "2", "--end", "3", compBED.getCanonicalPath() };
 			output = IO.executeCommandLineReturnAll(cmd);
 			File indexBED = new File (parentDir, compBED.getName()+".tbi");
 			if (output == null || output.length != 0 || indexBED.exists() == false){
@@ -188,7 +189,7 @@ public class BedTabix{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                BedTabix: Jan 2013                                **\n" +
+				"**                                BedTabix: Dec 2019                                **\n" +
 				"**************************************************************************************\n" +
 				"Converts bed files to a SAMTools compressed bed tabix format. Recursive.\n" +
 

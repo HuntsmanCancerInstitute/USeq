@@ -188,10 +188,10 @@ public class SamComparator {
 	
 
 	private void addHeaders() throws IOException {
-		String firstHeader = samReaderFirst.getFileHeader().getTextHeader().trim();
+		String firstHeader = samReaderFirst.getFileHeader().getSAMString().trim();
 		goodSamFirst.println(firstHeader);
 		badSamFirst.println(firstHeader);
-		String secondHeader = samReaderSecond.getFileHeader().getTextHeader().trim();
+		String secondHeader = samReaderSecond.getFileHeader().getSAMString().trim();
 		goodSamSecond.println(secondHeader);
 		badSamSecond.println(secondHeader);
 	}

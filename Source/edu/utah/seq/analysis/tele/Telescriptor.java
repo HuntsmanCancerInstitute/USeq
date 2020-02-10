@@ -126,9 +126,9 @@ public class Telescriptor {
 
 	private void writeOutSamHeaders() {
 		try {
-			String head = treatmentSamReaders[0].getFileHeader().getTextHeader().trim();
+			String head = treatmentSamReaders[0].getFileHeader().getSAMString().trim();
 			treatmentMisSplicedSamOut.println(head);
-			head = controlSamReaders[0].getFileHeader().getTextHeader().trim();
+			head = controlSamReaders[0].getFileHeader().getSAMString().trim();
 			controlMisSplicedSamOut.println(head);
 		} catch (IOException e) {
 			e.printStackTrace();

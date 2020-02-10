@@ -4718,6 +4718,18 @@ public class Num {
 		return sb.toString();
 	}
 	
+	/**Converts an array of Integer to a String seperated by the delimiter.  */
+	public static String integerArrayToString(Integer[] d, String delimiter){
+		StringBuffer sb = new StringBuffer();
+		int num = d.length;
+		sb.append(d[0].toString());
+		for (int i=1; i<num; i++){
+			sb.append(delimiter);
+			sb.append(d[i].toString());
+		}
+		return sb.toString();
+	}
+	
 	/**Converts an array of short to a String seperated by the delimiter.  */
 	public static String shortArrayToString(short[] d, String delimiter){
 		StringBuffer sb = new StringBuffer();

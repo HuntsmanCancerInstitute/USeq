@@ -157,6 +157,7 @@ public class SimpleSomaticCaller {
 				pass.println(workingRecord);
 			}
 			IO.pl(numPass+"\t"+numFail);
+			pass.close();
 		}
 	}
 
@@ -452,7 +453,7 @@ public class SimpleSomaticCaller {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                          Simple Somatic Caller: Oct 2019                         **\n" +
+				"**                          Simple Somatic Caller: Jan 2020                         **\n" +
 				"**************************************************************************************\n" +
 				"Takes vcf output from Bcftools mpileup and norm applications (http://www.htslib.org)\n"+
 				"run on a paired tumor and normal bam file set and filters the variants for somatic\n"+
