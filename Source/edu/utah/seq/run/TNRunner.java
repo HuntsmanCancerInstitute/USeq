@@ -359,6 +359,8 @@ public class TNRunner {
 						case 'k': copyRatioBkgDir = new File(args[++i]); break;
 						case 'v': clinicalVcfDir = new File(args[++i]); break;
 						case 'o': otherDir = new File(args[++i]); break;
+						case 'g': germlineAnnotatedVcfParser = args[++i]; break;
+						case 's': somaticAnnotatedVcfParser = args[++i]; break;
 						case 'u': minReadCoverageTumor = Integer.parseInt(args[++i]); break;
 						case 'i': minReadCoverageNormal = Integer.parseInt(args[++i]); break;
 						case 'x': maxNumJobsToSubmit = Integer.parseInt(args[++i]); break;
@@ -514,7 +516,7 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                  TNRunner : Dec 2019                             **\n" +
+				"**                                  TNRunner : Feb 2020                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several dockerized snakmake workflows on human tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, Hg38\n"+
