@@ -387,13 +387,16 @@ public class AggregateQCStats {
 				else {
 					//fetch name and type
 					String[] nameType = parseSampleName(j.getName());
-					//fetch SampleQC
-					SampleQC sqc = samples.get(nameType[0]);
-					if (sqc == null){
-						sqc = new SampleQC(nameType[0], calcReadCoverage, swapExomeForDNA);
-						samples.put(nameType[0], sqc);
+					if (nameType == null) IO.pl("\nWarning, no match, skipping json file -> "+j);
+					else {
+						//fetch SampleQC
+						SampleQC sqc = samples.get(nameType[0]);
+						if (sqc == null){
+							sqc = new SampleQC(nameType[0], calcReadCoverage, swapExomeForDNA);
+							samples.put(nameType[0], sqc);
+						}
+						sqc.loadJson(j, nameType[1]);
 					}
-					sqc.loadJson(j, nameType[1]);
 				}
 			}
 		}
@@ -441,8 +444,6 @@ public class AggregateQCStats {
 		mat = s2uPattern.matcher(name);
 		if (mat.matches()) return new String[]{mat.group(1), "s2u"};
 
-		Misc.printErrAndExit("\nERROR: failed to parse the sample name from "+name +"\nLooking for "+
-				saePattern.pattern()+" or "+mpaPattern.pattern()+" or "+s2uPattern.pattern());
 		return null;
 	}
 
@@ -501,7 +502,7 @@ public class AggregateQCStats {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Aggregate QC Stats: May 2019                          **\n" +
+				"**                            Aggregate QC Stats: Feb 2020                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from json files produced by the\n"+
 				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, BamConcordance and Fastq rule.\n"+
