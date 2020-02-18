@@ -2,7 +2,6 @@ package edu.utah.seq.vcf;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -21,7 +20,7 @@ import org.apache.commons.httpclient.methods.GetMethod;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import edu.utah.hci.query.LocalQuery;
-import edu.utah.hci.query.UserQuery;  
+import edu.utah.hci.query.UserQuery;
 
 /**Calculates call frequencies for each vcf record from a db of vcf files and callable region files. 
  * Most mutated single site in p53 is seen at 0.039 across all cancers in TCGA.  0.57 for BRAF V600E across all cancers.*/
@@ -35,7 +34,8 @@ public class VCFCallFrequency {
 	private String queryKey = null;
 	private String userName = null; 
 	private String password = null; 
-	private String fileFilter = null;
+	private String vcfFileFilter = null;
+	private String bedFileFilter = null;
 	private int numberRecordsPerQuery = 1000;
 	private String vcfSearchUrl = null;
 	private String bedSearchUrl = null;
@@ -63,6 +63,9 @@ public class VCFCallFrequency {
 
 
 	public VCFCallFrequency (String[] args) {
+		
+		
+		
 		long startTime = System.currentTimeMillis();
 		processArgs(args);
 
@@ -89,8 +92,8 @@ public class VCFCallFrequency {
 		fetchEncodedQueryKey();
 
 		//set search url
-		vcfSearchUrl = queryURL+"search?key="+ queryKey+"&regExAll=.vcf.gz;"+fileFilter+"&matchVcf=true&vcf=";
-		bedSearchUrl = queryURL+"search?key="+ queryKey+"&regExAll=.bed.gz;"+fileFilter+"&bed=";
+		vcfSearchUrl = queryURL+"search?key="+ queryKey+"&regExAll=.vcf.gz;"+vcfFileFilter+"&matchVcf=true&vcf=";
+		bedSearchUrl = queryURL+"search?key="+ queryKey+"&regExAll=.bed.gz;"+bedFileFilter+"&bed=";
 		fetchOptionsUrl = queryURL+"search?key="+ queryKey+"&fetchOptions=true";
 		IO.pl("fetchOptions:\t"+fetchOptionsUrl);
 		IO.pl("\tCall this in a browser to pick an appropriate file filter for your analysis. Only those data files with the file filter in their path will be queried.");
@@ -143,13 +146,13 @@ public class VCFCallFrequency {
 				if (line.startsWith("#")) {
 					out.println(line);
 					if (addInfo && line.startsWith("##INFO")){
-						out.println("##INFO=<ID=CF,Number=1,Type=Float,Description=\"Frequency the variant has been observed in '"+fileFilter
+						out.println("##INFO=<ID=CF,Number=1,Type=Float,Description=\"Frequency the variant has been observed in '"+vcfFileFilter
 								+ "' variant datasets, number vcf matches, number bed matches.\">");
 						addInfo = false;
 					}
 					else if (addFilter && line.startsWith("##FILTER")){
 						out.println("##FILTER=<ID=CallFreq,Description=\"Variant exceeded a call frequency of "+maxCallFreq+
-								" from querying vcf and callable region bed files in '"+fileFilter+"'\">");
+								" from querying vcf and callable region bed files in '"+vcfFileFilter+"'\">");
 						addFilter = false;
 					}
 				}
@@ -447,14 +450,15 @@ public class VCFCallFrequency {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'v': forExtraction = new File(args[++i]); break;
-					case 'f': fileFilter = args[++i]; break;
+					case 'f': forExtraction = new File(args[++i]); break;
+					case 'v': vcfFileFilter = args[++i]; break;
+					case 'b': bedFileFilter = args[++i]; break;
 					case 'x': appendFilter = false; break;
 					case 'c': configFile = new File(args[++i]); break;
 					case 'i': indexDir = new File(args[++i]); break;
 					case 'd': dataDir = new File(args[++i]); break;
 					case 'm': maxCallFreq = Double.parseDouble(args[++i]); break;
-					case 'b': minBedCount = Integer.parseInt(args[++i]); break;
+					case 'o': minBedCount = Integer.parseInt(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'e': debug = true; break;
 					case 'h': printDocs(); System.exit(0);
@@ -477,22 +481,24 @@ public class VCFCallFrequency {
 			if (config.containsKey("username")) userName = config.get("username");
 			if (config.containsKey("password")) password = config.get("password");
 			if (config.containsKey("maxcallfreq")) maxCallFreq = Double.parseDouble(config.get("maxcallfreq"));
-			if (config.containsKey("filefilter")) fileFilter = config.get("filefilter");
+			if (config.containsKey("vcffilefilter")) vcfFileFilter = config.get("vcffilefilter");
+			if (config.containsKey("bedfilefilter")) bedFileFilter = config.get("bedfilefilter");
 		}
 		//local search?
 		if (queryURL == null){
 			if (dataDir == null || indexDir == null || dataDir.isDirectory()== false || indexDir.isDirectory() == false) {
 				Misc.printErrAndExit("\nProvide either a configuration file for remotely accessing a genomic query service or "
-						+ "two directory paths to the Data and Index directories uses by the USeq QueryIndexer app.\n");;
+						+ "two directory paths to the Data and Index directories uses by the GQueryIndexer app.\n");;
 			}
 		}
 
 		IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments:");
-		IO.pl("\t-v Vcfs "+forExtraction);
+		IO.pl("\t-f Vcfs "+forExtraction);
 		IO.pl("\t-s SaveDir "+saveDirectory);
-		IO.pl("\t-f File Filter "+fileFilter);
+		IO.pl("\t-v VCF File Filter "+vcfFileFilter);
+		IO.pl("\t-b VCF File Filter "+vcfFileFilter);
 		IO.pl("\t-m MaxCallFreq "+maxCallFreq);
-		IO.pl("\t-b MinBedCount "+minBedCount);
+		IO.pl("\t-o MinBedCount "+minBedCount);
 		IO.pl("\t-x Remove failing "+(appendFilter==false));
 		IO.pl("\t-e Verbose "+debug);
 		if (queryURL != null){
@@ -515,7 +521,6 @@ public class VCFCallFrequency {
 		}
 		IO.pl();
 
-
 		//pull vcf files
 		if (forExtraction == null || forExtraction.exists() == false) Misc.printErrAndExit("\nError: please enter a path to a vcf file or directory containing such.\n");
 		File[][] tot = new File[3][];
@@ -526,25 +531,26 @@ public class VCFCallFrequency {
 		if (vcfFiles == null || vcfFiles.length ==0 || vcfFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.vcf(.zip/.gz OK) file(s)!\n");
 
 		//check params
-		if (fileFilter == null) Misc.printErrAndExit("\nError: provide a fileFilter, e.g. /B37/Somatic/Avatar/ ");
+		if (vcfFileFilter == null) Misc.printErrAndExit("\nError: provide a vcf file filter, e.g. Hg38/Somatic/Avatar/Vcf ");
+		if (vcfFileFilter == null) Misc.printErrAndExit("\nError: provide a bed file filter, e.g. Hg38/Somatic/Avatar/Bed ");
 		if (saveDirectory == null) Misc.printErrAndExit("\nError: provide a directory to save the annotated vcf files.");
 		else saveDirectory.mkdirs();
 		if (saveDirectory.exists() == false) Misc.printErrAndExit("\nError: could not find your save directory? "+saveDirectory);
 
-		userQueryVcf = new UserQuery().addRegexAll(".vcf.gz").addRegexAll(fileFilter).matchVcf();
-		userQueryBed = new UserQuery().addRegexAll(".bed.gz").addRegexAll(fileFilter);
+		userQueryVcf = new UserQuery().addRegexAll(".vcf.gz").addRegexAll(vcfFileFilter).matchVcf();
+		userQueryBed = new UserQuery().addRegexAll(".bed.gz").addRegexAll(bedFileFilter);
 	}	
 
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Call Frequency: June 2019                         **\n" +
+				"**                            VCF Call Frequency: Feb 2020                          **\n" +
 				"**************************************************************************************\n" +
 				"Calculates a vcf call frequency for each variant when pointed at a genomic Query\n"+
-				"service (https://github.com/HuntsmanCancerInstitute/Query) or the Data and Index\n"+
+				"service (https://github.com/HuntsmanCancerInstitute/GQuery) or the Data and Index\n"+
 				"directories the service is accessing. CallFreq's are calculated \n"+
 				"by first counting the number of exact vcf matches present and dividing it by the\n"+
-				"number of intersecting bed files. Use this to flag variants with high call rates that\n"+
+				"number of intersecting callable bed files. Use this tool to flag variants with high call rates that\n"+
 				"are potential false positives. Some are not, e.g. BRAF V600E occurs in 58% of cancers\n"+
 				"with a BRAF mutation. So treate the call freq as an annotation requiring context level\n"+
 				"interpretation. Use the file filter to limit which files are included in the call freq\n"+
@@ -553,15 +559,16 @@ public class VCFCallFrequency {
 				"index folder path as defined by -f. \n"+
 
 				"\nRequired Options:\n"+
-				"-v Full path to a file or directory containing xxx.vcf(.gz/.zip OK) file(s)\n" +
+				"-f Full path to a file or directory containing xxx.vcf(.gz/.zip OK) file(s)\n" +
 				"-s Directory to save the annotated vcf files\n"+
-				"-f Query service file filter, e.g. /B37/Somatic/Avatar/\n"+
+				"-v GQuery service vcf file filter, e.g. Hg38/Somatic/Avatar/Vcf\n"+
+				"-v GQuery service callable region bed file filter, e.g. Hg38/Somatic/Avatar/Bed\n"+
 				"-c Config txt file containing two tab delimited columns with host, queryUrl, realm, \n"+
 				"     userName, password, and (optionally) fileFilter and or maxCallFreq. 'chmod 600'\n"+
 				"     the file! e.g.: \n"+
 				"     host hci-clingen1.hci.utah.edu\n"+
-				"     queryUrl http://hci-clingen1.hci.utah.edu:8080/Query/\n"+
-				"     realm QueryAPI\n"+
+				"     queryUrl http://hci-clingen1.hci.utah.edu:8080/GQuery/\n"+
+				"     realm GQuery\n"+
 				"     userName FColins\n"+
 				"     password g0QueryAP1\n"+
 				"-i (Alternative to -c), provide a path to the Index directory generated by the USeq \n"+
@@ -571,12 +578,12 @@ public class VCFCallFrequency {
 				"\nOptions:\n"+
 				"-m Maximum call freq, defaults to 1, before appending 'CallFreq' to the FILTER field.\n"+
 				"-x Remove failing max call freq records, not recommended.\n"+
-				"-b Minimum bed call count before applying a max call freq filter, defaults to 8.\n"+
+				"-o Minimum bed call count before applying a max call freq filter, defaults to 8.\n"+
 				"-e Print verbose debugging output.\n"+
 
 
-				"\nExample: java -jar pathToUSeq/Apps/VCFCallFrequency -v Vcf/ -s CFVcfs -f \n"+
-				"    /B37/Somatic/Avatar/ -m 0.05 -c vcfCFConfig.txt \n\n" +
+				"\nExample: java -jar pathToUSeq/Apps/VCFCallFrequency -f Vcf/ -s CFVcfs -v \n"+
+				"    Hg38/Somatic/Avatar/Vcf -b Hg38/Somatic/Avatar/Bed -m 0.05 -c vcfCFConfig.txt \n\n" +
 				"**************************************************************************************\n");
 
 	}
