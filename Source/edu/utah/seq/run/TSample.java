@@ -170,7 +170,9 @@ public class TSample {
 		//squeue the shell script
 		new File(jobDir, "QUEUED").createNewFile();
 		String alignDirPath = jobDir.getCanonicalPath();
-		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(tRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
+		String nice =  "";
+		if (tRunner.isNice()) nice = "--nice=10000";
+		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", nice, "-J", alignDirPath.replace(tRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
 		for (String o: output) info.add("\t\t"+o);
 		numJobsLaunched++;
 	}

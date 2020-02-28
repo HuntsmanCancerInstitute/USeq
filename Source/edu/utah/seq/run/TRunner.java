@@ -27,6 +27,7 @@ public class TRunner {
 	private boolean restartFailed = false;
 	private String pathToTrim = null;
 	private int maxNumJobsToSubmit = 0;
+	private boolean  nice = false;
 
 	public TRunner (String[] args) {
 		long startTime = System.currentTimeMillis();
@@ -112,6 +113,7 @@ public class TRunner {
 						case 'x': maxNumJobsToSubmit = Integer.parseInt(args[++i]); break;
 						case 'q': verbose = false; break;
 						case 'f': forceRestart = true; break;
+						case 'n': nice = true; break;
 						case 'd': restartFailed = true; break;
 						case 'r': softRestart = true; break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
@@ -165,6 +167,7 @@ public class TRunner {
 				IO.pl("Delete and restart failed jobs\t"+restartFailed);
 				IO.pl("Force restart\t"+forceRestart);
 				IO.pl("Verbose logging\t"+verbose);
+				IO.pl("Nice jobs\t"+nice);
 				if (maxNumJobsToSubmit!=0) IO.pl("Max # jobs to launch\t"+maxNumJobsToSubmit);
 				else IO.pl("Max # jobs to launch\tno limit");
 			}
@@ -178,7 +181,7 @@ public class TRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TRunner December 2018                            **\n" +
+				"**                                 TRunner Feb 2020                                 **\n" +
 				"**************************************************************************************\n" +
 				"TRunner is designed to execute several dockerized snakmake workflows on human tumor\n"+
 				"only datasets via a slurm cluster.  Based on the availability of the bams and xml,\n"+
@@ -218,12 +221,14 @@ public class TRunner {
 				"-f Force a restart of all running and uncompleted jobs.\n"+
 				"-q Quite output.\n"+
 				"-x Maximum # jobs to launch, defaults to 0, no limit\n"+
+				"-n Nice jobs\n"+
 
-				"\nExample: java -jar pathToUSeq/Apps/TRunner -p FoundationPatients -e \n"+
-				"     ~/Hg38/CaptureAlignQC/WorkflowDocs/ -c ~/Hg38/SomExoCaller/WorkflowDocs/ -a \n"+
-				"     ~/Hg38/Annotator/WorkflowDocs/ -b ~/Hg38/BamConcordance/WorkflowDocs/ -j\n"+
-				"     ~/Hg38/JointGenotyping/WorkflowDocs/ -t ~/Hg38/TranscriptomeAlignQC/WorkflowDocs/ \n"+
-				"     -s '-d 100 -f' -x 20 \n\n"+
+				"\nExample: java -jar pathToUSeq/Apps/TRunner -p FJobs -n -x 1000 \n"+
+				"    -e ~/TNRunner/Workflows/Foundation/AlignQC/\n"+
+				"    -t ~/TNRunner/Workflows/Foundation/TransAlignQC/\n"+
+				"    -c ~/TNRunner/Workflows/Foundation/SomTumorCaller/\n"+
+				"    -a ~/TNRunner/Workflows/Foundation/Annotator/\n"+
+				"    -v ~/TNRunner/Workflows/Foundation/VCFIntegration/\n\n"+
 
 
 				"**************************************************************************************\n");
@@ -262,5 +267,9 @@ public class TRunner {
 
 	public boolean isSoftRestart() {
 		return softRestart;
+	}
+
+	public boolean isNice() {
+		return nice;
 	}
 }
