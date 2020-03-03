@@ -495,8 +495,8 @@ public class VCFCallFrequency {
 		IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments:");
 		IO.pl("\t-f Vcfs "+forExtraction);
 		IO.pl("\t-s SaveDir "+saveDirectory);
-		IO.pl("\t-v VCF File Filter "+vcfFileFilter);
-		IO.pl("\t-b VCF File Filter "+vcfFileFilter);
+		IO.pl("\t-v Vcf File Filter "+vcfFileFilter);
+		IO.pl("\t-b Bed File Filter "+bedFileFilter);
 		IO.pl("\t-m MaxCallFreq "+maxCallFreq);
 		IO.pl("\t-o MinBedCount "+minBedCount);
 		IO.pl("\t-x Remove failing "+(appendFilter==false));
@@ -562,7 +562,7 @@ public class VCFCallFrequency {
 				"-f Full path to a file or directory containing xxx.vcf(.gz/.zip OK) file(s)\n" +
 				"-s Directory to save the annotated vcf files\n"+
 				"-v GQuery service vcf file filter, e.g. Hg38/Somatic/Avatar/Vcf\n"+
-				"-v GQuery service callable region bed file filter, e.g. Hg38/Somatic/Avatar/Bed\n"+
+				"-b GQuery service callable region bed file filter, e.g. Hg38/Somatic/Avatar/Bed\n"+
 				"-c Config txt file containing two tab delimited columns with host, queryUrl, realm, \n"+
 				"     userName, password, and (optionally) fileFilter and or maxCallFreq. 'chmod 600'\n"+
 				"     the file! e.g.: \n"+
