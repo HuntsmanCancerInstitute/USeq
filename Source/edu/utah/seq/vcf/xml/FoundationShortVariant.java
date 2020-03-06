@@ -36,7 +36,7 @@ public class FoundationShortVariant {
 	
 	//for extracting 
 	private static Pattern snvPat = Pattern.compile("[-_\\d\\+]+([GATC]+)>([GATC]+)");
-	private static Pattern delPat = Pattern.compile("[-_\\d\\+]+DEL([GATC\\d]+)");
+	private static Pattern delPat = Pattern.compile("[-_\\*\\d\\+]+DEL([GATC\\d]+)");
 	private static Pattern insPat = Pattern.compile("[-_\\d\\+]+INS([GATC\\d]+)");
 	private static Pattern multiPat = Pattern.compile("([-_\\d\\+]+)>([GATC\\d]+)");    
 	private static Pattern intPat = Pattern.compile("\\d+");
@@ -118,11 +118,19 @@ public class FoundationShortVariant {
 	}
 
 	private void parseRefAlt() {
-		//parse the strand info
-		String strand = parseString("strand");
-		if (strand.equals("+") == false && strand.equals("-") == false) Misc.printErrAndExit("\nError: failed to parse + or - strand info from "+parsedAttributes);
-		//parse effect
-		parseEffect(strand);
+		//parse the strand info, this is sometimes missing
+		if (parsedAttributes.containsKey("strand") == false) {
+			String gene = parseString("gene");
+			String s = parser.getGeneNameStrand().get(gene);
+			if (s == null) Misc.printErrAndExit("\nError: failed to parse strand info and can't find the associated gene from "+parsedAttributes);
+			else parseEffect(s);
+		}
+		else {
+			String strand = parseString("strand");
+			if (strand.equals("+") == false && strand.equals("-") == false) Misc.printErrAndExit("\nError: failed to parse + or - strand info from "+parsedAttributes);
+			//parse effect
+			parseEffect(strand);
+		}
 	}
 
 	private void parseEffect(String strand) {
@@ -145,7 +153,12 @@ public class FoundationShortVariant {
 			return;
 		}
 		
-		//deletion?   4835_4835delT   660-107_664del112
+		//deletion?   4835_4835delT   660-107_664del112   
+		// 1262950_ORD-0663444-01  new -> 4201_*43del49
+		// 1261997_ORD-0675868-01  new -> 642_*12delGTAAGTTGAAAATATT
+		//    delPat = Pattern.compile("[-_\\d\\+]+DEL([GATC\\d]+)");
+		
+		
 		Matcher del = delPat.matcher(eff);
 		if (del.matches()){
 			type = "del";

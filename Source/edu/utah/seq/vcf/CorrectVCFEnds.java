@@ -59,6 +59,12 @@ public class CorrectVCFEnds {
 						//attempt a match
 						Matcher mat = Bed.END.matcher(line);
 						if (mat.matches() == false) Misc.printErrAndExit("Error: failed to find and END=xxx for:\n\tbed: "+b.toString()+"\n\tvcf: "+line);
+						//is end before pos?
+						int pos = Integer.parseInt(fields[1]);
+						if (b.getStop()<= pos)  {
+							System.err.println("WARNING: end is less that POS, using POS+1 for:\n\tbed: "+b.toString()+"\n\tvcf: "+line);
+							b.setStop(pos+1);
+						}
 						//swap it
 						mat = END_SWAP.matcher(line);
 						String swapped = mat.replaceFirst("END="+b.getStop());
