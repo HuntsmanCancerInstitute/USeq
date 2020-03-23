@@ -1140,17 +1140,19 @@ public class IO {
 			String[] fileNames;
 			if (directory.isDirectory()){
 				fileNames = directory.list();
-				int num = fileNames.length;
-				ArrayList<File> al = new ArrayList<File>();
+				if (fileNames != null) {
+					int num = fileNames.length;
+					ArrayList<File> al = new ArrayList<File>();
 
-				String path = directory.getCanonicalPath();
-				for (int i=0; i< num; i++)  {
-					if (fileNames[i].startsWith(".") == false) al.add(new File(path, fileNames[i])); 
-				}
-				//convert arraylist to file[]
-				if (al.size() != 0){
-					files = new File[al.size()];
-					al.toArray(files);
+					String path = directory.getCanonicalPath();
+					for (int i=0; i< num; i++)  {
+						if (fileNames[i].startsWith(".") == false) al.add(new File(path, fileNames[i])); 
+					}
+					//convert arraylist to file[]
+					if (al.size() != 0){
+						files = new File[al.size()];
+						al.toArray(files);
+					}
 				}
 			}
 			if (files == null){

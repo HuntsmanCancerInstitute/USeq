@@ -339,7 +339,7 @@ public class MergePairedAlignments {
 					switch (test){
 					case 'b': bamFile = new File(args[++i]); break;
 					case 'd': saveDirectory = new File(args[++i]); break;
-					case 'e': bedRegionFile = new File(args[++i]); break;
+					// case 'e': bedRegionFile = new File(args[++i]); break;
 					case 's': saveSams = true; break;
 					case 'm': crossCheckMateCoordinates = false; break;
 					case 'r': secondPairReverseStrand = true; break;
@@ -418,7 +418,7 @@ public class MergePairedAlignments {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Merge Paired Alignments: Oct 2018                     **\n" +
+				"**                            Merge Paired Alignments: Mar 2020                     **\n" +
 				"**************************************************************************************\n" +
 				"Merges proper paired alignments that pass a variety of checks and thresholds. Only\n" +
 				"unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps\n" +
@@ -433,7 +433,7 @@ public class MergePairedAlignments {
 				"\nDefault Options:\n"+
 				"-s Save merged xxx.sam.gz alignments instead of binary ChromData. Either works\n"+
 				"      in Sam2USeq for read coverage analysis, the ChromData is much faster.\n"+
-				"-e Only process and save alignments overlapping this bed format region file.\n"+
+				//"-e Only process and save alignments overlapping this bed format region file.\n"+
 				"-u Remove all alignments marked as duplicates, defaults to keeping.\n"+
 				"-a Maximum alignment score (AS:i: tag). Defaults to 300, smaller numbers are more\n" +
 				"      stringent for novoalign where each mismatch is ~30pts.\n"+

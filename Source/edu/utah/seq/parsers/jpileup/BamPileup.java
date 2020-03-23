@@ -3,19 +3,14 @@ package edu.utah.seq.parsers.jpileup;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.*;
 import htsjdk.samtools.*;
-import htsjdk.samtools.reference.IndexedFastaSequenceFile;
-import htsjdk.samtools.reference.ReferenceSequence;
+import htsjdk.samtools.cram.ref.ReferenceSource;
 import util.bio.annotation.Bed;
 import util.gen.*;
-import edu.utah.seq.data.sam.SamAlignment;
-import edu.utah.seq.data.sam.SamLayoutForMutation;
-import edu.utah.seq.parsers.mpileup.MpileupTabixLoader;
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream; //needed by cram
 
 /** Set MinBaseQual to 1, MinMapQual to 0, includeOverlaps to true, to replicate IGV.
  * /scratch/mammoth/serial/u0028003/Underhill/SpikeBuild/SpikedAlignments/FirstSet/15352X1_9/15352X1_BB_Indels/BamMixer/0.01.bam
@@ -86,9 +81,8 @@ public class BamPileup {
 			processArgs(args);
 			
 			//create reader
-			samFactory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+			samFactory = SamReaderFactory.makeDefault().referenceSource(new ReferenceSource(fastaFile)).validationStringency(ValidationStringency.SILENT);
 			
-
 			//load and chunk the bed file of regions to scan
 			int numRegionsPerWorker = 0;
 			Bed[] regions = Bed.parseFile(bedFile, 0, 0);
@@ -145,6 +139,7 @@ public class BamPileup {
 	public void processArgs(String[] args) throws Exception{
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
+		File forExtraction = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -152,7 +147,7 @@ public class BamPileup {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'b': bamFiles = IO.extractFiles(new File(args[++i]), ".bam"); break;
+					case 'b': forExtraction = new File(args[++i]); break;
 					case 'r': bedFile = new File(args[++i]); break;
 					case 'f': fastaFile = new File(args[++i]); break;
 					case 's': results = new File(args[++i]); break;
@@ -173,8 +168,15 @@ public class BamPileup {
 		//Create fasta fetcher
 		if (fastaFile == null || fastaFile.canRead() == false)  Misc.printErrAndExit("\nError: please provide an reference genome fasta file and it's index.");		
 		if (bedFile == null ||  bedFile.canRead() == false) Misc.printErrAndExit("\nError: please provide a file of regions in bed format.");
-		if (bamFiles == null ) Misc.printErrAndExit("\nError: please provide one or more sorted and indexed bam alignment files.");
 		if (results == null ) Misc.printErrAndExit("\nError: please provide a results file that ends with xxx.gz");
+		
+		//pull bam and cram files
+		if (forExtraction == null || forExtraction.exists() == false) Misc.printErrAndExit("\nError: please enter a path to directory containing xxx.bam and xxx.cram files with their indexes.\n");
+		File[][] tot = new File[2][];
+		tot[0] = IO.extractFiles(forExtraction, ".bam");
+		tot[1] = IO.extractFiles(forExtraction,".cram");
+		bamFiles = IO.collapseFileArray(tot);
+		if (bamFiles == null || bamFiles.length ==0 || bamFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.bam or xxx.cram files!\n");		
 		
 		//number of workers
 		int numProc = Runtime.getRuntime().availableProcessors();
@@ -184,7 +186,7 @@ public class BamPileup {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 Bam Pileup:  Oct 2019                            **\n" +
+				"**                                Bam Pileup:  March 2020                           **\n" +
 				"**************************************************************************************\n" +
 				"BP extracts pileup information for each bam file over a list of regions. This includes\n"+
 				"the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available to\n"+
@@ -196,7 +198,7 @@ public class BamPileup {
 				"pileup info, set -q 0 -m 0 -i\n"+
 				
 				"\nRequired Options:\n"+
-				"-b Path to a coordinate sorted bam file or directory of bams.\n"+
+				"-b Path to a directory of coordinate sorted bams or crams with indexes.\n"+
 				"-r Bed file of regions to extract pileup information. MUST BE NON OVERLAPPING. Run the\n"+
 				"      USeq MergeRegions app if unsure. xxx.bed.gz/.zip OK\n"+
 				"-f Path to the reference fasta with and xxx.fai index.\n"+
@@ -208,7 +210,7 @@ public class BamPileup {
 				"-i Include counts from overlapping paired reads, defaults to excluding them.\n"+
 				"-p Number processors to use, defaults to all.\n"+
 
-				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b BamFiles/ -r target.bed\n"+
+				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b CramFiles/ -r target.bed\n"+
 				"-f Ref/human_g1k_v37_decoy.fasta -s 15352RX.bp.txt.gz \n\n" +
 
 				"**************************************************************************************\n");

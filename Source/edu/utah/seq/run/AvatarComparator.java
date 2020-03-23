@@ -87,7 +87,7 @@ public class AvatarComparator {
 			
 			//check each Fastq dir for just two fastq files
 			for (File fqd: fastqDirs){
-				File[] fastq = IO.extractFiles(fqd, ".gz");
+				File[] fastq = IO.extractFiles(fqd);
 				if (fastq == null || fastq.length !=2){
 					IO.pl(name+"\tERROR: Failed to find just two fastq in "+fqd);
 					needsAttention.add(patientDir);
@@ -128,7 +128,6 @@ public class AvatarComparator {
 			String alignDirNames = Misc.stringArrayToString(IO.fetchFileNames(alignDirs), ",");
 			if (alignDirNames.contains("_NormalDNA") && alignDirNames.contains("_TumorDNA")){
 
-				//need to update this when you make the rename
 				File cr = new File(patientDir, "CopyAnalysis"); 
 				File gc = new File(patientDir, "GermlineVariantCalling");
 				File sc = new File(patientDir, "SampleConcordance");
@@ -136,7 +135,7 @@ public class AvatarComparator {
 				File[] toCheck = new File[]{cr, gc, sc, sv};
 				boolean fail = false;
 				for (File dir: toCheck){
-					if (dir.exists() == false) {
+					if (dir == null || dir.exists() == false) {
 						IO.pl(name+"\tERROR: Failed to find "+dir);
 						fail = true;
 					}
@@ -200,7 +199,7 @@ public class AvatarComparator {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Avatar Comparator : Feb 2019                           **\n" +
+				"**                           Avatar Comparator : March 2019                         **\n" +
 				"**************************************************************************************\n" +
 				"Tool for identifying AVATAR datasets that are ready for analysis or need attention.\n"+
 

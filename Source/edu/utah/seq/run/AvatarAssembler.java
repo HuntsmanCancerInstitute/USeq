@@ -25,10 +25,12 @@ public class AvatarAssembler {
 	private File gender = null;
 	private File diagnosis = null;
 	private File info = null;
+	private File prep = null;
+	private File sourceOrigin = null;
 	private File path = null;
 	private File results = null;
 	private File jobDir = null;
-	private String[] yearDirNames = new String[] {"2017", "2018", "2019", "2020", "2021"};
+	private String[] yearDirNames = new String[] {"2017", "2018", "2019", "2020", "2021", "2022"};
 	private File[] yearDirs = null;
 	private TreeMap<Integer, AvatarPatient> hciId2AvatarPatient = new TreeMap<Integer, AvatarPatient>();
 	private HashMap<String, AvatarPatient> experimentId2AvatarPatient = new HashMap<String, AvatarPatient>(); 
@@ -90,6 +92,10 @@ public class AvatarAssembler {
 			
 			loadDiagnosis();
 			
+			loadOrigin();
+			
+			loadPrep();
+			
 			filterPatients();
 
 			outputStatPatients();
@@ -108,11 +114,13 @@ public class AvatarAssembler {
 	
 	private void filterPatients() {
 		if (diagnosisFilter == null) return;
+		String lcDF = diagnosisFilter.toLowerCase();
 		TreeMap<Integer, AvatarPatient> keep = new TreeMap<Integer, AvatarPatient>();
 		for (Integer i: hciId2AvatarPatient.keySet()) {
 			AvatarPatient ap = hciId2AvatarPatient.get(i);
 			for (AvatarSample as: ap.avatarSamples){
-				if (as.diagnosis.contains(diagnosisFilter)){
+				String lcDig = as.diagnosis.toLowerCase();
+				if (lcDig.contains(lcDF)){
 					keep.put(i, ap);
 					break;
 				}
@@ -145,18 +153,20 @@ public class AvatarAssembler {
 	}
 
 
-
+	//these are all of the diagnosis from Foundation, Tempus, and Avatar so many won't have Avatar info
 	private void loadDiagnosis() throws IOException {
 		BufferedReader in = IO.fetchBufferedReader(diagnosis);
 		String line = in.readLine();
 		while ((line = in.readLine()) != null){
 			String[] fields = Misc.TAB.split(line);
 			if (fields.length != 2) {
+				//often broken
 				continue;
 				//throw new IOException("Incorrect number "+fields.length+" of fields in "+line);
 			}
 			AvatarSample as = sampleId2AvatarPatient.get(fields[0]);
 			if (as == null) {
+				//IO.pl("WARNING failed to find a sample associated with this diagnosis "+line);
 				continue;
 				//throw new IOException("Failed to find a sample assoicated with "+line);
 			}
@@ -164,7 +174,37 @@ public class AvatarAssembler {
 		}
 		in.close();
 	}
+	
+	//these are all of the origins from Foundation, Tempus, and Avatar so many won't have Avatar info
+	private void loadOrigin() throws IOException {
+		BufferedReader in = IO.fetchBufferedReader(sourceOrigin);
+		String line = in.readLine();
+		while ((line = in.readLine()) != null){
+			String[] fields = Misc.TAB.split(line.trim());
+			if (fields.length != 2) continue;
+			AvatarSample as = sampleId2AvatarPatient.get(fields[0]);
+			if (as == null) continue;
+			as.origin = fields[1].trim();
+		}
+		in.close();
+	}
+	
+	//these are all of the preps from Foundation, Tempus, and Avatar so many won't have Avatar info
+	private void loadPrep() throws IOException {
+		BufferedReader in = IO.fetchBufferedReader(prep);
+		String line = in.readLine();
+		while ((line = in.readLine()) != null){
+			line = line.replaceAll("\"", "");
+			String[] fields = Misc.TAB.split(line.trim());
+			if (fields.length != 2) continue;
+			AvatarSample as = sampleId2AvatarPatient.get(fields[0]);
+			if (as == null) continue;
+			as.prep = fields[1].trim();
+		}
+		in.close();
+	}
 
+	//these are all of the genders from Foundation, Tempus, and Avatar so many won't have Avatar info
 	private void loadGender() throws IOException {
 		BufferedReader in = IO.fetchBufferedReader(gender);
 		String line = in.readLine();
@@ -349,6 +389,8 @@ public class AvatarAssembler {
 		String sampleId = null;
 		String sampleName = null;
 		String diagnosis = "";
+		String origin = "";
+		String prep = "";
 		
 		//Exome or Transcriptome
 		String sampleType = null;
@@ -384,14 +426,17 @@ public class AvatarAssembler {
 			}
 			if (notFound) System.err.println("\nFailed to find the fastq file "+fields[6]+" associated with patient "+avatarPatient.hciId);
 		}
-		
+
 		public String toString(){
 			StringBuilder sb = new StringBuilder();
 			sb.append("\tSampleName\t"+ sampleName); sb.append("\n");
-			sb.append("\t\tSampleId\t"+         sampleId); sb.append("\n");
+			sb.append("\t\tId\t"+         sampleId); sb.append("\n");
 			sb.append("\t\tDiagnosis\t"+   diagnosis); sb.append("\n");
-			sb.append("\t\tSampleType\t"+        sampleType); sb.append("\n");
-			sb.append("\t\tSampleSource\t"+sampleSource);  sb.append("\n");
+			sb.append("\t\tType\t"+        sampleType); sb.append("\n");
+			sb.append("\t\tSource\t"+sampleSource);  sb.append("\n");
+			sb.append("\t\tOrigin\t"+   origin); sb.append("\n");
+			sb.append("\t\tPrep\t"+   prep); sb.append("\n");
+			
 			for (File f: fastq) {
 				sb.append("\t\t");
 				sb.append(f.toString());
@@ -402,11 +447,13 @@ public class AvatarAssembler {
 		
 		public JSONObject toJson(){
 			JSONObject fo = new JSONObject();
-			fo.put("SampleName", sampleName);
-			fo.put("SampleId", sampleId);
+			fo.put("Name", sampleName);
+			fo.put("Id", sampleId);
 			fo.put("Diagnosis", diagnosis);
-			fo.put("SampleType", sampleType);
-			fo.put("SampleSource", sampleSource);
+			fo.put("Type", sampleType);
+			fo.put("Source", sampleSource);
+			fo.put("Origin", origin);
+			fo.put("Prep", prep);
 			String[] fileNames = new String[fastq.size()];
 			int counter = 0;
 			for (File f: fastq) fileNames[counter++] = f.toString();
@@ -443,6 +490,8 @@ public class AvatarAssembler {
 					case 'i': info = new File(args[++i]); break;
 					case 'p': path = new File(args[++i]); break;
 					case 'r': results = new File(args[++i]); break;
+					case 'o': sourceOrigin = new File(args[++i]); break;
+					case 'e': prep = new File(args[++i]); break;
 					case 'y': yearDirNames = Misc.splitString(args[++i], ",");
 					case 'f': diagnosisFilter = args[++i]; break;
 					case 'j': jobDir = new File(args[++i]); break;
@@ -456,8 +505,8 @@ public class AvatarAssembler {
 				}
 			}
 		}
-		File[] files = new File[]{gender, diagnosis, info, path, results, jobDir};
-		for (File f: files) if (f== null) Misc.printErrAndExit("Error: missing one of the required five files (-g -d -i -p -r -j).");
+		File[] files = new File[]{gender, diagnosis, info, path, results, jobDir, sourceOrigin, prep};
+		for (File f: files) if (f== null) Misc.printErrAndExit("Error: missing one of the required five files (-g -d -i -p -r -j -s -e)");
 		
 		int numYearDirs = yearDirNames.length;
 		yearDirs = new File[numYearDirs];
@@ -471,7 +520,7 @@ public class AvatarAssembler {
 		
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                              Avatar Assembler : April 2019                       **\n" +
+				"**                              Avatar Assembler : March 2020                       **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling fastq avatar datasets based on the results of three sql queries.\n"+
 				"See https://ri-confluence.hci.utah.edu/x/KwBFAg   Login as root on hci-clingen1\n"+
@@ -480,8 +529,10 @@ public class AvatarAssembler {
 				"-i Info\n" +
 				"-d Diagnosis\n"+
 				"-g Gender\n"+
+				"-o Origin\n"+
+				"-e Prep\n"+
 				"-p Path to Exp dir w/o Year, e.g. /Repository/PersonData/\n"+
-				"-y Year dirs to examine for fastq linking, defaults to 2017,2018,2019,2020,2021\n"+
+				"-y Year dirs to examine for fastq linking, defaults to 2017,2018,2019,2020,2021,2022\n"+
 				"-j Job dir to place linked fastq\n"+
 				"-f Only keep patients with a diagnosis containing this String, defaults to all.\n"+
 				"-l Create Fastq links for all patient datasets, defaults to just those with both a\n"+
@@ -490,7 +541,8 @@ public class AvatarAssembler {
 				
                 "Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/\n"+
                 "    -r avatarAssembler.log.gz -i sampleInfo.txt -d sampleDiagnosis.txt -g \n"+
-                "    sampleGender.txt > avatarAssemblerProblemSamples.txt -f HEM -y 2018,2019\n\n"+
+                "    sampleGender.txt -s sampleOrigin.txt -e samplePrep.txt -f HEM \n"+
+                "    > avatarAssemblerProblemSamples.txt \n\n"+
 
 
 				"**************************************************************************************\n");

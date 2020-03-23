@@ -41,7 +41,13 @@ public class BamPileupLoader implements Runnable {
 		//create sam readers
 		File[] bamFiles = bamPileup.getBamFiles();
 		samReaders = new SamReader[bamFiles.length];
-		for (int i=0; i< samReaders.length; i++) samReaders[i] = bamPileup.getSamFactory().open(bamFiles[i]);
+		for (int i=0; i< samReaders.length; i++) {
+			samReaders[i] = bamPileup.getSamFactory().open(bamFiles[i]);
+			if (samReaders[i].hasIndex() == false) {
+				failed = true;
+				throw new IOException("Failed to find an index for "+bamFiles[i]);
+			}
+		}
 
 		//add header?
 		if (loaderIndex == 0) {
@@ -49,7 +55,7 @@ public class BamPileupLoader implements Runnable {
 			out.println("# MinBaseQual\t"+minBaseQuality);
 			out.println("# IncludeOverlappingBpCounts "+includeOverlaps);
 			out.println("# Bed "+IO.getCanonicalPath(bamPileup.getBedFile()));
-			for (int i=0; i<bamFiles.length; i++) out.println("# Bam "+i+" "+IO.getCanonicalPath(bamFiles[i]));
+			for (int i=0; i<bamFiles.length; i++) out.println("# Bam/Cram "+i+" "+IO.getCanonicalPath(bamFiles[i]));
 			out.println("# Chr\t1BasePos\tRef\tA,C,G,T,N,Del,Ins,FailBQ");
 		}
 
