@@ -71,7 +71,9 @@ public class BamPileup {
 	private int minBaseQuality = 10;
 	private SamReaderFactory samFactory;
 	private boolean includeOverlaps = false;
+	private boolean printAll = false;
 	private int numCpu = 0;
+	private int maxBpOfRegion = 1000;
 
 	//constructor
 	public BamPileup(String[] args){
@@ -87,6 +89,12 @@ public class BamPileup {
 			int numRegionsPerWorker = 0;
 			Bed[] regions = Bed.parseFile(bedFile, 0, 0);
 			Arrays.sort(regions);
+			int numOriRegions = regions.length;
+			
+			//split big regions
+			regions = Bed.splitBigRegions(regions, maxBpOfRegion);
+			IO.pl(numOriRegions+" regions split into "+regions.length+" regions with a max size of "+maxBpOfRegion+" bps\n");
+			
 			if (regions.length <= numCpu) {
 				numCpu = regions.length;
 				numRegionsPerWorker = 1;
@@ -124,6 +132,7 @@ public class BamPileup {
 			System.out.println("\nDone! "+Num.formatNumber(diffTime, 2)+" minutes");
 		} catch (Exception e) {
 			e.printStackTrace();
+			Misc.printErrAndExit("\nERROR making bpileup! Correct and restart.");
 		}
 	}
 
@@ -147,12 +156,13 @@ public class BamPileup {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'b': forExtraction = new File(args[++i]); break;
+					case 'b': forExtraction = new File(args[++i]).getCanonicalFile(); break;
 					case 'r': bedFile = new File(args[++i]); break;
 					case 'f': fastaFile = new File(args[++i]); break;
 					case 's': results = new File(args[++i]); break;
 					case 'q': minBaseQuality = Integer.parseInt(args[++i]); break;
 					case 'm': minMappingQuality = Integer.parseInt(args[++i]); break;
+					case 'x': maxBpOfRegion = Integer.parseInt(args[++i]); break;
 					case 'p': numCpu = Integer.parseInt(args[++i]); break;
 					case 'i': includeOverlaps = true; break;
 					case 'h': printDocs(); System.exit(0);
@@ -164,11 +174,6 @@ public class BamPileup {
 				}
 			}
 		}
-
-		//Create fasta fetcher
-		if (fastaFile == null || fastaFile.canRead() == false)  Misc.printErrAndExit("\nError: please provide an reference genome fasta file and it's index.");		
-		if (bedFile == null ||  bedFile.canRead() == false) Misc.printErrAndExit("\nError: please provide a file of regions in bed format.");
-		if (results == null ) Misc.printErrAndExit("\nError: please provide a results file that ends with xxx.gz");
 		
 		//pull bam and cram files
 		if (forExtraction == null || forExtraction.exists() == false) Misc.printErrAndExit("\nError: please enter a path to directory containing xxx.bam and xxx.cram files with their indexes.\n");
@@ -177,10 +182,20 @@ public class BamPileup {
 		tot[1] = IO.extractFiles(forExtraction,".cram");
 		bamFiles = IO.collapseFileArray(tot);
 		if (bamFiles == null || bamFiles.length ==0 || bamFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.bam or xxx.cram files!\n");		
+		Arrays.sort(bamFiles);
+		if (bamFiles.length == 1) printAll = true;
 		
+		//Create fasta fetcher
+		if (fastaFile == null || fastaFile.canRead() == false)  Misc.printErrAndExit("\nError: please provide an reference genome fasta file and it's index.");		
+		if (bedFile == null ||  bedFile.canRead() == false) Misc.printErrAndExit("\nError: please provide a file of regions in bed format.");
+		if (results == null ) Misc.printErrAndExit("\nError: please provide a results file that ends with xxx.gz");
+		
+				
 		//number of workers
 		int numProc = Runtime.getRuntime().availableProcessors();
 		if (numCpu == 0 || numCpu > numProc) numCpu = numProc;
+		
+		tempDir = results.getParentFile();
 	}	
 
 	public static void printDocs(){
@@ -189,18 +204,19 @@ public class BamPileup {
 				"**                                Bam Pileup:  March 2020                           **\n" +
 				"**************************************************************************************\n" +
 				"BP extracts pileup information for each bam file over a list of regions. This includes\n"+
-				"the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available to\n"+
-				"JVM, multithreaded. BGZip and Tabix index the results to make it searchable, e.g.\n"+
+				"the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available\n"+
+				"to the JVM. BGZip and Tabix index the results to make it searchable, e.g.\n"+
 				"      gunzip 15352R.bp.txt.gz\n"+
 				"      ~/BioApps/HTSlib/1.3/bin/bgzip --threads 20 15352R.bp.txt\n"+
 				"      ~/BioApps/HTSlib/1.3/bin/tabix -s 1 -b 2 -e 2 15352R.bp.txt.gz\n"+
 				"The header of the results file contains the order of the bams. To approximate IGV\n"+
-				"pileup info, set -q 0 -m 0 -i\n"+
+				"pileup info, set -q 0 -m 0 -i. If many alignment files are to be processed, run this\n"+
+				"app on each file individually and then merge them with the BamPileupMerger app.\n"+
 				
 				"\nRequired Options:\n"+
-				"-b Path to a directory of coordinate sorted bams or crams with indexes.\n"+
-				"-r Bed file of regions to extract pileup information. MUST BE NON OVERLAPPING. Run the\n"+
-				"      USeq MergeRegions app if unsure. xxx.bed.gz/.zip OK\n"+
+				"-b Path to a coordinate sorted bam/cram file with index or directory containing such.\n"+
+				"-r Bed file of regions to extract pileup information. MUST BE NON OVERLAPPING. Run\n"+
+				"      the USeq MergeRegions app if unsure. xxx.bed.gz/.zip OK\n"+
 				"-f Path to the reference fasta with and xxx.fai index.\n"+
 				"-s Path to a gzip file to save the pileup information, must end in xxx.gz\n"+
 
@@ -208,7 +224,9 @@ public class BamPileup {
 				"-q Minimum base quality, defaults to 10\n"+
 				"-m Minimum alignment mapping quality, defaults to 13\n"+
 				"-i Include counts from overlapping paired reads, defaults to excluding them.\n"+
-				"-p Number processors to use, defaults to all.\n"+
+				"-p Number processors to use, defaults to all, reduce if out of memory errors occur.\n"+
+				"-x Max length of region chunk, defaults to 1000, set smaller if out of memory errors\n"+
+				"      occur.\n"+
 
 				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b CramFiles/ -r target.bed\n"+
 				"-f Ref/human_g1k_v37_decoy.fasta -s 15352RX.bp.txt.gz \n\n" +
@@ -239,6 +257,10 @@ public class BamPileup {
 	}
 	public boolean isIncludeOverlaps() {
 		return includeOverlaps;
+	}
+
+	public boolean isPrintAll() {
+		return printAll;
 	}
 
 }

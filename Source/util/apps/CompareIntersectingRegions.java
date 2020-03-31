@@ -62,7 +62,7 @@ public class CompareIntersectingRegions {
 				}
 			}
 		}
-		header.append("Chr\tStart\tStop\tName\tScore");
+		header.append("#Chr\tStart\tStop\tName\tScore");
 		
 		System.out.println("\nIntersecting with:");
 		//for each file to split

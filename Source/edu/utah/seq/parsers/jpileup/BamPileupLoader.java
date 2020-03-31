@@ -25,6 +25,7 @@ public class BamPileupLoader implements Runnable {
 	private Bed[] regions = null;
 	private File resultsFile = null;
 	private boolean includeOverlaps;
+	private boolean printAll;
 
 
 	public BamPileupLoader (BamPileup bamPileup, int loaderIndex, Bed[] regions) throws IOException{
@@ -32,6 +33,7 @@ public class BamPileupLoader implements Runnable {
 		minMappingQuality = bamPileup.getMinMappingQuality();
 		this.regions = regions;
 		includeOverlaps = bamPileup.isIncludeOverlaps();
+		printAll = bamPileup.isPrintAll();
 
 		//create gzipper for results
 		resultsFile = new File(bamPileup.getTempDir(), loaderIndex+"_tempBamPileup.txt.gz");
@@ -54,8 +56,9 @@ public class BamPileupLoader implements Runnable {
 			out.println("# MinMapQual\t"+minMappingQuality);
 			out.println("# MinBaseQual\t"+minBaseQuality);
 			out.println("# IncludeOverlappingBpCounts "+includeOverlaps);
+			out.println("# PrintAll "+printAll);
 			out.println("# Bed "+IO.getCanonicalPath(bamPileup.getBedFile()));
-			for (int i=0; i<bamFiles.length; i++) out.println("# Bam/Cram "+i+" "+IO.getCanonicalPath(bamFiles[i]));
+			for (int i=0; i<bamFiles.length; i++) out.println("# BamCram\t"+i+"\t"+IO.getCanonicalPath(bamFiles[i]));
 			out.println("# Chr\t1BasePos\tRef\tA,C,G,T,N,Del,Ins,FailBQ");
 		}
 
@@ -77,7 +80,7 @@ public class BamPileupLoader implements Runnable {
 					IO.p(".");
 				}
 				String chr = region.getChromosome();
-//IO.pl("\tReg "+region);
+
 				//pileup each base from each bam
 				BaseCount[][] bamBC = new BaseCount[samReaders.length][];
 				for (int i=0; i< samReaders.length; i++ ) {
@@ -85,17 +88,24 @@ public class BamPileupLoader implements Runnable {
 				}
 
 				//for each base
+				StringBuilder sb  = null;
+				boolean noCounts = true;
 				for (int bp=0; bp< region.getLength(); bp++) {
-					out.print(chr+"\t"+ (bamBC[0][bp].bpPosition +1)+ "\t"+ bamBC[0][bp].ref);
-//IO.p(chr+"\t"+ (bamBC[0][bp].bpPosition +1)+ "\t"+ bamBC[0][bp].ref);
+					sb  = new StringBuilder();
+					noCounts = true;
+					
+					sb.append(chr); sb.append("\t");
+					sb.append((bamBC[0][bp].bpPosition +1)); sb.append("\t");
+					sb.append(bamBC[0][bp].ref);
+					
+					//out.print(chr+"\t"+ (bamBC[0][bp].bpPosition +1)+ "\t"+ bamBC[0][bp].ref);
+
 					//for each bam
 					for (int b = 0; b<samReaders.length; b++ ) {
-						out.print("\t");
-						out.print(bamBC[b][bp].toString());
-//IO.p("\t"+bamBC[b][bp].toString());
+						sb.append("\t");
+						if (bamBC[b][bp].loadStringBuilderWithCounts(sb)  == true) noCounts = false;
 					}
-					out.println();
-//IO.pl();
+					if (noCounts == false || printAll == true) out.println(sb.toString());
 				}
 			}
 		} catch (Exception e) {

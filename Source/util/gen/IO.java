@@ -2620,7 +2620,13 @@ public class IO {
 			in.close();
 		} catch (IOException e) {
 		}
-		
+	}
+	
+	public static void closeNoException(PrintWriter out) {
+		try {
+			out.close();
+		} catch (Exception e) {
+		}
 	}
 
 	public static double gigaBytes(File file) {

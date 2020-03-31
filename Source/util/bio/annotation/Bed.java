@@ -43,8 +43,8 @@ public class Bed extends Coordinate implements Serializable{
 
 	public Bed(String[] tokens) {
 		super (tokens[0], Integer.parseInt(tokens[1]), Integer.parseInt(tokens[2]));
-		double score = 0;
-		char strand = '.';
+		score = 0;
+		strand = '.';
 		if (tokens.length >= 6) {
 			name = tokens[3];
 			score = Double.parseDouble(tokens[4]);
@@ -195,6 +195,38 @@ public class Bed extends Coordinate implements Serializable{
 		return split;
 	}
 	
+	/**Chunks the sorted Bed[] by maxBp.
+	 * If the input is sorted, so will the output.*/
+	public static Bed[] splitBigRegions(Bed[] regions, int maxBp) {
+		ArrayList<Bed> split = new ArrayList<Bed>();
+		for (int i=0; i< regions.length; i++) Bed.splitBed(regions[i], maxBp, split);
+		Bed[] splitRegions = new Bed[split.size()];
+		split.toArray(splitRegions);
+		return splitRegions;
+	}
+	
+	/**Splits a Bed region into sorted sub regions of maxBp in size adding them to the ArrayList*/
+	private static void splitBed(Bed bed, int maxBp, ArrayList<Bed> al) {
+		if (bed.getLength()<= maxBp) {
+			al.add(bed);
+			return;
+		}
+		
+		int start = bed.getStart();
+		int end = bed.getStop();
+		while (true) {
+			int nextEnd = start + maxBp;
+			if (nextEnd < end) {
+				al.add(new Bed (bed.getChromosome(), start, nextEnd, bed.getName(), bed.getScore(), bed.getStrand()) );
+				start = nextEnd;
+			}
+			else {
+				al.add(new Bed (bed.getChromosome(), start, end, bed.getName(), bed.getScore(), bed.getStrand()) );
+				break;
+			}
+		}
+	}
+
 	/**Chunks the Bed[] by number of regions, then sorts each.*/
 	public static ArrayList<Bed[]> splitByNumber(Bed[] regions, int numRegionsPerChunk) {
 		ArrayList<Bed[]> split = new ArrayList<Bed[]>();

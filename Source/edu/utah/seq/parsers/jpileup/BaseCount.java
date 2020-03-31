@@ -64,6 +64,23 @@ public class BaseCount {
 	public String toString(){
 		return a+","+c+","+g+","+t+","+n+","+del+","+ins+","+failQual;
 	}
+	/**A,C,G,T,N,Del,Ins,FailBQ
+	 * Returns whether any counts were found.*/
+	public boolean loadStringBuilderWithCounts(StringBuilder sb) {
+		if (getTotalReadCoverage()==0) {
+			sb.append("0,0,0,0,0,0,0,0");
+			return false;
+		}
+		sb.append(a); sb.append(",");
+		sb.append(c); sb.append(",");
+		sb.append(g); sb.append(",");
+		sb.append(t); sb.append(",");
+		sb.append(n); sb.append(",");
+		sb.append(del); sb.append(",");
+		sb.append(ins); sb.append(",");
+		sb.append(failQual);
+		return true;
+	}
 	/**Returns the passing read coverage minus the max count base or indel */
 	public double fetchNonGermlinePassingReadCount() {
 		int max = a;
