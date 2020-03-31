@@ -397,7 +397,7 @@ public class MergePairedAlignments {
 		SamReaderFactory readerFactory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
 		SamReader bamReader = readerFactory.open(bamFile);
 		SAMFileHeader h = bamReader.getFileHeader();
-		String[] shLines = Misc.RETURN.split(h.getTextHeader()); //this gets the original header, setting SamSort.unsorted doesn't change it. Ugg.
+		String[] shLines = Misc.RETURN.split(h.getSAMString()); //this gets the original header, setting SamSort.unsorted doesn't change it. Ugg.
 		bamReader.close();
 		for (int i=0; i< shLines.length; i++){
 			if (shLines[i].contains("SO:coordinate")){
@@ -418,7 +418,7 @@ public class MergePairedAlignments {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Merge Paired Alignments: Mar 2020                     **\n" +
+				"**                          Merge Paired Alignments: March 2020                     **\n" +
 				"**************************************************************************************\n" +
 				"Merges proper paired alignments that pass a variety of checks and thresholds. Only\n" +
 				"unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps\n" +
