@@ -15,7 +15,7 @@ import util.gen.IO;
 public class FileSplitter {
 	//fields
 	private File[] files;
-	private int numLinesPerFile = 0;
+	private long numLinesPerFile = 0;
 	private int fileNumber = 1;
 	private boolean gzip = false;
 
@@ -30,7 +30,7 @@ public class FileSplitter {
 				try{
 					switch (test){
 					case 'f': files = IO.extractFiles(new File(args[++i])); break;
-					case 'n': numLinesPerFile=Integer.parseInt(args[i+1]); i++; break;
+					case 'n': numLinesPerFile=Long.parseLong(args[i+1]); i++; break;
 					case 'g': gzip = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: System.out.println("\nProblem, unknown option! " + mat.group());
@@ -57,7 +57,7 @@ public class FileSplitter {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          File Splitter: July 2010                                **\n" +
+				"**                            File Splitter: April 2020                             **\n" +
 				"**************************************************************************************\n" +
 				"Splits a big text file into smaller files given a maximum number of lines.\n\n"+
 
@@ -92,7 +92,7 @@ public class FileSplitter {
 				if (gzip){
 					byte[] cr = "\n".getBytes(); 
 					GZIPOutputStream out = getGZipOutputStream (files[i]);
-					int counter = 0;
+					long counter = 0;
 					byte[] b = null;
 					while ((line = in.readLine()) !=null) { 
 						if (counter < numLinesPerFile) {

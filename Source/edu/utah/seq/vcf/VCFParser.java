@@ -838,6 +838,10 @@ public class VCFParser {
 		return chromosomeVCFRecords;
 	}
 
+	public File getVcfFile() {
+		return vcfFile;
+	}
+
 
 
 

@@ -174,6 +174,26 @@ public class VCFRecord implements Comparable<VCFRecord> {
 		}
 		return true;
 	}
+	
+	/**Checks if the position, ref, and any of the alternate alleles match.*/
+	public boolean matchesPosRefAlt(VCFRecord vcfRecord) {
+		if (this.position != vcfRecord.position) return false;
+		if (this.reference.equals(vcfRecord.reference) == false) return false;
+		
+		//check alternate allele
+		String[] otherAlts = vcfRecord.getAlternate();
+		boolean match = false;
+		for (String o : otherAlts){
+			for (String t : alternate){
+				if (o.equals(t)){
+					match = true;
+					break;
+				}
+			}
+		}
+		if (match == false) return false;
+		return true;
+	}
 
 	public int getPosition() {
 		return position;

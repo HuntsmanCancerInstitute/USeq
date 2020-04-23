@@ -54,6 +54,12 @@ public class GenomicRegion implements Serializable{
 		}
 	}
 	
+	public void pad(int bps) {
+		start = start - bps;
+		if (start < 0) start = 0;
+		end = end + bps;
+	}
+	
 	/**Reads binary chrom start stop file into GenomicRegion[]*/
 	public static GenomicRegion[] loadBinaryCoordinates(File file){
 		Coordinate[] c = Coordinate.readBinary(file);

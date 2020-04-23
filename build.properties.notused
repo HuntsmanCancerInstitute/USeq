@@ -1,0 +1,35 @@
+version=9.2.6
+src.dir=Source
+classes.dir=Classes
+orig.doc.dir=Documentation/USeqDocumentation
+base.dir=Releases
+library.jar=LibraryJars
+release.name=USeq_${version}
+release.base.dir=${base.dir}/${release.name}
+release.build.dir=${release.base.dir}/build
+release.master.jar.dir=${release.base.dir}/LibraryJars
+release.worker.jar.dir=${release.base.dir}/Apps
+release.doc.dir=${release.base.dir}/Documentation
+class.select=trans,util,edu,meme
+jar.select=edu/utah/seq/analysis/AggregatePlotter,\
+# edu/utah/seq/analysis/ArupPipelineWrapper,\
+# edu/utah/seq/parsers/BedStats,\
+# edu/utah/seq/parsers/CollectBamStats,\
+# edu/utah/diagnostics/CountChromosomes,\
+# util/bio/seq/ConvertFasta2GCBarGraph,\
+# edu/utah/seq/parsers/DbNSFPCoordinateConverter,\
+# edu/utah/diagnostics/GenerateOverlapStats,\
+# edu/utah/bass/InosinePredict,\
+# edu/expr/KeggPathwayEnrichment,\
+# edu/utah/diagnostics/MergeExonMetrics,\
+# edu/utah/seq/vcf/MutectVCFParser,\
+# util/bio/seq/OligoTiler,\
+# edu/utah/diagnostics/ParseExonMetrics,\
+# util/bio/wrappers/Primer3Wrapper,\
+# edu/utah/seq/analysis/QCSeqs,\
+# edu/utah/seq/data/ReadCoverage,\
+# edu/utah/seq/amazon/S3UrlMaker,\
+# edu/utah/seq/vcf/ScalpelVCFParser,\
+# edu/utah/seq/parsers/Tag2Point,\
+# edu/utah/pysano/TomatoFarmer,\
+# edu/utah/seq/vcf/SomaticSniperVCFParser,\

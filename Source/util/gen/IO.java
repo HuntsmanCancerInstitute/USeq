@@ -1008,8 +1008,11 @@ public class IO {
 			BufferedReader data = new BufferedReader(new InputStreamReader(proc.getInputStream()));
 			String line;
 			while ((line = data.readLine()) != null){
-				al.add(line);
-				if (printToStandardOut) System.out.println(line);
+				line = line.trim();
+				if (line.length() !=0) {
+					al.add(line);
+					if (printToStandardOut) System.out.println(line);
+				}
 			}
 			data.close();
 		} catch (Exception e) {
