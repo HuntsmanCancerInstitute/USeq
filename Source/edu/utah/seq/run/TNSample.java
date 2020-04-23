@@ -70,7 +70,7 @@ public class TNSample {
 		}
 
 		//launch t/n somatic DNA analysis?
-		if (tumorDNABamBedGvcf != null && normalDNABamBedGvcf != null && tnRunner.getSomaticVarCallDocs() != null) somDNACall();
+		if (tnRunner.getSomaticVarCallDocs() != null) somDNACall();
 		
 		//merge somatic vars with clinical test results?
 		if (tnRunner.getClinicalVcfDocs()!= null && somaticVariants != null) parseMergeClinicalVars();
@@ -337,7 +337,16 @@ public class TNSample {
 	}
 
 	private void somDNACall() throws IOException {
-		info.add("Checking somatic variant calling...");		
+		if (tumorDNABamBedGvcf == null) return;
+		if (normalDNABamBedGvcf == null) {
+			//still waiting for normal alignment
+			if (normalDNAFastq.isFastqDirExists()) return;
+			//no non matched so can't run som calling
+			if (tnRunner.getNonMatchedNormal() == null) return;
+		}
+		
+		//OK good to go
+		info.add("Checking somatic variant calling...");
 
 		//make dir, ok if it already exists
 		File jobDir = new File (rootDir,"SomaticVariantCalls/"+id+"_Illumina");
@@ -693,9 +702,25 @@ public class TNSample {
 		Path tumorBam = tumorDNABamBedGvcf[0].toPath();
 		Path tumorBai = fetchBamIndex(tumorDNABamBedGvcf[0]).toPath();
 		Path tumorBed = tumorDNABamBedGvcf[1].toPath();
-		Path normalBam = normalDNABamBedGvcf[0].toPath();
-		Path normalBai = fetchBamIndex(normalDNABamBedGvcf[0]).toPath();
-		Path normalBed = normalDNABamBedGvcf[1].toPath();
+		
+		Path normalBam = null;
+		Path normalBai = null;
+		Path normalBed = null;
+		// link non matched normal?
+		if (normalDNABamBedGvcf == null) {
+			normalBam = tnRunner.getNonMatchedNormal()[0].toPath();
+			normalBai = fetchBamIndex(tnRunner.getNonMatchedNormal()[0]).toPath();
+			normalBed = tnRunner.getNonMatchedNormal()[1].toPath();
+			//indicate this is non matched
+			File f = new File (rootDir,"SomaticVariantCalls/NON_MATCHED_NORMAL_GERMLINE_CONTAMINATION");
+			if (f.exists()== false) f.createNewFile();
+		}
+		else {
+			normalBam = normalDNABamBedGvcf[0].toPath();
+			normalBai = fetchBamIndex(normalDNABamBedGvcf[0]).toPath();
+			normalBed = normalDNABamBedGvcf[1].toPath();
+		}
+		
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bam").toPath(), tumorBam);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bai").toPath(), tumorBai);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bed.gz").toPath(), tumorBed);

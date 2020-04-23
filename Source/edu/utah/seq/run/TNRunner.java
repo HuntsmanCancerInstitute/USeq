@@ -26,6 +26,8 @@ public class TNRunner {
 	private File[] copyRatioDocs = null;
 	private File[] clinicalVcfDocs = null;
 	private File[] msiDocs = null;
+	private File normalAlignmentDir = null;
+	private File[] nonMatchedNormal = null;
 	private File maleBkg = null;
 	private File femaleBkg = null;
 	private boolean forceRestart = false;
@@ -150,8 +152,8 @@ public class TNRunner {
 			}
 			
 		} catch (IOException e) {
-			System.err.println("\nProblem processing group analysis!");
 			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem processing group analysis!");
 		}
 
 	}
@@ -359,6 +361,7 @@ public class TNRunner {
 						case 'k': copyRatioBkgDir = new File(args[++i]); break;
 						case 'v': clinicalVcfDir = new File(args[++i]); break;
 						case 'o': otherDir = new File(args[++i]); break;
+						case 'w': normalAlignmentDir = new File(args[++i]); break;
 						case 'g': germlineAnnotatedVcfParser = args[++i]; break;
 						case 's': somaticAnnotatedVcfParser = args[++i]; break;
 						case 'u': minReadCoverageTumor = Integer.parseInt(args[++i]); break;
@@ -462,6 +465,16 @@ public class TNRunner {
 				if (maleBkg == null || femaleBkg == null) Misc.printErrAndExit("Error: failed to find male "+maleBkg+" and female "+femaleBkg+" background xxxFemalePoN.hdf5 or xxxMalePoN.hdf5 files in "+copyRatioBkgDir);
 			}
 			
+			//non matched normal?
+			if (normalAlignmentDir != null) {
+				//find the final bam and bed
+				File[] finalBam = IO.extractFiles(new File(normalAlignmentDir, "Bam"), "_final.bam");
+				File[] passingBed = IO.extractFiles(new File(normalAlignmentDir, "QC"), "_Pass.bed.gz");
+				if (finalBam == null || finalBam.length !=1 )throw new IOException("\nFailed to find a single Bam/xxx_final.bam in "+normalAlignmentDir);
+				if (passingBed == null || passingBed.length !=1 )throw new IOException("\nFailed to find a single QC/xxx_Pass.bed.gz in "+normalAlignmentDir);
+				nonMatchedNormal = new File[] {finalBam[0], passingBed[0]};
+			}
+			
 			
 			//AnnotatedVcfParser options for germline and somatic filtering
 			if (germlineAnnotatedVcfParser == null) germlineAnnotatedVcfParser = "-d "+minReadCoverageNormal+" -m 0.2 -x 1 -p 0.01 -g D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign";
@@ -488,6 +501,7 @@ public class TNRunner {
 				IO.pl("DNA alignment workflow directory\t"+DNAWorkflowDir);
 				IO.pl("RNA alignment workflow directory\t"+transWorkflowDir);
 				IO.pl("Somatic variant workflow directory\t"+somVarCallWorkflowDir);
+				if (normalAlignmentDir != null) IO.pl("Non matched normal alignment directory for somatic calling\t"+normalAlignmentDir);
 				IO.pl("Variant annotation workflow directory\t"+annoWorkflowDir);
 				IO.pl("Bam concordance workflow directory\t"+bamConWorkflowDir);
 				IO.pl("MSI workflow directory\t"+msiWorkflowDir);
@@ -509,6 +523,7 @@ public class TNRunner {
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem parsing arguments for TNRunner, aborting!");
 		}
 	}
 
@@ -516,10 +531,10 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                  TNRunner : Feb 2020                             **\n" +
+				"**                                 TNRunner : April 2020                            **\n" +
 				"**************************************************************************************\n" +
-				"TNRunner is designed to execute several dockerized snakmake workflows on human tumor\n"+
-				"normal datasets via a slurm cluster.  Based on the availability of fastq, Hg38\n"+
+				"TNRunner is designed to execute several containerized snakmake workflows on tumor\n"+
+				"normal datasets via a slurm cluster.  Based on the availability of fastq, \n"+
 				"alignments are run, somatic and germline variants are called, and concordance measured\n"+
 				"between sample bams. To execute TNRunner, create the following directory structure and\n"+
 				"link or copy in the corresponding paired end Illumina gzipped fastq files.\n"+
@@ -547,12 +562,8 @@ public class TNRunner {
 				"https://hci-bio-app.hci.utah.edu/gnomex/gnomexFlex.jsp?analysisNumber=A5578 .\n"+
 				"All workflow docs are optional although some require output from prior Analysis.\n"+
 					
-				"\nOptions:\n"+
+				"\nSetup Options:\n"+
 				"-p Directory containing one or more patient data directories to process.\n" +
-				"-o Other patient's directory, containing additional xxx_final.bam files to include in\n"+
-				"   sample concordance. The patient directory naming must match.\n"+
-				"-k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio\n"+
-				"      background files.\n"+
 				"-e Workflow docs for launching DNA alignments.\n"+
 				"-t Workflow docs for launching RNA alignments.\n"+
 				"-c Workflow docs for launching somatic variant calling.\n"+
@@ -563,18 +574,27 @@ public class TNRunner {
 				"-y Workflow docs for launching somatic copy analysis.\n"+
 				"-v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder to\n"+
 				"      each patient dir containing the json formatted clinical information.\n"+
+				"-o Other patient's directory, containing additional xxx_final.bam files to include in\n"+
+				"   sample concordance. The patient directory naming must match.\n"+
+				"-k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio\n"+
+				"      background files.\n"+
 				"-g Germline AnnotatedVcfParser options, defaults to '-d 15 -m 0.2 -x 1 -p 0.01 -g \n"+
 				"      D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign'\n"+
 				"-s Somatic AnnotatedVcfParser options, defaults to '-d 20 -f'\n"+
 				"-u Minimum read coverage for tumor DNA samples, defaults to 20\n"+
 				"-i Minimum read coverage for normal DNA samples, defaults to 15\n"+
+				"-w Non matched normal alignment directory (e.g. from NA12878) to use when no matched\n"+
+				"      normal is available for somatic variant calling. Needs to contain Bam/xxx_final.bam\n"+
+				"      and QC/xxx_Pass.bed.gz dirs and files with indexes.\n"+
+				
+				"\nJob Execution Options:\n"+
 				"-r Attempt to restart FAILED jobs from last successfully completed rule.\n"+
 				"-d Delete and restart FAILED jobs.\n"+
 				"-f Force a restart of all running, queued, failed, and uncompleted jobs.\n"+
 				"-q Quite output.\n"+
 				"-x Maximum # jobs to launch, defaults to 40.\n"+
-				"-n Nice jobs to make them take a low priority (--nice=10000), defaults to not.\n"+
-				"-l Check and launch jobs every hour until all are complete, defaults to launching once.\n"+
+				"-n Nice jobs to make them take a low priority (--nice=10000).\n"+
+				"-l Check and launch jobs every hour until all are complete.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/\n"+
 				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+
@@ -647,5 +667,9 @@ public class TNRunner {
 
 	public File[] getMsiDocs() {
 		return msiDocs;
+	}
+
+	public File[] getNonMatchedNormal() {
+		return nonMatchedNormal;
 	}
 }
