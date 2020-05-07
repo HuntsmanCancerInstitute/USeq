@@ -111,7 +111,7 @@ public class SamComparator {
 			
 			for (int i=0; i<gzippedFiles.length; i++){
 				File bam = new File (saveDirectory, Misc.removeExtension(gzippedFiles[i].getName())+".bam");
-				new PicardSortSam(gzippedFiles[i], bam);
+				new PicardSortSam(gzippedFiles[i], bam, true);
 			}
 			
 		} catch (IOException e) {

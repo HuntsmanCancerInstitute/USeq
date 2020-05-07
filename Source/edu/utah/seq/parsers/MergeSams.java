@@ -106,7 +106,7 @@ public class MergeSams{
 		samOut.close();
 		
 		if (verbose) System.out.println("\nSorting and writing bam output with Picard's SortSam...");
-		new PicardSortSam (outputFile, saveFile);
+		new PicardSortSam (outputFile, saveFile, true);
 
 
 		//stats

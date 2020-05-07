@@ -708,7 +708,7 @@ public class SamTranscriptomeParser{
 		else toSortFile = outputFile;
 
 		//sort and convert to BAM
-		new PicardSortSam (toSortFile, saveFile);
+		new PicardSortSam (toSortFile, saveFile, true);
 
 		//delete old files
 		toSortFile.delete();

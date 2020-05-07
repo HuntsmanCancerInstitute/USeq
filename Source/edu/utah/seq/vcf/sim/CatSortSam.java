@@ -2,10 +2,10 @@ package edu.utah.seq.vcf.sim;
 
 import java.io.File;
 import java.util.ArrayList;
-
 import edu.utah.seq.data.sam.PicardSortSam;
 import util.gen.IO;
 import util.gen.Misc;
+
 
 public class CatSortSam implements Runnable {
 
@@ -26,7 +26,9 @@ public class CatSortSam implements Runnable {
 			File finalSam = new File (finalBamFile.getParentFile(), "temp_"+id+"_"+Misc.removeExtension(finalBamFile.getName())+".sam.gz");
 			finalSam.deleteOnExit();
 			IO.concatinateFiles(gzSamsToMerge, finalSam);
-			new PicardSortSam (finalSam, finalBamFile);
+			 
+			new PicardSortSam (finalSam, finalBamFile, false);
+			
 		} catch (Exception e) {
 			failed = true;
 			e.printStackTrace();

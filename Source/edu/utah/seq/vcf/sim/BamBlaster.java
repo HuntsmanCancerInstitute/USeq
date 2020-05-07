@@ -17,6 +17,7 @@ import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.utah.seq.data.sam.SamLayoutLite;
+import edu.utah.seq.query.QueryIndexFileLoader;
 import edu.utah.seq.vcf.VCFLookUp;
 import edu.utah.seq.vcf.VCFParser;
 import edu.utah.seq.vcf.VCFRecord;
@@ -143,6 +144,7 @@ public class BamBlaster {
 		int numAlignments = 0;
 		int numAlignmentsToUnmodifiedBam = 0;
 		int counter = 0;
+		
 		while (it.hasNext()) {
 			SAMRecord sam = it.next();
 			numAlignments++;
@@ -150,8 +152,11 @@ public class BamBlaster {
 				System.out.print(".");
 				counter = 0;
 			}
-			//is it present in the modified hash, skip secondary and unmapped reads
-			if (sam.isSecondaryOrSupplementary() == false && sam.getReadUnmappedFlag() == false && readName2Pairs.containsKey(sam.getReadName())){
+			//junk alignment? skip it
+			if (sam.isSecondaryOrSupplementary() || sam.getReadUnmappedFlag()) continue;
+			
+			//is it present in the modified hash
+			if (readName2Pairs.containsKey(sam.getReadName())){
 				//write unmodified
 				unmodifiedFastqBamWriter.addAlignment(sam);
 				
@@ -290,6 +295,7 @@ public class BamBlaster {
 				else {
 					//fetch alignments
 					ArrayList<SAMRecord> al = fetchAlignments(vcf);
+
 					//enough coverage?
 					if (al.size() < minAlignmentDepth ){
 						excludedVCF.println(vcf.getOriginalRecord());
@@ -406,21 +412,12 @@ public class BamBlaster {
 		String mutBases = vcf.getAlternate()[0];
 		//make layout
 		SamLayoutLite sl = new SamLayoutLite(r);
-//if (r.getReadName().equals("NS500690:5:H2KC5AFXX:3:11612:25200:12440")) {
-//System.out.println("\nOri\t"+sl.getSequence());
-//sl.print();
-//}
 		//attempt mod
 		if (sl.insertBases(pos, refBases, mutBases, warn)){
 			String[] sq = sl.getSequenceAndQualtities();
 			r.setReadString(sq[0]);
 			r.setBaseQualityString(sq[1]);
 			r.setAttribute("BB", "INS_"+pos+"_"+refBases+"_"+mutBases);
-
-//if (r.getReadName().equals("NS500690:5:H2KC5AFXX:3:11612:25200:12440")) {
-//System.out.println("Mod\t"+sl.getSequence());
-//sl.print();
-//}
 			return true;
 		}
 		if (warn) {
@@ -437,20 +434,12 @@ public class BamBlaster {
 		String mutBases = vcf.getAlternate()[0];
 		//make layout
 		SamLayoutLite sl = new SamLayoutLite(r);
-//if (r.getReadName().equals("NS500690:5:H2KC5AFXX:3:11612:25200:12440")) {
-//System.out.println("\nOri\t"+sl.getSequence());
-//sl.print();
-//}
 		//attempt mod
 		if (sl.markDeletion(pos, refBases, mutBases, warn)){
 			String[] sq = sl.getSequenceAndQualtities();
 			r.setReadString(sq[0]);
 			r.setBaseQualityString(sq[1]);
 			r.setAttribute("BB", "DEL_"+pos+"_"+refBases+"_"+mutBases);
-//if (r.getReadName().equals("NS500690:5:H2KC5AFXX:3:11612:25200:12440")) {
-//System.out.println("Mod\t"+sl.getSequence());
-//sl.print();
-//}
 			return true;
 		}
 		
@@ -483,16 +472,22 @@ public class BamBlaster {
 
 
 
-	/**Checks that the alignment actually touches down on at least one base of the region to avoid spanners and masked alignments.*/
-	public ArrayList<SAMRecord> fetchAlignments (VCFRecord vcf){
+	/**Checks that the alignment actually touches down on at least one base of the region to avoid spanners and masked alignments.
+	 * @throws IOException */
+	public ArrayList<SAMRecord> fetchAlignments (VCFRecord vcf) throws IOException{
 		ArrayList<SAMRecord> al = new ArrayList<SAMRecord>();
-		int start = vcf.getPosition();
-		int end = vcf.getMaxEndPosition();
+
+		int[] interbaseStartStop = QueryIndexFileLoader.fetchEffectedBps(Misc.TAB.split(vcf.getOriginalRecord()), false);
+		if (interbaseStartStop == null) throw new IOException("WARNING: Failed to parse the effected bps for : "+vcf.getOriginalRecord());
+		int start = interbaseStartStop[0];
+		int end = interbaseStartStop[1];
+
+		
 		SAMRecordIterator i = bamReader.queryOverlapping(workingChrom, (start+1), end); 
 		while (i.hasNext()) {
 			SAMRecord sam = i.next();
-			//unmapped? not primary? not proper pair?
-			if (sam.getReadUnmappedFlag() || sam.isSecondaryOrSupplementary() || sam.getProperPairFlag() == false) continue;
+			//unmapped? not primary? 
+			if (sam.getReadUnmappedFlag() || sam.isSecondaryOrSupplementary()) continue;
 			//fetch blocks of actual alignment
 			ArrayList<int[]> blocks = fetchAlignmentBlocks(sam.getCigarString(), sam.getUnclippedStart()-1);
 			//check to see if any intersect the region, needed since the queryOverlap returns spanners
@@ -549,6 +544,7 @@ public class BamBlaster {
 					case 's': maxSizeIndel = Integer.parseInt(args[++i]); break;
 					case 'm': minVarDist = Integer.parseInt(args[++i]); break;
 					case 'd': minAlignmentDepth = Integer.parseInt(args[++i]); break;
+					case 'i': warn = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -643,7 +639,7 @@ public class BamBlaster {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              Bam Blaster : April 2019                            **\n" +
+				"**                               Bam Blaster : May 2020                            **\n" +
 				"**************************************************************************************\n" +
 				"Injects SNVs and INDELs from a vcf file into bam alignments. These and their mates are\n"+
 				"extracted as fastq for realignment. For SNVs, only alignment bases that match the\n"+
@@ -662,6 +658,7 @@ public class BamBlaster {
 				"-s Max size INDEL, defaults to 50\n"+
 				"-d Min alignment depth, defaults to 25\n"+
 				"-m Min distance between variants, defaults to 150\n"+
+				"-i Verbose debugging output\n"+
 
 				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/BamBlaster -b ~/BMData/na12878.bam\n"+
 				"    -r ~/BMData/BB0 -v ~/BMData/clinvar.pathogenic.SnvIndel.vcf.gz \n\n" +

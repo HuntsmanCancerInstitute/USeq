@@ -115,19 +115,19 @@ public class SamSVFilter{
 					System.out.println("Sorting...");
 					File bam = new File (saveDirectory, "passSpan_"+name+".bam");
 					//sort and convert to BAM
-					new PicardSortSam (span, bam);
+					new PicardSortSam (span, bam, true);
 					span.delete();
 					bam = new File (saveDirectory, "passSoft_"+name+".bam");
 					//sort and convert to BAM
-					new PicardSortSam (soft, bam);
+					new PicardSortSam (soft, bam, true);
 					soft.delete();
 					bam = new File (saveDirectory, "passSingle_"+name+".bam");
 					//sort and convert to BAM
-					new PicardSortSam (single, bam);
+					new PicardSortSam (single, bam, true);
 					single.delete();
 					bam = new File (saveDirectory, "fail_"+name+".bam");
 					//sort and convert to BAM
-					new PicardSortSam (fail, bam);
+					new PicardSortSam (fail, bam, true);
 					fail.delete();
 				}
 				

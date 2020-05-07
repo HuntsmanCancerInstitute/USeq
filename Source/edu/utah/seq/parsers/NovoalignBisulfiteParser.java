@@ -87,7 +87,7 @@ public class NovoalignBisulfiteParser{
 					File sortFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_sort.bam"));
 
 					//call Picard's SortSam to coordinate-sort input sam files
-					new PicardSortSam(samFiles[i], sortFile);
+					new PicardSortSam(samFiles[i], sortFile, true);
 					File dupeFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_dup.bam"));
 					File metricsFile = new File(samFiles[i].toString().replaceAll(".sam.gz", "_metrics.txt"));
 

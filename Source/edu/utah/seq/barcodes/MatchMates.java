@@ -74,7 +74,7 @@ public class MatchMates {
 			//sort by coordinate
 			System.out.println("\nSorting passing bam file by coordinate...");
 			File sortedBam = new File(saveDirectory, "passingMM.sorted.bam");
-			new PicardSortSam(passingBamFile, sortedBam);
+			new PicardSortSam(passingBamFile, sortedBam, true);
 
 		} catch (Exception e) {
 			e.printStackTrace();

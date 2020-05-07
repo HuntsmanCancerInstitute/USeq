@@ -33,10 +33,12 @@ package edu.utah.seq.data.sam;
 import picard.sam.*;
 import picard.cmdline.CommandLineProgram;
 import util.gen.Misc;
+import util.gen.NullPrintStream;
 import htsjdk.samtools.*;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.PrintStream;
 import java.util.Iterator;
 
 
@@ -66,18 +68,19 @@ public class PicardSortSam extends CommandLineProgram {
 		//make bam File
 		String name = Misc.removeExtension(inputSamFile.getName());
 		File bam = new File (inputSamFile.getParentFile(), name+".bam");
-		new PicardSortSam (inputSamFile, bam);
+		new PicardSortSam (inputSamFile, bam, true);
 	}
 
 	/** Launches SortSam suppressing all output except warnings and errors
 	 * Temp files are written to the parent of the outputBamFile
 	 */
-	 public PicardSortSam(File inputSamFile, File outputBamFile){
+	 public PicardSortSam(File inputSamFile, File outputBamFile, boolean byCoordinate){
 		 File realOutputFile;
 		 try {
 			 realOutputFile = outputBamFile.getCanonicalFile();
-			 String[] argv = {
-					 "I="+inputSamFile,
+			 String[] argv = null;
+			 if (byCoordinate) {
+				 argv = new String[] { "I="+inputSamFile,
 					 "O="+outputBamFile,
 					 "SO=coordinate",
 					 "CREATE_INDEX=true",
@@ -86,15 +89,67 @@ public class PicardSortSam extends CommandLineProgram {
 					 "USE_JDK_DEFLATER=true",
 					 "USE_JDK_INFLATER=true",
 					 "VERBOSITY=ERROR",
-					 "VALIDATION_STRINGENCY=SILENT"
-			 };
-
+					 "VALIDATION_STRINGENCY=SILENT"};
+			 }
+			 else {
+				 argv = new String[] { "I="+inputSamFile,
+						 "O="+outputBamFile,
+						 "SO=queryname",
+						 "TMP_DIR="+realOutputFile.getParent(),
+						 "QUIET=true",
+						 "USE_JDK_DEFLATER=true",
+						 "USE_JDK_INFLATER=true",
+						 "VERBOSITY=ERROR",
+						 "VALIDATION_STRINGENCY=SILENT"};
+ 
+			 }
+			 
 			 new SortSam().instanceMain(argv);
 
 		 } catch (IOException e) {
 			 e.printStackTrace();
 		 }
 	 }
+	 
+		/** Launches SortSam suppressing all output except warnings and errors
+		 * Temp files are written to the parent of the outputBamFile
+		 
+		 public PicardSortSam(File inputSamFile, File outputBamFile, boolean byCoordinate){
+			 File realOutputFile;
+			 try {
+				 realOutputFile = outputBamFile.getCanonicalFile();
+				 String[] argv = null;
+				 if (byCoordinate) {
+					 argv = new String[] { "-I", inputSamFile.getCanonicalPath(),
+						 "-O", outputBamFile.getCanonicalPath(),
+						 "-SO","coordinate",
+						 "-CREATE_INDEX", "true",
+						 "-TMP_DIR", realOutputFile.getParentFile().getCanonicalPath(),
+						 "-QUIET", "true",
+						 "-USE_JDK_DEFLATER","true",
+						 "-USE_JDK_INFLATER","true",
+						 "-VERBOSITY","ERROR",
+						 "-VALIDATION_STRINGENCY","SILENT"};
+				 }
+				 else {
+					 argv = new String[] { "-I", inputSamFile.getCanonicalPath(),
+							 "-O", outputBamFile.getCanonicalPath(),
+							 "-SO","queryName",
+							 "-TMP_DIR", realOutputFile.getParentFile().getCanonicalPath(),
+							 "-QUIET", "true",
+							 "-USE_JDK_DEFLATER","true",
+							 "-USE_JDK_INFLATER","true",
+							 "-VERBOSITY","ERROR",
+							 "-VALIDATION_STRINGENCY","SILENT"};
+				 }
+
+				 new SortSam().instanceMain(argv);
+
+			 } catch (IOException e) {
+				 e.printStackTrace();
+			 }
+		 }*/
+		 
 	 /*
 	 public static void main(String[] args) {
 		 if (args.length == 3) {

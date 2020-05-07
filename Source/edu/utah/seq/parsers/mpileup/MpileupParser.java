@@ -282,7 +282,7 @@ public class MpileupParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              MpileUp Parser: Sept 2015                           **\n" +
+				"**                              MpileUp Parser: April 2015                           **\n" +
 				"**************************************************************************************\n" +
 				"Parses a SAMTools mpileup output file for non reference bases generating bed files and\n" +
 				"data tracks with information related to error prone bases. Multiple samples are merged.\n\n"+
@@ -293,9 +293,9 @@ public class MpileupParser {
 				"      http://genome.ucsc.edu/FAQ/FAQreleases.\n" +
 				"-s Save directory, full path, defaults to pileup file directory.\n"+
 				"-r Minimum read coverage, defaults to 15.\n"+
-				"-e Max nonRef base fraction, defaults to 0.05\n"+
+				"-e Max nonRef base fraction to score as a failing bp, defaults to 0.01\n"+
 				"-w Window size, defaults to 50\n"+
-				"-f Max fraction failing bp in window, defaults to 0.05\n"+
+				"-f Max fraction failing bp in window to score as a high error window, defaults to 0.05\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/MpileupParser -p /Pileups/N2.mpileup.gz -v\n"+
 				"      H_sapiens_Feb_2009 -e 0.1 -w 25\n\n" +

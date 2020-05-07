@@ -58,7 +58,7 @@ public class SamSVJoiner{
 		addSpanners();
 		
 		System.out.println("Sorting...");
-		new PicardSortSam (samOut.getGzipFile(), bamResult);
+		new PicardSortSam (samOut.getGzipFile(), bamResult, true);
 		
 		
 		System.out.println("Stats:");

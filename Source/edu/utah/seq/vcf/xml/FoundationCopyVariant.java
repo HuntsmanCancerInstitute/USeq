@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import htsjdk.samtools.reference.ReferenceSequence;
+import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
@@ -45,9 +46,9 @@ public class FoundationCopyVariant {
 		this.parser = parser;
 		
 		parseEffect();
-		parseChromPos();
-		parseRefAlt();
-		parseStats();
+		if (failedParsing == false) parseChromPos();
+		if (failedParsing == false) parseRefAlt();
+		if (failedParsing == false) parseStats();
 	}
 
 	/** Returns CHROM POS ID REF ALT QUAL FILTER INFO */
@@ -137,6 +138,7 @@ public class FoundationCopyVariant {
 
 	private void parseChromPos() {
 		String pos = parseString("position");
+		//chr([\\dXYM]+):(\\d+)-(\\d+)
 		Matcher mat = coorPat.matcher(pos);
 		if (mat.matches()){
 			chromosome = mat.group(1);

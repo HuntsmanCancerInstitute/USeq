@@ -19,7 +19,7 @@ public class SampleInfo {
 	private String qualityControl;
 	
 	public SampleInfo(LinkedHashMap<String,String> ra){
-		sampleName= ra.get("test-request");
+		sampleName= ra.get("ReportId");
 		submittedDiagnosis= ra.get("SubmittedDiagnosis");
 		specSite= ra.get("SpecSite");
 		disease= ra.get("disease");

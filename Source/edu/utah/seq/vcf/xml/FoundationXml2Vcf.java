@@ -15,7 +15,7 @@ import java.util.concurrent.TimeUnit;
 
 /**
  * Takes one or more patient xml reports from FoundationOne tests and converts most of the variants into vcf format.
- * 
+ * Outputs a summary clinical data spreadsheet
  * @author david.nix@hci.utah.edu 
  **/
 public class FoundationXml2Vcf {
@@ -25,6 +25,8 @@ public class FoundationXml2Vcf {
 	private File indexedFasta = null;
 	private File saveDirectory;
 	private boolean skipBadVariants = false;
+	private boolean includePHI = false;
+	private LinkedHashSet<String> keysToExport = null;
 	
 	//internal fields
 	private String source;
@@ -47,7 +49,8 @@ public class FoundationXml2Vcf {
 	private ArrayList<FoundationShortVariant> shortVariants = new ArrayList<FoundationShortVariant>();
 	private ArrayList<FoundationCopyVariant> copyVariants = new ArrayList<FoundationCopyVariant>();
 	private ArrayList<FoundationRearrangeVariant> rearrangeVariants = new ArrayList<FoundationRearrangeVariant>();
-	private LinkedHashMap<String,String> reportAttributes = new LinkedHashMap<String,String>();
+	private LinkedHashMap<String,String> reportAttributes = null;
+	private LinkedHashMap<String,String>[] allReportAttributes = null;
 	private boolean problemParsing;
 
 	//constructors
@@ -66,9 +69,10 @@ public class FoundationXml2Vcf {
 			System.out.println(numCopyFail+ "\t# CNV Fail");
 			System.out.println(numRearrangePass+ "\t# Rearrange Pass");
 			System.out.println(numRearrangeFail+ "\t# Rearrange Fail");
-			
-			//sampleInfo
+
 			printSampleInfo();
+			
+			printSpreadsheet();
 
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
@@ -78,6 +82,49 @@ public class FoundationXml2Vcf {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nProblem running FoundationXml2Vcf app!");
 		}
+	}
+
+	private void printSpreadsheet() throws IOException {
+		IO.pl("Exporting patient summary spreadsheet... ");
+		//merge all the keys
+		LinkedHashSet<String> allKeys = new LinkedHashSet<String>();
+		for (LinkedHashMap<String,String> s : allReportAttributes) allKeys.addAll(s.keySet());
+		if (keysToExport == null) keysToExport = allKeys;
+		else {
+			//check that the keys they want are part of the allKeys
+			boolean failed = false;
+			for (String k: keysToExport) {
+				if (allKeys.contains(k) == false) {
+					failed = true;
+					IO.pl("\tFailed to find "+k);
+				}
+			}
+			if (failed) {
+				IO.pl("\tAvailable attributes: "+allKeys);
+				throw new IOException("\nError printing requested attributes to spreadsheet.");
+			}
+		}
+		
+		//make writer add header
+		PrintWriter txtOut = new PrintWriter (new FileWriter(new File (saveDirectory, "aggregatePatientInfo.xls")));
+		for (String k: keysToExport) {
+			txtOut.print(k);
+			txtOut.print("\t");
+		}
+		txtOut.println();
+		
+		//write a line per sample
+		for (LinkedHashMap<String,String> s : allReportAttributes) {
+			//for each key
+			for (String k: keysToExport) {
+				String v = s.get(k);
+				if (v!=null) txtOut.print(v);
+				txtOut.print("\t");
+			}
+			txtOut.println();
+		}
+		
+		txtOut.close();
 	}
 
 	private void loadGeneNameStrand() {
@@ -102,12 +149,13 @@ public class FoundationXml2Vcf {
 		//Get the DOM Builder Factory and builder
 		factory = DocumentBuilderFactory.newInstance();
 		builder = factory.newDocumentBuilder();
+		allReportAttributes = new LinkedHashMap[xmlFiles.length];
 
-		System.out.println("Parsing and coverting...\n");
+		System.out.println("Parsing and coverting...");
 		for (int i=0; i< xmlFiles.length; i++){
 			
 			//clear any prior data
-			reportAttributes.clear();
+			reportAttributes = new LinkedHashMap<String,String>();
 			shortVariants.clear();
 			copyVariants.clear();
 			rearrangeVariants.clear();
@@ -131,9 +179,10 @@ public class FoundationXml2Vcf {
 			sampleInfo.add(si);
 			
 			if (problemParsing) failingFiles.add(workingXmlFile.getName());
+			allReportAttributes[i] = reportAttributes;
 		}
 		
-		//close the fasta lookup fetcher
+		//close the IO
 		fasta.close();
 
 	}
@@ -296,14 +345,68 @@ public class FoundationXml2Vcf {
 			if (cNode instanceof Element) {
 				String name = cNode.getNodeName();
 				//PMI?
-				if (name.equals("PMI")){
-					parsePmiInfo(cNode);
+				if (name.equals("PMI")) parsePmiInfo(cNode);
+				//Genes?
+				else if (name.equals("Genes")) parseGenes(cNode);
+			}
+		}
+	}
+	
+	private void parseGenes(Node node) throws DOMException, ParseException {
+		NodeList sampleList = node.getChildNodes();
+		
+		for (int j = 0; j < sampleList.getLength(); j++) {
+			Node cNode = sampleList.item(j);
+			String name = cNode.getNodeName();
+
+			if (cNode instanceof Element && name.equals("Gene")) {
+				NodeList geneNodes = cNode.getChildNodes();
+				//for each node under a particular Gene
+				for (int i=0; i<geneNodes.getLength(); i++) {
+					Node gNode = geneNodes.item(i);
+					String gName = gNode.getNodeName();
+					//check the Name
+					if (gName.equals("Name")) {
+						Node last = gNode.getLastChild();
+						if (last != null){
+							String x = last.getTextContent().trim();
+							//is it Microsatellite status?
+							if (x.equals("Microsatellite status")) parseMSIOrTMB(geneNodes, "MSI");
+							//is it Tumor Mutation Burden?
+							else if (x.equals("Tumor Mutation Burden")) parseMSIOrTMB(geneNodes, "TMB");
+						}
+					}
+				}
+			}
+		}	
+	}
+
+	
+	private void parseMSIOrTMB(NodeList nodes, String key) {
+		//for each node under a particular Gene
+		for (int i=0; i<nodes.getLength(); i++) {
+			Node mNode = nodes.item(i);
+			String name = mNode.getNodeName();
+			//is it the Alterations?
+			if (name.equals("Alterations")) {
+				NodeList altList = mNode.getChildNodes();
+				for (int j=0; j<altList.getLength(); j++) {
+					Node aNode = altList.item(j);
+					if (aNode.getNodeName().equals("Alteration")) {
+						NodeList aList = aNode.getChildNodes();
+						for (int x=0; x<aList.getLength(); x++) {
+							Node last= aList.item(x);
+							if (last.getNodeName().equals("Name")) {
+								addLastChild(key, last);
+								return;
+							}
+						}
+					}
 				}
 			}
 		}
 	}
 
-	
 	private void parsePmiInfo(Node node) throws DOMException, ParseException {
 		NodeList sampleList = node.getChildNodes();
 		Date collDate = null;
@@ -318,8 +421,21 @@ public class FoundationXml2Vcf {
 				else if (name.equals("OrderingMD")) addLastChild("OrderingMD", cNode);
 				else if (name.equals("SpecSite")) addLastChild("SpecSite", cNode);
 				else if (name.equals("SubmittedDiagnosis")) addLastChild("SubmittedDiagnosis", cNode);
-				else if (name.equals("DOB")) dob = formatter.parse(cNode.getLastChild().getTextContent());
-				else if (name.equals("CollDate")) collDate = formatter.parse(cNode.getLastChild().getTextContent());
+				else if (name.equals("CollDate")) {
+					collDate = formatter.parse(cNode.getLastChild().getTextContent());
+					if (includePHI) addLastChild("CollDate", cNode);
+				}
+				else if (name.equals("DOB")) {
+					dob = formatter.parse(cNode.getLastChild().getTextContent());
+					if (includePHI) addLastChild("DOB", cNode);
+				}
+				else if (name.equals("ReportId")) addLastChild("ReportId", cNode);
+				else if (includePHI) {
+					if (name.equals("MRN")) addLastChild("MRN", cNode);
+					else if (name.equals("FirstName")) addLastChild("FirstName", cNode);
+					else if (name.equals("LastName")) addLastChild("LastName", cNode);
+					else if (name.equals("ReceivedDate")) addLastChild("ReceivedDate", cNode);
+				}
 			}
 		}	
 		
@@ -327,7 +443,7 @@ public class FoundationXml2Vcf {
 			long duration  = collDate.getTime() - dob.getTime();
 			double days = TimeUnit.MILLISECONDS.toDays(duration);
 			String years = Num.formatNumberOneFraction(days/365.0);
-			reportAttributes.put("age-at-collection", years);
+			reportAttributes.put("AgeAtCollection", years);
 		}
 	}
 	
@@ -337,6 +453,7 @@ public class FoundationXml2Vcf {
 		if (last != null){
 			String x = last.getTextContent().trim();
 			if (x.length()!=0) reportAttributes.put(key, x);
+			//if (key.equals("MSI") || key.equals("TMB"))IO.pl("Adding "+key+" : "+x);
 		}
 	}
 
@@ -350,6 +467,8 @@ public class FoundationXml2Vcf {
 		att.remove("xmlns");
 		att.remove("xmlns:xsi");
 		att.remove("xsi:schemaLocation");
+		att.remove("gender");
+		att.remove("test-request");
 		reportAttributes.putAll(att);
 		
 		//parse its children
@@ -364,7 +483,7 @@ public class FoundationXml2Vcf {
 				//samples? parse and add the attributes
 				if (name.equals("samples")){
 					LinkedHashMap<String,String> sampleAtt = parseSamples(cNode);
-					if (sampleAtt == null) Misc.printErrAndExit("\nError: failed to parse sample info from variant-report node.\n");
+					if (sampleAtt.size() == 0) Misc.printErrAndExit("\nError: failed to parse sample info from variant-report node.\n");
 					reportAttributes.putAll(sampleAtt);
 				}
 				else if (name.equals("short-variants")) parseShortVariants(cNode);
@@ -443,15 +562,22 @@ public class FoundationXml2Vcf {
 
 	/**Parses <samples>  <sample bait-set="T7" mean-exon-depth="963.88" name="SA-1352726" nucleic-acid-type="DNA"/> in the variant-report */
 	private LinkedHashMap<String, String> parseSamples(Node node) {
+		LinkedHashMap<String, String> att = new LinkedHashMap<String, String>();
 		NodeList sampleList = node.getChildNodes();
 		for (int j = 0; j < sampleList.getLength(); j++) {
 			Node cNode = sampleList.item(j); 
 			if (cNode instanceof Element) {
-				//sample? parse and add the attributes, should be only one
-				if (cNode.getNodeName().equals("sample")) return parseNodeAttributes(cNode);
+				//sample? parse and add the attributes, should be only one, not so! now seeing RNA
+				if (cNode.getNodeName().equals("sample")) {
+					LinkedHashMap<String, String> kv = parseNodeAttributes(cNode);
+					String nt = kv.remove("nucleic-acid-type").toLowerCase();
+					for (String k: kv.keySet()) {
+						att.put(nt+ "-"+ k, kv.get(k));
+					}
+				}
 			}
 		}		
-		return null;
+		return att;
 	}
 
 	/**Loads a hashmap with all of the key: value attribute pairs of the node, not its children though.*/
@@ -482,6 +608,7 @@ public class FoundationXml2Vcf {
 		String useqVersion = IO.fetchUSeqVersion();
 		source = useqVersion+" Args: "+ Misc.stringArrayToString(args, " ");
 		System.out.println("\n"+ source +"\n");
+		String attributes = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -493,6 +620,8 @@ public class FoundationXml2Vcf {
 					case 'f': indexedFasta = new File(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'o': skipBadVariants = true; break;
+					case 'i': includePHI = true; break;
+					case 'a': attributes = args[++i]; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -506,31 +635,38 @@ public class FoundationXml2Vcf {
 		if (saveDirectory == null) Misc.printErrAndExit("\nError: cannot find your save directory!\n"+saveDirectory);
 		saveDirectory.mkdirs();
 		if (saveDirectory.isDirectory() == false) Misc.printErrAndExit("\nError: your save directory does not appear to be a directory?\n");
-
 		if (xmlFiles == null || xmlFiles.length == 0) Misc.printErrAndExit("\nError: cannot find any xml files to parse?!\n");
 		if (indexedFasta == null || indexedFasta.canRead() == false) Misc.printErrAndExit("\nError: cannot find your fasta reference?\n");
+		
+		if (attributes !=null) {
+			String[] at = Misc.COMMA.split(attributes);
+			keysToExport = new LinkedHashSet<String>();
+			for (String s: at) keysToExport.add(s);
+		}
 
 	}	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Foundation Xml 2 Vcf: March 2020                       **\n" +
+				"**                           Foundation Xml 2 Vcf: April 2020                       **\n" +
 				"**************************************************************************************\n" +
-				"Attempts to parse xml foundation reports to vcf. This is an inprecise process with\n"+
-				"some insertions, multi snv, and multi vars. VCF variants have not been normalized.\n"+
-				"Consider left aligning and demultiplexing with vt. Remove PHI elements first with grep: \n"+
-				"grep -vwE '(MRN|FullName|FirstName|LastName|ReportPDF)' TRF123.xml > clnTRF123.xml\n"+
+				"Parses xml foundation reports to vcf. This is an inprecise process with some\n"+
+				"insertions, multi snv, and multi vars. Output vcf variants have not been normalized.\n"+
+				"Recommend running vt normalize, see https://genome.sph.umich.edu/wiki/Vt\n"+
 
 				"\nOptions:\n"+
 				"-x Path to a FoundationOne xml report or directory containing such.\n"+
 				"-s Path to a directory for saving the results.\n"+
-				"-f Path to the reference fasta with xxx.fai index\n"+
+				"-f Path to the reference fasta with xxx.fai index used by Foundation for coordinates.\n"+
 				"-o Skip variants that clearly fail to convert, e.g. var seq doesn't match fasta.\n"+
 				"     Defaults to marking 'ci' in FILTER field.\n"+
+				"-i Include PHI in spreadsheet output.\n"+
+				"-a Print this list of attributes in spreadsheet, comma delimited, case sensitive, no\n"+
+				"     spaces. Defaults to all.\n"+
 				
-				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/FoundationXml2Vcf -x /F1/TRF145179.xml\n" +
-				"     -f /Ref/human_g1k_v37.fasta -s /F1/VCF/ \n\n" +
+				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/FoundationXml2Vcf -x FXmlReports/\n" +
+				"     -f /Ref/b37.fasta -s FVcfs/ -a ReportId,Gender,SubmittedDiagnosis,MSI,TMB\n\n" +
 
 				"**************************************************************************************\n");
 

@@ -846,7 +846,7 @@ public class MergePairedSamAlignments{
 		out.close();
 
 		//sort and convert to BAM
-		new PicardSortSam (headerFile, saveFile);
+		new PicardSortSam (headerFile, saveFile, true);
 
 		//delete old files
 		headerFile.delete();

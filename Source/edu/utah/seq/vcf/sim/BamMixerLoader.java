@@ -7,6 +7,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import edu.utah.seq.query.QueryIndexFileLoader;
@@ -14,6 +15,7 @@ import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
 import htsjdk.samtools.SamReader;
 import util.gen.Gzipper;
+import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
@@ -35,12 +37,8 @@ public class BamMixerLoader implements Runnable{
 	private static final Pattern BB = Pattern.compile(":BB-");
 	private static final Pattern numUnder = Pattern.compile("^\\d[\\d_]+");
 	private static final Pattern trailingBB = Pattern.compile(":BB-");
-	private Random random = new Random();
+	private Random random = new Random(1); 
 	private double[] targetFractions = null;
-	private boolean writeOutSam = true;
-
-
-
 
 	public BamMixerLoader (File modifiedBam, File unModifiedBam, ExactBamMixer ebm, int loaderId) throws IOException{
 		this.ebm = ebm;
@@ -56,7 +54,7 @@ public class BamMixerLoader implements Runnable{
 		samWriters = new Gzipper[targetFractions.length];
 		vcfWriters = new Gzipper[targetFractions.length];
 		for (int i=0; i< samWriters.length; i++) {
-			File samOut = new File (ebm.getSaveDirectory(), targetFractions[i]+"_"+loaderId+".sam.gz");
+			File samOut = new File (ebm.getSaveDirectory(), targetFractions[i]+"_"+loaderId+".sam.gz");		
 			samOut.deleteOnExit();
 			samWriters[i] = new Gzipper(samOut);
 			File vcfOut = new File (ebm.getSaveDirectory(), targetFractions[i]+"_"+loaderId+".vcf.gz");
@@ -85,20 +83,16 @@ public class BamMixerLoader implements Runnable{
 
 	public void run() {	
 		try {
+			
 			//get next chunk of work
 			while (ebm.loadVcfRecords(vcfLines)){ 
 
 				//for each record
 				for (String record: vcfLines) processRecord(record);
-
+				
 				//cleanup
 				vcfLines.clear();
-
-				//write out filtered sam?
-				if (loaderId == 0 && writeOutSam) writeOutUnMatched();
 			}
-
-
 		} catch (Exception e) {
 			failed = true;
 			e.printStackTrace();
@@ -109,10 +103,9 @@ public class BamMixerLoader implements Runnable{
 				//close readers
 				modifiedReader.close();
 				unModifiedReader.close();
-
 				//close writers
 				for (Gzipper g: samWriters) g.close();
-				for (Gzipper g: vcfWriters) g.close();
+				for (Gzipper g: vcfWriters) g.close();				
 				targetVarResults.close();
 			} catch (IOException e){
 				failed = true;
@@ -122,23 +115,7 @@ public class BamMixerLoader implements Runnable{
 		}
 	}
 
-	private void writeOutUnMatched() throws FileNotFoundException, IOException {
-		writeOutSam = false;
-		File noMatchSam = new File(ebm.getSaveDirectory(),"noMatchTemp.sam.gz");
-		noMatchSam.deleteOnExit();
-		Gzipper sam = new Gzipper( noMatchSam );
-		SamReader in = ebm.getReaderFactory().open(ebm.getUnModifiedNoMatchBamFile());
-		SAMRecordIterator it = in.iterator();
-		while (it.hasNext()) sam.println(it.next().getSAMString().trim());
-		sam.close();
-		in.close();
-	}
-
-
-
 	private void processRecord(String record) throws IOException {
-
-
 		//#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NORMAL	TUMOR
 		String[] vcfFields = Misc.TAB.split(record);
 
@@ -150,54 +127,43 @@ public class BamMixerLoader implements Runnable{
 		String[] modNames = new String[modifiedPairs.size()];
 		int index =0;
 		for (String key : modifiedPairs.keySet()) modNames[index++] = key;
-		Misc.randomize(modNames, random);
+		Misc.randomize(modNames, random);	
 
 		//fetch unModifiedAlignments
 		HashMap<String, ArrayList<SAMRecord>> unModifiedPairs = fetchAlignmentPairs(unModifiedReader, interbaseStartStop, vcfFields[0], false);
 		double numUnmodified = unModifiedPairs.size();
-
-		HashSet<String> modPairNames = new HashSet<String>();
+		ArrayList<String> readPairNamesWritten = new ArrayList<String>();
+		//for each target fraction
 		for (int i=0; i< targetFractions.length; i++) {
 
 			//calculate number of modified pairs to add
 			int numMod = (int)Math.round(targetFractions[i] * numUnmodified);
 			if (numMod < minNumAltReads) {
 				targetVarResults.print(targetFractions[i]+"\t0\tSkippedTooFewMod(" +numMod+ "/"+ (int)numUnmodified+")\t");
-				//write out unmodified
-				for (ArrayList<SAMRecord> al: unModifiedPairs.values()) {
-					for (SAMRecord sam: al) samWriters[i].print("u"+sam.getSAMString());
-				}
 			}
 			else if (numMod > modifiedPairs.size()) {
 				targetVarResults.print(targetFractions[i]+"\t0\tSkippedNotEnoughMod(" +modifiedPairs.size()+ "/"+ (int)numUnmodified+")\t");
-				//write out unmodified
-				for (ArrayList<SAMRecord> al: unModifiedPairs.values()) {
-					for (SAMRecord sam: al) samWriters[i].print("u"+sam.getSAMString());
-				}
 			}
 			else {
-				double actAF = (double)numMod / numUnmodified;
+				double actAF = (double)numMod / (numUnmodified);
 				targetVarResults.print(targetFractions[i]+"\t"+ Num.formatNumber(actAF, 4)+ "\t(" +numMod+ "/"+ (int)numUnmodified+")\t");
 				vcfWriters[i].println(record);
-				
-				//write out modified pairs
-				for (int m=0; m< numMod; m++) {
-					modPairNames.add(modNames[m]);
-					ArrayList<SAMRecord> al = modifiedPairs.get(modNames[m]);
-					for (SAMRecord sam: al) {
-						samWriters[i].print("m"+sam.getSAMString());
-					}
-				}
+				readPairNamesWritten.clear();
 
-				//write out unmodified
-				for (String name: unModifiedPairs.keySet()) {
-					if (modPairNames.contains(name) == false){
-						ArrayList<SAMRecord> al = unModifiedPairs.get(name);
-						for (SAMRecord sam: al) {
-							samWriters[i].print("u"+sam.getSAMString());
-						}
-					}
+				//write out modified pairs, randomized
+				for (int m=0; m< numMod; m++) {
+					ArrayList<SAMRecord> al = modifiedPairs.get(modNames[m]);
+					readPairNamesWritten.add(modNames[m]);
+					for (SAMRecord sam: al) samWriters[i].print(sam.getSAMString());
 				}
+				
+				//write out unModified minus those already written out
+				Set<String> keys = unModifiedPairs.keySet();			
+				keys.removeAll(readPairNamesWritten);
+				for (String rm: keys) {			
+					ArrayList<SAMRecord> al = unModifiedPairs.get(rm);
+					for (SAMRecord sam: al) samWriters[i].print(sam.getSAMString()); 
+				}	
 			}
 		}
 		//close line
@@ -212,12 +178,14 @@ public class BamMixerLoader implements Runnable{
 
 		int start = interbaseStartStop[0];
 		int end = interbaseStartStop[1];
+		
+		//won't fetch mate that doesn't intersect coordinates!
 		SAMRecordIterator i = reader.queryOverlapping(chr, (start+1), end); 
 
 		while (i.hasNext()) {
 			SAMRecord sam = i.next();
 			//unmapped? not primary? 
-			if (sam.getReadUnmappedFlag() || sam.isSecondaryOrSupplementary() || sam.getNotPrimaryAlignmentFlag() || sam.getReadFailsVendorQualityCheckFlag()) continue;
+			if (sam.getReadUnmappedFlag() || sam.isSecondaryOrSupplementary() ) continue;
 
 			//fetch blocks of actual alignment
 			ArrayList<int[]> blocks = BamBlaster.fetchAlignmentBlocks(sam.getCigarString(), sam.getUnclippedStart()-1);
@@ -229,11 +197,9 @@ public class BamMixerLoader implements Runnable{
 				//OK overlaps so add it
 				//clean up name and add tag?  Only with modified
 				if (modified) {
+					stripNameNumber(sam);
 					String[] tokens = BB.split(sam.getReadName());
-					if (tokens.length != 1) {
-						sam.setAttribute("BB", tokens[1]);
-						stripNameNumber(sam);
-					}
+					if (tokens.length != 1) sam.setAttribute("BB", tokens[1]);
 				}
 
 				ArrayList<SAMRecord> al = nameRecord.get(sam.getReadName());
@@ -249,7 +215,7 @@ public class BamMixerLoader implements Runnable{
 		return nameRecord;
 	}
 
-	/**Removes leading and trailing info from BamMixer
+	/**Removes leading and trailing info from BamBlaster
 	 * e.g. 0_HWI-D00294:322:CATY4ANXX:6:1101:1166:34209:BB-INS_178536299_C_CT_2  ->  HWI-D00294:322:CATY4ANXX:6:1101:1166:34209 */
 	public static void stripNameNumber(SAMRecord sam){
 		String name = sam.getReadName();

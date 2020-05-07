@@ -171,7 +171,7 @@ public class SamSubsampler{
 				if (verbose) System.out.println("Sorting and indexing...");
 				File bam = new File (saveDirectory, "randomized"+toSave+".bam");
 				//sort and convert to BAM
-				new PicardSortSam (outputGzSamFile, bam);
+				new PicardSortSam (outputGzSamFile, bam, true);
 				outputGzSamFile.delete();
 			}
 

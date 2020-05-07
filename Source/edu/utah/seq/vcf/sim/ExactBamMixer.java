@@ -11,6 +11,7 @@ import java.util.concurrent.Executors;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.parsers.SamAlignmentExtractor;
 import edu.utah.seq.vcf.xml.SimpleVcf;
 import util.gen.IO;
@@ -38,6 +39,8 @@ public class ExactBamMixer {
 	private static final int numVcfToProc = 100;
 	private BamMixerLoader[] loaders = null;
 	private String vcfHeader = null;
+	private File unModMatchingNameSortedBam = null;
+	private File[] modNameSortedBams = null;
 
 
 	public ExactBamMixer (String[] args){
@@ -63,12 +66,49 @@ public class ExactBamMixer {
 			
 			concatinateVcfs();
 
-			concatinateSams();
+			concatinateNameSortSams();
+			
+			nameSortUnModified();
+			
+			walkWriteFinalBams();
 
 			vcfIn.close();
+			
 		} catch (Exception e) {
 			e.printStackTrace();
+			System.exit(1);
 		}
+	}
+
+	private void walkWriteFinalBams() throws IOException {
+
+		WalkSortSam[] wss = new WalkSortSam[fractions.length];
+
+		//for each fraction, make a walker
+		for (int i=0; i< fractions.length; i++){
+			File finalBam = new File (saveDirectory, fractions[i]+".bam");
+			wss[i] = new WalkSortSam(modNameSortedBams[i], unModMatchingNameSortedBam, finalBam, unModifiedNoMatchBamFile, i);
+		}
+
+		//run threads
+		int num = fractions.length;
+		if (numberThreads < num) num = numberThreads;
+		IO.pl("Walking unmodified adding alignments for each mix with "+num+" threads...");
+		ExecutorService executor = Executors.newFixedThreadPool(num);
+		for (WalkSortSam l: wss) executor.execute(l);
+		executor.shutdown();
+		while (!executor.isTerminated()) {}
+		for (WalkSortSam l: wss) {
+			if (l.isFailed()) throw new IOException("ERROR: Walk Sort Sam issue! \n");
+		}
+		
+	}
+
+	private void nameSortUnModified() {
+		IO.pl("Name sorting unmodified matching bam...");
+		unModMatchingNameSortedBam = new File (saveDirectory, Misc.removeExtension(unModifiedMatchingBamFile.getName())+".nameSorted.unmod.bam");
+		unModMatchingNameSortedBam.deleteOnExit();
+		new PicardSortSam (unModifiedMatchingBamFile, unModMatchingNameSortedBam, false);
 	}
 
 	private void concatinateTxtResults() throws IOException {
@@ -112,20 +152,19 @@ public class ExactBamMixer {
 		}
 	}
 
-	private void concatinateSams() throws IOException {
-
-		File noMatchSam = new File(saveDirectory,"noMatchTemp.sam.gz");
+	private void concatinateNameSortSams() throws IOException {
 
 		CatSortSam[] css = new CatSortSam[fractions.length];
+		modNameSortedBams = new File[fractions.length];
 
 		//for each fraction
 		for (int i=0; i< fractions.length; i++){
 			ArrayList<File> toMerge = new ArrayList<File>();
 			//for each loader pull appropriate gzipped file
 			for (int j=0; j< loaders.length; j++) toMerge.add(loaders[j].getSamWriters()[i].getGzipFile());
-			toMerge.add(noMatchSam);
-			File finalBam = new File (saveDirectory, fractions[i]+".bam");
-			css[i] = new CatSortSam(toMerge, finalBam, i);
+			modNameSortedBams[i] = new File (saveDirectory, fractions[i]+".nameSorted.mod.bam");
+			modNameSortedBams[i].deleteOnExit();
+			css[i] = new CatSortSam(toMerge, modNameSortedBams[i], i);
 		}
 
 		//run threads
@@ -218,7 +257,7 @@ public class ExactBamMixer {
 		if (frac != null) fractions = Num.parseDoubles(Misc.COMMA.split(frac));
 
 		//check bams
-		if (injectedBamFile == null || injectedBamFile.canRead() == false) Misc.printErrAndExit("Error: please proved a sorted bam alignment file containing paired and single end alignments from aligning the fastq.gz files from your BamBlaster run.\n");
+		if (injectedBamFile == null || injectedBamFile.canRead() == false) Misc.printErrAndExit("Error: please proved a sorted bam alignment file containing the merged paired and single end alignments from aligning the fastq.gz files from your BamBlaster run.\n");
 		if (unModifiedMatchingBamFile == null || unModifiedMatchingBamFile.canRead() == false) Misc.printErrAndExit("Error: please proved a path to the xxx_unmodified.bam from your BamBlaster run.\n");
 		if (unModifiedNoMatchBamFile == null || unModifiedNoMatchBamFile.canRead() == false) Misc.printErrAndExit("Error: please proved a path to the xxx_filtered.bam from your BamBlaster run.\n");
 		SamAlignmentExtractor.lookForBaiIndexes(new File[]{injectedBamFile,unModifiedMatchingBamFile,unModifiedMatchingBamFile,unModifiedNoMatchBamFile}, true);
@@ -238,12 +277,13 @@ public class ExactBamMixer {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Exact Bam Mixer : March 2019                         **\n" +
+				"**                              Exact Bam Mixer : May 2020                          **\n" +
 				"**************************************************************************************\n" +
 				"Combines bam alignment files in different fractions to simulate multiple variant\n"+
 				"frequencies. Run BamBlaster first. Threaded, so provide almost all the memory available\n"+
 				"to java. The ExactBamMixer attempts to create bam files containing variants will very\n"+
-				"similar AFs.  The BamMixer produces more of a spread of AFs.\n\n"+
+				"similar AFs.  The BamMixer produces more of a spread of AFs. Ignore Picard and log4j\n"+
+				"NOTE and ERROR output. These are just warnings from Picard that can't be silenced.\n\n"+
 
 				"Required:\n"+
 				"-r Path to a directory to save the results\n" +
@@ -260,8 +300,8 @@ public class ExactBamMixer {
 				"-a Minimum number alt read pairs to include an injected variant in a particular mixed\n"+
 				"     bam, defaults to 2\n"+
 
-				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/BamMixer -r ~/TumorSim/ -v inject.vcf\n"+
-				"    -u ~/bb_unmodified.bam -f ~/bb_filtered.bam -p ~/bb_paired.bam -s ~/bb_single.bam \n\n" +
+				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/ExactBamMixer -r ~/TumorSim/ -v inject.vcf\n"+
+				"    -u bb_unmodified.bam -f bb_filtered.bam -i bb_mergedReAlign.bam \n\n" +
 
 				"**************************************************************************************\n");
 	}

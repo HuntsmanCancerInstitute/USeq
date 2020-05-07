@@ -16,7 +16,7 @@ public class SamSorter implements Runnable {
 
 	public void run() {	
 		try {
-			new PicardSortSam (samToSort, bamOutput);
+			new PicardSortSam (samToSort, bamOutput, true);
 		} catch (Exception e) {
 			failed = true;
 			bamOutput.delete();

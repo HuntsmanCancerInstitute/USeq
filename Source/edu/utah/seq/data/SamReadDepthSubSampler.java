@@ -61,7 +61,7 @@ public class SamReadDepthSubSampler{
 		parseWorkingSAMFile();
 		
 		System.out.println("\n\nSorting...");
-		new PicardSortSam(workingGzippedFile, workingBamFile);
+		new PicardSortSam(workingGzippedFile, workingBamFile, true);
 
 		printStats();
 
