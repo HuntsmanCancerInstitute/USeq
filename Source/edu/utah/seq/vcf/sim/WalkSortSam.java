@@ -4,15 +4,16 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.LinkedHashSet;
 import java.util.List;
 
 import edu.utah.seq.data.sam.PicardSortSam;
+import htsjdk.samtools.SAMFileHeader;
 import htsjdk.samtools.SAMFileWriter;
 import htsjdk.samtools.SAMFileWriterFactory;
+import htsjdk.samtools.SAMReadGroupRecord;
 import htsjdk.samtools.SAMRecord;
 import htsjdk.samtools.SAMRecordIterator;
-import htsjdk.samtools.SAMSequenceRecord;
+import htsjdk.samtools.SAMTag;
 import htsjdk.samtools.SamReader;
 import htsjdk.samtools.SamReaderFactory;
 import htsjdk.samtools.ValidationStringency;
@@ -27,31 +28,29 @@ public class WalkSortSam implements Runnable {
 	private File finalBam;
 	private File filteredBam;
 	private int id;
+	private String readGroupName; 
+	private String readGroupTag = SAMTag.RG.toString();
 	
 	private SamReaderFactory readerFactory = null;
 	private SamReader modifiedReader = null;
 	private SamReader unModifiedReader = null;
 	private SAMRecordIterator modifiedIterator = null;
 	private SAMRecordIterator unModifiedIterator = null;
-	
 	private ArrayList<SAMRecord> modifiedSamRecords = new ArrayList<SAMRecord>();
 	private SAMRecord lastModifiedSamRecord = null;
-	
 	private ArrayList<SAMRecord> unModifiedSamRecords = new ArrayList<SAMRecord>();
 	private SAMRecord lastUnModifiedSamRecord = null;
 	private SAMFileWriter unsortedWriter = null;
-	
 	private long numModifiedSaved = 0;
 	private long numUnModifiedSaved = 0;
 	
-	private boolean verbose = true;
-	
-	public WalkSortSam (File modifiedBam, File unModifiedBam, File finalBam, File filteredBam, int id) {
+	public WalkSortSam (File modifiedBam, File unModifiedBam, File finalBam, File filteredBam, int id, String readGroupName) {
 		this.modifiedBam = modifiedBam;
 		this.unModifiedBam = unModifiedBam;
 		this.finalBam = finalBam;
 		this.filteredBam = filteredBam;
 		this.id = id;
+		this.readGroupName = readGroupName;
 	}
 	
 	public void run() {	
@@ -65,29 +64,25 @@ public class WalkSortSam implements Runnable {
 						
 			//fetch iterators and load first record
 			modifiedIterator = modifiedReader.iterator();
-/*while (modifiedIterator.hasNext()) {
-modifiedIterator.next();
-numModifiedSaved++;
-}*/
 			lastModifiedSamRecord = modifiedIterator.next();
 			unModifiedIterator = unModifiedReader.iterator();
-/*while (unModifiedIterator.hasNext()) {
-				unModifiedIterator.next();
-				numUnModifiedSaved++;
-}*/
 			lastUnModifiedSamRecord = unModifiedIterator.next();
-//IO.pl(id+ "\tTotals # in ModMix: "+ numModifiedSaved+"  UnMod: "+ numUnModifiedSaved);
-//System.exit(0);
 
 			//create a writer for the unsorted output
 			File unsortedFinalBam = new File (finalBam.getParentFile(), "unsorted_"+finalBam.getName());
 			unsortedFinalBam.deleteOnExit();
 			SAMFileWriterFactory writerFactory = new SAMFileWriterFactory().setCreateIndex(true).setTempDirectory(finalBam.getParentFile());
-			unsortedWriter = writerFactory.makeBAMWriter(unModifiedReader.getFileHeader(), false, unsortedFinalBam);
+			//replace the readgroups
+			SAMFileHeader header = unModifiedReader.getFileHeader();
+			List<SAMReadGroupRecord> rgList = new ArrayList<SAMReadGroupRecord>();
+			rgList.add( new SAMReadGroupRecord(readGroupName));
+			header.setReadGroups(rgList);
+			unsortedWriter = writerFactory.makeBAMWriter(header, false, unsortedFinalBam);
+			
 			
 			walkBams();
 			
-//IO.pl(id+ "\t# Saved from ModMix: "+ numModifiedSaved+"  UnMod: "+ numUnModifiedSaved);
+			IO.pl(id+ "\tSaved from ModMix: "+ numModifiedSaved+"  UnMod: "+ numUnModifiedSaved);
 
 			//add in the remaining alignments not associated with any vcf
 			addInRemainingAlignments();
@@ -115,7 +110,9 @@ numModifiedSaved++;
 		SamReader filteredReader = readerFactory.open(filteredBam);
 		SAMRecordIterator it = filteredReader.iterator();
 		while (it.hasNext()) {
-			unsortedWriter.addAlignment(it.next());
+			SAMRecord sam = it.next();
+			sam.setAttribute(readGroupTag, readGroupName);
+			unsortedWriter.addAlignment(sam);
 			numUnModifiedSaved++;
 		}
 		it.close();
@@ -125,13 +122,10 @@ numModifiedSaved++;
 	private void walkBams() throws IOException {
 			
 			//walk every unmodified record
-//int counter = 0;
 			while (true) {
-//if (counter++ == 10) return;
 				
 				//fetch next unmodified set of Sams
 				String unModifiedReadName = loadNextUnmodified();
-//if(verbose) IO.pl("xxxxx NewRound" +unModifiedReadName+" with unMod "+unModifiedSamRecords.size());
 				
 				//any records?
 				if (unModifiedReadName == null) {
@@ -141,14 +135,16 @@ numModifiedSaved++;
 				
 				//attempt to load modified records
 				loadModified(unModifiedReadName);
-//IO.pl("\tNum Match Mod "+modifiedSamRecords.size());
 				
 				//any matches?
 				if (modifiedSamRecords.size() !=0) writeSamRecords();
 				else {
 					//write out the unmodified 
 					numUnModifiedSaved+=unModifiedSamRecords.size();
-					for (SAMRecord unMod: unModifiedSamRecords) unsortedWriter.addAlignment(unMod);
+					for (SAMRecord unMod: unModifiedSamRecords) {
+						unMod.setAttribute(readGroupTag, readGroupName);
+						unsortedWriter.addAlignment(unMod);
+					}
 				}
 					
 				//any modified left?
@@ -184,47 +180,39 @@ numModifiedSaved++;
 			for (SAMRecord sam : unModifiedSamRecords) sb.append("Un\t"+sam.getSAMString()+"\n");
 			throw new IOException ("Incorrect pairing "+numMod+" : "+numUn+"\n"+sb);
 		}
-
-//boolean speak = true;
-		//if(speak) IO.pl("\nNew ReadSet "+modifiedSamRecords.get(0).getReadName());
-
-//if(speak) IO.pl("\t\tNumMod: "+numMod+"   NumUnMod"+numUn);
 		
 		numModifiedSaved+= numMod;
 
 		//two mods? then write both and return
 		if (numMod == 2) {
-//if(speak) IO.pl("\t\tTwo mod present, saving both and returning");
-			for (SAMRecord mod: modifiedSamRecords) unsortedWriter.addAlignment(mod);
+			for (SAMRecord mod: modifiedSamRecords) {
+				mod.setAttribute(readGroupTag, readGroupName);
+				unsortedWriter.addAlignment(mod);
+			}
 			return;
 		}
 
 		//ok only one mod and there is one or more unMod
 		SAMRecord modOne = modifiedSamRecords.get(0);
+		modOne.setAttribute(readGroupTag, readGroupName);
 		//save it
 		unsortedWriter.addAlignment(modOne);
 		
 		SAMRecord unModOne = unModifiedSamRecords.get(0);
 		
 		//check to see if modOne and unModOne are different, if so then save unModOne and return
-//if(speak) IO.pl("\t\tChecking single modOne against unModOne");
-//if(speak) IO.pl("\t\tMo "+modOne.getSAMString());
 		if (matchSAMs(modOne, unModOne) == false) {
-//if(speak) IO.pl("\t\tDifferent so writing unModOne");	
-//if(speak) IO.pl("\t\tUn "+unModOne.getSAMString());
+			unModOne.setAttribute(readGroupTag, readGroupName);
 			unsortedWriter.addAlignment(unModOne);
 			numUnModifiedSaved++;
 			return;
 		}
-		else {
-//if(speak) IO.pl("\t\tSame so looking to see if there are 2 unMods");	
-		}
 		
 		//print unModTwo if it exists
 		if (numUn == 2) {
-//if(speak) IO.pl("\t\tWriting 2nd unMod, should be different");
-//if(speak) IO.pl("\t\tUn "+unModifiedSamRecords.get(1).getSAMString());
-			unsortedWriter.addAlignment(unModifiedSamRecords.get(1));
+			SAMRecord s = unModifiedSamRecords.get(1);
+			s.setAttribute(readGroupTag, readGroupName);
+			unsortedWriter.addAlignment(s);
 			numUnModifiedSaved++;
 		}
 	}
@@ -298,11 +286,14 @@ numModifiedSaved++;
 	private void writeOutAllModified() {
 		IO.pl(id+ "\tWriting out all remaining modified...");
 		if (lastModifiedSamRecord!= null) {
+			lastModifiedSamRecord.setAttribute(readGroupTag, readGroupName);
 			unsortedWriter.addAlignment(lastModifiedSamRecord);
 			numModifiedSaved++;
 		}
 		while (modifiedIterator.hasNext()) {
-			unsortedWriter.addAlignment(modifiedIterator.next());
+			SAMRecord s = modifiedIterator.next();
+			s.setAttribute(readGroupTag, readGroupName);
+			unsortedWriter.addAlignment(s);
 			numModifiedSaved++;
 		}
 	}
@@ -310,11 +301,14 @@ numModifiedSaved++;
 	private void writeOutAllUnModified() {
 		IO.pl(id+"\tWriting out all remaining unmodified...");
 		if (lastUnModifiedSamRecord!= null) {
+			lastUnModifiedSamRecord.setAttribute(readGroupTag, readGroupName);
 			unsortedWriter.addAlignment(lastUnModifiedSamRecord);
 			numUnModifiedSaved++;
 		}
 		while (unModifiedIterator.hasNext()) {
-			unsortedWriter.addAlignment(unModifiedIterator.next());
+			SAMRecord s = unModifiedIterator.next();
+			s.setAttribute(readGroupTag, readGroupName);
+			unsortedWriter.addAlignment(s);
 			numUnModifiedSaved++;
 		}
 	}
@@ -324,7 +318,6 @@ numModifiedSaved++;
 		//clear old and add last if it isn't null;
 		unModifiedSamRecords.clear();
 		if (lastUnModifiedSamRecord == null) {
-//IO.pl("LastUnModified is null!");
 			return null;
 		}
 		unModifiedSamRecords.add(lastUnModifiedSamRecord);
@@ -334,17 +327,14 @@ numModifiedSaved++;
 		
 		//fetch new
 		while (unModifiedIterator.hasNext()) {
-			SAMRecord nextUnMod = unModifiedIterator.next();
-//IO.pl("\tFetching next "+nextUnMod.getReadName());			
+			SAMRecord nextUnMod = unModifiedIterator.next();		
 			//same name?
 			if (nextUnMod.getReadName().equals(currentName)) {
 				unModifiedSamRecords.add(nextUnMod);
-//IO.pl("\t\tSame as current adding");
 			}
 			//diff name
 			else {
 				lastUnModifiedSamRecord = nextUnMod;
-//IO.pl("\t\tDifferent than current returning");
 				return currentName;
 			}
 		}

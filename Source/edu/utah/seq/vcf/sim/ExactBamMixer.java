@@ -29,6 +29,7 @@ public class ExactBamMixer {
 	private File unModifiedNoMatchBamFile;
 	private File saveDirectory;
 	private File vcfFile;
+	private String readGroupName = "EBM";
 	private double[] fractions = {0.025, 0.05, 0.1, 0.2};
 	private int minNumAltReads = 2;
 
@@ -87,7 +88,7 @@ public class ExactBamMixer {
 		//for each fraction, make a walker
 		for (int i=0; i< fractions.length; i++){
 			File finalBam = new File (saveDirectory, fractions[i]+".bam");
-			wss[i] = new WalkSortSam(modNameSortedBams[i], unModMatchingNameSortedBam, finalBam, unModifiedNoMatchBamFile, i);
+			wss[i] = new WalkSortSam(modNameSortedBams[i], unModMatchingNameSortedBam, finalBam, unModifiedNoMatchBamFile, i, readGroupName+"_"+fractions[i]);
 		}
 
 		//run threads
@@ -243,6 +244,7 @@ public class ExactBamMixer {
 					case 'v': vcfFile = new File(args[++i]); break;
 					case 't': numberThreads = Integer.parseInt(args[++i]); break;
 					case 'm': frac = args[++i]; break;
+					case 'n': readGroupName = args[++i]; break;
 					case 'a': minNumAltReads = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
@@ -299,9 +301,10 @@ public class ExactBamMixer {
 				"-t Number of threads to use, defaults to all\n"+
 				"-a Minimum number alt read pairs to include an injected variant in a particular mixed\n"+
 				"     bam, defaults to 2\n"+
+				"-n Name to prepend onto the read group, defaults to EBM\n"+
 
-				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/ExactBamMixer -r ~/TumorSim/ -v inject.vcf\n"+
-				"    -u bb_unmodified.bam -f bb_filtered.bam -i bb_mergedReAlign.bam \n\n" +
+				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/ExactBamMixer -r ~/TumorSim/ -v snv.vcf\n"+
+				"    -u bb_unmodified.bam -f bb_filtered.bam -i bb_mergedReAlign.bam -n Snv\n\n" +
 
 				"**************************************************************************************\n");
 	}
