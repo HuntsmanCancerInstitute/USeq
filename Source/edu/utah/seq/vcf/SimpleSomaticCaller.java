@@ -236,7 +236,10 @@ public class SimpleSomaticCaller {
 		double afDiff = tAF-nAF;
 		double afRto = tAF/nAF;
 		int totalSum = (int)(nDP+ tDP);
-		if (totalSum > this.maxCountSum) fisher = new FisherExact(totalSum);
+		if (totalSum > maxCountSum) {
+			fisher = new FisherExact(totalSum);
+			maxCountSum = totalSum;
+		}
 		double pval = fisher.getLeftTailedP((int)tRefAlt[0],(int)tRefAlt[1], (int)nRefAlt[0], (int)nRefAlt[1]);
 
 		ArrayList<String> flags = new ArrayList<String>();

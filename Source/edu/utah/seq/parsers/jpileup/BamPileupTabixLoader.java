@@ -40,6 +40,8 @@ public class BamPileupTabixLoader implements Runnable{
 	private boolean calcAllBkgAfs = false;
 	private boolean includeNsPoorQualBpsInAllBkgAfs = false;
 	private boolean debug = false;
+	private int bpIndelPad = 0;
+	private boolean includeIndelCountsForSnvs = false;
 	
 	//internal
 	public Pattern AF = null;
@@ -59,6 +61,8 @@ public class BamPileupTabixLoader implements Runnable{
 		excludeBKAFs = vbp.isExcludeBKAFs();
 		calcAllBkgAfs = vbp.isCalcAllBkgAfs();
 		AF = Pattern.compile( vbp.getAFInfoName()+"=([\\d\\.]+)");
+		bpIndelPad = vbp.getBpIndelPad();
+		includeIndelCountsForSnvs = vbp.isIncludeIndelCountsForSnvs();
 	}
 	
 	public void run() {	
@@ -133,9 +137,10 @@ if (debug) IO.el("\nProc "+record);
 		//fetch sorted, smallest to largest AFs
 		Arrays.sort(scoreAfs.afs);
 
-		//were two or more background AF >= tum AF seen?
+		//were two or more background AF * 1.111111112 >= tum AF seen?
 		int len = scoreAfs.afs.length-1;
-		boolean bkafFound = (scoreAfs.afs[len]>altAF && scoreAfs.afs[len-1]>altAF);
+		double testAf = 0.9*altAF;
+		boolean bkafFound = scoreAfs.afs[len]>=testAf && scoreAfs.afs[len-1]>=testAf;
 
 		if (bkafFound && excludeBKAFs) numWithBKAF++;
 		else {
@@ -171,14 +176,25 @@ if (debug) IO.el("\nProc "+record);
 		if (allele == 'D') {
 			int[] startStop = QueryIndexFileLoader.fetchEffectedBps(fields, true);
 			if (startStop == null) return null; 
+			if (bpIndelPad !=0) {
+				startStop[0] = startStop[0]-bpIndelPad;
+				if (startStop[0] <0) startStop[0] = 0;
+				startStop[1] = startStop[1]+ bpIndelPad;
+			}
 			if (debug) IO.pl("\tStartEnd "+startStop[0]+ " to "+startStop[1]);
 			//pull bpileup records over deleted bps
 			tabixCoor = fields[0]+":"+(startStop[0]+2)+"-"+ (startStop[1]);
 		}
 		else if (allele ==  'I') {
 			//single downstream base
-			int downStream = Integer.parseInt(fields[1])+1;
-			tabixCoor = fields[0]+":"+downStream+"-"+downStream;
+			int start = Integer.parseInt(fields[1])+1;
+			int stop = start;
+			if (bpIndelPad !=0) {
+				start = start-bpIndelPad;
+				if (start <0) start = 0;
+				stop = stop+bpIndelPad;
+			}
+			tabixCoor = fields[0]+":"+start+"-"+stop;
 		}
 		
 		
@@ -343,8 +359,11 @@ if (debug) IO.el("\nProc "+record);
 			if (calcAllBkgAfs) af = calcAllBkgAf(samples[i]);
 			else {
 				//check that alt isn't a het in the normal sample
-				af = (double)samples[i].getSnvCount(alt) / samples[i].getPassingReadCoverageSnv();
+				double snvCounts = samples[i].getSnvCount(alt);
+				af = snvCounts / samples[i].getPassingReadCoverageSnv();
 				if (af > maxSampleAF) continue;	
+				//include indel counts?
+				if (includeIndelCountsForSnvs) af = ((double)samples[i].getIndelCount()+snvCounts) / samples[i].getPassingReadCoverage();
 			}
 
 			al.add(af);

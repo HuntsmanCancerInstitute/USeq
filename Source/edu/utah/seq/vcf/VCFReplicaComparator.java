@@ -28,6 +28,8 @@ public class VCFReplicaComparator {
 	private File fasta;
 	private float minRatio = 0.5f;
 	private int minAltCounts = 3;
+	private float minQualFilt = 0;
+	private String filterTxtToExclude = null;
 	
 	//internal 
 	private ArrayList<VCFMatch> vcfMatches = new ArrayList<VCFMatch>();
@@ -112,7 +114,7 @@ public class VCFReplicaComparator {
 		double fracAMatch = 1.0 - fracANonMatch;
 		double fracBMatch = 1.0 - fracBNonMatch;
 		IO.pl("\nFinal Intersection Statistics:");
-		IO.pl("\t"+ (int)numMatch+ "\tMatch - A: "+Num.formatPercentOneFraction(fracAMatch)+"  B: "+Num.formatPercentOneFraction(fracBMatch));
+		IO.pl("\t"+ (int)numMatch+ "\tMatch w/ extras - A: "+Num.formatPercentOneFraction(fracAMatch)+"  B: "+Num.formatPercentOneFraction(fracBMatch));
 		IO.pl("\t"+vcfNonMatchesA.size()+"\tUnique to A "+Num.formatPercentOneFraction(fracANonMatch));
 		IO.pl("\t"+vcfNonMatchesB.size()+"\tUnique to B "+Num.formatPercentOneFraction(fracBNonMatch));
 	}
@@ -168,11 +170,19 @@ public class VCFReplicaComparator {
 	private void parseVcfs() {
 		IO.pl("\nInitial Intersection Statistics:");
 		vcfParserA = new VCFParser(vcfA, true, false, false);
+		int numAPre = vcfParserA.getVcfRecords().length;
+		vcfParserA.getVcfRecords();
+		if (minQualFilt !=0.0f) vcfParserA.filterVCFRecordsOnQUAL(minQualFilt);
+		if (filterTxtToExclude != null) vcfParserA.filterVCFRecordsOnFILTER(filterTxtToExclude);
 		numVcfA = vcfParserA.getVcfRecords().length;
-		IO.pl("\t"+vcfParserA.getVcfRecords().length+"\tin A");
+		IO.pl("\t"+(int)numVcfA+"\tin A ("+numAPre+" before filtering)");
+		
 		vcfParserB = new VCFParser(vcfB, true, false, false);
+		int numBPre = vcfParserB.getVcfRecords().length;
+		if (minQualFilt !=0.0f) vcfParserB.filterVCFRecordsOnQUAL(minQualFilt);
+		if (filterTxtToExclude != null) vcfParserB.filterVCFRecordsOnFILTER(filterTxtToExclude);
 		numVcfB = vcfParserB.getVcfRecords().length;
-		IO.pl("\t"+vcfParserB.getVcfRecords().length+"\tin B");
+		IO.pl("\t"+(int)numVcfB+"\tin B ("+numBPre+" before filtering)");
 	}
 
 	private ArrayList<VCFRecord>[] adjudicate(HashMap<String, float[]> keyAfDpCalled, HashMap<String, float[]> keyAfDpTest, ArrayList<VCFRecord> vcfNonMatches) throws IOException {
@@ -310,9 +320,11 @@ public class VCFReplicaComparator {
 					case '2': bamB = new File(args[++i]); break;
 					case 'g': graphiteExe = new File(args[++i]); break;
 					case 'o': outputDir = new File(args[++i]); break;
-					case 'f': fasta = new File(args[++i]); break;
+					case 'i': fasta = new File(args[++i]); break;
 					case 'c': minAltCounts = Integer.parseInt(args[++i]); break;
 					case 'r': minRatio = Float.parseFloat(args[++i]); break;
+					case 'f': filterTxtToExclude = args[++i]; break;
+					case 'q': minQualFilt = Float.parseFloat(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -327,14 +339,15 @@ public class VCFReplicaComparator {
 		if (bamA == null || bamB == null || bamA.exists()==false || bamB.exists()==false) Misc.printErrAndExit("\nError -1 or -2: please provide paths to the first bam ("+bamA+") and second bam ("+bamB+") files.");
 		if (graphiteExe == null || graphiteExe.canExecute() == false) Misc.printErrAndExit("\nError -g: please provide path to the graphite executable.");
 		if (outputDir == null) Misc.printErrAndExit("\nError -o: please provide a path to a directory to write the adjudicated vcf files.\n");
-		if (fasta == null || fasta.exists()==false) Misc.printErrAndExit("\nError -f: please provide an indexed fasta file.\n");
+		if (fasta == null || fasta.exists()==false) Misc.printErrAndExit("\nError -i: please provide an indexed fasta file.\n");
 		if (outputDir.exists() == false) outputDir.mkdirs();
 		
 		//make temp dir for Graphite
+		int numThreads = Runtime.getRuntime().availableProcessors() - 1;
 		graphiteTempDir = new File (outputDir, "GraphiteTempDir_"+Misc.getRandomString(6));
 		graphiteTempDir = graphiteTempDir.getCanonicalFile();
 		graphiteTempDir.mkdirs();
-		graphite = new Graphite(graphiteExe, fasta, graphiteTempDir);
+		graphite = new Graphite(graphiteExe, fasta, graphiteTempDir, numThreads);
 		
 		printOptions();
 	}	
@@ -348,28 +361,32 @@ public class VCFReplicaComparator {
 		IO.pl(" -o OutputDir\t"+outputDir);
 		IO.pl(" -c MinAltCounts\t"+minAltCounts);
 		IO.pl(" -r MinAFRatio Test/RealCall "+minRatio);
-		IO.pl(" -f FastaIndex "+fasta);
-		IO.pl(" -g Graphite "+graphiteExe);
+		IO.pl(" -q Min QUAL "+minQualFilt);
+		IO.pl(" -f FILTER exclude "+filterTxtToExclude);
+		IO.pl(" -i FastaIndex "+fasta);
+		IO.pl(" -g Graphite app "+graphiteExe);
 	}
-
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           VCF Replica Comparator : April 2020                    **\n" +
+				"**                            VCF Replica Comparator : May 2020                     **\n" +
 				"**************************************************************************************\n" +
 				"Compares two vcf files derived from a multi replica experiment. Variants unique to\n"+
 				"either are run through Graphite (https://github.com/dillonl/graphite) to accurately\n"+
-				"calculate alignment support and potentially add more matches based on the -c and -r\n"+
-				"thresholds.\n"+
+				"calculate alignment support and potentially add more replica matches based on the -c \n"+
+				"and -r thresholds. Thus filter the input VCFs for min QUAL and min alt allele coverage\n"+
+				"and allele freq before running. Be sure to run the USeq MergePairedAlignments app on\n"+
+				"the bam files, otherwise Graphite will double count variant observations from\n" + 
+				"overlapping pairs. Uses all threads available.\n"+
 
 				"\nRequired Options:\n"+
 				"-a Vcf file for replica A (xxx.vcf(.gz/.zip OK))\n"+
 				"-b Vcf file for replica B\n"+
-				"-1 Bam file for replica A (e.g. tumor) with its index\n"+
-				"-2 Bam file for replica B\n"+
+				"-1 Path to a merged bam file for replica A (e.g. tumor) with its index\n"+
+				"-2 Path to a merged bam file for replica B\n"+
 				"-o Output directory for adjudicated variant calls\n"+
-				"-f Fasta index used in aligning the reads\n"+
+				"-i Fasta index used in aligning the reads\n"+
 				"-g Graphite executable, see https://github.com/dillonl/graphite install e.g.:\n"+
 				"     module load gcc/4.9.2\n" + 
 				"     git clone https://github.com/dillonl/graphite.git\n" + 
@@ -379,12 +396,14 @@ public class VCFReplicaComparator {
 				"     make\n"+
 				
 				"\nDefault Options:\n"+
-				"-c Min alt allele variant observations to match, defaults to 3\n"+
+				"-c Min alt allele variant observations in replica to match, defaults to 3\n"+
 				"-r Min test AF/ called AF ratio to match, defaults to 0.5\n"+
+				"-q Min QUAL score for vcf record import, defaults to 0\n"+
+				"-f FILTER field value to exclude records from import, defaults to no filtering\n"+
 				
-				"\nExample: module load gcc/4.9.2; java -Xmx10G -jar USeq/Apps/VCFReplicaComparator\n" +
-				"       -a repA.vcf.gz -b repB.vcf.gz -1 repA.bam -2 repB.bam -o AdjVcfs \n" +
-				"       -g ~/Graphite/bin/graphite -f ~/Hg38Ref/hs38DH.fa -c 2 -r 0.3 \n\n"+
+				"\nExample: module load gcc/4.9.2; java -Xmx25G -jar USeq/Apps/VCFReplicaComparator\n" +
+				"       -a repA.vcf.gz -b repB.vcf.gz -1 repA.bam -2 repB.bam -o AdjVcfs -f BKAF\n" +
+				"       -g ~/Graphite/bin/graphite -i ~/Hg38Ref/hs38DH.fa -c 5 -r 0.75 -q 3\n\n"+
 
 		"**************************************************************************************\n");
 

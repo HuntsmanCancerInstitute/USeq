@@ -587,6 +587,36 @@ public class VCFParser {
 		//remake split chrom data?
 		if (chromosomeVCFRecords != null) splitVCFRecordsByChromosome();
 	}
+	
+	public ArrayList<VCFRecord> filterVCFRecordsOnFILTER(String filterTxtToExclude) {
+		ArrayList<VCFRecord> keep = new ArrayList<VCFRecord>();
+		ArrayList<VCFRecord> fail = new ArrayList<VCFRecord>();
+		for (VCFRecord r : vcfRecords){
+			if (r.getFilter().contains(filterTxtToExclude) == false) keep.add(r);
+			else fail.add(r);
+		}
+		vcfRecords = new VCFRecord[keep.size()];
+		keep.toArray(vcfRecords);
+
+		//remake split chrom data?
+		if (chromosomeVCFRecords != null) splitVCFRecordsByChromosome();
+		return fail;
+	}
+	
+	public ArrayList<VCFRecord> filterVCFRecordsOnQUAL(float minQualFilt) {
+		ArrayList<VCFRecord> keep = new ArrayList<VCFRecord>();
+		ArrayList<VCFRecord> fail = new ArrayList<VCFRecord>();
+		for (VCFRecord r : vcfRecords){
+			if (r.getQuality() >= minQualFilt) keep.add(r);
+			else fail.add(r);
+		}
+		vcfRecords = new VCFRecord[keep.size()];
+		keep.toArray(vcfRecords);
+
+		//remake split chrom data?
+		if (chromosomeVCFRecords != null) splitVCFRecordsByChromosome();
+		return fail;
+	}
 
 	public int countMatchingVCFRecords(String matchFilterText){
 		int numMatches = 0;
@@ -841,12 +871,5 @@ public class VCFParser {
 	public File getVcfFile() {
 		return vcfFile;
 	}
-
-
-
-
-
-
-
 
 }

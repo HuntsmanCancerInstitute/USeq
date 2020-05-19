@@ -38,6 +38,8 @@ public class VCFBkz {
 	private String afInfoName = "T_AF";
 	private boolean excludeBKAFs = false;
 	private boolean calcAllBkgAfs = false;
+	private int bpIndelPad = 0;
+	private boolean includeIndelCountsForSnvs = false;
 	
 	//internal
 	private static final int numVcfToProc = 100;
@@ -251,10 +253,12 @@ public class VCFBkz {
 					case 'f': maxSampleAF = Double.parseDouble(args[++i]); break;
 					case 'c': minReadCoverage = Integer.parseInt(args[++i]); break;
 					case 'n': minNumSamples = Integer.parseInt(args[++i]); break;
+					case 'x': bpIndelPad = Integer.parseInt(args[++i]); break;
 					case 'e': removeNonZScoredRecords = true; break;
 					case 'l': excludeBKAFs = true; break;
 					case 'i': sampleIndexes = args[++i]; break;
 					case 'u': replaceQualScore = true; break;
+					case 'y': includeIndelCountsForSnvs = true; break;
 					case 'a': calcAllBkgAfs = true; break;
 					case 'p': numberThreads = Integer.parseInt(args[++i]); break;
 					case 't': afInfoName = args[++i]; break;
@@ -320,6 +324,8 @@ public class VCFBkz {
 		IO.pl(" -e "+ removeNonZScoredRecords+ "\tExclude vcf records that could not be z-scored");
 		IO.pl(" -l "+ excludeBKAFs+ "\tExclude vcf records with 2 or more bkg AF >= record AF");
 		IO.pl(" -u "+ replaceQualScore+"\tReplace QUAL score with z-score and set non scored records to 0");
+		IO.pl(" -x "+ bpIndelPad+"\tBP padding for scanning INDEL backgrounds");
+		IO.pl(" -y "+ includeIndelCountsForSnvs+"\tInclude INDEL counts when scoring SNV bkgs");
 	}
 
 	
@@ -331,13 +337,13 @@ public class VCFBkz {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                VCF Bkz : Oct 2019                                **\n" +
+				"**                                VCF Bkz : May 2020                                **\n" +
 				"**************************************************************************************\n" +
 				"VCFBkz uses a panel of normals to calculate non-germline allele frequencies (AF) from \n"+
 				"each sample that intersect a vcf record. It then calculates a z-score based on the vcf\n"+
 				"AF and appends it to the INFO field. If multiple bps are affected (e.g. deletion), the \n"+
 				"lowest z-score is appended. Z-scores < ~3 are indicative of false positives. A flag is \n"+
-				"appended to the FILTER field if 2 or more background AF were found >= vcf AF. Note,\n"+
+				"appended to the FILTER field if 2 or more background AF were found >= vcf AF*.9 . Note,\n"+
 				"VCFBkz requires a tumor AF tag in the INFO field of each record to use in the z-score\n"+
 				"calculation. Be sure to vt normalize, decompose, decompose_blocksub your vcf files, see\n"+
 				"https://genome.sph.umich.edu/wiki/Vt#Normalization\n"+
@@ -359,13 +365,15 @@ public class VCFBkz {
 				"-i Sample indexes to exclude, comma delimited, no spaces, zero based, defaults to all,\n"+
 				"      see the bpileup file header for bam sample order.\n"+
 				"-e Exclude vcf records that could not be z-scored, recommended, indicative of high bkg.\n"+
-				"-l Exclude vcf records with two or more bkg AF >= the record AF, recommended.\n"+
+				"-l Exclude vcf records with two or more bkg AFs >= the record AF*0.9, recommended.\n"+
 				"-u Replace QUAL value with z-score. Un scored vars will be assigned 0\n"+
+				"-x Bp padding for scanning INDEL bkg, defaults to 0\n"+
+				"-y Include INDEL counts when scoring SNVs to down weight SNV calls that overlap.\n"+
 				"-p Number of processors to use, defaults to all\n"+
 				"\n"+
 
 				"Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFBkz -v SomaticVcfs/ -z 3 -u -l -e -n 8\n"+
-				"      -b bkgPoN.bpileup.gz -s BkgFiltVcfs/\n\n"+
+				"      -b bkgPoN.bpileup.gz -s BkgFiltVcfs/ -x 3 -y\n\n"+
 
 		        "**************************************************************************************\n");
 	}
@@ -401,5 +409,13 @@ public class VCFBkz {
 
 	public boolean isCalcAllBkgAfs() {
 		return calcAllBkgAfs;
+	}
+
+	public int getBpIndelPad() {
+		return bpIndelPad;
+	}
+
+	public boolean isIncludeIndelCountsForSnvs() {
+		return includeIndelCountsForSnvs;
 	}
 }
