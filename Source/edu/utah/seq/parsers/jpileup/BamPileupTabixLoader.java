@@ -165,7 +165,6 @@ if (debug) IO.el("\nProc "+record);
 				}
 			}
 		}
-
 	}
 	
 	private ScoreAfs scoreIndel(String[] fields, double altAF, char allele) throws Exception {
@@ -286,7 +285,7 @@ if (debug) IO.el("\nProc "+record);
 		}
 
 	/**Return GATC or ID for indels*/
-	private char fetchAllele(String[] fields) throws IOException {
+	private static char fetchAllele(String[] fields) throws IOException {
 		if (fields[4].contains(",") || fields[4].startsWith("<")) throw new IOException("Cannot interpret this alt, deconvolute? "+Misc.stringArrayToString(fields,  "\t"));
 		//#CHROM	POS	ID	REF	ALT
 		int lenRef = fields[3].length();
