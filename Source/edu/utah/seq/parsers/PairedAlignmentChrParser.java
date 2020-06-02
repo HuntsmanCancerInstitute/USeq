@@ -161,27 +161,43 @@ public class PairedAlignmentChrParser implements Runnable{
 		if (stop == 0) return 0;
 		int length = 0;
 		int numIs = 0;
+//IO.pl("Stop/StartRight in 0 coordinates "+stop+" "+cigar);
+
 		//for each M D I or N block  MDIN
 		Matcher mat = MergePairedAlignments.CIGAR_SUB.matcher(cigar);
 		while (mat.find()){
 			//pass
 			int num = Integer.parseInt(mat.group(1));
+//IO.pl("\nAlignmentBlock "+mat.group(1)+mat.group(2)+" num "+num);			
 			//is call I 
-			if (mat.group(2).equals("I")){			
+			if (mat.group(2).equals("I")){	
+//IO.pl("\tI found");
+				numIs+= num;
+				if (length >= stop) {
+//IO.pl("\t\tLen >= stop Breaking");
+					break;
+				}
+				/*
 				for (int i=0; i< num; i++){
+					// shouldn't this not count to length!  
 					length++;	
 					numIs++;
 					if (length >= stop) break;
-					//numIs++;
-				}
+				}*/
 			}
 			//nope just addit
 			else {
+//IO.pl("\tNot I found");
 				length += num;
-				if (length >= stop) break;
+//IO.pl("\t\t"+numIs+" I    Len "+length);
+				if (length >= stop) {
+//IO.pl("\t\tLen >= stop Breaking");
+					break;
+				}
 			}
 
 		}	
+//IO.pl("Final num I "+numIs);
 		return numIs;
 	}
 
@@ -215,18 +231,25 @@ public class PairedAlignmentChrParser implements Runnable{
 			left = second;
 		}
 
-		//System.out.println("Name "+left.getName());
+//System.out.println("\nName "+left.getName());
 
-		//fetch genomic space coordinates
+		//fetch genomic space coordinates, not for INDELS
 		int startLeft = left.getPosition();
 		int stopLeft = startLeft + countLengthOfCigar(left.getCigar());
+//IO.pl("LeftStart "+startLeft);
+//IO.pl("LeftStop "+stopLeft);
+		
+		
 		int startRight = right.getPosition();
 		int stopRight = startRight + countLengthOfCigar(right.getCigar());
 		int stop = stopRight;
 		if (stopLeft > stop) stop = stopLeft;
+//IO.pl("RightStart "+startRight);
+//IO.pl("RightStop "+stopRight);
 
 		//any Is in left that precede the start of right?
 		int numAdders = countIs(left.getCigar(), startRight-startLeft);
+//IO.pl("Adders "+numAdders+" LeftCigar "+left.getCigar()+"   R-L "+(startRight-startLeft));		
 
 		//make arrays to hold sequence and qualities in cigar space
 		int size = numAdders + stop-startLeft;
@@ -234,10 +257,18 @@ public class PairedAlignmentChrParser implements Runnable{
 		SamLayout leftLayout = new SamLayout(size);
 		SamLayout rightLayout = new SamLayout(size);
 
+
 		//layout data
 		leftLayout.layoutCigar(startLeft, left);
 		rightLayout.layoutCigar(startLeft-numAdders, right);
 
+//System.out.println("LeftLayout");
+//leftLayout.print();	
+//System.out.println("RightLayout");
+//rightLayout.print();
+		
+
+		
 		//increment overlap and insert size
 		int[] overNonOver = SamLayout.countOverlappingBases(leftLayout, rightLayout);
 		numberOverlappingBases+= (double)overNonOver[0];
@@ -251,8 +282,10 @@ public class PairedAlignmentChrParser implements Runnable{
 		//merge layouts, modifies original layouts so print first if you want to see em before mods.
 		SamLayout mergedSamLayout = SamLayout.mergeLayouts(leftLayout, rightLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);
 
-		//System.out.println("MergedLayout");
-		//mergedSamLayout.print();
+//System.out.println("\nMergedLayout");
+//mergedSamLayout.print();
+
+//System.exit(1);
 
 		if (mergedSamLayout == null) {
 			//add failed merge tag
@@ -522,6 +555,7 @@ public class PairedAlignmentChrParser implements Runnable{
 
 	/**Attempts to merge a proper paired alignment.  Increments counters and sends examples to the gzipper.*/
 	private void mergeAndScorePair(SamAlignment first, SamAlignment second) throws Exception{
+		
 		//collect string rep since the merge method will modify the SamAlignment while merging 
 		//so if it fails you can output the unmodified SamAlignment
 		String firstSamString = first.toString();

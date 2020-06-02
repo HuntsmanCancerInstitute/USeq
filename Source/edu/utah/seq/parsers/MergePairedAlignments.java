@@ -418,7 +418,7 @@ public class MergePairedAlignments {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Merge Paired Alignments: March 2020                     **\n" +
+				"**                          Merge Paired Alignments: June 2020                      **\n" +
 				"**************************************************************************************\n" +
 				"Merges proper paired alignments that pass a variety of checks and thresholds. Only\n" +
 				"unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps\n" +
