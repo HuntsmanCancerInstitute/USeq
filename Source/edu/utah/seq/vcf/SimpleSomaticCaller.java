@@ -65,8 +65,8 @@ public class SimpleSomaticCaller {
 	//normal
 	private double maximumNormalAltFraction = 1;
 	private int minimumNormalReadDepth = 0;
-	private double maximumNormalIndelAF = 0.01;
-	private double maximumNormalIndelAFRatio = 0.5;
+	private double maximumNormalIndelAF = 0;
+	private double maximumNormalIndelAFRatio = 1;
 
 	private double minimumTNFractionDiff = 0;
 	private double minimumTNRatio = 0;
@@ -535,40 +535,42 @@ public class SimpleSomaticCaller {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                          Simple Somatic Caller: May 2020                         **\n" +
+				"**                          Simple Somatic Caller: June 2020                         **\n" +
 				"**************************************************************************************\n" +
 				"Takes vcf output from Bcftools mpileup and norm applications (http://www.htslib.org)\n"+
 				"run on a paired tumor and normal bam file set and filters the variants for somatic\n"+
 				"calls. Select -z to print an example bash script. A one-tailed Fisher's Exact test is\n"+
 				"performed on each alt allele count to select somatic variants. Vt normalization isn't\n"+
-				"needed for the output vcfs. An indel scan is performed to down weight snvs and indels\n"+
-				" that occur in noisy indel regions.\n"+
+				"needed for the output vcfs. An indel scan can be performed to exclude snvs and\n"+
+				"indels that occur in noisy indel regions, recommended.\n"+
 
-				"\nRequired Params:\n"+
+				"\nParams:\n"+
 				"-v Path to the bcftools xxx.vcf(.gz/.zip OK) file.\n" +
-				"-b Normal BamPileup file, compressed and tabix indexed, see the USeq BamPileup app.\n"+
-				
-				"\nDefault Params:\n"+
 				"-s Directory in which to save the parsed file, defaults to parent dir of the vcf.\n"+
+				
+				"\n-b Normal BamPileup file, compressed and tabix indexed, see the USeq BamPileup app.\n"+
 				"-c Normal BamPileup index, 0\n"+
-				"-t Minimum tumor allele frequency (AF), 0\n"+
+				"-i Maximum normal INDEL scan AF, 0\n"+
+				"-j Maximum normal INDEL scan AF/ tumor AF ratio, 0\n"+
+				"-p BP padding for INDEL scan, default 3\n"+
+				
+				"\n-t Minimum tumor allele frequency (AF), 0\n"+
 				"-x Maximum tumor AF, 1\n"+
-				"-n Maximum normal AF, 1\n"+
 				"-u Minimum tumor alignment depth (DP), 0\n"+
 				"-a Minimum tumor alt count, 0\n"+
+				
+				"\n-n Maximum normal AF, 1\n"+
 				"-o Minimum normal DP, 0\n"+
-				"-i Maximum normal INDEL AF, 0\n"+
-				"-j Maximum normal INDEL AF/ tumor AF ratio, 0\n"+
-				"-d Minimum T-N AF difference, 0\n"+
+
+				"\n-d Minimum T-N AF difference, 0\n"+
 				"-r Minimum T/N AF ratio, 0\n"+
 				"-f Maximum Fisher's TN pvalue, defaults to 1\n"+
 				"-m For multi alt alleles, save just the biggest T-N AF difference\n"+
-				"-p BP padding for indel scan, default 3\n"+
 				"-z Print example bcftools bash script.\n"+
-
+			
 				"\nExample: java -jar pathToUSeq/Apps/SimpleSomaticCaller -v bcfTools.vcf.gz -f 0.001 \n"+
-				" -t 0.005 -x 0.2 -n 0.1 -u 100 -a 3 -o 100 -d 0.0025 -r 3 -m -s SSC/ -b norm.bp.txt.gz\n"+
-				"-i 0.01 -j 0.5\n\n"+
+				" -t 0.0025 -x 0.2 -n 0.1 -u 100 -a 3 -o 100 -d 0.0025 -r 3 -m -s SSC/ -b norm.bp.txt.gz\n"+
+				"-i 0.02 -j 0.5\n\n"+
 
 
 				"**************************************************************************************\n");
