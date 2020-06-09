@@ -181,7 +181,7 @@ public class TRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TRunner Feb 2020                                 **\n" +
+				"**                                 TRunner June 2020                                **\n" +
 				"**************************************************************************************\n" +
 				"TRunner is designed to execute several dockerized snakmake workflows on human tumor\n"+
 				"only datasets via a slurm cluster.  Based on the availability of the bams and xml,\n"+
