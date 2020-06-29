@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import edu.utah.hci.query.Util;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -45,7 +47,7 @@ public class TNRunner {
 	private int maxNumJobsToSubmit = 40;
 	private boolean loop = false;
 	private int numMinToSleep = 60;
-	private boolean niceJobs = false;
+	private boolean niceJobs = true;
 
 	private String pathToTrim = null;
 	private String nice = "";
@@ -125,18 +127,21 @@ public class TNRunner {
 					return;
 				}
 				
-				//if it exists then wait until all gvcfs become available
+				//OK doesn't exist so wait until all gvcfs become available
+				//does this sample have a normal sample?
 				if (tns.getNormalDNAFastq().isFastqDirExists()) {
-					File[] ab = tns.getNormalDNABamBedGvcf();
-					if (ab == null) {
+					AlignmentDataset normalDNADataset = tns.getNormalDNADataset();
+					if (normalDNADataset == null || normalDNADataset.isComplete() == false) {
 						if (verbose) IO.pl("\tWaiting for germline gvcfs from "+tns.getId());
 						allPresent = false;
 					}
-					//skip adding the mock NA12878 normal used in unpaired analysis
-					else if (ab[2].getName().equals("NA12878_NormalDNA_Hg38_Haplo.g.vcf.gz") == false) {
-						//add the vcf and matched index
-						toGeno.add(ab[2]);
-						toGeno.add(ab[3]);
+					//OK it's present, add it if it's not the mock normal
+					else {
+						if (normalDNADataset.getgVcfFile().getName().equals("NA12878_NormalDNA_Hg38_Haplo.g.vcf.gz") == false) {
+							//add the vcf and matched index
+							toGeno.add(normalDNADataset.getgVcfFile());
+							toGeno.add(normalDNADataset.getgVcfIndexFile());
+						}
 					}
 				}
 			}
@@ -174,7 +179,7 @@ public class TNRunner {
 		//OK some files are present
 		//COMPLETE
 		else if (nameFile.containsKey("COMPLETE")){
-			IO.pl("\t\tCOMPLETE "+jobDir.getCanonicalPath());
+			IO.pl("\tCOMPLETE "+jobDir.getCanonicalPath());
 			//find the final vcfs
 			File res = new File(jobDir, jobDir.getName()+"_Hg38_GenotypedVcfs");
 			File[] genoVcfs = IO.extractFiles(res, ".vcf.gz");
@@ -212,7 +217,7 @@ public class TNRunner {
 					}
 				}
 				if (sampleDir == null) throw new IOException("\nERROR: Failed to find the sampleDir by parsing the JointGenotyping vcf names. "+fileName);
-				if (verbose) IO.pl("\t\t\tMoving genotyped vcfs to "+sampleDir);
+				if (verbose) IO.pl("\tMoving genotyped vcfs to "+sampleDir);
 				//delete any existing germline folder
 				IO.deleteDirectoryViaCmdLine(new File(sampleDir, "GermlineVariantCalling"));
 				//create a folder for the incoming genotyped vcf in the sample folder
@@ -245,7 +250,7 @@ public class TNRunner {
 		}
 		//QUEUED
 		else if (nameFile.containsKey("QUEUED")){
-			info.add("\t\tQUEUED "+jobDir);
+			info.add("\tQUEUED "+jobDir);
 		}		
 		//STARTED
 		else if (nameFile.containsKey("STARTED")){
@@ -253,19 +258,19 @@ public class TNRunner {
 		}
 		//FAILED but no forceRestart
 		else if (nameFile.containsKey("FAILED")){
-			if (verbose) IO.pl("\t\tFAILED "+jobDir);
+			if (verbose) IO.pl("\tFAILED "+jobDir);
 			groupProcessingFailed = true;
 		}
 		//hmm no status files, probably something went wrong on the cluster? mark it as FAILED
 		else {
-			if (verbose) IO.pl("\t\tMarking as FAILED, no job status files in "+jobDir);
+			if (verbose) IO.pl("\tMarking as FAILED, no job status files in "+jobDir);
 			new File(jobDir, "FAILED").createNewFile();
 			groupProcessingFailed = true;
 		}
 	}
 
 	private void launchJointGenotyping(ArrayList<File> toGeno, File jobDir) throws IOException {
-		if (verbose) IO.pl("\t\tLaunching "+jobDir);
+		if (verbose) IO.pl("\tLAUNCHING "+jobDir);
 		//want to create/ replace the soft links
 		createJointGenotypingLinks(toGeno, jobDir);
 
@@ -276,10 +281,23 @@ public class TNRunner {
 		TNSample.removeProgressFiles(jobDir);
 
 		//squeue the shell script
-		new File(jobDir, "QUEUED").createNewFile();
 		String alignDirPath = jobDir.getCanonicalPath();
-		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", nice, "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
+		String [] cmd = null;
+		if (nice.length() !=0) cmd = new String[]{"sbatch", nice, "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
+		else cmd = new String[]{"sbatch", "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
+		String[] output = IO.executeViaProcessBuilder(cmd, false);
 		if (verbose) for (String o: output) IO.pl("\t\t"+o);
+		for (String o: output) {
+			if (o.toLowerCase().contains("error")) {
+				groupProcessingFailed = true;
+				IO.pl("\tERROR launching "+Util.stringArrayToString(cmd, " "));
+				if (verbose == false) for (String x: output) IO.pl("\t\t"+x);
+				new File(jobDir, "FAILED").createNewFile();
+				return;
+			}
+		}
+		new File(jobDir, "QUEUED").createNewFile();
+		
 	}
 
 	private void createJointGenotypingLinks(ArrayList<File> toGeno, File jobDir) throws IOException {
@@ -367,7 +385,7 @@ public class TNRunner {
 						case 'u': minReadCoverageTumor = Integer.parseInt(args[++i]); break;
 						case 'i': minReadCoverageNormal = Integer.parseInt(args[++i]); break;
 						case 'x': maxNumJobsToSubmit = Integer.parseInt(args[++i]); break;
-						case 'n': niceJobs = true; break;
+						case 'z': niceJobs = true; break;
 						case 'q': verbose = false; break;
 						case 'f': forceRestart = true; break;
 						case 'l': loop = true; break;
@@ -531,13 +549,15 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TNRunner : April 2020                            **\n" +
+				"**                                 TNRunner : June 2020                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several containerized snakmake workflows on tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, \n"+
 				"alignments are run, somatic and germline variants are called, and concordance measured\n"+
 				"between sample bams. To execute TNRunner, create the following directory structure and\n"+
-				"link or copy in the corresponding paired end Illumina gzipped fastq files.\n"+
+				"link or copy in the corresponding paired end Illumina gzipped fastq files. To run \n"+
+				"Joint Genotyping on sample sets where this has been run before, delete the\n "+
+				"GermlineVariantCalling and JointGenotyping folders.\n"+
 				
 				"\nMyPatientSampleDatasets\n"+
 				"   MyPatientA\n"+
@@ -593,14 +613,14 @@ public class TNRunner {
 				"-f Force a restart of all running, queued, failed, and uncompleted jobs.\n"+
 				"-q Quite output.\n"+
 				"-x Maximum # jobs to launch, defaults to 40.\n"+
-				"-n Nice jobs to make them take a low priority (--nice=10000).\n"+
+				"-z Do not nice jobs (--nice=10000), run at maximum primority.\n"+
 				"-l Check and launch jobs every hour until all are complete.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/\n"+
 				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+
 				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/\n"+
 				"     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l \n"+
-				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l -n\n"+
+				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l \n"+
 
 
 				"\n**************************************************************************************\n");

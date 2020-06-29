@@ -4,7 +4,6 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.nio.file.FileAlreadyExistsException;
 import java.nio.file.Files;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -13,9 +12,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import org.json.JSONObject;
-
 import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
@@ -46,7 +43,7 @@ public class AvatarAssembler {
 	private ArrayList<AvatarPatient> toLink = new ArrayList<AvatarPatient>();
 	private boolean linkOnlyTN = true;
 	private String diagnosisFilter = null;
-
+	private boolean printFastqErrors = true;
 	
 	private void incrementSampleCounters(AvatarPatient ap) {
 		SamplesInfo is = ap.createSamplesInfo();
@@ -100,7 +97,7 @@ public class AvatarAssembler {
 
 			outputStatPatients();
 			
-			for (AvatarPatient ap: toLink) ap.writeSoftLinks();
+			for (AvatarPatient ap: toLink) ap.buildJobDirs();
 			
 			
 		} catch (IOException e) {
@@ -229,8 +226,8 @@ public class AvatarAssembler {
 		String line = in.readLine();
 		while ((line = in.readLine()) != null){
 			String[] fields = Misc.TAB.split(line);
-			if (fields.length != 7) throw new IOException("Incorrect number "+fields.length+" of fields in "+line);
-			int hciId = Integer.parseInt(fields[4]);
+			if (fields.length != 8) throw new IOException("Incorrect number "+fields.length+" of fields in "+line);
+			int hciId = Integer.parseInt(fields[5]);
 			AvatarPatient ap = hciId2AvatarPatient.get(hciId);
 			if (ap == null){
 				ap = new AvatarPatient(fields);
@@ -249,19 +246,161 @@ public class AvatarAssembler {
 		String gender = null;
 		ArrayList<AvatarSample> avatarSamples = new ArrayList<AvatarSample>();
 		SamplesInfo samplesInfo = null;
+		HashMap<String, ArrayList<AvatarSample>> nameSamples = null;
+		ArrayList<AvatarSample> normalExomes = new ArrayList<AvatarSample>();
 		
 		public AvatarPatient(String[] fields) {
-			hciId = Integer.parseInt(fields[4]);
+			hciId = Integer.parseInt(fields[5]);
 			gExperimentId = fields[1];
 			gAnalysisId = fields[2];
 		}
 		
-		public void writeSoftLinks() {
+		public void buildSampleSets() {
+			nameSamples = new HashMap<String, ArrayList<AvatarSample>>();
+			for (AvatarSample as: avatarSamples) {
+				String name = as.sampleSpecimen;
+				//remove .xxx from each 14-0022632.15a to 14-0022632
+				int index = name.lastIndexOf(".");
+				if (index != -1) name = name.substring(0, index);
+				
+				
+				ArrayList<AvatarSample> samples = nameSamples.get(name);
+				if (samples == null) {
+					samples = new ArrayList<AvatarSample>();
+					nameSamples.put(name, samples);
+				}
+				samples.add(as);
+				if (as.sampleType.equals("Exome") && as.sampleSource.equals("Normal")) normalExomes.add(as);
+			}
+			
+			/*
+			if (hciId == 1175614) {
+				IO.pl("\n"+hciId);
+				for (String n: nameSamples.keySet()) {
+					IO.pl(n);
+					for (AvatarSample as: nameSamples.get(n)) {
+						IO.p(as.toString());
+					}
+				}
+				//IO.pl("\tNormals");
+				//for (AvatarSample as: normalExomes) IO.pl(as.toString());
+			}
+			*/
+			 
+
+		}
+		
+		public void buildJobDirs() {
+			buildSampleSets();
+
+			try {
+				
+			//for each specimen set
+			for (String specimenName: nameSamples.keySet()) {
+				ArrayList<AvatarSample> samples = nameSamples.get(specimenName);
+				
+				//find a tumor exome and normal exome
+				AvatarSample te = null;
+				int numTe = 0;
+				AvatarSample ne = null;
+				int numNe = 0;
+				AvatarSample tt = null;
+				int numTT = 0;
+				for (AvatarSample as: samples) {
+					if (as.sampleType.equals("Exome")) {
+						if (as.sampleSource.equals("Tumor")) {
+							te = as;
+							numTe++;
+						}
+						else if (as.sampleSource.equals("Normal")) {
+							ne = as;
+							numNe++;
+						}
+					}
+					else if (as.sampleType.equals("Transcriptome")) {
+						tt = as;
+						numTT++;
+					}
+				}
+				
+				//any double counts for this specimen?
+				if (numTe > 1 || numNe > 1 || numTT > 1) {
+					IO.pl("\nERROR: Multiple TE's ("+numTe+"), TN's("+numNe+"), or TT's("+numTT+") with the same specimen name("+specimenName+"), needs attention, skipping:\n"+this.toString());
+					return;
+				}
+				
+				//only build a set if a TE or TT is present, skip everything else
+				if (numTe == 1 || numTT == 1) {
+					
+					//create dir to put linked files
+					File patientDir = new File (jobDir, new Integer(hciId).toString()+"_"+specimenName);
+					File patFastqDir = new File (patientDir, "Fastq");
+					patFastqDir.mkdirs();
+					
+					//TE?
+					if (numTe == 1) {
+						//make the dir
+						File fastqDir = new File (patFastqDir, "TumorDNA");
+						fastqDir.mkdirs();
+						//add the fastq links
+						for (File oriF: te.fastq){
+							File link = new File(fastqDir, "TumorDNA_"+oriF.getName());
+							Files.createSymbolicLink(link.toPath(), oriF.toPath());
+							links.add(link.toString());
+						}
+						
+						//normal exome?
+						//if null try to find one associated with the patient
+						if (numNe == 0 && normalExomes.size() > 0) ne = normalExomes.get(0);
+						if (ne != null) {
+							//make the dir
+							File fastqDirN = new File (patFastqDir, "NormalDNA");
+							fastqDirN.mkdirs();
+							//add the fastq links
+							for (File oriF: ne.fastq){
+								File link = new File(fastqDirN, "NormalDNA_"+oriF.getName());
+								Files.createSymbolicLink(link.toPath(), oriF.toPath());
+								links.add(link.toString());
+							}
+						}
+					}
+					
+					//TT?
+					if (numTT == 1) {
+						//make the dir
+						File fastqDir = new File (patFastqDir, "TumorRNA");
+						fastqDir.mkdirs();
+						//add the fastq links
+						for (File oriF: tt.fastq){
+							File link = new File(fastqDir, "TumorRNA_"+oriF.getName());
+							Files.createSymbolicLink(link.toPath(), oriF.toPath());
+							links.add(link.toString());
+						}
+					}
+					
+					//write out info
+					File info = new File(patientDir, hciId+"_AvatarInfo.json.gz");
+					Gzipper gz = new Gzipper(info);
+					gz.println(this.toJson().toString(4));
+					gz.close();
+				}
+			}
+			
+
+
+			} catch (IOException e) {
+				e.printStackTrace();
+				System.exit(1);
+			}
+		}
+
+		/*
+		public void writeSoftLinksOld() {
 			File patFastqDir = null;
 			File link = null;
 			try {
 				//check counts if weird then don't output, needs custom
-				if (samplesInfo.justSingle() == false) IO.pl("Needs custom:"+this.toString());
+				//if (samplesInfo.justSingle() == false) IO.pl("Needs custom:"+this.toString());
 
 				//create dir to put linked files
 				File patientDir = new File (jobDir, new Integer(hciId).toString());
@@ -297,7 +436,7 @@ public class AvatarAssembler {
 				e.printStackTrace();
 				System.exit(1);
 			}
-		}
+		}*/
 		
 		public void addSample(String[] fields) {
 			//does it exist?
@@ -311,14 +450,23 @@ public class AvatarAssembler {
 				//look for fastq in each year
 				boolean notFound = true;
 				for (File p: yearDirs) {
-					File f = new File (p, fields[6]);
+					File f = new File (p, fields[7]);
 					if (f.exists()) {
 						as.fastq.add(f);
 						notFound = false;
 						break;
 					}
+					//archived in Amazon S3? don't add if real file is present
+					else {
+						f = new File (p, fields[7]+".S3.txt");
+						if (f.exists()) {
+							as.fastq.add(f);
+							notFound = false;
+							break;
+						}
+					}
 				}
-				if (notFound) System.err.println("\nFailed to find the fastq file "+fields[6]+" associated with\n"+this);
+				if (printFastqErrors && notFound) System.err.println("\nFailed to find the fastq file "+fields[7]+" and xxx.S3.txt associated with\n"+this);
 			}
 		}
 		public String toString(){
@@ -377,17 +525,19 @@ public class AvatarAssembler {
 				}
 			}
 		}
-
+		
+		/*
 		public boolean justSingle() {
 			if (numTE > 1 || numNE > 1 || numTT >1) return false;
 			return true;
-		}
+		}*/
 	}
 	
 	private class AvatarSample {
 		AvatarPatient avatarPatient = null;
 		String sampleId = null;
 		String sampleName = null;
+		String sampleSpecimen = null;
 		String diagnosis = "";
 		String origin = "";
 		String prep = "";
@@ -402,35 +552,48 @@ public class AvatarAssembler {
 		public AvatarSample(String[] fields, AvatarPatient avatarPatient) {
 			this.avatarPatient = avatarPatient;
 			sampleId = fields[0];
-			sampleName = fields[3];
+			sampleSpecimen = fields[3];
+			//int index = sampleSpecimen.lastIndexOf(".");
+			//if (index != -1) sampleSpecimen = sampleSpecimen.substring(0, index);
+			sampleName = fields[4];
 			//set type
-			if (fields[5].contains("WES")) {
+			if (fields[6].contains("WES")) {
 				sampleType = "Exome";
 				//set source
-				if (fields[5].contains("Tumor")) sampleSource = "Tumor";
-				else if (fields[5].contains("Germline")) sampleSource = "Normal";
+				if (fields[6].contains("Tumor")) sampleSource = "Tumor";
+				else if (fields[6].contains("Germline")) sampleSource = "Normal";
 			}
-			else if (fields[5].contains("RNA")) {
+			else if (fields[6].contains("RNA")) {
 				sampleType = "Transcriptome";
 				sampleSource = "Tumor";
 			}
 			//look for fastq in each year
 			boolean notFound = true;
 			for (File p: yearDirs) {
-				File f = new File (p, fields[6]);
+				File f = new File (p, fields[7]);
+				if (f.exists()) {
+					fastq.add(f);
+					notFound = false;
+					break;
+				}
+				//archived in Amazon S3?
+				f = new File (p, fields[7]+".S3.txt");
 				if (f.exists()) {
 					fastq.add(f);
 					notFound = false;
 					break;
 				}
 			}
-			if (notFound) System.err.println("\nFailed to find the fastq file "+fields[6]+" associated with patient "+avatarPatient.hciId);
+			if (printFastqErrors && notFound) {
+				System.err.println("\nFailed to find the fastq file "+fields[7]+" associated with patient "+avatarPatient.hciId);
+			}
 		}
 
 		public String toString(){
 			StringBuilder sb = new StringBuilder();
 			sb.append("\tSampleName\t"+ sampleName); sb.append("\n");
 			sb.append("\t\tId\t"+         sampleId); sb.append("\n");
+			sb.append("\t\tSpecimen\t"+    sampleSpecimen); sb.append("\n");
 			sb.append("\t\tDiagnosis\t"+   diagnosis); sb.append("\n");
 			sb.append("\t\tType\t"+        sampleType); sb.append("\n");
 			sb.append("\t\tSource\t"+sampleSource);  sb.append("\n");
@@ -449,6 +612,7 @@ public class AvatarAssembler {
 			JSONObject fo = new JSONObject();
 			fo.put("Name", sampleName);
 			fo.put("Id", sampleId);
+			fo.put("Specimen", sampleSpecimen);
 			fo.put("Diagnosis", diagnosis);
 			fo.put("Type", sampleType);
 			fo.put("Source", sampleSource);
@@ -506,7 +670,7 @@ public class AvatarAssembler {
 			}
 		}
 		File[] files = new File[]{gender, diagnosis, info, path, results, jobDir, sourceOrigin, prep};
-		for (File f: files) if (f== null) Misc.printErrAndExit("Error: missing one of the required five files (-g -d -i -p -r -j -s -e)");
+		for (File f: files) if (f== null) Misc.printErrAndExit("Error: missing one of the required eight files (-i -d -g -o -p -r -j -e)");
 		
 		int numYearDirs = yearDirNames.length;
 		yearDirs = new File[numYearDirs];
@@ -520,10 +684,10 @@ public class AvatarAssembler {
 		
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                              Avatar Assembler : March 2020                       **\n" +
+				"**                              Avatar Assembler : June 2020                        **\n" +
 				"**************************************************************************************\n" +
-				"Tool for assembling fastq avatar datasets based on the results of three sql queries.\n"+
-				"See https://ri-confluence.hci.utah.edu/x/KwBFAg   Login as root on hci-clingen1\n"+
+				"Tool for assembling fastq avatar datasets based on the results of several sql queries.\n"+
+				"See https://ri-confluence.hci.utah.edu/x/KwBFAg  Login on hci-clingen1\n"+
 
 				"\nOptions:\n"+
 				"-i Info\n" +

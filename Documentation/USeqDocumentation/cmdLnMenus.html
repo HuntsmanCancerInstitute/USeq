@@ -693,10 +693,10 @@ Example: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/
 </pre><br><p>
 				
 					<a name="AvatarAssembler"><pre>**************************************************************************************
-**                              Avatar Assembler : March 2020                       **
+**                              Avatar Assembler : June 2020                        **
 **************************************************************************************
-Tool for assembling fastq avatar datasets based on the results of three sql queries.
-See https://ri-confluence.hci.utah.edu/x/KwBFAg   Login as root on hci-clingen1
+Tool for assembling fastq avatar datasets based on the results of several sql queries.
+See https://ri-confluence.hci.utah.edu/x/KwBFAg  Login on hci-clingen1
 
 Options:
 -i Info
@@ -721,7 +721,7 @@ Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/
 </pre><br><p>
 				
 					<a name="AvatarComparator"><pre>**************************************************************************************
-**                           Avatar Comparator : March 2019                         **
+**                           Avatar Comparator : June 2020                          **
 **************************************************************************************
 Tool for identifying AVATAR datasets that are ready for analysis or need attention.
 
@@ -2686,7 +2686,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/MergeOverlappingGenes -d
 </pre><br><p>
 				
 					<a name="MergePairedAlignments"><pre>**************************************************************************************
-**                          Merge Paired Alignments: March 2020                     **
+**                          Merge Paired Alignments: June 2020                      **
 **************************************************************************************
 Merges proper paired alignments that pass a variety of checks and thresholds. Only
 unambiguous pairs will be merged. Increases base calling accuracy in overlap and helps
@@ -4190,40 +4190,42 @@ Example: java -Xmx1500M -jar pathTo/Apps/Sgr2Bar -f /affy/sgrFiles/ -s + -t
 </pre><br><p>
 				
 					<a name="SimpleSomaticCaller"><pre>**************************************************************************************
-**                          Simple Somatic Caller: May 2020                         **
+**                          Simple Somatic Caller: June 2020                         **
 **************************************************************************************
 Takes vcf output from Bcftools mpileup and norm applications (http://www.htslib.org)
 run on a paired tumor and normal bam file set and filters the variants for somatic
 calls. Select -z to print an example bash script. A one-tailed Fisher's Exact test is
 performed on each alt allele count to select somatic variants. Vt normalization isn't
-needed for the output vcfs. An indel scan is performed to down weight snvs and indels
- that occur in noisy indel regions.
+needed for the output vcfs. An indel scan can be performed to exclude snvs and
+indels that occur in noisy indel regions, recommended.
 
-Required Params:
+Params:
 -v Path to the bcftools xxx.vcf(.gz/.zip OK) file.
--b Normal BamPileup file, compressed and tabix indexed, see the USeq BamPileup app.
-
-Default Params:
 -s Directory in which to save the parsed file, defaults to parent dir of the vcf.
+
+-b Normal BamPileup file, compressed and tabix indexed, see the USeq BamPileup app.
 -c Normal BamPileup index, 0
+-i Maximum normal INDEL scan AF, 0
+-j Maximum normal INDEL scan AF/ tumor AF ratio, 0
+-p BP padding for INDEL scan, default 3
+
 -t Minimum tumor allele frequency (AF), 0
 -x Maximum tumor AF, 1
--n Maximum normal AF, 1
 -u Minimum tumor alignment depth (DP), 0
 -a Minimum tumor alt count, 0
+
+-n Maximum normal AF, 1
 -o Minimum normal DP, 0
--i Maximum normal INDEL AF, 0
--j Maximum normal INDEL AF/ tumor AF ratio, 0
+
 -d Minimum T-N AF difference, 0
 -r Minimum T/N AF ratio, 0
 -f Maximum Fisher's TN pvalue, defaults to 1
 -m For multi alt alleles, save just the biggest T-N AF difference
--p BP padding for indel scan, default 3
 -z Print example bcftools bash script.
 
 Example: java -jar pathToUSeq/Apps/SimpleSomaticCaller -v bcfTools.vcf.gz -f 0.001 
- -t 0.005 -x 0.2 -n 0.1 -u 100 -a 3 -o 100 -d 0.0025 -r 3 -m -s SSC/ -b norm.bp.txt.gz
--i 0.01 -j 0.5
+ -t 0.0025 -x 0.2 -n 0.1 -u 100 -a 3 -o 100 -d 0.0025 -r 3 -m -s SSC/ -b norm.bp.txt.gz
+-i 0.02 -j 0.5
 
 **************************************************************************************
 </pre><br><p>
@@ -4483,13 +4485,15 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 </pre><br><p>
 				
 					<a name="TNRunner"><pre>**************************************************************************************
-**                                 TNRunner : April 2020                            **
+**                                 TNRunner : June 2020                             **
 **************************************************************************************
 TNRunner is designed to execute several containerized snakmake workflows on tumor
 normal datasets via a slurm cluster.  Based on the availability of fastq, 
 alignments are run, somatic and germline variants are called, and concordance measured
 between sample bams. To execute TNRunner, create the following directory structure and
-link or copy in the corresponding paired end Illumina gzipped fastq files.
+link or copy in the corresponding paired end Illumina gzipped fastq files. To run 
+Joint Genotyping on sample sets where this has been run before, delete the
+ GermlineVariantCalling and JointGenotyping folders.
 
 MyPatientSampleDatasets
    MyPatientA
@@ -4545,20 +4549,20 @@ Job Execution Options:
 -f Force a restart of all running, queued, failed, and uncompleted jobs.
 -q Quite output.
 -x Maximum # jobs to launch, defaults to 40.
--n Nice jobs to make them take a low priority (--nice=10000).
+-z Do not nice jobs (--nice=10000), run at maximum primority.
 -l Check and launch jobs every hour until all are complete.
 
 Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/
      -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b 
      ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/
      -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l 
-     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l -n
+     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l 
 
 **************************************************************************************
 </pre><br><p>
 				
 					<a name="TRunner"><pre>**************************************************************************************
-**                                 TRunner Feb 2020                                 **
+**                                 TRunner June 2020                                **
 **************************************************************************************
 TRunner is designed to execute several dockerized snakmake workflows on human tumor
 only datasets via a slurm cluster.  Based on the availability of the bams and xml,

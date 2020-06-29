@@ -187,6 +187,7 @@ public class VCFVarSeqParser {
 		int recordIndex = 0;
 		int numExcluded = 0;
 		int numSaved = 0;
+		int numRecords = 0;
 		String line;
 		boolean addInfo = true;
 		//for each line in the file
@@ -203,6 +204,7 @@ public class VCFVarSeqParser {
 			}
 			//data line
 			else {	
+				numRecords++;
 				//#CHROM POS ID REF ALT QUAL FILTER INFO ......
 				//   0    1   2  3   4   5     6     7
 				String[] tokens = Misc.TAB.split(line);
@@ -232,7 +234,7 @@ public class VCFVarSeqParser {
 		in.close();
 		out.close();
 
-		if (filtersToExclude ==null) IO.pl("\t"+recordIndex+"\tOri records\t"+originalVcfNameFile.get(oriName).getName());
+		if (filtersToExclude ==null) IO.pl("\t"+numRecords+"\tOri records\t"+originalVcfNameFile.get(oriName).getName());
 		else IO.pl("\t"+numSaved+" saved\t"+numExcluded+" filtered\t"+originalVcfNameFile.get(oriName).getName());
 
 	}
