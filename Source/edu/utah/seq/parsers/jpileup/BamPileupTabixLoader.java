@@ -285,7 +285,7 @@ if (debug) IO.el("\nProc "+record);
 		}
 
 	/**Return GATC or ID for indels*/
-	private static char fetchAllele(String[] fields) throws IOException {
+	public static char fetchAllele(String[] fields) throws IOException {
 		if (fields[4].contains(",") || fields[4].startsWith("<")) throw new IOException("Cannot interpret this alt, deconvolute? "+Misc.stringArrayToString(fields,  "\t"));
 		//#CHROM	POS	ID	REF	ALT
 		int lenRef = fields[3].length();

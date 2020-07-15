@@ -23,7 +23,7 @@ public class FastqDataset{
 				//ok it exits check that there are two files
 				fastqs = checkNumberFiles(dir, ".gz", 2);
 				if (fastqs == null) {
-					info.add("\tFailed to find two fastq files within "+dir);
+					info.add("\tDid not find two fastq files within "+dir);
 					incorrectNumberFastq = true;
 				}
 				else info.add("\tREADY "+dir);

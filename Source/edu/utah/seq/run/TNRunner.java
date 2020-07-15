@@ -44,10 +44,11 @@ public class TNRunner {
 	private boolean groupProcessingFailed = false;
 	private boolean restartFailed = false;
 	private HashMap<String, File> otherBams = null;
-	private int maxNumJobsToSubmit = 40;
+	private int maxNumJobs = 25;
 	private boolean loop = false;
 	private int numMinToSleep = 60;
 	private boolean niceJobs = true;
+	private String partition = "hci-rw";
 
 	private String pathToTrim = null;
 	private String nice = "";
@@ -203,11 +204,13 @@ public class TNRunner {
 				//1218982_NormalDNA_Hg38_JointGenotyped.vcf.gz
 				//1218982_Pancreas_NormalDNA_Hg38_JointGenotyped.vcf.gz
 				String fileName = genoVcfs[i].getName();
+				String[] split = Misc.UNDERSCORE.split(fileName);
 				File sampleDir = null;
 				String id = null;
 				
 				//find the sample
 				TNSample toLaunch = null;
+				ArrayList<File> sampleDirMatches = new ArrayList<File>();
 				for (TNSample tns: tNSamples){
 					id = tns.getId();
 					if (fileName.startsWith(id)){
@@ -215,8 +218,13 @@ public class TNRunner {
 						toLaunch = tns;
 						break;
 					}
+					//may be more than one so don't break
+					else if (id.startsWith(split[0])) sampleDirMatches.add(tns.getRootDir().getCanonicalFile());
 				}
-				if (sampleDir == null) throw new IOException("\nERROR: Failed to find the sampleDir by parsing the JointGenotyping vcf names. "+fileName);
+				if (sampleDir == null) {
+					if (sampleDirMatches.size() == 1) sampleDir = sampleDirMatches.get(0);
+					else throw new IOException("\nERROR: Failed to find the sampleDir by parsing the JointGenotyping vcf names. "+fileName);
+				}
 				if (verbose) IO.pl("\tMoving genotyped vcfs to "+sampleDir);
 				//delete any existing germline folder
 				IO.deleteDirectoryViaCmdLine(new File(sampleDir, "GermlineVariantCalling"));
@@ -299,6 +307,14 @@ public class TNRunner {
 		new File(jobDir, "QUEUED").createNewFile();
 		
 	}
+	
+	private static int countNumberRunningJobs(String partition) throws IOException {
+		String [] cmd = new String[]{"squeue", "-p", partition};
+		String[] output = IO.executeViaProcessBuilder(cmd, false);
+		return output.length -1;
+		
+	}
+	
 
 	private void createJointGenotypingLinks(ArrayList<File> toGeno, File jobDir) throws IOException {
 		File linkDir = new File(jobDir.getCanonicalFile(), "ToGenotype");
@@ -316,17 +332,17 @@ public class TNRunner {
 			if (verbose) IO.pl("\nChecking individual samples...");
 			else IO.pl("\nChecking individual samples (SampleID RunningJobs)");
 			
-			int numJobsLaunched = 0;
+			int numJobsLaunched = countNumberRunningJobs(partition);
 			tNSamples = new TNSample[rootDirs.length];
 			for (int i=0; i< rootDirs.length; i++){
+				if (numJobsLaunched >= maxNumJobs) {
+					IO.pl("\nMaximum number jobs launched, skipping remaining samples.");
+					return false;
+				}
 				if (verbose == false) IO.p("\t"+rootDirs[i].getName());
 				tNSamples[i] = new TNSample(rootDirs[i].getCanonicalFile(), this);
 				if (verbose == false) IO.pl("\t"+tNSamples[i].isRunning());
 				numJobsLaunched += tNSamples[i].getNumJobsLaunched();
-				if (numJobsLaunched > maxNumJobsToSubmit) {
-					IO.pl("\nMaximum number jobs launched, skipping remaining samples.");
-					return false;
-				}
 			}
 			return true;
 		} catch (IOException e) {
@@ -384,13 +400,14 @@ public class TNRunner {
 						case 's': somaticAnnotatedVcfParser = args[++i]; break;
 						case 'u': minReadCoverageTumor = Integer.parseInt(args[++i]); break;
 						case 'i': minReadCoverageNormal = Integer.parseInt(args[++i]); break;
-						case 'x': maxNumJobsToSubmit = Integer.parseInt(args[++i]); break;
+						case 'x': maxNumJobs = Integer.parseInt(args[++i]); break;
 						case 'z': niceJobs = true; break;
 						case 'q': verbose = false; break;
 						case 'f': forceRestart = true; break;
 						case 'l': loop = true; break;
 						case 'd': restartFailed = true; break;
 						case 'r': softRestart = true; break;
+						case 'n': partition = args[++i]; break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 						}
 					}
@@ -535,8 +552,9 @@ public class TNRunner {
 				IO.pl("Delete and restart failed jobs\t"+restartFailed);
 				IO.pl("Force restart\t"+forceRestart);
 				IO.pl("Verbose logging\t"+verbose);
-				IO.pl("Max # jobs to launch\t"+maxNumJobsToSubmit);
+				IO.pl("Max # jobs to launch\t"+maxNumJobs);
 				IO.pl("Nice jobs\t"+niceJobs);
+				IO.pl("Job Partition\t"+partition);
 				IO.pl("Relaunch jobs until complete\t"+loop);
 			}
 		} catch (IOException e) {
@@ -549,7 +567,7 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TNRunner : June 2020                             **\n" +
+				"**                                 TNRunner : July 2020                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several containerized snakmake workflows on tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, \n"+
@@ -612,9 +630,10 @@ public class TNRunner {
 				"-d Delete and restart FAILED jobs.\n"+
 				"-f Force a restart of all running, queued, failed, and uncompleted jobs.\n"+
 				"-q Quite output.\n"+
-				"-x Maximum # jobs to launch, defaults to 40.\n"+
+				"-x Maximum # jobs to run at any given time, defaults to 25.\n"+
 				"-z Do not nice jobs (--nice=10000), run at maximum primority.\n"+
 				"-l Check and launch jobs every hour until all are complete.\n"+
+				"-n Cluster partitian, defaults to hci-rw\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/\n"+
 				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+

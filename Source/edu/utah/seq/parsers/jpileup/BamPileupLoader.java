@@ -1,7 +1,10 @@
 package edu.utah.seq.parsers.jpileup;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
+
 import edu.utah.seq.data.sam.SamAlignment;
 import edu.utah.seq.data.sam.SamLayoutForMutation;
 import htsjdk.samtools.SAMRecord;
@@ -10,7 +13,6 @@ import htsjdk.samtools.SamReader;
 import htsjdk.samtools.reference.IndexedFastaSequenceFile;
 import htsjdk.samtools.reference.ReferenceSequence;
 import util.bio.annotation.Bed;
-import util.gen.Gzipper;
 import util.gen.IO;
 
 public class BamPileupLoader implements Runnable { 
@@ -20,12 +22,13 @@ public class BamPileupLoader implements Runnable {
 	private SamReader[] samReaders = null;
 	private int minBaseQuality = 0;
 	private int minMappingQuality = 0;
-	private Gzipper out = null;
+	private PrintWriter out = null;
 	private IndexedFastaSequenceFile fasta = null;
 	private Bed[] regions = null;
 	private File resultsFile = null;
 	private boolean includeOverlaps;
 	private boolean printAll;
+	private boolean verbose; 
 
 
 	public BamPileupLoader (BamPileup bamPileup, int loaderIndex, Bed[] regions) throws IOException{
@@ -34,11 +37,12 @@ public class BamPileupLoader implements Runnable {
 		this.regions = regions;
 		includeOverlaps = bamPileup.isIncludeOverlaps();
 		printAll = bamPileup.isPrintAll();
+		verbose = bamPileup.isVerbose();
 
 		//create gzipper for results
-		resultsFile = new File(bamPileup.getTempDir(), loaderIndex+"_tempBamPileup.txt.gz");
+		resultsFile = new File(bamPileup.getTempDir(), loaderIndex+"_tempBamPileup.txt");
 		resultsFile.deleteOnExit();
-		out = new Gzipper(resultsFile);
+		out = new PrintWriter (new FileWriter(resultsFile));
 		
 		//create sam readers
 		File[] bamFiles = bamPileup.getBamFiles();
@@ -77,7 +81,7 @@ public class BamPileupLoader implements Runnable {
 			for (Bed region: regions) {
 				if (counter++ > 100) {
 					counter = 0;
-					IO.p(".");
+					if (verbose) IO.p(".");
 				}
 				String chr = region.getChromosome();
 
@@ -113,8 +117,8 @@ public class BamPileupLoader implements Runnable {
 			System.err.println("\nError: problem processing\n" );
 			e.printStackTrace();
 		} finally {
-			out.closeNoException();
 			try {
+				out.close();
 				fasta.close();
 				for (SamReader sr: samReaders) sr.close();
 			} catch (IOException e) {}
@@ -169,7 +173,10 @@ public class BamPileupLoader implements Runnable {
 
 				//mate already processed
 				if (includeOverlaps == false) {
-					if (bc[counter].readNames.contains(readName)) continue;
+					if (bc[counter].readNames.contains(readName)) {
+						counter++;
+						continue;
+					}
 					else bc[counter].readNames.add(readName);
 				}
 

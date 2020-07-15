@@ -67,6 +67,8 @@ public class BamPileup {
 	private File tempDir;
 	private File results;
 	private File fastaFile;
+	private File tabix;
+	private File bgzip;
 	private int minMappingQuality = 13;
 	private int minBaseQuality = 10;
 	private SamReaderFactory samFactory;
@@ -74,59 +76,17 @@ public class BamPileup {
 	private boolean printAll = false;
 	private int numCpu = 0;
 	private int maxBpOfRegion = 1000;
+	private boolean verbose = true;
 
-	//constructor
+	//constructor for stand alone use
 	public BamPileup(String[] args){
 		try {
 			long startTime = System.currentTimeMillis();
 
 			processArgs(args);
 			
-			//create reader
-			samFactory = SamReaderFactory.makeDefault().referenceSource(new ReferenceSource(fastaFile)).validationStringency(ValidationStringency.SILENT);
-			
-			//load and chunk the bed file of regions to scan
-			int numRegionsPerWorker = 0;
-			Bed[] regions = Bed.parseFile(bedFile, 0, 0);
-			Arrays.sort(regions);
-			int numOriRegions = regions.length;
-			
-			//split big regions
-			regions = Bed.splitBigRegions(regions, maxBpOfRegion);
-			IO.pl(numOriRegions+" regions split into "+regions.length+" regions with a max size of "+maxBpOfRegion+" bps\n");
-			
-			if (regions.length <= numCpu) {
-				numCpu = regions.length;
-				numRegionsPerWorker = 1;
-			}
-			else numRegionsPerWorker = (int)Math.round( (double)regions.length/(double)numCpu );
-			Object[][] chunks = Misc.chunk(regions, numRegionsPerWorker);
-			
-			//make and execute loaders
-			IO.p("Launching "+chunks.length+" loaders");
-			ExecutorService executor = Executors.newFixedThreadPool(chunks.length);
-			BamPileupLoader[] loaders = new BamPileupLoader[chunks.length];
-			for (int i=0; i< chunks.length; i++) {
-				Bed[] b = new Bed[chunks[i].length];
-				for (int x = 0; x< b.length; x++) b[x] = (Bed)chunks[i][x];
-				loaders[i] = new BamPileupLoader(this, i, b);
-				executor.execute(loaders[i]);
-			}
-			executor.shutdown();
-			while (!executor.isTerminated()) {}
-			IO.pl();
-			
-			//check loaders fetch files
-			ArrayList<File> tempFiles = new ArrayList<File>();
-			for (BamPileupLoader l: loaders) {
-				if (l.isFailed()) throw new IOException("ERROR: File Loader issue! \n");
-				tempFiles.add(l.getResultsFile());
-			}
-			
-			//concatinate gzipped files
-			IO.concatinateFiles(tempFiles, results);
+			doWork();
 
-			
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
 			System.out.println("\nDone! "+Num.formatNumber(diffTime, 2)+" minutes");
@@ -134,6 +94,74 @@ public class BamPileup {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nERROR making bpileup! Correct and restart.");
 		}
+	}
+	
+	/**For use with other apps*/
+	public BamPileup(File bedFile, File[] bamCramFiles, File tempDir, File fastaFile, File gzResultFile, File bgzip, File tabix, boolean verbose) throws IOException {
+		this.bedFile = bedFile;
+		this.bamFiles = bamCramFiles;
+		this.tempDir = tempDir;
+		this.fastaFile = fastaFile;
+		this.results = gzResultFile;
+		this.bgzip = bgzip;
+		this.tabix = tabix;
+		this.verbose = verbose;
+		numCpu = Runtime.getRuntime().availableProcessors();
+		doWork();
+	}
+	
+	public void doWork() throws IOException {
+		//create reader
+		samFactory = SamReaderFactory.makeDefault().referenceSource(new ReferenceSource(fastaFile)).validationStringency(ValidationStringency.SILENT);
+		
+		//load and chunk the bed file of regions to scan
+		int numRegionsPerWorker = 0;
+		Bed[] regions = Bed.parseFile(bedFile, 0, 0);
+		Arrays.sort(regions);
+		int numOriRegions = regions.length;
+		
+		//split big regions
+		regions = Bed.splitBigRegions(regions, maxBpOfRegion);
+		if (verbose) IO.pl(numOriRegions+" regions split into "+regions.length+" regions with a max size of "+maxBpOfRegion+" bps\n");
+		
+		if (regions.length <= numCpu) {
+			numCpu = regions.length;
+			numRegionsPerWorker = 1;
+		}
+		else numRegionsPerWorker = (int)Math.round( (double)regions.length/(double)numCpu );
+		Object[][] chunks = Misc.chunk(regions, numRegionsPerWorker);
+		
+		//make and execute loaders
+		if (verbose) IO.p("Launching "+chunks.length+" loaders");
+		ExecutorService executor = Executors.newFixedThreadPool(chunks.length);
+		BamPileupLoader[] loaders = new BamPileupLoader[chunks.length];
+		for (int i=0; i< chunks.length; i++) {
+			Bed[] b = new Bed[chunks[i].length];
+			for (int x = 0; x< b.length; x++) b[x] = (Bed)chunks[i][x];
+			loaders[i] = new BamPileupLoader(this, i, b);
+			executor.execute(loaders[i]);
+		}
+		executor.shutdown();
+		while (!executor.isTerminated()) {}
+		if (verbose) IO.pl();
+		
+		//check loaders fetch files
+		ArrayList<File> tempFiles = new ArrayList<File>();
+		for (BamPileupLoader l: loaders) {
+			if (l.isFailed()) throw new IOException("ERROR: File Loader issue! \n");
+			tempFiles.add(l.getResultsFile());
+		}
+		
+		//concatinate txt files
+		String name = results.getCanonicalPath();
+		name = name.substring(0, name.length()-3);
+		File resultsNoGz = new File (name);
+		IO.concatinateFiles(tempFiles, resultsNoGz);
+		
+		//compress it
+		if (verbose) IO.pl("Bgzipping and tabixing");
+		BamPileupMerger.compressAndIndex(bgzip, tabix, resultsNoGz, false);
+
 	}
 
 	public static void main(String[] args) {
@@ -149,6 +177,7 @@ public class BamPileup {
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 		File forExtraction = null;
+		File tabixBinDirectory = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -165,6 +194,7 @@ public class BamPileup {
 					case 'x': maxBpOfRegion = Integer.parseInt(args[++i]); break;
 					case 'p': numCpu = Integer.parseInt(args[++i]); break;
 					case 'i': includeOverlaps = true; break;
+					case 't': tabixBinDirectory = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -190,6 +220,12 @@ public class BamPileup {
 		if (bedFile == null ||  bedFile.canRead() == false) Misc.printErrAndExit("\nError: please provide a file of regions in bed format.");
 		if (results == null ) Misc.printErrAndExit("\nError: please provide a results file that ends with xxx.gz");
 		
+		//pull tabix and bgzip
+		if (tabixBinDirectory == null) Misc.printExit("\nError: please point to your HTSlib directory containing the tabix and bgzip executables (e.g. ~/BioApps/HTSlib/1.10.2/bin/ )\n");
+		bgzip = new File (tabixBinDirectory, "bgzip");
+		tabix = new File (tabixBinDirectory, "tabix");
+		if (bgzip.canExecute() == false || tabix.canExecute() == false) Misc.printExit("\nCannot find or execute bgzip or tabix executables from "+tabixBinDirectory);
+
 				
 		//number of workers
 		int numProc = Runtime.getRuntime().availableProcessors();
@@ -201,17 +237,14 @@ public class BamPileup {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Bam Pileup:  March 2020                           **\n" +
+				"**                                Bam Pileup:  July 2020                            **\n" +
 				"**************************************************************************************\n" +
 				"BP extracts pileup information for each bam file over a list of regions. This includes\n"+
 				"the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available\n"+
-				"to the JVM. BGZip and Tabix index the results to make it searchable, e.g.\n"+
-				"      gunzip 15352R.bp.txt.gz\n"+
-				"      ~/BioApps/HTSlib/1.3/bin/bgzip --threads 20 15352R.bp.txt\n"+
-				"      ~/BioApps/HTSlib/1.3/bin/tabix -s 1 -b 2 -e 2 15352R.bp.txt.gz\n"+
-				"The header of the results file contains the order of the bams. To approximate IGV\n"+
-				"pileup info, set -q 0 -m 0 -i. If many alignment files are to be processed, run this\n"+
-				"app on each file individually and then merge them with the BamPileupMerger app.\n"+
+				"to the JVM. The header of the results file contains the order of the bams. To \n"+
+				"approximate IGV pileup info, set -q 0 -m 0 -i. If many alignment files are to be\n"+
+				"processed, run this app on each file individually and then merge them with the\n"+
+				"BamPileupMerger app.\n"+
 				
 				"\nRequired Options:\n"+
 				"-b Path to a coordinate sorted bam/cram file with index or directory containing such.\n"+
@@ -219,6 +252,8 @@ public class BamPileup {
 				"      the USeq MergeRegions app if unsure. xxx.bed.gz/.zip OK\n"+
 				"-f Path to the reference fasta with and xxx.fai index.\n"+
 				"-s Path to a gzip file to save the pileup information, must end in xxx.gz\n"+
+				"-t Path to a directory containing the bgzip and tabix executables to compress and index\n"+
+				"      the bp file, see htslib.org \n"+
 
 				"\nDefault Options:\n"+
 				"-q Minimum base quality, defaults to 10\n"+
@@ -229,7 +264,7 @@ public class BamPileup {
 				"      occur.\n"+
 
 				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b CramFiles/ -r target.bed\n"+
-				"-f Ref/human_g1k_v37_decoy.fasta -s 15352RX.bp.txt.gz \n\n" +
+				"-f Ref/human_g1k_v37_decoy.fasta -s 15352RX.bp.txt.gz -t ~/BioApps/HTSlib/1.10.2/bin/\n\n" +
 
 				"**************************************************************************************\n");
 	}
@@ -261,6 +296,10 @@ public class BamPileup {
 
 	public boolean isPrintAll() {
 		return printAll;
+	}
+
+	public boolean isVerbose() {
+		return verbose;
 	}
 
 }

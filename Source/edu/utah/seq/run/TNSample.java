@@ -580,25 +580,27 @@ public class TNSample {
 
 		//load with align dirs, if they exist check launch them
 		HashSet<String> keys = new HashSet<String>();
-
-		for (File ads: IO.extractOnlyDirectories(alignDir)) {
-			if (ads.getName().endsWith("_NormalDNA")) {
-				if (keys.contains("NormalDNA")) throw new IOException ("ERROR: found >1 NormalDNA alignments in "+alignDir);
-				keys.add("NormalDNA");
-				normalDNADataset = DNAAlignQC(normalDNAFastq, ads, tnRunner.getMinReadCoverageNormal());
-				if (normalDNADataset.isComplete() == false) complete = false;
-			}
-			else if (ads.getName().endsWith("_TumorDNA")) {
-				if (keys.contains("TumorDNA")) throw new IOException ("ERROR: found >1 TumorDNA alignments in "+alignDir);
-				keys.add("TumorDNA");
-				tumorDNADataset = DNAAlignQC(tumorDNAFastq, ads, tnRunner.getMinReadCoverageTumor());
-				if (tumorDNADataset.isComplete() == false) complete = false;
-			}
-			else if (ads.getName().endsWith("_TumorRNA")) {
-				if (keys.contains("TumorRNA")) throw new IOException ("ERROR: found >1 TumorRNA alignments in "+alignDir);
-				keys.add("TumorRNA");
-				tumorRNADataset = RNAAlignQC(tumorTransFastq, ads);
-				if (tumorRNADataset.isComplete() == false) complete = false;
+		
+		if (alignDir.exists()) {
+			for (File ads: IO.extractOnlyDirectories(alignDir)) {
+				if (ads.getName().endsWith("_NormalDNA")) {
+					if (keys.contains("NormalDNA")) throw new IOException ("ERROR: found >1 NormalDNA alignments in "+alignDir);
+					keys.add("NormalDNA");
+					normalDNADataset = DNAAlignQC(normalDNAFastq, ads, tnRunner.getMinReadCoverageNormal());
+					if (normalDNADataset.isComplete() == false) complete = false;
+				}
+				else if (ads.getName().endsWith("_TumorDNA")) {
+					if (keys.contains("TumorDNA")) throw new IOException ("ERROR: found >1 TumorDNA alignments in "+alignDir);
+					keys.add("TumorDNA");
+					tumorDNADataset = DNAAlignQC(tumorDNAFastq, ads, tnRunner.getMinReadCoverageTumor());
+					if (tumorDNADataset.isComplete() == false) complete = false;
+				}
+				else if (ads.getName().endsWith("_TumorRNA")) {
+					if (keys.contains("TumorRNA")) throw new IOException ("ERROR: found >1 TumorRNA alignments in "+alignDir);
+					keys.add("TumorRNA");
+					tumorRNADataset = RNAAlignQC(tumorTransFastq, ads);
+					if (tumorRNADataset.isComplete() == false) complete = false;
+				}
 			}
 		}
 

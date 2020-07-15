@@ -211,6 +211,10 @@
 			</sequential>
 		</for>
 	</target>
+	
+	<target name="minimal-release" depends="clean,master-jar,worker-jars">
+		<zip destfile="${base.dir}/USeq_${version}.minimal.zip" basedir="${base.dir}" includes="${release.name}/**"/>
+	</target>
 					
 	<target name="build-release" depends="clean,master-jar,worker-jars,create-docs">
 		<zip destfile="${release.base.dir}/SourceCode.zip" basedir="${src.dir}"/>

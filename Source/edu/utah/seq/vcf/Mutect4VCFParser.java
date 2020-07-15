@@ -81,7 +81,6 @@ public class Mutect4VCFParser {
 					r.setFilter(VCFRecord.FAIL);
 					continue;
 				}
-
 				
 				//check depth
 				int normDepth = normTumor[0].getReadDepthDP();
@@ -253,7 +252,7 @@ public class Mutect4VCFParser {
 				"**************************************************************************************\n" +
 				"Parses Mutect2 VCF files from the GATK 4.0+ package, filtering for read depth, allele\n"+
 				"frequency diff ratio, etc. Inserts AF and DP into for the tumor sample into the INFO\n"+
-				"field. Replaces the QUAL with TLOD.\n"+
+				"field. Replaces the QUAL with TLOD. Be sure to run vt normalization first.\n"+
 
 				"\nOptions:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s). It is REQUIRED\n"+

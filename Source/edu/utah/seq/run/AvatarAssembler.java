@@ -272,22 +272,6 @@ public class AvatarAssembler {
 				samples.add(as);
 				if (as.sampleType.equals("Exome") && as.sampleSource.equals("Normal")) normalExomes.add(as);
 			}
-			
-			/*
-			if (hciId == 1175614) {
-				IO.pl("\n"+hciId);
-				for (String n: nameSamples.keySet()) {
-					IO.pl(n);
-					for (AvatarSample as: nameSamples.get(n)) {
-						IO.p(as.toString());
-					}
-				}
-				//IO.pl("\tNormals");
-				//for (AvatarSample as: normalExomes) IO.pl(as.toString());
-			}
-			*/
-			 
-
 		}
 		
 		public void buildJobDirs() {
@@ -450,7 +434,9 @@ public class AvatarAssembler {
 				//look for fastq in each year
 				boolean notFound = true;
 				for (File p: yearDirs) {
-					File f = new File (p, fields[7]);
+					//look for fastq.gz first
+					String noS3Name = fields[7].replace(".S3.txt", "");
+					File f = new File (p, noS3Name);
 					if (f.exists()) {
 						as.fastq.add(f);
 						notFound = false;
@@ -458,7 +444,7 @@ public class AvatarAssembler {
 					}
 					//archived in Amazon S3? don't add if real file is present
 					else {
-						f = new File (p, fields[7]+".S3.txt");
+						f = new File (p, noS3Name+".S3.txt");
 						if (f.exists()) {
 							as.fastq.add(f);
 							notFound = false;
@@ -570,18 +556,22 @@ public class AvatarAssembler {
 			//look for fastq in each year
 			boolean notFound = true;
 			for (File p: yearDirs) {
-				File f = new File (p, fields[7]);
+				//look for fastq.gz first
+				String noS3Name = fields[7].replace(".S3.txt", "");
+				File f = new File (p, noS3Name);
 				if (f.exists()) {
 					fastq.add(f);
 					notFound = false;
 					break;
 				}
-				//archived in Amazon S3?
-				f = new File (p, fields[7]+".S3.txt");
-				if (f.exists()) {
-					fastq.add(f);
-					notFound = false;
-					break;
+				//archived in Amazon S3? don't add if real file is present
+				else {
+					f = new File (p, noS3Name+".S3.txt");
+					if (f.exists()) {
+						fastq.add(f);
+						notFound = false;
+						break;
+					}
 				}
 			}
 			if (printFastqErrors && notFound) {
@@ -684,10 +674,10 @@ public class AvatarAssembler {
 		
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                              Avatar Assembler : June 2020                        **\n" +
+				"**                              Avatar Assembler : July 2020                        **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling fastq avatar datasets based on the results of several sql queries.\n"+
-				"See https://ri-confluence.hci.utah.edu/x/KwBFAg  Login on hci-clingen1\n"+
+				"See https://ri-confluence.hci.utah.edu/x/KwBFAg  Login on hci-clingen1.hci.utah.edu\n"+
 
 				"\nOptions:\n"+
 				"-i Info\n" +

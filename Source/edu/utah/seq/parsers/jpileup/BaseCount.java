@@ -141,4 +141,11 @@ public class BaseCount {
 		if (allele == 'T') return t;
 		throw new IOException("Unrecognized allele? "+allele);
 	}
+	
+	public double getSnvAlleleFreq(char allele) throws IOException {
+		double aTotal = getPassingReadCoverageSnv();
+		if (aTotal == 0) return 0;
+		double aCount = getSnvCount(allele);
+		return aCount/aTotal;
+	}
 }

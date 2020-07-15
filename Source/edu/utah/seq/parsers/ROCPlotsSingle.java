@@ -26,7 +26,7 @@ public class ROCPlotsSingle {
 	private PrintWriter out = null;
 	private File fullPathToR = new File ("/usr/local/bin/R");
 	private double xMax = 0.3; //or 1
-	private int numRows = 2;
+	private int numRows = 3;
 	private int numColumns = 3;
 
 	//constructors
@@ -222,8 +222,8 @@ public class ROCPlotsSingle {
 		}
 
 
-		String[] colors = {"#FE2712", "#FB9902",  "#FEFE33", "#B2D732", "#66B032", "#347C98", "#0247FE", "#FCCC1A", "#4424D6", "#8601AF", "#C21460", "#FC600A", "#000000", "#98f5ff"};
-		int[] symbols = {15,16,17,18,19,20,21,22,23,24,25,1,2,3,4,5,6};
+		String[] colors = {"#FE2712", "#FB9902",  "#FEFE33", "#B2D732", "#66B032", "#347C98", "#0247FE", "#FCCC1A", "#4424D6", "#8601AF", "#C21460", "#FC600A", "#000000", "#98f5ff",      "#FE2712", "#FB9902",  "#FEFE33", "#B2D732", "#66B032", "#347C98", "#0247FE", "#FCCC1A", "#4424D6", "#8601AF", "#C21460", "#FC600A", "#000000", "#98f5ff"};
+		int[] symbols = {15,16,17,18,19,20,21,22,23,24,25,1,2,3,4,5,6,      15,16,17,18,19,20,21,22,23,24,25,1,2,3,4,5,6};
 
 		public void printPlot(String title) throws IOException {
 			TreeMap<String, String[]> ordered = fetchOrderedData();			

@@ -47,7 +47,7 @@ public class BamPileupMerger {
 			out.close();
 			for (int i=0; i< pileups.length; i++) ins[i].close();
 			
-			compressAndIndex();
+			compressAndIndex(bgzip, tabix, mergedPileup, true);
 			
 			IO.pl("\tMerged pileup saved to "+mergedPileup);
 			
@@ -63,18 +63,18 @@ public class BamPileupMerger {
 		}
 	}
 
-	private void compressAndIndex() throws IOException {
-		IO.pl("Bgzipping...");
+	public static void compressAndIndex(File bgzip, File tabix, File uncompressedPileupTxtFile, boolean verbose) throws IOException {
+		if (verbose) IO.pl("Bgzipping...");
 		//compress with bgzip
-		String[] cmd = { bgzip.getCanonicalPath(), "-f", "--threads", new Integer(Runtime.getRuntime().availableProcessors()).toString(), mergedPileup.getCanonicalPath()};
+		String[] cmd = { bgzip.getCanonicalPath(), "-f", "--threads", new Integer(Runtime.getRuntime().availableProcessors()).toString(), uncompressedPileupTxtFile.getCanonicalPath()};
 		String[] output = IO.executeCommandLineReturnAll(cmd);
-		File bgzipped = new File(mergedPileup.toString()+".gz");
+		File bgzipped = new File(uncompressedPileupTxtFile.toString()+".gz");
 		if (output == null || output.length != 0 || bgzipped.exists() == false){
-			throw new IOException("\nFailed to bgzip compress "+mergedPileup+"\nError: "+Misc.stringArrayToString(output, "\n"));
+			throw new IOException("\nFailed to bgzip compress "+uncompressedPileupTxtFile+"\nError: "+Misc.stringArrayToString(output, "\n"));
 		}
 
 		//tabix
-		IO.pl("Tabixing...");
+		if (verbose) IO.pl("Tabixing...");
 		cmd = new String[]{ tabix.getCanonicalPath(), "-f", "-s", "1", "-b", "2", "-e", "2", bgzipped.getCanonicalPath() };
 		output = IO.executeCommandLineReturnAll(cmd);
 		File indexed = new File (bgzipped+".tbi");
