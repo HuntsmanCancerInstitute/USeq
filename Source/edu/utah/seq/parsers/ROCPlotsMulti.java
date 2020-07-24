@@ -22,8 +22,11 @@ public class ROCPlotsMulti {
 	private File pdfFile = null;
 	private PrintWriter out = null;
 	private int numRows = 2;
-	private int numColumns = 3;
+	private int numColumns = 2;
 	private File fullPathToR = new File ("/usr/local/bin/R");
+	private double maxFDR = 0.2;
+	private double minTPR = 0;
+	private double maxTPR = 1;
 
 	//constructors
 	/**Stand alone.*/
@@ -37,7 +40,7 @@ public class ROCPlotsMulti {
 		for (File d: dirsToParse) {
 			IO.pl("\nProcessing "+d);
 			toParse = IO.extractFiles(d, ".txt");
-			if (toParse.length > (numRows * numColumns)) Misc.printErrAndExit("Adjust numRows or numColumns");
+			//if (toParse.length > (numRows * numColumns)) Misc.printErrAndExit("Adjust numRows or numColumns");
 			
 			//parse the FdrSets for each of the comps fdrTprSummary.txt
 			fdrSets.clear();
@@ -48,9 +51,9 @@ public class ROCPlotsMulti {
 
 			//print script file to generate 5 plots, one for each caller app, Strelka, ssc, lofreq, ...
 			try {
-				File scriptFile = new File(d, "rScript.txt");
+				File scriptFile = new File(d, "rScript.txt.r");
 				out = new PrintWriter(new FileWriter(scriptFile));
-				pdfFile = new File(d, d.getParentFile().getName()+"_"+d.getName()+".pdf");
+				pdfFile = new File(d, d.getName()+".pdf");
 				//start printer and set grid
 				out.println("pdf(file='"+pdfFile+"', width=12, height=7)");
 				out.println("old.par = par(mfrow=c("+numRows+", "+numColumns+"))");
@@ -67,7 +70,7 @@ public class ROCPlotsMulti {
 				out.close();
 
 				//make command
-				File rOut = new File(d, "rOutput.txt");
+				File rOut = new File(d, "rOutput.txt.r");
 				String[] command = new String[] {
 						fullPathToR.getCanonicalPath(),
 						"CMD",
@@ -214,9 +217,15 @@ public class ROCPlotsMulti {
 				for (String[] d: ordered.values()) if(d != null) out.println(d[0]);
 
 				//print plot
-				String parsedTitle = title.replaceAll("_", " ");
-				out.println("plot("+first[1]+",pch="+symbols[i]+",col='"+colors[i]+"',main='"+parsedTitle+"',type='b',bty='l',xlab='dFDR',ylab='TPR',lwd=3,xlim=c(0,1),ylim=c(0,1))");
-
+//Modify Title, Indels_0.01.lofreq 
+				String parsedTitle = Misc.UNDERSCORE.split(title)[1];
+				if (parsedTitle.contains(".strelka")) parsedTitle = parsedTitle.replace(".strelka", " Strelka");
+				else if (parsedTitle.contains(".ssc")) parsedTitle = parsedTitle.replace(".ssc", " SSC");
+				else if (parsedTitle.contains(".mutect")) parsedTitle = parsedTitle.replace(".mutect", " Mutect");
+				else if (parsedTitle.contains(".lofreq")) parsedTitle = parsedTitle.replace(".lofreq", " Lofreq");
+				
+				out.println("plot("+first[1]+",pch="+symbols[i]+",col='"+colors[i]+"',main='"+parsedTitle+"',type='b',bty='l',xlab='dFDR',ylab='TPR',lwd=3,xlim=c(0,"+maxFDR+"),ylim=c("+minTPR+","+maxTPR+"))");
+				out.println("grid(lty = \"solid\")");
 
 
 				//print lines

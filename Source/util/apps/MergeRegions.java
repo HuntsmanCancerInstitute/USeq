@@ -25,6 +25,7 @@ public class MergeRegions {
 	private long numberMergedRegions = 0;
 	private int minimumCount = 1;
 	private int pad = 0;
+	private boolean verbose = true;
 	
 	public MergeRegions(String[] args) {
 		//start clock
@@ -34,16 +35,17 @@ public class MergeRegions {
 		processArgs(args);
 		doWork();
 		
-		IO.pl("\nMerged "+numberRegions+" -> "+numberMergedRegions);
+		if (verbose) IO.pl("\nMerged "+numberRegions+" -> "+numberMergedRegions);
 		
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
 	}
 	
-	public MergeRegions (File[] regionFiles, File mergedFile){
+	public MergeRegions (File[] regionFiles, File mergedFile, boolean verbose){
 		this.regionFiles = regionFiles;
 		this.mergedFile = mergedFile;
+		this.verbose = verbose;
 		doWork();
 	}
 	
@@ -86,7 +88,7 @@ public class MergeRegions {
 			while (it.hasNext()){
 				//get text of chromosome and maxBase
 				String chrom = it.next();
-				IO.p(chrom+" ");
+				if (verbose) IO.p(chrom+" ");
 				int maxBase =map.get(chrom);
 				//make boolean array to hold whether it's flagged, initially they are all false
 				//boolean[] bps = new boolean[maxBase+1];
@@ -110,7 +112,7 @@ public class MergeRegions {
 				//print merged chrom
 				print(chrom, thresholdCountArray(bpsCounts), out);
 			}
-			IO.pl();
+			if (verbose) IO.pl();
 			out.close();
 		} catch (IOException e){
 			e.printStackTrace();

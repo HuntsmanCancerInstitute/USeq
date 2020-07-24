@@ -2,8 +2,6 @@ package edu.utah.seq.parsers;
 
 import java.io.*;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.regex.Matcher;
@@ -11,107 +9,70 @@ import java.util.regex.Pattern;
 import util.gen.*;
 
 /**
- * Generates a single combine ROC plot for each directory
+ * Generates a single combine ROC plot for the directory
  * @author Nix
  * */
-public class ROCPlotsSingle {
+public class ROCPlotOneDir {
 
 	//user defined fields
-	private File[] dirsToParse;
+	private File dirToParse = new File ("/Users/u0028003/HCI/Labs/Underhill/Hg38cfDNASims/NewTestTrainAnalysis/Replicas/VCFComp/ForRoc/Snv/Snv_0.05");
 	private File[] toParse;
-	private File nameSwitcher;
-	private HashMap<String, String> renamer = null;
-	private FdrSet fdrSet = null;
+	private FdrSets fdrSets = null;
 	private File pdfFile = null;
 	private PrintWriter out = null;
 	private File fullPathToR = new File ("/usr/local/bin/R");
-	private double xMax = 0.2; //or 1
-	private double yMin = 0.4; //or 1
-	private int numRows = 2;
-	private int numColumns = 2;
+	private double xMax = 0.15; //or 1
+	private double yMin = 0.4; //or 0
+	private double yMax = 1; // or 1
+	//private double xMax = 1; //or 1
+	//private double yMin = 0; //or 0
+	//private double yMax = 0.25; // or 1
+	private int numRows = 1;
+	private int numColumns = 1;
+	private String[] colors = {"#FE2712", "#FB9902",  "#FEFE33", "#B2D732", "#66B032", "#347C98", "#0247FE", "#FCCC1A", "#4424D6", "#8601AF", "#C21460", "#FC600A", "#000000", "#98f5ff",      "#FE2712", "#FB9902",  "#FEFE33", "#B2D732", "#66B032", "#347C98", "#0247FE", "#FCCC1A", "#4424D6", "#8601AF", "#C21460", "#FC600A", "#000000", "#98f5ff"};
+	private int[] symbols = {15,16,17,18,19,20,21,22,23,24,25,1,2,3,4,5,6,      15,16,17,18,19,20,21,22,23,24,25,1,2,3,4,5,6};
+
 
 	//constructors
 	/**Stand alone.*/
-	public ROCPlotsSingle(String[] args){
+	public ROCPlotOneDir(String[] args){
 		long startTime = System.currentTimeMillis();
 
 		//set fields
-		processArgs(args);
-
-		//check num rows and columns
-		if (dirsToParse.length > (numRows * numColumns)) Misc.printErrAndExit("Adjust numRows or numColumns");
+		//processArgs(args);
 
 		try {
 
+			//pull files to parse
+			IO.pl("\nProcessing "+dirToParse);
+			toParse = IO.extractFiles(dirToParse, ".txt");
+
 			//start printer and set grid for composite pdf
-			File scriptFile = new File(dirsToParse[0].getParentFile(), "rScript.txt");
+			File scriptFile = new File(dirToParse, "rScript.txt");
 			scriptFile.deleteOnExit();
 			out = new PrintWriter(new FileWriter(scriptFile));
-			pdfFile = new File(dirsToParse[0].getParentFile(), dirsToParse[0].getParentFile().getName()+"_pROC.pdf");
+			pdfFile = new File(dirToParse, dirToParse.getName()+"_pROC.pdf");
 			out.println("pdf(file='"+pdfFile+"', width=12, height=7)");
 			out.println("old.par = par(mfrow=c("+numRows+", "+numColumns+"))");
 
-
-			//for each dir, say 0.1, 0.05, 0.001
-			for (int i=dirsToParse.length-1; i>=0; i--) {
-				File d = dirsToParse[i];
-				IO.pl("\nProcessing "+d);
-				toParse = IO.extractFiles(d, ".txt");
-
-				//parse the FdrSets for each of the comps fdrTprSummary.txt, combining all
-				fdrSet = new FdrSet();
-				for (File f: toParse) {
-					IO.pl("\tParsing "+f);
-					parse(f);
-				}
-
-				//print script file to generate 1
-
-				/*File scriptFile = new File(d, "rScript.single");
-				//scriptFile.deleteOnExit();
-				//out = new PrintWriter(new FileWriter(scriptFile));
-				//pdfFile = new File(d, d.getParentFile().getName()+"_"+d.getName()+".single.pdf");
-				//start printer
-				//out.println("pdf(file='"+pdfFile+"', width=12, height=7)");
-				 */
-
-				//define title and print it
-				String title = d.getParentFile().getName()+"_"+d.getName();
-				fdrSet.printPlot(title);
-
-				//close the printer
-				/*out.println("dev.off()");
-				//out.close();
-
-				//make command
-				File rOut = new File(d, "rOutput.single");
-				rOut.deleteOnExit();
-				String[] command = new String[] {
-						fullPathToR.getCanonicalPath(),
-						"CMD",
-						"BATCH",
-						"--no-save",
-						"--no-restore",
-						scriptFile.getCanonicalPath(),
-						rOut.getCanonicalPath()};			
-				//execute
-				//Misc.printArray(command);
-				if (IO.executeCommandLine(command) == null) Misc.printErrAndExit("\nError executing R script.\n"+scriptFile);
-				String[] output = IO.loadFile(rOut);
-				for (String s: output) if (s.toLowerCase().contains("error")) Misc.printErrAndExit("\nError executing R script.\n"+scriptFile);
-				 */
-
-
-
+			//parse the FdrSets for each of the comps fdrTprSummary.txt, combining all
+			fdrSets = new FdrSets();
+			for (File f: toParse) {
+				IO.pl("\tParsing "+f);
+				parse(f);
 			}
 			
+//HERE: define the title
+			String title = dirToParse.getName();
+			fdrSets.printPlot(title.replaceAll("_", " "));
+
 			//close the grid and printer
 			out.println("par(old.par)");
 			out.println("dev.off()");
 			out.close();
-			
+
 			//make command
-			File rOut = new File(dirsToParse[0].getParentFile(), "rOutput.single");
+			File rOut = new File(dirToParse, "rOutput.single");
 			rOut.deleteOnExit();
 			String[] command = new String[] {
 					fullPathToR.getCanonicalPath(),
@@ -127,9 +88,9 @@ public class ROCPlotsSingle {
 			String[] output = IO.loadFile(rOut);
 			for (String s: output) if (s.toLowerCase().contains("error")) Misc.printErrAndExit("\nError executing R script.\n"+scriptFile);
 
-			
-			
-			
+
+
+
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -152,22 +113,21 @@ public class ROCPlotsSingle {
 			//dFDR	15352X1_Indels_0.1_Lofreq_low	dFDR	15352X1_Indels_0.1_Mutect_low	dFDR	15352X1_Indels_0.1_SSC_low	dFDR	15352X1_Indels_0.1_Strelka_low	dFDR	15352X1_Indels_0.1_TNscope_low
 
 
-			//fix all graph names, remove 1534X? 15352X1_Indels_0.0075.1st to 1_Indels_0.0075.1st
+//HERE: fix all graph names, remove 1534X? 15352X1_Indels_0.0075.1st to 1_Indels_0.0075.1st
 			String hl = in.readLine();
+			IO.pl("Ori "+hl);
+			//Pattern pat = Pattern.compile("_Indels_0\\.\\d+");
+			Pattern pat = Pattern.compile("_Snvs_0\\.\\d+");
+			hl = pat.matcher(hl).replaceAll("");
+			hl = hl.replaceAll("merged", "Merged");
+			hl = hl.replaceAll("replica", "Replica");
+			hl = hl.replaceAll("single", "Single");
+			IO.pl("Pst "+hl+"\n");
 			//hl = hl.replaceAll("15352X", "");
 			//hl = hl.replaceAll("Indels_", "");
 			//hl = hl.replaceAll("Snvs_", "");
 
 			String[] header = Misc.TAB.split(hl);
-			//change the names?
-			if (renamer !=null) {
-				for (int i=1; i< header.length; i++) {
-					String newName = renamer.get(header[i]);
-					if (newName == null) throw new IOException("Couldn't rename "+header[i]);
-					header[i] = newName;
-					i++;
-				}
-			}
 
 			//make ArrayLists
 			ArrayList<Float>[] fAL = new ArrayList[header.length];
@@ -191,7 +151,12 @@ public class ROCPlotsSingle {
 				ArrayList<Float> fdr = fAL[i];
 				i++;
 				ArrayList<Float> tpr = fAL[i];
-				fdrSet.add(header[i], fdr, tpr);
+				String legendName = header[i];
+//HERE: modify legend name
+String[] split = header[i].split("\\.");
+legendName = split[1]+ " "+ split[0];
+
+				fdrSets.addNewGraph(legendName, fdr, tpr);
 			}
 
 			in.close();
@@ -203,29 +168,35 @@ public class ROCPlotsSingle {
 
 
 	}
+	
+	/*private class FdrSet {
+		String legendName;
+		float[] fdr;
+		float[] tpr;
+		String color;
+		int symbol;
+		
+		public FdrSet(String name, float[] fdr, float[] tpr) {
+			legendName = name;
+			this.fdr = fdr;
+			this.tpr = tpr;
+		}
+	}*/
 
-	private class FdrSet {
+	private class FdrSets {
+
 		ArrayList<String>  individualNames = new ArrayList<String>();
 		ArrayList<float[]> fdr = new ArrayList<float[]>();
 		ArrayList<float[]> tpr = new ArrayList<float[]>();
+		
+		//ArrayList<FdrSet> fdrSetAL = new ArrayList<FdrSet>();
 
-		public void add(String name, ArrayList<Float> fdrAL, ArrayList<Float> tprAL ) {
+		public void addNewGraph(String name, ArrayList<Float> fdrAL, ArrayList<Float> tprAL) {
 			individualNames.add(name);
 			fdr.add(Num.arrayListOfFloatToArray(fdrAL));
 			tpr.add(Num.arrayListOfFloatToArray(tprAL));
+			//fdrSetAL.add(new FdrSet(name, Num.arrayListOfFloatToArray(fdrAL), Num.arrayListOfFloatToArray(tprAL)));
 		}
-
-		public void print() {
-			for (int i=0; i< individualNames.size(); i++) {
-				IO.pl("\t"+individualNames.get(i));
-				IO.pl("\tFDR "+Misc.floatArrayToString(fdr.get(i), ","));
-				IO.pl("\tTPR "+Misc.floatArrayToString(tpr.get(i), ","));
-			}
-		}
-
-
-		String[] colors = {"#FE2712", "#FB9902",  "#FEFE33", "#B2D732", "#66B032", "#347C98", "#0247FE", "#FCCC1A", "#4424D6", "#8601AF", "#C21460", "#FC600A", "#000000", "#98f5ff",      "#FE2712", "#FB9902",  "#FEFE33", "#B2D732", "#66B032", "#347C98", "#0247FE", "#FCCC1A", "#4424D6", "#8601AF", "#C21460", "#FC600A", "#000000", "#98f5ff"};
-		int[] symbols = {15,16,17,18,19,20,21,22,23,24,25,1,2,3,4,5,6,      15,16,17,18,19,20,21,22,23,24,25,1,2,3,4,5,6};
 
 		public void printPlot(String title) throws IOException {
 			TreeMap<String, String[]> ordered = fetchOrderedData();			
@@ -241,16 +212,24 @@ public class ROCPlotsSingle {
 			//find first good one
 			String[] first = null;
 			int i=0;
+			String color = null;
 			for (; i< al.size(); i++) {
 				String[] data = ordered.get(al.get(i));
-				lColors.add(colors[i]);
+				String legendName = al.get(i);
+//HERE: modify graph colors, do the same thing below			
+				if (legendName.startsWith("Merged")) color = "#FF0000";
+				else if (legendName.startsWith("Replica")) color = "#008000";
+				else if (legendName.startsWith("Single")) color = "#0000FF";
+				else color = colors[i];
+				lColors.add(color);
+				
 				lSymbols.add(symbols[i]+"");
 				if (data != null) {
 					first = data;
-					lNames.add(al.get(i)+"");
+					lNames.add(legendName+"");
 					break;
 				}
-				else lNames.add(al.get(i)+" NA");
+				else lNames.add(legendName+" NA");
 			}
 
 			if (first == null) IO.pl("\t\t# "+title+ " All Failed!");
@@ -260,28 +239,34 @@ public class ROCPlotsSingle {
 
 				//print plot
 				String parsedTitle = title.replaceAll("_", " ");
-				out.println("plot("+first[1]+",pch="+symbols[i]+",col='"+colors[i]+"',main='"+parsedTitle+
-						"',type='b',bty='l',xlab='dFDR',ylab='TPR',lwd=3,xlim=c(0,"+xMax+"),ylim=c("+yMin+",1))");
-
-
+				out.println("plot("+first[1]+",pch="+symbols[i]+",col='"+color+"',main='"+parsedTitle+
+						"',type='b',bty='l',xlab='dFDR',ylab='TPR',lwd=3,xlim=c(0,"+xMax+"),ylim=c("+yMin+","+yMax+"))");
+				out.println("grid()");
 
 				//print lines
 				i++;
 				for (; i< al.size(); i++) {
 					String[] data = ordered.get(al.get(i));
-					lColors.add(colors[i]);
+					String legendName = al.get(i);
+//HERE: modify graph colors				
+					if (legendName.startsWith("Merged")) color = "#FF0000";
+					else if (legendName.startsWith("Replica")) color = "#008000";
+					else if (legendName.startsWith("Single")) color = "#0000FF";
+					else color = colors[i];
+					lColors.add(color);
+					
 					lSymbols.add(symbols[i]+"");
 					if (data != null) {
-						out.println("lines("+data[1]+",pch="+symbols[i]+",col='"+colors[i]+ "',lwd=3,type='b')" );
-						lNames.add(al.get(i)+"");
+						out.println("lines("+data[1]+",pch="+symbols[i]+",col='"+color+ "',lwd=3,type='b')" );
+						lNames.add(legendName+"");
 					}
-					else lNames.add(al.get(i)+" NA");
+					else lNames.add(legendName+" NA");
 				}
 
 				//print grid
 				out.println("abline(h=seq(0,1,0.1),v=seq(0,1,0.1),col='grey',lwd=0.8)");
 
-				//print the legend
+//HERE: where to print the legend bottomright topleft
 				out.println("legend('bottomright',bty ='n',pt.cex=1,cex=1,text.col='black',horiz=F,inset=c(0.05, 0.05),");
 				out.println("legend=c('"+ Misc.stringArrayListToString(lNames, "','")+ "'),");
 				out.println("col=c('"+ Misc.stringArrayListToString(lColors, "','")+ "'),");
@@ -291,6 +276,7 @@ public class ROCPlotsSingle {
 
 		public TreeMap<String, String[]> fetchOrderedData() {
 			TreeMap<String, String[]> ordered = new TreeMap<String, String[]>();
+			//for each set
 			for (int i=0; i< individualNames.size(); i++) {
 				//is it a failed array
 				float[] iFdr = fdr.get(i);
@@ -311,7 +297,7 @@ public class ROCPlotsSingle {
 			printDocs();
 			System.exit(0);
 		}
-		new ROCPlotsSingle(args);
+		new ROCPlotOneDir(args);
 	}		
 
 	/**This method will process each argument and assign new variables*/
@@ -325,8 +311,7 @@ public class ROCPlotsSingle {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'd': dirsToParse = IO.fetchDirsRecursively(new File(args[++i])); break;
-					case 'n': nameSwitcher = new File(args[++i]); break;
+					case 'd': dirToParse = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group()+", Try -h");
 					}
@@ -336,8 +321,6 @@ public class ROCPlotsSingle {
 				}
 			}
 		}
-		Arrays.sort(dirsToParse);
-		if (nameSwitcher != null) renamer = IO.loadFileIntoHashMap(nameSwitcher);
 	}	
 
 	public static void printDocs(){

@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.2.7
+			<html><head><title>USeq Command Line Menus 9.2.8
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -693,10 +693,10 @@ Example: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/
 </pre><br><p>
 				
 					<a name="AvatarAssembler"><pre>**************************************************************************************
-**                              Avatar Assembler : June 2020                        **
+**                              Avatar Assembler : July 2020                        **
 **************************************************************************************
 Tool for assembling fastq avatar datasets based on the results of several sql queries.
-See https://ri-confluence.hci.utah.edu/x/KwBFAg  Login on hci-clingen1
+See https://ri-confluence.hci.utah.edu/x/KwBFAg  Login on hci-clingen1.hci.utah.edu
 
 Options:
 -i Info
@@ -876,17 +876,14 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/BamMixer -r ~/TumorSim/
 </pre><br><p>
 				
 					<a name="BamPileup"><pre>**************************************************************************************
-**                                Bam Pileup:  March 2020                           **
+**                                Bam Pileup:  July 2020                            **
 **************************************************************************************
 BP extracts pileup information for each bam file over a list of regions. This includes
 the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available
-to the JVM. BGZip and Tabix index the results to make it searchable, e.g.
-      gunzip 15352R.bp.txt.gz
-      ~/BioApps/HTSlib/1.3/bin/bgzip --threads 20 15352R.bp.txt
-      ~/BioApps/HTSlib/1.3/bin/tabix -s 1 -b 2 -e 2 15352R.bp.txt.gz
-The header of the results file contains the order of the bams. To approximate IGV
-pileup info, set -q 0 -m 0 -i. If many alignment files are to be processed, run this
-app on each file individually and then merge them with the BamPileupMerger app.
+to the JVM. The header of the results file contains the order of the bams. To 
+approximate IGV pileup info, set -q 0 -m 0 -i. If many alignment files are to be
+processed, run this app on each file individually and then merge them with the
+BamPileupMerger app.
 
 Required Options:
 -b Path to a coordinate sorted bam/cram file with index or directory containing such.
@@ -894,6 +891,8 @@ Required Options:
       the USeq MergeRegions app if unsure. xxx.bed.gz/.zip OK
 -f Path to the reference fasta with and xxx.fai index.
 -s Path to a gzip file to save the pileup information, must end in xxx.gz
+-t Path to a directory containing the bgzip and tabix executables to compress and index
+      the bp file, see htslib.org 
 
 Default Options:
 -q Minimum base quality, defaults to 10
@@ -904,7 +903,7 @@ Default Options:
       occur.
 
 Example: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b CramFiles/ -r target.bed
--f Ref/human_g1k_v37_decoy.fasta -s 15352RX.bp.txt.gz 
+-f Ref/human_g1k_v37_decoy.fasta -s 15352RX.bp.txt.gz -t ~/BioApps/HTSlib/1.10.2/bin/
 
 **************************************************************************************
 </pre><br><p>
@@ -3064,7 +3063,7 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/MultiSampleVCFFilter
 **************************************************************************************
 Parses Mutect2 VCF files from the GATK 4.0+ package, filtering for read depth, allele
 frequency diff ratio, etc. Inserts AF and DP into for the tumor sample into the INFO
-field. Replaces the QUAL with TLOD.
+field. Replaces the QUAL with TLOD. Be sure to run vt normalization first.
 
 Options:
 -v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s). It is REQUIRED
@@ -4485,7 +4484,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 </pre><br><p>
 				
 					<a name="TNRunner"><pre>**************************************************************************************
-**                                 TNRunner : June 2020                             **
+**                                 TNRunner : July 2020                             **
 **************************************************************************************
 TNRunner is designed to execute several containerized snakmake workflows on tumor
 normal datasets via a slurm cluster.  Based on the availability of fastq, 
@@ -4548,9 +4547,10 @@ Job Execution Options:
 -d Delete and restart FAILED jobs.
 -f Force a restart of all running, queued, failed, and uncompleted jobs.
 -q Quite output.
--x Maximum # jobs to launch, defaults to 40.
+-x Maximum # jobs to run at any given time, defaults to 25.
 -z Do not nice jobs (--nice=10000), run at maximum primority.
 -l Check and launch jobs every hour until all are complete.
+-n Cluster partitian, defaults to hci-rw
 
 Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/
      -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b 
@@ -5098,15 +5098,12 @@ Example: java -Xmx64G -jar pathTo/USeq/Apps/VCFMpileupAnnotator -v spikes.vcf -q
 </pre><br><p>
 				
 					<a name="VCFReplicaComparator"><pre>**************************************************************************************
-**                            VCF Replica Comparator : May 2020                     **
+**                           VCF Replica Comparator : July 2020                     **
 **************************************************************************************
 Compares two vcf files derived from a multi replica experiment. Variants unique to
-either are run through Graphite (https://github.com/dillonl/graphite) to accurately
-calculate alignment support and potentially add more replica matches based on the -c 
-and -r thresholds. Thus filter the input VCFs for min QUAL and min alt allele coverage
-and allele freq before running. Be sure to run the USeq MergePairedAlignments app on
-the bam files, otherwise Graphite will double count variant observations from
-overlapping pairs. Uses all threads available.
+either are run through BamPilup to estimate alignment support and potentially add more
+replica matches based on the -c and -r thresholds. Thus filter the input VCFs for min
+QUAL and min alt allele coverage and allele freq before running.
 
 Required Options:
 -a Vcf file for replica A (xxx.vcf(.gz/.zip OK))
@@ -5115,13 +5112,8 @@ Required Options:
 -2 Path to a merged bam file for replica B
 -o Output directory for adjudicated variant calls
 -i Fasta index used in aligning the reads
--g Graphite executable, see https://github.com/dillonl/graphite install e.g.:
-     module load gcc/4.9.2
-     git clone https://github.com/dillonl/graphite.git
-     mkdir graphite/bin
-     cd graphite/bin
-     cmake ../ -DCMAKE_C_COMPILER=$(which gcc) -DCMAKE_CXX_COMPILER=$(which g++)
-     make
+-t Path to a directory containing the bgzip and tabix executables to compress and index
+      the bp file, see htslib.org 
 
 Default Options:
 -c Min alt allele variant observations in replica to match, defaults to 3
@@ -5131,7 +5123,7 @@ Default Options:
 
 Example: module load gcc/4.9.2; java -Xmx25G -jar USeq/Apps/VCFReplicaComparator
        -a repA.vcf.gz -b repB.vcf.gz -1 repA.bam -2 repB.bam -o AdjVcfs -f BKAF
-       -g ~/Graphite/bin/graphite -i ~/Hg38Ref/hs38DH.fa -c 5 -r 0.75 -q 3
+       -t ~/BioApps/HTSlib/1.10.2/bin/ -i ~/Hg38Ref/hs38DH.fa -c 5 -r 0.75 -q 3
 
 **************************************************************************************
 </pre><br><p>

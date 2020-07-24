@@ -114,6 +114,7 @@ public class SimpleSomaticCaller {
 		catch (Exception e) {
 			if (vcfFile != null) IO.el("\nProblem parsing "+vcfFile);
 			e.printStackTrace();
+			System.exit(1);
 		}
 		finally {
 			try {

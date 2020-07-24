@@ -34,9 +34,9 @@ public class Num {
 	}
 	
 	/**Does a linear regression type interpolation, assumes 2's are > 1's.*/
-	public static float interpolateY(float x1, float y1, float x2, float y2, float fixedX){
+	public static float interpolateY(float x1, float y1, float x2, float y2, float testX){
 		float diffX = x2-x1;
-		float diffFixed = fixedX- x1;
+		float diffFixed = testX- x1;
 		float ratio = diffFixed/diffX;
 		float diffY = y2-y1;
 		float diff = diffY * ratio;
@@ -44,9 +44,9 @@ public class Num {
 	}
 
 	/**Does a linear regression type interpolation, assumes 2's are > 1's.*/
-	public static double interpolateY(double x1, double y1, double x2, double y2, double fixedX){
+	public static double interpolateY(double x1, double y1, double x2, double y2, double testX){
 		double diffX = x2-x1;
-		double diffFixed = fixedX- x1;
+		double diffFixed = testX- x1;
 		double ratio = diffFixed/diffX;
 		double diffY = y2-y1;
 		double diff = diffY * ratio;
@@ -3453,6 +3453,37 @@ public class Num {
 			return index;
 		}
 	}
+	
+	public static int countNumLessThan(float threshold, float[] sortedValues){
+		int index = Arrays.binarySearch(sortedValues,threshold);
+		//no exact match
+		if (index<0) {
+			index = (-1* index) -1;
+			if (index > sortedValues.length-1) {
+				//IO.pl("countNumLessThan\t"+index);
+				return sortedValues.length;
+			}
+		}
+		//look for smaller indexes with same value
+		float value = sortedValues[index];
+		int testIndex = index;
+		while (true){
+			testIndex--;
+			//look for negative index
+			if (testIndex< 0) {
+				index = 0;
+				break;
+			}
+			//if different value break
+			if (value != sortedValues[testIndex]) {
+				index = ++testIndex;
+				break;
+			}
+		}
+		//IO.pl("countNumLessThan\t"+index);
+		return index;
+	}
+	
 	
 	/**Returns the index of the smalles values[index] to the key. Returns -1 if none found
 	 * If identical values are present, returns the smallest index containing the key.

@@ -12,28 +12,23 @@ import util.bio.annotation.Bed;
 import util.bio.annotation.ExportIntergenicRegions;
 import util.gen.*;
 
-/**Estimates Fdr for each somatic variant based on a backgroundTumor vs normal contrast. 
+/**Estimates Fdr for each somatic variant based on mock tumor vs normal contrasts. 
  * @author Nix
  * */
 public class VCFFdrEstimator {
 
 	//user fields
-	private File bkgVcfFile;
-	private File realTumorVcfsFile;
-	private File fdrEstimatesVcfFile;
+	private File[] mockVcfs;
+	private File[] realVcfs;
+	private File saveDir;
+	private double minFdr = 0;
+	
+	private float[][] mockQuals = null;
+	private float[] mockThresholds = null;
+	private float[] mockCounts = null;
 
-	private VCFRecord[][] snvIndel = null;
-	private int numSnvsInBkg = 0;
-	private int numIndelsInBkg = 0;
-	private int numSnvsInReal = 0;
-	private int numIndelsInReal = 0;
-	private float[] backgroundSnvQuals = null;
-	private float[] backgroundIndelQuals = null;
-	private Histogram snvQualHistBkg = null;
-	private Histogram indelQualHistBkg = null;
-	private Histogram snvQualHistReal = null;
-	private Histogram indelQualHistReal = null;
-	private VCFParser testParser;
+	private Histogram mockQualScoreHistogram = null;
+	
 
 	//constructor
 	public VCFFdrEstimator(String[] args) throws FileNotFoundException, IOException {
@@ -43,8 +38,8 @@ public class VCFFdrEstimator {
 		//process args
 		processArgs(args);
 
-		//parse background
-		parseBkg();
+		//analyze mock vcfs
+		analyzeMocks();
 
 		parseReal();
 		
@@ -57,6 +52,68 @@ public class VCFFdrEstimator {
 	}
 
 	private void parseReal() {
+		File f = null;
+		String line = null;
+		try {
+			IO.pl("\nScoring VCF files...");
+			
+			//for each file
+			for (File vcfFile: realVcfs) {
+				f= vcfFile;
+				IO.pl("\t"+vcfFile.getName());
+				float[] sortedQuals = this.fetchSortedQualScores(vcfFile);
+				File passFile = new File (saveDir, Misc.removeExtension(vcfFile.getName())+".passFdr.vcf.gz");
+				Gzipper outPass = new Gzipper (passFile);
+				File failFile = new File (saveDir, Misc.removeExtension(vcfFile.getName())+".failFdr.vcf.gz");
+				Gzipper outFail = new Gzipper (failFile);
+				BufferedReader in = IO.fetchBufferedReader(vcfFile);
+				int numPass = 0;
+				int numFail = 0;
+				while ((line = in.readLine())!= null) {
+					if (line.startsWith("#")) {
+						outPass.println(line);
+						outFail.println(line);
+					}
+					else {
+						String[] fields = Misc.TAB.split(line);
+						double phred = 0;
+						if (fields[5].equals(".") || fields[5].length() == 0) fields[5] = "0";
+						else {
+							float qual = Float.parseFloat(fields[5]);
+							double numRealCounts = countGreaterThanEqualTo(qual, sortedQuals);
+							double numMockCounts = estimateMockCounts(qual);
+							double fdr = numMockCounts/ numRealCounts;
+							phred = Num.minus10log10(fdr);
+							fields[5] = Num.formatNumber(phred, 3);
+							IO.pl("Qual "+qual+"  #Real "+numRealCounts+"   #NumMock "+numMockCounts+"   Phred "+phred);
+						}
+						
+//need to sort, need to add dFDR info tag and not replace QUAL
+						
+						if (phred >= minFdr) {
+							outPass.println(Misc.stringArrayToString(fields, "\t"));
+							numPass++;
+						}
+						else {
+							outFail.println(Misc.stringArrayToString(fields, "\t"));
+							numFail++;
+						}
+					}
+					
+				}
+				
+
+				in.close();
+				outPass.close();
+				outFail.close();
+				return;
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem processing "+f+" record "+line);
+		}
+
+		/*
 		testParser = new VCFParser(realTumorVcfsFile, true, false, false);
 		testParser.setRecordQUALAsScore();
 
@@ -74,17 +131,17 @@ public class VCFFdrEstimator {
 
 		replaceScoreWithFDR(snvIndel[0], backgroundSnvQuals);
 		replaceScoreWithFDR(snvIndel[1], backgroundIndelQuals);
-		
+
 		//watch out for non snvIndel records
 		if (snvIndel[2].length !=0) for (VCFRecord v: snvIndel[2]) v.setScore(-1.0f);
 
 		//print modified records adding an dFDR=xxx; to the INFO column
 		printVariants(Misc.removeExtension(realTumorVcfsFile.getName()));
-		
+		 */
 	}
 
 	private void printStats() {
-		IO.pl("QUAL score stats:");
+		/*IO.pl("QUAL score stats:");
 		
 		IO.pl("\t"+ numSnvsInReal+"\tNum Som SNVs");
 		IO.pl("\t"+ numSnvsInBkg+"\tNum Bkg SNVs");
@@ -109,142 +166,160 @@ public class VCFFdrEstimator {
 		IO.pl("INDEL Min "+snvIndel[1][numIndelsInReal-1].getScore());
 		IO.pl("INDEL Max "+snvIndel[1][0].getScore());
 		IO.pl();
-		
+		*/
 	}
 
-	private void printVariants(String name) {
-		Gzipper out = null;
+	
+	
+
+	
+
+	private void analyzeMocks() {
+		//collect qual scores
+		mockQuals = new float[this.mockVcfs.length][];
+		float min = 1000;
+		float max = 0;
+		HashSet<Float> allScores = new HashSet<Float>();
+		allScores.add(0.0f);
+		for (int i=0; i< mockVcfs.length; i++) {
+			mockQuals[i] = fetchSortedQualScores(mockVcfs[i]);
+			for (float f: mockQuals[i]) {
+				allScores.add(f);
+				if (f<min) min = f;
+				if (f>max) max = f;
+			}
+		}
+		
+		//load and print histogram
+		printMockHistogram(min, max);
+		
+		//Calculate # FPs vs Score, at every threshold, will start at zero
+		calculateMockCountVsScoreTable(allScores);
+	}
+	
+	
+
+
+
+	private void calculateMockCountVsScoreTable(HashSet<Float> allScores) {
+		File table = new File (this.saveDir, "mockCountVsQual.txt");
+		IO.pl("\nSaving mock count vs QUAL threshold table to "+table);
+		mockThresholds = new float[allScores.size()];
+		mockCounts = new float[allScores.size()];
 		try {
-			out = new Gzipper( fdrEstimatesVcfFile);
-			printHeader(out, testParser.getStringComments());
-			VCFRecord[] vcfRecords = testParser.getVcfRecords();
-			for (VCFRecord v : vcfRecords){
-				if (v.getScore() == -1.0f) out.println(v.getOriginalRecord());
-				else {
-					String[] fields = Misc.TAB.split(v.getOriginalRecord());
-					fields[7] = "dFDR="+Num.formatNumber(v.getScore(), 5)+";"+fields[7];
-					out.println(Misc.stringArrayToString(fields, "\t"));
+			float[] scores = Num.hashSetToFloat(allScores);
+			Arrays.sort(scores);
+			//print header
+			PrintWriter out = new PrintWriter ( new FileWriter(table));
+			out.print("#Scores");
+			for (int j=0; j<mockVcfs.length; j++) out.print("\t"+Misc.removeExtension(mockVcfs[j].getName()));
+			out.print("\tMean");
+			float numMockDatasets = (float)mockVcfs.length;
+			for (int i=0; i< scores.length; i++) {
+				out.print(scores[i]);
+				float total = 0;
+				for (int j=0; j<mockVcfs.length; j++) {
+					int num = countGreaterThanEqualTo (scores[i], mockQuals[j]);
+					total += num;
+					out.print("\t"+num);
 				}
+				float mean = total/numMockDatasets;
+				mockThresholds[i] = scores[i];
+				mockCounts[i] = mean;
+				out.println("\t"+ mean);
 			}
-		} catch (Exception e) {
+			out.close();
+		} catch (IOException e) {
 			e.printStackTrace();
-			Misc.printErrAndExit("\nProblem processing "+name);
-		} finally {
-			if (out != null) out.closeNoException();
+			Misc.printErrAndExit("\nProblem saving mock count QUAL table to  "+table);
 		}
 	}
-
-	private void printHeader(Gzipper out, String[] header) throws IOException {
-		boolean add2Info = true;
-		for (int i=0; i< header.length; i++){
-			if (add2Info && header[i].startsWith("##INFO")){
-				add2Info = false;
-				out.println("##INFO=<ID=dFDR,Number=1,Type=Float,Description=\"Lowest estimated FDR observed for the given QUAL or a smaller QUAL score threshold, see USeq VCFFdrEstimator app.\">");
+	
+	public float estimateMockCounts(float threshold){
+		int index = Arrays.binarySearch(mockThresholds,threshold);
+		//no exact match
+		boolean exact = true;
+		if (index<0) {
+			exact = false;
+			index = (-1* index) -1;
+			if (index > mockThresholds.length-1) {
+				//IO.pl("Not exact past end returning last \t"+mockCounts[mockCounts.length-1]);
+				return mockCounts[mockCounts.length-1];
 			}
-			out.println( header[i]);
 		}
-
+		//look for smaller indexes with same value
+		float value = mockThresholds[index];
+		int testIndex = index;
+		while (true){
+			testIndex--;
+			//look for negative index
+			if (testIndex< 0) {
+				index = 0;
+				break;
+			}
+			//if different value break
+			if (value != mockThresholds[testIndex]) {
+				index = ++testIndex;
+				break;
+			}
+		}
+		if (exact) {
+			//IO.pl("Exact index\t"+index+"\t"+mockCounts[index]);
+			return mockCounts[index];
+		}
+		else {
+			//must interpolate
+			int leftIndex = index -1;
+			float x1 = mockThresholds[leftIndex];
+			float x2 = mockThresholds[index];
+			float y1 = mockCounts[leftIndex];
+			float y2 = mockCounts[index];
+			float interpCounts = Num.interpolateY(x1, y1, x2, y2, threshold);
+			//IO.pl("Interp\t"+leftIndex+"\t"+index+ "\t"+x1+"\t"+x2+ "\t"+y1+"\t"+y2+" final "+interpCounts);
+			return interpCounts;
+		}
 	}
 
-	private void replaceScoreWithFDR(VCFRecord[] vcfRecords, float[] backgroundQuals)  {
-		double numTest = vcfRecords.length;
-		double numBkg = backgroundQuals.length;
+	private int countGreaterThanEqualTo(float threshold, float[] sortedQuals) {
+		int numLessThan = Num.countNumLessThan(threshold, sortedQuals);
+		return sortedQuals.length - numLessThan;
+	}
 
-		int backgroundIndex = 0;
-		double numTestRemaining;
-		float oldScore = vcfRecords[0].getScore();
-		double numBkgRemaining;
-		double fdr;
-		double oldFdr = numBkg/numTest;
-		int i=0;
-		float testScore;
-		int indexLastSet = 0;
+	private void printMockHistogram(float min, float max) {
+		IO.pl("\nMock QUAL score histogram:");
+		mockQualScoreHistogram = new Histogram(min, max, 50);
+		for (int i=0; i< mockVcfs.length; i++) mockQualScoreHistogram.countAll(mockQuals[i]);
+		mockQualScoreHistogram.printScaledHistogram();
+	}
 
-		//for each VCF record
-		for (; i< vcfRecords.length; i++){
-			testScore =  vcfRecords[i].getScore();
-
-			if (testScore != oldScore){
-				numTestRemaining = numTest - i;
-				backgroundIndex = numBkgRemaining(backgroundQuals, backgroundIndex, testScore);
-				//watch out for when there are none left!
-				if (backgroundIndex == numBkg){
-					vcfRecords[i].setScore(0.0f); 
-					for (; i< vcfRecords.length; i++) vcfRecords[i].setScore(0.0f);
-					return;
+	private float[] fetchSortedQualScores(File vcf) {
+		BufferedReader in = null;
+		String line = null;
+		try {
+			in = IO.fetchBufferedReader(vcf);
+			ArrayList<Float> quals = new ArrayList<Float>();
+			while ((line = in.readLine())!= null) {
+				if (line.startsWith("#") == false) {
+					//#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT
+					String[] fields = Misc.TAB.split(line);
+					if (fields[5].equals(".") || fields[5].length() == 0) quals.add(0.0f);
+					else quals.add(Float.parseFloat(fields[5]));
 				}
-				numBkgRemaining = numBkg-backgroundIndex;
-				fdr = numBkgRemaining/ numTestRemaining;
-
-				if (fdr < oldFdr) oldFdr = fdr;
-				oldScore = testScore;
-				indexLastSet = i;
 			}
-			vcfRecords[i].setScore((float)oldFdr);
-		}
+			float[] q = Num.arrayListOfFloatToArray(quals);
+			Arrays.sort(q);
+			return q;
 
-		//set last?
-		if (indexLastSet != vcfRecords.length-1){
-			i--;
-			testScore =  vcfRecords[i].getScore();
-			numTestRemaining = numTest - i;
-			backgroundIndex = numBkgRemaining(backgroundQuals, backgroundIndex, testScore);
-			numBkgRemaining = numBkg-backgroundIndex;
-			fdr = numBkgRemaining/ numTestRemaining;
-			if (fdr < oldFdr) oldFdr = fdr;
-			vcfRecords[i].setScore((float)oldFdr);
+		} catch (Exception e) {
+			if (in != null) IO.closeNoException(in);
+			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem parsing QUAL score from "+vcf+" for VCF record "+line);
+		} finally {
+			if (in != null) IO.closeNoException(in);
 		}
+		return null;
 	}
-
-	private int numBkgRemaining(float[] backgroundQuals, int backgroundIndex, float score) {
-		int i = backgroundIndex;
-		for (; i < backgroundQuals.length; i++){
-			if (backgroundQuals[i] >= score) break;
-		}
-		return i;
-	}
-
-	private void parseBkg() {
-		
-		ArrayList<Float> snvQuals = new ArrayList<Float>();
-		ArrayList<Float> indelQuals = new ArrayList<Float>();
-
-
-		VCFParser parser = new VCFParser(bkgVcfFile, true, false, false);	
-		//for each record
-		float maxIndel = 0;
-		float maxSnv = 0;  
-		for (VCFRecord rec: parser.getVcfRecords()){
-			float q = rec.getQuality();
-			if (rec.isSNP()){
-				numSnvsInBkg++;
-				snvQuals.add(q);
-				if (q > maxSnv) maxSnv = q;
-			}
-			else if (rec.isDeletion() || rec.isInsertion()){
-				numIndelsInBkg++;
-				indelQuals.add(q);
-				if (q > maxIndel) maxIndel = q;
-			}
-		}
-
-		backgroundSnvQuals = Num.arrayListOfFloatToArray(snvQuals);
-		Arrays.sort(backgroundSnvQuals);
-
-		backgroundIndelQuals = Num.arrayListOfFloatToArray(indelQuals);
-		Arrays.sort(backgroundIndelQuals);
-
-		snvQualHistBkg = new Histogram(0, maxSnv*1.1, 25);
-		snvQualHistBkg.countAll(backgroundSnvQuals);
-		indelQualHistBkg = new Histogram(0, maxIndel*1.1, 25);
-		indelQualHistBkg.countAll(backgroundIndelQuals);
-		
-		snvQualHistReal = new Histogram(0, maxSnv*1.1, 25);
-		indelQualHistReal = new Histogram(0, maxIndel*1.1, 25);
-
-	}
-
-
+	
 
 	public static void main(String[] args) throws FileNotFoundException, IOException {
 		if (args.length ==0){
@@ -259,6 +334,8 @@ public class VCFFdrEstimator {
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
+		File toParseMocks = null;
+		File toParseReal = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -266,9 +343,10 @@ public class VCFFdrEstimator {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'b': bkgVcfFile = new File(args[++i]); break;
-					case 's': realTumorVcfsFile = new File(args[++i]); break;
-					case 'r': fdrEstimatesVcfFile = new File(args[++i]); break;
+					case 'm': toParseMocks = new File(args[++i]); break;
+					case 'r': toParseReal = new File(args[++i]); break;
+					case 's': saveDir = new File(args[++i]); break;
+					case 'f': minFdr = Double.parseDouble(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -278,13 +356,25 @@ public class VCFFdrEstimator {
 				}
 			}
 		}
-		//check files
-		if (bkgVcfFile == null || bkgVcfFile.exists() == false) Misc.printErrAndExit("\nError: please provide either a background variant VCF file to use in estimating FDRs.\n");
-		if (realTumorVcfsFile == null || realTumorVcfsFile.exists() == false) Misc.printErrAndExit("\nError: please provide a somatic variant VCF file to use in calculating dFDRs.\n");
-		if (fdrEstimatesVcfFile == null || fdrEstimatesVcfFile.getName().endsWith(".vcf.gz") == false) Misc.printErrAndExit("\nError: please provide a vcf file ending in xxx.vcf.gz to save the results.\n");
+		//check args
+		if (saveDir == null) Misc.printErrAndExit("\nError: please provide a directory to save the FDR scored vcf files.\n");
+		saveDir.mkdirs();
+		mockVcfs = fetchVcfFiles(toParseMocks);
+		realVcfs = fetchVcfFiles(toParseReal);
 
-
-	}	
+	}
+	
+	public File[] fetchVcfFiles (File forExtraction) {
+		if (forExtraction == null || forExtraction.exists() == false) Misc.printErrAndExit("\nError: please enter a path to a vcf file or directory containing such for "+forExtraction);
+		File[][] tot = new File[3][];
+		tot[0] = IO.extractFiles(forExtraction, ".vcf");
+		tot[1] = IO.extractFiles(forExtraction,".vcf.gz");
+		tot[2] = IO.extractFiles(forExtraction,".vcf.zip");
+		File[] vcfFiles = IO.collapseFileArray(tot);
+		Arrays.sort(vcfFiles);
+		if (vcfFiles == null || vcfFiles.length ==0 || vcfFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.vcf(.zip/.gz OK) file(s) in "+forExtraction);
+		return vcfFiles;
+	}
 
 
 	public static void printDocs(){

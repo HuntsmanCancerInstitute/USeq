@@ -142,10 +142,22 @@ public class BaseCount {
 		throw new IOException("Unrecognized allele? "+allele);
 	}
 	
+	public int getIndelCount(char allele) throws IOException {
+		if (allele == 'D') return del;
+		if (allele == 'I') return ins;
+		throw new IOException("Unrecognized allele? "+allele);
+	}
+	
 	public double getSnvAlleleFreq(char allele) throws IOException {
 		double aTotal = getPassingReadCoverageSnv();
 		if (aTotal == 0) return 0;
 		double aCount = getSnvCount(allele);
+		return aCount/aTotal;
+	}
+	public double getIndelAlleleFreq(char allele) throws IOException {
+		double aTotal = getPassingReadCoverage();
+		if (aTotal == 0) return 0;
+		double aCount = getIndelCount(allele);
 		return aCount/aTotal;
 	}
 }
