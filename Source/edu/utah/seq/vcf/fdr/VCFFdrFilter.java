@@ -1,4 +1,4 @@
-package edu.utah.seq.vcf;
+package edu.utah.seq.vcf.fdr;
 
 import java.io.BufferedReader;
 import java.io.File;

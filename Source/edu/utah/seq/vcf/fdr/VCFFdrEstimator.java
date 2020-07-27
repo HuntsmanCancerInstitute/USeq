@@ -1,4 +1,4 @@
-package edu.utah.seq.vcf;
+package edu.utah.seq.vcf.fdr;
 
 import java.io.*;
 import java.util.*;
@@ -21,9 +21,10 @@ public class VCFFdrEstimator {
 	private File[] mockVcfs;
 	private File[] realVcfs;
 	private File saveDir;
-	private double minFdr = 0;
+	private double minFdr = 6;
 	
 	private float[][] mockQuals = null;
+	private float[][] realQuals = null;
 	private float[] mockThresholds = null;
 	private float[] mockCounts = null;
 
@@ -55,58 +56,24 @@ public class VCFFdrEstimator {
 		File f = null;
 		String line = null;
 		try {
-			IO.pl("\nScoring VCF files...");
+			IO.pl("\nScoring VCF files (Name #Pass #Fail), minFDR "+minFdr);
 			
 			//for each file
 			for (File vcfFile: realVcfs) {
 				f= vcfFile;
-				IO.pl("\t"+vcfFile.getName());
-				float[] sortedQuals = this.fetchSortedQualScores(vcfFile);
-				File passFile = new File (saveDir, Misc.removeExtension(vcfFile.getName())+".passFdr.vcf.gz");
+				IO.p("\t"+vcfFile.getName());
+				File passFile = new File (saveDir, Misc.removeExtension(vcfFile.getName())+".pass"+minFdr+"Fdr.vcf.gz");
 				Gzipper outPass = new Gzipper (passFile);
-				File failFile = new File (saveDir, Misc.removeExtension(vcfFile.getName())+".failFdr.vcf.gz");
+				File failFile = new File (saveDir, Misc.removeExtension(vcfFile.getName())+".fail"+minFdr+"Fdr.vcf.gz");
 				Gzipper outFail = new Gzipper (failFile);
-				BufferedReader in = IO.fetchBufferedReader(vcfFile);
-				int numPass = 0;
-				int numFail = 0;
-				while ((line = in.readLine())!= null) {
-					if (line.startsWith("#")) {
-						outPass.println(line);
-						outFail.println(line);
-					}
-					else {
-						String[] fields = Misc.TAB.split(line);
-						double phred = 0;
-						if (fields[5].equals(".") || fields[5].length() == 0) fields[5] = "0";
-						else {
-							float qual = Float.parseFloat(fields[5]);
-							double numRealCounts = countGreaterThanEqualTo(qual, sortedQuals);
-							double numMockCounts = estimateMockCounts(qual);
-							double fdr = numMockCounts/ numRealCounts;
-							phred = Num.minus10log10(fdr);
-							fields[5] = Num.formatNumber(phred, 3);
-							IO.pl("Qual "+qual+"  #Real "+numRealCounts+"   #NumMock "+numMockCounts+"   Phred "+phred);
-						}
-						
-//need to sort, need to add dFDR info tag and not replace QUAL
-						
-						if (phred >= minFdr) {
-							outPass.println(Misc.stringArrayToString(fields, "\t"));
-							numPass++;
-						}
-						else {
-							outFail.println(Misc.stringArrayToString(fields, "\t"));
-							numFail++;
-						}
-					}
-					
-				}
-				
-
-				in.close();
+				VCFFdrDataset vcfDataset = new VCFFdrDataset(vcfFile, minFdr);
+				vcfDataset.addHeader(outPass, outFail);
+				vcfDataset.estimateFdrs(outPass, outFail, this);
 				outPass.close();
 				outFail.close();
-				return;
+				if (vcfDataset.getNumFail() == 0) failFile.deleteOnExit();
+				if (vcfDataset.getNumPass() == 0) passFile.deleteOnExit();
+				
 			}
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -193,17 +160,25 @@ public class VCFFdrEstimator {
 		//load and print histogram
 		printMockHistogram(min, max);
 		
+		//load real vcfs
+		realQuals = new float[realVcfs.length][];
+		for (int i=0; i< realVcfs.length; i++) {
+			realQuals[i] = fetchSortedQualScores(realVcfs[i]);
+			for (float f: realQuals[i]) allScores.add(f);
+		}
+		
+		
 		//Calculate # FPs vs Score, at every threshold, will start at zero
-		calculateMockCountVsScoreTable(allScores);
+		calculateCountVsScoreTable(allScores);
 	}
 	
 	
 
 
 
-	private void calculateMockCountVsScoreTable(HashSet<Float> allScores) {
-		File table = new File (this.saveDir, "mockCountVsQual.txt");
-		IO.pl("\nSaving mock count vs QUAL threshold table to "+table);
+	private void calculateCountVsScoreTable(HashSet<Float> allScores) {
+		File table = new File (this.saveDir, "qualVcfCountTable.txt");
+		IO.pl("\nQUAL threshold VCF record count table to "+table);
 		mockThresholds = new float[allScores.size()];
 		mockCounts = new float[allScores.size()];
 		try {
@@ -211,9 +186,11 @@ public class VCFFdrEstimator {
 			Arrays.sort(scores);
 			//print header
 			PrintWriter out = new PrintWriter ( new FileWriter(table));
-			out.print("#Scores");
+			out.print("QUALThreshold");
 			for (int j=0; j<mockVcfs.length; j++) out.print("\t"+Misc.removeExtension(mockVcfs[j].getName()));
-			out.print("\tMean");
+			out.print("\tMockMean");
+			for (int j=0; j<realVcfs.length; j++) out.print("\t"+Misc.removeExtension(realVcfs[j].getName()));
+			out.println();
 			float numMockDatasets = (float)mockVcfs.length;
 			for (int i=0; i< scores.length; i++) {
 				out.print(scores[i]);
@@ -226,12 +203,18 @@ public class VCFFdrEstimator {
 				float mean = total/numMockDatasets;
 				mockThresholds[i] = scores[i];
 				mockCounts[i] = mean;
-				out.println("\t"+ mean);
+				out.print("\t"+ mean);
+				
+				for (int j=0; j<realVcfs.length; j++) {
+					int num = countGreaterThanEqualTo (scores[i], realQuals[j]);
+					out.print("\t"+num);
+				}
+				out.println();
 			}
 			out.close();
 		} catch (IOException e) {
 			e.printStackTrace();
-			Misc.printErrAndExit("\nProblem saving mock count QUAL table to  "+table);
+			Misc.printErrAndExit("\nProblem saving count QUAL table to  "+table);
 		}
 	}
 	
@@ -280,7 +263,7 @@ public class VCFFdrEstimator {
 		}
 	}
 
-	private int countGreaterThanEqualTo(float threshold, float[] sortedQuals) {
+	static int countGreaterThanEqualTo(float threshold, float[] sortedQuals) {
 		int numLessThan = Num.countNumLessThan(threshold, sortedQuals);
 		return sortedQuals.length - numLessThan;
 	}
@@ -319,6 +302,9 @@ public class VCFFdrEstimator {
 		}
 		return null;
 	}
+	
+
+	
 	
 
 	public static void main(String[] args) throws FileNotFoundException, IOException {
@@ -380,29 +366,28 @@ public class VCFFdrEstimator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Fdr Estimator  :   Jan 2019                       **\n" +
+				"**                           VCF Fdr Estimator  :   July 2020                       **\n" +
 				"**************************************************************************************\n" +
-				"Estimates false discovery rates for each QUAL score in a somatic VCF file by counting\n"+
-				"the number of records that are >= to that QUAL score in a matched background VCF. The\n"+
-				"estimated FDR = #Bkg/ #Som. In cases where increasingly stringent QUAL thresholds\n"+
-				"reduce the nummber of Som records but not Bkg records, the FDR increases. To control\n"+
-				"for this inconsistancy, the prior FDR is assigned to the more stringent QUAL, a 'dFDR'.\n\n"+
+				"This app estimates false discovery rates (FDR) for each somatic VCF by counting the\n"+
+				"number of records that are >= to that QUAL score in one or more mock VCF.\n"+
+				"The estimated FDR = #Mock/ #Real. In cases where increasingly stringent QUAL thresholds\n"+
+				"reduce the nummber of real records but not mock records, the FDR increases. To control\n"+
+				"for this inconsistancy, the prior FDR is assigned to the more stringent QUAL. Use\n"+
+				"the USeq VCFBkz app to generate reliable QUAL ranking scores if your somatic call does.\n"+
+				"not provide them.\n"+
 				
-				"To generate a matched background VCF file, use the SamReadDepthMatcher app to\n"+
-				"subsample a high depth normal bam file to match the read depth over each exon in the\n"+
-				"tumor bam file.  Run the same somatic variant calling and filtering workflow used in\n"+
-				"generating the real somatic VCF file but substitute the matched depth mock tumor bam\n"+
-				"for the real tumor bam. Lastly, use a low stringency set of germline variants\n"+
-				"identified in the high depth normal sample to filter out any het and hom variants in\n"+
-				"the bkg VCF.\n\n"+
+				"\nTo generate mock somatic VCF files, run 3 or more mock tumor vs normal sample sets\n"+
+				"where the mock tumor samples are either uninvolved tissue or biopsies from\n"+
+				"healthy volunteers. Prepare and analyze them the same way as the real tumor samples.\n\n"+
 
-				"Required Options:\n"+
-				"-b Background VCF file (xxx.vcf(.gz/.zip OK)).\n"+
-				"-s Somatic VCF file (xxx.vcf(.gz/.zip OK)).\n"+
-				"-r VCF file for saving the estimated FDR results.\n"+
+				"Options:\n"+
+				"-m Directory containing one or more mock VCF files (xxx.vcf(.gz/.zip OK)).\n"+
+				"-r Directory containing one or more real VCF files to score\n"+
+				"-s Directory for saving the dFDR scored vcf files. \n"+
+				"-f Minimum -10Log10(FDR), defaults to 6, where 6=0.25, 10=0.1, 13=0.05, 20=0.01\n"+
 
-				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/VCFFdrEstimator -b patient123Bkg.vcf.gz\n" +
-				"       -v patient123Somatic.vcf.gz -r FinalVcfs/patient123SomaticFdr.vcf.gz\n\n"+
+				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/VCFFdrEstimator -m MockVcfs/ -f 10"+
+				"   -r RealVcfs/ -s FDRFilteredVcfs\n\n"+
 
 				"**************************************************************************************\n");
 
