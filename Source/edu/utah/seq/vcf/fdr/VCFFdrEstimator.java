@@ -3,13 +3,6 @@ package edu.utah.seq.vcf.fdr;
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
-
-import edu.utah.seq.its.Interval;
-import edu.utah.seq.its.IntervalTree;
-import edu.utah.seq.useq.data.RegionScoreText;
-import edu.utah.seq.useq.data.RegionScoreTextData;
-import util.bio.annotation.Bed;
-import util.bio.annotation.ExportIntergenicRegions;
 import util.gen.*;
 
 /**Estimates Fdr for each somatic variant based on mock tumor vs normal contrasts. 
@@ -22,12 +15,13 @@ public class VCFFdrEstimator {
 	private File[] realVcfs;
 	private File saveDir;
 	private double minFdr = 6;
+	private boolean excludeMockMatches = true;
 	
 	private float[][] mockQuals = null;
 	private float[][] realQuals = null;
 	private float[] mockThresholds = null;
 	private float[] mockCounts = null;
-
+	private HashSet<String> mockVars = new HashSet<String>();
 	private Histogram mockQualScoreHistogram = null;
 	
 
@@ -36,16 +30,11 @@ public class VCFFdrEstimator {
 		//start clock
 		long startTime = System.currentTimeMillis();
 
-		//process args
 		processArgs(args);
 
-		//analyze mock vcfs
 		analyzeMocks();
 
 		parseReal();
-		
-		//print stats
-		printStats();
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
@@ -56,7 +45,7 @@ public class VCFFdrEstimator {
 		File f = null;
 		String line = null;
 		try {
-			IO.pl("\nScoring VCF files (Name #Pass #Fail), minFDR "+minFdr);
+			IO.pl("\nScoring VCF files (Name #TotalPassing #TotalFailing #InMock), minFDR "+minFdr+ ", failInMock "+excludeMockMatches);
 			
 			//for each file
 			for (File vcfFile: realVcfs) {
@@ -66,7 +55,7 @@ public class VCFFdrEstimator {
 				Gzipper outPass = new Gzipper (passFile);
 				File failFile = new File (saveDir, Misc.removeExtension(vcfFile.getName())+".fail"+minFdr+"Fdr.vcf.gz");
 				Gzipper outFail = new Gzipper (failFile);
-				VCFFdrDataset vcfDataset = new VCFFdrDataset(vcfFile, minFdr);
+				VCFFdrDataset vcfDataset = new VCFFdrDataset(vcfFile, minFdr, mockVars, excludeMockMatches);
 				vcfDataset.addHeader(outPass, outFail);
 				vcfDataset.estimateFdrs(outPass, outFail, this);
 				outPass.close();
@@ -79,69 +68,10 @@ public class VCFFdrEstimator {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nProblem processing "+f+" record "+line);
 		}
-
-		/*
-		testParser = new VCFParser(realTumorVcfsFile, true, false, false);
-		testParser.setRecordQUALAsScore();
-
-		//split into snv and indel
-		snvIndel = testParser.splitVCFRecordsBySnvIndelOther();
-
-		//sort snv and indels by score, small to large
-		ComparatorVCFRecordScore scr = new ComparatorVCFRecordScore();
-		Arrays.sort(snvIndel[0], scr);
-		Arrays.sort(snvIndel[1], scr);
-		numSnvsInReal = snvIndel[0].length;
-		numIndelsInReal = snvIndel[1].length;
-		for (VCFRecord v: snvIndel[0]) snvQualHistReal.count(v.getScore());
-		for (VCFRecord v: snvIndel[1]) indelQualHistReal.count(v.getScore());
-
-		replaceScoreWithFDR(snvIndel[0], backgroundSnvQuals);
-		replaceScoreWithFDR(snvIndel[1], backgroundIndelQuals);
-
-		//watch out for non snvIndel records
-		if (snvIndel[2].length !=0) for (VCFRecord v: snvIndel[2]) v.setScore(-1.0f);
-
-		//print modified records adding an dFDR=xxx; to the INFO column
-		printVariants(Misc.removeExtension(realTumorVcfsFile.getName()));
-		 */
 	}
-
-	private void printStats() {
-		/*IO.pl("QUAL score stats:");
-		
-		IO.pl("\t"+ numSnvsInReal+"\tNum Som SNVs");
-		IO.pl("\t"+ numSnvsInBkg+"\tNum Bkg SNVs");
-		
-		IO.pl("\t"+ numIndelsInReal+"\tNum Som INDELs");
-		IO.pl("\t"+ numIndelsInBkg+"\tNum Bkg INDELs");
-		
-		IO.pl("\nHistogram of Som SNV QUALs:");
-		snvQualHistReal.printScaledHistogram();
-		IO.pl("\nHistogram of Bkg SNV QUALs:");
-		snvQualHistBkg.printScaledHistogram();
-		
-		IO.pl("\nHistogram of Som INDEL QUALs:");
-		indelQualHistReal.printScaledHistogram();
-		IO.pl("\nHistogram of Bkg INDEL QUALs:");
-		indelQualHistBkg.printScaledHistogram();
-		
-		//print list FDRs
-		IO.pl("\nEstimated dFDRs:");
-		IO.pl("SNV Min "+snvIndel[0][numSnvsInReal-1].getScore());
-		IO.pl("SNV Max "+snvIndel[0][0].getScore());
-		IO.pl("INDEL Min "+snvIndel[1][numIndelsInReal-1].getScore());
-		IO.pl("INDEL Max "+snvIndel[1][0].getScore());
-		IO.pl();
-		*/
-	}
-
-	
-	
-
-	
 
 	private void analyzeMocks() {
+		IO.pl("Loading mock VCF files (Name #Records)");
 		//collect qual scores
 		mockQuals = new float[this.mockVcfs.length][];
 		float min = 1000;
@@ -149,12 +79,14 @@ public class VCFFdrEstimator {
 		HashSet<Float> allScores = new HashSet<Float>();
 		allScores.add(0.0f);
 		for (int i=0; i< mockVcfs.length; i++) {
-			mockQuals[i] = fetchSortedQualScores(mockVcfs[i]);
+			IO.p("\t"+mockVcfs[i].getName()+"\t");
+			mockQuals[i] = fetchSortedQualScores(mockVcfs[i], true);
 			for (float f: mockQuals[i]) {
 				allScores.add(f);
 				if (f<min) min = f;
 				if (f>max) max = f;
 			}
+			IO.pl(mockQuals[i].length);
 		}
 		
 		//load and print histogram
@@ -163,22 +95,17 @@ public class VCFFdrEstimator {
 		//load real vcfs
 		realQuals = new float[realVcfs.length][];
 		for (int i=0; i< realVcfs.length; i++) {
-			realQuals[i] = fetchSortedQualScores(realVcfs[i]);
+			realQuals[i] = fetchSortedQualScores(realVcfs[i], false);
 			for (float f: realQuals[i]) allScores.add(f);
 		}
-		
 		
 		//Calculate # FPs vs Score, at every threshold, will start at zero
 		calculateCountVsScoreTable(allScores);
 	}
-	
-	
-
-
 
 	private void calculateCountVsScoreTable(HashSet<Float> allScores) {
 		File table = new File (this.saveDir, "qualVcfCountTable.txt");
-		IO.pl("\nQUAL threshold VCF record count table to "+table);
+		IO.pl("\nSaving QUAL threshold VCF record count table to "+table);
 		mockThresholds = new float[allScores.size()];
 		mockCounts = new float[allScores.size()];
 		try {
@@ -275,7 +202,7 @@ public class VCFFdrEstimator {
 		mockQualScoreHistogram.printScaledHistogram();
 	}
 
-	private float[] fetchSortedQualScores(File vcf) {
+	private float[] fetchSortedQualScores(File vcf, boolean addToRecordHash) {
 		BufferedReader in = null;
 		String line = null;
 		try {
@@ -287,6 +214,11 @@ public class VCFFdrEstimator {
 					String[] fields = Misc.TAB.split(line);
 					if (fields[5].equals(".") || fields[5].length() == 0) quals.add(0.0f);
 					else quals.add(Float.parseFloat(fields[5]));
+					//add to hash?
+					if (addToRecordHash) {
+						String coor = fields[0]+"_"+fields[1]+"_"+fields[3]+"_"+fields[4];
+						mockVars.add(coor);
+					}
 				}
 			}
 			float[] q = Num.arrayListOfFloatToArray(quals);
@@ -333,6 +265,7 @@ public class VCFFdrEstimator {
 					case 'r': toParseReal = new File(args[++i]); break;
 					case 's': saveDir = new File(args[++i]); break;
 					case 'f': minFdr = Double.parseDouble(args[++i]); break;
+					case 'k': excludeMockMatches = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -369,27 +302,33 @@ public class VCFFdrEstimator {
 				"**                           VCF Fdr Estimator  :   July 2020                       **\n" +
 				"**************************************************************************************\n" +
 				"This app estimates false discovery rates (FDR) for each somatic VCF by counting the\n"+
-				"number of records that are >= to that QUAL score in one or more mock VCF.\n"+
-				"The estimated FDR = #Mock/ #Real. In cases where increasingly stringent QUAL thresholds\n"+
-				"reduce the nummber of real records but not mock records, the FDR increases. To control\n"+
-				"for this inconsistancy, the prior FDR is assigned to the more stringent QUAL. Use\n"+
-				"the USeq VCFBkz app to generate reliable QUAL ranking scores if your somatic call does.\n"+
-				"not provide them.\n"+
+				"number of records that are >= to that QUAL score in one or more mock VCF files.\n"+
+				"The estimated FDR at a given QUAL threshold is = mean # Mock/ # Real. In cases where\n"+
+				"increasingly stringent QUAL thresholds increase the FDR, the prior FDR is assigned. Use\n"+
+				"the USeq VCFBkz app to generate reliable QUAL ranking scores if your somatic caller\n"+
+				"does not provide them. Lastly, by default, real variants found in the mocks are\n"+
+				"excluded from the pass files.\n"+
 				
 				"\nTo generate mock somatic VCF files, run 3 or more mock tumor vs normal sample sets\n"+
 				"where the mock tumor samples are either uninvolved tissue or biopsies from\n"+
-				"healthy volunteers. Prepare and analyze them the same way as the real tumor samples.\n\n"+
+				"healthy volunteers. Prepare, sequence, and analyze them the same way as the real tumor\n"+
+				"samples.\n\n"+
 
 				"Options:\n"+
 				"-m Directory containing one or more mock VCF files (xxx.vcf(.gz/.zip OK)).\n"+
 				"-r Directory containing one or more real VCF files to score\n"+
-				"-s Directory for saving the dFDR scored vcf files. \n"+
-				"-f Minimum -10Log10(FDR), defaults to 6, where 6=0.25, 10=0.1, 13=0.05, 20=0.01\n"+
+				"-s Directory for saving the dFDR scored VCF files. \n"+
+				"-f Minimum -10Log10(FDR) to pass, defaults to 6, where 6=0.25, 10=0.1, 13=0.05, 20=0.01\n"+
+				"-k Keep real vcfs that are found in the mock files, defaults to failing them.\n "+
 
 				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/VCFFdrEstimator -m MockVcfs/ -f 10"+
 				"   -r RealVcfs/ -s FDRFilteredVcfs\n\n"+
 
 				"**************************************************************************************\n");
 
+	}
+
+	public HashSet<String> getMockVars() {
+		return mockVars;
 	}
 }
