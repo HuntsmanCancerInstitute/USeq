@@ -715,6 +715,8 @@ public class IO {
 			dir.delete();
 		}
 		dir.delete();
+		
+		if (dir.exists()) deleteDirectoryViaCmdLine(dir);
 	}
 
 	public static void deleteDirectoryViaCmdLine(File dir){

@@ -1,11 +1,12 @@
 package edu.utah.seq.vcf.fdr;
 
 import java.io.*;
+import java.text.NumberFormat;
 import java.util.*;
 import java.util.regex.*;
 import util.gen.*;
 
-/**Estimates Fdr for each somatic variant based on mock tumor vs normal contrasts. 
+/**Estimates Fdr for each somatic variant based on mock tumor vs normal contrasts. Excludes shared mock-real variants from the analysis and output files. 
  * @author Nix
  * */
 public class VCFFdrEstimator {
@@ -14,8 +15,8 @@ public class VCFFdrEstimator {
 	private File[] mockVcfs;
 	private File[] realVcfs;
 	private File saveDir;
-	private double minFdr = 6;
-	private boolean excludeMockMatches = true;
+	private double minFdr = 0.25;
+	private boolean excludeSharedVariants = true;
 	
 	private float[][] mockQuals = null;
 	private float[][] realQuals = null;
@@ -23,6 +24,8 @@ public class VCFFdrEstimator {
 	private float[] mockCounts = null;
 	private HashSet<String> mockVars = new HashSet<String>();
 	private Histogram mockQualScoreHistogram = null;
+	private File filteredMockDir = null;
+	private File filteredRealDir = null;
 	
 
 	//constructor
@@ -31,37 +34,140 @@ public class VCFFdrEstimator {
 		long startTime = System.currentTimeMillis();
 
 		processArgs(args);
+		
+		excludeSharedMatches();
 
 		analyzeMocks();
 
 		parseReal();
+		
+		if (filteredMockDir != null) {
+			IO.deleteDirectory(filteredMockDir);
+			IO.deleteDirectory(filteredRealDir);
+		}
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
 	}
 
+	private void excludeSharedMatches() {
+		if (excludeSharedVariants == false) return;
+		
+		// load the variants
+		IO.pl("\nIdentifying vcf records present in the mock and real vcf files");
+		HashSet<String> mockVars = loadVars(mockVcfs);
+		IO.pl("\t"+mockVars.size()+"\t# Unique mock variants");
+		HashSet<String> realVars = loadVars(realVcfs);
+		IO.pl("\t"+realVars.size()+"\t# Unique real variants");
+		
+		// only keep those in common
+		mockVars.retainAll(realVars);
+		IO.pl("\t"+mockVars.size()+"\t# Shared variants to exclude");
+		
+		//write out the vcfs retaining those not in the hash
+		filteredMockDir = new File (this.saveDir, "TempFiltMock");
+		filteredMockDir.mkdirs();
+		filteredRealDir = new File (this.saveDir, "TempFiltReal");
+		filteredRealDir.mkdirs();
+		IO.pl("\nSaving vcfs sans shared variants (Name #Pass #Fail)");
+		mockVcfs = filterVcfs (mockVcfs, filteredMockDir, mockVars);
+		realVcfs = filterVcfs (realVcfs, filteredRealDir, mockVars);
+	}
+
+	private File[] filterVcfs(File[] vcfs, File saveDir, HashSet<String> toExclude)  {
+		File[] saved = new File[vcfs.length];
+		String line = null;
+		File toParse = null;
+		BufferedReader in = null;
+		Gzipper out = null;
+		try {		
+			for (int i=0; i< vcfs.length; i++) {
+				
+				toParse = vcfs[i];
+				saved[i] = new File (saveDir, vcfs[i].getName());
+				out = new Gzipper(saved[i]);
+				in = IO.fetchBufferedReader(vcfs[i]);
+				int numPass = 0;
+				int numFail = 0;
+				
+				while ((line = in.readLine())!= null) {
+					if (line.startsWith("#") == false) {
+						//#CHROM0	POS1	ID2	REF3	ALT4	QUAL	FILTER	INFO	FORMAT
+						String[] fields = Misc.TAB.split(line);
+						String coor = fields[0]+"_"+fields[1]+"_"+fields[3]+"_"+fields[4];
+						if (toExclude.contains(coor) == false) {
+							out.println(line);
+							numPass++;
+						}
+						else numFail++;
+					}
+					else out.println(line);
+				}
+				out.close();
+				in.close();
+				IO.pl("\t"+ Misc.removeExtension(vcfs[i].getName())+ "\t"+ numPass+ "\t"+ numFail);
+			}
+		} catch (Exception e) {
+			if (in != null) IO.closeNoException(in);
+			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem filtering "+ toParse +" for shared variants "+line);
+		} finally {
+			if (in != null) IO.closeNoException(in);
+			if (out != null) out.closeNoException();
+		}
+		return saved;
+
+
+	}
+
+	private HashSet<String> loadVars(File[] vcfs) {
+		HashSet<String> varHash = new HashSet<String>();
+		for (int i=0; i< vcfs.length; i++) addVarCoordinates(vcfs[i], varHash);
+		return varHash;
+	}
+	
+	private void addVarCoordinates(File vcf, HashSet<String> varHash) {
+		BufferedReader in = null;
+		String line = null;
+		try {
+			in = IO.fetchBufferedReader(vcf);
+			while ((line = in.readLine())!= null) {
+				if (line.startsWith("#") == false) {
+					//#CHROM0	POS1	ID2	REF3	ALT4	QUAL	FILTER	INFO	FORMAT
+					String[] fields = Misc.TAB.split(line);
+					String coor = fields[0]+"_"+fields[1]+"_"+fields[3]+"_"+fields[4];
+					varHash.add(coor);
+				}
+			}
+		} catch (Exception e) {
+			if (in != null) IO.closeNoException(in);
+			e.printStackTrace();
+			Misc.printErrAndExit("\nProblem parsing "+vcf+" for shared variants "+line);
+		} finally {
+			if (in != null) IO.closeNoException(in);
+		}
+	}
+
 	private void parseReal() {
 		File f = null;
 		String line = null;
 		try {
-			IO.pl("\nScoring VCF files (Name #TotalPassing #TotalFailing #InMock), minFDR "+minFdr+ ", failInMock "+excludeMockMatches);
-			
+			IO.pl("\nScoring VCF files (Name #Passing #Failing), minFDR "+minFdr);
+			String minFdrString = NumberFormat.getNumberInstance().format(minFdr);
 			//for each file
 			for (File vcfFile: realVcfs) {
 				f= vcfFile;
 				IO.p("\t"+vcfFile.getName());
-				File passFile = new File (saveDir, Misc.removeExtension(vcfFile.getName())+".pass"+minFdr+"Fdr.vcf.gz");
+				File passFile = new File (saveDir, Misc.removeExtension(vcfFile.getName())+".pass."+minFdrString+".vcf.gz");
 				Gzipper outPass = new Gzipper (passFile);
-				File failFile = new File (saveDir, Misc.removeExtension(vcfFile.getName())+".fail"+minFdr+"Fdr.vcf.gz");
+				File failFile = new File (saveDir, Misc.removeExtension(vcfFile.getName())+".fail."+minFdrString+".vcf.gz");
 				Gzipper outFail = new Gzipper (failFile);
-				VCFFdrDataset vcfDataset = new VCFFdrDataset(vcfFile, minFdr, mockVars, excludeMockMatches);
+				VCFFdrDataset vcfDataset = new VCFFdrDataset(vcfFile, minFdr);
 				vcfDataset.addHeader(outPass, outFail);
+				//this closes the io
 				vcfDataset.estimateFdrs(outPass, outFail, this);
-				outPass.close();
-				outFail.close();
-				if (vcfDataset.getNumFail() == 0) failFile.deleteOnExit();
-				if (vcfDataset.getNumPass() == 0) passFile.deleteOnExit();
+				
 				
 			}
 		} catch (IOException e) {
@@ -234,10 +340,6 @@ public class VCFFdrEstimator {
 		}
 		return null;
 	}
-	
-
-	
-	
 
 	public static void main(String[] args) throws FileNotFoundException, IOException {
 		if (args.length ==0){
@@ -246,7 +348,6 @@ public class VCFFdrEstimator {
 		}
 		new VCFFdrEstimator(args);
 	}		
-
 
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
@@ -265,7 +366,7 @@ public class VCFFdrEstimator {
 					case 'r': toParseReal = new File(args[++i]); break;
 					case 's': saveDir = new File(args[++i]); break;
 					case 'f': minFdr = Double.parseDouble(args[++i]); break;
-					case 'k': excludeMockMatches = false; break;
+					case 'k': excludeSharedVariants = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -280,7 +381,6 @@ public class VCFFdrEstimator {
 		saveDir.mkdirs();
 		mockVcfs = fetchVcfFiles(toParseMocks);
 		realVcfs = fetchVcfFiles(toParseReal);
-
 	}
 	
 	public File[] fetchVcfFiles (File forExtraction) {
@@ -304,24 +404,24 @@ public class VCFFdrEstimator {
 				"This app estimates false discovery rates (FDR) for each somatic VCF by counting the\n"+
 				"number of records that are >= to that QUAL score in one or more mock VCF files.\n"+
 				"The estimated FDR at a given QUAL threshold is = mean # Mock/ # Real. In cases where\n"+
-				"increasingly stringent QUAL thresholds increase the FDR, the prior FDR is assigned. Use\n"+
-				"the USeq VCFBkz app to generate reliable QUAL ranking scores if your somatic caller\n"+
-				"does not provide them. Lastly, by default, real variants found in the mocks are\n"+
-				"excluded from the pass files.\n"+
+				"increasingly stringent QUAL thresholds increase the FDR, the prior FDR is assigned.\n"+
+				"Use the USeq VCFBkz app to generate reliable QUAL ranking scores if your somatic\n"+
+				"caller does not provide them. Lastly, shared mock-real variants are removed from\n"+
+				"the analysis and output files.\n"+
 				
-				"\nTo generate mock somatic VCF files, run 3 or more mock tumor vs normal sample sets\n"+
-				"where the mock tumor samples are either uninvolved tissue or biopsies from\n"+
-				"healthy volunteers. Prepare, sequence, and analyze them the same way as the real tumor\n"+
-				"samples.\n\n"+
+				"\nTo generate mock somatic VCF files, run 3 or more mock tumor vs matched normal\n"+
+				"sample sets  where the mock tumor samples are either uninvolved tissue or biopsies\n"+
+				"from healthy volunteers. Prepare, sequence, and analyze them the same way as the real\n"+
+				"tumor samples.\n\n"+
 
 				"Options:\n"+
 				"-m Directory containing one or more mock VCF files (xxx.vcf(.gz/.zip OK)).\n"+
-				"-r Directory containing one or more real VCF files to score\n"+
+				"-r Directory containing one or more real VCF files to score.\n"+
 				"-s Directory for saving the dFDR scored VCF files. \n"+
-				"-f Minimum -10Log10(FDR) to pass, defaults to 6, where 6=0.25, 10=0.1, 13=0.05, 20=0.01\n"+
-				"-k Keep real vcfs that are found in the mock files, defaults to failing them.\n "+
+				"-f Minimum FDR to pass, defaults to 0.25 .\n"+
+				"-k Keep shared mock-real variants, defaults to excluding them.\n "+
 
-				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/VCFFdrEstimator -m MockVcfs/ -f 10"+
+				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/VCFFdrEstimator -m MockVcfs/ -f 0.05\n"+
 				"   -r RealVcfs/ -s FDRFilteredVcfs\n\n"+
 
 				"**************************************************************************************\n");

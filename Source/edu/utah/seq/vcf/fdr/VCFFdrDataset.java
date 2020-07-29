@@ -5,8 +5,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashSet;
-
 import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
@@ -14,23 +12,16 @@ import util.gen.Num;
 
 class VCFFdrDataset {
 
-	private static final String fdrInfo = "##INFO=<ID=dFDR,Number=1,Type=Float,Description=\"-10Log10(FDR) based on mock T/N contrasts; 20=0.01, 13=0.05, 10=0.1; see the USeq VCFFdrEstimator application.\">";
+	private static final String fdrInfo = "##INFO=<ID=dFDR,Number=1,Type=Float,Description=\"Estimated false discovery rate (-10Log10(Ave#Mock/#Real)) based on mock T/N contrasts, see the USeq VCFFdrEstimator application. 10=10%, 13=5%, 20=1%, 30=0.1%\">";
 	private QualSortedVcf[] qualSortedVcfs = null;
 	private float[] qualScores = null;
 	private ArrayList<String> header = new ArrayList<String>();
 	private File vcfFile;
 	private double minFDR;
-	private int numPass = 0;
-	private int numFail = 0;
-	private int numInMock = 0;
-	private HashSet<String> mockVars;
-	private boolean excludeMockMatches;
 
-	public VCFFdrDataset (File vcfFile, double minFDR, HashSet<String> mockVars, boolean excludeMockMatches) {
+	public VCFFdrDataset (File vcfFile, double minFDR) {
 		this.vcfFile = vcfFile;
 		this.minFDR = minFDR;
-		this.mockVars = mockVars;
-		this.excludeMockMatches = excludeMockMatches;
 		loadVcfRecords();
 	}
 
@@ -41,6 +32,7 @@ class VCFFdrDataset {
 			in = IO.fetchBufferedReader(vcfFile);
 			ArrayList<QualSortedVcf> quals = new ArrayList<QualSortedVcf>();
 			boolean addFDRInfo = true;
+			float order = 0;
 			while ((line = in.readLine())!= null) {
 				if (line.startsWith("#") == false) {
 					//#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT
@@ -48,7 +40,7 @@ class VCFFdrDataset {
 					Float qual = null;
 					if (fields[5].equals(".") || fields[5].length() == 0) qual = new Float(0.0f);
 					else qual = Float.parseFloat(fields[5]);
-					quals.add( new QualSortedVcf(qual, fields));
+					quals.add( new QualSortedVcf(qual, fields, order++));
 				}
 				else {
 					//add header?
@@ -78,16 +70,12 @@ class VCFFdrDataset {
 	private class QualSortedVcf implements Comparable<QualSortedVcf> {
 		float qual;
 		String[] vcfFields;
-		boolean inMock = false;
+		float order;
 
-		QualSortedVcf (float qual, String[] vcfFields) {
+		QualSortedVcf (float qual, String[] vcfFields, float order) {
 			this.qual = qual;
 			this.vcfFields = vcfFields;
-			String coor = vcfFields[0]+"_"+vcfFields[1]+"_"+vcfFields[3]+"_"+vcfFields[4];
-			if (mockVars.contains(coor)) {
-				if (excludeMockMatches) inMock = true;
-				numInMock++;
-			}
+			this.order = order;
 		}
 
 		public int compareTo(QualSortedVcf other) {
@@ -108,11 +96,13 @@ class VCFFdrDataset {
 	}
 
 	public void estimateFdrs(Gzipper outPass, Gzipper outFail, VCFFdrEstimator vcfFdrEstimator) throws IOException {
-		double priorPhred = -1;
+		double priorFdr = 1000;
 		float priorQual = -1;
 		double numRealCounts = 0;
 		double numMockCounts = 0;
-		String priorPhredString = null;
+		String priorFdrString = "dFDR=100;";
+		ArrayList<QualSortedVcf> pass = new ArrayList<QualSortedVcf>();
+		ArrayList<QualSortedVcf> fail = new ArrayList<QualSortedVcf>();
 		for (int i=0; i< qualScores.length; i++) {
 			if (priorQual != qualScores[i]) {
 				priorQual = qualScores[i];
@@ -121,35 +111,35 @@ class VCFFdrDataset {
 				//watch out for zero counts
 				if (numRealCounts != 0 && numMockCounts != 0) {
 					double fdr = numMockCounts/ numRealCounts;
-					double phred = Num.minus10log10(fdr);
-					//only assign to prior if it's better
-					if (phred > priorPhred) {
-						priorPhred = phred;	
-						priorPhredString = "dFDR=" + Num.formatNumber(priorPhred, 2)+";";
+					//only assign to prior if it's smaller, e.g. decreasingFDR dFDR
+					if (fdr < priorFdr) {
+						priorFdr = fdr;	
+						priorFdrString = "dFDR=" + Num.formatNumberJustMax(Num.minus10log10(fdr), 2)+";";
 					}
 				}
 			}
 
-			qualSortedVcfs[i].vcfFields[7] = priorPhredString + qualSortedVcfs[i].vcfFields[7];
+			qualSortedVcfs[i].vcfFields[7] = priorFdrString + qualSortedVcfs[i].vcfFields[7];
 			//IO.pl("Qual "+priorQual+"  #Real "+numRealCounts+"   #NumMock "+numMockCounts+"   Phred "+priorPhredString +"\t"+(Misc.stringArrayToString(qualSortedVcfs[i].vcfFields, "\t")));
-			if (qualSortedVcfs[i].inMock == false && priorPhred >= minFDR) {
-				outPass.println(Misc.stringArrayToString(qualSortedVcfs[i].vcfFields, "\t"));
-				numPass++;
-			}
-			else {
-				outFail.println(Misc.stringArrayToString(qualSortedVcfs[i].vcfFields, "\t"));
-				numFail++;
-			}
+			if (priorFdr <= minFDR) pass.add(qualSortedVcfs[i]);
+			else fail.add(qualSortedVcfs[i]);
 		}
-		IO.pl("\t"+numPass+"\t"+numFail+"\t"+numInMock);
+		sortSave(pass, outPass);
+		sortSave(fail, outFail);
+		IO.pl("\t"+pass.size()+"\t"+fail.size());
 	}
 
-	public int getNumPass() {
-		return numPass;
-	}
-
-	public int getNumFail() {
-		return numFail;
+	private void sortSave(ArrayList<QualSortedVcf> qsv, Gzipper out) throws IOException {
+		if (qsv.size() == 0) {
+			out.close();
+			IO.deleteFile(out.getGzipFile());
+		}
+		QualSortedVcf[] toSort = new QualSortedVcf[qsv.size()];
+		qsv.toArray(toSort);
+		for (int i=0; i< toSort.length; i++) toSort[i].qual= toSort[i].order;
+		Arrays.sort(toSort);
+		for (int i=0; i< toSort.length; i++) out.println(Misc.stringArrayToString(toSort[i].vcfFields, "\t"));	
+		out.close();
 	}
 }
 
