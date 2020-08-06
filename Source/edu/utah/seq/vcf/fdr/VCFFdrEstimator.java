@@ -383,7 +383,7 @@ public class VCFFdrEstimator {
 		realVcfs = fetchVcfFiles(toParseReal);
 	}
 	
-	public File[] fetchVcfFiles (File forExtraction) {
+	public static File[] fetchVcfFiles (File forExtraction) {
 		if (forExtraction == null || forExtraction.exists() == false) Misc.printErrAndExit("\nError: please enter a path to a vcf file or directory containing such for "+forExtraction);
 		File[][] tot = new File[3][];
 		tot[0] = IO.extractFiles(forExtraction, ".vcf");
