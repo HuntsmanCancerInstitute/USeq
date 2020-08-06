@@ -163,7 +163,7 @@ public class FisherExact {
      * @param b
      * @param c
      * @param d
-     * @return two-tailed P-value
+     * @return two-tailed P-value or NaN if the table sum exceeds the maxSize
      */
     public final double getTwoTailedP(int a, int b, int c, int d) {
         int min, i;
