@@ -1,10 +1,12 @@
 package edu.utah.seq.vcf.json;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 import util.gen.Json;
+import util.gen.Misc;
 
 public class TempusSpecimen {
 	
@@ -107,6 +109,25 @@ public class TempusSpecimen {
 
 	public Integer getTumorPercentage() {
 		return tumorPercentage;
+	}
+
+	public static void addAttributes(LinkedHashMap<String, String> reportAttributes, TempusSpecimen[] specimens) {
+		ArrayList<String> al = new ArrayList<String>();
+		Integer tp = null;
+		for (int i=0; i< specimens.length; i++ ) {
+			String type = specimens[i].getSampleType();
+			String site = specimens[i].getSampleSite();
+			String tn = specimens[i].getSampleCategory();
+			if (site == null && type == null) continue;
+			if (site == null) al.add(tn+" : "+type);
+			else if (type == null) al.add(tn+" : "+site);
+			else al.add(tn+" : "+type+" - "+site);
+			//tumor percentage
+			if (specimens[i].getTumorPercentage() != null) tp = specimens[i].getTumorPercentage();
+		}
+		String sum = Misc.stringArrayListToString(al, "; ");
+		reportAttributes.put("specimines", sum);
+		if (tp != null) reportAttributes.put("tumorPercentage", tp.toString());
 	}
 
 }

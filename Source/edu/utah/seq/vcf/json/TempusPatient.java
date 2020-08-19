@@ -40,6 +40,7 @@ public class TempusPatient {
 		tempusId = Json.getStringAttribute(patient, "tempusId");
 		emr_id = Json.getStringAttribute(patient, "emr_id");
 		sex = Json.getStringAttribute(patient, "sex");
+		if (sex != null) sex = sex.toUpperCase();
 		dateOfBirth = Json.getStringAttribute(patient, "DoB");
 		diagnosis = Json.getStringAttribute(patient, "diagnosis");
 		diagnosisDate = Json.getStringAttribute(patient, "diagnosisDate");
@@ -69,6 +70,19 @@ public class TempusPatient {
 		meta.put("tempusPatientGender", sex);
 		if (diagnosis != null) meta.put("tempusDiagnosis", diagnosis);
 		if (ageAtDiagnosis != null) meta.put("tempusAgeAtDiagnosis", ageAtDiagnosis.toString());
+	}
+	
+	public void addAttributes(LinkedHashMap<String, String> meta, boolean includePhi) {
+		meta.put("tempusId", tempusId);
+		meta.put("sex", sex);
+		if (diagnosis != null) meta.put("diagnosis", diagnosis);
+		if (ageAtDiagnosis != null) meta.put("ageAtDiagnosis", ageAtDiagnosis.toString());
+		if (includePhi) {
+			meta.put("firstName", firstName);
+			meta.put("lastName", lastName);
+			meta.put("DoB", dateOfBirth);
+			meta.put("emr_id", emr_id);
+		}
 	}
 
 	public String getFirstName() {

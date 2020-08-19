@@ -684,7 +684,7 @@ public class FoundationXml2Vcf {
 		return genomeVersion;
 	}
 	
-	/*Table of gene name and strand, needed for a few cases where Foundation doesn't report the strand for an effected gene.*/
+	/*Table of gene name and strand, needed for a few cases where Foundation doesn't report the strand for an effected gene. Arrrrggggg! */
 	private String[] geneStrand  = new String[]{"CDC14A","+", "KIF1B","+", "PRMT6","+", "TNFRSF14","+", "VAV3","-", "CSF1","+", "RBM15","+", "MTOR","-", "WNT2B","+", "PTPN22","-",
 			"TRIM33","-", "NRAS","-", "NGF","-", "MAD2L2","-", "VTCN1","-", "FAM46C","+", "MTHFR","-", "NPPB","-", "HSD3B1","+", "NOTCH2","-", "DVL1","-",
 			"PRDM2","+", "NOTCH2NL","-", "CHD1L","+", "BCL9","+", "APH1A","-", "MCL1","-", "CTSS","-", "ARNT","-", "SETDB1","+", "MLLT11","+", "FLG","-",

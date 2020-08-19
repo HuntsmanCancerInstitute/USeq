@@ -19,6 +19,8 @@ public class TempusJson2Vcf {
 	private File[] jsonFiles = null;
 	private File indexedFasta = null;
 	private File saveDirectory = null;
+	private boolean includePHI = false;
+	private LinkedHashSet<String> keysToExport = null;
 	
 	//internal fields
 	private String[] acceptedSchema = {"1.3", "1.3.1"};
@@ -26,6 +28,8 @@ public class TempusJson2Vcf {
 	private String source = null;
 	private HashMap<String, Bed> cnvGeneNameBed = null;
 	private String jsonSchema = null;
+	
+	private LinkedHashMap<String,String>[] allReportAttributes = null;
 	
 	//counters across all datasets
 	TreeMap<String, Integer> bioInfPipelines = new TreeMap<String, Integer>();
@@ -59,6 +63,7 @@ public class TempusJson2Vcf {
 	private int numFusionVariants = 0;
 	
 	//working data for a particular report
+	private LinkedHashMap<String,String> reportAttributes = null;
 	private File workingJsonFile = null;
 	private TempusReport workingReport = null;
 	private TempusPatient workingPatient = null;
@@ -97,6 +102,8 @@ public class TempusJson2Vcf {
 			doWork();
 
 			printStats();
+			
+			printSpreadsheet();
 
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
@@ -115,6 +122,9 @@ public class TempusJson2Vcf {
 			fasta = new IndexedFastaSequenceFile(indexedFasta);
 			if (fasta.isIndexed() == false) Misc.printErrAndExit("\nError: cannot find your xxx.fai index or the multi fasta file isn't indexed\n"+ indexedFasta);
 		}
+		
+		//create container for each report attributes
+		allReportAttributes = new LinkedHashMap[jsonFiles.length];
 
 		IO.pl("Parsing and coverting...\n");
 		IO.pl("Name\t"
@@ -149,11 +159,58 @@ public class TempusJson2Vcf {
 					workingNumFusionVariants);
 			
 			resetWorkingCounters();
+			
+			allReportAttributes[i] = reportAttributes;
 		}
 		
 		//close the fasta lookup fetcher
 		if (indexedFasta != null) fasta.close();
 
+	}
+	
+	private void printSpreadsheet() throws IOException {
+		IO.pl("\nExporting patient summary spreadsheet... ");
+		//merge all the keys
+		LinkedHashSet<String> allKeys = new LinkedHashSet<String>();
+		for (LinkedHashMap<String,String> s : allReportAttributes) allKeys.addAll(s.keySet());
+		IO.pl("\tAvailable attributes: "+allKeys);
+		
+		if (keysToExport == null) keysToExport = allKeys;
+		else {
+			//check that the keys they want are part of the allKeys
+			boolean failed = false;
+			for (String k: keysToExport) {
+				if (allKeys.contains(k) == false) {
+					failed = true;
+					IO.pl("\tFailed to find "+k);
+				}
+			}
+			if (failed) {
+				IO.pl("\tAvailable attributes: "+allKeys);
+				throw new IOException("\nError printing requested attributes to spreadsheet.");
+			}
+		}
+		
+		//make writer add header
+		PrintWriter txtOut = new PrintWriter (new FileWriter(new File (saveDirectory, "aggregatePatientInfo.xls")));
+		for (String k: keysToExport) {
+			txtOut.print(k);
+			txtOut.print("\t");
+		}
+		txtOut.println();
+		
+		//write a line per sample
+		for (LinkedHashMap<String,String> s : allReportAttributes) {
+			//for each key
+			for (String k: keysToExport) {
+				String v = s.get(k);
+				if (v!=null) txtOut.print(v);
+				txtOut.print("\t");
+			}
+			txtOut.println();
+		}
+		
+		txtOut.close();
 	}
 
 	private void resetWorkingCounters() {
@@ -292,21 +349,27 @@ public class TempusJson2Vcf {
 	        
 	        //schema
 	        checkSchema(object);
+	        reportAttributes = new LinkedHashMap<String,String>();
 	        
 	        //report
 	        workingReport = new TempusReport(object, this);
+	        workingReport.addAttributes(reportAttributes);
 	        
 	        //patient
 	        workingPatient = new TempusPatient(object, this);
+	        workingPatient.addAttributes(reportAttributes, includePHI);
 	        
 	        //order
 	        workingOrder = new TempusOrder(object, this);
+	        workingOrder.addAttributes(reportAttributes);
 
 	        //specimens, should be just two!
 	        workingSpecimens = TempusSpecimen.getSpecimens(object, this);
+	        TempusSpecimen.addAttributes(reportAttributes, workingSpecimens);
 	        
 	        //results
-	        workingResults = new TempusResults(object, this); 
+	        workingResults = new TempusResults(object, this);
+	        workingResults.addAttributes(reportAttributes);
 	        
 	        //check variant ref bps
 	        if (indexedFasta != null) checkRefSeqs();
@@ -420,6 +483,7 @@ public class TempusJson2Vcf {
 		source = useqVersion+" Args: USeq/TempusJson2Vcf "+ Misc.stringArrayToString(args, " ");
 		System.out.println("\n"+ source +"\n");
 		File forExtraction = null;
+		String attributes = null;
 		File bed = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -432,6 +496,8 @@ public class TempusJson2Vcf {
 					case 'f': indexedFasta = new File(args[++i]); break;
 					case 'b': bed = new File(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
+					case 'i': includePHI = true; break;
+					case 'a': attributes = args[++i]; break;
 					
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -463,13 +529,19 @@ public class TempusJson2Vcf {
 			if (indexedFasta == null) Misc.printErrAndExit("\nError: addition of CNV info requires an indexed fasta\n");
 			cnvGeneNameBed = Bed.parseBedForNames(bed);
 		}
+		
+		if (attributes !=null) {
+			String[] at = Misc.COMMA.split(attributes);
+			keysToExport = new LinkedHashSet<String>();
+			for (String s: at) keysToExport.add(s);
+		}
 
 	}	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Tempus Json 2 Vcf: October 2019                        **\n" +
+				"**                           Tempus Json 2 Vcf: August 2020                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses json Tempus reports to vcf. Leave in PHI to enable calculating age at\n"+
 				"diagnosis. Summary statistics calculated for all reports. Vcfs will contain a mix of \n"+
@@ -482,9 +554,13 @@ public class TempusJson2Vcf {
 				"-b Path to a bed file for converting CNV gene names to coordinates where the name\n"+
 				"     column contains just the gene name.\n"+
 				"-f Path to the reference fasta with xxx.fai index. Required for CNV conversions.\n"+
+				"-i Include PHI in spreadsheet output, defaults to excluding it.\n"+
+				"-a Print this list of attributes in spreadsheet, comma delimited, case sensitive, no\n"+
+				"     spaces. Defaults to all. Run without to get a list of available attributes.\n"+
 				
 				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/TempusJson2Vcf -j /F1/TempusJsons\n" +
-				"     -f /Ref/human_g1k_v37.fasta -s /F1/VCF/ -b /Ref/b37TempusGeneRegions.bed.gz \n\n" +
+				"     -f /Ref/human_g1k_v37.fasta -s /F1/VCF/ -b /Ref/b37TempusGeneRegions.bed.gz\n"+
+				"     -a accessionId,sex,tumorMutationalBurden,msiStatus,diagnosis\n\n" +
 
 				"**************************************************************************************\n");
 

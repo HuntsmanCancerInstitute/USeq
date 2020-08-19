@@ -174,6 +174,7 @@ public class VCFGeneFreqComparator {
 					if (i == null) i = new Integer(1);
 					else i = new Integer (i.intValue()+1);
 					geneNameCounts.put(gene,i);
+//if (line.contains("|NF1|")) IO.pl(gene+" --- "+fields[7]);
 				}
 			}
 			return new ParsedVcfStats(vcf, numVars, geneNameCounts);

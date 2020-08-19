@@ -5,6 +5,7 @@ import java.util.LinkedHashMap;
 import org.json.JSONException;
 import org.json.JSONObject;
 import util.gen.Json;
+import util.gen.Misc;
 
 public class TempusReport {
 
@@ -36,6 +37,7 @@ public class TempusReport {
 		signout_date = Json.getStringAttribute(report, "signout_date");
 		bioInfPipeline = Json.getStringAttribute(report, "bioInfPipeline");
 		notes = Json.getStringAttribute(report, "notes");
+		if (notes != null) notes = Misc.WHITESPACE.matcher(notes).replaceAll(" ");
 		TempusJson2Vcf.add(bioInfPipeline, tempusJson2Vcf.bioInfPipelines);
 		
 		JSONObject workflow = report.getJSONObject("workflow");
@@ -77,4 +79,12 @@ public class TempusReport {
 		meta.put("tempusBioInfPipeline", bioInfPipeline);
 		if (notes != null) meta.put("tempusReportNotes", notes);
 	}
+	public void addAttributes(LinkedHashMap<String, String> meta) {
+		meta.put("reportId", reportId);
+		meta.put("reportStatus", reportStatus);
+		meta.put("signout_date", signout_date);
+		meta.put("bioInfPipeline", bioInfPipeline);
+		if (notes != null) meta.put("notes", notes);
+	}
+	
 }

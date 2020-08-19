@@ -53,6 +53,7 @@ public class TempusResults {
 		String tmbp = Json.forceGetString(results, "tumorMutationBurdenPercentile");
 		if (tmbp != null) tumorMutationBurdenPercentile = Double.parseDouble(tmbp);
 		msiStatus = Json.getStringAttribute(results, "msiStatus");
+		if (msiStatus != null) msiStatus = msiStatus.toLowerCase();
 		
 		//any somaticPotentiallyActionableMutations? these are special where the gene is separated from the variant
 		if (results.has("somaticPotentiallyActionableMutations")) {
@@ -174,6 +175,12 @@ public class TempusResults {
 		if (tumorMutationalBurden != null) meta.put("tempusTumorMutationalBurden", tumorMutationalBurden.toString());
 		if (tumorMutationBurdenPercentile != null) meta.put("tempusTumorMutationBurdenPercentile", tumorMutationBurdenPercentile.toString());
 		if (msiStatus != null) meta.put("tempusMsiStatus", msiStatus);
+	}
+	
+	public void addAttributes(LinkedHashMap<String, String> meta) {
+		if (tumorMutationalBurden != null) meta.put("tumorMutationalBurden", tumorMutationalBurden.toString());
+		if (tumorMutationBurdenPercentile != null) meta.put("tumorMutationBurdenPercentile", tumorMutationBurdenPercentile.toString());
+		if (msiStatus != null) meta.put("msiStatus", msiStatus);
 	}
 
 	public Double getTumorMutationalBurden() {

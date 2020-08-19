@@ -11,6 +11,7 @@ public class TempusOrder {
 	private String accessionId = null;
 	private String testCode = null;
 	private String testDescription = null;
+	private String institution = null;
 	
 	/*
     "order": {
@@ -27,6 +28,7 @@ public class TempusOrder {
 	 */
 	public TempusOrder(JSONObject object, TempusJson2Vcf tempusJson2Vcf) throws JSONException {
 		JSONObject order = object.getJSONObject("order");
+		institution = Json.getStringAttribute(order, "institution");
 		physician = Json.getStringAttribute(order, "physician");
 		accessionId = Json.getStringAttribute(order, "accessionId");
 		JSONObject test = order.getJSONObject("test");
@@ -43,6 +45,14 @@ public class TempusOrder {
 		meta.put("tempusTestCode", testCode);
 		meta.put("tempusTestDescription", testDescription);
 		meta.put("tempusAccessionId", accessionId);
+	}
+	
+	public void addAttributes(LinkedHashMap<String, String> meta) {
+		meta.put("institution", institution);
+		meta.put("physician", physician);
+		meta.put("accessionId", accessionId);
+		meta.put("testCode", testCode);
+		meta.put("testDescription", testDescription);
 	}
 
 	public String getPhysician() {
