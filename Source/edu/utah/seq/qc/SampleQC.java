@@ -6,7 +6,6 @@ import java.io.IOException;
 import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.TreeSet;
 
 import org.json.JSONArray;
@@ -37,6 +36,10 @@ public class SampleQC {
 	private double alignmentScoreThreshold;
 	private boolean divideAlignmentScoreByCigarM;
 	private String targetRegionsFileNameSAE;
+	
+	//DUP
+	private boolean dupParsed = false;
+	//will also load the estimatedFractionDuplicateAlignments
 
 	//MPA
 	private boolean mpaParsed = false;
@@ -93,7 +96,8 @@ public class SampleQC {
 				//fraction that also are on target, this represents the usable paired and often overlapping alignments, ideally > 0.75
 				fractionOnTargetAndPassQCScoreFilters = jo.getDouble("fractionOnTargetAndPassQCScoreFilters", -1);
 				//fraction of these usable alignments that are also marked as duplicate, all but one will be tossed at a later step, ideally < 0.2
-				estimatedFractionDuplicateAlignments = jo.getDouble("estimatedFractionDuplicateAlignments", -1);
+				//only load if not set, better to get from the dup json
+				if (dupParsed == false) estimatedFractionDuplicateAlignments = jo.getDouble("estimatedFractionDuplicateAlignments", -1);
 				//MQ threshold,
 				mappingQualityThreshold = jo.getDouble("mappingQualityThreshold", -1);
 				//AS threshold see boolean it might be divided the the length of the M's in the CIGAR String
@@ -101,6 +105,11 @@ public class SampleQC {
 				divideAlignmentScoreByCigarM = jo.getBoolean("divideAlignmentScoreByCigarM", true);
 				//target file
 				targetRegionsFileNameSAE = jo.getString("targetRegionsFileName", "notFound");
+			}
+			else if (type.equals("dup")){
+				dupParsed = true;
+				//fraction duplicate reads, should overwrite anyting from sae
+				estimatedFractionDuplicateAlignments = jo.getDouble("fractionDuplicateAlignments", -1);
 			}
 			else if (type.equals("mpa")){
 				mpaParsed = true;

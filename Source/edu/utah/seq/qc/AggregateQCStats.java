@@ -27,6 +27,7 @@ public class AggregateQCStats {
 	private String s2uMatch = "(.+)_Sam2USeq.json.gz";
 	private String bcMatch = "(.+)_BamConcordance.json.gz";
 	private String aiMatch = "(.+)_AvatarInfo.json.gz";
+	private String dupMatch = "(.+)_RemoveDuplicates.json.gz";
 
 	private TreeMap<String, SampleQC> samples;
 	private ArrayList<File> bamConcordanceFiles = new ArrayList<File>();
@@ -38,6 +39,7 @@ public class AggregateQCStats {
 	private Pattern s2uPattern;
 	private Pattern bcPattern;
 	private Pattern aiPattern;
+	private Pattern dupPattern;
 	
 	private boolean debug = false;
 	private boolean calcReadCoverage = true;
@@ -366,7 +368,8 @@ public class AggregateQCStats {
 		s2uPattern = Pattern.compile(s2uMatch, Pattern.CASE_INSENSITIVE);
 		bcPattern = Pattern.compile(bcMatch, Pattern.CASE_INSENSITIVE);
 		aiPattern = Pattern.compile(aiMatch, Pattern.CASE_INSENSITIVE);
-
+		dupPattern = Pattern.compile(dupMatch, Pattern.CASE_INSENSITIVE);
+		
 		//for each json file
 		Matcher mat = null;
 		for (File j: jsonFiles){
@@ -443,6 +446,9 @@ public class AggregateQCStats {
 
 		mat = s2uPattern.matcher(name);
 		if (mat.matches()) return new String[]{mat.group(1), "s2u"};
+		
+		mat = dupPattern.matcher(name);
+		if (mat.matches()) return new String[]{mat.group(1), "dup"};
 
 		return null;
 	}
@@ -475,6 +481,7 @@ public class AggregateQCStats {
 					case 's': saeMatch = args[++i]; break;
 					case 'm': mpaMatch = args[++i]; break;
 					case 'u': s2uMatch = args[++i]; break;
+					case 'd': dupMatch = args[++i]; break;
 					case 'p': prependString = args[++i]; break;
 					case 'v': debug = true; break;
 					case 'e': swapExomeForDNA = true; break;
@@ -502,10 +509,11 @@ public class AggregateQCStats {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Aggregate QC Stats: Feb 2020                          **\n" +
+				"**                            Aggregate QC Stats: Aug 2020                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from json files produced by the\n"+
-				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, BamConcordance and Fastq rule.\n"+
+				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, BamConcordance, Fastq, and\n"+
+				"RemoveDuplicates rules in the TNRunner workflows.\n"+
 
 				"\nOptions:\n"+
 				"-j Directory containing xxx.json.gz files for parsing. Recurses through all other\n"+
@@ -514,11 +522,12 @@ public class AggregateQCStats {
 
 				"\nDefault Options:\n"+
 				"-f FastqCount regex for parsing sample name, note the name must be identical across\n"+
-				"the json files, defaults to (.+)_FastqCount.json.gz, case insensitive.\n"+
+				"   the json files, defaults to (.+)_FastqCount.json.gz, case insensitive.\n"+
 				"-s SAE regex, defaults to (.+)_SamAlignmentExtractor.json.gz\n"+
 				"-m MPA regex, defaults to (.+)_MergePairedAlignments.json.gz\n"+
 				"-u S2U regex, defaults to (.+)_Sam2USeq.json.gz\n"+
 				"-b BC regex, defaults to (.+)_BamConcordance.json.gz\n"+
+				"-b DUP regex, defaults to (.+)_RemoveDuplicates.json.gz\n"+
 				"-p String to prepend onto output file names.\n"+
 				"-c Don't calculate detailed region read coverage statistics, saves memory and time.\n"+
 				"-v Print verbose debugging output.\n"+

@@ -139,6 +139,7 @@ public class VCFMerger {
 				"**************************************************************************************\n" +
 				"Merges VCF files with the same samples. Collapses the headers with a simple hash. Will\n"+
 				"not work well with downstream apps that cannot process mixed INFO and FORMAT records.\n" +
+				"If you want to remove duplicate records use the VCFConsensus app.\n"+
 
 				"\nRequired:\n"+
 				"-v Full path to a vcf file (xxx.vcf(.gz/.zip OK)) or directory containing such. Note,\n"+

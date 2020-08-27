@@ -350,6 +350,7 @@ public class TempusJson2Vcf {
 	        //schema
 	        checkSchema(object);
 	        reportAttributes = new LinkedHashMap<String,String>();
+	        reportAttributes.put("jsonFile", workingJsonFile.getCanonicalPath());
 	        
 	        //report
 	        workingReport = new TempusReport(object, this);
