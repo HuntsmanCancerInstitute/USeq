@@ -303,101 +303,6 @@ public class VCFSpliceAnnotator {
 		sb.append(numSJsLost+"\tKnown splice junctions damaged\n");
 		System.out.println(sb);
 	}
-	
-	
-	
-	/**Adds splice junction information to each record. 
-	public void annotateVCFWithSplicesThreaded(File vcfFile) {
-		BufferedReader in = null;
-		VCFParser parser = new VCFParser(vcfFile, true, false, false);
-		HashMap<String, VCFLookUp> chrRecords = parser.getChromosomeVCFRecords();
-		
-		
-		try {
-			in  = IO.fetchBufferedReader(vcfFile);
-			vcfOut = new Gzipper(new File(saveDirectory, Misc.removeExtension(vcfFile.getName())+"_VCFSA.vcf.gz"));
-			//add ##INFO line and find "#CHROM" line 
-			loadAndModifyHeader(in);
-			in.close();
-
-			//For each chromosome of records
-			HashSet<String> effects = new HashSet<String>();
-			for (String chr: chrRecords.keySet()){
-				
-				//get records
-				VCFLookUp v = chrRecords.get(chr);
-				VCFRecord[] records =v.getVcfRecord();
-				
-				//load chrom specific data
-				loadChromosomeData(chr);
-				
-				//check if any transcripts were found
-				if (workingTranscripts == null) {
-					for (VCFRecord r: records) vcfOut.println(r.getOriginalRecord());
-					continue;
-				}
-				
-				//create some loaders
-				
-				
-				//for each record
-				
-
-
-				//for each alternate allele, some vcf records have several
-				String[] alts = vcf.getAlternate();
-				effects.clear();
-				for (int i=0; i< alts.length; i++){	
-					numVariantsScanned++;
-					vcf.setAlternate(new String[]{alts[i]});
-					
-					//fetch intersecting transcripts
-					UCSCGeneLine[] trans = fetchIntersectingTranscripts(vcf);
-					if (trans == null) continue;
-					numVariantsIntersectingTranscripts++;
-					
-					//for each transcript score effect
-					for (UCSCGeneLine l: trans){
-						SpliceHit sh = new SpliceHit (vcf, i, l);
-						scoreVariantTranscript(sh);
-						
-						//any changes? add to hash for spreadsheet output
-						if (sh.getAffectedSpliceJunctions() != null) {
-							String geneName = sh.getTranscript().getDisplayName();
-							ArrayList<SpliceHit> al = geneNameSpliceHits.get(geneName);
-							if (al == null) {
-								al = new ArrayList<SpliceHit>();
-								geneNameSpliceHits.put(geneName, al);
-							}
-							al.add(sh);
-							//add vcf entry
-							effects.addAll(sh.getVcfEntries(vcfExportCategory));
-						}
-					}
-				}
-				vcf.setAlternate(alts);
-				//modify INFO field?
-				if (effects.size() == 0) vcfOut.println(vcf.getOriginalRecord());
-				else {
-					String e = Misc.hashSetToString(effects, ":");
-					String[] fields = VCFParser.TAB.split(vcf.getOriginalRecord());
-					fields[7] = fields[7]+";VCFSA="+e;
-					String f = Misc.stringArrayToString(fields, "\t");
-					vcfOut.println(f);
-				}
-			}
-			//last
-			System.out.println();
-			in.close();
-			vcfOut.close();
-		}catch (Exception e) {
-			System.err.println("Error -> "+e.getMessage());
-			e.printStackTrace();
-			System.exit(1);
-		}
-	}*/
-
-
 
 	/**Adds splice junction information to each record. */
 	public void annotateVCFWithSplices(File vcfFile) {
@@ -994,36 +899,40 @@ public class VCFSpliceAnnotator {
 
 	private void loadChromosomeData(String chrom) {
 		try {
-		//set new name
-		workingChromosomeName = chrom;
-		
-		//find and load sequence
-		ReferenceSequence p = fasta.getSequence(workingChromosomeName);
-		if (p == null ) throw new IOException ("\n\nFailed to find or load a fasta sequence for '"+workingChromosomeName+"', aborting.\n");
-		workingSequence = new String(p.getBases());
-		workingSequence = workingSequence.toUpperCase();
-		
-		//fetch transcripts
-		workingTranscripts = chromGenes.get(workingChromosomeName);
-		if (workingTranscripts == null) System.out.println("\n\nWARNING: no transcripts found for this chromosome, skipping all associated vcf records.");
-		System.out.println("\tLoading: "+workingChromosomeName+"\tLen: "+workingSequence.length()+"\t Trans: "+workingTranscripts.length);
-		
-		//create interval tree, watch out for duplicates
-		workingGeneTree = new IntervalST<ArrayList<UCSCGeneLine>>();
-		for (UCSCGeneLine line : workingTranscripts){
-			//the end is included in IntervalST so sub 1 from end
-			int start = line.getTxStart();
-			int stop = line.getTxEnd() -1;
-			Interval1D it = new Interval1D(start, stop);
-			ArrayList<UCSCGeneLine> al;
-			if (workingGeneTree.contains(it)) al = workingGeneTree.get(it);
-			else {
-				al = new ArrayList<UCSCGeneLine>();
-				workingGeneTree.put(it, al);
+			//set new name
+			workingChromosomeName = chrom;
+
+			//find and load sequence
+			ReferenceSequence p = fasta.getSequence(workingChromosomeName);
+			if (p == null ) throw new IOException ("\n\nFailed to find or load a fasta sequence for '"+workingChromosomeName+"', aborting.\n");
+			workingSequence = new String(p.getBases());
+			workingSequence = workingSequence.toUpperCase();
+
+			//fetch transcripts
+			workingTranscripts = chromGenes.get(workingChromosomeName);
+			if (workingTranscripts == null) {
+				System.out.println("\tWARNING: no transcripts found for "+workingChromosomeName+" chromosome, skipping all associated vcf records.");
+				workingGeneTree = null;
+				return;
 			}
-			al.add(line);
-		}
-		if (workingGeneTree.size() ==0 ) workingGeneTree = null;
+			System.out.println("\tLoading: "+workingChromosomeName+"\tLen: "+workingSequence.length()+"\t Trans: "+workingTranscripts.length);
+
+			//create interval tree, watch out for duplicates
+			workingGeneTree = new IntervalST<ArrayList<UCSCGeneLine>>();
+			for (UCSCGeneLine line : workingTranscripts){
+				//the end is included in IntervalST so sub 1 from end
+				int start = line.getTxStart();
+				int stop = line.getTxEnd() -1;
+				Interval1D it = new Interval1D(start, stop);
+				ArrayList<UCSCGeneLine> al;
+				if (workingGeneTree.contains(it)) al = workingGeneTree.get(it);
+				else {
+					al = new ArrayList<UCSCGeneLine>();
+					workingGeneTree.put(it, al);
+				}
+				al.add(line);
+			}
+			if (workingGeneTree.size() ==0 ) workingGeneTree = null;
 		} catch (Exception e){
 			e.printStackTrace();
 			Misc.printErrAndExit("\nDo your chromosome names in the gene table and vcf file match? Watch for 'chr'.\n");
@@ -1502,62 +1411,9 @@ public class VCFSpliceAnnotator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Splice Annotator : Aug 2017                       **\n" +
+				"**                            VCF Splice Annotator : Sept 2020                      **\n" +
 				"**************************************************************************************\n" +
-				"Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and\n"+
-				"Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice\n"+
-				"acceptors and donors are scored for loss of a junction.  Exonic, intronic, and splice\n"+
-				"bases are scanned for novel junctions. P-values for gained exonic or intronic splices\n"+
-				"are estimated by generating null distibutions of masked sequence scores. Likewise,\n"+
-				"damaged splice p-values are calculated using a score distribution from scoring high\n"+
-				"confidence splice junctions. A detailed spreadsheet and modified vcf file are\n"+
-				"produced. \n\n" +
-
-				"Required Options:\n"+
-				"-r Save directory for writing results files.\n"+
-				"-v VCF file or directory containing such (xxx.vcf(.gz/.zip OK)).\n"+
-				"-f Path to the reference fasta with xxx.fai index\n"+
-				"-u UCSC RefFlat or RefSeq transcript (not merged genes) file, full path. See RefSeq \n"+
-				"       http://genome.ucsc.edu/cgi-bin/hgTables, (uniqueName1 name2(optional) chrom\n" +
-				"       strand txStart txEnd cdsStart cdsEnd exonCount (commaDelimited)exonStarts\n" +
-				"       (commaDelimited)exonEnds). Example: ENSG00000183888 C1orf64 chr1 + 16203317\n" +
-				"       16207889 16203385 16205428 2 16203317,16205000 16203467,16207889 .\n"+
-				"-m Full path directory name containing the me2x3acc1-9, splice5sequences and me2x5\n"+
-				"       splice model files. See USeqDocumentation/splicemodels/ or \n"+
-				"       http://genes.mit.edu/burgelab/maxent/download/ \n"+
-				"-h Histogram object file for estimating pvalues or complete -j -t below. For human\n"+
-				"       use USeqDocumentation/splicemodels/humanSpliceHist1.1.sjo.gz \n"+
-				"\n"+
-				
-				"Optional options:\n"+
-				"-e Don't scan exonic bases for novel splice junctions.\n"+
-				"-i Don't scan intronic bases for novel splice junctions.\n"+
-				"-s Don't scan known splice junctions for novel splice junctions.\n"+
-				"-x Export category for adding info to the vcf file, defaults to 0:\n"+
-				"       0 All types (gain or damaged in exon, intron, and splice)\n"+
-				"       1 Just damaged splices\n"+
-				"       2 Damaged splices and novel splices in exons and splice junctions\n"+
-				"-a Minimum 5' MaxEntScan threshold for scoring the presence of a splice junction,\n"+
-				"       defaults to 2.\n"+
-				"-b Minimum 3' threshold for scoring the presence of a splice junction, defaults to 2.\n"+
-				"-c Minimum difference for loss or gain of a 5' splice junction, defaults to 2.\n"+
-				"-d Minimum difference for loss or gain of a 3' splice junction, defaults to 2.\n"+
-				"-p Minimum -10Log10(pvalue) for reporting a splice junction, defaults to 10.\n"+
-				"\n"+
-				
-				"Options for generating reusable splice score histograms:\n"+
-				"-j Bam alignment splice file from running the SamTranscriptomeParser with -j to use\n"+
-				"       in checking for actual use of the known splice junction prior to scoring it for\n"+
-				"       inclusion in the known junction histograms. Besure to remove duplicates with the\n"+
-				"       Picard MarkDuplicates app too.\n"+
-				"-t CCDS transcript file, see -u above.\n"+
-				"-k Minimum read coverage for known splice junction scoring, defaults to 10\n"+
-				
-				"\n"+
-				"Example: java -Xmx10G -jar ~/USeq/Apps/VCFSpliceAnnotator -f ~/Hg19/Fa/ -v ~/exm2.vcf\n"+
-				"       -m ~/USeq/Documentation/splicemodels -i -u ~/Hg19/hg19EnsTrans.ucsc.zip -t\n"+
-				"       ~/Hg19/hg19CCDSTrans.ucsc.zip -j ~/Hg19/allReadsSTP.bam -r ~/ExmSJAnno/\n"+
-				"       -e -i -x 2\n"+
+				"DON't USE, see VCFSpliceScanner!\n"+
 
 				"**************************************************************************************\n");
 

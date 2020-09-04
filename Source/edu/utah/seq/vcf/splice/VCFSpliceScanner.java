@@ -318,9 +318,10 @@ public class VCFSpliceScanner {
 		
 		//fetch transcripts
 		workingTranscripts = chromGenes.get(workingChromosomeName);
-		if (workingTranscripts == null) System.out.println("\n\nWARNING: no transcripts found for this chromosome, skipping all associated vcf records.");
-		System.out.print("\tAnnotating: "+workingChromosomeName+"\tLen: "+workingSequence.length()+"\t Trans: "+workingTranscripts.length);
-		
+		if (workingTranscripts == null) {
+			System.out.println("\tWARNING: no transcripts found for "+workingChromosomeName+" chromosome, skipping all associated vcf records.");
+		}
+		else System.out.print("\tAnnotating: "+workingChromosomeName+"\tLen: "+workingSequence.length()+"\t Trans: "+workingTranscripts.length);
 
 		} catch (Exception e){
 			e.printStackTrace();
@@ -595,7 +596,7 @@ public class VCFSpliceScanner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Splice Scanner : Sept 2018                        **\n" +
+				"**                            VCF Splice Scanner : Sept 2020                        **\n" +
 				"**************************************************************************************\n" +
 				"Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and\n"+
 				"Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice\n"+
