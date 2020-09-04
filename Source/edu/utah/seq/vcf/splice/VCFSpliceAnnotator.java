@@ -24,7 +24,7 @@ import util.bio.parsers.UCSCGeneModelTableReader;
 import util.bio.seq.Seq;
 import util.gen.*;
 
-/**Annotates vcf records with Max Ent Scan predictions for the gain or loss of a 5' or 3' splice junction.
+/**Depreciated, don't use!  Use VCFSpliceScanner
  * @author Nix
  * */
 public class VCFSpliceAnnotator {

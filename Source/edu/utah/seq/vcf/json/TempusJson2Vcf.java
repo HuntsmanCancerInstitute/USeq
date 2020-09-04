@@ -23,7 +23,7 @@ public class TempusJson2Vcf {
 	private LinkedHashSet<String> keysToExport = null;
 	
 	//internal fields
-	private String[] acceptedSchema = {"1.3", "1.3.1"};
+	private String[] acceptedSchema = {"1.3", "1.3.1", "1.3.2"};
 	private IndexedFastaSequenceFile fasta = null;
 	private String source = null;
 	private HashMap<String, Bed> cnvGeneNameBed = null;
@@ -542,12 +542,12 @@ public class TempusJson2Vcf {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Tempus Json 2 Vcf: August 2020                         **\n" +
+				"**                            Tempus Json 2 Vcf: Sept 2020                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses json Tempus reports to vcf. Leave in PHI to enable calculating age at\n"+
 				"diagnosis. Summary statistics calculated for all reports. Vcfs will contain a mix of \n"+
 				"somatic and inherited snvs, indels, and cnvs. Be sure to vt normalize the exported\n"+
-				"vcfs, https://github.com/atks/vt . Works with schemas 1.3 and 1.3.1\n"+
+				"vcfs, https://github.com/atks/vt . Works with schemas 1.3, 1.3.1, 1.3.2\n"+
 
 				"\nOptions:\n"+
 				"-j Path to Tempus json report or directory containing such, xxx.json(.gz/.zip OK)\n"+
