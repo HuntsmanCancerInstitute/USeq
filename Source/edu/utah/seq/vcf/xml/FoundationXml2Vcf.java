@@ -348,6 +348,8 @@ public class FoundationXml2Vcf {
 				if (name.equals("PMI")) parsePmiInfo(cNode);
 				//Genes?
 				else if (name.equals("Genes")) parseGenes(cNode);
+				//Genes?
+				else if (name.equals("Sample")) parseSampleInfo(cNode);
 			}
 		}
 	}
@@ -405,6 +407,18 @@ public class FoundationXml2Vcf {
 				}
 			}
 		}
+	}
+	
+	private void parseSampleInfo(Node node) throws DOMException, ParseException {
+		NodeList sampleList = node.getChildNodes();
+		for (int j = 0; j < sampleList.getLength(); j++) {
+			Node cNode = sampleList.item(j);
+			if (cNode instanceof Element) {
+				String name = cNode.getNodeName();
+				if (name.equals("BlockId")) addLastChild("BlockId", cNode);
+				else if (name.equals("TestType")) addLastChild("TestType", cNode);
+			}
+		}	
 	}
 
 	private void parsePmiInfo(Node node) throws DOMException, ParseException {
@@ -649,7 +663,7 @@ public class FoundationXml2Vcf {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Foundation Xml 2 Vcf: April 2020                       **\n" +
+				"**                           Foundation Xml 2 Vcf: Sept 2020                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses xml foundation reports to vcf. This is an inprecise process with some\n"+
 				"insertions, multi snv, and multi vars. Output vcf variants have not been normalized.\n"+

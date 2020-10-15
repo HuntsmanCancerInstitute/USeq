@@ -131,8 +131,10 @@ public class SamAlignmentExtractor {
 			printStatLine(numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate, numPassingBasicOnTargetAndScores, "Duplicates (not filtered)");
 			printStatLine(numPassingBasicOnTargetAndScores, numRawAlignments, "Passing all filters");
 			
-			System.out.println("\nFamily Size Histogram for alignments passing filters:");
-			if (minimumFamilySize !=0) histogram.printScaledHistogram();
+			if (minimumFamilySize !=0) {
+				System.out.println("\nFamily Size Histogram for alignments passing filters:");
+				histogram.printScaledHistogram();
+			}
 			
 			if (jsonOutputFile !=null) saveJson();
 

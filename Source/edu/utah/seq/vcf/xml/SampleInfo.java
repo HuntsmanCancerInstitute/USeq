@@ -4,8 +4,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.TreeMap;
 
-import util.gen.Misc;
-
 public class SampleInfo {
 	
 	//fields

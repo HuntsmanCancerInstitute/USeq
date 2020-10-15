@@ -17,9 +17,11 @@ public class JointGenotypeVCFParser {
 	private File vcfFile;
 
 	private File saveDirectory;
-	private double alleleFreq = 0.2;
+	private double alleleFreq = 0.025;
 	private double readDepth = 10;
 	private double genotypeQuality = 20;
+	private double minAltCount = 2;
+	private boolean simplifyInfo = false;
 	private double qual = 20;
 	private boolean debug = false;
 	private HashMap<String, String> formatValues = new HashMap<String,String>();
@@ -28,10 +30,12 @@ public class JointGenotypeVCFParser {
 	private int[] numPass = null;
 	private int[] numFail = null;
 	private int numFailingQual = 0;
+	private int numFailingRefAlt = 0;
 	private int numRecords;
 	
 	public static final Pattern AF = Pattern.compile("AF=[\\d\\.]+;");
 	public static final Pattern DP = Pattern.compile("DP=[\\d\\.]+;");	
+	//public static final Pattern AFExtraction = Pattern.compile(".+;AF=([\\d\\.]+);.+");
 	
 	public JointGenotypeVCFParser (String[] args) {
 
@@ -102,6 +106,12 @@ public class JointGenotypeVCFParser {
 				//#CHROM POS ID REF ALT QUAL FILTER INFO FORMAT Sample1, Sample2.....
 				//   0    1   2  3   4   5     6      7     8      9       10
 				String[] fields = Misc.TAB.split(line);
+				
+				//check ref and alt
+				if (fields[3].equals("*") || fields[4].equals("*")) {
+					numFailingRefAlt++;
+					continue;
+				}
 
 				//check whole line QUAL
 				double q = Double.parseDouble(fields[5]);
@@ -163,6 +173,7 @@ public class JointGenotypeVCFParser {
 		System.out.println("\nParsing Statistics:");
 		System.out.println(numRecords+ "\tNumber records");
 		System.out.println(numFailingQual+ "\tNumber failing QUAL");
+		System.out.println(numFailingRefAlt+ "\tNumber failed REF ALTS with *");
 		System.out.println("\nPassing\tFailing\tSampleName");
 		for (int i=0; i< sampleNames.length; i++){
 			System.out.println(numPass[i] + "\t"+ numFail[i] + "\t"+ sampleNames[i] );
@@ -173,29 +184,54 @@ public class JointGenotypeVCFParser {
 	private String replaceAfDb(String info, double[] dpAf) throws Exception {
 		String afString = "AF="+ Num.formatNumberMinOne(dpAf[1], 4)+";";
 		String dpString = "DP="+ (int)dpAf[0] +";";
-		
-		//check it contains AF= and DP=
-		if (info.contains("AF=") == false || info.contains("DP=") == false) throw new Exception("Failed to find AF= and/or DP= in "+info);
-		
-		String modAF = AF.matcher(info).replaceFirst(afString);
-		String finalMod = DP.matcher(modAF).replaceFirst(dpString);
-		return finalMod;
+
+		if (simplifyInfo) {
+			StringBuilder sb = new StringBuilder();
+			sb.append(afString);
+			sb.append("DP="+ (int)dpAf[0]);
+
+			//add in any OLD_ indicating a vt normalization that might not really have worked 
+			String[] splitInfo = Misc.SEMI_COLON.split(info);
+			for (String f: splitInfo) if (f.startsWith("OLD_")) {
+				sb.append(";");
+				sb.append(f);
+
+			}
+			return sb.toString();
+		}
+
+		else {
+
+
+			//check it contains AF= and DP=
+			if (info.contains("AF=") == false || info.contains("DP=") == false) throw new Exception("Failed to find AF= and/or DP= in "+info);
+
+			String mod = DP.matcher(info).replaceFirst(dpString);
+			mod = AF.matcher(mod).replaceFirst(afString);
+
+			return mod;
+		}
 	}
 
-	/**Returns null if fails, otherwise the DP and AF.*/
+	/**Returns null if fails, otherwise the DP and AF.
+	 * @param infoAF */
 	private double[] checkSample(String[] ids, String sample) throws Exception {
 		if (debug) System.out.println("\t"+sample);
-		//no values?
-		if (sample.startsWith("./.")) {
-			if (debug) System.out.println ("\t\tEmpty");
-			return null;
-		}
 		
 		formatValues.clear();
 		String[] values = Misc.COLON.split(sample);
 		if (ids.length != values.length) throw new Exception ("\t\tThe FORMAT length and sample values do not match");
 		
 		for (int i=0; i< ids.length; i++) formatValues.put(ids[i], values[i]);
+		
+		//check genotype
+		String gt = formatValues.get("GT");
+		if (gt == null) throw new Exception ("\t\tNo GT? "+sample);
+		//no values?
+		if (gt.equals("0/1") == false && gt.equals("1/1") == false && gt.equals("1/0") == false) {
+			if (debug) System.out.println ("\t\tEmpty");
+			return null;
+		}
 		
 		//check GQ?
 		if (genotypeQuality != 0){
@@ -218,14 +254,24 @@ public class JointGenotypeVCFParser {
 		if (ad == null) throw new Exception ("\t\tNo AD?");
 
 		String[] refAltCounts = Misc.COMMA.split(ad);
-		if (refAltCounts.length != 2) throw new Exception ("\nThe AD for this sample does not contain 2 values, did you vt decompose? "+ad+" "+sample);
-		double refCounts = Double.parseDouble(refAltCounts[0]);
-		double altCounts = Double.parseDouble(refAltCounts[1]);
-		double dp = refCounts + altCounts;
-		double af = altCounts/dp;
-		if (dp >= readDepth && af >= alleleFreq) return new double[]{dp, af};
 		
-		if (debug) System.out.println ("\t\tFailing dp ("+dp+") or af ("+af+")");
+		//refCounts are always first one
+		//double refCounts = Double.parseDouble(refAltCounts[0]);
+		
+		//typically there is only one more AD value but for multi alts there are several, unfortunately Vt doesn't properly split these so just sum them
+		double altCounts = 0;
+		for (int i=1; i< refAltCounts.length; i++) altCounts += Double.parseDouble(refAltCounts[i]);
+		
+		String dpString = formatValues.get("DP");
+		if (dpString == null) throw new Exception ("\t\tNo DP?");
+		double dp = Double.parseDouble(dpString);
+
+		double af = altCounts/dp;
+		
+		if (dp >= readDepth && af >= alleleFreq && altCounts >= minAltCount) return new double[]{dp, af};
+		
+		
+		if (debug) System.out.println ("\t\tFailing dp ("+dp+") or af ("+af+") or altCount ("+altCounts+")");
 		return null;
 	}
 
@@ -252,10 +298,11 @@ public class JointGenotypeVCFParser {
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'd': readDepth = Double.parseDouble(args[++i]); break;
 					case 'a': alleleFreq = Double.parseDouble(args[++i]); break;
+					case 'c': minAltCount = Double.parseDouble(args[++i]); break;
 					case 'q': qual = Double.parseDouble(args[++i]); break;
 					case 'g': genotypeQuality = Double.parseDouble(args[++i]); break;
 					case 'f': debug = true; break;
-					
+					case 'i': simplifyInfo = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -276,11 +323,12 @@ public class JointGenotypeVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Joint Genotype VCF Parser: Oct 2018                     **\n" +
+				"**                       Joint Genotype VCF Parser: September 2020                  **\n" +
 				"**************************************************************************************\n" +
 				"Splits and filters GATK joint genotyped multi sample vcf files. Use vt to decompose \n"+
 				"the multi alts. See https://genome.sph.umich.edu/wiki/Vt#Decompose . Replaces the AF\n"+
-				"and DP INFO fields with the sample level values.\n"+
+				"and DP INFO fields with the sample level values. Warning, some multi alts AF cannot be\n"+
+				"resolved following Vt decomposing and are assigned a value of 0.\n"+
 
 				"\nRequired Params:\n"+
 				"-v Path to vt decomposed GATK joint genotyped multi sample vcf file, gz/zip OK.\n"+
@@ -290,12 +338,14 @@ public class JointGenotypeVCFParser {
 				"\nOptional Params:\n"+
 				"-q Minimum QUAL value, defaults to 20\n"+
 				"-d Minimum read depth based on the AD sample values, defaults to 10\n"+
-				"-a Minimum AF allele freq, defaults to 0.2\n"+
+				"-a Minimum AF allele freq, defaults to 0.025\n"+
+				"-c Minimum alt read depth, defaults to 2\n"+
 				"-g Minimum GT genotype quality, defaults to 20\n"+
 				"-f Print debugging output to screen\n"+
+				"-i Simplify INFO to just AF, DP, and OLD_xxx info\n"+
 
-				"\nExample: java -jar -Xmx2G pathToUSeq/Apps/HaplotypeVCFParser -d 20 -a 0.25 -g 30 -f\n"+
-				"      -v jointGenotyped.decomp.vcf.gz -s SplitFilteredVcfs/ -q 30 \n\n" +
+				"\nExample: java -jar -Xmx2G pathToUSeq/Apps/HaplotypeVCFParser -d 20 -a 0.05 -g 30 \n"+
+				"      -v jointGenotyped.decomp.vcf.gz -s SplitFilteredVcfs/ -q 30 -c 3 -i \n\n" +
 
 
 				"**************************************************************************************\n");

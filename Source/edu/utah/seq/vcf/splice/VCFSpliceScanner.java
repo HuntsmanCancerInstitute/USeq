@@ -319,9 +319,9 @@ public class VCFSpliceScanner {
 		//fetch transcripts
 		workingTranscripts = chromGenes.get(workingChromosomeName);
 		if (workingTranscripts == null) {
-			System.out.println("\tWARNING: no transcripts found for "+workingChromosomeName+" chromosome, skipping all associated vcf records.");
+			System.out.println("\tWARNING: no transcripts found for "+workingChromosomeName+", skipping all associated vcf records.");
 		}
-		else System.out.print("\tAnnotating: "+workingChromosomeName+"\tLen: "+workingSequence.length()+"\t Trans: "+workingTranscripts.length);
+		else System.out.print("\tAnnotating: "+workingChromosomeName+"\tLen: "+workingSequence.length()+"\tTrans: "+workingTranscripts.length);
 
 		} catch (Exception e){
 			e.printStackTrace();
@@ -632,7 +632,7 @@ public class VCFSpliceScanner {
 
 				"\n"+
 				
-				"Example: java -Xmx10G -jar ~/USeq/Apps/VCFSpliceAnnotator -f ~/Hg19/Fa/ -v ~/exm2.vcf\n"+
+				"Example: java -Xmx20G -jar ~/USeq/Apps/VCFSpliceAnnotator -f ~/Hg19/Fa/ -v ~/exm2.vcf\n"+
 				"       -m ~/USeq/Documentation/splicemodels -i -u ~/Hg19/hg19EnsTrans.ucsc.zip -r\n"+
 				"       ~/ExmSJAnno/exm2VSSAnno.vcf.gz -x 0\n"+
 

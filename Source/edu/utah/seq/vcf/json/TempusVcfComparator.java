@@ -232,7 +232,7 @@ public class TempusVcfComparator {
 			for (int j=0; j< rVcfs.length; j++){
 				SimpleVcf r = rVcfs[j];
 				if (f.compareToExact(r)){
-					if (f.getMatch() !=null || r.getMatch() != null) Misc.printErrAndExit("\nERROR: more than one exact match found for \n"+f+"\n"+r);
+					if (f.getMatch() !=null || r.getMatch() != null) System.err.println("WARNING: more than one exact match found for \n\t"+f+"\n\t"+r);
 					f.setMatch(r);
 					r.setMatch(f);
 				}
@@ -316,7 +316,7 @@ public class TempusVcfComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Tempus Vcf Comparator: March 2019                      **\n" +
+				"**                           Tempus Vcf Comparator: Sept 2020                       **\n" +
 				"**************************************************************************************\n" +
 				"TVC compares a Tempus vcf generated with the TempusJson2Vcf to a recalled vcf.\n"+
 				"Exact recall vars are so noted and removed. Tempus vcf with no exact but one\n"+

@@ -16,6 +16,9 @@ public class TempusSpecimen {
 	private String sampleSite = null;
 	private String sampleType = null;
 	private String notes = null;
+	private String caseId = null;
+	private String caseSourceId = null;
+	private String blockId = null;
 	private Integer tumorPercentage = null;
 	
 	/*
@@ -58,6 +61,16 @@ public class TempusSpecimen {
 		sampleType = Json.getStringAttribute(object, "sampleType");
 		if (object.has("institutionData")){
 			JSONObject id = object.getJSONObject("institutionData");
+			//caseId
+			String unParsed = Json.getStringAttribute(id, "caseId");
+			if (unParsed != null && unParsed.equals("")== false) {
+				String[] split = Misc.WHITESPACE.split(unParsed);
+				caseId = split[split.length-1].trim();
+				caseSourceId = unParsed.replace(caseId, "").trim();
+			}
+			//blockId
+			blockId = Json.getStringAttribute(id, "blockId");
+			//tumorPercentage
 			tumorPercentage = Json.getIntegerAttribute(id, "tumorPercentage");
 			if (tumorPercentage != null) tempusJson2Vcf.tumorPercentages.count(tumorPercentage);
 		}
@@ -74,6 +87,8 @@ public class TempusSpecimen {
 		if (sampleSite != null) meta.put("tempusSampleSite_"+id, sampleSite);
 		if (sampleType != null) meta.put("tempusSampleType_"+id, sampleType);
 		if (tumorPercentage != null) meta.put("tempusTumorPercentage_"+id, tumorPercentage.toString());	
+		if (caseId != null) meta.put("tempusCaseId_"+id, caseId +" : "+caseSourceId);
+		if (blockId != null) meta.put("tempusBlockId_"+id, blockId);
 	}
 	
 	public static TempusSpecimen[] getSpecimens(JSONObject object, TempusJson2Vcf tempusJson2Vcf) throws JSONException{
@@ -114,6 +129,9 @@ public class TempusSpecimen {
 	public static void addAttributes(LinkedHashMap<String, String> reportAttributes, TempusSpecimen[] specimens) {
 		ArrayList<String> al = new ArrayList<String>();
 		Integer tp = null;
+		String caseId = null;
+		String caseSourceId = null;
+		String blockId = null;
 		for (int i=0; i< specimens.length; i++ ) {
 			String type = specimens[i].getSampleType();
 			String site = specimens[i].getSampleSite();
@@ -124,10 +142,34 @@ public class TempusSpecimen {
 			else al.add(tn+" : "+type+" - "+site);
 			//tumor percentage
 			if (specimens[i].getTumorPercentage() != null) tp = specimens[i].getTumorPercentage();
+			//caseId
+			if (specimens[i].getCaseId() != null) {
+				caseId = specimens[i].getCaseId();
+				caseSourceId = specimens[i].getCaseSourceId();
+				blockId = specimens[i].getBlockId();
+			}
 		}
 		String sum = Misc.stringArrayListToString(al, "; ");
 		reportAttributes.put("specimines", sum);
 		if (tp != null) reportAttributes.put("tumorPercentage", tp.toString());
+		//should only be one of these
+		if (caseId != null) {
+			reportAttributes.put("caseId", caseId);
+			reportAttributes.put("blockId", blockId);
+			reportAttributes.put("caseIdSource", caseSourceId);
+		}
+	}
+
+	public String getCaseId() {
+		return caseId;
+	}
+
+	public String getCaseSourceId() {
+		return caseSourceId;
+	}
+
+	public String getBlockId() {
+		return blockId;
 	}
 
 }
