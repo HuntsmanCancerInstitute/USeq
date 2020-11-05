@@ -2,6 +2,7 @@ package edu.utah.seq.vcf;
 
 import java.io.BufferedReader;
 import java.io.File;
+import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -19,11 +20,14 @@ import org.apache.commons.httpclient.auth.AuthScope;
 import org.apache.commons.httpclient.methods.GetMethod;
 import org.json.JSONArray;
 import org.json.JSONObject;
-import edu.utah.hci.query.LocalQuery;
+
+import edu.utah.hci.misc.Util;
+import edu.utah.hci.query.MasterQuery;
+import edu.utah.hci.query.QueryRequest;
 import edu.utah.hci.query.UserQuery;
 
 /**Calculates call frequencies for each vcf record from a db of vcf files and callable region files. 
- * Most mutated single site in p53 is seen at 0.039 across all cancers in TCGA.  0.57 for BRAF V600E across all cancers.*/
+ * Most mutated single site in p53 are seen at 0.039 across all cancers in TCGA.  0.57 for BRAF V600E across all cancers.*/
 public class VCFCallFrequency {
 
 	private File[] vcfFiles;
@@ -45,10 +49,11 @@ public class VCFCallFrequency {
 	private double maxCallFreq = 1.0;
 	private int minBedCount = 8;
 	private boolean appendFilter = true;
+	
 	//local searching
 	private File dataDir = null;
-	private File indexDir = null;
-	private LocalQuery localQuery = null;
+	//private LocalQuery localQuery = null;
+	private MasterQuery masterQuery = null;
 	private UserQuery userQueryVcf = null;
 	private UserQuery userQueryBed = null;
 
@@ -63,27 +68,39 @@ public class VCFCallFrequency {
 
 
 	public VCFCallFrequency (String[] args) {
-		
-		
-		
-		long startTime = System.currentTimeMillis();
-		processArgs(args);
 
-		if (queryURL != null) buildSearchUrls(); 
-		else localQuery = new LocalQuery(dataDir, indexDir, false);
+		try {	
 
-		for (File vcf: vcfFiles) {
-			IO.p(vcf.getName());
-			annotate(vcf);
+			long startTime = System.currentTimeMillis();
+			processArgs(args);
+
+			if (queryURL != null) buildSearchUrls(); 
+			else {
+				Util.pl("Building the MasterQuery engine...");
+				masterQuery = new MasterQuery (dataDir);
+				Util.pl("\t"+masterQuery.getBuildInfo());
+				if (masterQuery.isInitialized() == false) Misc.printErrAndExit("ERROR: failed to initialize MasterQuery, aborting.");
+			}
+
+			for (File vcf: vcfFiles) {
+				IO.p(vcf.getName());
+				annotate(vcf);
+			}
+
+			//print stats
+			IO.pl("\nTotal Vcf Queries: "+ totalQueries +", with matches: "+totalQueriesWithHits+", passing callFreq: "+numPassingCallFreq+", failing callFreq: "+numFailingCallFreq+ ", too low bed count to score: "+numWithLowBedCount);
+			IO.pl("\nHistogram of call frequencies meeting the minimum bed count:");
+			hist.printScaledHistogram();
+
+			//finish and calc run time
+			double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
+			IO.pl("\nDone! "+Math.round(diffTime)+" Sec\n");
+
+		} catch (IOException e) {
+			System.err.println("\nProblem with VCFCallFreq");
+			e.printStackTrace();
+			System.exit(1);
 		}
-		//print stats
-		IO.pl("\nTotal Vcf Queries: "+ totalQueries +", with matches: "+totalQueriesWithHits+", passing callFreq: "+numPassingCallFreq+", failing callFreq: "+numFailingCallFreq+ ", too low bed count to score: "+numWithLowBedCount);
-		IO.pl("\nHistogram of call frequencies meeting the minimum bed count:");
-		hist.printScaledHistogram();
-
-		//finish and calc run time
-		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
-		IO.pl("\nDone! "+Math.round(diffTime)+" Sec\n");
 
 	}
 
@@ -92,8 +109,8 @@ public class VCFCallFrequency {
 		fetchEncodedQueryKey();
 
 		//set search url
-		vcfSearchUrl = queryURL+"search?key="+ queryKey+"&regExAll=.vcf.gz;"+vcfFileFilter+"&matchVcf=true&vcf=";
-		bedSearchUrl = queryURL+"search?key="+ queryKey+"&regExAll=.bed.gz;"+bedFileFilter+"&bed=";
+		vcfSearchUrl = queryURL+"search?key="+ queryKey+"&regExFileName=.vcf.gz&regExDirPath="+vcfFileFilter+"&matchVcf=true&vcf=";
+		bedSearchUrl = queryURL+"search?key="+ queryKey+"&regExFileName=.bed.gz&regExDirPath="+bedFileFilter+"&bed=";
 		fetchOptionsUrl = queryURL+"search?key="+ queryKey+"&fetchOptions=true";
 		IO.pl("fetchOptions:\t"+fetchOptionsUrl);
 		IO.pl("\tCall this in a browser to pick an appropriate file filter for your analysis. Only those data files with the file filter in their path will be queried.");
@@ -203,8 +220,8 @@ public class VCFCallFrequency {
 		//local file system query?
 		else {
 			if (loadVcfsBedsToQuery(vcfRecords)) {
-				localQuery.query(userQueryVcf);
-				localQuery.query(userQueryBed);
+				query(userQueryVcf);
+				query(userQueryBed);
 				jsonResultsVcf  = userQueryVcf.getResults();
 				jsonResultsBed = userQueryBed.getResults();
 			}
@@ -261,10 +278,24 @@ public class VCFCallFrequency {
 				}
 			}
 		}
-		//else throw new IOException("Error! Failed to generate search urls?! Aborting.");
+		else throw new IOException("Error! the json vcf or bed result is null?! ");
 		System.out.print(".");
 
 	}
+	
+	public void query(UserQuery userQuery) throws IOException {
+		HashMap<String,String> options = userQuery.fetchQueryOptions();
+		//make a single use QueryRequest object
+		QueryRequest qr = new QueryRequest(masterQuery, null, options, null);
+		//any errors?
+		if (qr.getErrTxtForUser() != null || qr.getWarningTxtForUser().size()!=0) {
+			if (qr.getErrTxtForUser() !=null) Util.printErrAndExit("\nInvalid request, "+qr.getErrTxtForUser()+ ",aborting.");
+			if (qr.getWarningTxtForUser().size() !=0) Util.printErrAndExit("\n"+qr.getWarningTxtForUser()+", aborting.");
+		}
+		//set results
+		else userQuery.setResults(qr.getJsonResults());
+	}
+	
 
 	private String modifyFilter(String filter) {
 		if (filter.equals(".") || filter.toUpperCase().equals("PASS")) return "CallFreq";
@@ -276,7 +307,7 @@ public class VCFCallFrequency {
 		//clear prior, all set to zero
 		idVcfCount = new double[numberRecordsPerQuery];
 
-		//any results?
+		//any results? if no results then the count is zero
 		if (results.has("queryResults")){
 			JSONArray ja = results.getJSONArray("queryResults");
 
@@ -285,7 +316,7 @@ public class VCFCallFrequency {
 
 			for (int i=0; i< numWithHits; i++){
 				JSONObject jo = ja.getJSONObject(i);
-				double numHits = jo.getDouble("numberHits");
+				double numHits = jo.getDouble("numberIntersectingDataFiles");
 				String vcfRecord = jo.getString("input");
 				String[] splitVcf = Misc.TAB.split(vcfRecord);
 				int index = Integer.parseInt(splitVcf[2]);
@@ -301,13 +332,13 @@ public class VCFCallFrequency {
 		//clear prior, set to zero
 		idBedCount = new double[numberRecordsPerQuery];
 
-		//any results?
+		//any results? if no results then the count is zero
 		if (results.has("queryResults")){
 			JSONArray ja = results.getJSONArray("queryResults");
 			int numWithHits = ja.length();
 			for (int i=0; i< numWithHits; i++){
 				JSONObject jo = ja.getJSONObject(i);
-				double numHits = jo.getDouble("numberHits");
+				double numHits = jo.getDouble("numberIntersectingDataFiles");
 				String bedRecord = jo.getString("input");
 				String[] splitbed = Misc.TAB.split(bedRecord);
 				int index = Integer.parseInt(splitbed[3]);
@@ -455,7 +486,6 @@ public class VCFCallFrequency {
 					case 'b': bedFileFilter = args[++i]; break;
 					case 'x': appendFilter = false; break;
 					case 'c': configFile = new File(args[++i]); break;
-					case 'i': indexDir = new File(args[++i]); break;
 					case 'd': dataDir = new File(args[++i]); break;
 					case 'm': maxCallFreq = Double.parseDouble(args[++i]); break;
 					case 'o': minBedCount = Integer.parseInt(args[++i]); break;
@@ -486,7 +516,7 @@ public class VCFCallFrequency {
 		}
 		//local search?
 		if (queryURL == null){
-			if (dataDir == null || indexDir == null || dataDir.isDirectory()== false || indexDir.isDirectory() == false) {
+			if (dataDir == null || dataDir.isDirectory()== false) {
 				Misc.printErrAndExit("\nProvide either a configuration file for remotely accessing a genomic query service or "
 						+ "two directory paths to the Data and Index directories uses by the GQueryIndexer app.\n");;
 			}
@@ -507,7 +537,7 @@ public class VCFCallFrequency {
 			IO.pl("\tRealm "+realm);
 			IO.pl("\tUserName "+userName);
 			//check config params
-			if (queryURL == null) Misc.printErrAndExit("\nError: failed to find a queryUrl in the config file, e.g. queryUrl http://hci-clingen1.hci.utah.edu:8080/Query/");
+			if (queryURL == null) Misc.printErrAndExit("\nError: failed to find a queryUrl in the config file, e.g. queryUrl http://hci-clingen1.hci.utah.edu:8080/GQuery/");
 			if (queryURL.endsWith("/") == false) queryURL = queryURL+"/";
 			if (host == null) Misc.printErrAndExit("\nError: failed to find a host in the config file, e.g. host hci-clingen1.hci.utah.edu");
 			if (realm == null) Misc.printErrAndExit("\nError: failed to find a realm in the config file, e.g. realm QueryAPI");
@@ -515,10 +545,7 @@ public class VCFCallFrequency {
 			if (password == null) Misc.printErrAndExit("\nError: failed to find a password in the config file, e.g. password g0QueryAP1");
 
 		}
-		else {
-			IO.pl("\tDataDir "+dataDir);
-			IO.pl("\tIndexDir "+indexDir);
-		}
+		else IO.pl("\tDataDir "+dataDir);
 		IO.pl();
 
 		//pull vcf files
@@ -537,14 +564,14 @@ public class VCFCallFrequency {
 		else saveDirectory.mkdirs();
 		if (saveDirectory.exists() == false) Misc.printErrAndExit("\nError: could not find your save directory? "+saveDirectory);
 
-		userQueryVcf = new UserQuery().addRegexAll(".vcf.gz").addRegexAll(vcfFileFilter).matchVcf();
-		userQueryBed = new UserQuery().addRegexAll(".bed.gz").addRegexAll(bedFileFilter);
+		userQueryVcf = new UserQuery().addRegExFileName(".vcf.gz").addRegExDirPath(vcfFileFilter).matchVcf();
+		userQueryBed = new UserQuery().addRegExFileName(".bed.gz").addRegExDirPath(bedFileFilter);
 	}	
 
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Call Frequency: May 2020                          **\n" +
+				"**                            VCF Call Frequency: Nov 2020                          **\n" +
 				"**************************************************************************************\n" +
 				"Calculates a vcf call frequency for each variant when pointed at a genomic Query\n"+
 				"service (https://github.com/HuntsmanCancerInstitute/GQuery) or the Data and Index\n"+
@@ -571,8 +598,6 @@ public class VCFCallFrequency {
 				"     realm GQuery\n"+
 				"     userName ExampleUser\n"+
 				"     password ExamplePW\n"+
-				"-i (Alternative to -c), provide a path to the Index directory generated by the USeq \n"+
-				"     QueryIndexer app.\n"+
 				"-d (Alternative to -c), provide a path to the Data directory used in creating the Index.\n"+
 
 				"\nOptions:\n"+

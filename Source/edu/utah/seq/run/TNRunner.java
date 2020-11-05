@@ -7,8 +7,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import edu.utah.hci.query.Util;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -298,7 +296,7 @@ public class TNRunner {
 		for (String o: output) {
 			if (o.toLowerCase().contains("error")) {
 				groupProcessingFailed = true;
-				IO.pl("\tERROR launching "+Util.stringArrayToString(cmd, " "));
+				IO.pl("\tERROR launching "+Misc.stringArrayToString(cmd, " "));
 				if (verbose == false) for (String x: output) IO.pl("\t\t"+x);
 				new File(jobDir, "FAILED").createNewFile();
 				return;
