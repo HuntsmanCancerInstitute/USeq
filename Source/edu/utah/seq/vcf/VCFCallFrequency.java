@@ -21,7 +21,6 @@ import org.apache.commons.httpclient.methods.GetMethod;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
-import edu.utah.hci.misc.Util;
 import edu.utah.hci.query.MasterQuery;
 import edu.utah.hci.query.QueryRequest;
 import edu.utah.hci.query.UserQuery;
@@ -76,9 +75,9 @@ public class VCFCallFrequency {
 
 			if (queryURL != null) buildSearchUrls(); 
 			else {
-				Util.pl("Building the MasterQuery engine...");
+				IO.pl("Building the MasterQuery engine...");
 				masterQuery = new MasterQuery (dataDir);
-				Util.pl("\t"+masterQuery.getBuildInfo());
+				IO.pl("\t"+masterQuery.getBuildInfo());
 				if (masterQuery.isInitialized() == false) Misc.printErrAndExit("ERROR: failed to initialize MasterQuery, aborting.");
 			}
 
@@ -289,8 +288,8 @@ public class VCFCallFrequency {
 		QueryRequest qr = new QueryRequest(masterQuery, null, options, null);
 		//any errors?
 		if (qr.getErrTxtForUser() != null || qr.getWarningTxtForUser().size()!=0) {
-			if (qr.getErrTxtForUser() !=null) Util.printErrAndExit("\nInvalid request, "+qr.getErrTxtForUser()+ ",aborting.");
-			if (qr.getWarningTxtForUser().size() !=0) Util.printErrAndExit("\n"+qr.getWarningTxtForUser()+", aborting.");
+			if (qr.getErrTxtForUser() !=null) Misc.printErrAndExit("\nInvalid request, "+qr.getErrTxtForUser()+ ",aborting.");
+			if (qr.getWarningTxtForUser().size() !=0) Misc.printErrAndExit("\n"+qr.getWarningTxtForUser()+", aborting.");
 		}
 		//set results
 		else userQuery.setResults(qr.getJsonResults());
@@ -559,7 +558,7 @@ public class VCFCallFrequency {
 
 		//check params
 		if (vcfFileFilter == null) Misc.printErrAndExit("\nError: provide a vcf file filter, e.g. Hg38/Somatic/Avatar/Vcf ");
-		if (vcfFileFilter == null) Misc.printErrAndExit("\nError: provide a bed file filter, e.g. Hg38/Somatic/Avatar/Bed ");
+		if (bedFileFilter == null) Misc.printErrAndExit("\nError: provide a bed file filter, e.g. Hg38/Somatic/Avatar/Bed ");
 		if (saveDirectory == null) Misc.printErrAndExit("\nError: provide a directory to save the annotated vcf files.");
 		else saveDirectory.mkdirs();
 		if (saveDirectory.exists() == false) Misc.printErrAndExit("\nError: could not find your save directory? "+saveDirectory);
