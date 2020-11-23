@@ -509,7 +509,7 @@ public class AggregateQCStats {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Aggregate QC Stats: Aug 2020                          **\n" +
+				"**                            Aggregate QC Stats: Nov 2020                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from json files produced by the\n"+
 				"SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, BamConcordance, Fastq, and\n"+

@@ -5,8 +5,6 @@ import java.util.regex.*;
 import util.bio.annotation.Bed;
 import util.gen.*;
 import java.util.*;
-import edu.utah.seq.parsers.jpileup.BamPileupMerger;
-
 
 /**
  * @author david.nix@hci.utah.edu 
@@ -17,8 +15,6 @@ public class StarFusion2Bed {
 	private File starFusionFile;
 	private File bedOutput;
 	private int junctionPadding = 500;
-	private File tabix;
-	private File bgzip;
 	private int numBeds = 0;
 
 	//constructors
@@ -41,14 +37,12 @@ public class StarFusion2Bed {
 
 	private void doWork() {
 		BufferedReader in = null;
-		PrintWriter out = null;
+		Gzipper out = null;
 		try {
 			IO.pl("Parsing...");
 			//make IO
 			in = IO.fetchBufferedReader(starFusionFile);
-			File noGzipBed = new File (Misc.removeExtension(bedOutput.toString())+".bed");
-			out = new PrintWriter (new FileWriter(noGzipBed));
-			
+			out = new Gzipper (bedOutput);
 			
 			String[] tokens;
 			String line;
@@ -88,15 +82,11 @@ public class StarFusion2Bed {
 			in.close();
 			out.close();
 			
-			//tabix index
-			BamPileupMerger.compressAndIndex(bgzip, tabix, noGzipBed, true);
-			
-			
 		} catch (IOException e) {
 			e.printStackTrace();
 			bedOutput.deleteOnExit();
 			IO.closeNoException(in);
-			IO.closeNoException(out);
+			out.closeNoException();
 			Misc.printErrAndExit("\nError parsing "+starFusionFile);
 		} 
 	}
@@ -125,7 +115,6 @@ public class StarFusion2Bed {
 	public void processArgs(String[] args) throws FileNotFoundException, IOException{
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
-		File tabixBinDirectory = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -136,7 +125,6 @@ public class StarFusion2Bed {
 					case 's': starFusionFile = new File(args[++i]).getCanonicalFile(); break;
 					case 'b': bedOutput = new File(args[++i]); break;
 					case 'p': junctionPadding = Integer.parseInt(args[++i]); break;
-					case 't': tabixBinDirectory = new File(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -151,13 +139,6 @@ public class StarFusion2Bed {
 
 		if (bedOutput == null) Misc.printErrAndExit("\nError: please provide a bed results output file, -b xxx.bed.gz\n");
 		
-		//pull tabix and bgzip
-		if (tabixBinDirectory == null) Misc.printExit("\nError: please point to your HTSlib directory containing the tabix and bgzip executables (e.g. -t ~/BioApps/HTSlib/1.10.2/bin/ )\n");
-		bgzip = new File (tabixBinDirectory, "bgzip");
-		tabix = new File (tabixBinDirectory, "tabix");
-		//look for bgzip and tabix executables
-		if (bgzip.canExecute() == false || tabix.canExecute() == false) Misc.printExit("\nCannot find or execute the bgzip '"+bgzip+"' or tabix executables '"+tabix+"'\n");
-
 	}	
 
 
@@ -165,26 +146,24 @@ public class StarFusion2Bed {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          STAR Fusion 2 Bed: June 2020                      **\n" +
+				"**                             STAR Fusion 2 Bed: June 2020                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses STAR-Fusion output tsv files into bed format. Two bed entries are made per\n"+
 				"fusion to represent the left and right breakpoints +/- junction padding. The entire\n"+
 				"fusion line is placed in the bed name column, and the FFPM in the score column. See\n" +
-				"https://github.com/STAR-Fusion/STAR-Fusion/wiki#Outputs for details. The final bed is\n"+
-				"bgzip compressed and tabix indexed.\n"+
+				"https://github.com/STAR-Fusion/STAR-Fusion/wiki#Outputs for details.\n"+
 
 				"\nRequired Options:\n"+
 				"-s Path to one of the xxx.tsv STAR-Fusion output files, recommend using\n" +
 				"      star-fusion.fusion_predictions.abridged.coding_effect.tsv \n"+
 				"-b Path to the xxx.bed.gz output results file\n"+
-				"-t Path to the directory containing the compiled bgzip and tabix executables. See\n" +
-				"     https://www.htslib.org\n"+
+
 
 				"\nDefault Options:\n"+
 				"-p BP junction padding, defaults to 500\n"+
 
 				"\nExample: java -Xmx20G -jar pathToUSeq/Apps/StarFusion2Bed -b P13445.sf.bed.gz\n" +
-				"     -s P13445_SF/star-fusion.fusion_predictions.abridged.coding_effect.tsv  \n\n" +
+				"     -s P13445_SF/star-fusion.fusion_predictions.abridged.coding_effect.tsv\n\n" +
 
 				"**************************************************************************************\n");
 

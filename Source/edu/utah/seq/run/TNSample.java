@@ -62,6 +62,9 @@ public class TNSample {
 
 		//look for fastq folders and check they contain 2 xxx.gz files, some may be null
 		checkFastq();
+		
+		//RNA fusion
+		if (tnRunner.getRNAFusionDocs() != null) rnaFusionAnalysis();
 
 		if (checkAlignments()) {
 
@@ -409,6 +412,51 @@ public class TNSample {
 		else {
 			if (checkJob(nameFile,jobDir,null, tnRunner.getMsiDocs())){
 				createMsiLinks(jobDir);
+			}
+		}
+	}
+
+	private void rnaFusionAnalysis() throws IOException {
+
+		info.add("Checking RNA Fusion status...");
+		//look for tumor RNA fastq
+		if (tumorTransFastq == null || tumorTransFastq.isGoodToAlign() == false) {
+			info.add("\tMissing one or more of the tumor RNA fastq data");
+			return;
+		}
+
+		//make dir, ok if it already exists
+		File jobDir = new File (rootDir,"RNAAnalysis/"+id+"_STARFusion");
+		jobDir.mkdirs();
+
+		//any files?
+		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+
+		//any files?
+		if (nameFile.size() == 0) {
+			createDNAAlignLinks(tumorTransFastq.getFastqs(), jobDir);
+			launch(jobDir, null, tnRunner.getRNAFusionDocs());
+		}
+
+		//OK some files are present, complete?
+		else if (nameFile.containsKey("COMPLETE")){
+			//find the final tsv file
+			File tsv = new File(jobDir, "Spreadsheets/star-fusion.fusion_predictions.abridged.coding_effect.tsv.gz");
+			if (tsv.exists() == false) {
+				clearAndFail(jobDir, "\tThe STAR Fusion workflow was marked COMPLETE but failed to find Spreadsheets/star-fusion.fusion_predictions.abridged.coding_effect.tsv.gz in "+jobDir);
+				return;
+			}
+			
+			//remove the linked files
+			File f = jobDir.getCanonicalFile();
+			new File(f, "1.fastq.gz").delete();
+			new File(f,"2.fastq.gz").delete();
+			info.add("\tCOMPLETE "+jobDir);
+		}
+
+		else {
+			if (checkJob(nameFile, jobDir, null, tnRunner.getRNAFusionDocs())){
+				createDNAAlignLinks(tumorTransFastq.getFastqs(), jobDir);
 			}
 		}
 	}

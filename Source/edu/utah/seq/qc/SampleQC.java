@@ -106,10 +106,11 @@ public class SampleQC {
 				//target file
 				targetRegionsFileNameSAE = jo.getString("targetRegionsFileName", "notFound");
 			}
-			else if (type.equals("dup")){
+			else if (type.equals("dup")){				
 				dupParsed = true;
 				//fraction duplicate reads, should overwrite anyting from sae
-				estimatedFractionDuplicateAlignments = jo.getDouble("fractionDuplicateAlignments", -1);
+				estimatedFractionDuplicateAlignments = jo.getDouble("fractionDuplicateAlignments", -1.0);
+				if (estimatedFractionDuplicateAlignments == -1.0) estimatedFractionDuplicateAlignments = jo.getDouble("estimatedFractionDuplicateAlignments", -1.0);
 			}
 			else if (type.equals("mpa")){
 				mpaParsed = true;

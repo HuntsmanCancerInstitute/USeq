@@ -19,6 +19,7 @@ public class TNRunner {
 	private boolean verbose = true;
 	private File[] DNAAlignQCDocs = null;
 	private File[] RNAAlignQCDocs = null;
+	private File[] RNAFusionDocs = null;
 	private File[] somaticVarCallDocs = null;
 	private File[] bamConcordanceDocs = null;
 	private File[] varAnnoDocs = null;
@@ -369,6 +370,7 @@ public class TNRunner {
 			File bamConWorkflowDir = null;
 			File jointGenoWorklfowDir = null;
 			File transWorkflowDir = null;
+			File rnaFuseDir = null;
 			File copyRatioDocsDir = null;
 			File copyRatioBkgDir = null;
 			File clinicalVcfDir = null;
@@ -384,6 +386,7 @@ public class TNRunner {
 						case 'p': sampleDir = new File(args[++i]).getCanonicalFile(); break;
 						case 'e': DNAWorkflowDir = new File(args[++i]); break;
 						case 't': transWorkflowDir = new File(args[++i]); break;
+						case 'f': rnaFuseDir = new File(args[++i]); break;
 						case 'c': somVarCallWorkflowDir = new File(args[++i]); break;
 						case 'a': annoWorkflowDir = new File(args[++i]); break;
 						case 'b': bamConWorkflowDir = new File(args[++i]); break;
@@ -401,7 +404,7 @@ public class TNRunner {
 						case 'x': maxNumJobs = Integer.parseInt(args[++i]); break;
 						case 'z': niceJobs = true; break;
 						case 'q': verbose = false; break;
-						case 'f': forceRestart = true; break;
+						case 'h': forceRestart = true; break;
 						case 'l': loop = true; break;
 						case 'd': restartFailed = true; break;
 						case 'r': softRestart = true; break;
@@ -440,6 +443,12 @@ public class TNRunner {
 			if (transWorkflowDir != null) {
 				if (transWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing RNA alignment workflow docs? "+transWorkflowDir);
 				RNAAlignQCDocs = IO.extractFiles(transWorkflowDir);
+			}
+			
+			//RNA fusion docs
+			if (rnaFuseDir != null) {
+				if (rnaFuseDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing RNA fusion workflow docs? "+rnaFuseDir);
+				RNAFusionDocs = IO.extractFiles(rnaFuseDir);
 			}
 			
 			//variant calling docs
@@ -565,7 +574,7 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TNRunner : July 2020                             **\n" +
+				"**                                  TNRunner : Nov 2020                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several containerized snakmake workflows on tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, \n"+
@@ -602,6 +611,7 @@ public class TNRunner {
 				"-p Directory containing one or more patient data directories to process.\n" +
 				"-e Workflow docs for launching DNA alignments.\n"+
 				"-t Workflow docs for launching RNA alignments.\n"+
+				"-f Workflow docs for launching RNA fusion detection.\n"+
 				"-c Workflow docs for launching somatic variant calling.\n"+
 				"-m Workflow docs for launching MSI status calling.\n"+
 				"-a Workflow docs for launching variant annotation.\n"+
@@ -626,7 +636,7 @@ public class TNRunner {
 				"\nJob Execution Options:\n"+
 				"-r Attempt to restart FAILED jobs from last successfully completed rule.\n"+
 				"-d Delete and restart FAILED jobs.\n"+
-				"-f Force a restart of all running, queued, failed, and uncompleted jobs.\n"+
+				"-h Force a restart of all running, queued, failed, and uncompleted jobs.\n"+
 				"-q Quite output.\n"+
 				"-x Maximum # jobs to run at any given time, defaults to 25.\n"+
 				"-z Do not nice jobs (--nice=10000), run at maximum primority.\n"+
@@ -637,7 +647,7 @@ public class TNRunner {
 				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+
 				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/\n"+
 				"     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l \n"+
-				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l \n"+
+				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l \n"+
 
 
 				"\n**************************************************************************************\n");
@@ -678,6 +688,9 @@ public class TNRunner {
 	}
 	public File[] getRNAAlignQCDocs() {
 		return RNAAlignQCDocs;
+	}
+	public File[] getRNAFusionDocs() {
+		return RNAFusionDocs;
 	}
 	public boolean isRestartFailed() {
 		return restartFailed;
