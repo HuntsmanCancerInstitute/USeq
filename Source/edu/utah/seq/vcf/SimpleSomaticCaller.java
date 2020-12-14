@@ -20,7 +20,7 @@ import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
-/**Takes output like the following and filters it. 
+/**Takes output like the following and filters it. Be sure to use bcftools 1.9, 1.10 won't work, not sure about subsequent releases, 1.10 contains bugs.
  * 
 bcftools=/uufs/chpc.utah.edu/common/HIPAA/u0028003/BioApps/Bcftools/1.9/bin/bcftools
 fasta=/uufs/chpc.utah.edu/common/PE/hci-bioinformatics1/TNRunner/Indexes/B38IndexForBwa-0.7.17/hs38DH.fa
@@ -196,6 +196,8 @@ public class SimpleSomaticCaller {
 					printInfo = false;
 				}
 				else if (line.startsWith("#")) {
+					//flip the tumor and normal designation to enable combining with other callers
+					if (line.startsWith("#CHROM")) line = "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tNORMAL\tTUMOR";
 					pass.println(line);
 					fail.println(line);
 				}
@@ -432,6 +434,13 @@ public class SimpleSomaticCaller {
 		double phred = Num.minus10log10(pval);
 		sb.append(Num.formatNumber(phred, 3));sb.append(";");
 		sb.append(fields[7]);
+		
+		//flip 9 and 10 so it's normal and tumor for combining with other callers like Manta/Strelka
+		String t= new String(fields[9]);
+		String n= new String(fields[10]);
+		fields[9] = n;
+		fields[10] = t;
+		
 		//samples
 		for (int i=8; i< fields.length; i++) {
 			sb.append("\t");
@@ -536,7 +545,7 @@ public class SimpleSomaticCaller {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                          Simple Somatic Caller: June 2020                         **\n" +
+				"**                          Simple Somatic Caller: Dec 2020                         **\n" +
 				"**************************************************************************************\n" +
 				"Takes vcf output from Bcftools mpileup and norm applications (http://www.htslib.org)\n"+
 				"run on a paired tumor and normal bam file set and filters the variants for somatic\n"+
