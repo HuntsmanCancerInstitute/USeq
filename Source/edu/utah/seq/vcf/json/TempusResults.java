@@ -53,6 +53,11 @@ public class TempusResults {
 		String tmbp = Json.forceGetString(results, "tumorMutationBurdenPercentile");
 		if (tmbp != null) tumorMutationBurdenPercentile = Double.parseDouble(tmbp);
 		msiStatus = Json.getStringAttribute(results, "msiStatus");
+		//for version 1.4+
+		if (msiStatus == null) {
+			JSONObject msi = results.getJSONObject("microsatelliteInstability");
+			if (msi != null) msiStatus = Json.getStringAttribute(msi, "status");
+		}
 		if (msiStatus != null) msiStatus = msiStatus.toLowerCase();
 		
 		//any somaticPotentiallyActionableMutations? these are special where the gene is separated from the variant
@@ -79,7 +84,7 @@ public class TempusResults {
 			tempusJson2Vcf.setWorkingNumSomaticVariantsOfUnknownSignificance(ja.length());
 		}
 		//any somaticBiologicallyRelevantVariants, mix of cnv and short indels, maybe fusions?
-		if (results.has("somaticBiologicallyRelevantVariants")) {
+		if (results.has("somaticBiologicallyRelevantVariants")) {			
 			JSONArray ja = results.getJSONArray("somaticBiologicallyRelevantVariants");
 			for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("somaticBiologicallyRelevantVariant", null, ja.getJSONObject(i), tempusJson2Vcf) );
 			tempusJson2Vcf.setWorkingNumSomaticBiologicallyRelevantVariants(ja.length());
@@ -92,16 +97,14 @@ public class TempusResults {
 		}
 		//any fusionVariants, none seen so this might fail
 		if (results.has("fusionVariants")) {
-			/*  These are just so far large chromosome rearrangements, no gene specific coordinates
 			JSONArray ja = results.getJSONArray("fusionVariants");
-			if (ja.length() !=0) Misc.printErrAndExit("\nFound fusion variants!!! Contact Nix to fix parser\n");
 			for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("fusionVariant", null, ja.getJSONObject(i), tempusJson2Vcf) );
 			tempusJson2Vcf.setWorkingNumFusionVariants(ja.length());
-			*/
 		}
 		
 		//OK change with 1.3.1, Tempus is providing objects instead of arrays for the inherited germline info
 		//1.3
+//how about with 1.4?
 		if (tempusJson2Vcf.getJsonSchema().equals("1.3")) {
 			//any inheritedRelevantVariants
 			if (results.has("inheritedRelevantVariants")) {

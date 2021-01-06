@@ -35,6 +35,7 @@ public class TempusReport {
 		JSONObject report = object.getJSONObject("report");
 		reportId = Json.getStringAttribute(report, "reportId");
 		signout_date = Json.getStringAttribute(report, "signout_date");
+		if (signout_date == null) signout_date = Json.getStringAttribute(report, "signoutDate");
 		bioInfPipeline = Json.getStringAttribute(report, "bioInfPipeline");
 		notes = Json.getStringAttribute(report, "notes");
 		if (notes != null) notes = Misc.WHITESPACE.matcher(notes).replaceAll(" ");

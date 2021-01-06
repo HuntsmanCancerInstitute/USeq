@@ -2,8 +2,6 @@ package edu.utah.seq.vcf.xml;
 
 import java.util.regex.Matcher;
 import htsjdk.samtools.reference.ReferenceSequence;
-import util.gen.Misc;
-
 
 public class MateInfo {
 

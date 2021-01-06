@@ -17,7 +17,7 @@ public class TempusSpecimen {
 	private String sampleType = null;
 	private String notes = null;
 	private String caseId = null;
-	private String caseSourceId = null;
+	//private String caseSourceId = null;
 	private String blockId = null;
 	private Integer tumorPercentage = null;
 	
@@ -62,12 +62,15 @@ public class TempusSpecimen {
 		if (object.has("institutionData")){
 			JSONObject id = object.getJSONObject("institutionData");
 			//caseId
+			caseId = Json.getStringAttribute(id, "caseId");
+			//don't do this anymore
+			/*
 			String unParsed = Json.getStringAttribute(id, "caseId");
 			if (unParsed != null && unParsed.equals("")== false) {
 				String[] split = Misc.WHITESPACE.split(unParsed);
 				caseId = split[split.length-1].trim();
 				caseSourceId = unParsed.replace(caseId, "").trim();
-			}
+			}*/
 			//blockId
 			blockId = Json.getStringAttribute(id, "blockId");
 			//tumorPercentage
@@ -87,7 +90,8 @@ public class TempusSpecimen {
 		if (sampleSite != null) meta.put("tempusSampleSite_"+id, sampleSite);
 		if (sampleType != null) meta.put("tempusSampleType_"+id, sampleType);
 		if (tumorPercentage != null) meta.put("tempusTumorPercentage_"+id, tumorPercentage.toString());	
-		if (caseId != null) meta.put("tempusCaseId_"+id, caseId +" : "+caseSourceId);
+		//if (caseId != null) meta.put("tempusCaseId_"+id, caseId +" : "+caseSourceId);
+		if (caseId != null) meta.put("tempusCaseId_"+id, caseId);
 		if (blockId != null) meta.put("tempusBlockId_"+id, blockId);
 	}
 	
@@ -145,7 +149,7 @@ public class TempusSpecimen {
 			//caseId
 			if (specimens[i].getCaseId() != null) {
 				caseId = specimens[i].getCaseId();
-				caseSourceId = specimens[i].getCaseSourceId();
+				//caseSourceId = specimens[i].getCaseSourceId();
 				blockId = specimens[i].getBlockId();
 			}
 		}
@@ -164,9 +168,9 @@ public class TempusSpecimen {
 		return caseId;
 	}
 
-	public String getCaseSourceId() {
+	/*public String getCaseSourceId() {
 		return caseSourceId;
-	}
+	}*/
 
 	public String getBlockId() {
 		return blockId;

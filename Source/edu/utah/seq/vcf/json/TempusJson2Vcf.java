@@ -23,7 +23,7 @@ public class TempusJson2Vcf {
 	private LinkedHashSet<String> keysToExport = null;
 	
 	//internal fields
-	private String[] acceptedSchema = {"1.3", "1.3.1", "1.3.2"};
+	private String[] acceptedSchema = {"1.3", "1.3.1", "1.3.2", "1.4"};
 	private IndexedFastaSequenceFile fasta = null;
 	private String source = null;
 	private HashMap<String, Bed> cnvGeneNameBed = null;
@@ -81,7 +81,7 @@ public class TempusJson2Vcf {
 	
 	//for the vcf header
 	private static String altCNV = "##ALT=<ID=CNV,Description=\"Copy number variable region\">";
-	private static String infoEG = "##INFO=<ID=EG,Number=1,Type=String,Description=\"Effected gene\">";
+	private static String infoEG = "##INFO=<ID=EG,Number=1,Type=String,Description=\"Effected gene(s)\">";
 	private static String infoCL = "##INFO=<ID=CL,Number=1,Type=String,Description=\"Tempus classification\">";
 	private static String infoFE = "##INFO=<ID=FE,Number=1,Type=String,Description=\"Functional effect on gene\">";
 	private static String infoDP = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">";
@@ -91,6 +91,8 @@ public class TempusJson2Vcf {
 	private static String infoSVLEN = "##INFO=<ID=SVLEN,Number=1,Type=Integer,Description=\"Difference in length between REF and ALT alleles. Negative values for deletions, positive for amplifications.\">";
 	private static String infoEND = "##INFO=<ID=END,Number=1,Type=Integer,Description=\"End position of the variant described in this record\">";
 	private static String infoCN = "##INFO=<ID=CN,Number=1,Type=Integer,Description=\"Copy Number\">";
+	private static String infoDESC = "##INFO=<ID=DESC,Number=1,Type=String,Description=\"Description of the type of rearrangement observed\">";
+	private static String infoMATEID = "##INFO=<ID=MATEID,Number=1,Type=String,Description=\"ID of the mate vcf record\">";
 
 
 	//constructors
@@ -335,6 +337,8 @@ public class TempusJson2Vcf {
 		sb.append(infoSVLEN+"\n");
 		sb.append(infoEND+"\n");
 		sb.append(infoCN+"\n");
+		sb.append(infoDESC+"\n");
+		sb.append(infoMATEID+"\n");
 
 		//chrom line
 		sb.append("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO");
@@ -542,7 +546,7 @@ public class TempusJson2Vcf {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Tempus Json 2 Vcf: Sept 2020                          **\n" +
+				"**                             Tempus Json 2 Vcf: Jan 2021                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses json Tempus reports to vcf. Leave in PHI to enable calculating age at\n"+
 				"diagnosis. Summary statistics calculated for all reports. Vcfs will contain a mix of \n"+
@@ -552,9 +556,9 @@ public class TempusJson2Vcf {
 				"\nOptions:\n"+
 				"-j Path to Tempus json report or directory containing such, xxx.json(.gz/.zip OK)\n"+
 				"-s Path to a directory for saving the results.\n"+
-				"-b Path to a bed file for converting CNV gene names to coordinates where the name\n"+
-				"     column contains just the gene name.\n"+
-				"-f Path to the reference fasta with xxx.fai index. Required for CNV conversions.\n"+
+				"-b Path to a bed file for converting CNV and fusion gene names to coordinates where the\n"+
+				"     bed name column contains just the gene name.\n"+
+				"-f Path to the reference fasta with xxx.fai index. Required for gene conversions.\n"+
 				"-i Include PHI in spreadsheet output, defaults to excluding it.\n"+
 				"-a Print this list of attributes in spreadsheet, comma delimited, case sensitive, no\n"+
 				"     spaces. Defaults to all. Run without to get a list of available attributes.\n"+

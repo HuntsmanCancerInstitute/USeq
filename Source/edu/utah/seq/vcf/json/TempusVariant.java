@@ -39,6 +39,8 @@ public class TempusVariant{
 	private String fusionType = null;
 	private String gene3 = null;
 	private String gene5 = null;
+	private String geneDescription = null;
+	private TempusJson2Vcf tempusJson2Vcf = null;
 	
 	//for CNV
 	private int start;
@@ -48,7 +50,7 @@ public class TempusVariant{
 	/**Object to represent a Tempus variant, SNV/ INDEL/ CNV/ Fusion*/
 	public TempusVariant(String variantSource, String geneName, JSONObject object, TempusJson2Vcf tempusJson2Vcf) throws JSONException {
 		this.variantSource = variantSource;
-		
+		this.tempusJson2Vcf = tempusJson2Vcf;
 		//attempt to parse gene, if null pull from constructor
 		gene = Json.forceGetString(object, "gene");
 		if (gene == null) gene = geneName;
@@ -81,6 +83,8 @@ public class TempusVariant{
 		fusionType = Json.forceGetString(object, "fusionType");
 		gene3 = Json.forceGetString(object, "gene3");
 		gene5 = Json.forceGetString(object, "gene5");
+		if (gene3 != null && gene5 != null) variantType = "fusion";
+		geneDescription = Json.forceGetString(object, "geneDescription");
 		
 		//set coordinates from nucleotideAlteration?
 		if (nucleotideAlteration != null){
@@ -91,6 +95,12 @@ public class TempusVariant{
 				ref = t[2];
 				alt = t[3];
 			}
+		}
+		
+		//check variant type, Tempus groups all short vars as SNV
+		if (variantType != null && variantType.equals("SNV")) {
+			if (ref.length()< alt.length()) variantType = "INS";
+			else if (ref.length()> alt.length()) variantType = "DEL";
 		}
 		
 		//increment counters
@@ -109,8 +119,10 @@ public class TempusVariant{
 		if (coverage !=null) t.tumorDP.count(Double.parseDouble(coverage));
 	}
 	
-	/** Returns CHROM POS ID REF ALT QUAL FILTER INFO (EG FE ST PE DP AF)*/
-	public String toVcf(int id){
+	/** Returns CHROM POS ID REF ALT QUAL FILTER INFO (EG FE ST PE DP AF)
+	 * @throws IOException */
+	public String toVcf(int id) throws IOException{
+		if (gene5 != null && gene3 !=null && tempusJson2Vcf.getCnvGeneNameBed() != null) return fusionVariantToVcf(id);
 		if (chromosome==null || pos==null || ref==null || alt==null) return null;
 		StringBuilder sb = new StringBuilder();
 		//CHROM
@@ -162,6 +174,57 @@ public class TempusVariant{
 		return sb.toString();
 	}
 	
+	private String fusionVariantToVcf(int id) throws IOException {
+		//fetch bed coordinates
+		Bed bed5 = tempusJson2Vcf.getCnvGeneNameBed().get(gene5);
+		Bed bed3 = tempusJson2Vcf.getCnvGeneNameBed().get(gene3);
+		if (bed5 == null || bed3 == null) throw new IOException("Failed to find fusion gene info in the lookup hash for "+ gene5 +" and/or "+gene3);
+		
+		//create common info 
+		StringBuilder sb = new StringBuilder();
+		sb.append("EG="); sb.append(gene5); sb.append(","); sb.append(gene3);
+		sb.append(";CL="); sb.append(variantSource);
+		sb.append(";FE="); sb.append(variantDescription.replaceAll(" ", "_"));
+		sb.append(";DESC="); sb.append(geneDescription.replaceAll(" ", "_"));
+		sb.append(";IMPRECISE;SVTYPE=BND");
+		String commonInfo = sb.toString();
+		
+		String id5 = "Tempus_"+id+"_5";
+		String id3 = "Tempus_"+id+"_3";
+		
+		String vcf5 = fetchFusionVcf(bed5, commonInfo, id5, id3);
+		String vcf3 = fetchFusionVcf(bed3, commonInfo, id3, id5);
+		
+		return vcf5+"\n"+vcf3;
+	}
+
+	private String fetchFusionVcf(Bed bed, String commonInfo, String idThis, String idMate) {
+		StringBuilder sb = new StringBuilder();
+		//CHROM
+		sb.append(bed.getChromosome()); sb.append("\t");
+		//POS, bed is zero based
+		int pos = bed.getStart()+1;
+		sb.append(pos); sb.append("\t");
+		//ID
+		sb.append(idThis);
+		sb.append("\t");
+		//REF
+		ReferenceSequence rs = tempusJson2Vcf.getFasta().getSubsequenceAt(bed.getChromosome(), pos, pos);
+		sb.append(new String(rs.getBases())); sb.append("\t");
+		//ALT
+		sb.append("<BND>"); sb.append("\t");
+		//QUAL and FILTER
+		sb.append(".\t.\t");
+
+		//INFO
+		sb.append(commonInfo);
+		sb.append(";END=");
+		sb.append(bed.getStop());
+		sb.append(";MATEID=");
+		sb.append(idMate);
+		return sb.toString();
+	}
+
 	/**Returns all non null values*/
 	public String toString(){
 		StringBuilder sb = new StringBuilder();
