@@ -5,7 +5,7 @@ import java.util.ArrayList;
 import util.bio.parsers.UCSCGeneLine;
 import util.gen.Num;
 import edu.utah.seq.vcf.VCFRecord;
-import edu.utah.seq.vcf.xml.SimpleVcf;
+import edu.utah.seq.vcf.xml.foundation.SimpleVcf;
 
 public class SpliceHitThreaded {
 	//fields

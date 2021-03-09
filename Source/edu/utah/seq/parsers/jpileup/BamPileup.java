@@ -237,7 +237,7 @@ public class BamPileup {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Bam Pileup:  July 2020                            **\n" +
+				"**                                Bam Pileup:  Feb 2021                             **\n" +
 				"**************************************************************************************\n" +
 				"BP extracts pileup information for each bam file over a list of regions. This includes\n"+
 				"the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available\n"+
@@ -264,7 +264,7 @@ public class BamPileup {
 				"      occur.\n"+
 
 				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b CramFiles/ -r target.bed\n"+
-				"-f Ref/human_g1k_v37_decoy.fasta -s 15352RX.bp.txt.gz -t ~/BioApps/HTSlib/1.10.2/bin/\n\n" +
+				"-f Ref/human_g1k_v37_decoy.fasta -s 15350X.bp.txt.gz -t ~/BioApps/HTSlib/1.10.2/bin/\n\n" +
 
 				"**************************************************************************************\n");
 	}

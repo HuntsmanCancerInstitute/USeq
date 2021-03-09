@@ -288,12 +288,7 @@ public class ChIPSeq {
 			if (skipParsingPointData) continue;
 			System.out.print("\t"+repDir+"\t");
 			//parse data
-			if (alignmentType.equals(alignmentTypeEland)){
-				pd[i].mkdir();
-				ElandParser p = new ElandParser(pd[i], IO.extractFiles(replicaDirectories[i]), maximumAlignmentScore,genomeVersion);
-				System.out.println(p.getTotalNumMatch());
-			}
-			else if (alignmentType.equals(alignmentTypeSam)){
+			if (alignmentType.equals(alignmentTypeSam)){
 				SamParser p = new SamParser(repDir, IO.extractFiles(replicaDirectories[i]), minimumMappingQualityScore, maximumAlignmentScore, genomeVersion);
 				System.out.println(p.getNumberPassingAlignments());
 			}

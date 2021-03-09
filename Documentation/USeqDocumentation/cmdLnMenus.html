@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.2.8
+			<html><head><title>USeq Command Line Menus 9.2.9
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -305,6 +305,8 @@
 				
 					<a href="#SRAProcessor">SRAProcessor</a><br>
 				
+					<a href="#StarFusion2Bed">StarFusion2Bed</a><br>
+				
 					<a href="#SubSamplePointData">SubSamplePointData</a><br>
 				
 					<a href="#TempusJson2Vcf">TempusJson2Vcf</a><br>
@@ -348,6 +350,10 @@
 					<a href="#VCFFdrEstimator">VCFFdrEstimator</a><br>
 				
 					<a href="#VCFFdrFilter">VCFFdrFilter</a><br>
+				
+					<a href="#VCFGeneFreqComparator">VCFGeneFreqComparator</a><br>
+				
+					<a href="#VCFGeneFreqJointGenoComp">VCFGeneFreqJointGenoComp</a><br>
 				
 					<a href="#VCFGraphiteFilter">VCFGraphiteFilter</a><br>
 				
@@ -425,10 +431,11 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/AggregatePlotter -t
 </pre><br><p>
 				
 					<a name="AggregateQCStats"><pre>**************************************************************************************
-**                            Aggregate QC Stats: Feb 2020                          **
+**                            Aggregate QC Stats: Nov 2020                          **
 **************************************************************************************
 Parses and aggregates alignment quality statistics from json files produced by the
-SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, BamConcordance and Fastq rule.
+SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, BamConcordance, Fastq, and
+RemoveDuplicates rules in the TNRunner workflows.
 
 Options:
 -j Directory containing xxx.json.gz files for parsing. Recurses through all other
@@ -437,11 +444,12 @@ Options:
 
 Default Options:
 -f FastqCount regex for parsing sample name, note the name must be identical across
-the json files, defaults to (.+)_FastqCount.json.gz, case insensitive.
+   the json files, defaults to (.+)_FastqCount.json.gz, case insensitive.
 -s SAE regex, defaults to (.+)_SamAlignmentExtractor.json.gz
 -m MPA regex, defaults to (.+)_MergePairedAlignments.json.gz
 -u S2U regex, defaults to (.+)_Sam2USeq.json.gz
 -b BC regex, defaults to (.+)_BamConcordance.json.gz
+-b DUP regex, defaults to (.+)_RemoveDuplicates.json.gz
 -p String to prepend onto output file names.
 -c Don't calculate detailed region read coverage statistics, saves memory and time.
 -v Print verbose debugging output.
@@ -735,7 +743,7 @@ Example: java -jar -Xmx2G ~/USeqApps/AvatarComparator -j AJobs/
 </pre><br><p>
 				
 					<a name="BamConcordance"><pre>**************************************************************************************
-**                             Bam Concordance: April 2019                          **
+**                               Bam Concordance: Feb 2021                          **
 **************************************************************************************
 BC calculates sample level concordance based on uncommon homozygous SNVs found in bam
 files. Samples from the same person will show high similarity (>0.9). Run BC on
@@ -876,7 +884,7 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/BamMixer -r ~/TumorSim/
 </pre><br><p>
 				
 					<a name="BamPileup"><pre>**************************************************************************************
-**                                Bam Pileup:  July 2020                            **
+**                                Bam Pileup:  Feb 2021                             **
 **************************************************************************************
 BP extracts pileup information for each bam file over a list of regions. This includes
 the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available
@@ -903,7 +911,7 @@ Default Options:
       occur.
 
 Example: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b CramFiles/ -r target.bed
--f Ref/human_g1k_v37_decoy.fasta -s 15352RX.bp.txt.gz -t ~/BioApps/HTSlib/1.10.2/bin/
+-f Ref/human_g1k_v37_decoy.fasta -s 15350X.bp.txt.gz -t ~/BioApps/HTSlib/1.10.2/bin/
 
 **************************************************************************************
 </pre><br><p>
@@ -2171,7 +2179,7 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/FoundationVcfComparator -f /F1/TRF145.
 </pre><br><p>
 				
 					<a name="FoundationXml2Vcf"><pre>**************************************************************************************
-**                           Foundation Xml 2 Vcf: April 2020                       **
+**                           Foundation Xml 2 Vcf: Sept 2020                        **
 **************************************************************************************
 Parses xml foundation reports to vcf. This is an inprecise process with some
 insertions, multi snv, and multi vars. Output vcf variants have not been normalized.
@@ -2404,11 +2412,12 @@ Example: java -Xmx1500M -jar pathTo/Apps/IntersectRegions -f /data/miRNAs.txt
 </pre><br><p>
 				
 					<a name="JointGenotypeVCFParser"><pre>**************************************************************************************
-**                          Joint Genotype VCF Parser: Oct 2018                     **
+**                       Joint Genotype VCF Parser: September 2020                  **
 **************************************************************************************
 Splits and filters GATK joint genotyped multi sample vcf files. Use vt to decompose 
 the multi alts. See https://genome.sph.umich.edu/wiki/Vt#Decompose . Replaces the AF
-and DP INFO fields with the sample level values.
+and DP INFO fields with the sample level values. Warning, some multi alts AF cannot be
+resolved following Vt decomposing and are assigned a value of 0.
 
 Required Params:
 -v Path to vt decomposed GATK joint genotyped multi sample vcf file, gz/zip OK.
@@ -2418,12 +2427,14 @@ Required Params:
 Optional Params:
 -q Minimum QUAL value, defaults to 20
 -d Minimum read depth based on the AD sample values, defaults to 10
--a Minimum AF allele freq, defaults to 0.2
+-a Minimum AF allele freq, defaults to 0.025
+-c Minimum alt read depth, defaults to 2
 -g Minimum GT genotype quality, defaults to 20
 -f Print debugging output to screen
+-i Simplify INFO to just AF, DP, and OLD_xxx info
 
-Example: java -jar -Xmx2G pathToUSeq/Apps/HaplotypeVCFParser -d 20 -a 0.25 -g 30 -f
-      -v jointGenotyped.decomp.vcf.gz -s SplitFilteredVcfs/ -q 30 
+Example: java -jar -Xmx2G pathToUSeq/Apps/HaplotypeVCFParser -d 20 -a 0.05 -g 30 
+      -v jointGenotyped.decomp.vcf.gz -s SplitFilteredVcfs/ -q 30 -c 3 -i 
 
 **************************************************************************************
 </pre><br><p>
@@ -3808,7 +3819,7 @@ Example: java -Xmx25G -jar pathToUSeq/Apps/SamAlignmentDepthMatcher -m tumor.bam
 </pre><br><p>
 				
 					<a name="SamAlignmentExtractor"><pre>**************************************************************************************
-**                        Sam Alignment Extractor: April 2018                       **
+**                        Sam Alignment Extractor: March 2021                       **
 **************************************************************************************
 Splits an alignment file into those that pass or fail thresholds and intersects
 regions of interest. Calculates a variety of QC statistics.
@@ -4189,7 +4200,7 @@ Example: java -Xmx1500M -jar pathTo/Apps/Sgr2Bar -f /affy/sgrFiles/ -s + -t
 </pre><br><p>
 				
 					<a name="SimpleSomaticCaller"><pre>**************************************************************************************
-**                          Simple Somatic Caller: June 2020                         **
+**                          Simple Somatic Caller: Dec 2020                         **
 **************************************************************************************
 Takes vcf output from Bcftools mpileup and norm applications (http://www.htslib.org)
 run on a paired tumor and normal bam file set and filters the variants for somatic
@@ -4314,6 +4325,28 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/SRAProcessor -n SRP000401 /
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="StarFusion2Bed"><pre>**************************************************************************************
+**                             STAR Fusion 2 Bed: June 2020                         **
+**************************************************************************************
+Parses STAR-Fusion output tsv files into bed format. Two bed entries are made per
+fusion to represent the left and right breakpoints +/- junction padding. The entire
+fusion line is placed in the bed name column, and the FFPM in the score column. See
+https://github.com/STAR-Fusion/STAR-Fusion/wiki#Outputs for details.
+
+Required Options:
+-s Path to one of the xxx.tsv STAR-Fusion output files, recommend using
+      star-fusion.fusion_predictions.abridged.coding_effect.tsv 
+-b Path to the xxx.bed.gz output results file
+
+Default Options:
+-p BP junction padding, defaults to 500
+
+Example: java -Xmx20G -jar pathToUSeq/Apps/StarFusion2Bed -b P13445.sf.bed.gz
+     -s P13445_SF/star-fusion.fusion_predictions.abridged.coding_effect.tsv
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="SubSamplePointData"><pre>**************************************************************************************
 **                             SubSamplePointData:  Dec 2008                        **
 **************************************************************************************
@@ -4332,28 +4365,32 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/SubSamplePointData -n 10000000 -f
 </pre><br><p>
 				
 					<a name="TempusJson2Vcf"><pre>**************************************************************************************
-**                           Tempus Json 2 Vcf: October 2019                        **
+**                             Tempus Json 2 Vcf: Jan 2021                          **
 **************************************************************************************
 Parses json Tempus reports to vcf. Leave in PHI to enable calculating age at
 diagnosis. Summary statistics calculated for all reports. Vcfs will contain a mix of 
 somatic and inherited snvs, indels, and cnvs. Be sure to vt normalize the exported
-vcfs, https://github.com/atks/vt . Works with schemas 1.3 and 1.3.1
+vcfs, https://github.com/atks/vt . Works with schemas 1.3, 1.3.1, 1.3.2
 
 Options:
 -j Path to Tempus json report or directory containing such, xxx.json(.gz/.zip OK)
 -s Path to a directory for saving the results.
--b Path to a bed file for converting CNV gene names to coordinates where the name
-     column contains just the gene name.
--f Path to the reference fasta with xxx.fai index. Required for CNV conversions.
+-b Path to a bed file for converting CNV and fusion gene names to coordinates where the
+     bed name column contains just the gene name.
+-f Path to the reference fasta with xxx.fai index. Required for gene conversions.
+-i Include PHI in spreadsheet output, defaults to excluding it.
+-a Print this list of attributes in spreadsheet, comma delimited, case sensitive, no
+     spaces. Defaults to all. Run without to get a list of available attributes.
 
 Example: java -Xmx2G -jar pathToUSeq/Apps/TempusJson2Vcf -j /F1/TempusJsons
-     -f /Ref/human_g1k_v37.fasta -s /F1/VCF/ -b /Ref/b37TempusGeneRegions.bed.gz 
+     -f /Ref/human_g1k_v37.fasta -s /F1/VCF/ -b /Ref/b37TempusGeneRegions.bed.gz
+     -a accessionId,sex,tumorMutationalBurden,msiStatus,diagnosis
 
 **************************************************************************************
 </pre><br><p>
 				
 					<a name="TempusVcfComparator"><pre>**************************************************************************************
-**                           Tempus Vcf Comparator: March 2019                      **
+**                           Tempus Vcf Comparator: Sept 2020                       **
 **************************************************************************************
 TVC compares a Tempus vcf generated with the TempusJson2Vcf to a recalled vcf.
 Exact recall vars are so noted and removed. Tempus vcf with no exact but one
@@ -4484,7 +4521,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 </pre><br><p>
 				
 					<a name="TNRunner"><pre>**************************************************************************************
-**                                 TNRunner : July 2020                             **
+**                                  TNRunner : Feb 2021                             **
 **************************************************************************************
 TNRunner is designed to execute several containerized snakmake workflows on tumor
 normal datasets via a slurm cluster.  Based on the availability of fastq, 
@@ -4521,6 +4558,7 @@ Setup Options:
 -p Directory containing one or more patient data directories to process.
 -e Workflow docs for launching DNA alignments.
 -t Workflow docs for launching RNA alignments.
+-f Workflow docs for launching RNA fusion detection.
 -c Workflow docs for launching somatic variant calling.
 -m Workflow docs for launching MSI status calling.
 -a Workflow docs for launching variant annotation.
@@ -4545,7 +4583,7 @@ Setup Options:
 Job Execution Options:
 -r Attempt to restart FAILED jobs from last successfully completed rule.
 -d Delete and restart FAILED jobs.
--f Force a restart of all running, queued, failed, and uncompleted jobs.
+-h Force a restart of all running, queued, failed, and uncompleted jobs.
 -q Quite output.
 -x Maximum # jobs to run at any given time, defaults to 25.
 -z Do not nice jobs (--nice=10000), run at maximum primority.
@@ -4556,7 +4594,7 @@ Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatien
      -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b 
      ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/
      -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l 
-     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -l 
+     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l 
 
 **************************************************************************************
 </pre><br><p>
@@ -4827,7 +4865,7 @@ Example: java -Xmx20G -jar pathTo/USeq/Apps/VCFAnnotator -v 9908R.vcf
 </pre><br><p>
 				
 					<a name="VCFCallFrequency"><pre>**************************************************************************************
-**                            VCF Call Frequency: May 2020                          **
+**                            VCF Call Frequency: Jan 2021                          **
 **************************************************************************************
 Calculates a vcf call frequency for each variant when pointed at a genomic Query
 service (https://github.com/HuntsmanCancerInstitute/GQuery) or the Data and Index
@@ -4854,8 +4892,6 @@ Required Options:
      realm GQuery
      userName ExampleUser
      password ExamplePW
--i (Alternative to -c), provide a path to the Index directory generated by the USeq 
-     QueryIndexer app.
 -d (Alternative to -c), provide a path to the Data directory used in creating the Index.
 
 Options:
@@ -4890,7 +4926,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFCenterFormatter -v Calls/ -s CCall
 </pre><br><p>
 				
 					<a name="VCFComparator"><pre>**************************************************************************************
-**                             VCF Comparator : August 2019                         **
+**                             VCF Comparator : Feb 2021                            **
 **************************************************************************************
 Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls
 that fall in the common interrogated regions are compared. WARNING tabix gzipped files
@@ -4951,29 +4987,30 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFConsensus -p illumina.vcf -q Strel
 </pre><br><p>
 				
 					<a name="VCFFdrEstimator"><pre>**************************************************************************************
-**                            VCF Fdr Estimator  :   Jan 2019                       **
+**                           VCF Fdr Estimator  :   July 2020                       **
 **************************************************************************************
-Estimates false discovery rates for each QUAL score in a somatic VCF file by counting
-the number of records that are >= to that QUAL score in a matched background VCF. The
-estimated FDR = #Bkg/ #Som. In cases where increasingly stringent QUAL thresholds
-reduce the nummber of Som records but not Bkg records, the FDR increases. To control
-for this inconsistancy, the prior FDR is assigned to the more stringent QUAL, a 'dFDR'.
+This app estimates false discovery rates (FDR) for each somatic VCF by counting the
+number of records that are >= to that QUAL score in one or more mock VCF files.
+The estimated FDR at a given QUAL threshold is = mean # Mock/ # Real. In cases where
+increasingly stringent QUAL thresholds increase the FDR, the prior FDR is assigned.
+Use the USeq VCFBkz app to generate reliable QUAL ranking scores if your somatic
+caller does not provide them. Lastly, shared mock-real variants are removed from
+the analysis and output files.
 
-To generate a matched background VCF file, use the SamReadDepthMatcher app to
-subsample a high depth normal bam file to match the read depth over each exon in the
-tumor bam file.  Run the same somatic variant calling and filtering workflow used in
-generating the real somatic VCF file but substitute the matched depth mock tumor bam
-for the real tumor bam. Lastly, use a low stringency set of germline variants
-identified in the high depth normal sample to filter out any het and hom variants in
-the bkg VCF.
+To generate mock somatic VCF files, run 3 or more mock tumor vs matched normal
+sample sets  where the mock tumor samples are either uninvolved tissue or biopsies
+from healthy volunteers. Prepare, sequence, and analyze them the same way as the real
+tumor samples.
 
-Required Options:
--b Background VCF file (xxx.vcf(.gz/.zip OK)).
--s Somatic VCF file (xxx.vcf(.gz/.zip OK)).
--r VCF file for saving the estimated FDR results.
-
-Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFFdrEstimator -b patient123Bkg.vcf.gz
-       -v patient123Somatic.vcf.gz -r FinalVcfs/patient123SomaticFdr.vcf.gz
+Options:
+-m Directory containing one or more mock VCF files (xxx.vcf(.gz/.zip OK)).
+-r Directory containing one or more real VCF files to score.
+-s Directory for saving the dFDR scored VCF files. 
+-f Minimum FDR to pass, defaults to 0.25 .
+-k Keep shared mock-real variants, defaults to excluding them.
+ 
+Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFFdrEstimator -m MockVcfs/ -f 0.05
+   -r RealVcfs/ -s FDRFilteredVcfs
 
 **************************************************************************************
 </pre><br><p>
@@ -4998,6 +5035,47 @@ Required:
 Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFFdrFilter -v Calls/ -s FDR5Calls -q 
       8.75,8.63,8.62,8.64,8.85 -r 16.5,15.9,15.3,25.7,45.2 -a
       0.005,0.0075,0.01,0.05,0.1 -b 0.005,0.0075,0.01,0.05,0.1 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCFGeneFreqComparator"><pre>**************************************************************************************
+**                            VCF Gene Freq Comparator : Aug 2020                   **
+**************************************************************************************
+For SnpEff annotated vcf files, counts the number of affected genes and compares their
+counts to those in another group using a two-tailed fisher's exact test. Pre filter
+vcfs to include relevant variants.
+
+Required Params:
+-a Directory containing filtered vcf files for group A (xxx.vcf(.gz/.zip OK))
+-a Directory containing group B vcf files 
+
+Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFGeneFreqComparator -a MeningiomaVcfs/
+       -b AllCancerVcfs/ &> vgfc.results.txt 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCFGeneFreqJointGenoComp"><pre>**************************************************************************************
+**                         VCF Gene Freq Joint Geno Comp : Aug 2020                 **
+**************************************************************************************
+For each affected gene in a multi sample vcf file, this tool contrasts the number of 
+mutant and wild type samples using a 2x2 two-tailed fisher's exact test. Run the 
+https://tinyurl.com/yygmj4oq workflow to annotate a joint genotyped, multi sample vcf
+with SnpEff, Clinvar, and VCFSpliceScanner info. Then filter the vcf file with the
+USeq AnnotatedVcfParser app to select variants of interest before running this app.
+
+Required Params:
+-v Path to a multi-sample, joint genotyped, filtered vcf file (xxx.vcf(.gz/.zip OK))
+-a Group A sample name pattern, must match entire name, see Java Pattern class
+-a Group B sample name pattern, must match entire name, see Java Pattern class
+
+-q Minimum VCF QUAL, defaults to 20
+-d Minimum sample read depth, defaults to 20
+-g Minimum sample genotype quality, defaults to 20
+
+Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFGeneFreqJointGenoComp -v jg.vcf.gz
+       -d 20 -a '^M_.+' -b '^1.+' 
 
 **************************************************************************************
 </pre><br><p>
@@ -5055,6 +5133,7 @@ Example: module load gcc/4.9.2; java -Xmx25G -jar USeq/Apps/VCFGraphiteFilter
 **************************************************************************************
 Merges VCF files with the same samples. Collapses the headers with a simple hash. Will
 not work well with downstream apps that cannot process mixed INFO and FORMAT records.
+If you want to remove duplicate records use the VCFConsensus app.
 
 Required:
 -v Full path to a vcf file (xxx.vcf(.gz/.zip OK)) or directory containing such. Note,
@@ -5286,7 +5365,7 @@ Example: java -Xmx9G -jar pathTo/USeq/Apps/VCFSelector -b GBMTargets.bed.gz -p 1
 </pre><br><p>
 				
 					<a name="VCFSpliceScanner"><pre>**************************************************************************************
-**                            VCF Splice Scanner : Sept 2018                        **
+**                            VCF Splice Scanner : Sept 2020                        **
 **************************************************************************************
 Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and
 Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice
@@ -5319,7 +5398,7 @@ Optional options:
 -d Minimum damaged score difference, refseq - new, defaults to 1.
 -s Format vcf with minimal output for downstream annotators, e.g. snpEff.
 
-Example: java -Xmx10G -jar ~/USeq/Apps/VCFSpliceAnnotator -f ~/Hg19/Fa/ -v ~/exm2.vcf
+Example: java -Xmx20G -jar ~/USeq/Apps/VCFSpliceAnnotator -f ~/Hg19/Fa/ -v ~/exm2.vcf
        -m ~/USeq/Documentation/splicemodels -i -u ~/Hg19/hg19EnsTrans.ucsc.zip -r
        ~/ExmSJAnno/exm2VSSAnno.vcf.gz -x 0
 **************************************************************************************

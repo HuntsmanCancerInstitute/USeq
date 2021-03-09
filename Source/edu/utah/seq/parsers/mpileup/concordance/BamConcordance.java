@@ -379,7 +379,7 @@ public class BamConcordance {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Bam Concordance: April 2019                          **\n" +
+				"**                               Bam Concordance: Feb 2021                          **\n" +
 				"**************************************************************************************\n" +
 				"BC calculates sample level concordance based on uncommon homozygous SNVs found in bam\n"+
 				"files. Samples from the same person will show high similarity (>0.9). Run BC on\n"+

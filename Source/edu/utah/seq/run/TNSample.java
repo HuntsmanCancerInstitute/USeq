@@ -735,6 +735,11 @@ public class TNSample {
 		else if (nameFile.containsKey("COMPLETE")) {
 			//were all the files found?
 			if (ad.isComplete() == false) clearAndFail(jobDir, null);
+			
+			//remove any linked fastq files
+			File f = jobDir.getCanonicalFile();
+			new File(f, "1.fastq.gz").delete();
+			new File(f,"2.fastq.gz").delete();
 		}
 		
 		//files present but not complete, check job

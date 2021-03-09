@@ -72,7 +72,6 @@ public class TempusPatient {
 				Period p = new Period(ldob, ldod, PeriodType.yearMonthDay());
 				ageAtDiagnosis = p.getYears();
 				tempusJson2Vcf.ageAtDiagnosis.count(ageAtDiagnosis);
-				IO.pl("\nAAD "+ageAtDiagnosis);
 			}	
 		}
 		TempusJson2Vcf.add(diagnosis, tempusJson2Vcf.diagnosis);

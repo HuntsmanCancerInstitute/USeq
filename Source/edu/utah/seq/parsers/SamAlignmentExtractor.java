@@ -43,15 +43,14 @@ public class SamAlignmentExtractor {
 	private String workingChromosome;
 	private boolean[] workingCoveredBases;
 	private RegionScoreText[] workingRegions;
-	private int numRawAlignments = 0;
-	private int numPassingBasicOnTargetYetFailingMQ = 0;
-	private int numPassingBasicOnTargetYetFailingAS = 0;
-	private int numPassingBasicAndOnTarget = 0;
-	private int numFailingBasic = 0;
-	private int numFailingFS = 0;
-	private int numPassingBasicOnTargetAndScores = 0;
-	private int numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate = 0;
-	private int numExcludeChrom = 0;
+	private long numRawAlignments = 0;
+	private long numPassingBasicOnTargetYetFailingMQ = 0;
+	private long numPassingBasicOnTargetYetFailingAS = 0;
+	private long numPassingBasicAndOnTarget = 0;
+	private long numFailingBasic = 0;
+	private long numFailingFS = 0;
+	private long numPassingBasicOnTargetAndScores = 0;
+	private long numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate = 0;
 	private File jsonOutputFile;
 	private Histogram histogram = new Histogram(1, 250, 249);
 	
@@ -147,7 +146,7 @@ public class SamAlignmentExtractor {
 	private void saveJson() {
 		try {
 			//calc stats
-			Integer numberUnfilteredAlignments = new Integer(numRawAlignments);
+			Long numberUnfilteredAlignments = new Long(numRawAlignments);
 			Double fractionAlignmentsOnTarget = new Double((double)numPassingBasicAndOnTarget/(double)(numRawAlignments-numFailingBasic));
 			Double fractionOnTargetAndPassQCScoreFilters = new Double((double)numPassingBasicOnTargetAndScores/(double)numRawAlignments);
 			Double estimatedFractionDuplicateAlignments = new Double( (double)numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate/ (double) numPassingBasicOnTargetAndScores  );
@@ -202,9 +201,7 @@ public class SamAlignmentExtractor {
 		SAMRecordIterator it = bamReader.queryUnmapped();
 		while (it.hasNext()) {
 			numRawAlignments++;
-			if (keepUnmapped) {
-				passingBamWriter.addAlignment(it.next());
-			}
+			if (keepUnmapped) passingBamWriter.addAlignment(it.next());
 			else {
 				failingBamWriter.addAlignment(it.next());
 				numFailingBasic++;
@@ -476,7 +473,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Sam Alignment Extractor: April 2018                       **\n" +
+				"**                        Sam Alignment Extractor: March 2021                       **\n" +
 				"**************************************************************************************\n" +
 				"Splits an alignment file into those that pass or fail thresholds and intersects\n"+
 				"regions of interest. Calculates a variety of QC statistics.\n"+

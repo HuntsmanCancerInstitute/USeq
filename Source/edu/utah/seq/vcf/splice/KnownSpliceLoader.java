@@ -12,7 +12,7 @@ import edu.utah.seq.its.Interval1D;
 import edu.utah.seq.its.IntervalST;
 import edu.utah.seq.mes.MaxEntScanScore3;
 import edu.utah.seq.mes.MaxEntScanScore5;
-import edu.utah.seq.vcf.xml.SimpleVcf;
+import edu.utah.seq.vcf.xml.foundation.SimpleVcf;
 import htsjdk.samtools.reference.ReferenceSequence;
 import util.bio.annotation.ExonIntron;
 import util.bio.parsers.UCSCGeneLine;

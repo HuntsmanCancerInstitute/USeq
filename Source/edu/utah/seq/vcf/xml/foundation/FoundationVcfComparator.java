@@ -1,4 +1,4 @@
-package edu.utah.seq.vcf.xml;
+package edu.utah.seq.vcf.xml.foundation;
 
 import java.io.*;
 import java.util.regex.*;

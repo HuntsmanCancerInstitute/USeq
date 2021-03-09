@@ -3,7 +3,7 @@ package edu.utah.seq.vcf.json;
 import java.io.*;
 import java.util.regex.*;
 import edu.utah.seq.vcf.VCFParser;
-import edu.utah.seq.vcf.xml.SimpleVcf;
+import edu.utah.seq.vcf.xml.foundation.SimpleVcf;
 import util.gen.*;
 import java.util.*;
 

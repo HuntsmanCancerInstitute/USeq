@@ -126,8 +126,14 @@ public class BamPileupLoader implements Runnable {
 	}
 
 	private BaseCount[] pileup(String chr, int start, int stop, SamReader samReader) throws Exception{
+		//watch end
+		int stopPlusOne = stop+1;
+		int chromEnd = (int)fasta.getIndex().getIndexEntry(chr).getSize();
+		if (stopPlusOne > chromEnd) stopPlusOne = chromEnd;
+		
 		//create container for counts
-		ReferenceSequence p = fasta.getSubsequenceAt(chr, start+1, stop+1);
+		ReferenceSequence p = fasta.getSubsequenceAt(chr, start+1, stopPlusOne);
+		
 		char[] refSeq = new String(p.getBases()).toCharArray();
 		BaseCount[] bc = new BaseCount[stop-start];
 		int counter = 0;

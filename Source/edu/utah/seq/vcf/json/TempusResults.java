@@ -55,7 +55,7 @@ public class TempusResults {
 		msiStatus = Json.getStringAttribute(results, "msiStatus");
 		//for version 1.4+
 		if (msiStatus == null) {
-			JSONObject msi = results.getJSONObject("microsatelliteInstability");
+			JSONObject msi = Json.getJSONObject(results, "microsatelliteInstability");
 			if (msi != null) msiStatus = Json.getStringAttribute(msi, "status");
 		}
 		if (msiStatus != null) msiStatus = msiStatus.toLowerCase();

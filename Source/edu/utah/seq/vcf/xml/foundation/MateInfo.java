@@ -1,4 +1,4 @@
-package edu.utah.seq.vcf.xml;
+package edu.utah.seq.vcf.xml.foundation;
 
 import java.util.regex.Matcher;
 import htsjdk.samtools.reference.ReferenceSequence;

@@ -204,8 +204,9 @@ public class ConcordanceChunk implements Runnable{
 					if (indelRto > maxIndel) passDpIndel = false;
 					else {
 						passDpIndel = true;
+						//might be null!
 						maxAFIndex = ms.findMaxSnvAFAndIndex();
-						if (maxAFIndex[0] >= minAFForHis){
+						if (maxAFIndex != null && maxAFIndex[0] >= minAFForHis){
 							afHist[index].count(maxAFIndex[0]);
 							if (chrX) chrXAfHist[index].count(maxAFIndex[0]);
 						}

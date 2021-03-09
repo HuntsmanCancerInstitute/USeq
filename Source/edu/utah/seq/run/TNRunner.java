@@ -197,34 +197,37 @@ public class TNRunner {
 			
 			//for each separate genotyped vcf
 			for (int i=0; i< genoVcfs.length; i++){
-				
+
 				//Extract the sample name 
 				//HCI_P1_NormalDNA_Hg38_JointGenotyping_Hg38.vcf.gz
 				//1218982_NormalDNA_Hg38_JointGenotyped.vcf.gz
 				//1218982_Pancreas_NormalDNA_Hg38_JointGenotyped.vcf.gz
-				String fileName = genoVcfs[i].getName();
-				String[] split = Misc.UNDERSCORE.split(fileName);
+				
+				//how about just remove _NormalDNA_Hg38_JointGenotyped.vcf.gz?
+				
+				
+				String fileName = genoVcfs[i].getName();			
+				String sampleName = fileName.replace("_NormalDNA_Hg38_JointGenotyped.vcf.gz", "");
+				if (sampleName.length() == fileName.length()) throw new IOException("\nERROR: Failed to parse the sample name from "+fileName);
+				
 				File sampleDir = null;
 				String id = null;
 				
 				//find the sample
 				TNSample toLaunch = null;
-				ArrayList<File> sampleDirMatches = new ArrayList<File>();
 				for (TNSample tns: tNSamples){
-					id = tns.getId();
-					if (fileName.startsWith(id)){
+					id = tns.getId();			
+					if (id.equals(sampleName)){
 						sampleDir = tns.getRootDir().getCanonicalFile();
 						toLaunch = tns;
 						break;
 					}
-					//may be more than one so don't break
-					else if (id.startsWith(split[0])) sampleDirMatches.add(tns.getRootDir().getCanonicalFile());
 				}
-				if (sampleDir == null) {
-					if (sampleDirMatches.size() == 1) sampleDir = sampleDirMatches.get(0);
-					else throw new IOException("\nERROR: Failed to find the sampleDir by parsing the JointGenotyping vcf names. "+fileName);
-				}
+				if (sampleDir == null) throw new IOException("\nERROR: Failed to find the sampleDir by parsing the JointGenotyping vcf names. "+fileName);
+				
 				if (verbose) IO.pl("\tMoving genotyped vcfs to "+sampleDir);
+				
+				
 				//delete any existing germline folder
 				IO.deleteDirectoryViaCmdLine(new File(sampleDir, "GermlineVariantCalling"));
 				//create a folder for the incoming genotyped vcf in the sample folder
@@ -574,7 +577,7 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                  TNRunner : Nov 2020                             **\n" +
+				"**                                  TNRunner : Feb 2021                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several containerized snakmake workflows on tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, \n"+

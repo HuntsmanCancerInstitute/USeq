@@ -202,6 +202,9 @@ public class VCFCallFrequency {
 
 	private void processRecordBlock(String[][] vcfRecords, Gzipper out) throws Exception {
 
+		//watch out for no records
+		if (vcfRecords[0] == null) return;
+		
 		//run queries
 		JSONObject jsonResultsVcf = null;
 		JSONObject jsonResultsBed = null;
@@ -277,7 +280,7 @@ public class VCFCallFrequency {
 				}
 			}
 		}
-		else throw new IOException("Error! the json vcf or bed result is null?! ");
+		else throw new IOException("Error! the json vcf or bed result is null?!");
 		System.out.print(".");
 
 	}
@@ -570,7 +573,7 @@ public class VCFCallFrequency {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Call Frequency: Nov 2020                          **\n" +
+				"**                            VCF Call Frequency: Jan 2021                          **\n" +
 				"**************************************************************************************\n" +
 				"Calculates a vcf call frequency for each variant when pointed at a genomic Query\n"+
 				"service (https://github.com/HuntsmanCancerInstitute/GQuery) or the Data and Index\n"+

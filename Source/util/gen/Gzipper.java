@@ -58,6 +58,12 @@ public class Gzipper {
 		out.write(rtn);
 	}
 	
+	/**Adds a return onto the line*/
+	public void print(Object line) throws IOException{
+		out.write(line.toString().getBytes());
+		
+	}
+	
 	/**Adds a comma and return onto the line*/
 	public void printcln(Object line) throws IOException{
 		out.write(line.toString().getBytes());

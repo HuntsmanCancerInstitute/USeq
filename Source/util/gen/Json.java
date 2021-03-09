@@ -27,6 +27,12 @@ public class Json {
 		return null;
 	}
 	
+	/**Returns null if not found.*/
+	public static JSONObject getJSONObject(JSONObject obj, String key) throws JSONException {
+		if (obj.has(key) && obj.isNull(key) == false) return obj.getJSONObject(key);
+		return null;
+	}
+	
 	/**Returns null if not found, is a JSON null, or length of String rep is zero*/
 	public static String forceGetString(JSONObject obj, String key) throws JSONException {
 		if (obj.has(key) == false || obj.isNull(key) == true) return null;

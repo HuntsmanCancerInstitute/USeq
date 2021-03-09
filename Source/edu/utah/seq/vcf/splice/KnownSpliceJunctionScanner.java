@@ -21,7 +21,7 @@ import edu.utah.seq.parsers.BamLoader;
 import edu.utah.seq.vcf.VCFLookUp;
 import edu.utah.seq.vcf.VCFParser;
 import edu.utah.seq.vcf.VCFRecord;
-import edu.utah.seq.vcf.xml.SimpleVcf;
+import edu.utah.seq.vcf.xml.foundation.SimpleVcf;
 import util.bio.annotation.ExonIntron;
 import util.bio.annotation.ExportIntergenicRegions;
 import util.bio.parsers.UCSCGeneLine;

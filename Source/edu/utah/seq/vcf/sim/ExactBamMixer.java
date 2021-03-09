@@ -13,7 +13,7 @@ import java.util.regex.Pattern;
 
 import edu.utah.seq.data.sam.PicardSortSam;
 import edu.utah.seq.parsers.SamAlignmentExtractor;
-import edu.utah.seq.vcf.xml.SimpleVcf;
+import edu.utah.seq.vcf.xml.foundation.SimpleVcf;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;

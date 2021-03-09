@@ -9,7 +9,7 @@ import edu.utah.seq.its.IntervalTree;
 import edu.utah.seq.query.QueryIndexFileLoader;
 import edu.utah.seq.useq.data.RegionScoreText;
 import edu.utah.seq.useq.data.RegionScoreTextData;
-import edu.utah.seq.vcf.xml.SimpleVcf;
+import edu.utah.seq.vcf.xml.foundation.SimpleVcf;
 import util.bio.annotation.Bed;
 import util.bio.annotation.Coordinate;
 import util.bio.annotation.ExportIntergenicRegions;

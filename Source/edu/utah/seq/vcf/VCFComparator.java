@@ -54,7 +54,8 @@ public class VCFComparator {
 	private ArrayList<Float> fdrAL = new ArrayList<Float>();
 	private ArrayList<ScoredCalls> scoredCallsAL = new ArrayList<ScoredCalls>();
 	private String[] fixedFdrLines = null;
-	double[] fixedFdr = new double[] {0.15, 0.05, 0.01};
+	//double[] fixedFdr = new double[] {0.15, 0.05, 0.01};
+	double[] fixedFdr = new double[] {0.2, 0.15, 0.10};
 	private String headerLine = "QUALThreshold\tNumMatchTest\tNumNonMatchTest\tFDR= nonMatchTest/(matchTest+nonMatchTest)\tdecreasingFDR\tRecall TPR= matchTest/totalKey\tFPR= nonMatchTest/totalKey\tPrecision PPV= matchTest/(matchTest+nonMatchTest)\tF-score= harmonicMean(Precision, Recall)";
 
 	//constructor
@@ -1005,7 +1006,7 @@ public class VCFComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             VCF Comparator : August 2019                         **\n" +
+				"**                             VCF Comparator : Feb 2021                            **\n" +
 				"**************************************************************************************\n" +
 				"Compares test vcf file(s) against a gold standard key of trusted vcf calls. Only calls\n" +
 				"that fall in the common interrogated regions are compared. WARNING tabix gzipped files\n" +
