@@ -26,6 +26,7 @@ public class MergeRegions {
 	private int minimumCount = 1;
 	private int pad = 0;
 	private boolean verbose = true;
+	private boolean printHeader = true;
 	
 	public MergeRegions(String[] args) {
 		//start clock
@@ -42,10 +43,11 @@ public class MergeRegions {
 		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
 	}
 	
-	public MergeRegions (File[] regionFiles, File mergedFile, boolean verbose){
+	public MergeRegions (File[] regionFiles, File mergedFile, boolean verbose, boolean printHeader){
 		this.regionFiles = regionFiles;
 		this.mergedFile = mergedFile;
 		this.verbose = verbose;
+		this.printHeader = printHeader;
 		doWork();
 	}
 	
@@ -82,9 +84,11 @@ public class MergeRegions {
 		
 		try {
 			PrintWriter out = new PrintWriter( new FileWriter( mergedFile));
-			out.println("# MinOverlap\t"+ minimumCount);
-			out.println("# BpPadding\t"+ pad);
-			for (File f: regionFiles) out.println("# "+f.getCanonicalPath());
+			if (printHeader) {
+				out.println("# MinOverlap\t"+ minimumCount);
+				out.println("# BpPadding\t"+ pad);
+				for (File f: regionFiles) out.println("# "+f.getCanonicalPath());
+			}
 			while (it.hasNext()){
 				//get text of chromosome and maxBase
 				String chrom = it.next();
@@ -199,7 +203,7 @@ public class MergeRegions {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Merge Regions: April 2020                            **\n" +
+				"**                             Merge Regions: March 2021                            **\n" +
 				"**************************************************************************************\n" +
 				"Flattens tab delimited bed files (chr start stop ...). Assumes interbase coordinates.\n" +
 				"Set the -m threshold to restrict the output to bps with that minimum of overlapping\n"+

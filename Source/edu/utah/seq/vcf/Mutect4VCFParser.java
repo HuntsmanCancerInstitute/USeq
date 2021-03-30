@@ -25,6 +25,7 @@ public class Mutect4VCFParser {
 	private double maximumNormalAltFraction = 1;
 	private double minimumTumorAltFraction = 0;
 	private boolean excludeNonPass = false;
+	private boolean tumorNormal = false;
 	private String afInfo = "##INFO=<ID=AF,Number=1,Type=Float,Description=\"Allele Frequency for tumor\">";
 	private String dpInfo = "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
 	private Pattern tLod = Pattern.compile(".+;TLOD=([\\d\\.]+).+"); 
@@ -62,6 +63,14 @@ public class Mutect4VCFParser {
 				VCFSample[] normTumor = r.getSample();
 				if (normTumor.length !=2) Misc.printErrAndExit("\nLooks like there aren't two samples present in this VCF, aborting.\n");
 				
+				//flip samples?
+				if (tumorNormal) {
+					VCFSample t = normTumor[0];
+					VCFSample n = normTumor[1];
+					normTumor = new VCFSample[] {n,t};
+					r.setSample(normTumor);
+				}
+				
 				//check PASS?
 				if (excludeNonPass){
 					if (r.getFilter().toLowerCase().contains("pass") == false){
@@ -85,6 +94,9 @@ public class Mutect4VCFParser {
 				//check depth
 				int normDepth = normTumor[0].getReadDepthDP();
 				int tumDepth = normTumor[1].getReadDepthDP();
+				
+				
+				
 				if (normDepth < minimumNormalReadDepth || tumDepth < minimumTumorReadDepth){
 					r.setFilter(VCFRecord.FAIL);
 					continue;
@@ -92,6 +104,7 @@ public class Mutect4VCFParser {
 				
 				//check alt counts
 				int tumorAltCounts = Integer.parseInt(normTumor[1].getAlternateCounts());
+				
 				if (tumorAltCounts < minimumAltReadDepth) {
 					r.setFilter(VCFRecord.FAIL);
 					continue;
@@ -185,6 +198,13 @@ public class Mutect4VCFParser {
 				//seq qual
 				t[5] = new Float(vcf.getQuality()).toString();
 				
+				//9,10 flip samples?
+				if (tumorNormal) {
+					String a= t[9];
+					String b = t[10];
+					t[9] = b;
+					t[10] = a;
+				}
 				out.println(Misc.stringArrayToString(t, "\t"));
 			}
 		}
@@ -222,6 +242,7 @@ public class Mutect4VCFParser {
 					case 'r': minimumTNRatio = Double.parseDouble(args[++i]); break;
 					case 'l': minTLOD = Double.parseDouble(args[++i]); break;
 					case 'p': excludeNonPass = true; break;
+					case 'x': tumorNormal = true; break;
 					case 'f': saveDirectory = new File(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -248,11 +269,12 @@ public class Mutect4VCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Mutect 4 VCF Parser: Oct 2018                      **\n" +
+				"**                              Mutect 4 VCF Parser: March 2021                     **\n" +
 				"**************************************************************************************\n" +
-				"Parses Mutect2 VCF files from the GATK 4.0+ package, filtering for read depth, allele\n"+
-				"frequency diff ratio, etc. Inserts AF and DP into for the tumor sample into the INFO\n"+
-				"field. Replaces the QUAL with TLOD. Be sure to run vt normalization first.\n"+
+				"Parses Mutect2 VCF files from the GATK 4.0+ package and Sentieon TNhaplotyper2 for\n"+
+				"read depth, allele frequency diff ratio, etc. Inserts AF and DP into for the tumor\n"+
+				"sample into the INFO field. Replaces the QUAL with TLOD. Be sure to run vt\n"+
+				"normalization first and check the sample order.\n"+
 
 				"\nOptions:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s). It is REQUIRED\n"+
@@ -268,9 +290,10 @@ public class Mutect4VCFParser {
 				"-r Minimum T/N AF ratio, defaults to 0.\n"+
 				"-t Minimum TLOD score, defaults to 0.\n"+
 				"-p Remove non PASS filter field records.\n"+
+				"-x Sample order is Tumor then Normal, defaults to Normal then Tumor. Check!\n"+
 				
 
-				"\nExample: java -jar pathToUSeq/Apps/Mutect4VCFParser -v /VCFFiles/ -t 0.05 -n 0.5 -u 100\n"+
+				"\nExample: java -jar pathToUSeq/Apps/Mutect4VCFParser -v /VCFFiles/ -t 0.06 -n 0.5 -u 100\n"+
 				"        -o 20 -d 0.05 -r 2 -a 3 \n\n"+
 
 

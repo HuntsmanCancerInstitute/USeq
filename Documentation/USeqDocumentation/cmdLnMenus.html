@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.2.9
+			<html><head><title>USeq Command Line Menus 9.3.0
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -72,6 +72,8 @@
 					<a href="#BisStatRegionMaker">BisStatRegionMaker</a><br>
 				
 					<a href="#CalculatePerCycleErrorRate">CalculatePerCycleErrorRate</a><br>
+				
+					<a href="#CarisXmlVcfParser">CarisXmlVcfParser</a><br>
 				
 					<a href="#ChIPSeq">ChIPSeq</a><br>
 				
@@ -324,6 +326,8 @@
 					<a href="#TRunner">TRunner</a><br>
 				
 					<a href="#UCSCBig2USeq">UCSCBig2USeq</a><br>
+				
+					<a href="#UniObRC">UniObRC</a><br>
 				
 					<a href="#USeq2UCSCBig">USeq2UCSCBig</a><br>
 				
@@ -884,14 +888,16 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/BamMixer -r ~/TumorSim/
 </pre><br><p>
 				
 					<a name="BamPileup"><pre>**************************************************************************************
-**                                Bam Pileup:  Feb 2021                             **
+**                                Bam Pileup:  March 2021                           **
 **************************************************************************************
 BP extracts pileup information for each bam file over a list of regions. This includes
 the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available
 to the JVM. The header of the results file contains the order of the bams. To 
 approximate IGV pileup info, set -q 0 -m 0 -i. If many alignment files are to be
 processed, run this app on each file individually and then merge them with the
-BamPileupMerger app.
+BamPileupMerger app. BP also calculates read coverage statistics and a passing region
+bed file provided -o . Secondary, supplementary, duplicate and failing vendorQC 
+alignments are skipped.
 
 Required Options:
 -b Path to a coordinate sorted bam/cram file with index or directory containing such.
@@ -905,13 +911,15 @@ Required Options:
 Default Options:
 -q Minimum base quality, defaults to 10
 -m Minimum alignment mapping quality, defaults to 13
+-o Minimum read depth for passing coverge bed, defaults to 0, no coverage bed created.
 -i Include counts from overlapping paired reads, defaults to excluding them.
 -p Number processors to use, defaults to all, reduce if out of memory errors occur.
 -x Max length of region chunk, defaults to 1000, set smaller if out of memory errors
       occur.
+-c Maximum read coverage stats calculated, defaults to 1000.
 
 Example: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b CramFiles/ -r target.bed
--f Ref/human_g1k_v37_decoy.fasta -s 15350X.bp.txt.gz -t ~/BioApps/HTSlib/1.10.2/bin/
+-f Ref/human_g1k_v37_decoy.fasta -s 15350X.bp.gz -t ~/BioApps/HTSlib/bin/ -o 20
 
 **************************************************************************************
 </pre><br><p>
@@ -1242,6 +1250,30 @@ Default Options:
 
 Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate
      -b /Data/Bam/ -f /Fastas/chrPhiX_Illumina.fasta.gz 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="CarisXmlVcfParser"><pre>**************************************************************************************
+**                           Caris Xml Vcf Parser: March 2021                       **
+**************************************************************************************
+This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml
+reported genomic alternations are annotated, bed files of copy number changes and gene
+fusions as well as a summary spreadsheet of the non NGS test results and report
+attributes.
+
+Options:
+-d Path to a directory containing paired xml and vcf files from Caris.
+-s Path to a directory for saving the results.
+-u Path to a Hg38 UCSC RefFlat or RefSeq merged gene file for CNV and gene fusion
+   coordinate extraction. See: http://www.genome.ucsc.edu/FAQ/FAQformat.html#format9
+   (refSeqGeneName name2(optional) chr strand txStart txEnd cdsStart cdsEnd exonCount
+   exonStarts exonEnds). Be sure to merge transcripts with the USeq MergeUCSCGeneTable
+   app and remove non standard chromosomes.
+-i Include PHI in spreadsheet output, defaults to excluding.
+
+Example: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/
+     -s ParsedCarisReports/ -i -u ~/GRCh38/hg38RefSeq9Dec2020_MergedStdChr.ucsc.gz 
 
 **************************************************************************************
 </pre><br><p>
@@ -2753,7 +2785,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/MergePointData -p
 </pre><br><p>
 				
 					<a name="MergeRegions"><pre>**************************************************************************************
-**                             Merge Regions: April 2020                            **
+**                             Merge Regions: March 2021                            **
 **************************************************************************************
 Flattens tab delimited bed files (chr start stop ...). Assumes interbase coordinates.
 Set the -m threshold to restrict the output to bps with that minimum of overlapping
@@ -3070,11 +3102,12 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/MultiSampleVCFFilter
 </pre><br><p>
 				
 					<a name="Mutect4VCFParser"><pre>**************************************************************************************
-**                               Mutect 4 VCF Parser: Oct 2018                      **
+**                              Mutect 4 VCF Parser: March 2021                     **
 **************************************************************************************
-Parses Mutect2 VCF files from the GATK 4.0+ package, filtering for read depth, allele
-frequency diff ratio, etc. Inserts AF and DP into for the tumor sample into the INFO
-field. Replaces the QUAL with TLOD. Be sure to run vt normalization first.
+Parses Mutect2 VCF files from the GATK 4.0+ package and Sentieon TNhaplotyper2 for
+read depth, allele frequency diff ratio, etc. Inserts AF and DP into for the tumor
+sample into the INFO field. Replaces the QUAL with TLOD. Be sure to run vt
+normalization first and check the sample order.
 
 Options:
 -v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s). It is REQUIRED
@@ -3090,8 +3123,9 @@ Options:
 -r Minimum T/N AF ratio, defaults to 0.
 -t Minimum TLOD score, defaults to 0.
 -p Remove non PASS filter field records.
+-x Sample order is Tumor then Normal, defaults to Normal then Tumor. Check!
 
-Example: java -jar pathToUSeq/Apps/Mutect4VCFParser -v /VCFFiles/ -t 0.05 -n 0.5 -u 100
+Example: java -jar pathToUSeq/Apps/Mutect4VCFParser -v /VCFFiles/ -t 0.06 -n 0.5 -u 100
         -o 20 -d 0.05 -r 2 -a 3 
 
 **************************************************************************************
@@ -4672,6 +4706,39 @@ Options:
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/USeq2UCSCBig -v M_musculus_Jul_2007 -u
       /AnalysisResults/USeqDataArchives/ -d /MyApps/UCSC/
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="UniObRC"><pre>**************************************************************************************
+**                        Unique Observation Read Coverage:  March 2021             **
+**************************************************************************************
+UniObRC calculates read coverage statistics and generates a bed file of regions
+that pass thresholds for read depth. Overlapping pairs, secondary, supplementary,
+duplicate, and failing vendorQC alignments are excluded. INDEL counts are included.
+Summary statistics and app setting are saved in json format.
+
+Required Options:
+-b Path to a coordinate sorted bam/cram file with index.
+-r Bed file of non overlapping regions to interrogate. Run the USeq MergeRegions app
+      if unsure. xxx.bed.gz/.zip OK
+-s File path to write the passing region bed file.
+
+Default Options:
+-q Minimum base quality, defaults to 13
+-m Minimum alignment mapping quality, defaults to 13
+-d Minimum read depth for passing coverge bed, defaults to 10
+-i Include counts from overlapping paired reads, defaults to excluding them.
+-p Number processors to use, defaults to all, reduce if out of memory errors occur.
+-x Max length of region chunk, defaults to 1000, set smaller if out of memory errors
+      occur.
+-c Maximum read coverage stats calculated, defaults to 1000.
+-f For xxx.cram alignments, provide a path to the reference fasta with index.
+-t Path to a directory containing the bgzip and tabix executables to compress and index
+      the bed file, see htslib.org 
+
+Example: java -Xmx100G -jar pathTo/USeq/Apps/UniObRC -b my.cram -r target.bed
+-f Ref/human_g1k_v37_decoy.fasta -s passing.bed.gz -t ~/BioApps/HTSlib/bin/ -o 20
 
 **************************************************************************************
 </pre><br><p>

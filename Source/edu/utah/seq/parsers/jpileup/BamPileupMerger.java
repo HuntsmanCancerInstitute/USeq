@@ -47,7 +47,7 @@ public class BamPileupMerger {
 			out.close();
 			for (int i=0; i< pileups.length; i++) ins[i].close();
 			
-			compressAndIndex(bgzip, tabix, mergedPileup, true);
+			compressAndIndex(bgzip, tabix, mergedPileup, new String[] {"-f", "-s", "1", "-b", "2", "-e", "2"}, true);
 			
 			IO.pl("\tMerged pileup saved to "+mergedPileup);
 			
@@ -63,7 +63,7 @@ public class BamPileupMerger {
 		}
 	}
 
-	public static void compressAndIndex(File bgzip, File tabix, File uncompressedPileupTxtFile, boolean verbose) throws IOException {
+	public static void compressAndIndex(File bgzip, File tabix, File uncompressedPileupTxtFile, String[] tabixCmds, boolean verbose) throws IOException {
 		if (verbose) IO.pl("Bgzipping...");
 		//compress with bgzip
 		String[] cmd = { bgzip.getCanonicalPath(), "-f", "--threads", new Integer(Runtime.getRuntime().availableProcessors()).toString(), uncompressedPileupTxtFile.getCanonicalPath()};
@@ -75,7 +75,14 @@ public class BamPileupMerger {
 
 		//tabix
 		if (verbose) IO.pl("Tabixing...");
-		cmd = new String[]{ tabix.getCanonicalPath(), "-f", "-s", "1", "-b", "2", "-e", "2", bgzipped.getCanonicalPath() };
+		
+		cmd = new String[tabixCmds.length+2];
+		cmd[0]= tabix.getCanonicalPath();
+		cmd[cmd.length-1] = bgzipped.getCanonicalPath();
+		int i = 1;
+		for (String c: tabixCmds)cmd[i++] = c;
+		//cmd = new String[]{ tabix.getCanonicalPath(), "-f", "-s", "1", "-b", "2", "-e", "2", bgzipped.getCanonicalPath() };
+		
 		output = IO.executeCommandLineReturnAll(cmd);
 		File indexed = new File (bgzipped+".tbi");
 		if (output == null || output.length != 0 || indexed.exists() == false){

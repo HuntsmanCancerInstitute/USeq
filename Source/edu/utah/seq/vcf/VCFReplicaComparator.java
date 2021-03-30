@@ -295,7 +295,7 @@ public class VCFReplicaComparator {
 	
 	}
 	
-	private File createBamPileup(File mergedBed) throws IOException {
+	private File createBamPileup(File mergedBed) throws Exception {
 		File bpTempResults = new File (outputDir, "tempNonMatch.bp.txt.gz");
 		bpTempResults.deleteOnExit();
 		File tbi = new File (outputDir, "tempNonMatch.bp.txt.gz.tbi");
@@ -326,7 +326,7 @@ public class VCFReplicaComparator {
 		//merge and sort the regions
 		File mergedBed = new File(outputDir, "tempNonMatchVcfMerged_"+Misc.getRandomString(6)+".bed");
 		mergedBed.deleteOnExit();
-		new MergeRegions (new File[] {bed}, mergedBed, false);
+		new MergeRegions (new File[] {bed}, mergedBed, false, false);
 		return mergedBed;
 	}
 
