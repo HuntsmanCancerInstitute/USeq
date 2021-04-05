@@ -28,6 +28,7 @@ public class AnnotatedVcfParser {
 	private double maximumPopAF = 0;
 	private double maxFracBKAFs = 0; //maximum number of background samples with >= AF, measure as fraction of total samples, 50 for foundation so 5 max
 	private double minimumBKZ = 0;
+	private double minFractionPathogenic = 0.51;
 	private String[] passingIDKeys = null;
 	private TreeSet<String> passingAnnImpact = null;
 	private TreeSet<String> passingClinSig = null;
@@ -267,6 +268,35 @@ public class AnnotatedVcfParser {
 		return false;
 	}
 	
+	public static double[] calcFracPathoFromConfInterp(String info) {
+		double numPathogenic = 0;
+		double numBenign = 0;
+		if (info.contains("CLNSIGCONF=")) {
+			String[] fields = Misc.SEMI_COLON.split(info);
+			String conf = null;
+			for (String s: fields) {
+				if (s.startsWith("CLNSIGCONF=")) {
+					conf = s;
+					break;
+				}
+			}
+			if (conf != null) {
+//IO.pl("\n"+conf);
+				String[] type = Misc.COMMA.split(conf);
+				for (String t: type) {
+					String trimmed = t.substring(0, t.length()-1);
+					String[] nameNumber = Misc.FORWARD_PARENTHESIS.split(trimmed);
+//IO.pl(nameNumber[0]);
+					String nameLC = nameNumber[0].toLowerCase();
+					if (nameLC.contains("pathogenic")) numPathogenic+= Double.parseDouble(nameNumber[1]);
+					else if (nameLC.contains("benign")) numBenign+= Double.parseDouble(nameNumber[1]);
+				}
+			}
+		}		
+//IO.pl("NumPath "+numPathogenic+"\nNumOther "+numBenign);
+		return new double[] {numPathogenic, numBenign};
+	}
+	
 	private boolean checkIDs(String id) {
 		
 		//for each user provided key (all lower cased), check if in id and pass if so
@@ -392,10 +422,20 @@ public class AnnotatedVcfParser {
 			
 			String[] cTerms = COMMA_SLASH.split(csAll);
 			boolean passClinSig = false;
+			double[] numPathoBenign = null;
 			//is there a check for particular clinsig terms?
 			if (passingClinSig != null){
 				for (String cs: cTerms){
-					passClinSig = passingClinSig.contains(cs.toLowerCase());
+					String cslc = cs.toLowerCase();
+					passClinSig = passingClinSig.contains(cslc);
+					//Conflicting_interpretations_of_pathogenicity? Check fraction patho
+					if (passClinSig && minFractionPathogenic != 0 && cslc.equals("conflicting_interpretations_of_pathogenicity")) {
+						numPathoBenign = calcFracPathoFromConfInterp(info);
+						double total = (numPathoBenign[0]+numPathoBenign[1]);
+						double fracPatho = 0;
+						if (total != 0) fracPatho = numPathoBenign[0]/total;
+						passClinSig = (fracPatho >= minFractionPathogenic);
+					}
 					if (verbose) IO.pl("\tCLINSIG For Check\t"+passClinSig+"\t"+cs);
 					if (passClinSig) {
 						numPassingClinSing++;
@@ -413,6 +453,13 @@ public class AnnotatedVcfParser {
 					if (passClinSigAgainst) {
 						numPassingExcludeClinSing++;
 						break;
+					}
+				}
+				//check if just benign in Conflicting_interpretations_of_pathogenicity
+				if (passClinSigAgainst == false && numPathoBenign !=null) {
+					if (numPathoBenign[0]==0 && numPathoBenign[1]>0) {
+						passClinSigAgainst = true;
+						numPassingExcludeClinSing++;
 					}
 				}
 			}
@@ -747,7 +794,12 @@ public class AnnotatedVcfParser {
 			IO.pl("\n\t"+Misc.treeSetToString(passingAnnImpact, ",")+"\t: ANN impact keys");
 			IO.pl("\t"+ justFrameShiftStartStop+"\t: Further restrict ANN impacts to one of these effects: frameshift_variant, stop_gained, stop_lost, or start_lost.");
 		}
-		if (passingClinSig != null) IO.pl("\n\t"+Misc.treeSetToString(passingClinSig, ",")+"\t: CLINSIG keep keys");
+		if (passingClinSig != null) {
+			IO.pl("\n\t"+Misc.treeSetToString(passingClinSig, ",")+"\t: CLINSIG keep keys");
+			if (minFractionPathogenic!=0 && passingClinSig.contains("conflicting_interpretations_of_pathogenicity")) {
+				IO.pl("\t"+minFractionPathogenic+"\t: Minimum fraction pathogenic when CLINSIG is Conflicting_interpretations_of_pathogenicity");
+			}
+		}
 		if (excludeClinSig != null) IO.pl("\t"+Misc.treeSetToString(excludeClinSig, ",")+"\t: CLINSIG exclude keys");
 		if (passingVCFSS != null) {
 			IO.pl("\n\t"+Misc.stringArrayToString(passingVCFSS, ",")+"\t: Splice junction types to scan");
@@ -886,6 +938,7 @@ public class AnnotatedVcfParser {
 					case 'g': passingVCFSS = Misc.COMMA.split(args[++i]); break;
 					case 'n': minimumVCFSSDiff = Double.parseDouble(args[++i]); break;
 					case 'z': minimumBKZ = Double.parseDouble(args[++i]); break;
+					case 't': minFractionPathogenic = Double.parseDouble(args[++i]); break;
 					case 'a': impactString = args[++i]; break;
 					case 'c': clinString = args[++i]; break;
 					case 'e': clinStringExclude = args[++i]; break;
@@ -976,6 +1029,8 @@ public class AnnotatedVcfParser {
                 "-l Further restrict ANN impacts to one of these effects: frameshift_variant,\n"+
                 "       stop_gained, stop_lost, or start_lost.\n"+
                 "-c Comma delimited list of CLINSIG terms to select for.\n"+
+                "-t For CLINSIG=Conflicting_interpretations_of_pathogenicity, minimum fraction\n"+
+                "       pathogenicity, defaults to 0\n"+
                 "-e Comma delimited list of CLINSIG terms to select against.\n"+
                 "-i Comma delimited list of VCF ID keys to select for. If the VCF ID contains one or\n"+
                 "       more, the record is passed regardless of other filters. The match is not exact.\n"+
@@ -985,9 +1040,10 @@ public class AnnotatedVcfParser {
                 "-y Path to a config txt file for setting the above.\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/\n"+
-				"        -d 75 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -g D5S,D3S,G5S,G3S -n 3.5 -a\n"+
-				"        HIGH,MODERATE -c Pathogenic,Likely_pathogenic -i Foundation,Tempus -v\n"+
-				"        -e Benign,Likely_benign\n\n"+
+				"        -d 75 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -g D5S,D3S,G5S,G3S -n 4.5 -a\n"+
+				"        HIGH,MODERATE -e Benign,Likely_benign -c Pathogenic,Likely_pathogenic,\n"+
+				"        Conflicting_interpretations_of_pathogenicity -t 0.51\n"+
+				"        \n\n"+
 
 
 				"**************************************************************************************\n");

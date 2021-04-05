@@ -26,6 +26,7 @@ public class Misc {
 	public static final Pattern COMMA = Pattern.compile(",");
 	public static final Pattern SEMI_COLON = Pattern.compile(";");
 	public static final Pattern PIPE = Pattern.compile("\\|");
+	public static final Pattern FORWARD_PARENTHESIS = Pattern.compile("\\(");
 	public static final Pattern GREATER_THAN = Pattern.compile(">");
 	public static final Pattern AMP = Pattern.compile("&");
 	
