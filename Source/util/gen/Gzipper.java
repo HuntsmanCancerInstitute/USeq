@@ -44,6 +44,7 @@ public class Gzipper {
 	
 	/**Adds a return onto the line*/
 	public void println(String line) throws IOException{
+		//IO.pl(line);
 		out.write(line.getBytes());
 		out.write(rtn);
 	}
