@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.3.0
+			<html><head><title>USeq Command Line Menus 9.3.1.beta
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -28,6 +28,8 @@
 					<a href="#AllelicMethylationDetector">AllelicMethylationDetector</a><br>
 				
 					<a href="#AnnotateBedWithGenes">AnnotateBedWithGenes</a><br>
+				
+					<a href="#AnnotatedBed2UCSCRefFlat">AnnotatedBed2UCSCRefFlat</a><br>
 				
 					<a href="#AnnotatedVcfParser">AnnotatedVcfParser</a><br>
 				
@@ -243,6 +245,8 @@
 				
 					<a href="#PointDataManipulator">PointDataManipulator</a><br>
 				
+					<a href="#PolyADiffSeq">PolyADiffSeq</a><br>
+				
 					<a href="#PoReCNV">PoReCNV</a><br>
 				
 					<a href="#PrintSelectColumns">PrintSelectColumns</a><br>
@@ -354,6 +358,8 @@
 					<a href="#VCFFdrEstimator">VCFFdrEstimator</a><br>
 				
 					<a href="#VCFFdrFilter">VCFFdrFilter</a><br>
+				
+					<a href="#VCFExACParser">VCFExACParser</a><br>
 				
 					<a href="#VCFGeneFreqComparator">VCFGeneFreqComparator</a><br>
 				
@@ -665,13 +671,31 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/AnnotateBedWithGenes -p 100 -g -i 1,2
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                             Annotated Vcf Parser  Sept 2018                      **
+					<a name="AnnotatedBed2UCSCRefFlat"><pre>**************************************************************************************
+**                          Annotated Bed 2 UCSC RefFlat   June 2015                **
 **************************************************************************************
-Splits VCF files that have been annotated with SnpEff w/ dbNSFP and clinvar, plus the
-VCFBackgroundChecker and VCFSpliceScanner USeq apps into passing and failing records.
-Use the -e option to inspect the effect of the various filters on each record. Use
-the VCFRegionFilter app to restrict variants to particular gene regions.
+Run AnnotateBedWithGenes using the addGeneFeature option then use this tool to convert
+the annotated bed to genes for those with a gene name. To convert to GTF, use the UCSC
+genePredToGtf tool.
+
+Parameters:
+-b Annotated bed file to convert
+-m Minimum number exons for conversion, defaults to 1
+-a Required anno type, defaults to none
+
+Example: java -Xmx2G -jar pathTo/USeq/Apps/AnnotatedBed2UCSCRefFlat -b anno.bed.gz
+   -a 3pUTR -m 2
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
+**                            Annotated Vcf Parser  May 2021                        **
+**************************************************************************************
+Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
+VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
+records. Use the -r option to inspect the effect of the various filters on each
+record. Use the VCFRegionFilter app to restrict variants to particular gene regions.
 
 Options:
 -v File path or directory containing xxx.vcf(.gz/.zip OK) file(s) to filter.
@@ -681,15 +705,24 @@ Options:
 -d Minimum DP alignment depth
 -m Minimum AF allele frequency
 -x Maximum AF allele frequency
+-q Maximum CF prior call frequency
+-w Include WARNING_TRANSCRIPT in ANN, defaults to excluding
+-k Include non protein_coding transcripts in ANN, defaults to excluding
 -j Ignore the max AF filter for ACMG incidental germline gene variants.
 -p Maximum population allele frequency, only applies if present.
+-z Minimum BKZ when present.
 -b Maximum fraction of BKAF samples with allele frequency >= VCF AF, only applies
        if present.
 -g Splice junction types to scan.
 -n Minimum difference in splice junction scores, only applies if present.
 -a Comma delimited list of SnpEff ANN impact categories to select for.
+-l Further restrict ANN impacts to one of these effects: frameshift_variant,
+       stop_gained, stop_lost, or start_lost.
 -c Comma delimited list of CLINSIG terms to select for.
--e Comma delimited list of CLINSIG terms to select against.
+-t For CLINSIG=Conflicting_interpretations_of_pathogenicity, minimum fraction
+       pathogenicity, defaults to 0
+-u For CLINSIG=drug_response, only pass it if associated with these genes. Comma
+       delimited, no spaces. Defaults to all.-e Comma delimited list of CLINSIG terms to select against.
 -i Comma delimited list of VCF ID keys to select for. If the VCF ID contains one or
        more, the record is passed regardless of other filters. The match is not exact.
 -o Only require, if set or present, SnpEff ANN or CLINSIG or Splice to be true to pass.
@@ -698,8 +731,10 @@ Options:
 -y Path to a config txt file for setting the above.
 
 Example: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/
-        -d 75 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -g D5S,D3S,G5S,G3S -n 3.5 -a
-        HIGH,MODERATE -c Pathogenic,Likely_pathogenic -i Foundation,Tempus -v
+        -d 75 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a
+        HIGH,MODERATE -e Benign,Likely_benign -c Pathogenic,Likely_pathogenic,
+        Conflicting_interpretations_of_pathogenicity -t 0.51 -u RYR1
+        
 
 **************************************************************************************
 </pre><br><p>
@@ -3419,6 +3454,73 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/PointDataManipulator -p
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="PolyADiffSeq"><pre>**************************************************************************************
+**                     Defined Region Differential Seq: May 2021                    **
+**************************************************************************************
+DRDS takes sorted bam files, one per replica, minimum one per condition, minimum two
+conditions (e.g. treatment and control or a time course/ multiple conditions) and
+identifies differentially expressed genes using DESeq2 or SAMTools. DESeq2's rLog
+normalized count data is used to heirachically cluster the samples. Differential
+splicing is estimated using a chi-square test of independence. When testing only a
+few genes or regions, append these onto a full gene table so that DESeq2 can
+appropriately estimate the library size and replica variance.
+
+Options:
+-s Save directory.
+-c Conditions directory containing one directory for each condition with one xxx.bam
+       file per biological replica and their xxx.bai indexs. 3-4 reps recommended per
+       condition. The BAM files should be sorted by coordinate using Picard's SortSam.
+       All spice junction coordinates should be converted to genomic coordinates, see
+       USeq's SamTranscriptomeParser.
+-r Full path to R (version 3+) loaded with DESeq2, samr, and gplots defaults to
+       '/usr/bin/R' file, see http://www.bioconductor.org . Type 'library(DESeq2);
+       library(samr); library(gplots)' in R to see if they are installed. 
+-u UCSC RefFlat or RefSeq gene table file, full path. Tab delimited, see RefSeq Genes
+       http://genome.ucsc.edu/cgi-bin/hgTables, (uniqueName1 name2(optional) chrom
+       strand txStart txEnd cdsStart cdsEnd exonCount (commaDelimited)exonStarts
+       (commaDelimited)exonEnds). Example: ENSG00000183888 C1orf64 chr1 + 16203317
+       16207889 16203385 16205428 2 16203317,16205000 16203467,16207889 . NOTE:
+       this table should contain only ONE composite transcript per gene (e.g. use
+       Ensembl genes NOT transcripts). Use the MergeUCSCGeneTable app to collapse
+       transcripts. See http://useq.sourceforge.net/usageRNASeq.html for details.
+-b (Or) a bed file (chr, start, stop,...), full path, See,
+       http://genome.ucsc.edu/FAQ/FAQformat#format1
+-g Genome Version  (ie H_sapiens_Mar_2006), see UCSC Browser,
+      http://genome.ucsc.edu/FAQ/FAQreleases.
+-f Turn off DESeq2 independent filtering.
+
+Advanced Options:
+-m Mask overlapping gene annotations, recommended for well annotated genomes.
+-x Max per base alignment depth, defaults to 50000. Genes containing such high
+       density coverage are ignored.
+-n Max number alignments per read. Defaults to 1, unique.  Assumes 'NH' tags have
+      been set by processing raw alignments with the SamTranscriptomeProcessor.
+-e Minimum number alignments per gene-region per replica, defaults to 10.
+-q Minimum alignment mapping quality, defaults to 0, no filtering.
+-i Score introns instead of exons.
+-p Perform a stranded analysis. Only collect reads from the same strand as the
+      annotation.
+-j Reverse stranded analysis.  Only collect reads from the opposite strand of the
+      annotation.  This setting should be used for the Illumina's strand-specific
+      dUTP protocol.
+-k Second read's strand is flipped. Otherwise, assumes this was not done in the 
+      SamTranscriptomeParser.
+-t Don't delete temp files (R script, R results, Rout, etc..).
+-a Run SAMseq in place of DESeq2.  This is only recommended with five or more
+      replicates per condition.
+-v Use these 3 -10Log10(AdjPVal) thresholds, comma delimited, no spaces, defaults
+      to 10,20,30
+-w Use these 3 absolute log2 ratio thresholds, comma delimited, no spaces, defaults
+      to 0.585,1,1.585
+-y Add in non phred AdjPVal columns, defaults to excluding.
+ 
+Example: java -Xmx4G -jar pathTo/USeq/Apps/DefinedRegionDifferentialSeq -c
+      /Data/TimeCourse/ESCells/ -s /Data/TimeCourse/DRDS -g H_sapiens_Feb_2009
+     -u /Anno/mergedHg19EnsemblGenes.ucsc.gz -w 0.322,0.585,1 -y -q 13 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="PoReCNV"><pre>**************************************************************************************
 **                                PoRe CNV: April 2017                              **
 **************************************************************************************
@@ -4555,7 +4657,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 </pre><br><p>
 				
 					<a name="TNRunner"><pre>**************************************************************************************
-**                                  TNRunner : Feb 2021                             **
+**                                  TNRunner : May 2021                             **
 **************************************************************************************
 TNRunner is designed to execute several containerized snakmake workflows on tumor
 normal datasets via a slurm cluster.  Based on the availability of fastq, 
@@ -4605,8 +4707,10 @@ Setup Options:
    sample concordance. The patient directory naming must match.
 -k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio
       background files.
--g Germline AnnotatedVcfParser options, defaults to '-d 15 -m 0.2 -x 1 -p 0.01 -g 
-      D5S,D3S -n 5 -a HIGH -c Pathogenic,Likely_pathogenic -o -e Benign,Likely_benign'
+-g Germline AnnotatedVcfParser options, defaults to '-d 15 -m 0.1 -q 0.1 -p 0.01 -g
+      D5S,D3S -n 4.4 -a HIGH -l -c Pathogenic,Likely_pathogenic,Conflicting_
+      interpretations_of_pathogenicity,Drug_response -t 0.51 -e Benign,Likely_benign
+      -o -b 0.1 -z 3 -u RYR1'
 -s Somatic AnnotatedVcfParser options, defaults to '-d 20 -f'
 -u Minimum read coverage for tumor DNA samples, defaults to 20
 -i Minimum read coverage for normal DNA samples, defaults to 15
@@ -4729,16 +4833,16 @@ Default Options:
 -m Minimum alignment mapping quality, defaults to 13
 -d Minimum read depth for passing coverge bed, defaults to 10
 -i Include counts from overlapping paired reads, defaults to excluding them.
--p Number processors to use, defaults to all, reduce if out of memory errors occur.
+-p Number processors to use, defaults to 25, reduce if out of memory errors occur.
 -x Max length of region chunk, defaults to 1000, set smaller if out of memory errors
       occur.
 -c Maximum read coverage stats calculated, defaults to 1000.
 -f For xxx.cram alignments, provide a path to the reference fasta with index.
--t Path to a directory containing the bgzip and tabix executables to compress and index
-      the bed file, see htslib.org 
+-t Path to a directory containing the bgzip and tabix executables to compress and
+      index the passing bed file, see htslib.org 
 
 Example: java -Xmx100G -jar pathTo/USeq/Apps/UniObRC -b my.cram -r target.bed
--f Ref/human_g1k_v37_decoy.fasta -s passing.bed.gz -t ~/BioApps/HTSlib/bin/ -o 20
+-f Ref/human_g1k_v37_decoy.fasta -s passing.bed.gz -t ~/BioApps/HTSlib/bin/ -d 20
 
 **************************************************************************************
 </pre><br><p>
@@ -4821,7 +4925,7 @@ Example: java -jar pathToUSeq/Apps/VarScanVCFParser -v /VarScan2/VCFFiles/
 </pre><br><p>
 				
 					<a name="VCFBkz"><pre>**************************************************************************************
-**                                VCF Bkz : May 2020                                **
+**                                VCF Bkz : May 2021                                **
 **************************************************************************************
 VCFBkz uses a panel of normals to calculate non-germline allele frequencies (AF) from 
 each sample that intersect a vcf record. It then calculates a z-score based on the vcf
@@ -5102,6 +5206,19 @@ Required:
 Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFFdrFilter -v Calls/ -s FDR5Calls -q 
       8.75,8.63,8.62,8.64,8.85 -r 16.5,15.9,15.3,25.7,45.2 -a
       0.005,0.0075,0.01,0.05,0.1 -b 0.005,0.0075,0.01,0.05,0.1 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCFExACParser"><pre>**************************************************************************************
+**                              VCF ExAC Parser: April 2021                         **
+**************************************************************************************
+Extracts the AF= value from the INFO field and uses it for the INFO.
+
+Required Options:
+-v Path to the xxx.vcf(.gz/.zip OK) file.
+
+Example: java -jar pathToUSeq/Apps/VCFExACParser -v ExAC.r1.sites.vep.hg38.vcf
 
 **************************************************************************************
 </pre><br><p>

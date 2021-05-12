@@ -174,6 +174,16 @@ public class UCSCGeneLine {
 		this.strand = strand;
 	}
 	
+	public UCSCGeneLine(Bed[] sorted, String name) {
+		displayName = name;
+		chrom = sorted[0].getChromosome();
+		txStart = cdsStart = sorted[0].getStart();
+		txEnd = cdsEnd = sorted[sorted.length-1].getStop();
+		exons = new ExonIntron[sorted.length];
+		for (int i=0; i< sorted.length; i++) exons[i] = new ExonIntron (sorted[i].getStart(), sorted[i].getStop());
+		strand = ""+sorted[0].getStrand();
+		scores = new float[]{(float)sorted[0].getScore()};
+	}
 	public static int[] findMinMax (UCSCGeneLine[] genes){
 		int min = Integer.MAX_VALUE;
 		int max = -1;
@@ -391,6 +401,34 @@ public class UCSCGeneLine {
 				sb.append(exons[i].getEnd());
 			}
 		}
+		return sb.toString();
+	}
+	
+	public String toUCSC(){
+		//refGene.name	refGene.chrom	refGene.strand	refGene.txStart	refGene.txEnd	refGene.cdsStart	refGene.cdsEnd	refGene.exonCount	refGene.exonStarts	refGene.exonEnds
+		StringBuffer sb = new StringBuffer();
+		if (displayName != null && displayName.length()!=0) {
+			sb.append(displayName); sb.append("\t");
+		}
+		if (name != null && name.length()!=0) {
+			sb.append(name); sb.append("\t");
+		}
+		sb.append(chrom); sb.append("\t");
+		sb.append(strand); sb.append("\t");
+		sb.append(txStart); sb.append("\t");
+		sb.append(txEnd); sb.append("\t");
+		sb.append(cdsStart); sb.append("\t");
+		sb.append(cdsEnd); sb.append("\t");
+		
+		int[] starts = new int[exons.length];
+		int[] ends = new int[exons.length];
+		for (int i=0; i<exons.length; i++){
+			starts[i] = exons[i].getStart();
+			ends[i] = exons[i].getEnd();
+		}
+		sb.append(exons.length); sb.append("\t");
+		sb.append(Misc.intArrayToString(starts, ",")); sb.append("\t");
+		sb.append(Misc.intArrayToString(ends, ","));
 		return sb.toString();
 	}
 	

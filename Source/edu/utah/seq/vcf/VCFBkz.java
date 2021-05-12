@@ -337,7 +337,7 @@ public class VCFBkz {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                VCF Bkz : May 2020                                **\n" +
+				"**                                VCF Bkz : May 2021                                **\n" +
 				"**************************************************************************************\n" +
 				"VCFBkz uses a panel of normals to calculate non-germline allele frequencies (AF) from \n"+
 				"each sample that intersect a vcf record. It then calculates a z-score based on the vcf\n"+

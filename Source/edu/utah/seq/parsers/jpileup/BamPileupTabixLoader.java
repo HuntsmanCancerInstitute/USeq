@@ -364,7 +364,8 @@ if (debug) IO.el("\nProc "+record);
 				//include indel counts?
 				if (includeIndelCountsForSnvs) af = ((double)samples[i].getIndelCount()+snvCounts) / samples[i].getPassingReadCoverage();
 			}
-
+			//watch out for infinity or not a number
+			if (Double.isInfinite(af) || Double.isNaN(af)) continue;
 			al.add(af);
 		}
 		return al;
@@ -424,7 +425,8 @@ if (debug) IO.el("\nProc "+record);
 				//recalc using all indels, real indels have either ins or del, fp indels often have both
 				af = (double)allSamples[i].getIndelCount() / allSamples[i].getPassingReadCoverage();
 			}
-
+			//watch out for infinity or not a number
+			if (Double.isInfinite(af) || Double.isNaN(af)) continue;
 			al.add(af);
 		}
 		return al;

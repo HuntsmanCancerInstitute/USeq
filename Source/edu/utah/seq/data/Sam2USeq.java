@@ -11,7 +11,7 @@ import edu.utah.seq.useq.ArchiveInfo;
 import edu.utah.seq.useq.SliceInfo;
 import edu.utah.seq.useq.USeqUtilities;
 import edu.utah.seq.useq.data.*;
-import edu.utah.seq.vcf.AnnotatedVcfParser;
+import edu.utah.seq.vcf.anno.AnnotatedVcfParser;
 import htsjdk.samtools.*;
 import htsjdk.samtools.SAMRecord.SAMTagAndValue;
 import util.bio.annotation.Bed;

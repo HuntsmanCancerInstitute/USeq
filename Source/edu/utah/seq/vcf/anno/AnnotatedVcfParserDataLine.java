@@ -132,9 +132,9 @@ public class AnnotatedVcfParserDataLine {
 		
 		//any pass?
 		if (pass.size() !=0) for (AnnotatedGene ag: pass) sumarySpreadSheet.println(main + ag.toString());
-		//any fail?
-		if (fail.size() !=0) for (AnnotatedGene ag: fail) sumarySpreadSheet.println(main + ag.toString());
-		if (pass.size() == 0 && fail.size() == 0) sumarySpreadSheet.println(main);
+		//only print fail if no pass
+		else if (fail.size() !=0) for (AnnotatedGene ag: fail) sumarySpreadSheet.println(main + ag.toString());
+		else sumarySpreadSheet.println(main);
 		sumarySpreadSheet.println();
 	}
 	
