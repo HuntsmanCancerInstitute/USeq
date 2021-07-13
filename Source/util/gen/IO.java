@@ -1903,6 +1903,7 @@ public class IO {
 				line = line.trim();
 				a.add(line);
 			}
+			in.close();
 		}catch(Exception e){
 			System.out.println("Prob loadFileInto String[]");
 			e.printStackTrace();
@@ -1923,6 +1924,7 @@ public class IO {
 				sb.append(line);
 				sb.append(seperator);
 			}
+			in.close();
 		}catch(Exception e){
 			System.out.println("Prob loadFileInto String "+file);
 			e.printStackTrace();
@@ -1943,6 +1945,7 @@ public class IO {
 				if (keyValue.length !=2 || keyValue[0].startsWith("#")) continue;
 				names.put(keyValue[0].trim(), keyValue[1].trim());
 			}
+			in.close();
 		}catch(Exception e){
 			System.out.println("Prob loadFileInttoHash()");
 			e.printStackTrace();
@@ -1963,6 +1966,7 @@ public class IO {
 				if (keyValue.length !=2 || keyValue[0].startsWith("#")) continue;
 				names.put(keyValue[0].trim().toLowerCase(), keyValue[1].trim());
 			}
+			in.close();
 		}catch(Exception e){
 			System.out.println("Prob loadFileInttoHash()");
 			e.printStackTrace();
@@ -1983,6 +1987,7 @@ public class IO {
 				if (keyValue.length !=2 || keyValue[0].startsWith("#")) continue;
 				names.put(keyValue[0].trim(), new Integer(keyValue[1].trim()));
 			}
+			in.close();
 		}catch(Exception e){
 			System.out.println("Prob loadFileInttoHash()");
 			e.printStackTrace();
@@ -2004,6 +2009,7 @@ public class IO {
 				//}
 				names.add(line);
 			}
+			in.close();
 		}catch(Exception e){
 			System.out.println("Prob loadFileInttoHash()");
 			e.printStackTrace();
@@ -2024,6 +2030,7 @@ public class IO {
 				if (i == null) names.put(line, new Integer(1));
 				else names.put(line, new Integer(i.intValue() + 1));
 			}
+			in.close();
 		}catch(Exception e){
 			System.out.println("Prob loadFileInttoHash()");
 			e.printStackTrace();
@@ -2046,6 +2053,7 @@ public class IO {
 				if (tokens.length ==0) continue;
 				for (int i=0; i< tokens.length; i++) names.add(tokens[i]);
 			}
+			in.close();
 		}catch(Exception e){
 			System.out.println("Prob loadFileInttoHashSplitLines()");
 			e.printStackTrace();
@@ -2064,6 +2072,7 @@ public class IO {
 				if (line.length() ==0) continue;
 				names.add(line);
 			}
+			in.close();
 		}catch(Exception e){
 			System.out.println("Prob loadFileIntoLinkedHashSet()");
 			e.printStackTrace();

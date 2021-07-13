@@ -39,6 +39,11 @@ public class Coordinate implements Comparable<Coordinate>, Serializable{
 		return new String(chromosome +"\t"+ start+ "\t"+ stop);
 	}
 	
+	/**Returns chr+":"+(start+1)+"-"+stop; */
+	public String getTabixSearchCoordinates() {
+		return new String(chromosome +":"+ (start+1)+ "-"+ stop);
+	}
+	
 	/**Assumes coordinates are inclusive.*/
 	public boolean intersects (int beginning, int end){
 		if (end < start || beginning > stop) return false;

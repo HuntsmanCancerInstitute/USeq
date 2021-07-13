@@ -198,7 +198,7 @@ public class TNSample {
 			if (normalDNADataset != null && normalDNADataset.isComplete()) {
 				goN = true;
 				//skip the mock normal
-				if (normalDNADataset.getBamFile().getName().equals("NA12878_NormalDNA_Hg38_final.bam")) numExist--;
+				if (normalDNADataset.getBamFile().getName().contains("NA12878")) numExist--;
 			}
 			numExist++;
 		}
@@ -258,6 +258,23 @@ public class TNSample {
 		if (toLink != null && toLink.size() != 0){
 			for (File f: toLink) Files.createSymbolicLink(new File(canJobDir, "F_"+f.getName()).toPath(), f.toPath());
 		}
+		
+		//link in gender file
+		//is it from Avatar?
+		File[] info = IO.extractFiles(rootDir, "Info.json.gz");
+		if (info == null || info.length !=1) {
+			//try to fetch from Tempus/ Caris/ Foundation
+			File d = new File(rootDir, "ClinicalReport");
+			if (d.exists() == false) info= null;
+			info = IO.extractFiles(d, ".json");
+			if (info == null || info.length !=1) info= null;
+		}
+		
+		if (info == null) throw new IOException( "ERROR: failed to find a file containing gender information for BamConcordance. See TNRunner menu.");
+		
+		Files.createSymbolicLink(new File(canJobDir, "gender."+info[0].getName()).toPath(), info[0].toPath());
+
+		
 	}
 
 	private ArrayList<File> fetchOtherBams() throws IOException {
@@ -290,6 +307,9 @@ public class TNSample {
 	private void removeBamConcordanceLinks(File jobDir) throws IOException{
 		IO.deleteFiles(jobDir, ".bam");
 		IO.deleteFiles(jobDir, ".bai");
+		File[] toDel = IO.extractFilesStartingWith(jobDir, "gender.");
+		if (toDel != null && toDel.length ==1) toDel[0].delete();
+		
 	}
 
 	private void annotateSomaticVcf() throws IOException {
@@ -306,7 +326,7 @@ public class TNSample {
 		jobDir.mkdirs();
 		
 		File[] toLink = null;
-		if (mergedSomaticVariants != null)toLink = new File[]{mergedSomaticVariants, new File(mergedSomaticVariants+".tbi")};
+		if (mergedSomaticVariants != null) toLink = new File[]{mergedSomaticVariants, new File(mergedSomaticVariants+".tbi")};
 		else toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi")};
 		
 

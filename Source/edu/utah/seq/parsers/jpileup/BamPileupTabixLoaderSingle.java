@@ -12,6 +12,8 @@ import java.util.regex.Pattern;
 import edu.utah.seq.query.QueryIndexFileLoader;
 import edu.utah.seq.vcf.VCFBkz;
 import htsjdk.tribble.readers.TabixReader;
+import util.bio.annotation.Bed;
+import util.bio.annotation.Coordinate;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
@@ -44,6 +46,11 @@ public class BamPileupTabixLoaderSingle {
 		String tabixCoor = vcfFields[0]+":"+ startStop[0]+ "-"+ startStop[1];
 		
 		//return the lines
+		return fetchLines(tabixCoor);
+	}
+	
+	public ArrayList<BpileupLine> fetchBpileupRecords(Coordinate region) throws Exception {	
+		String tabixCoor = region.getTabixSearchCoordinates();
 		return fetchLines(tabixCoor);
 	}
 	

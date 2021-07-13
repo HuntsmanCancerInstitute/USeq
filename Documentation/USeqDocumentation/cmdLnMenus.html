@@ -37,13 +37,13 @@
 				
 					<a href="#AvatarComparator">AvatarComparator</a><br>
 				
-					<a href="#BamConcordance">BamConcordance</a><br>
-				
 					<a href="#BamContextInspector">BamContextInspector</a><br>
 				
 					<a href="#BamHg19ToB37Converter">BamHg19ToB37Converter</a><br>
 				
 					<a href="#BamBlaster">BamBlaster</a><br>
+				
+					<a href="#BamConcordance">BamConcordance</a><br>
 				
 					<a href="#BamMixer">BamMixer</a><br>
 				
@@ -280,6 +280,8 @@
 					<a href="#SamComparator">SamComparator</a><br>
 				
 					<a href="#SamParser">SamParser</a><br>
+				
+					<a href="#SampleConcordance">SampleConcordance</a><br>
 				
 					<a href="#SamTranscriptomeParser">SamTranscriptomeParser</a><br>
 				
@@ -695,7 +697,9 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/AnnotatedBed2UCSCRefFlat -b anno.bed.
 Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
 VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
 records. Use the -r option to inspect the effect of the various filters on each
-record. Use the VCFRegionFilter app to restrict variants to particular gene regions.
+record. Use the VCFRegionFilter app to restrict variants to particular regions.
+A summary spreadsheet is exported with select information and excel hyperlinks for
+rapid inspection.
 
 Options:
 -v File path or directory containing xxx.vcf(.gz/.zip OK) file(s) to filter.
@@ -781,53 +785,6 @@ Example: java -jar -Xmx2G ~/USeqApps/AvatarComparator -j AJobs/
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="BamConcordance"><pre>**************************************************************************************
-**                               Bam Concordance: Feb 2021                          **
-**************************************************************************************
-BC calculates sample level concordance based on uncommon homozygous SNVs found in bam
-files. Samples from the same person will show high similarity (>0.9). Run BC on
-related sample bams (e.g tumor & normal exomes, tumor RNASeq) plus an unrelated bam
-for comparison. Mismatches passing filters are written to file. BC also generates a
-variety of AF histograms for checking gender and sample contamination. Although
-threaded, BC runs slowly with more that a few bams. Use the USeq ClusterMultiSampleVCF
-app to check large batches of vcfs to identify the likely mismatched sample pairs.
-
-WARNING: Mpileup does not check that the chr order is the same across samples and the
-fasta reference, be certain they are or mpileup will produce incorrect counts. Use
-Picard's ReorderSam app if in doubt.
-
-Note re FFPE derived RNASeq data: A fair bit of systematic error is found in these
-datasets.  As such, the RNA-> DNA contrasts are low. Yet the DNA->RNA are > 0.9
-
-Options:
--r Path to a bed file of regions to interrogate.
--s Path to the samtools executable.
--f Path to an indexed reference fasta file.
--b Path to a directory containing indexed bam files.
--c Path to a tabix indexed bed file of common dbSNPs. Download 00-common_all.vcf.gz 
-       from ftp://ftp.ncbi.nih.gov/snp/organisms/, grep for 'G5;' containing lines, 
-       run VCF2Bed, bgzip and tabix it with https://github.com/samtools/htslib,
-       defaults to no exclusion from calcs. 
--d Minimum read depth, defaults to 25.
--a Minimum allele frequency to count as a homozygous variant, defaults to 0.95
--m Minimum allele frequency to count a homozygous match, defaults to 0.9
--q Minimum base quality, defaults to 20.
--u Minimum mapping quality, defaults to 20.
--n Minimum fraction similarity to pass sample set, defaults to 0.85
--x Maximum log2Rto score for calling a sample female, defaults to 1.5
--y Minimum log2Rto score for calling a sample male, defaults to 2.5
--e Sample name to ignore in scoring similarity and gender, defaults to 'RNA'
--j Write gzipped summary stats in json format to this file.
--t Number of threads to use.  If not set, determines this based on the number of
-      threads and memory available to the JVM so set the -Xmx value to the max.
-
-Example: java -Xmx100G -jar pathTo/USeq/Apps/BamConcordance -r ~/exomeTargets.bed
-      -s ~/Samtools1.3.1/bin/samtools -b ~/Patient7Bams -d 10 -a 0.9 -m 0.8 -f
-      ~/B37/human_g1k_v37.fasta -c ~/B37/b38ComSnps.bed.gz -j bc.json.gz 
-
-**************************************************************************************
-</pre><br><p>
-				
 					<a name="BamContextInspector"><pre>**************************************************************************************
 **                           Bam Context Inspector:  Oct 2016                       **
 **************************************************************************************
@@ -894,6 +851,57 @@ Required:
 
 Example: java -Xmx10G -jar pathTo/USeq/Apps/BamBlaster -b ~/BMData/na12878.bam
     -r ~/BMData/BB0 -v ~/BMData/clinvar.pathogenic.SnvIndel.vcf.gz 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="BamConcordance"><pre>**************************************************************************************
+**                              Bam Concordance: July 2021                          **
+**************************************************************************************
+BC calculates sample level concordance based on uncommon homozygous SNVs found in bam
+files. Samples from the same person will show high similarity (>0.9). Run BC on
+related sample bams (e.g tumor & normal exomes, tumor RNASeq) plus an unrelated bam
+for comparison. Mismatches passing filters are written to file. BC also generates a
+variety of AF histograms for checking gender and sample contamination. Although
+threaded, BC runs slowly with more that a few bams. Use the USeq ClusterMultiSampleVCF
+app to check large batches of vcfs to identify the likely mismatched sample pairs.
+
+WARNING: Mpileup does not check that the chr order is the same across samples and the
+fasta reference, be certain they are or mpileup will produce incorrect counts. Use
+Picard's ReorderSam app if in doubt.
+
+Note re FFPE derived RNASeq data: A fair bit of systematic error is found in these
+datasets.  As such, the RNA-> DNA contrasts are low. Yet the DNA->RNA are > 0.9
+
+Options:
+-r Path to a bed file of regions to interrogate.
+-s Path to the samtools executable.
+-f Path to an indexed reference fasta file.
+-b Path to a directory containing indexed bam and cram files.
+-c Path to a tabix indexed bed file of common dbSNPs. Download 00-common_all.vcf.gz 
+       from ftp://ftp.ncbi.nih.gov/snp/organisms/, grep for 'G5;' containing lines, 
+       run VCF2Bed, bgzip and tabix it with https://github.com/samtools/htslib,
+       defaults to no exclusion from calcs. 
+-g Path to a file containing a line with the word 'gender' followed by the word 'male',
+       'female', 'm', or 'f' surrounded by whitespace, case insensitive, gz/zip OK.
+       This is compared to the gender estimate.
+-d Minimum read depth, defaults to 25.
+-a Minimum allele frequency to count as a homozygous variant, defaults to 0.95
+-m Minimum allele frequency to count a homozygous match, defaults to 0.9
+-q Minimum base quality, defaults to 20.
+-u Minimum mapping quality, defaults to 20.
+-n Minimum fraction similarity to pass sample set, defaults to 0.85
+-x Maximum log2Rto score for calling a sample female, defaults to 1.5
+-y Minimum log2Rto score for calling a sample male, defaults to 2.5
+-e Sample name to ignore in scoring similarity and gender, defaults to 'RNA'
+-j Write gzipped summary stats in json format to this file.
+-t Number of threads to use.  If not set, determines this based on the number of
+      threads and memory available to the JVM so set the -Xmx value to the max.
+
+Example: java -Xmx100G -jar pathTo/USeq/Apps/BamConcordance -r ~/exomeTargets.bed
+      -s ~/ST/1.12/bin/samtools -b ~/Patient7Crams -d 10 -a 0.9 -m 0.8 -f
+      ~/B37/human_g1k_v37.fasta -c ~/B37/b38ComSnps.bed.gz -j bc.json.gz -g 
+      gender.json.gz
 
 **************************************************************************************
 </pre><br><p>
@@ -4025,6 +4033,47 @@ Options:
 
 Example: java -Xmx1500M -jar pathToUSeq/Apps/SamParser -f /Novo/Run7/
      -v C_elegans_May_2008 -m 0 -a 120  
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="SampleConcordance"><pre>**************************************************************************************
+**                            Sample Concordance: July 2021                         **
+**************************************************************************************
+SC calculates sample level concordance and gender based on uncommon homozygous SNVs in
+alignment files. Those from the same person will show high similarity (>0.9). To run
+SC, first create a multi-sample pileup file with the USeq BamPileup app. Try SC with
+related bams (e.g tumor & normal exomes, tumor RNASeq) plus an unrelated bam for
+comparison. Mismatches passing filters are written to file. BC also generates a
+variety of AF histograms for checking gender and sample contamination.
+
+Note re FFPE derived RNASeq data, a fair bit of systematic error is found in these
+datasets.  As such, the RNA-> DNA contrasts are low. Yet the DNA->RNA are > 0.9
+
+Options:
+-r Path to a bed file of regions to interrogate.
+-b Path to a multi-sample bam/ cram pileup file, see the USeq BamPileup app.
+-c Path to a tabix indexed bed file of common dbSNPs. Download 00-common_all.vcf.gz 
+       from ftp://ftp.ncbi.nih.gov/snp/organisms/, grep for 'G5;' containing lines, 
+       run VCF2Bed, bgzip and tabix it with https://github.com/samtools/htslib,
+       defaults to no exclusion from calcs. 
+-g Path to a txt file containing a line with the word 'gender' followed by 'male',
+       'female', 'm', or 'f', surrounded by whitespace, case insensitive, gz/zip OK.
+       This is compared to the BC gender estimate.
+-d Minimum SNV read depth, defaults to 25.
+-a Minimum allele frequency to count as a homozygous variant, defaults to 0.95
+-m Minimum allele frequency to count a homozygous match, defaults to 0.9
+-n Minimum fraction similarity to pass sample set, defaults to 0.85
+-x Maximum log2Rto score for calling a sample female, defaults to 1.5
+-y Minimum log2Rto score for calling a sample male, defaults to 2.5
+-e Sample name to ignore in scoring similarity and gender, defaults to 'RNA'
+-j Write gzipped summary stats in json format to this file.
+-t Number of threads to use.  If not set, determines this based on the number of
+      threads and memory available to the JVM so set the -Xmx value to the max.
+
+Example: java -Xmx100G -jar pathTo/USeq/Apps/SampleConcordance -r ~/exomeTargets.bed
+      -b ~/PatientA.bp.txt.gz -d 30 -a 0.9 -m 0.8 -c ~/B38/b38ComSnps.bed.gz -j
+      bc.json.gz -g gender.json.gz
 
 **************************************************************************************
 </pre><br><p>

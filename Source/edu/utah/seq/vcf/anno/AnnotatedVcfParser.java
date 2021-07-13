@@ -449,6 +449,7 @@ public class AnnotatedVcfParser {
 			dataLine.clinSig = csAll;
 			dataLine.clinSigCLNHGVS= infoKeyValue.get("CLNHGVS");
 			dataLine.clinSigConf = infoKeyValue.get("CLNSIGCONF");
+			dataLine.clinAlleleId = infoKeyValue.get("ALLELEID");
 			if (clinsig.containsKey(csAll)) {
 				int count = clinsig.get(csAll);
 				clinsig.put(csAll, new Integer( ++count ));
@@ -1084,7 +1085,9 @@ public class AnnotatedVcfParser {
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+
 				"records. Use the -r option to inspect the effect of the various filters on each\n"+
-				"record. Use the VCFRegionFilter app to restrict variants to particular gene regions.\n"+
+				"record. Use the VCFRegionFilter app to restrict variants to particular regions.\n"+
+				"A summary spreadsheet is exported with select information and excel hyperlinks for\n"+
+				"rapid inspection.\n"+
 
 				"\nOptions:\n"+
 				"-v File path or directory containing xxx.vcf(.gz/.zip OK) file(s) to filter.\n" +

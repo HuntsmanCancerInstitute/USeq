@@ -106,6 +106,16 @@ public class MpileupSample {
 		return sb.toString();
 	}
 	
+	public String toStringCounts() {
+		StringBuilder sb = new StringBuilder();
+		sb.append("F: " ); sb.append(Num.intArrayToString(forwardGATC, ","));
+		sb.append("\tR: " ); sb.append(Num.intArrayToString(reverseGATC, ","));
+		int total = readCoverageForwardBases + readCoverageReverseBases;
+		sb.append("\tTOT: "+total);
+
+		return sb.toString();
+	}
+	
 	public void printMinInfo(){
 		System.out.println(record.getChr()+" "+(record.getZeroPos()+1)+" "+readCoverageAll+" "+ getAlleleFreqNonRefPlusIndels());
 	}
@@ -305,8 +315,8 @@ public class MpileupSample {
 		return maxAF;
 	}
 	
-	/**Returns double[]{maxAF, maxIndex}, null if ref isn't GATC*/
-	public double[] findMaxSnvAFAndIndex(){
+	/**Returns non reference double[]{maxAF, maxIndex}, null if ref isn't GATC*/
+	public double[] findMaxNonReferenceSnvAFAndIndex(){
 		double maxAF = Double.MIN_NORMAL;
 		int maxIndex = -1;
 		char ref = record.getRef().charAt(0);
@@ -323,6 +333,7 @@ public class MpileupSample {
 				maxIndex = index;
 			}
 		}
+//System.out.println("\tMaxAF "+maxAF+"   Tot "+(this.getReadCoverageForwardBases()+this.getReadCoverageReverseBases())+"  Inx "+maxIndex);
 		return new double[]{maxAF, maxIndex};
 	}
 

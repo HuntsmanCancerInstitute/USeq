@@ -39,6 +39,7 @@ public class AnnotatedVcfParserDataLine {
 	String clinSigCLNHGVS = null;
 	String clinSig = null;
 	String clinSigConf = null;
+	String clinAlleleId = null;
 	
 	//Splice
 	boolean passesSplice = false;
@@ -61,7 +62,7 @@ public class AnnotatedVcfParserDataLine {
 	}
 
 	public static final String headerSpreadSheet = "FileName\tIGVLink\tCHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tAlleleFreq\t"
-			+ "UniOb\tReadDepth\tPriorCallFreq\tBKZ\tBKAF\tPopFreq\tPassClinvar\tClinHGVS\tClinSig\t"
+			+ "UniOb\tReadDepth\tPriorCallFreq\tBKZ\tBKAF\tPopFreq\tPassClinvar\tClinLink\tClinHGVS\tClinSig\t"
 			+ "ClinSigConf\tPassSpliceScan\tSpliceGene\tSpliceDiff";
 	
 	public void println(Gzipper sumarySpreadSheet) throws IOException {
@@ -110,6 +111,8 @@ public class AnnotatedVcfParserDataLine {
 				
 		//CLINVAR
 		al.add(passesCLINVAR+"");
+		
+		al.add(getClinvarLink());
 		al.add(clinSigCLNHGVS);
 		al.add(clinSig);
 		al.add(clinSigConf);
@@ -155,6 +158,18 @@ public class AnnotatedVcfParserDataLine {
 		return sb.toString();
 	}
 	
+	public String getClinvarLink() {
+		//create clinvar link  =HYPERLINK('https://www.ncbi.nlm.nih.gov/clinvar/?term=27450[alleleid]','27450')
+		if (clinAlleleId == null) return null;
+		StringBuilder sb = new StringBuilder();
+		sb.append("=HYPERLINK(\"https://www.ncbi.nlm.nih.gov/clinvar/?term=");
+		sb.append(clinAlleleId); 
+		sb.append("[alleleid]\",\"");
+		sb.append(clinAlleleId);
+		sb.append("\")");
+		return sb.toString();
+	}
+	
 	public static final String legend = "\nColumn Descriptions:\n"+
 			"FileName\tTrimmed name of the parsed vcf file\n"+
 			"IGVLink\tClicking moves IGV to the variant location\n"+
@@ -173,6 +188,7 @@ public class AnnotatedVcfParserDataLine {
 			"BKAF\tSorted list (largest to smallest) of background non-reference AFs used to calculate the BKZ.\n"+
 			"PopFreq\tMaximum observed population frequency, fractions > 0.01 are indicative of a common variant\n"+
 			"PassClinvar\tBoolean indicating whether this record passes the CLINVAR include and exclude criteria\n"+
+			"ClinLink\tCLINVAR ALLELEID Excel hyperlink, opens the CLINVAR page for this variant in a web browser\n"+
 			"ClinHGVS\tCLINVARs HGVS notation for this variant\n"+
 			"ClinSig\tCLINVAR's significance annotation\n"+
 			"ClinSigConf\tCLINVAR's conflicting interpretation tabulation\n"+

@@ -117,6 +117,7 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 	
 	public void appendID(SimpleVcf o) {
 		if (o.getId().equals(".") == false) id = id+";"+o.getId();
+		else id = o.getId();
 	}
 	
 	public void appendINFO(SimpleVcf o) {

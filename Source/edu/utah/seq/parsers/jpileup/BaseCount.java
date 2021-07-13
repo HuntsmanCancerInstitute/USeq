@@ -154,6 +154,87 @@ public class BaseCount {
 		double aCount = getSnvCount(allele);
 		return aCount/aTotal;
 	}
+	
+	/**Returns maximum non reference SNV double[]{maxAF, maxIndex}, null if ref isn't GATC*/
+	public double[] findMaxNonReferenceSnvAFAndIndex(){
+		//public static final int G_INDEX = 0;
+		//public static final int A_INDEX = 1;
+		//public static final int T_INDEX = 2;
+		//public static final int C_INDEX = 3;
+		
+		double aTotal = getPassingReadCoverageSnv();
+		if (aTotal == 0) return null;
+		double maxCount = 0;
+		double maxIndex = -1;
+		
+		if (ref == 'G') {
+			if (a > maxCount) {
+				maxCount = a;
+				maxIndex = 1;
+			}
+			if (t > maxCount) {
+				maxCount = t;
+				maxIndex = 2;
+			}
+			if (c > maxCount) {
+				maxCount = c;
+				maxIndex = 3;
+			}
+		}
+		
+		else if (ref == 'A') {
+			if (g > maxCount) {
+				maxCount = g;
+				maxIndex = 0;
+			}
+			if (t > maxCount) {
+				maxCount = t;
+				maxIndex = 2;
+			}
+			if (c > maxCount) {
+				maxCount = c;
+				maxIndex = 3;
+			}
+		}
+		
+		else if (ref == 'T') {
+			if (g > maxCount) {
+				maxCount = g;
+				maxIndex = 0;
+			}
+			if (a > maxCount) {
+				maxCount = a;
+				maxIndex = 1;
+			}
+			if (c > maxCount) {
+				maxCount = c;
+				maxIndex = 3;
+			}
+		}
+		
+		else if (ref == 'C') {
+			if (g > maxCount) {
+				maxCount = g;
+				maxIndex = 0;
+			}
+			if (a > maxCount) {
+				maxCount = a;
+				maxIndex = 1;
+			}
+			if (t > maxCount) {
+				maxCount = t;
+				maxIndex = 2;
+			}
+		}
+		
+		else return null;
+		
+
+		double maxAF =  maxCount/aTotal;
+//System.out.println("\tMaxAF "+maxAF+"   Tot "+aTotal+"  Inx "+maxIndex);
+		return new double[]{maxAF, maxIndex};
+	}
+	
 	public double getIndelAlleleFreq(char allele) throws IOException {
 		double aTotal = getPassingReadCoverage();
 		if (aTotal == 0) return 0;

@@ -31,7 +31,6 @@ public class ConcordanceChunk implements Runnable{
 	private Gzipper misMatchBed;
 	private int minSnvDP;
 	private double minAFForHom;
-	private double minAFForMatch;
 	private double minAFForHis;
 	private int minBaseQuality;
 	private int minMapQuality;
@@ -43,6 +42,7 @@ public class ConcordanceChunk implements Runnable{
 	private IntervalST<String> commonSnvRegions = null;
 	private String currCommonChr = "";
 	private TabixReader tabixReader;
+//private int numSimCheck = 0;
 	
 	public ConcordanceChunk(Bed[] regions, BamConcordance bcc, String chunkName) throws Exception{
 		this.bcc = bcc;
@@ -51,7 +51,6 @@ public class ConcordanceChunk implements Runnable{
 		this.minSnvDP = bcc.getMinSnvDP();
 		this.minAFForHom = bcc.getMinAFForHom();
 		this.minAFForHis = bcc.getMinAFForHis();
-		this.minAFForMatch = bcc.getMinAFForMatch();
 		this.minBaseQuality = bcc.getMinBaseQuality();
 		this.maxIndel = bcc.getMaxIndel();
 		this.minMapQuality = bcc.getMinMappingQuality();
@@ -78,19 +77,22 @@ public class ConcordanceChunk implements Runnable{
 			String line;
 			ParsedSample[] parsedSamples = null;
 
-			int counter = 0;
+//boolean printMe = false;
 			while ((line=data.readLine())!= null){
 				if (line.startsWith("#")){
 					System.out.println("\t"+line);
 					continue;
 				}
 				numMpileupLinesProc++;
-				
+//printMe = false;
 				//parse line
 				MpileupLine ml = new MpileupLine(line, minBaseQuality);
 				String chr = ml.getChr();
 				if (chr == null || ml.getRef().equals("N")) continue;
 				boolean chrX = (chr.equals("X") || chr.equals("chrX"));
+				
+//if (chr.equals("chr1") && ml.getZeroPos() > 146983121 && ml.getZeroPos()< 146983141) printMe=true;
+//if (printMe) System.out.println(ml.getLine());
 				
 				//load common snv interval tree?
 				if (chr.equals(currCommonChr) == false) loadIntervalTree(chr);
@@ -112,6 +114,7 @@ public class ConcordanceChunk implements Runnable{
 				boolean passDPIndel = false;
 				boolean passAF = false;
 				for (int i=0; i<samples.length; i++) {
+//if (printMe) System.out.println(samples[i].toStringCounts());
 					parsedSamples[i] = new ParsedSample(samples[i], chrX, i);
 					if (parsedSamples[i].passDpIndel) {
 						passDPIndel = true;
@@ -119,12 +122,15 @@ public class ConcordanceChunk implements Runnable{
 					}
 				}
 				
+//if (printMe) System.out.println(passDPIndel+" "+passAF);
+				
 				//any that pass?
 				if (passDPIndel == true && passAF == true){
 					//common?
 					if (commonSnp(ml.getZeroPos()) == false) {
 						//contrast samples
 						boolean foundMisMatch = false;
+//numSimCheck++;
 						for (int i=0; i< similarities.length; i++) {
 							if (similarities[i].contrast(parsedSamples)) foundMisMatch = true;
 						}
@@ -141,8 +147,8 @@ public class ConcordanceChunk implements Runnable{
 			if (numMpileupLinesProc == 0) throw new IOException("Failed to parse any mpileup lines? "+chunkName);
 			complete = true;
 			failed = false;
-			System.out.println(chunkName+ " job complete. "+numMpileupLinesProc+" bases parsed.");
-			
+System.out.println(chunkName+ " job complete. "+numMpileupLinesProc+" bases parsed.");
+//System.out.println(chunkName+ " job complete. "+numSimCheck+" sim check.");
 			
 		} catch (Exception e) {
 			System.err.println("Problem executing -> "+cmd);
@@ -205,7 +211,7 @@ public class ConcordanceChunk implements Runnable{
 					else {
 						passDpIndel = true;
 						//might be null!
-						maxAFIndex = ms.findMaxSnvAFAndIndex();
+						maxAFIndex = ms.findMaxNonReferenceSnvAFAndIndex();
 						if (maxAFIndex != null && maxAFIndex[0] >= minAFForHis){
 							afHist[index].count(maxAFIndex[0]);
 							if (chrX) chrXAfHist[index].count(maxAFIndex[0]);

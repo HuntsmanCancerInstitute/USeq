@@ -29,6 +29,15 @@ public class BpileupLine {
 		for (int i=3; i< numFields; i++) samples[index++] = new BaseCount(zeroPos, ref, fields[i]);	
 	}
 	
+	public String getBed(){
+		StringBuilder sb = new StringBuilder(chr);
+		sb.append("\t");
+		sb.append(zeroPos);
+		sb.append("\t");
+		sb.append(zeroPos+1);
+		return sb.toString();
+	}
+	
 	//getters and setters
 	public String getChr() {
 		return chr;

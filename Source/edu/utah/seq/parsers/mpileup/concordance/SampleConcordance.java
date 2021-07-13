@@ -11,22 +11,18 @@ import java.util.concurrent.Executors;
 /**
  * @author david.nix@hci.utah.edu 
  **/
-public class BamConcordance {
+public class SampleConcordance {
 
 	//user defined fields
 	private File bedFile;
+	private File bamPileupFile;
 	private File commonSnvBed;
-	private File samtools;
-	private File fasta;
 	private File gender;
-	private File[] bamFiles;
 	private int minSnvDP = 25;
 	private double minAFForHom = 0.95;
 	private double minAFForMatch = 0.90;
 	private double minAFForHis = 0.05;
 	private double minFracSim = 0.85;
-	private int minBaseQuality = 20;
-	private int minMappingQuality = 20;
 	private File jsonOutputFile = null;
 	private String toIgnoreForCall = "RNA";
 	private double minMale = 2.5;
@@ -39,7 +35,7 @@ public class BamConcordance {
 	private double maxIndel = 0.01;
 	private Histogram[] afHist;
 	private Histogram[] chrXAfHist;
-	private Similarity[] similarities;
+	private SimilarityBamPileup[] similarities;
 	private String[] sampleNames = null;
 	private String[] similarityForJson = null;
 	private String[] genderForJson = null;
@@ -51,15 +47,17 @@ public class BamConcordance {
 	private String clinicalGenderBCComparison = "NA";
 	
 	//internal fields
-	ConcordanceChunk[] runners;
+	ConcordanceChunkBamPileup[] runners;
 	
 
 	
 	//constructors
-	public BamConcordance(String[] args){
+	public SampleConcordance(String[] args){
 		try {
 			long startTime = System.currentTimeMillis();
 			processArgs(args);
+			
+			loadSampleNames();
 
 			printThresholds();
 			
@@ -83,6 +81,46 @@ public class BamConcordance {
 		}
 	}
 
+	private void loadSampleNames() throws IOException {
+		//sample names
+		/*
+		# MinMapQual    13
+		# MinBaseQual   10
+		# IncludeOverlappingBpCounts false
+		# PrintAll false
+		# Bed /uufs/chpc.utah.edu/common/PE/hci-bioinformatics1/TNRunner/Bed/AllExonHg38Bed8April2020/hg38AllGeneExonsPad175bp.bed.gz
+		# BamCram       0       /scratch/general/pe-nfs1/u0028003/Avatar/AJobs/1121013_13-0021350a/Alignment/1121013_13-0021350a_TumorRNA/Bam/1121013_13-0021350a_TumorRNA_Hg38.bam
+		# BamCram       1       /scratch/general/pe-nfs1/u0028003/Avatar/AJobs/1121013_13-0021350a/Alignment/1121013_TumorDNA/Bam/1121013_TumorDNA_Hg38_final.bam
+		# Chr   1BasePos        Ref     A,C,G,T,N,Del,Ins,FailBQ
+		*/
+		BufferedReader in = IO.fetchBufferedReader(bamPileupFile);
+		String line = null;
+		String[] fields = null;
+		ArrayList<String> namesAL = new ArrayList<String>();
+		while ((line = in.readLine())!= null) {
+			line = line.trim();
+			if (line.startsWith("# Chr")) break;
+			if (line.startsWith("# BamCram")){
+				fields = Misc.TAB.split(line);
+				if (fields.length != 3) throw new IOException("ERROR: failed to parse the sample names from your bam pileup file "+bamPileupFile);
+				namesAL.add(fields[2]);
+			}
+		}
+		sampleNames = new String[namesAL.size()];
+		bamFileNamesForJson = new String[sampleNames.length];
+		StringBuilder sb = new StringBuilder();
+		for (int i=0; i< sampleNames.length; i++) {
+			String fullPathName = namesAL.get(i);
+			fields = Misc.FORWARD_SLASH.split(fullPathName);
+			String justName = fields[fields.length-1];
+			if (justName.endsWith(".bam")) sampleNames[i] = justName.replace(".bam", "");
+			else sampleNames[i] = justName.replace(".cram", "");
+			bamFileNamesForJson[i] = justName;
+			sb.append(fullPathName); sb.append(" ");
+		}
+		bamNames = sb.toString();
+	}
+
 	public void doWork() throws Exception{
 		
 		//attempt to pull gender
@@ -103,23 +141,21 @@ public class BamConcordance {
 		
 		//create runners and start
 		System.out.println("\nLaunching "+splitBed.size() +" jobs...");
-		runners = new ConcordanceChunk[splitBed.size()];
+		runners = new ConcordanceChunkBamPileup[splitBed.size()];
 		ExecutorService executor = Executors.newFixedThreadPool(runners.length);
 		
 		for (int i=0; i< runners.length; i++) {
-			runners[i] = new ConcordanceChunk(splitBed.get(i), this, ""+i);
+			runners[i] = new ConcordanceChunkBamPileup(splitBed.get(i), this, ""+i);
 			executor.execute(runners[i]);
 		}
 		executor.shutdown();
 		//spins here until the executer is terminated, e.g. all threads complete
-        while (!executor.isTerminated()) {
-        }
+        while (!executor.isTerminated()) {}
 		
 		//check runners and pull bed gzippers
         ArrayList<File> toMerge = new ArrayList<File>();
-        for (ConcordanceChunk c: runners) {
+        for (ConcordanceChunkBamPileup c: runners) {
 			if (c.isFailed()) Misc.printErrAndExit("\nERROR: Failed runner, aborting! \n"+c.getCmd());
-			c.getTempBed().delete();
 			toMerge.add(c.getMisMatchBed().getGzipFile());
 		}
         
@@ -135,7 +171,7 @@ public class BamConcordance {
 		IO.deleteDirectory(tempDirectory);
 	}
 
-	private void aggregateStats(ConcordanceChunk[] runners) throws Exception {
+	private void aggregateStats(ConcordanceChunkBamPileup[] runners) throws Exception {
         //collect stats
     	afHist = runners[0].getAfHist();
     	chrXAfHist = runners[0].getChrXAfHist();
@@ -153,7 +189,7 @@ public class BamConcordance {
     		}
     	
     		//similarities
-    		Similarity[] s = runners[i].getSimilarities();
+    		SimilarityBamPileup[] s = runners[i].getSimilarities();
     		for (int x=0; x< s.length; x++) similarities[x].add(s[x]);
     		
     		runners[i].getMisMatchBed().getGzipFile().delete();
@@ -166,8 +202,6 @@ public class BamConcordance {
 		IO.pl(minAFForHom+"\tMinAFForHom");
 		IO.pl(minAFForMatch+"\tminAFForMatch");
 		IO.pl(minAFForHis+"\tMinAFForHis");
-		IO.pl(minBaseQuality+"\tMinBaseQuality");
-		IO.pl(minMappingQuality+"\tMinMappingQuality");
 		IO.pl(maxIndel+"\tMaxIndel");
 		IO.pl(minFracSim+"\tMinFractionSimilarity");
 		IO.pl(maxFemale+"\tMaxFemale");
@@ -374,7 +408,7 @@ public class BamConcordance {
 			printDocs();
 			System.exit(0);
 		}
-		new BamConcordance(args);
+		new SampleConcordance(args);
 	}		
 	
 	/**This method will process each argument and assign new varibles
@@ -383,7 +417,6 @@ public class BamConcordance {
 		Pattern pat = Pattern.compile("-[a-z]");
 		String useqVersion = IO.fetchUSeqVersion();
 		System.out.println("\n"+useqVersion+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
-		File bamCramDir = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -393,17 +426,13 @@ public class BamConcordance {
 					switch (test){
 					case 'r': bedFile = new File(args[++i]); break;
 					case 'c': commonSnvBed = new File(args[++i]); break;
-					case 's': samtools = new File(args[++i]); break;
-					case 'f': fasta = new File(args[++i]); break;
 					case 'g': gender = new File(args[++i]); break;
-					case 'b': bamCramDir = new File(args[++i]); break;
+					case 'b': bamPileupFile = new File(args[++i]); break;
 					case 'd': minSnvDP = Integer.parseInt(args[++i]); break; 
 					case 'a': minAFForHom = Double.parseDouble(args[++i]); break;
 					case 'x': maxFemale = Double.parseDouble(args[++i]); break;
 					case 'y': minMale = Double.parseDouble(args[++i]); break;
 					case 'm': minAFForMatch = Double.parseDouble(args[++i]); break;
-					case 'q': minBaseQuality = Integer.parseInt(args[++i]); break;
-					case 'u': minMappingQuality = Integer.parseInt(args[++i]); break;
 					case 'j': jsonOutputFile = new File(args[++i]); break;
 					case 'n': minFracSim = Double.parseDouble(args[++i]); break;
 					case 'e': toIgnoreForCall = args[++i]; break;
@@ -419,87 +448,51 @@ public class BamConcordance {
 
 		//check bed
 		if (bedFile == null || bedFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find your bed file of regions to interrogate? "+bedFile);
-		//check samtools
-		if (samtools == null || samtools.canExecute() == false) Misc.printErrAndExit("\nError: cannot find your samtools executable? "+samtools);
-		//check bed
-		if (fasta == null || fasta.canRead() == false) Misc.printErrAndExit("\nError: cannot find your indexed fasta reference file "+fasta);
-		//check bams
-		if (bamCramDir == null || bamCramDir.exists() == false || bamCramDir.isDirectory() == false) Misc.printErrAndExit("\nError: cannot find your directory containing bam and cram files ? "+bamCramDir);
-		File[][] tot = new File[2][];
-		tot[0] = IO.extractFiles(bamCramDir, ".bam");
-		tot[1] = IO.extractFiles(bamCramDir,".cram");
-		bamFiles = IO.collapseFileArray(tot);
-		if (bamFiles == null || bamFiles.length ==0 || bamFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.bam or xxx.cram files!\n");		
-		Arrays.sort(bamFiles);
-		
+		//check bam pileup
+		if (bamPileupFile == null || bamPileupFile.getName().endsWith(".gz") == false) Misc.printErrAndExit("\nError: cannot find your tabix indexed and bgzip compressed multi sample BamPileup -> "+bamPileupFile);
 		
 		//threads to use
-		double gigaBytesAvailable = ((double)Runtime.getRuntime().maxMemory())/ 1073741824.0;
-		int numPossCores = (int)Math.round(gigaBytesAvailable/5);
-		if (numPossCores < 1) numPossCores = 1;
 		int numPossThreads = Runtime.getRuntime().availableProcessors();
-		if (numberThreads == 0){
-			if (numPossCores <= numPossThreads) numberThreads = numPossCores;
-			else numberThreads = numPossThreads;
-			System.out.println("Core usage:\n\tTotal GB available to Java:\t"+ Num.formatNumber(gigaBytesAvailable, 1));
-			System.out.println("\tTotal available cores:\t"+numPossThreads);
-			System.out.println("\tNumber cores to use @ 5GB/core:\t"+numberThreads+"\n");
-		}
+		if (numberThreads == 0) numberThreads = 20;
+		if (numberThreads > numPossThreads) numberThreads = numPossThreads -1;
+		
+		System.out.println("Number threads to use:\t"+numberThreads+"\n");
+		
 				
 		//make temp dir
 		tempDirectory = new File ("TempDirBCC_"+Misc.getRandomString(6));
 		tempDirectory.mkdir();
-		
-		//sample names
-		sampleNames = new String[bamFiles.length];
-		bamFileNamesForJson = new String[bamFiles.length];
-		StringBuilder sb = new StringBuilder();
-		for (int i=0; i< bamFiles.length; i++) {
-			sampleNames[i] = bamFiles[i].getName().replace(".bam", "");
-			bamFileNamesForJson[i] = bamFiles[i].getCanonicalFile().getName();
-			sb.append(bamFiles[i].getCanonicalPath()); sb.append(" ");
-		}
-		bamNames = sb.toString();
 	
 	}	
 	
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              Bam Concordance: July 2021                          **\n" +
+				"**                            Sample Concordance: July 2021                         **\n" +
 				"**************************************************************************************\n" +
-				"BC calculates sample level concordance based on uncommon homozygous SNVs found in bam\n"+
-				"files. Samples from the same person will show high similarity (>0.9). Run BC on\n"+
-				"related sample bams (e.g tumor & normal exomes, tumor RNASeq) plus an unrelated bam\n"+
-				"for comparison. Mismatches passing filters are written to file. BC also generates a\n"+
-				"variety of AF histograms for checking gender and sample contamination. Although\n"+
-				"threaded, BC runs slowly with more that a few bams. Use the USeq ClusterMultiSampleVCF\n"+
-				"app to check large batches of vcfs to identify the likely mismatched sample pairs.\n\n"+
+				"SC calculates sample level concordance and gender based on uncommon homozygous SNVs in\n"+
+				"alignment files. Those from the same person will show high similarity (>0.9). To run\n"+
+				"SC, first create a multi-sample pileup file with the USeq BamPileup app. Try SC with\n"+
+				"related bams (e.g tumor & normal exomes, tumor RNASeq) plus an unrelated bam for\n"+
+				"comparison. Mismatches passing filters are written to file. BC also generates a\n"+
+				"variety of AF histograms for checking gender and sample contamination.\n\n"+
 				
-				"WARNING: Mpileup does not check that the chr order is the same across samples and the\n"+
-				"fasta reference, be certain they are or mpileup will produce incorrect counts. Use\n"+
-				"Picard's ReorderSam app if in doubt.\n\n"+
-				
-				"Note re FFPE derived RNASeq data: A fair bit of systematic error is found in these\n"+
+				"Note re FFPE derived RNASeq data, a fair bit of systematic error is found in these\n"+
 				"datasets.  As such, the RNA-> DNA contrasts are low. Yet the DNA->RNA are > 0.9\n\n"+
 
 				"Options:\n"+
 				"-r Path to a bed file of regions to interrogate.\n"+
-				"-s Path to the samtools executable.\n"+
-				"-f Path to an indexed reference fasta file.\n"+
-				"-b Path to a directory containing indexed bam and cram files.\n"+
+				"-b Path to a multi-sample bam/ cram pileup file, see the USeq BamPileup app.\n"+
 				"-c Path to a tabix indexed bed file of common dbSNPs. Download 00-common_all.vcf.gz \n"+
 				"       from ftp://ftp.ncbi.nih.gov/snp/organisms/, grep for 'G5;' containing lines, \n"+
 				"       run VCF2Bed, bgzip and tabix it with https://github.com/samtools/htslib,\n"+
 				"       defaults to no exclusion from calcs. \n"+
-				"-g Path to a file containing a line with the word 'gender' followed by the word 'male',\n"+
-				"       'female', 'm', or 'f' surrounded by whitespace, case insensitive, gz/zip OK.\n"+
-				"       This is compared to the gender estimate.\n"+
-				"-d Minimum read depth, defaults to 25.\n"+
+				"-g Path to a txt file containing a line with the word 'gender' followed by 'male',\n"+
+				"       'female', 'm', or 'f', surrounded by whitespace, case insensitive, gz/zip OK.\n"+
+				"       This is compared to the BC gender estimate.\n"+
+				"-d Minimum SNV read depth, defaults to 25.\n"+
 				"-a Minimum allele frequency to count as a homozygous variant, defaults to 0.95\n"+
 				"-m Minimum allele frequency to count a homozygous match, defaults to 0.9\n"+
-				"-q Minimum base quality, defaults to 20.\n"+
-				"-u Minimum mapping quality, defaults to 20.\n"+
 				"-n Minimum fraction similarity to pass sample set, defaults to 0.85\n"+
 				"-x Maximum log2Rto score for calling a sample female, defaults to 1.5\n"+
 				"-y Minimum log2Rto score for calling a sample male, defaults to 2.5\n"+
@@ -508,17 +501,12 @@ public class BamConcordance {
 				"-t Number of threads to use.  If not set, determines this based on the number of\n"+
 				"      threads and memory available to the JVM so set the -Xmx value to the max.\n\n"+
 
-				"Example: java -Xmx100G -jar pathTo/USeq/Apps/BamConcordance -r ~/exomeTargets.bed\n"+
-				"      -s ~/ST/1.12/bin/samtools -b ~/Patient7Crams -d 10 -a 0.9 -m 0.8 -f\n"+
-				"      ~/B37/human_g1k_v37.fasta -c ~/B37/b38ComSnps.bed.gz -j bc.json.gz -g \n"+
-				"      gender.json.gz\n\n" +
+				"Example: java -Xmx100G -jar pathTo/USeq/Apps/SampleConcordance -r ~/exomeTargets.bed\n"+
+				"      -b ~/PatientA.bp.txt.gz -d 30 -a 0.9 -m 0.8 -c ~/B38/b38ComSnps.bed.gz -j\n"+
+				"      bc.json.gz -g gender.json.gz\n\n" +
 
 				"**************************************************************************************\n");
 
-	}
-
-	public File getSamtools() {
-		return samtools;
 	}
 
 	public int getMinSnvDP() {
@@ -537,28 +525,12 @@ public class BamConcordance {
 		return minAFForHis;
 	}
 
-	public int getMinBaseQuality() {
-		return minBaseQuality;
-	}
-
 	public File getTempDirectory() {
 		return tempDirectory;
 	}
 
 	public double getMaxIndel() {
 		return maxIndel;
-	}
-
-	public File getFasta() {
-		return fasta;
-	}
-
-	public File[] getBamFiles() {
-		return bamFiles;
-	}
-
-	public int getMinMappingQuality() {
-		return minMappingQuality;
 	}
 
 	public File getCommonSnvBed() {
@@ -575,6 +547,14 @@ public class BamConcordance {
 
 	public double getMinFracSim() {
 		return minFracSim;
+	}
+
+	public File getBamPileupFile() {
+		return bamPileupFile;
+	}
+
+	public String[] getSampleNames() {
+		return sampleNames;
 	}
 
 	

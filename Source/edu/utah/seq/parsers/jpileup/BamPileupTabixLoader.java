@@ -240,30 +240,24 @@ if (debug) IO.el("\nProc "+record);
 	}
 
 	private ScoreAfs scoreSnv(String[] fields, double testAF, char allele) throws Exception {
-//IO.pl("\tScoring Snv "+testAF+" "+allele);
 		//pull bpileup record, if none return null;
 		String tabixCoor = fields[0]+":"+fields[1]+"-"+fields[1];
 		TabixReader.Iterator it = fetchInteratorOnCoordinates(tabixCoor);
 		if (it == null) {
-//IO.el("Failed to find any bpileup lines ");
 			return null;
 		}
 
 		String bpileupLine = it.next();
 		if (bpileupLine == null) {
-//IO.el("Failed to find any bpileup lines ");
 			return null;
 		}
-//IO.pl("\tbpileupLine "+bpileupLine);
 
 		//parse bpileup line calculate alt AF for samples not germline (het or homo) for the alt
 		BpileupLine ml = new BpileupLine(bpileupLine);
 		ArrayList<Double> altAFs = calcAltSnvAFs(allele, ml);
 		if (altAFs.size() < minNumSamples) {
-//IO.el("Too few passing samples to calc bkz "+bpileupLine);
 			return null;
-		}
-//IO.pl("\tNumSamp "+ml.getSamples().length+" "+altAFs.size()+" afs "+altAFs);		
+		}		
 
 		//calculate call zscore
 		double[] afs = Num.arrayListOfDoubleToArray(altAFs);
@@ -271,7 +265,6 @@ if (debug) IO.el("\nProc "+record);
 		double zscore = (testAF-meanStd[0])/meanStd[1];
 		if (Double.isInfinite(zscore)) zscore = VCFBkz.zscoreForInfinity;
 		if (zscore < VCFBkz.zscoreLessThanZero) zscore = VCFBkz.zscoreLessThanZero;
-//IO.pl("\tzScore "+zscore);
 		return new ScoreAfs(zscore, afs);
 	}
 		
