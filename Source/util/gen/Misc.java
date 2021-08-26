@@ -29,6 +29,15 @@ public class Misc {
 	public static final Pattern FORWARD_PARENTHESIS = Pattern.compile("\\(");
 	public static final Pattern GREATER_THAN = Pattern.compile(">");
 	public static final Pattern AMP = Pattern.compile("&");
+	public static final Pattern CSV = Pattern.compile("\",\"");
+	
+	/**Splits a comma and quotation split csv line.*/
+	public static String[] splitCsvLine(String line) {
+		String[] split = CSV.split(line);
+		split[0] = split[0].substring(1);
+		split[split.length-1] = split[split.length-1].substring(0, split[split.length-1].length()-1);
+		return split;
+	}
 	
 	/**Calls garbage collection then returns total - free.*/
 	public static long fetchUsedMemory(){

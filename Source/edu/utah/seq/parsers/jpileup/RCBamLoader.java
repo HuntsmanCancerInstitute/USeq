@@ -56,7 +56,7 @@ public class RCBamLoader implements Runnable {
 			//for each region
 			int counter = 0;			
 			for (Bed region: regions) {
-				if (counter++ > 100) {
+				if (counter++ > 1000) {
 					counter = 0;
 					IO.p(".");
 				}

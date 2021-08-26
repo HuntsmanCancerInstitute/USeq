@@ -13,7 +13,6 @@ import htsjdk.samtools.SamReader;
 import htsjdk.samtools.reference.IndexedFastaSequenceFile;
 import htsjdk.samtools.reference.ReferenceSequence;
 import util.bio.annotation.Bed;
-import util.gen.Histogram;
 import util.gen.IO;
 
 public class BamPileupLoader implements Runnable { 
@@ -23,24 +22,20 @@ public class BamPileupLoader implements Runnable {
 	private SamReader[] samReaders = null;
 	private int minBaseQuality = 0;
 	private int minMappingQuality = 0;
-	private int minimumReadDepth = 0;
 	private PrintWriter pileupOut = null;
 	private PrintWriter bedOut= null;
 	private IndexedFastaSequenceFile fasta = null;
 	private Bed[] regions = null;
 	private File pileupFile = null;
-	private File coverageFile = null;
 	
 	private boolean includeOverlaps;
 	private boolean printAll;
 	private boolean verbose; 
-	private Histogram histogram = null;
 
 
 	public BamPileupLoader (BamPileup bamPileup, int loaderIndex, Bed[] regions) throws IOException{
 		minBaseQuality = bamPileup.getMinBaseQuality();
 		minMappingQuality = bamPileup.getMinMappingQuality();
-		minimumReadDepth = bamPileup.getMinimumReadDepth();
 		this.regions = regions;
 		includeOverlaps = bamPileup.isIncludeOverlaps();
 		printAll = bamPileup.isPrintAll();
@@ -50,12 +45,6 @@ public class BamPileupLoader implements Runnable {
 		pileupFile = new File(bamPileup.getTempDir(), loaderIndex+"_tempBamPileup.txt");
 		pileupFile.deleteOnExit();
 		pileupOut = new PrintWriter (new FileWriter(pileupFile));
-		
-		if (minimumReadDepth > 0) {
-			coverageFile = new File(bamPileup.getTempDir(), loaderIndex+"_temp.bed");
-			coverageFile.deleteOnExit();
-			bedOut = new PrintWriter (new FileWriter(coverageFile));
-		}
 		
 		//create sam readers
 		File[] bamFiles = bamPileup.getBamFiles();
@@ -82,11 +71,6 @@ public class BamPileupLoader implements Runnable {
 		//create fasta sequence reader
 		fasta = new IndexedFastaSequenceFile(bamPileup.getFastaFile());
 		if (fasta.isIndexed() == false) throw new IOException("\nError: cannot find your xxx.fai index or the multi fasta file isn't indexed\n");
-		
-		//create histogram to count read depth
-		histogram = new Histogram(0, bamPileup.getMaximumCoverageCalculated(), (int)bamPileup.getMaximumCoverageCalculated());
-
-
 	}
 
 	public void run() {	
@@ -120,20 +104,13 @@ public class BamPileupLoader implements Runnable {
 					//out.print(chr+"\t"+ (bamBC[0][bp].bpPosition +1)+ "\t"+ bamBC[0][bp].ref);
 
 					//for each bam
-					double totalReadDepth = 0;
 					for (int b = 0; b<samReaders.length; b++ ) {
 						sb.append("\t");
 						if (bamBC[b][bp].loadStringBuilderWithCounts(sb)  == true) {
 							noCounts = false;
-							totalReadDepth += bamBC[b][bp].getPassingReadCoverage();
 						}
 					}
 					if (noCounts == false || printAll == true) pileupOut.println(sb.toString());
-					//save to histogram
-					histogram.count(totalReadDepth);
-					
-					//here
-					if (bedOut!= null && totalReadDepth >= minimumReadDepth) bedOut.println(chr+"\t"+bamBC[0][bp].bpPosition+"\t"+(bamBC[0][bp].bpPosition+1));
 				}
 			}
 		} catch (Exception e) {
@@ -274,13 +251,5 @@ public class BamPileupLoader implements Runnable {
 
 	public File getPileupFile() {
 		return pileupFile;
-	}
-
-	public File getCoverageFile() {
-		return coverageFile;
-	}
-
-	public Histogram getHistogram() {
-		return histogram;
 	}
 }

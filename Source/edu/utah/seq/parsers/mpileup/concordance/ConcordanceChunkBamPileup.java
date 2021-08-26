@@ -12,6 +12,7 @@ import htsjdk.tribble.readers.TabixReader;
 import util.bio.annotation.Bed;
 import util.gen.Gzipper;
 import util.gen.Histogram;
+import util.gen.IO;
 import util.gen.Misc;
 
 public class ConcordanceChunkBamPileup implements Runnable{
@@ -124,7 +125,7 @@ public class ConcordanceChunkBamPileup implements Runnable{
 			loader.getTabixReader().close();
 			misMatchBed.close();
 			if (commonSnvBed != null) tabixReader.close();
-			if (numMpileupLinesProc == 0) throw new IOException("Failed to parse any mpileup lines? "+chunkName);
+			if (numMpileupLinesProc == 0) IO.pl("WARNING: Failed to parse any mpileup lines? "+chunkName);
 			complete = true;
 			failed = false;
 System.out.println("\t"+chunkName+ " job complete. "+numMpileupLinesProc+" bases parsed.");

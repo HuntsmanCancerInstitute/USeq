@@ -2,8 +2,10 @@ package edu.utah.seq.vcf.anno;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
 
 import util.gen.Gzipper;
+import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
@@ -40,6 +42,7 @@ public class AnnotatedVcfParserDataLine {
 	String clinSig = null;
 	String clinSigConf = null;
 	String clinAlleleId = null;
+	String clinvarFileDate = null;
 	
 	//Splice
 	boolean passesSplice = false;
@@ -48,7 +51,7 @@ public class AnnotatedVcfParserDataLine {
 	
 	
 	//constructor
-	public AnnotatedVcfParserDataLine(String trimmedFileName, String[] vcfFields) {
+	public AnnotatedVcfParserDataLine(String trimmedFileName, String[] vcfFields, String clinvarFileDate) {
 		this.trimmedFileName = trimmedFileName;
 		//#CHROM POS ID REF ALT QUAL FILTER INFO ......
 		//   0    1   2  3   4   5     6      7
@@ -59,13 +62,14 @@ public class AnnotatedVcfParserDataLine {
 		alt = vcfFields[4];
 		qual = vcfFields[5];
 		filter = vcfFields[6];
+		this.clinvarFileDate = clinvarFileDate;
 	}
 
 	public static final String headerSpreadSheet = "FileName\tIGVLink\tCHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tAlleleFreq\t"
-			+ "UniOb\tReadDepth\tPriorCallFreq\tBKZ\tBKAF\tPopFreq\tPassClinvar\tClinLink\tClinHGVS\tClinSig\t"
+			+ "UniOb\tReadDepth\tPriorCallFreq\tBKZ\tBKAF\tPopFreq\tPassClinvar\tClinvarFileDate\tClinLink\tClinHGVS\tClinSig\t"
 			+ "ClinSigConf\tPassSpliceScan\tSpliceGene\tSpliceDiff";
 	
-	public void println(Gzipper sumarySpreadSheet) throws IOException {
+	public void println(Gzipper sumarySpreadSheet, HashSet<String> transcriptsToKeep) throws IOException {
 		//calc varUniOb
 		varUniOb = (int)Math.round(varAlleleFreq*(double)totalUniObDepth);
 		ArrayList<String> al = new ArrayList<String>();
@@ -111,7 +115,7 @@ public class AnnotatedVcfParserDataLine {
 				
 		//CLINVAR
 		al.add(passesCLINVAR+"");
-		
+		al.add(clinvarFileDate);
 		al.add(getClinvarLink());
 		al.add(clinSigCLNHGVS);
 		al.add(clinSig);
@@ -125,20 +129,45 @@ public class AnnotatedVcfParserDataLine {
 		
 		String main = Misc.stringArrayListToString(al, "\t");
 		
-		//each ANN
-		ArrayList<AnnotatedGene> pass = new ArrayList<AnnotatedGene>();
-		ArrayList<AnnotatedGene> fail = new ArrayList<AnnotatedGene>();
-		for (AnnotatedGene ag: annoGenes) {
-			if (ag.passImpact) pass.add(ag);
-			else fail.add(ag);
+		boolean found = false;
+		if (transcriptsToKeep != null) {
+				
+				for (AnnotatedGene ag: annoGenes) {
+					if (transcriptsToKeep.contains(ag.transcriptId)) {
+						ag.transcriptMatch = "TRUE";
+						sumarySpreadSheet.println(main + ag.toString());
+						found = true;
+					}
+					else ag.transcriptMatch = "FALSE";
+				}
 		}
 		
-		//any pass?
-		if (pass.size() !=0) for (AnnotatedGene ag: pass) sumarySpreadSheet.println(main + ag.toString());
-		//only print fail if no pass
-		else if (fail.size() !=0) for (AnnotatedGene ag: fail) sumarySpreadSheet.println(main + ag.toString());
-		else sumarySpreadSheet.println(main);
-		sumarySpreadSheet.println();
+		//standard
+		if (found == false) {
+
+			//each ANN
+			ArrayList<AnnotatedGene> pass = new ArrayList<AnnotatedGene>();
+			ArrayList<AnnotatedGene> fail = new ArrayList<AnnotatedGene>();
+			for (AnnotatedGene ag: annoGenes) {
+				if (ag.passImpact) pass.add(ag);
+				else fail.add(ag);
+			}
+			
+			//any pass?
+			if (pass.size() !=0) {
+				for (AnnotatedGene ag: pass) sumarySpreadSheet.println(main + ag.toString());
+			}
+			//only print fail if no pass
+			else if (fail.size() !=0) {
+				for (AnnotatedGene ag: fail) sumarySpreadSheet.println(main + ag.toString());
+			}
+			else {
+				sumarySpreadSheet.println(main);
+			}
+			sumarySpreadSheet.println();
+		}
+		
+		
 	}
 	
 	public String getIGVLink() {
@@ -170,7 +199,7 @@ public class AnnotatedVcfParserDataLine {
 		return sb.toString();
 	}
 	
-	public static final String legend = "\nColumn Descriptions:\n"+
+	public static final String legend = "\nAll Column Descriptions:\n"+
 			"FileName\tTrimmed name of the parsed vcf file\n"+
 			"IGVLink\tClicking moves IGV to the variant location\n"+
 			"CHROM\tVcf record chromosome\n"+
@@ -188,6 +217,7 @@ public class AnnotatedVcfParserDataLine {
 			"BKAF\tSorted list (largest to smallest) of background non-reference AFs used to calculate the BKZ.\n"+
 			"PopFreq\tMaximum observed population frequency, fractions > 0.01 are indicative of a common variant\n"+
 			"PassClinvar\tBoolean indicating whether this record passes the CLINVAR include and exclude criteria\n"+
+			"ClinvarFileDate\tCLINVAR annotation source file date\n"+
 			"ClinLink\tCLINVAR ALLELEID Excel hyperlink, opens the CLINVAR page for this variant in a web browser\n"+
 			"ClinHGVS\tCLINVARs HGVS notation for this variant\n"+
 			"ClinSig\tCLINVAR's significance annotation\n"+
@@ -198,6 +228,10 @@ public class AnnotatedVcfParserDataLine {
 			"PassAnn\tBoolean indicating whether this record passes the ANN criteria\n"+
 			"Gene\tANN impacted gene name\n"+
 			"TranscriptId\tANN impacted transcript\n"+
+			"TranscriptMatch\tWhether the transcript ID matches one in the transcript IDs in the filtering file.\n"+
+			
+			
+
 			"Annotation\tANN annotation\n"+
 			"Impact\tANN impact\n"+
 			"cDot\tANN HGVS.c\n"+

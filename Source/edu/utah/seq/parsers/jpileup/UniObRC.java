@@ -11,9 +11,9 @@ import htsjdk.samtools.cram.ref.ReferenceSource;
 import util.apps.MergeRegions;
 import util.bio.annotation.Bed;
 import util.gen.*;
-import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream; //needed by cram
+import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream; //needed by cram, don't delete!!!
 
-/** Stripped down version of BamPileup to calculate unique observation read coverage
+/** Tool for calculating unique observation read coverage and passing bed files, use bamPileupFiles, much faster.
  * Set MinBaseQual to 1, MinMapQual to 0, includeOverlaps to true, to replicate IGV.
  * @author Nix
  * */
@@ -21,7 +21,8 @@ public class UniObRC {
 
 	//user defined fields
 	private File bedFile;
-	private File bamFile;
+	private File bamFile = null;
+	private File bamPileupFile = null;
 	private File results;
 	private File fastaFile;
 	private File tabix;
@@ -78,27 +79,48 @@ public class UniObRC {
 		}
 		else numRegionsPerWorker = (int)Math.round( (double)regions.length/(double)numCpu );
 		Object[][] chunks = Misc.chunk(regions, numRegionsPerWorker);
-		
-		//make and execute loaders
 		IO.p("Launching "+chunks.length+" loaders...");
 		ExecutorService executor = Executors.newFixedThreadPool(chunks.length);
-		RCBamLoader[] loaders = new RCBamLoader[chunks.length];
-		for (int i=0; i< chunks.length; i++) {
-			Bed[] b = new Bed[chunks[i].length];
-			for (int x = 0; x< b.length; x++) b[x] = (Bed)chunks[i][x];
-			loaders[i] = new RCBamLoader(this, i, b);
-			executor.execute(loaders[i]);
-		}
-		executor.shutdown();
-		while (!executor.isTerminated()) {}
-		IO.pl();
-		
-		//check loaders fetch files
 		histogram = new Histogram(0, maximumCoverageCalculated, maximumCoverageCalculated);
-		for (RCBamLoader l: loaders) {
-			if (l.isFailed()) throw new IOException("ERROR: File Loader issue! \n");
-			tempBedFiles.add(l.getCoverageFile());
-			histogram.addCounts(l.getHistogram());
+		
+		//from alignment files
+		if (bamFile != null) {
+			//make and execute loaders
+			RCBamLoader[] loaders = new RCBamLoader[chunks.length];
+			for (int i=0; i< chunks.length; i++) {
+				Bed[] b = new Bed[chunks[i].length];
+				for (int x = 0; x< b.length; x++) b[x] = (Bed)chunks[i][x];
+				loaders[i] = new RCBamLoader(this, i, b);
+				executor.execute(loaders[i]);
+			}
+			executor.shutdown();
+			while (!executor.isTerminated()) {}
+			IO.pl();
+			for (RCBamLoader l: loaders) {
+				if (l.isFailed()) throw new IOException("ERROR: Bam File Loader issue! \n");
+				tempBedFiles.add(l.getCoverageFile());
+				histogram.addCounts(l.getHistogram());
+			}
+		}
+		//from existing bam pileup file, much faster!
+		else {
+			//make Loaders
+			ReadCoverageBedBPLoader[] loaders = new ReadCoverageBedBPLoader[chunks.length];
+			for (int i=0; i< chunks.length; i++) {
+				Bed[] b = new Bed[chunks[i].length];
+				for (int x = 0; x< b.length; x++) b[x] = (Bed)chunks[i][x];
+				//File bamPileup, File tempDir, int maxCoverageCalculated, int minimumReadDepth, int loaderIndex, Bed[] regions
+				loaders[i] = new ReadCoverageBedBPLoader(bamPileupFile, tempDir, maximumCoverageCalculated, minimumReadDepth, i, b);
+				executor.execute(loaders[i]);
+			}
+			executor.shutdown();
+			while (!executor.isTerminated()) {}
+			IO.pl();
+			for (ReadCoverageBedBPLoader l: loaders) {
+				if (l.isFailed()) throw new IOException("ERROR: BamPileup Loader issue! \n");
+				tempBedFiles.add(l.getCoverageFile());
+				histogram.addCounts(l.getHistogram());
+			}
 		}
 		
 		printCoverageStats(histogram);
@@ -108,19 +130,21 @@ public class UniObRC {
 	}
 	
 	private void printJson() throws Exception {
-
 		String jPath = Misc.removeExtension(results.getName()) + ".json.gz";
 		Gzipper gz = new Gzipper(new File (results.getParentFile(), jPath));
 		gz.println("{");
 		gz.printJson("meanCoverage", Num.formatNumber(histogram.getStandardDeviation().getMean(), 1), true);
 		gz.printJson("coverageAt0.95OfTargetBps", coverageAt95, true);
 		gz.printJson("coverageAt0.90OfTargetBps", coverageAt90, true);
-		gz.printJson("minimumMappingQuality", minMappingQuality, true);
-		gz.printJson("minimumBaseQuality", minBaseQuality, true);
+		if (bamFile != null) {
+			gz.printJson("alignmentFilePath", bamFile.getCanonicalPath(), true);
+			gz.printJson("minimumMappingQuality", minMappingQuality, true);
+			gz.printJson("minimumBaseQuality", minBaseQuality, true);
+		}
+		else gz.printJson("bamPileupFilePath", bamPileupFile.getCanonicalPath(), true);
 		gz.printJson("minimumPassingBedCoverageThreshold", minimumReadDepth, true);
 		gz.printJson("passingBedFilePath", results.getCanonicalPath(), true);
 		gz.printJson("targetRegionFilePath", bedFile.getCanonicalPath(), true);
-		gz.printJson("alignmentFilePath", bamFile.getCanonicalPath(), true);
 		gz.printJson("fractionTargetBpsWithIndexedCoverage", Num.arrayListToDoubles(fractionTargetBpsAL), true);
 		gz.println("}");
 		gz.close();
@@ -132,7 +156,7 @@ public class UniObRC {
 		if (name.endsWith(".gz")) name = name.substring(0, name.length()-3);
 		
 		//merge the temp files
-		IO.pl("\nMerging uniOb read coverge beds...");
+		IO.pl("\nMerging passing uniOb read coverge beds...");
 		File mergedBed = new File(name);
 		File[] beds = new File[tempBedFiles.size()];
 		tempBedFiles.toArray(beds);
@@ -152,11 +176,14 @@ public class UniObRC {
 		PrintWriter out = new PrintWriter (new FileWriter (temp));
 		
 		//add header
-		out.println("# BamCram "+ IO.getCanonicalPath(bamFile));
+		if (bamFile != null) {
+			out.println("# BamCram "+ IO.getCanonicalPath(bamFile));
+			out.println("# MinMapQual\t"+minMappingQuality);
+			out.println("# MinBaseQual\t"+minBaseQuality);
+		}
+		else out.println("# BamPileup "+ IO.getCanonicalPath(bamPileupFile));
 		out.println("# Bed "+IO.getCanonicalPath(bedFile));
 		out.println("# MinUniObRC\t"+minimumReadDepth);
-		out.println("# MinMapQual\t"+minMappingQuality);
-		out.println("# MinBaseQual\t"+minBaseQuality);
 		out.println("# MeanCoverage\t" +Num.formatNumber(histogram.getStandardDeviation().getMean(), 1));
 		out.println("# CoverageAt0.95OfTargetBps\t"+ coverageAt95);
 		out.println("# CoverageAt0.90OfTargetBps\t"+ coverageAt90);
@@ -236,6 +263,7 @@ public class UniObRC {
 				try{
 					switch (test){
 					case 'b': bamFile = new File(args[++i]).getCanonicalFile(); break;
+					case 'u': bamPileupFile = new File(args[++i]).getCanonicalFile(); break;
 					case 'r': bedFile = new File(args[++i]); break;
 					case 's': results = new File(args[++i]).getCanonicalFile(); break;
 					case 'f': fastaFile = new File(args[++i]); break;
@@ -256,12 +284,23 @@ public class UniObRC {
 			}
 		}
 		
-		//pull bam and cram files
-		if (bamFile == null || bamFile.canRead() == false) Misc.printExit("\nError: cannot find your xxx.bam or xxx.cram file!\n");		
+		if (bamFile == null && bamPileupFile == null) Misc.printErrAndExit("\nError: please provide a bam/cram file or a USeq bamPileup file.\n");
 		
-		//Create fasta fetcher
-		if (bamFile.getName().endsWith(".cram") && (fastaFile == null || fastaFile.canRead() == false))  Misc.printErrAndExit("\nError: please provide an reference genome fasta file and it's index for cram conversion");	
-		if (bedFile == null ||  bedFile.canRead() == false) Misc.printErrAndExit("\nError: please provide a file of regions in bed format.");
+		//from a bam file
+		if (bamFile !=null) {
+			//pull bam and cram files
+			if (bamFile.exists() == false || bamFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find your xxx.bam or xxx.cram file! "+bamFile);		
+			//Create fasta fetcher?
+			if (bamFile.getName().endsWith(".cram") && (fastaFile == null || fastaFile.canRead() == false))  Misc.printErrAndExit("\nError: please "
+					+ "provide an reference genome fasta file and it's index for cram conversion");	
+		}
+		
+		//or from a bam pileup file
+		else {
+			if (bamPileupFile.exists() == false || bamPileupFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find your bam pileup file! "+bamPileupFile);	
+		}
+		
+		if (bedFile == null ||  bedFile.canRead() == false) Misc.printErrAndExit("\nError: please provide a file of regions in bed format to process");
 		if (results == null ) Misc.printErrAndExit("\nError: please provide a results file that ends with xxx.bed.gz");
 		
 		//pull tabix and bgzip
@@ -282,25 +321,26 @@ public class UniObRC {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Unique Observation Read Coverage:  March 2021             **\n" +
+				"**                     Unique Observation Read Coverage:  August 2021               **\n" +
 				"**************************************************************************************\n" +
 				"UniObRC calculates read coverage statistics and generates a bed file of regions\n"+
 				"that pass thresholds for read depth. Overlapping pairs, secondary, supplementary,\n"+
 				"duplicate, and failing vendorQC alignments are excluded. INDEL counts are included.\n"+
-				"Summary statistics and app setting are saved in json format.\n"+
-
+				"Summary statistics and app setting are saved in json format. When available, use a\n"+
+				"USeq/BamPileup app output file instead of a bam/cram, much faster.\n"+
 				
-				"\nRequired Options:\n"+
-				"-b Path to a coordinate sorted bam/cram file with index.\n"+
+				"\nOptions:\n"+
+				"-u Path to a USeq/BamPileup app output file with tabix index.\n"+
+				"-b If no -u then the path to a coordinate sorted bam/cram file with index.\n"+
 				"-r Bed file of non overlapping regions to interrogate. Run the USeq MergeRegions app\n"+
 				"      if unsure. xxx.bed.gz/.zip OK\n"+
-				"-s File path to write the passing region bed file.\n"+
+				"-s File path to write the passing gzipped region bed file (json stats too).\n"+
 
 				"\nDefault Options:\n"+
-				"-q Minimum base quality, defaults to 13\n"+
-				"-m Minimum alignment mapping quality, defaults to 13\n"+
+				"-q Minimum base quality, defaults to 13, for -b\n"+
+				"-m Minimum alignment mapping quality, defaults to 13, for -b\n"+
 				"-d Minimum read depth for passing coverge bed, defaults to 10\n"+
-				"-i Include counts from overlapping paired reads, defaults to excluding them.\n"+
+				"-i Include counts from overlapping paired reads, defaults to excluding them, , for -b\n"+
 				"-p Number processors to use, defaults to 25, reduce if out of memory errors occur.\n"+
 				"-x Max length of region chunk, defaults to 1000, set smaller if out of memory errors\n"+
 				"      occur.\n"+
@@ -310,7 +350,7 @@ public class UniObRC {
 				"      index the passing bed file, see htslib.org \n"+
 
 				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/UniObRC -b my.cram -r target.bed\n"+
-				"-f Ref/human_g1k_v37_decoy.fasta -s passing.bed.gz -t ~/BioApps/HTSlib/bin/ -d 20\n\n" +
+				"-f Ref/human_g1k_v37_decoy.fasta -s my.uniObRC.bed.gz -t ~/BioApps/HTSlib/bin/ -d 20\n\n" +
 
 				"**************************************************************************************\n");
 	}

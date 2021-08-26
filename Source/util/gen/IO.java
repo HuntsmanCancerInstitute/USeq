@@ -1994,6 +1994,28 @@ public class IO {
 		}
 		return names;
 	}
+	
+	/**Loads a file's lines into a hash splitting on tab, using the designated keys. Returns null if a problem.*/
+	public static HashMap<String,String> loadFileIntoHash(File file, int keyIndex, int valueIndex){
+		HashMap<String,String> names = new HashMap<String,String>(1000);
+		BufferedReader in = null;
+		try{
+			in = IO.fetchBufferedReader(file);
+			String line;
+			String[] fields;
+			while ((line = in.readLine())!=null){
+				fields = Misc.TAB.split(line);
+				names.put(fields[keyIndex].trim(), fields[valueIndex].trim());
+			}
+			in.close();
+		}catch(Exception e){
+			e.printStackTrace();
+			names = null;
+		} finally {
+			IO.closeNoException(in);
+		}
+		return names;
+	}
 
 	/**Loads a file's lines into a hash set, keys only.*/
 	public static HashSet<String> loadFileIntoHashSet(File file){

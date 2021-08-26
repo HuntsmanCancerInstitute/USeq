@@ -184,8 +184,8 @@ public class SampleConcordance {
     		Histogram[] a = runners[i].getAfHist();
     		Histogram[] b = runners[i].getChrXAfHist();
     		for (int x=0; x< afHist.length; x++) {
-    			afHist[x].addCounts(a[x]);
-    			chrXAfHist[x].addCounts(b[x]);
+    			if (a[x] != null) afHist[x].addCounts(a[x]);
+    			if (b[x] != null) chrXAfHist[x].addCounts(b[x]);
     		}
     	
     		//similarities
@@ -468,21 +468,22 @@ public class SampleConcordance {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Sample Concordance: July 2021                         **\n" +
+				"**                           Sample Concordance: August 2021                        **\n" +
 				"**************************************************************************************\n" +
 				"SC calculates sample level concordance and gender based on uncommon homozygous SNVs in\n"+
 				"alignment files. Those from the same person will show high similarity (>0.9). To run\n"+
-				"SC, first create a multi-sample pileup file with the USeq BamPileup app. Try SC with\n"+
-				"related bams (e.g tumor & normal exomes, tumor RNASeq) plus an unrelated bam for\n"+
-				"comparison. Mismatches passing filters are written to file. BC also generates a\n"+
-				"variety of AF histograms for checking gender and sample contamination.\n\n"+
+				"SC, first create a multi-sample pileup file with the USeq BamPileup and BamPileupMerger\n"+
+				"apps. Try SC with related bams (e.g tumor & normal exomes, tumor RNASeq) plus an\n"+
+				"unrelated bam for omparison. Mismatches passing filters are written to file. BC also\n"+
+				"generates a variety of AF histograms for checking gender and sample contamination.\n\n"+
 				
 				"Note re FFPE derived RNASeq data, a fair bit of systematic error is found in these\n"+
 				"datasets.  As such, the RNA-> DNA contrasts are low. Yet the DNA->RNA are > 0.9\n\n"+
 
 				"Options:\n"+
 				"-r Path to a bed file of regions to interrogate.\n"+
-				"-b Path to a multi-sample bam/ cram pileup file, see the USeq BamPileup app.\n"+
+				"-b Path to a multi-sample bam/ cram pileup file, see the USeq BamPileup and\n"+
+				"       BamPileupMerger apps.\n"+
 				"-c Path to a tabix indexed bed file of common dbSNPs. Download 00-common_all.vcf.gz \n"+
 				"       from ftp://ftp.ncbi.nih.gov/snp/organisms/, grep for 'G5;' containing lines, \n"+
 				"       run VCF2Bed, bgzip and tabix it with https://github.com/samtools/htslib,\n"+

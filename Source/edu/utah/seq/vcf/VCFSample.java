@@ -81,19 +81,19 @@ public class VCFSample {
 						alleleCounts = data[i];
 						String[] multiple = data[i].split(",");
 						if (multiple.length > 1) {
-							if (referenceCounts == null)  referenceCounts = multiple[0];
+							referenceCounts = multiple[0];
 							alternateCounts = multiple[1];
 							//set DP, this will override anything set by DP
 							readDepthDP = Integer.parseInt(referenceCounts) + Integer.parseInt(alternateCounts);
 
 						} else if (multiple.length ==  1) {
-							this.alternateCounts = multiple[0];
+							alternateCounts = multiple[0];
 						} else {
 							throw new Exception("There is no data in the 'AD' field, please make sure your file is formed correctly.  If it is formed correctly, "
 									+ "please harass the HCI core to fix this problem");
 						}
 					} else if (format[i].equals("RD")) {
-						this.referenceCounts = data[i];
+						referenceCounts = data[i];
 					}
 					else if (format[i].equals("DP4")) {
 						//# high-quality ref-forward bases, ref-reverse, alt-forward and alt-reverse bases

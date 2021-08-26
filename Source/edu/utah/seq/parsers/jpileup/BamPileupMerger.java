@@ -233,6 +233,7 @@ public class BamPileupMerger {
 					switch (test){
 					case 'd': pileups = IO.extractFiles(new File(args[++i]), ".gz"); break;
 					case 't': tabixBinDirectory = new File(args[++i]); break;
+					case 'p': mergedPileup = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -254,9 +255,7 @@ public class BamPileupMerger {
 		if (pileups == null || pileups.length <2) Misc.printErrAndExit("\nPlease provide one or more xxx.gz bamPileup files to merge.\n");
 		
 		//set results file
-		File dir = pileups[0].getParentFile().getCanonicalFile();
-		mergedPileup = new File (dir.getParentFile(), "merged.bp.txt");
-		
+		if (mergedPileup == null || mergedPileup.exists() == false || mergedPileup.getName().endsWith(".gz")== false) Misc.printErrAndExit("\nPlease provide a path to a file ending with xxx.gz to save the merged pileup file, e.g. my.bp.txt.gz\n");
 		
 		//make IO
 		out = new PrintWriter(new BufferedWriter(new FileWriter(mergedPileup)));
@@ -268,17 +267,18 @@ public class BamPileupMerger {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Bam Pileup Meger:  March 2020                      **\n" +
+				"**                               Bam Pileup Meger:  August 2021                     **\n" +
 				"**************************************************************************************\n" +
 				"BPM merges BamPileup files, compresses, and indexes them. \n"+
 				
 				"\nRequired Options:\n"+
-				"-d Path to a directory of single alignment BamPileup files.\n"+
+				"-d Path to a directory of single sample bgzipped BamPileup files with the tbi indexes.\n"+
+				"-p Path to save the output pileup file, must end in gz.\n"+
 				"-t Path to the directory containing the compiled bgzip and tabix executables. See\n" +
 				"     https://www.htslib.org\n"+
 
 				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/BamPileupMerger -d BPFiles/\n"+
-				"     -t ~/BioApps/HTSlib/1.10.2/bin \n\n" +
+				"     -t ~/BioApps/HTSlib/1.10.2/bin -p my.bp.txt.gz\n\n" +
 
 				"**************************************************************************************\n");
 	}

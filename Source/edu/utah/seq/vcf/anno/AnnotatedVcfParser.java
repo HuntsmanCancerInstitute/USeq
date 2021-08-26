@@ -24,6 +24,8 @@ public class AnnotatedVcfParser {
 	//user input and default settings, don't modify defaults here
 	private File[] vcfFiles;
 	private File saveDirectory;
+	private File transcriptList = null;
+	private String clinvarDate = null;
 	private int minimumDP = 0;
 	private double minimumAF = 0;
 	private double maximumAF = 1;
@@ -50,6 +52,7 @@ public class AnnotatedVcfParser {
 	private Gzipper sumarySpreadSheet = null;
 	private static final Pattern COMMA_SLASH = Pattern.compile(",|/");
 	private String appSettings = null;
+	private HashSet<String> transcriptFilter = null;
 	
 	//trackers
 	private Histogram afs = new Histogram(0, 1.01, 101);
@@ -141,7 +144,8 @@ public class AnnotatedVcfParser {
 		File sss = new File(saveDirectory, "annotatedVcfParser."+date+".xls.gz");
 		sumarySpreadSheet = new Gzipper(sss);
 		sumarySpreadSheet.print(AnnotatedVcfParserDataLine.headerSpreadSheet);
-		sumarySpreadSheet.println(AnnotatedGene.headerSpreadSheet);
+		if (transcriptFilter != null) sumarySpreadSheet.println(AnnotatedGene.headerSpreadSheetMatch);
+		else sumarySpreadSheet.println(AnnotatedGene.headerSpreadSheet);
 	}
 
 
@@ -175,7 +179,7 @@ public class AnnotatedVcfParser {
 				//   0    1   2  3   4   5     6      7
 				String[] cells = Misc.TAB.split(vcfLine);
 				loadInfoHash(cells[7]);
-				dataLine = new AnnotatedVcfParserDataLine(trimmedFileName, cells);
+				dataLine = new AnnotatedVcfParserDataLine(trimmedFileName, cells, clinvarDate);
 				
 				boolean passDP=true, passAF=true, passImpact=true, passSplice=true, passID = true, passGermlineGenes = false;
 				boolean[] passCF= null;
@@ -203,7 +207,7 @@ public class AnnotatedVcfParser {
 				if (pass){
 					numPassingVcf++;
 					passVcf.println(vcfLine);
-					dataLine.println(sumarySpreadSheet);
+					dataLine.println(sumarySpreadSheet, transcriptFilter);
 				}
 				else {
 					failVcf.println(vcfLine);
@@ -856,6 +860,7 @@ public class AnnotatedVcfParser {
 
 		al.add("\t"+ skipWarningTrans+"\t: Ignore transcripts labeled WARNING_TRANSCRIPT_XXX");
 		al.add("\t"+ onlyProteinCoding+"\t: Only consider protein_coding transcripts");
+		if (transcriptFilter != null) al.add("\t"+ transcriptList+"\t: Select annotations that match transcript IDs in this file.");
 		
 		if (passingAnnImpact != null) {
 			al.add("\n\t"+Misc.treeSetToString(passingAnnImpact, ",")+"\t: ANN impact keys");
@@ -869,6 +874,7 @@ public class AnnotatedVcfParser {
 		}
 		if (excludeClinSig != null) al.add("\t"+Misc.treeSetToString(excludeClinSig, ",")+"\t: CLINSIG exclude keys");
 		if (drugResClinSigGenes != null) al.add("\t"+Misc.treeSetToString(drugResClinSigGenes, ",")+"\t: CLINSIG drug_response restricted genes");
+		if (clinvarDate != null) al.add("\t"+ clinvarDate+"\t: CLINVAR file date for spreadsheet.");
 		
 		if (passingVCFSS != null) {
 			al.add("\n\t"+Misc.stringArrayToString(passingVCFSS, ",")+"\t: Splice junction types to scan");
@@ -988,7 +994,7 @@ public class AnnotatedVcfParser {
 	public void processArgs(String[] args){
 		//look for a config file and append
 		args = appendConfigArgs(args,"-y");
-		Pattern pat = Pattern.compile("-[a-z]");
+		Pattern pat = Pattern.compile("-[a-zA-T]");
 		File forExtraction = null;
 		String impactString = null;
 		String clinString = null;
@@ -996,13 +1002,14 @@ public class AnnotatedVcfParser {
 		String drugResString = null;
 		IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 		for (int i = 0; i<args.length; i++){
-			String lcArg = args[i].toLowerCase();
+			String lcArg = args[i];
 			Matcher mat = pat.matcher(lcArg);
 			if (mat.matches()){
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
 					case 'v': forExtraction = new File(args[++i]); break;
+					case 'T': transcriptList = new File(args[++i]); break;
 					case 'd': minimumDP = Integer.parseInt(args[++i]); break;
 					case 'm': minimumAF = Double.parseDouble(args[++i]); break;
 					case 'x': maximumAF = Double.parseDouble(args[++i]); break;
@@ -1016,6 +1023,7 @@ public class AnnotatedVcfParser {
 					case 'u': drugResString = args[++i]; break;
 					case 'a': impactString = args[++i]; break;
 					case 'c': clinString = args[++i]; break;
+					case 'C': clinvarDate = args[++i]; break;
 					case 'e': clinStringExclude = args[++i]; break;
 					case 'j': createGermlineGenes(); break;
 					case 'i': passingIDKeys = Misc.COMMA.split(args[++i]); break;
@@ -1074,13 +1082,15 @@ public class AnnotatedVcfParser {
 		}
 		if (minimumVCFSSDiff !=0 && passingVCFSS == null) Misc.printErrAndExit("\nError: please provide a comma delimited list of splice junction types (e.g. D5S,D3S,G5S,G3S) to examine.\n");
 		
+		if (transcriptList != null)  transcriptFilter = IO.loadFileIntoHashSet(transcriptList);
+		
 	}
 	
 
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            Annotated Vcf Parser  May 2021                        **\n" +
+				"**                            Annotated Vcf Parser  July 2021                       **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+
@@ -1116,11 +1126,14 @@ public class AnnotatedVcfParser {
                 "-u For CLINSIG=drug_response, only pass it if associated with these genes. Comma\n"+
                 "       delimited, no spaces. Defaults to all."+
                 "-e Comma delimited list of CLINSIG terms to select against.\n"+
+                "-C CLINVAR file date for spreadsheet output.\n"+
 
                 "-i Comma delimited list of VCF ID keys to select for. If the VCF ID contains one or\n"+
                 "       more, the record is passed regardless of other filters. The match is not exact.\n"+
                 "-o Only require, if set or present, SnpEff ANN or CLINSIG or Splice to be true to pass.\n"+
                 "       Defaults to require that all set pass.\n"+
+                "-T Txt file containing a list of transcripts to keep, one per line, to use in filtering\n"+
+                "       the summary spreadsheet output.\n "+
 				"-r Verbose per record output.\n"+ 
                 "-y Path to a config txt file for setting the above.\n"+
 
@@ -1129,8 +1142,8 @@ public class AnnotatedVcfParser {
 				"\nExample: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/\n"+
 				"        -d 75 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a\n"+
 				"        HIGH,MODERATE -e Benign,Likely_benign -c Pathogenic,Likely_pathogenic,\n"+
-				"        Conflicting_interpretations_of_pathogenicity -t 0.51 -u RYR1\n"+
-				"        \n\n"+
+				"        Conflicting_interpretations_of_pathogenicity -t 0.51 -u RYR1 -T \n"+
+				"        ~/Ref/ACMGTranscripts.txt -C 2021-04-04\n\n"+
 
 
 				"**************************************************************************************\n");

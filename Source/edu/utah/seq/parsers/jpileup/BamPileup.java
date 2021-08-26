@@ -8,7 +8,6 @@ import java.util.concurrent.Executors;
 import java.util.regex.*;
 import htsjdk.samtools.*;
 import htsjdk.samtools.cram.ref.ReferenceSource;
-import util.apps.MergeRegions;
 import util.bio.annotation.Bed;
 import util.gen.*;
 import org.apache.commons.compress.compressors.bzip2.BZip2CompressorOutputStream; //needed by cram
@@ -79,9 +78,8 @@ public class BamPileup {
 	private int numCpu = 0;
 	private int maxBpOfRegion = 1000;
 	private boolean verbose = true;
-	private int maximumCoverageCalculated = 1001;
+
 	private ArrayList<File> tempPileupFiles = new ArrayList<File>();
-	private ArrayList<File> tempBedFiles = new ArrayList<File>();
 
 	//constructor for stand alone use
 	public BamPileup(String[] args){
@@ -151,16 +149,12 @@ public class BamPileup {
 		if (verbose) IO.pl();
 		
 		//check loaders fetch files
-		Histogram histogram = new Histogram(0, maximumCoverageCalculated, maximumCoverageCalculated);
 		for (BamPileupLoader l: loaders) {
 			if (l.isFailed()) throw new IOException("ERROR: File Loader issue! \n");
 			tempPileupFiles.add(l.getPileupFile());
-			if (l.getCoverageFile()!= null)tempBedFiles.add(l.getCoverageFile());
-			histogram.addCounts(l.getHistogram());
 		}
 		
 		procTempFiles();
-		printCoverageStats(histogram);
 
 	}
 
@@ -174,54 +168,7 @@ public class BamPileup {
 		File resultsNoGz = new File (name);
 		IO.concatinateFiles(tempPileupFiles, resultsNoGz);
 		BamPileupMerger.compressAndIndex(bgzip, tabix, resultsNoGz, new String[] {"-f", "-s", "1", "-b", "2", "-e", "2"}, false);
-		
-		//passing bed files
-		if (tempBedFiles.size()!=0) {
-			if (verbose) IO.pl("Merging read coverge bed, bgzipping, and tabixing...");
-			File mergedBed = new File(name+".MinCov"+minimumReadDepth+".bed");
-			File[] beds = new File[tempBedFiles.size()];
-			tempBedFiles.toArray(beds);
-			new MergeRegions (beds, mergedBed, false, false);
-			BamPileupMerger.compressAndIndex(bgzip, tabix, mergedBed, new String[] {"-f", "-s", "1", "-b", "2", "-e", "3"}, false);
-		}
-	}
-	
-	public void printCoverageStats(Histogram histogram){
 
-			long[] counts = histogram.getBinCounts();
-			double total = histogram.getTotalBinCounts();
-			ArrayList<Double> fractionTargetBpsAL = new ArrayList<Double>();
-
-			IO.pl("\nBaseCoverage\tFractionTargetBPs");
-			double numCounts = 0;
-			String zero = "0";
-			for (int i=0; i< counts.length; i++){
-				double cumFrac = (total-numCounts)/ total;
-				//runout up to just two decimals for calculating 0.90 and 0.95
-				String formNum = Num.formatNumber(cumFrac, 2);
-				if (formNum.equals(zero) == false) IO.pl(i+"\t"+formNum);
-				fractionTargetBpsAL.add(Double.parseDouble(formNum));
-				numCounts += counts[i];
-				if (numCounts == total) break;
-			}
-			
-			//calc 0.95 and 0.9
-			long coverageAt95 = 0;
-			long coverageAt90 = -1;
-			for (int i=fractionTargetBpsAL.size()-1; i >=0; i--){
-				double cov = fractionTargetBpsAL.get(i).doubleValue();
-				if (cov >= 0.9 && coverageAt90 == -1) coverageAt90 = i;
-				if (cov >= 0.95) {
-					coverageAt95 = i;
-					break;
-				}
-			}
-			
-			//print summary stats
-			IO.pl("\nTotal interrogated bases\t"+ (int)total);
-			IO.pl("Mean Coverage\t"+Num.formatNumber(histogram.getStandardDeviation().getMean(), 1));
-			IO.pl("CoverageAt0.95OfTargetBps\t" + coverageAt95);
-			IO.pl("CoverageAt0.90OfTargetBps\t" + coverageAt90);
 	}
 
 
@@ -255,7 +202,6 @@ public class BamPileup {
 					case 'x': maxBpOfRegion = Integer.parseInt(args[++i]); break;
 					case 'o': minimumReadDepth = Integer.parseInt(args[++i]); break;
 					case 'p': numCpu = Integer.parseInt(args[++i]); break;
-					case 'c': maximumCoverageCalculated  = (Integer.parseInt(args[++i]) + 1); break;
 					case 'i': includeOverlaps = true; break;
 					case 't': tabixBinDirectory = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
@@ -300,15 +246,14 @@ public class BamPileup {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Bam Pileup:  March 2021                           **\n" +
+				"**                                Bam Pileup:  August 2021                          **\n" +
 				"**************************************************************************************\n" +
 				"BP extracts pileup information for each bam file over a list of regions. This includes\n"+
 				"the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available\n"+
 				"to the JVM. The header of the results file contains the order of the bams. To \n"+
 				"approximate IGV pileup info, set -q 0 -m 0 -i. If many alignment files are to be\n"+
 				"processed, run this app on each file individually and then merge them with the\n"+
-				"BamPileupMerger app. BP also calculates read coverage statistics and a passing region\n"+
-				"bed file provided -o . Secondary, supplementary, duplicate and failing vendorQC \n"+
+				"BamPileupMerger app. Secondary, supplementary, duplicate and failing vendorQC \n"+
 				"alignments are skipped.\n"+
 				
 				"\nRequired Options:\n"+
@@ -323,7 +268,6 @@ public class BamPileup {
 				"\nDefault Options:\n"+
 				"-q Minimum base quality, defaults to 10\n"+
 				"-m Minimum alignment mapping quality, defaults to 13\n"+
-				"-o Minimum read depth for passing coverge bed, defaults to 0, no coverage bed created.\n"+
 				"-i Include counts from overlapping paired reads, defaults to excluding them.\n"+
 				"-p Number processors to use, defaults to all, reduce if out of memory errors occur.\n"+
 				"-x Max length of region chunk, defaults to 1000, set smaller if out of memory errors\n"+
@@ -331,7 +275,7 @@ public class BamPileup {
 				"-c Maximum read coverage stats calculated, defaults to 1000.\n"+
 
 				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b CramFiles/ -r target.bed\n"+
-				"-f Ref/human_g1k_v37_decoy.fasta -s 15350X.bp.gz -t ~/BioApps/HTSlib/bin/ -o 20\n\n" +
+				"-f Ref/human_g1k_v37_decoy.fasta -s 15350X.bp.gz -t ~/BioApps/HTSlib/bin/\n\n" +
 
 				"**************************************************************************************\n");
 	}
@@ -367,10 +311,6 @@ public class BamPileup {
 
 	public boolean isVerbose() {
 		return verbose;
-	}
-
-	public double getMaximumCoverageCalculated() {
-		return maximumCoverageCalculated;
 	}
 
 	public int getMinimumReadDepth() {
