@@ -20,11 +20,13 @@ public class GatkRunnerChunk implements Runnable{
 	private File tempBed;
 	private File tempLog;
 	private File bamOut = null;
+	private String oOption = " -o ";
 	
 	public GatkRunnerChunk(Bed[] regions, GatkRunner gatkRunner, String uniqueName) throws Exception{
 		this.gatkRunner = gatkRunner;
 		this.regions = regions;
 		name = uniqueName;
+		if (gatkRunner.isUseUpperCaseO()) oOption = " -O ";
 	}
 	
 	public void run(){
@@ -50,10 +52,10 @@ public class GatkRunnerChunk implements Runnable{
 		//build and execute gatk call
 		if (gatkRunner.useLowerCaseL) {
 			String[] t = Misc.WHITESPACE.split(gatkRunner.getGatkArgs());
-			t[t.length-1] = " -l "+tempBed+" -o "+tempVcf +" "+t[t.length-1];
+			t[t.length-1] = " -l "+tempBed+ oOption +tempVcf +" "+t[t.length-1];
 			cmd = Misc.stringArrayToString(t, " ");
 		}
-		else cmd = gatkRunner.getGatkArgs()+ " -L "+tempBed+" -o "+tempVcf;
+		else cmd = gatkRunner.getGatkArgs()+ " -L "+tempBed+ oOption +tempVcf;
 		if (bamOut != null) cmd = cmd + " -bamout "+bamOut;
 		
 		System.out.println(cmd);

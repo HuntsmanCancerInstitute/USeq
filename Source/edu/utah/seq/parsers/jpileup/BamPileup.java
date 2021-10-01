@@ -75,6 +75,7 @@ public class BamPileup {
 	private SamReaderFactory samFactory;
 	private boolean includeOverlaps = false;
 	private boolean printAll = false;
+	private boolean alignNoChr = false;
 	private int numCpu = 0;
 	private int maxBpOfRegion = 1000;
 	private boolean verbose = true;
@@ -203,6 +204,7 @@ public class BamPileup {
 					case 'o': minimumReadDepth = Integer.parseInt(args[++i]); break;
 					case 'p': numCpu = Integer.parseInt(args[++i]); break;
 					case 'i': includeOverlaps = true; break;
+					case 'a': alignNoChr = true; break;
 					case 't': tabixBinDirectory = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
@@ -246,7 +248,7 @@ public class BamPileup {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Bam Pileup:  August 2021                          **\n" +
+				"**                                Bam Pileup:  Sept 2021                            **\n" +
 				"**************************************************************************************\n" +
 				"BP extracts pileup information for each bam file over a list of regions. This includes\n"+
 				"the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available\n"+
@@ -260,7 +262,7 @@ public class BamPileup {
 				"-b Path to a coordinate sorted bam/cram file with index or directory containing such.\n"+
 				"-r Bed file of regions to extract pileup information. MUST BE NON OVERLAPPING. Run\n"+
 				"      the USeq MergeRegions app if unsure. xxx.bed.gz/.zip OK\n"+
-				"-f Path to the reference fasta with and xxx.fai index.\n"+
+				"-f Path to the reference fasta with xxx.fai index used for alignment.\n"+
 				"-s Path to a gzip file to save the pileup information, must end in xxx.gz\n"+
 				"-t Path to a directory containing the bgzip and tabix executables to compress and index\n"+
 				"      the bp file, see htslib.org \n"+
@@ -273,6 +275,7 @@ public class BamPileup {
 				"-x Max length of region chunk, defaults to 1000, set smaller if out of memory errors\n"+
 				"      occur.\n"+
 				"-c Maximum read coverage stats calculated, defaults to 1000.\n"+
+				"-a Alignment chroms and reference don't start with chr yet bed file does.\n"+
 
 				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b CramFiles/ -r target.bed\n"+
 				"-f Ref/human_g1k_v37_decoy.fasta -s 15350X.bp.gz -t ~/BioApps/HTSlib/bin/\n\n" +
@@ -315,6 +318,10 @@ public class BamPileup {
 
 	public int getMinimumReadDepth() {
 		return minimumReadDepth;
+	}
+
+	public boolean isAlignNoChr() {
+		return alignNoChr;
 	}
 
 }

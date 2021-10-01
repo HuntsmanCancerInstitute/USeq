@@ -173,14 +173,14 @@ public class VCFTabix{
 		tot[1] = IO.fetchFilesRecursively(forExtraction,".vcf.gz");
 		tot[2] = IO.fetchFilesRecursively(forExtraction,".vcf.zip");
 		vcfFiles2Convert = IO.collapseFileArray(tot);
-		if (vcfFiles2Convert == null || vcfFiles2Convert.length ==0 || vcfFiles2Convert[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.vcf(.zip/.gz OK) file(s)!\n");
+		if (vcfFiles2Convert == null || vcfFiles2Convert.length ==0 || vcfFiles2Convert[0].canRead() == false) Misc.printErrAndExit("\nError: cannot find your xxx.vcf(.zip/.gz OK) file(s)!\n");
 
 		//pull executables
-		if (tabixBinDirectory == null) Misc.printExit("\nError: please point to your tabix executable directory (e.g. /Users/madonna/Desktop/VCF/tabix-0.2.6/ )\n");
+		if (tabixBinDirectory == null) Misc.printErrAndExit("\nError: please point to your tabix executable directory (e.g. /Users/madonna/Desktop/VCF/tabix-0.2.6/ )\n");
 		bgzip = new File (tabixBinDirectory, "bgzip");
 		tabix = new File (tabixBinDirectory, "tabix");
 		//look for bgzip and tabix executables
-		if (bgzip.canExecute() == false || tabix.canExecute() == false) Misc.printExit("\nCannot find or execute bgzip or tabix executables from "+bgzip+" "+tabix);
+		if (bgzip.canExecute() == false || tabix.canExecute() == false) Misc.printErrAndExit("\nCannot find or execute bgzip or tabix executables from "+bgzip+" "+tabix);
 
 
 	}	
@@ -188,7 +188,7 @@ public class VCFTabix{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                VCFTabix: Jan 2013                                **\n" +
+				"**                                 VCFTabix: Sept 2021                              **\n" +
 				"**************************************************************************************\n" +
 				"Converts vcf files to a SAMTools compressed vcf tabix format. Recursive.\n" +
 

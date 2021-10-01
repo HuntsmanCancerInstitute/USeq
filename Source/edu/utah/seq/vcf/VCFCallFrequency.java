@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -24,6 +25,7 @@ import org.json.JSONObject;
 import edu.utah.hci.query.MasterQuery;
 import edu.utah.hci.query.QueryRequest;
 import edu.utah.hci.query.UserQuery;
+import edu.utah.seq.vcf.anno.AnnotatedVcfParser;
 
 /**Calculates call frequencies for each vcf record from a db of vcf files and callable region files. 
  * Most mutated single site in p53 are seen at 0.039 across all cancers in TCGA.  0.57 for BRAF V600E across all cancers.*/
@@ -469,10 +471,35 @@ public class VCFCallFrequency {
 			System.exit(0);
 		}
 		new VCFCallFrequency(args);
-	}		
+	}
+	
+	public String[] appendConfigArgs(String[] args, String configArg){
+		for (int i=0; i< args.length; i++){
+			if (args[i].equals(configArg)){
+				File configFile = new File(args[++i]);
+				configLines = IO.loadFile(configFile);
+				if (configLines == null || configLines.length == 0) Misc.printErrAndExit("\nProblem with your config file, this should contain one or more lines of parameteres, none should contain whitespace "+configFile);
+				//not a config file with - options so skip
+				if (configLines[0].startsWith("-") == false) return args;
+				
+				ArrayList<String> otherArgs = new ArrayList<String>();
+				for (String line: configLines){
+					String[] t = Misc.WHITESPACE.split(line);
+					for (String a: t) otherArgs.add(a);
+				}
+				return Misc.copyAndMerge(args, Misc.stringArrayListToStringArray(otherArgs));
+			}
+		}
+		return args;
+	}
+	
+	private String[] configLines = null;
 
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
+		//look for a config file 
+		args = appendConfigArgs(args,"-c");
+		
 		Pattern pat = Pattern.compile("-[a-z]");
 		File forExtraction = null;
 		File configFile = null;
@@ -504,23 +531,24 @@ public class VCFCallFrequency {
 		}
 
 		//config file? or local
-		if (configFile != null){
-			if (configFile.canRead() == false) Misc.printErrAndExit("\nSorry, cannot read your config file: "+configFile+"\n");
-			HashMap<String, String> config = IO.loadFileIntoHashMapLowerCaseKey(configFile);
-			if (config.containsKey("queryurl")) queryURL = config.get("queryurl");
-			if (config.containsKey("host")) host = config.get("host");
-			if (config.containsKey("realm")) realm = config.get("realm");
-			if (config.containsKey("username")) userName = config.get("username");
-			if (config.containsKey("password")) password = config.get("password");
-			if (config.containsKey("maxcallfreq")) maxCallFreq = Double.parseDouble(config.get("maxcallfreq"));
-			if (config.containsKey("vcffilefilter")) vcfFileFilter = config.get("vcffilefilter");
-			if (config.containsKey("bedfilefilter")) bedFileFilter = config.get("bedfilefilter");
+		if (configLines != null && configFile != null){
+			if (configLines[0].startsWith("-") == false ) {
+				HashMap<String, String> config = IO.loadFileIntoHashMapLowerCaseKey(configFile);
+				if (config.containsKey("queryurl")) queryURL = config.get("queryurl");
+				if (config.containsKey("host")) host = config.get("host");
+				if (config.containsKey("realm")) realm = config.get("realm");
+				if (config.containsKey("username")) userName = config.get("username");
+				if (config.containsKey("password")) password = config.get("password");
+				if (config.containsKey("maxcallfreq")) maxCallFreq = Double.parseDouble(config.get("maxcallfreq"));
+				if (config.containsKey("vcffilefilter")) vcfFileFilter = config.get("vcffilefilter");
+				if (config.containsKey("bedfilefilter")) bedFileFilter = config.get("bedfilefilter");
+			}
 		}
 		//local search?
 		if (queryURL == null){
 			if (dataDir == null || dataDir.isDirectory()== false) {
 				Misc.printErrAndExit("\nProvide either a configuration file for remotely accessing a genomic query service or "
-						+ "two directory paths to the Data and Index directories uses by the GQueryIndexer app.\n");;
+						+ "set the -d option to the Data directory created by the GQueryIndexer app.\n");;
 			}
 		}
 
@@ -547,7 +575,7 @@ public class VCFCallFrequency {
 			if (password == null) Misc.printErrAndExit("\nError: failed to find a password in the config file, e.g. password g0QueryAP1");
 
 		}
-		else IO.pl("\tDataDir "+dataDir);
+		else IO.pl("\t-d DataDir "+dataDir);
 		IO.pl();
 
 		//pull vcf files
@@ -573,34 +601,35 @@ public class VCFCallFrequency {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Call Frequency: Jan 2021                          **\n" +
+				"**                            VCF Call Frequency: Sept 2021                         **\n" +
 				"**************************************************************************************\n" +
 				"Calculates a vcf call frequency for each variant when pointed at a genomic Query\n"+
-				"service (https://github.com/HuntsmanCancerInstitute/GQuery) or the Data and Index\n"+
-				"directories the service is accessing. CallFreq's are calculated \n"+
-				"by first counting the number of exact vcf matches present and dividing it by the\n"+
-				"number of intersecting callable bed files. Use this tool to flag variants with high call rates that\n"+
-				"are potential false positives. Some are not, e.g. BRAF V600E occurs in 58% of cancers\n"+
-				"with a BRAF mutation. So treate the call freq as an annotation requiring context level\n"+
-				"interpretation. Use the file filter to limit which files are included in the call freq\n"+
-				"calculations. Only file paths containing the file filter will be included. Be sure to\n"+
-				"place both the sample vcf and associated callable region bed files in the same Query\n"+
-				"index folder path as defined by -f. \n"+
+				"service (https://github.com/HuntsmanCancerInstitute/GQuery) or the Data directory the\n"+
+				"service is accessing. CallFreq's are calculated by first counting the number of exact\n"+
+				"vcf matches present and dividing it by the number of intersecting callable bed files.\n"+
+				"Use this tool to flag variants with high call rates that are potential false positives.\n"+
+				"Some are not, e.g. BRAF V600E occurs in 58% of cancers with a BRAF mutation. So treat\n"+
+				"the call freq as an annotation requiring context level interpretation. Use the file\n"+
+				"filter to limit which files are included in the call freq calculations. Only file paths\n"+
+				"containing the file filter will be included.\n"+
 
 				"\nRequired Options:\n"+
 				"-f Full path to a file or directory containing xxx.vcf(.gz/.zip OK) file(s)\n" +
 				"-s Directory to save the annotated vcf files\n"+
 				"-v GQuery service vcf file filter, e.g. Hg38/Somatic/Avatar/Vcf\n"+
 				"-b GQuery service callable region bed file filter, e.g. Hg38/Somatic/Avatar/Bed\n"+
-				"-c Config txt file containing two tab delimited columns with host, queryUrl, realm, \n"+
-				"     userName, password, and (optionally) fileFilter and or maxCallFreq. 'chmod 600'\n"+
-				"     the file! e.g.: \n"+
+				"-c Config txt file containing two tab delimited columns with some of the relevant\n"+
+				"     options: host, queryUrl, realm, userName, password, vcfFileFilter, bedFileFilter\n"+
+				"     and maxCallFreq. 'chmod 600' the file! e.g.: \n"+
 				"     host example.hci.utah.edu\n"+
 				"     queryUrl http://example.hci.utah.edu:8080/GQuery/\n"+
 				"     realm GQuery\n"+
 				"     userName ExampleUser\n"+
 				"     password ExamplePW\n"+
-				"-d (Alternative to -c), provide a path to the Data directory used in creating the Index.\n"+
+				"     vcfFileFilter Hg38/Somatic/Avatar/Vcf\n"+
+				"     bedFileFilter Hg38/Somatic/Avatar/Bed\n"+
+				"        Alternatively use the -v xxx -b yyy -m notation in the config file.\n"+
+				"-d Execute a local search by providing a path to the GQuery Data directory.\n"+
 
 				"\nOptions:\n"+
 				"-m Maximum call freq, defaults to 1, before appending 'CallFreq' to the FILTER field.\n"+
@@ -610,7 +639,7 @@ public class VCFCallFrequency {
 
 
 				"\nExample: java -jar pathToUSeq/Apps/VCFCallFrequency -f Vcf/ -s CFVcfs -v \n"+
-				"    Hg38/Somatic/Avatar/Vcf -b Hg38/Somatic/Avatar/Bed -m 0.05 -c vcfCFConfig.txt \n\n" +
+				"    Hg38/Somatic/Avatar/Vcf -b  -m 0.05 -d ~/GQuery/Data \n\n" +
 				"**************************************************************************************\n");
 
 	}

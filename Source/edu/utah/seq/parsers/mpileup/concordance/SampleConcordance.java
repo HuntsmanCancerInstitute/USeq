@@ -101,9 +101,9 @@ public class SampleConcordance {
 			line = line.trim();
 			if (line.startsWith("# Chr")) break;
 			if (line.startsWith("# BamCram")){
-				fields = Misc.TAB.split(line);
-				if (fields.length != 3) throw new IOException("ERROR: failed to parse the sample names from your bam pileup file "+bamPileupFile);
-				namesAL.add(fields[2]);
+				fields = Misc.WHITESPACE.split(line);
+				if (fields.length != 4) throw new IOException("ERROR: failed to parse the sample names from your bam pileup file "+bamPileupFile);
+				namesAL.add(fields[3]);
 			}
 		}
 		sampleNames = new String[namesAL.size()];
@@ -503,7 +503,7 @@ public class SampleConcordance {
 				"      threads and memory available to the JVM so set the -Xmx value to the max.\n\n"+
 
 				"Example: java -Xmx100G -jar pathTo/USeq/Apps/SampleConcordance -r ~/exomeTargets.bed\n"+
-				"      -b ~/PatientA.bp.txt.gz -d 30 -a 0.9 -m 0.8 -c ~/B38/b38ComSnps.bed.gz -j\n"+
+				"      -b ~/PatientZ.bp.txt.gz -d 30 -a 0.9 -m 0.8 -c ~/B38/b38ComSnps.bed.gz -j\n"+
 				"      bc.json.gz -g gender.json.gz\n\n" +
 
 				"**************************************************************************************\n");

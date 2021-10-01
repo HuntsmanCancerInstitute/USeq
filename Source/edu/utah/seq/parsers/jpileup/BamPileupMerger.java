@@ -29,6 +29,7 @@ public class BamPileupMerger {
 	private File bgzip;
 	private PrintWriter out;
 	private BufferedReader[] ins;
+	private boolean skipHeaderCheck = false;
 	
 
 	//constructor
@@ -49,7 +50,7 @@ public class BamPileupMerger {
 			
 			compressAndIndex(bgzip, tabix, mergedPileup, new String[] {"-f", "-s", "1", "-b", "2", "-e", "2"}, true);
 			
-			IO.pl("\tMerged pileup saved to "+mergedPileup);
+			IO.pl("\tMerged pileup saved to "+mergedPileup+".gz");
 			
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
@@ -143,7 +144,7 @@ public class BamPileupMerger {
 
 	private void buildHeader() {
 		try {
-			IO.pl("Checking bam pileup file headers...");
+			if (skipHeaderCheck == false) IO.pl("Checking bam pileup file headers...");
 			
 			//load headers
 			BpHeader[] headers = new BpHeader[ins.length];
@@ -152,7 +153,7 @@ public class BamPileupMerger {
 			//check headers
 			for (int i=1; i<headers.length; i++) headers[0].compare(headers[i]);
 			
-			//write out merged header
+			//write out first header
 			out.println(headers[0].minMap);
 			out.println(headers[0].minBase);
 			out.println(headers[0].overlap);
@@ -204,6 +205,7 @@ public class BamPileupMerger {
 
 		public void compare(BpHeader other) throws IOException {
 			if (chrom.equals(other.chrom) == false) throw new IOException("Header chrom lines differ "+other.chrom);
+			if (skipHeaderCheck) return;
 			if (bed.equals(other.bed) == false) throw new IOException("Header bed lines differ "+other.bed);
 			if (minMap.equals(other.minMap) == false) throw new IOException("Header minMap lines differ "+other.minMap);
 			if (minBase.equals(other.minBase) == false) throw new IOException("Header minBase lines differ "+other.minBase);
@@ -234,6 +236,7 @@ public class BamPileupMerger {
 					case 'd': pileups = IO.extractFiles(new File(args[++i]), ".gz"); break;
 					case 't': tabixBinDirectory = new File(args[++i]); break;
 					case 'p': mergedPileup = new File(args[++i]); break;
+					case 's': skipHeaderCheck = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -255,7 +258,10 @@ public class BamPileupMerger {
 		if (pileups == null || pileups.length <2) Misc.printErrAndExit("\nPlease provide one or more xxx.gz bamPileup files to merge.\n");
 		
 		//set results file
-		if (mergedPileup == null || mergedPileup.exists() == false || mergedPileup.getName().endsWith(".gz")== false) Misc.printErrAndExit("\nPlease provide a path to a file ending with xxx.gz to save the merged pileup file, e.g. my.bp.txt.gz\n");
+		if (mergedPileup == null || mergedPileup.getName().endsWith(".gz")== false) Misc.printErrAndExit("\nPlease provide a path to a file ending with xxx.gz to save the merged pileup file, e.g. bp.txt.gz\n");
+		String path = mergedPileup.getCanonicalPath();
+		File noGz = new File (path.substring(0, path.length()-3));
+		mergedPileup = noGz;
 		
 		//make IO
 		out = new PrintWriter(new BufferedWriter(new FileWriter(mergedPileup)));
@@ -267,18 +273,19 @@ public class BamPileupMerger {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Bam Pileup Meger:  August 2021                     **\n" +
+				"**                               Bam Pileup Meger:  Sept 2021                       **\n" +
 				"**************************************************************************************\n" +
 				"BPM merges BamPileup files, compresses, and indexes them. \n"+
 				
-				"\nRequired Options:\n"+
+				"\nOptions:\n"+
 				"-d Path to a directory of single sample bgzipped BamPileup files with the tbi indexes.\n"+
 				"-p Path to save the output pileup file, must end in gz.\n"+
 				"-t Path to the directory containing the compiled bgzip and tabix executables. See\n" +
 				"     https://www.htslib.org\n"+
+				"-s Skip header check, use with caution!\n"+
 
 				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/BamPileupMerger -d BPFiles/\n"+
-				"     -t ~/BioApps/HTSlib/1.10.2/bin -p my.bp.txt.gz\n\n" +
+				"     -t ~/BioApps/HTSlib/1.10.2/bin -p abl.bp.txt.gz\n\n" +
 
 				"**************************************************************************************\n");
 	}

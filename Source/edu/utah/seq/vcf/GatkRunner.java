@@ -22,7 +22,9 @@ public class GatkRunner {
 	private String gatkArgs = null;
 	private int numberThreads = 0;
 	boolean useLowerCaseL = false;
+	boolean useUpperCaseO = false;
 	boolean bamOut = false;
+	boolean randomizeRegions = true;
 	
 	//internal fields
 	GatkRunnerChunk[] runners;
@@ -49,9 +51,9 @@ public class GatkRunner {
 		
 		System.out.println("Parsing and spliting bed file...");
 		
-		//parse regions and randomize
+		//parse regions 
 		Bed[] regions = Bed.parseFile(bedFile, 0, 0);
-		Misc.randomize(regions, 0);
+		if (randomizeRegions) Misc.randomize(regions, 0);
 		int numRegionsPerChunk = 1+ (int)Math.round( (double)regions.length/ (double)numberThreads );
 		
 		//split regions
@@ -142,6 +144,8 @@ public class GatkRunner {
 		Pattern pat = Pattern.compile("-[a-z]");
 		String useqVersion = IO.fetchUSeqVersion();
 		System.out.println("\n"+useqVersion+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
+		int numberProcPerChunk = 4;
+		double numberGBPerChunk = 5.0;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -157,9 +161,13 @@ public class GatkRunner {
 						i = si.i-1;
 						break;
 					}
+					case 'a': randomizeRegions = false; break;
 					case 'l': useLowerCaseL= true; break;
+					case 'u': useUpperCaseO= true; break;
 					case 'b': bamOut= true; break;
-					case 't': numberThreads = Integer.parseInt(args[++i]); break;
+					case 'p': numberProcPerChunk = Integer.parseInt(args[++i]); break;
+					case 'g': numberGBPerChunk = Double.parseDouble(args[++i]); break;
+					
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -170,17 +178,20 @@ public class GatkRunner {
 		}
 		
 		//threads to use
-		double gigaBytesAvailable = ((double)Runtime.getRuntime().maxMemory())/ 1073741824.0;
-		int numPossCores = (int)Math.round(gigaBytesAvailable/5.0);
-		if (numPossCores < 1) numPossCores = 1;
-		int numPossThreads = Runtime.getRuntime().availableProcessors();
-		if (numberThreads == 0){
-			if (numPossCores <= numPossThreads) numberThreads = numPossCores;
-			else numberThreads = numPossThreads;
-			System.out.println("Core usage:\n\tGB available to Java:\t"+ Num.formatNumber(gigaBytesAvailable, 1));
-			System.out.println("\tAvailable cores:\t"+numPossThreads);
-			System.out.println("\tNumber cores to use @ 5GB/core:\t"+numberThreads+"\n");
-		}
+		double gbAvail = ((double)Runtime.getRuntime().maxMemory())/ 1073741824.0;
+		float procAvail = Runtime.getRuntime().availableProcessors();
+		
+		int numChunkGB = (int)Math.round((gbAvail-1.0)/numberGBPerChunk);
+		int numChunkProc = Math.round(procAvail/(float)numberProcPerChunk);
+		
+		if (numChunkGB <= numChunkProc) numberThreads = numChunkGB;
+		else numberThreads = numChunkProc;
+		
+		
+		System.out.println("Core usage:\n\tGB available to Java:\t"+ Num.formatNumber(gbAvail, 1));
+		System.out.println("\tAvailable cores:\t"+procAvail);
+		System.out.println("\tNumber jobs to launch with a minimum "+numberGBPerChunk+"GB/Job and "+numberProcPerChunk+"Proc/Job: "+numberThreads+"\n");
+		
 
 		//check save dir
 		if (saveDirectory == null) Misc.printErrAndExit("\nError: cannot find your save directory!\n"+saveDirectory);
@@ -194,8 +205,6 @@ public class GatkRunner {
 		if (gatkArgs == null) Misc.printErrAndExit("\nError: please provide a gatk launch cmd similar to the example.\n\n");
 		if (gatkArgs.contains("~") || gatkArgs.contains("./")) Misc.printErrAndExit("\nError: provide full paths in the GATK command.\n"+gatkArgs);
 		if (gatkArgs.contains(" -o ") || gatkArgs.contains(" -L ")) Misc.printErrAndExit("\nError: please don't provide a -o or -L argument to the cmd.\n"+gatkArgs);	
-		
-		
 	}	
 	
 	private StringInt parseCmd(String[] args, int i) {
@@ -221,28 +230,30 @@ public class GatkRunner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Gatk Runner: March 2018                            **\n" +
+				"**                               Gatk Runner: August 2021                           **\n" +
 				"**************************************************************************************\n" +
 				"Takes a bed file of target regions, splits it by the number of threads, writes out\n"+
 				"each, executes the GATK Gatktype caller, and merges the results. Set the -Xmx to the\n"+
-				"maximum available on the machine to enable correct cpu thread usage.\n"+
+				"maximum available on the machine to enable correct thread usage.\n"+
 
 				"\nOptions:\n"+
 				"-r A regions bed file (chr, start, stop,...) to intersect, see\n" +
 				"       http://genome.ucsc.edu/FAQ/FAQformat#format1 , gz/zip OK.\n"+
 				"-s Path to a directory for saving the results.\n"+
-				"-t Number concurrent thread override. Sets itself based on the memory and cpus \n"+
-				"     available to the JVM.\n"+
-				"-c GATK command to execute, see the example below, modify to match your enviroment.\n"+
-				"     Most resources require full paths. Don't set -o or -L\n"+
-				"-l Use lowercased l for Lofreq compatability.\n"+
+				"-p Minimum number processors per job, defaults to 4\n"+
+				"-g Minimum GB RAM per job, defaults to 5\n"+
+				"-c Command to execute, see the example below, modify to match your enviroment.\n"+
+				"     Most resources require full paths. Don't set -o, -O, -l, or -L\n"+
+				"-l Use lowercased -l for Lofreq compatability, defaults to -L\n"+
+				"-u Use uppercase -O for GATK 4 compatability, defaults to -o\n"+
 				"-b Add a -bamout argument and merge bam chunks.\n"+
+				"-a Don't randomize the regions for each job.\n"+
 				
-				"\nExample: java -Xmx24G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -s\n" +
+				"\nExample: java -Xmx128G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -s\n" +
 				"     /SS/HC/ -c 'java -Xmx4G -jar /SS/GenomeAnalysisTK.jar -T MuTect2 \n"+
 				"    -R /SS/human_g1k_v37.fasta --dbsnp /SS/dbsnp_138.b37.vcf \n"+
 				"    --cosmic /SS/v76_GRCh37_CosmicCodingMuts.vcf.gz -I:tumor /SS/sar.bam -I:normal \n"+
-				"    /SS/normal.bam'\n\n" +
+				"    /SS/normal.bam' -u -a \n\n" +
 
 				"**************************************************************************************\n");
 
@@ -255,6 +266,10 @@ public class GatkRunner {
 
 	public String getGatkArgs() {
 		return gatkArgs;
+	}
+
+	public boolean isUseUpperCaseO() {
+		return useUpperCaseO;
 	}
 
 	

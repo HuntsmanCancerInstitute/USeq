@@ -14,6 +14,7 @@ import htsjdk.samtools.reference.IndexedFastaSequenceFile;
 import htsjdk.samtools.reference.ReferenceSequence;
 import util.bio.annotation.Bed;
 import util.gen.IO;
+import util.gen.Misc;
 
 public class BamPileupLoader implements Runnable { 
 
@@ -28,6 +29,7 @@ public class BamPileupLoader implements Runnable {
 	private Bed[] regions = null;
 	private File pileupFile = null;
 	
+	private boolean alignNoChr;
 	private boolean includeOverlaps;
 	private boolean printAll;
 	private boolean verbose; 
@@ -40,6 +42,7 @@ public class BamPileupLoader implements Runnable {
 		includeOverlaps = bamPileup.isIncludeOverlaps();
 		printAll = bamPileup.isPrintAll();
 		verbose = bamPileup.isVerbose();
+		alignNoChr = bamPileup.isAlignNoChr();
 
 		//create writers
 		pileupFile = new File(bamPileup.getTempDir(), loaderIndex+"_tempBamPileup.txt");
@@ -75,6 +78,7 @@ public class BamPileupLoader implements Runnable {
 
 	public void run() {	
 		try {
+			
 			//for each region
 			int counter = 0;			
 			for (Bed region: regions) {
@@ -82,12 +86,21 @@ public class BamPileupLoader implements Runnable {
 					counter = 0;
 					if (verbose) IO.p(".");
 				}
+				
+				//need to account for Stubben's RNASeq alignments which are to GRCh38 where chroms are 1,2,3..X,Y,MT
+				//this fix won't work for the Random and Alt contigs!
 				String chr = region.getChromosome();
+				String chrToSearchAli = chr;
+				if (alignNoChr && chr.startsWith("chr")) {
+					//watch out for mito
+					if (chr.equals("chrM")) chrToSearchAli = "MT";
+					else chrToSearchAli = chrToSearchAli.substring(3);
+				}
 
 				//pileup each base from each bam
 				BaseCount[][] bamBC = new BaseCount[samReaders.length][];
 				for (int i=0; i< samReaders.length; i++ ) {
-					bamBC[i]  = pileup(chr, region.getStart(), region.getStop(), samReaders[i]);
+					bamBC[i]  = pileup(chr, chrToSearchAli, region.getStart(), region.getStop(), samReaders[i]);
 				}
 
 				//for each base in the region
@@ -127,22 +140,22 @@ public class BamPileupLoader implements Runnable {
 		}
 	}
 
-	private BaseCount[] pileup(String chr, int start, int stop, SamReader samReader) throws Exception{
+	private BaseCount[] pileup(String chr, String chrToSearchAli, int start, int stop, SamReader samReader) throws Exception{
 		//watch end
 		int stopPlusOne = stop+1;
-		int chromEnd = (int)fasta.getIndex().getIndexEntry(chr).getSize();
+		int chromEnd = (int)fasta.getIndex().getIndexEntry(chrToSearchAli).getSize();
 		if (stopPlusOne > chromEnd) stopPlusOne = chromEnd;
 		
 		//create container for counts
-		ReferenceSequence p = fasta.getSubsequenceAt(chr, start+1, stopPlusOne);
+		ReferenceSequence p = fasta.getSubsequenceAt(chrToSearchAli, start+1, stopPlusOne);
 		
 		char[] refSeq = new String(p.getBases()).toCharArray();
 		BaseCount[] bc = new BaseCount[stop-start];
 		int counter = 0;
 		for (int i=start; i< stop; i++) bc[counter] = new BaseCount(i, refSeq[counter++]);
 
-		//fetch alignments
-		SAMRecordIterator it = samReader.queryOverlapping(chr, start-1, stop+1);
+		//fetch alignments, will throw exception if the chr isn't in the index
+		SAMRecordIterator it = samReader.queryOverlapping(chrToSearchAli, start-1, stop+1);
 		if (it.hasNext() == false) {
 			it.close();
 			return bc;
