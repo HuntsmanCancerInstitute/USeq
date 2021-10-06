@@ -10,21 +10,19 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.regex.Pattern;
 
 import org.json.*;
+
+import util.bio.annotation.Bed;
 
 
 
 public class Delme {
 
 	public static void main(String[] args) throws IOException {
-		/*HashMap<String, String> nameStats = loadStats(new File("/Users/u0028003/Downloads/OvarBamConParsing/stats.txt"));
-		
-		File[] jsonFiles = IO.extractFiles(new File("/Users/u0028003/Downloads/OvarBamConParsing/Jsons"), ".json");
-		 HashSet<String> noPrint = addJsons(jsonFiles, nameStats);
-		 */
-
-		test();
+		String x = "chr23";
+		System.out.println(x.substring(3));
 		 
 	}
 	

@@ -399,6 +399,11 @@ public class AnnotatedVcfParser {
 		
 		String bkafs = infoKeyValue.get("BKAF");
 		String bkzString = infoKeyValue.get("BKZ");
+		
+		//watch out for ? in the strings
+		if (bkafs!= null && bkafs.contains("?")) bkafs = null;
+		if (bkzString!= null && bkzString.contains("?")) bkzString = null;
+		
 		dataLine.bkz = bkzString;
 		dataLine.bkzAF = bkafs;
 		
@@ -1090,7 +1095,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            Annotated Vcf Parser  July 2021                       **\n" +
+				"**                            Annotated Vcf Parser  Oct 2021                        **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+

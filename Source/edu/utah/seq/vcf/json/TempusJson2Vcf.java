@@ -546,7 +546,7 @@ public class TempusJson2Vcf {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Tempus Json 2 Vcf: Jan 2021                          **\n" +
+				"**                             Tempus Json 2 Vcf: Oct 2021                          **\n" +
 				"**************************************************************************************\n" +
 				"Parses json Tempus reports to vcf. Leave in PHI to enable calculating age at\n"+
 				"diagnosis. Summary statistics calculated for all reports. Vcfs will contain a mix of \n"+

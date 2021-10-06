@@ -901,8 +901,8 @@ public class TNSample {
 	public static File copyInWorkflowDocs(File[] workflowDocs, File jobDir) throws IOException {
 		File shellScript = null;
 		for (File f: workflowDocs) {
+			if (f.isDirectory()) continue;
 			File copy = new File(jobDir, f.getName());
-			if (copy.isDirectory()) continue;
 			IO.copyViaFileChannel(f, copy);
 			if (copy.getName().endsWith(".sh")) shellScript = f;
 		}

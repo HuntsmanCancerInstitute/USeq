@@ -98,7 +98,7 @@ public class TempusVariant{
 		}
 		
 		//check variant type, Tempus groups all short vars as SNV
-		if (variantType != null && variantType.equals("SNV")) {
+		if (variantType != null && variantType.equals("SNV") && ref!= null && alt!=null) {
 			if (ref.length()< alt.length()) variantType = "INS";
 			else if (ref.length()> alt.length()) variantType = "DEL";
 		}
