@@ -206,8 +206,10 @@ public class TNRunner {
 				//how about just remove _NormalDNA_Hg38_JointGenotyped.vcf.gz?
 				
 				
-				String fileName = genoVcfs[i].getName();			
-				String sampleName = fileName.replace("_NormalDNA_Hg38_JointGenotyped.vcf.gz", "");
+				String fileName = genoVcfs[i].getName();
+				String sampleName = null;
+				if (fileName.contains("_NormalDNA_Hg38_JointGenotyped.vcf.gz")) sampleName = fileName.replace("_NormalDNA_Hg38_JointGenotyped.vcf.gz", "");
+				else sampleName = fileName.replace("_NormalDNA_Hg38_Haplo_JointGenotyped.vcf.gz", "");
 				if (sampleName.length() == fileName.length()) throw new IOException("\nERROR: Failed to parse the sample name from "+fileName);
 				
 				File sampleDir = null;
