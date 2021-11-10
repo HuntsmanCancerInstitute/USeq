@@ -14,6 +14,7 @@ import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
+import util.gen.StandardDeviation;
 
 /**Given a vcf file compares each record against a tabix indexed mpileup file and adds/ overwrites AF and DP info.
  * @author Nix*/
@@ -37,6 +38,9 @@ public class VCFMpileupAnnotator {
 	private int numRecords = 0;
 	private ArrayList<String> vcfHeader = new ArrayList<String>();
 	private ArrayList<String> vcfRecords = new ArrayList<String>();
+	private StandardDeviation afStdDev = new StandardDeviation();
+	private StandardDeviation dpStdDev = new StandardDeviation();
+	private StandardDeviation uniObStdDev = new StandardDeviation();
 	
 	//constructor
 	public VCFMpileupAnnotator(String[] args){
@@ -48,7 +52,7 @@ public class VCFMpileupAnnotator {
 			loaders = new MpileupTabixLoaderAFDP[numberThreads];
 			for (int i=0; i< loaders.length; i++) loaders[i] = new MpileupTabixLoaderAFDP(mpileup, this);
 
-			System.out.print("\nParsing "+vcfFile.getName()+"\t");
+			System.out.print("\nParsing (Name #Records Mean#AltObs SD#AltObs MeanAFs SDAFs MeanDPs SDDPs\n"+Misc.removeExtension(vcfFile.getName())+"\t");
 
 			createReaderSaveHeader();
 
@@ -58,19 +62,33 @@ public class VCFMpileupAnnotator {
 			executor.shutdown();
 			while (!executor.isTerminated()) {}
 
-			//check loaders 
+			//check loaders and load the Standard deviations 
 			for (MpileupTabixLoaderAFDP l: loaders) {
 				if (l.isFailed()) throw new IOException("ERROR: File Loader issue! \n");
+				ArrayList<Double> afs = l.getAlleleFreqs();
+				ArrayList<Double> dps = l.getReadDepth();
+				int num = afs.size();			
+				for (int i=0; i< num; i++) {
+					double af = afs.get(i);
+					double dp = dps.get(i);
+					double obs = af*dp;
+					afStdDev.count(af);
+					dpStdDev.count(dp);
+					uniObStdDev.count(obs);
+				}
 			}
 			vcfIn.close();
 
 			VcfSorter[] finalVcfs = fetchVcfSorterArray();
 			Arrays.sort(finalVcfs);
 			writeOutModifiedVcf (finalVcfs, vcfOut);
+			
+		
 
 			//print summary stats
-			System.out.println(numRecords);
-
+			System.out.println(numRecords+"\t"+uniObStdDev.getMean()+"\t"+uniObStdDev.getStandardDeviation()+
+					"\t"+afStdDev.getMean()+"\t"+afStdDev.getStandardDeviation()+
+					"\t"+dpStdDev.getMean()+"\t"+dpStdDev.getStandardDeviation());
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -246,7 +264,7 @@ public class VCFMpileupAnnotator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          VCF Mpileup Annotator : April 2019                      **\n" +
+				"**                            VCF Mpileup Annotator : Oct 2021                      **\n" +
 				"**************************************************************************************\n" +
 				"VMA estimates the AF and DP of a vcf record from a single sample mpileup file.  It \n"+
 				"replaces the AF or DP INFO values in the vcf records if present. For INDELs, the\n"+

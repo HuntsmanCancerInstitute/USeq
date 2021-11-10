@@ -30,6 +30,7 @@ public class AvatarProjectAssembler {
 	private int numJobDirs = 0;
 	private StringBuilder normalsToDelete = new StringBuilder();
 
+	
 
 	public AvatarProjectAssembler (String[] args){
 		long startTime = System.currentTimeMillis();
@@ -38,7 +39,7 @@ public class AvatarProjectAssembler {
 
 			loadHashes();
 
-			loadFastq();
+			loadFastqCram();
 
 			walkLinkageFile();
 			
@@ -68,7 +69,7 @@ public class AvatarProjectAssembler {
 		}
 		
 		IO.pl("\nNumber patients "+ patients.size());
-		IO.pl("Number patients with fastq files "+ numWithFastq);
+		IO.pl("Number patients with fastq/cram files "+ numWithFastq);
 		IO.pl("Number patient job directories "+ numJobDirs);
 		
 	}
@@ -98,14 +99,20 @@ public class AvatarProjectAssembler {
 			if (verbose) IO.pl("\tNumber normal samples "+numNorm);
 			//more than one normal? throw error and skip
 			if (numNorm > 1) {
-				IO.el("\nERROR: skipping patient "+p.getPatientId()+ ", multiple normal files found in the same platform, cat these and modify the linkage file, then restart: ");
+				IO.el("\tERROR: skipping subject "+p.getPatientId()+ ", multiple normal files found in the same platform, cat these and modify the linkage file, then restart: ");
 				for (NormalSample ns: normalSamples) {
-					for (File f: ns.getNormalDnaFastq()) IO.el("\t"+f);
+					for (File f: ns.getNormalDnaFastqCram()) IO.el("\t"+f);
 				}
 				return;
 			}
+
 			NormalSample ns = null;
-			if (numNorm !=0) ns = normalSamples.get(0);
+			if (numNorm !=0) {
+				ns = normalSamples.get(0);
+				for (NormalSample n: normalSamples) {
+					if (n.getNormalDnaFastqCram().size() == 0) IO.el("\tWARNING: subject "+p.getPatientId()+" is missing the normal/ germline fastq/cram file(s) for "+n.getNormalDnaName()+", putting dataset name in job dir name but no files to link in! Find them and rerun." );
+				}
+			}
 			if (verbose) IO.pl("\tNumber tumor samples "+numTum);
 			
 			//No tumor samples just yet?
@@ -119,11 +126,19 @@ public class AvatarProjectAssembler {
 			}
 			else {
 				for (TumorSample ts: tumorSamples) {
+					if (ts.getTumorDnaName() != null && ts.getTumorDnaFastqCram().size() ==0) {
+						IO.el("\tWARNING: subject "+p.getPatientId()+" is missing tumor DNA fastq/cram file(s) for "+ts.getTumorDnaName()+", putting dataset name in job dir name but no files to link in! Find them and rerun." );
+					}
+					if (ts.getTumorRnaName() != null && ts.getTumorRnaFastqCram().size() ==0) {
+						IO.el("\tWARNING: subject "+p.getPatientId()+" is missing tumor RNA fastq/cram file(s) for "+ts.getTumorRnaName()+", putting dataset name in job dir name but no files to link in! Find them and rerun." );
+					}
 					//create patient dir, patientID-Platform-NormalExomeID-TumorExomeID-TumorRNAID 
 					String platform = "NA";
 					if (ts.getPlatformName() != null) platform = ts.getPlatformName();
 					String normDnaName = "NA";
-					if (ns != null) normDnaName = ns.getNormalDnaName();
+					if (ns != null) {
+						normDnaName = ns.getNormalDnaName();
+					}
 					String tumorDnaName = "NA";
 					
 					boolean normalWarning = false;
@@ -143,6 +158,7 @@ public class AvatarProjectAssembler {
 					}
 					String tumorRnaName = "NA";
 					if (ts.getTumorRnaName() != null) tumorRnaName = ts.getTumorRnaName();
+						
 					File dir = new File(jobDir, p.getPatientId()+"-"+platform+"-"+normDnaName+"-"+tumorDnaName+"-"+tumorRnaName);
 					dir.mkdirs();
 					addNormalSample(ns, dir);
@@ -174,12 +190,12 @@ public class AvatarProjectAssembler {
 
 
 	private void addTumorRnaSample(TumorSample ts, File dir) throws IOException {
-		if (ts.getTumorRnaFastq().size() !=2) return;
+		if (ts.getTumorRnaFastqCram().size() ==0) return;
 		//create fastq
 		File fastqDir = new File (dir, "Fastq/TumorRNA");
 		fastqDir.mkdirs();
 		//link in files
-		for (File f: ts.getTumorRnaFastq()) {
+		for (File f: ts.getTumorRnaFastqCram()) {
 			File link = new File(fastqDir, f.getName());
 			if (link.exists() == false) Files.createSymbolicLink(link.toPath(), f.toPath());
 			if (verbose) IO.pl("\tLinking in Tumor Sample RNA "+f.getName()+" into "+fastqDir);
@@ -188,12 +204,12 @@ public class AvatarProjectAssembler {
 	}
 
 	private void addTumorDnaSample(TumorSample ts, File dir) throws IOException {
-		if (ts.getTumorDnaFastq().size() !=2) return;
+		if (ts.getTumorDnaFastqCram().size() ==0) return;
 		//create fastq
 		File fastqDir = new File (dir, "Fastq/TumorDNA");
 		fastqDir.mkdirs();
 		//link in files
-		for (File f: ts.getTumorDnaFastq()) {
+		for (File f: ts.getTumorDnaFastqCram()) {
 			File link = new File(fastqDir, f.getName());
 			if (link.exists() == false) Files.createSymbolicLink(link.toPath(), f.toPath());
 			if (verbose) IO.pl("\tLinking in Tumor Sample DNA "+f.getName()+" into "+fastqDir);
@@ -207,7 +223,7 @@ public class AvatarProjectAssembler {
 		File fastqDir = new File (dir, "Fastq/NormalDNA");
 		fastqDir.mkdirs();
 		//link in files
-		for (File f: ns.getNormalDnaFastq()) {
+		for (File f: ns.getNormalDnaFastqCram()) {
 			File link = new File(fastqDir, f.getName());
 			if (link.exists() == false) Files.createSymbolicLink(link.toPath(), f.toPath());
 			if (verbose) IO.pl("\tLinking in NormalSample "+f.getName()+" into "+fastqDir);
@@ -296,20 +312,19 @@ public class AvatarProjectAssembler {
 						wesId+" for patient ID "+patientId+" Aborting.");
 				}
 			}
-
+			
 			if (tumorGermline.equals("Tumor")) {
 				TumorSample ts = new TumorSample(wesId, rnaId, platform);
-				if (ts.fetchFastqs(nameFastqFile, patientId) == true) p.getTumorSamples().add(ts);
+				if (ts.fetchFastqCrams(nameFastqFile, patientId) == true) p.getTumorSamples().add(ts);
 			}
 			else if (tumorGermline.equals("Germline")) {
 				NormalSample ns = new NormalSample(wesId, platform);
-				if (ns.fetchFastqs(nameFastqFile, patientId) == true) p.getNormalSamples().add(ns);
+				if (ns.fetchFastqCrams(nameFastqFile, patientId) == true) p.getNormalSamples().add(ns);
 			}
 			else {
 				in.close();
 				Misc.printErrAndExit("\nERROR: didn't find 'Tumor' or 'Germline' in the type column for "+line);
 			}
-
 		}
 	}
 
@@ -323,9 +338,11 @@ public class AvatarProjectAssembler {
 		return p;
 	}
 
-	private void loadFastq() throws IOException {
+	private void loadFastqCram() throws IOException {
 		File[] allGz = IO.extractFiles(fastqDir, ".gz");
 		for (File f: allGz) nameFastqFile.put(f.getName(), f.getCanonicalFile());
+		File[] allCrams = IO.extractFiles(fastqDir, ".cram");
+		for (File f: allCrams) nameFastqFile.put(f.getName(), f.getCanonicalFile());
 	}
 
 	private void loadHashes() {
@@ -358,6 +375,7 @@ public class AvatarProjectAssembler {
 					case 'p': platformFile = new File(args[++i]); break;
 					case 'j': jobDir = new File(args[++i]); break;
 					case 'f': fastqDir = new File(args[++i]); break;
+					case 'v': verbose = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -380,7 +398,7 @@ public class AvatarProjectAssembler {
 
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                          Avatar Project Assembler : July 2021                    **\n" +
+				"**                          Avatar Project Assembler : Oct 2021                    **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling directories for TNRunner based on files provided by M2Gen.\n"+
 				"Handles patient datasets from different exome capture platforms with multiple tumor\n"+
@@ -399,15 +417,16 @@ public class AvatarProjectAssembler {
 				"-p Sample exome platform file with just two tab delimited columns, the sample IDs that\n"+
 				"     match those in the 'WES' linkage file and the platform type NIM or IDT, see\n"+
 				"     xxx_WES_Resource_table.txt \n"+
-				"-f Directory containing all of the paired fastq files for T/N exomes and T RNASeq,\n"+
-				"     these should begin with the sample IDs that match those in the 'WES' and 'RNASeq'\n"+
-				"     columns in the linkage file.\n"+
+				"-f Directory containing all of the paired fastq and M2Gen cram files for the T/N exomes\n"+
+				"     and T RNASeq, these should begin with the sample IDs that match those in the 'WES'\n"+
+				"     and 'RNASeq' columns in the linkage file.\n"+
 				"-j Job dir to build out the patient dir structure and linked fastqs. Existing files\n"+
 				"     won't be overwritten.\n"+
+				"-v Verbose debugging output.\n"+
 				
 
                 "\nExample: java -jar ~/USeqApps/AvatarProjectAssembler -l linkage.txt -g gender.txt -p\n"+
-                "     platform.txt -f ~/UroProj/Fastq -j ~/UroProj/TNRunnerJobs/\n\n"+
+                "     platform.txt -f ~/UroProj/Fastq -j ~/UroProj/TNRunnerJobs/ -v\n\n"+
 
 
 				"**************************************************************************************\n");

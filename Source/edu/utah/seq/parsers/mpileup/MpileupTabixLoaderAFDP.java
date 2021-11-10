@@ -24,6 +24,8 @@ public class MpileupTabixLoaderAFDP implements Runnable{
 	private int minBaseQuality;
 	private boolean verbose;
 	private int numDecimals = 0;
+	private ArrayList<Double> alleleFreqs = new ArrayList<Double>();
+	private ArrayList<Double> readDepth = new ArrayList<Double>();
 
 	//internal
 	public static final Pattern AF = Pattern.compile("AF=[\\d\\.]+;*");
@@ -125,6 +127,11 @@ public class MpileupTabixLoaderAFDP implements Runnable{
 		}
 		else if (verbose) IO.pl("\tFound no mpileup records, appending AF=0;DP=0;");
 
+		//save af and dp
+		IO.pl("Counting "+maxAfDp[0]+" "+maxAfDp[1]);
+		alleleFreqs.add(maxAfDp[0]);
+		readDepth.add(maxAfDp[1]);
+		
 		//append vcf info
 		String modInfo = modifyInfo(maxAfDp, fields[7]);
 		fields[7] = modInfo;
@@ -212,7 +219,15 @@ public class MpileupTabixLoaderAFDP implements Runnable{
 			}
 		}
 		else if (verbose) IO.pl("\tFound no mpileup records, appending AF=0;DP=0;");
-
+		
+		
+		//save first af and dp
+		if (maxAfDpAL.size() != 0) {
+			Double[] maxAfDp = maxAfDpAL.get(0);
+			alleleFreqs.add(maxAfDp[0]);
+			readDepth.add(maxAfDp[1]);	
+		}
+		
 		//append vcf info
 		String modInfo = modifyInfo(maxAfDpAL, fields[7]);
 		fields[7] = modInfo;
@@ -303,5 +318,13 @@ public class MpileupTabixLoaderAFDP implements Runnable{
 
 	public TabixReader getTabixReader() {
 		return tabixReader;
+	}
+
+	public ArrayList<Double> getAlleleFreqs() {
+		return alleleFreqs;
+	}
+
+	public ArrayList<Double> getReadDepth() {
+		return readDepth;
 	}
 }

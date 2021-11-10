@@ -141,6 +141,7 @@ public class TNSample {
 	public void annotateGermlineVcf() throws IOException {
 		//look for genotyped vcf
 		File vcf = new File (rootDir, "GermlineVariantCalling/"+id+"_NormalDNA/"+id+"_NormalDNA_Hg38_JointGenotyped.vcf.gz");
+		if (vcf.exists() == false) vcf = new File (rootDir, "GermlineVariantCalling/"+id+"_NormalDNA/"+id+"_NormalDNA_Hg38_Haplo_JointGenotyped.vcf.gz");
 		if (vcf.exists() == false) return;
 		germlineVcf = new File[]{vcf, new File(rootDir, "GermlineVariantCalling/"+id+"_NormalDNA/"+id+"_NormalDNA_Hg38_JointGenotyped.vcf.gz.tbi") };
 

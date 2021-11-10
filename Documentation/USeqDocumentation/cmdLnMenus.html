@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.3.2.beta
+			<html><head><title>USeq Command Line Menus 9.3.3.beta
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -779,7 +779,7 @@ Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/
 </pre><br><p>
 				
 					<a name="AvatarProjectAssembler"><pre>**************************************************************************************
-**                          Avatar Project Assembler : July 2021                    **
+**                          Avatar Project Assembler : Oct 2021                    **
 **************************************************************************************
 Tool for assembling directories for TNRunner based on files provided by M2Gen.
 Handles patient datasets from different exome capture platforms with multiple tumor
@@ -797,14 +797,15 @@ Required Parameters:
 -p Sample exome platform file with just two tab delimited columns, the sample IDs that
      match those in the 'WES' linkage file and the platform type NIM or IDT, see
      xxx_WES_Resource_table.txt 
--f Directory containing all of the paired fastq files for T/N exomes and T RNASeq,
-     these should begin with the sample IDs that match those in the 'WES' and 'RNASeq'
-     columns in the linkage file.
+-f Directory containing all of the paired fastq and M2Gen cram files for the T/N exomes
+     and T RNASeq, these should begin with the sample IDs that match those in the 'WES'
+     and 'RNASeq' columns in the linkage file.
 -j Job dir to build out the patient dir structure and linked fastqs. Existing files
      won't be overwritten.
+-v Verbose debugging output.
 
 Example: java -jar ~/USeqApps/AvatarProjectAssembler -l linkage.txt -g gender.txt -p
-     platform.txt -f ~/UroProj/Fastq -j ~/UroProj/TNRunnerJobs/
+     platform.txt -f ~/UroProj/Fastq -j ~/UroProj/TNRunnerJobs/ -v
 
 **************************************************************************************
 </pre><br><p>
@@ -4752,7 +4753,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 </pre><br><p>
 				
 					<a name="TNRunner"><pre>**************************************************************************************
-**                                  TNRunner : May 2021                             **
+**                                  TNRunner : Nov 2021                             **
 **************************************************************************************
 TNRunner is designed to execute several containerized snakmake workflows on tumor
 normal datasets via a slurm cluster.  Based on the availability of fastq, 
@@ -4833,7 +4834,7 @@ Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatien
 </pre><br><p>
 				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                TNRunner2 : Sept 2021                             **
+**                                TNRunner2 : Nov 2021                              **
 **************************************************************************************
 TNRunner is designed to execute several containerized snakmake workflows on tumor
 normal datasets via a slurm cluster.  Based on the availability of fastq, 
@@ -4876,17 +4877,18 @@ Setup Options:
 -a Workflow docs for launching variant annotation.
 -b Workflow docs for launching sample concordance.
 -y Workflow docs for launching somatic copy analysis.
+-q Workflow docs for launching Illumina germline joint genotyping.
 -h Workflow docs for launching GATK haplotype calling.
--j Workflow docs for launching GATK joint genotyping.
+-j Workflow docs for launching GATK germline joint genotyping.
 -v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder to
       each patient dir containing the json formatted clinical information.
 -k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio
       background files.
--g Germline AnnotatedVcfParser options, defaults to '-d 12 -m 0.1 -q 0.1 -p 0.01 -g
+-g Germline AnnotatedVcfParser options, defaults to '-d 12 -m 0.075 -q 0.1 -p 0.01 -g
       D5S,D3S -n 4.4 -a HIGH -l -c Pathogenic,Likely_pathogenic,Conflicting_
       interpretations_of_pathogenicity,Drug_response -t 0.51 -e Benign,Likely_benign
       -o -b 0.1 -z 3 -u RYR1'
--s Somatic AnnotatedVcfParser options, defaults to '-d 12 -f'
+-s Somatic AnnotatedVcfParser options, defaults to '-f -d 12 -m 0.025 -j'
 -G Germline VCFCallFrequency options, defaults to '-b Hg38/Germline/Avatar/Bed -v Hg38/Germline/Avatar/Vcf'
 -S Somatic VCFCallFrequency options, defaults to '-b Hg38/Somatic/Avatar/Bed -v Hg38/Somatic/Avatar/Vcf'
 -u Minimum read coverage for tumor sample vcf records, defaults to 12
@@ -5509,7 +5511,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFMerger -v /CancerSamples/
 </pre><br><p>
 				
 					<a name="VCFMpileupAnnotator"><pre>**************************************************************************************
-**                          VCF Mpileup Annotator : April 2019                      **
+**                            VCF Mpileup Annotator : Oct 2021                      **
 **************************************************************************************
 VMA estimates the AF and DP of a vcf record from a single sample mpileup file.  It 
 replaces the AF or DP INFO values in the vcf records if present. For INDELs, the

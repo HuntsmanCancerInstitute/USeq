@@ -13,6 +13,15 @@ public class Patient {
 		this.patientId = patientId;
 		this.gender = gender;
 	}
+	
+	public String toString() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(patientId); 
+		sb.append("\n\tGender "+gender);
+		sb.append("\n\t#Norm "+normalSamples.size());
+		sb.append("\n\t#Tum "+tumorSamples.size());
+		return sb.toString();
+	}
 
 	public String getPatientId() {
 		return patientId;

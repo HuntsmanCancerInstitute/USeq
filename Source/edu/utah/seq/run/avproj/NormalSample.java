@@ -11,7 +11,7 @@ public class NormalSample {
 
 	private String platformName = null;
 	private String normalDnaName = null;
-	private ArrayList<File> normalDnaFastq = new ArrayList<File>();
+	private ArrayList<File> normalDnaFastqCram = new ArrayList<File>();
 
 
 	public NormalSample (String normalDnaName, String platformName) {
@@ -19,15 +19,16 @@ public class NormalSample {
 		this.platformName = platformName;
 	}
 
-	public boolean fetchFastqs (HashMap<String, File> nameFastq, String patientId) {
+	public boolean fetchFastqCrams (HashMap<String, File> nameFastq, String patientId) {
 		for (String name : nameFastq.keySet()) {
-			if (name.startsWith(normalDnaName)) normalDnaFastq.add(nameFastq.get(name));
+			if (name.startsWith(normalDnaName)) normalDnaFastqCram.add(nameFastq.get(name));
 		}
 		//check number
-		int num = normalDnaFastq.size();
-		if (num == 1 || num > 2) Misc.printErrAndExit("ERROR: normal sample for patient "+patientId+ "Incorrect # number DNA fastq samples "+ num);
-		
-		if (num == 2) return true;
+		int num = normalDnaFastqCram.size();
+
+		if (num == 1 && normalDnaFastqCram.get(0).getName().endsWith(".cram")) return true;
+		if (num == 2 && normalDnaFastqCram.get(0).getName().endsWith(".gz")) return true;
+		else Misc.printErrAndExit("ERROR: normal sample for patient "+patientId+ " Incorrect # number DNA fastq or cram files "+ num);
 		return false;
 	}
 
@@ -39,7 +40,7 @@ public class NormalSample {
 		return normalDnaName;
 	}
 
-	public ArrayList<File> getNormalDnaFastq() {
-		return normalDnaFastq;
+	public ArrayList<File> getNormalDnaFastqCram() {
+		return normalDnaFastqCram;
 	}
 }

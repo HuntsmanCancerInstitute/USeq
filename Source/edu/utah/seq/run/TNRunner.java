@@ -182,7 +182,9 @@ public class TNRunner {
 			IO.pl("\tCOMPLETE "+jobDir.getCanonicalPath());
 			//find the final vcfs
 			File res = new File(jobDir, jobDir.getName()+"_Hg38_GenotypedVcfs");
-			File[] genoVcfs = IO.extractFiles(res, ".vcf.gz");
+			if (res.exists() == false) res = new File (jobDir, "Vcfs");
+			File[] genoVcfs = IO.extractFiles(res, "Haplo_JointGenotyped.vcf.gz");
+			
 			//any files? might have already been moved
 			if (genoVcfs.length == 0) {
 				groupProcessingComplete = true;
@@ -190,9 +192,10 @@ public class TNRunner {
 			}
 			
 			//OK just completed, need to distribute files to individual Sample dirs
-			File[] genoVcfIndexes = IO.extractFiles(res, ".vcf.gz.tbi");
+			File[] genoVcfIndexes = IO.extractFiles(res, "Haplo_JointGenotyped.vcf.gz.tbi");
 			File logs = new File(jobDir, "Logs");
 			File runScripts = new File(jobDir, "RunScripts");
+			
 			if (genoVcfs.length == 0 || genoVcfs.length != genoVcfIndexes.length) throw new IOException("\tThe JointGenotyping was marked COMPLETE but failed to find the final vcf files or their indexes in "+res);
 			
 			//for each separate genotyped vcf
@@ -580,7 +583,7 @@ public class TNRunner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                  TNRunner : May 2021                             **\n" +
+				"**                                  TNRunner : Nov 2021                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several containerized snakmake workflows on tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, \n"+

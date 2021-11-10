@@ -1190,7 +1190,7 @@ public class IO {
 	public static File[] extractOnlyDirectories(File directory){
 		if (directory.isDirectory() == false) return null;
 		File[] fileNames = directory.listFiles();
-		ArrayList al = new ArrayList();
+		ArrayList<File> al = new ArrayList<File>();
 		Pattern pat = Pattern.compile("^\\w+.*");
 		Matcher mat; 
 		for (int i=0; i< fileNames.length; i++)  {
@@ -1206,6 +1206,18 @@ public class IO {
 			return files;
 		}
 		else return new File[]{directory};
+	}
+	
+	/**Returns directories starting with the String. Not recursive.*/
+	public static ArrayList<File> extractOnlyDirectories(File directory, String startsWith){
+		if (directory.isDirectory() == false) return null;
+		File[] fileNames = directory.listFiles();
+		ArrayList<File> al = new ArrayList<File>();
+		for (int i=0; i< fileNames.length; i++)  {
+			if (fileNames[i].isDirectory() == false) continue;
+			if (fileNames[i].getName().startsWith(startsWith)) al.add(fileNames[i]);
+		}
+		return al;
 	}
 	
 	public static void pl(Object obj){

@@ -7,6 +7,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import edu.utah.hci.misc.Util;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -25,7 +27,7 @@ public class TNRunner2 {
 	private File[] varAnnoDocs = null;
 	private File[] haplotypeCallDocs = null;
 	private File[] gatkJointGenotypingDocs = null;
-	private File[] strelkaJointGenotypingDocs = null;
+	private File[] illuminaJointGenotypingDocs = null;
 	private File[] copyRatioDocs = null;
 	private File[] clinicalVcfDocs = null;
 	private File[] msiDocs = null;
@@ -36,13 +38,16 @@ public class TNRunner2 {
 	private int minReadCoverageTumor = 12;
 	private int minReadCoverageNormal = 12;
 	private TNSample2[] tNSamples = null;
+	private HashMap<String, TNSample2> idSample = new HashMap<String, TNSample2>();
 	private String germlineAnnotatedVcfParser = null;
 	private String somaticAnnotatedVcfParser = null;
 	private String germlineVcfCallFreq = "-b Hg38/Germline/Avatar/Bed -v Hg38/Germline/Avatar/Vcf";
 	private String somaticVcfCallFreq = "-b Hg38/Somatic/Avatar/Bed -v Hg38/Somatic/Avatar/Vcf";
 	private ArrayList<String> info = new ArrayList<String>();
-	private boolean groupProcessingComplete = false;
-	private boolean groupProcessingFailed = false;
+	private boolean gatkGroupProcessingComplete = false;
+	private boolean gatkGroupProcessingFailed = false;
+	private boolean illGroupProcessingComplete = false;
+	private boolean illGroupProcessingFailed = false;
 	private boolean restartFailed = false;
 	private int maxNumJobs = 35;
 	private boolean loop = false;
@@ -54,39 +59,46 @@ public class TNRunner2 {
 	private String nice = "";
 
 	public TNRunner2 (String[] args) {
-		long startTime = System.currentTimeMillis();
+		try {
+			long startTime = System.currentTimeMillis();
 
-		processArgs(args);
+			processArgs(args);
 
-		//loop?
-		int iterations = 1;
-		int i=0;
-		if (loop) iterations = 1000;
-		
-		for (; i< iterations; i++){
-			if (processIndividualSamples()){
-				processGATKSampleGroup();
-				if (complete()) {
-					IO.pl("\nALL COMPLETE!");
-					break;
+			//loop?
+			int iterations = 1;
+			int i=0;
+			if (loop) iterations = 1000;
+
+			for (; i< iterations; i++){
+				if (processIndividualSamples()){
+					processGATKSampleGroup();
+					processIlluminaSampleGroup();
+					if (complete()) {
+						IO.pl("\nALL COMPLETE!");
+						break;
+					}
+					else IO.pl("\nNOT COMPLETE!");
 				}
 				else IO.pl("\nNOT COMPLETE!");
+				if (iterations !=1){
+					try {
+						IO.pl("\nWaiting... "+i);
+						Thread.sleep(1000*60*numMinToSleep);
+					} catch (InterruptedException e) {}
+				}
 			}
-			else IO.pl("\nNOT COMPLETE!");
-			if (iterations !=1){
-				try {
-					IO.pl("\nWaiting... "+i);
-					Thread.sleep(1000*60*numMinToSleep);
-				} catch (InterruptedException e) {}
-			}
-		}
-		
-		printSamplesWithFastqIssues();
-		
 
-		//finish and calc run time
-		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
-		IO.pl("\nDone! "+Math.round(diffTime)+" Sec\n");
+			printSamplesWithFastqIssues();
+
+
+			//finish and calc run time
+			double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
+			IO.pl("\nDone! "+Math.round(diffTime)+" Sec\n");
+		} catch (IOException e) {
+			IO.el("\nERROR running TNRunner, aborting");
+			e.printStackTrace();
+			System.exit(1);
+		}
 	}
 
 	private void printSamplesWithFastqIssues() {
@@ -98,24 +110,24 @@ public class TNRunner2 {
 	}
 
 	private boolean complete() {
-		if (groupProcessingComplete == false || groupProcessingFailed == true) return false;
+		if (gatkGroupProcessingComplete == false || gatkGroupProcessingFailed == true || illGroupProcessingComplete == false || illGroupProcessingFailed == true) return false;
 		for (TNSample2 t: tNSamples){
 			if (t.isFailed() || t.isRunning()) return false;
 		}
 		return true;
 	}
-	
+
 	private void processGATKSampleGroup() {
 		try {
 			//any joint genotyping workflow files? If none then they want to skip this, e.g. no matched normal
 			if (gatkJointGenotypingDocs == null) {
-				groupProcessingFailed = false;
-				groupProcessingComplete = true;
+				gatkGroupProcessingFailed = false;
+				gatkGroupProcessingComplete = true;
 				return;
 			}
 			IO.pl("\nChecking GATK joint genotype group processing...");
 
-			
+
 			//for each sample are the haplotype gvcf calls ready?
 			ArrayList<File> toGeno = new ArrayList<File>();
 			boolean allPresent = true;
@@ -124,10 +136,10 @@ public class TNRunner2 {
 				File gatkDir = new File(tns.getRootDir(), "GermlineVariantCalling/"+tns.getId()+"_GATK");
 				if (gatkDir.exists()) {
 					if (verbose) IO.pl("\tComplete");
-					groupProcessingComplete = true;
+					gatkGroupProcessingComplete = true;
 					return;
 				}
-				
+
 				//OK doesn't exist so wait until all gvcfs become available
 				//does this sample have a normal sample?
 				if (tns.getNormalDNADataset() != null) {
@@ -148,16 +160,16 @@ public class TNRunner2 {
 				}
 			}
 			if (allPresent == false) return;
-			
+
 			//launch it
 			checkJointGenotyping(toGeno);
-			if (groupProcessingFailed || verbose) Misc.printArray(info);
+			if (gatkGroupProcessingFailed || verbose) Misc.printArray(info);
 
 			if (verbose) {
-				IO.pl("\tFailed? "+groupProcessingFailed);
-				IO.pl("\tComplete? "+groupProcessingComplete);
+				IO.pl("\tFailed? "+gatkGroupProcessingFailed);
+				IO.pl("\tComplete? "+gatkGroupProcessingComplete);
 			}
-			
+
 		} catch (IOException e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nProblem processing group analysis!");
@@ -165,10 +177,205 @@ public class TNRunner2 {
 
 	}
 
+	private void processIlluminaSampleGroup() throws IOException {
+		//any joint genotyping workflow files? If none then they want to skip this
+		if (illuminaJointGenotypingDocs == null) {
+			illGroupProcessingFailed = false;
+			illGroupProcessingComplete = true;
+			return;
+		}
+		IO.pl("\nChecking Illumina joint genotype group processing...");
+
+		//look for completed dirs
+		boolean alreadyLaunched = lookAndDistributeIlluminaJointGenotypedSamples();
+		if (alreadyLaunched) return;
+		
+		//for each sample are the normal cram files ready?
+		ArrayList<TNSample2> done = new ArrayList<TNSample2>();
+		ArrayList<TNSample2> toRun = new ArrayList<TNSample2>();
+		ArrayList<TNSample2> waitingForAlignment = new ArrayList<TNSample2>();
+		ArrayList<TNSample2> noNormal = new ArrayList<TNSample2>();
+
+		for (TNSample2 tns: tNSamples){
+			//Already run?
+			File complete = new File(tns.getRootDir(), "GermlineVariantCalling/"+tns.getId()+"_Illumina/COMPLETE");
+			boolean alreadyRun = complete.exists();
+			if (alreadyRun) {
+				done.add(tns);
+				continue;
+			}
+			//Alignment complete?
+			else if (tns.getNormalDNADataset() != null && tns.getNormalDNADataset().isComplete()) {
+				//is it the NA12878 control?
+				if (nonMatchedNormal != null) {
+					String nonMatchName = nonMatchedNormal[0].getName();
+					String normName = tns.getNormalDNADataset().getCramFile().getName();
+					if (normName.equals(nonMatchName) == false) toRun.add(tns);
+				}
+				else toRun.add(tns);
+			}
+			//Fastq present?
+			else if (tns.getNormalDNAFastq()!= null && tns.getNormalDNAFastq().isGoodToAlign()) waitingForAlignment.add(tns);
+			//Fastq and alignment not present so skip
+			else  {
+				noNormal.add(tns);
+				continue;
+			}
+		}
+
+		//any normals awaiting?
+		int numWaiting = waitingForAlignment.size();
+		if (numWaiting != 0) {
+			if (verbose) {
+				for (TNSample2 ts2: waitingForAlignment){
+					IO.pl("\tWaiting for normal alignment from "+ts2.getId());
+				}
+			}
+		}
+		//all ready so build and launch
+		else if (toRun.size() !=0) {
+			jointGenotypeIlluminaSamples(toRun);
+		}
+		
+	}
+
+
+	private void jointGenotypeIlluminaSamples(ArrayList<TNSample2> toRun) throws IOException {
+		//create a IlluminaJointGenotyping_XXX dir for every 10 or less normals
+
+		//split into chunks with a max of 10 samples
+		TNSample2[] tns = new TNSample2[toRun.size()];
+		toRun.toArray(tns);
+		Misc.randomize(tns, 1);
+		Object[][] chunks = Misc.chunkWithMax(tns, 10);
+
+		//for each chunk make a dir, link in the normal crams to call germline vars on, submit to the queue
+		for (int i=0; i< chunks.length; i++) {
+			File jjDir = new File(sampleDir, "IlluminaJointGenotyping_"+i);
+			jjDir.mkdir();
+			File toGenoDir = new File(jjDir, "ToGenotype");
+			toGenoDir.mkdir();
+			Object[] samples = chunks[i];
+			ArrayList<File> filesToLink = new ArrayList<File>();
+			for (int j=0; j< samples.length; j++) {
+				TNSample2 tn = (TNSample2) samples[j];
+				filesToLink.add(tn.getNormalDNADataset().getCramFile());
+				filesToLink.add(tn.getNormalDNADataset().getCramIndexFile());
+			}
+			launchIlluminaJointGenotyping(filesToLink, jjDir);
+		}
+		illGroupProcessingComplete = false;
+		illGroupProcessingFailed = false;
+	}
+
+	private boolean lookAndDistributeIlluminaJointGenotypedSamples() throws IOException {
+
+		ArrayList<File> jjDirs = IO.extractOnlyDirectories(sampleDir, "IlluminaJointGenotyping");
+		if (jjDirs.size() == 0) {
+			return false;
+		}
+
+		illGroupProcessingComplete = true;
+		illGroupProcessingFailed = false;
+		boolean checkSamples = false;
+		
+		//check each Joint Geno dir
+		for (File jobDir: jjDirs) {
+			if (verbose) IO.pl("\tChecking "+jobDir);
+			//any files?
+			HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+
+			//COMPLETE
+			if (nameFile.containsKey("COMPLETE")){
+				IO.pl("\tCOMPLETE "+jobDir.getCanonicalPath());
+				//find the final vcfs
+				File res = new File(jobDir, "Vcfs");
+				File[] genoVcfs = IO.extractFiles(res, "JointGenotyped.vcf.gz");
+
+				//any files? might have already been moved
+				if (genoVcfs.length != 0) {
+					//OK just completed, need to distribute files to individual Jobs
+					File logs = new File(jobDir, "Logs");
+					File runScripts = new File(jobDir, "RunScripts");
+					if (logs.exists() == false || runScripts.exists() == false) throw new IOException("\t"+jobDir.getName()+ 
+							" was marked COMPLETE but failed to find the Logs or RunScripts directories ");
+
+					//for each separate genotyped vcf
+					for (int i=0; i< genoVcfs.length; i++){
+
+						//Extract the sample name, JZBCLZLXL6-IDT-SL409940-SL413507-SL416453_NormalDNA_Hg38_JointGenotyped.vcf.gz
+						String fileName = genoVcfs[i].getName();			
+						String sampleName = fileName.replace("_NormalDNA_Hg38_JointGenotyped.vcf.gz", "");
+						TNSample2 tns = idSample.get(sampleName);
+						if (tns == null) throw new IOException("\nERROR: Failed to find the sample dataset by parsing the JointGenotyping vcf names for "+fileName +" -> "+sampleName);
+
+						//create a folder for the incoming genotyped vcf in the sample folder
+						File resDir = new File(tns.getRootDir(), "GermlineVariantCalling/"+sampleName+"_Illumina");
+						resDir.mkdirs();
+
+						if (verbose) IO.pl("\tMoving genotyped vcfs to "+resDir);
+
+						//copy and move over relevant files
+						File newLogDir = new File(resDir,"Logs");
+						newLogDir.mkdir();
+						File newRSDir = new File(resDir,"RunScripts");
+						newRSDir.mkdir();
+						IO.copyDirectoryRecursive(logs, newLogDir, null);
+						IO.copyDirectoryRecursive(runScripts, newRSDir, null);
+						genoVcfs[i].renameTo(new File(resDir, genoVcfs[i].getName()));
+						File tbi = new File (genoVcfs[i].getCanonicalPath()+".tbi");
+						tbi.renameTo(new File(resDir, tbi.getName()));
+						File complete = new File(resDir, "COMPLETE");
+						complete.createNewFile();
+						
+					}
+				}
+				checkSamples = true;
+			}
+
+			//force a restart?
+			else if (restartFailed && nameFile.containsKey("FAILED")){
+				//cancel any slurm jobs and delete the directory
+				TNSample.cancelDeleteJobDir(nameFile, jobDir, info, true);
+				illGroupProcessingComplete = false;
+				illGroupProcessingFailed = true;
+			}
+			//QUEUED
+			else if (nameFile.containsKey("QUEUED")){
+				info.add("\tQUEUED "+jobDir);
+				illGroupProcessingComplete = false;
+			}		
+			//STARTED
+			else if (nameFile.containsKey("STARTED")){
+				if (TNSample.checkQueue(nameFile, jobDir, info) == false) illGroupProcessingFailed = true;
+				illGroupProcessingComplete = false;
+			}
+			//FAILED but no forceRestart
+			else if (nameFile.containsKey("FAILED")){
+				if (verbose) IO.pl("\tFAILED "+jobDir);
+				illGroupProcessingFailed = true;
+				illGroupProcessingComplete = false;
+			}
+			//hmm no status files, probably something went wrong on the cluster? mark it as FAILED
+			else {
+				if (verbose) IO.pl("\tFAILED?, no job status files in "+jobDir);
+				illGroupProcessingFailed = true;
+				illGroupProcessingComplete = false;
+			}
+			//check samples to run annotator?
+			if (checkSamples) processIndividualSamples();
+		}
+		if (verbose) {
+			IO.pl("\tAll complete? "+illGroupProcessingComplete);
+			IO.pl("\tAny failed? "+illGroupProcessingFailed);
+		}
+		return true;
+	}
+
 	private void checkJointGenotyping(ArrayList<File> toGeno) throws IOException {
 
 		//make dir, ok if it already exists
-		File jobDir = new File (sampleDir, "JointGenotyping");
+		File jobDir = new File (sampleDir, "GATKJointGenotyping");
 		jobDir.mkdirs();
 
 		//any files?
@@ -187,16 +394,16 @@ public class TNRunner2 {
 			File[] genoVcfs = IO.extractFiles(res, "JointGenotyped.vcf.gz");
 			//any files? might have already been moved
 			if (genoVcfs.length == 0) {
-				groupProcessingComplete = true;
+				gatkGroupProcessingComplete = true;
 				return;
 			}
-			
+
 			//OK just completed, need to distribute files to individual Sample dirs
 			File[] genoVcfIndexes = IO.extractFiles(res, "JointGenotyped.vcf.gz.tbi");
 			File logs = new File(jobDir, "Logs");
 			File runScripts = new File(jobDir, "RunScripts");
 			if (genoVcfs.length == 0 || genoVcfs.length != genoVcfIndexes.length) throw new IOException("\tThe JointGenotyping was marked COMPLETE but failed to find the final vcf files or their indexes in "+res);
-			
+
 			//for each separate genotyped vcf
 			for (int i=0; i< genoVcfs.length; i++){
 
@@ -204,17 +411,17 @@ public class TNRunner2 {
 				//HCI_P1_NormalDNA_Hg38_JointGenotyping_Hg38.vcf.gz
 				//1218982_NormalDNA_Hg38_JointGenotyped.vcf.gz
 				//1218982_Pancreas_NormalDNA_Hg38_JointGenotyped.vcf.gz
-				
+
 				//how about just remove _NormalDNA_Hg38_JointGenotyped.vcf.gz?
-				
-				
+
+
 				String fileName = genoVcfs[i].getName();			
 				String sampleName = fileName.replace("_GVCF_Hg38_JointGenotyped.vcf.gz", "");
 				if (sampleName.length() == fileName.length()) throw new IOException("\nERROR: Failed to parse the sample name from "+fileName);
-				
+
 				File sampleDir = null;
 				String id = null;
-				
+
 				//find the sample
 				TNSample2 toLaunch = null;
 				for (TNSample2 tns: tNSamples){
@@ -226,16 +433,16 @@ public class TNRunner2 {
 					}
 				}
 				if (sampleDir == null) throw new IOException("\nERROR: Failed to find the sampleDir by parsing the JointGenotyping vcf names. "+fileName);
-				
+
 				if (verbose) IO.pl("\tMoving genotyped vcfs to "+sampleDir);
-				
-				
+
+
 				//delete any existing germline folder
 				IO.deleteDirectoryViaCmdLine(new File(sampleDir, "GermlineVariantCalling"));
 				//create a folder for the incoming genotyped vcf in the sample folder
 				File resDir = new File(sampleDir, "GermlineVariantCalling/"+sampleName+"_GATK");
 				resDir.mkdirs();
-				
+
 				//copy and move over relevant files
 				File newLogDir = new File(resDir,"Logs");
 				newLogDir.mkdir();
@@ -243,14 +450,14 @@ public class TNRunner2 {
 				newRSDir.mkdir();
 				IO.copyDirectoryRecursive(logs, newLogDir, null);
 				IO.copyDirectoryRecursive(runScripts, newRSDir, null);
-				
+
 				genoVcfs[i].renameTo(new File(resDir, genoVcfs[i].getName()));
 				genoVcfIndexes[i].renameTo(new File(resDir, genoVcfIndexes[i].getName()));
-				
+
 				//launch germline annotator?
 				if (this.getVarAnnoDocs()!= null) toLaunch.annotateGermlineVcf("GATK");
 			}
-			groupProcessingComplete = true;
+			gatkGroupProcessingComplete = true;
 		}
 
 		//force a restart?
@@ -266,18 +473,18 @@ public class TNRunner2 {
 		}		
 		//STARTED
 		else if (nameFile.containsKey("STARTED")){
-			if (TNSample.checkQueue(nameFile, jobDir, info) == false) groupProcessingFailed = true;
+			if (TNSample.checkQueue(nameFile, jobDir, info) == false) gatkGroupProcessingFailed = true;
 		}
 		//FAILED but no forceRestart
 		else if (nameFile.containsKey("FAILED")){
 			if (verbose) IO.pl("\tFAILED "+jobDir);
-			groupProcessingFailed = true;
+			gatkGroupProcessingFailed = true;
 		}
 		//hmm no status files, probably something went wrong on the cluster? mark it as FAILED
 		else {
 			if (verbose) IO.pl("\tMarking as FAILED, no job status files in "+jobDir);
 			new File(jobDir, "FAILED").createNewFile();
-			groupProcessingFailed = true;
+			gatkGroupProcessingFailed = true;
 		}
 	}
 
@@ -301,7 +508,7 @@ public class TNRunner2 {
 		if (verbose) for (String o: output) IO.pl("\t\t"+o);
 		for (String o: output) {
 			if (o.toLowerCase().contains("error")) {
-				groupProcessingFailed = true;
+				gatkGroupProcessingFailed = true;
 				IO.pl("\tERROR launching "+Misc.stringArrayToString(cmd, " "));
 				if (verbose == false) for (String x: output) IO.pl("\t\t"+x);
 				new File(jobDir, "FAILED").createNewFile();
@@ -309,16 +516,48 @@ public class TNRunner2 {
 			}
 		}
 		new File(jobDir, "QUEUED").createNewFile();
-		
+
 	}
-	
+
+	private void launchIlluminaJointGenotyping(ArrayList<File> toGeno, File jobDir) throws IOException {
+		if (verbose) IO.pl("\tLAUNCHING "+jobDir);
+		//want to create/ replace the soft links
+		createJointGenotypingLinks(toGeno, jobDir);
+
+		//replace any launch scripts with the current
+		File shellScript = TNSample.copyInWorkflowDocs(illuminaJointGenotypingDocs, jobDir);
+
+		//clear any progress files
+		TNSample.removeProgressFiles(jobDir);
+
+		//squeue the shell script
+		String alignDirPath = jobDir.getCanonicalPath();
+		String [] cmd = null;
+		
+
+		if (nice.length() !=0) cmd = new String[]{"sbatch", nice, "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
+		else cmd = new String[]{"sbatch", "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
+		String[] output = IO.executeViaProcessBuilder(cmd, false);
+		if (verbose) for (String o: output) IO.pl("\t\t"+o);
+		for (String o: output) {
+			if (o.toLowerCase().contains("error")) {
+				illGroupProcessingFailed = true;
+				IO.pl("\tERROR launching "+Misc.stringArrayToString(cmd, " "));
+				if (verbose == false) for (String x: output) IO.pl("\t\t"+x);
+				new File(jobDir, "FAILED").createNewFile();
+				return;
+			}
+		}
+		new File(jobDir, "QUEUED").createNewFile();
+
+	}
+
 	private static int countNumberRunningJobs(String partition) throws IOException {
 		String [] cmd = new String[]{"squeue", "-p", partition};
 		String[] output = IO.executeViaProcessBuilder(cmd, false);
 		return output.length -1;
-		
 	}
-	
+
 
 	private void createJointGenotypingLinks(ArrayList<File> toGeno, File jobDir) throws IOException {
 		File linkDir = new File(jobDir.getCanonicalFile(), "ToGenotype");
@@ -335,7 +574,7 @@ public class TNRunner2 {
 		try {
 			if (verbose) IO.pl("\nChecking individual samples...");
 			else IO.pl("\nChecking individual samples (SampleID RunningJobs)");
-			
+
 			int numJobsLaunched = countNumberRunningJobs(partition);
 			tNSamples = new TNSample2[rootDirs.length];
 			for (int i=0; i< rootDirs.length; i++){
@@ -345,6 +584,7 @@ public class TNRunner2 {
 				}
 				if (verbose == false) IO.p("\t"+rootDirs[i].getName());
 				tNSamples[i] = new TNSample2(rootDirs[i].getCanonicalFile(), this);
+				idSample.put(tNSamples[i].getId(), tNSamples[i]);
 				if (verbose == false) IO.pl("\t"+tNSamples[i].isRunning());
 				numJobsLaunched += tNSamples[i].getNumJobsLaunched();
 			}
@@ -374,7 +614,7 @@ public class TNRunner2 {
 			File annoWorkflowDir = null;
 			File sampleConWorkflowDir = null;
 			File gatkJointGenoWorklfowDir = null;
-			File strelkaJointGenoWorklfowDir = null;
+			File illuminaJointGenoWorklfowDir = null;
 			File haploWorklfowDir = null;
 			File RNAWorkflowDir = null;
 			File rnaFuseDir = null;
@@ -397,7 +637,7 @@ public class TNRunner2 {
 						case 'b': sampleConWorkflowDir = new File(args[++i]); break;
 						case 'm': msiWorkflowDir = new File(args[++i]); break;
 						case 'j': gatkJointGenoWorklfowDir = new File(args[++i]); break;
-//case 'q': strelkaJointGenoWorklfowDir = new File(args[++i]); break;
+						case 'q': illuminaJointGenoWorklfowDir = new File(args[++i]); break;
 						case 'h': haploWorklfowDir = new File(args[++i]); break;
 						case 'y': copyRatioDocsDir = new File(args[++i]); break;
 						case 'k': copyRatioBkgDir = new File(args[++i]); break;
@@ -410,7 +650,7 @@ public class TNRunner2 {
 						case 'u': minReadCoverageTumor = Integer.parseInt(args[++i]); break;
 						case 'i': minReadCoverageNormal = Integer.parseInt(args[++i]); break;
 						case 'x': maxNumJobs = Integer.parseInt(args[++i]); break;
-						case 'z': niceJobs = true; break;
+						case 'z': niceJobs = false; break;
 						case 'l': loop = true; break;
 						case 'd': restartFailed = true; break;
 						case 'n': partition = args[++i]; break;
@@ -428,16 +668,16 @@ public class TNRunner2 {
 			if (sampleDir == null || sampleDir.exists() == false) Misc.printErrAndExit("Error: failed to find your data directory? "+sampleDir);
 			rootDirs = IO.extractOnlyDirectories(sampleDir);
 			if (rootDirs == null || rootDirs.length == 0) Misc.printErrAndExit("Error: failed to find root directories to process? "+rootDirs);
-			
+
 			//remove JointGenotyping if present
 			ArrayList<File> toKeep = new ArrayList<File>();
 			for (File rd: rootDirs){
 				String name = rd.getName();
-				if (name.equals("JointGenotyping") == false) toKeep.add(rd);
+				if (name.contains("JointGenotyping") == false) toKeep.add(rd);
 			}
 			rootDirs = new File[toKeep.size()];
 			toKeep.toArray(rootDirs);
-			
+
 			//DNA align qc docs
 			if (DNAWorkflowDir != null){
 				if (DNAWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing DNA alignment workflow docs? "+DNAWorkflowDir);
@@ -449,55 +689,55 @@ public class TNRunner2 {
 				if (RNAWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing RNA alignment workflow docs? "+RNAWorkflowDir);
 				RNAAlignQCDocs = IO.extractFiles(RNAWorkflowDir);
 			}
-			
+
 			//RNA fusion docs
 			if (rnaFuseDir != null) {
 				if (rnaFuseDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing RNA fusion workflow docs? "+rnaFuseDir);
 				RNAFusionDocs = IO.extractFiles(rnaFuseDir);
 			}
-			
+
 			//variant calling docs
 			if (somVarCallWorkflowDir != null){
 				if(somVarCallWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing somatic variant calling workflow docs? "+somVarCallWorkflowDir);
 				somaticVarCallDocs = IO.extractFiles(somVarCallWorkflowDir);
 			}
-			
+
 			//variant annotation
 			if (annoWorkflowDir != null){
 				if (annoWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing variant annotation workflow docs? "+annoWorkflowDir);
 				varAnnoDocs = IO.extractFiles(annoWorkflowDir);
 			}
-			
+
 			//sample concordance
 			if (sampleConWorkflowDir != null){
 				if (sampleConWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing sample concordance workflow docs? "+sampleConWorkflowDir);
 				sampleConcordanceDocs = IO.extractFiles(sampleConWorkflowDir);
 			}
-			
+
 			//haplotype calling
 			if (haploWorklfowDir != null){
 				if (haploWorklfowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing GATK haplotype calling workflow docs? "+haploWorklfowDir);
 				haplotypeCallDocs = IO.extractFiles(haploWorklfowDir);
 			}
-			
+
 			//gatk joint genotyping
 			if (gatkJointGenoWorklfowDir != null){
 				if (gatkJointGenoWorklfowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing GATK joint genotyping workflow docs? "+gatkJointGenoWorklfowDir);
 				gatkJointGenotypingDocs = IO.extractFiles(gatkJointGenoWorklfowDir);
 			}
-			
+
 			//strelka joint genotyping
-			if (strelkaJointGenoWorklfowDir != null){
-				if (strelkaJointGenoWorklfowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing strelka joint genotyping workflow docs? "+strelkaJointGenoWorklfowDir);
-				strelkaJointGenotypingDocs = IO.extractFiles(strelkaJointGenoWorklfowDir);
+			if (illuminaJointGenoWorklfowDir != null){
+				if (illuminaJointGenoWorklfowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing strelka joint genotyping workflow docs? "+illuminaJointGenoWorklfowDir);
+				illuminaJointGenotypingDocs = IO.extractFiles(illuminaJointGenoWorklfowDir);
 			}
-			
+
 			//msi
 			if (msiWorkflowDir != null){
 				if (msiWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing msi workflow docs? "+msiWorkflowDir);
 				msiDocs = IO.extractFiles(msiWorkflowDir);
 			}
-			
+
 			//clinical vcf merging workflow
 			if (clinicalVcfDir != null){
 				if (clinicalVcfDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing workflow docs for merging and comparing clinical test reports and vcfs? "+clinicalVcfDocs);
@@ -523,29 +763,29 @@ public class TNRunner2 {
 				}
 				if (maleBkg == null || femaleBkg == null) Misc.printErrAndExit("Error: failed to find male "+maleBkg+" and female "+femaleBkg+" background xxxFemalePoN.hdf5 or xxxMalePoN.hdf5 files in "+copyRatioBkgDir);
 			}
-			
+
 			//non matched normal?
 			if (normalAlignmentDir != null) {
-//need to generate cram files from these and rename the Pass to PassRC
+				//need to generate cram files from these and rename the Pass to PassRC
 				//find the final bam and bed
-				File[] finalBam = IO.extractFiles(new File(normalAlignmentDir, "Bam"), "_final.bam");
-				File[] passingBed = IO.extractFiles(new File(normalAlignmentDir, "QC"), "_Pass.bed.gz");
-				if (finalBam == null || finalBam.length !=1 )throw new IOException("\nFailed to find a single Bam/xxx_final.bam in "+normalAlignmentDir);
-				if (passingBed == null || passingBed.length !=1 )throw new IOException("\nFailed to find a single QC/xxx_Pass.bed.gz in "+normalAlignmentDir);
+				File[] finalBam = IO.extractFiles(new File(normalAlignmentDir, "Alignment"), ".cram");
+				File[] passingBed = IO.extractFiles(new File(normalAlignmentDir, "QC"), "PassRC.bed.gz");
+				if (finalBam == null || finalBam.length !=1 )throw new IOException("\nFailed to find a single Alignment/xxx.cram in "+normalAlignmentDir);
+				if (passingBed == null || passingBed.length !=1 )throw new IOException("\nFailed to find a single QC/xxxPassRC.bed.gz in "+normalAlignmentDir);
 				nonMatchedNormal = new File[] {finalBam[0], passingBed[0]};
 			}
-			
-			
+
+
 			//AnnotatedVcfParser options for germline and somatic filtering
-			if (germlineAnnotatedVcfParser == null) germlineAnnotatedVcfParser = "-d "+minReadCoverageNormal+" -m 0.1 -q 0.1 -p 0.01 -g D5S,D3S -n 4.4 -a HIGH -l -c "
+			if (germlineAnnotatedVcfParser == null) germlineAnnotatedVcfParser = "-d "+minReadCoverageNormal+" -m 0.075 -q 0.1 -p 0.01 -g D5S,D3S -n 4.4 -a HIGH -l -c "
 					+ "Pathogenic,Likely_pathogenic,Conflicting_interpretations_of_pathogenicity,Drug_response -t 0.51 -e Benign,Likely_benign -o -b 0.1 -z 3 -u RYR1";
-			if (somaticAnnotatedVcfParser == null) somaticAnnotatedVcfParser = "-d "+minReadCoverageTumor+" -f";
+			if (somaticAnnotatedVcfParser == null) somaticAnnotatedVcfParser = "-d "+minReadCoverageTumor+" -f -m 0.025 -j";
 
 			//set path to trim
 			pathToTrim = sampleDir.getCanonicalFile().getParentFile().getCanonicalPath()+"/";
-			
+
 			if (niceJobs) nice = "--nice=10000";
-			
+
 			if (verbose){
 				IO.pl("Run parameters:");
 				IO.pl("Patient sample directory\t"+rootDirs[0].getParent());
@@ -558,15 +798,15 @@ public class TNRunner2 {
 				IO.pl("MSI workflow directory\t"+msiWorkflowDir);
 				IO.pl("GATK haplotype calling workflow directory\t"+haploWorklfowDir);
 				IO.pl("GATK Joint genotyping workflow directory\t"+gatkJointGenoWorklfowDir);
-//IO.pl("Strelka Joint genotyping workflow directory\t"+strelkaJointGenoWorklfowDir);
+				IO.pl("Illumina Joint genotyping workflow directory\t"+illuminaJointGenoWorklfowDir);
 				IO.pl("Copy ratio workflow directory\t"+copyRatioDocsDir);
 				IO.pl("Copy ratio background directory\t"+copyRatioBkgDir);
-	
+
 				IO.pl("Min tumor read coverage\t"+minReadCoverageTumor);
 				IO.pl("Min normal read coverage\t"+minReadCoverageNormal);
 				IO.pl("Germline Annotated Vcf Parser options\t"+germlineAnnotatedVcfParser);
 				IO.pl("Somatic Annotated Vcf Parser options\t"+somaticAnnotatedVcfParser);
-	
+
 				IO.pl("Delete and restart failed jobs\t"+restartFailed);
 				IO.pl("Verbose logging\t"+verbose);
 				IO.pl("Max # jobs to launch\t"+maxNumJobs);
@@ -584,7 +824,7 @@ public class TNRunner2 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                TNRunner2 : Sept 2021                             **\n" +
+				"**                                TNRunner2 : Nov 2021                              **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several containerized snakmake workflows on tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, \n"+
@@ -593,7 +833,7 @@ public class TNRunner2 {
 				"link or copy in the corresponding paired end Illumina gzipped fastq files. To run \n"+
 				"GATK Joint Genotyping on sample sets where this has been run before, delete the\n "+
 				"GermlineVariantCalling/GATK* and GATKJointGenotyping folders.\n"+
-				
+
 				"\nMyPatientSampleDatasets\n"+
 				"   MyPatientA\n"+
 				"      Fastq\n"+
@@ -605,7 +845,7 @@ public class TNRunner2 {
 				"         TumorDNA\n"+
 				"         TumorRNA\n"+
 				"   MyPatientC....\n"+
-				
+
 				"\nThe Fastq directory and sub directories must match this naming. Only include those\n"+
 				"for which you have fastq.  Change the MyXXX to something relevant. TNRunner is\n"+
 				"stateless so as more Fastq becomes available or issues are addressed, relaunch the\n"+
@@ -616,7 +856,7 @@ public class TNRunner2 {
 				"and the matching resource bundle from\n"+
 				"https://hci-bio-app.hci.utah.edu/gnomex/gnomexFlex.jsp?analysisNumber=A5578 .\n"+
 				"All workflow docs are optional although some require output from prior Analysis.\n"+
-					
+
 				"\nSetup Options:\n"+
 				"-p Directory containing one or more patient data directories to process.\n" +
 				"-e Workflow docs for launching DNA alignments.\n"+
@@ -627,18 +867,18 @@ public class TNRunner2 {
 				"-a Workflow docs for launching variant annotation.\n"+
 				"-b Workflow docs for launching sample concordance.\n"+
 				"-y Workflow docs for launching somatic copy analysis.\n"+
+				"-q Workflow docs for launching Illumina germline joint genotyping.\n"+
 				"-h Workflow docs for launching GATK haplotype calling.\n"+
-				"-j Workflow docs for launching GATK joint genotyping.\n"+
-//"-q Workflow docs for launching Strelka germline joint genotyping.\n"+
+				"-j Workflow docs for launching GATK germline joint genotyping.\n"+
 				"-v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder to\n"+
 				"      each patient dir containing the json formatted clinical information.\n"+
 				"-k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio\n"+
 				"      background files.\n"+
-				"-g Germline AnnotatedVcfParser options, defaults to '-d 12 -m 0.1 -q 0.1 -p 0.01 -g\n"+
+				"-g Germline AnnotatedVcfParser options, defaults to '-d 12 -m 0.075 -q 0.1 -p 0.01 -g\n"+
 				"      D5S,D3S -n 4.4 -a HIGH -l -c Pathogenic,Likely_pathogenic,Conflicting_\n"+
 				"      interpretations_of_pathogenicity,Drug_response -t 0.51 -e Benign,Likely_benign\n"+
 				"      -o -b 0.1 -z 3 -u RYR1'\n"+
-				"-s Somatic AnnotatedVcfParser options, defaults to '-d 12 -f'\n"+
+				"-s Somatic AnnotatedVcfParser options, defaults to '-f -d 12 -m 0.025 -j'\n"+
 				"-G Germline VCFCallFrequency options, defaults to '-b Hg38/Germline/Avatar/Bed -v Hg38/Germline/Avatar/Vcf'\n"+
 				"-S Somatic VCFCallFrequency options, defaults to '-b Hg38/Somatic/Avatar/Bed -v Hg38/Somatic/Avatar/Vcf'\n"+
 				"-u Minimum read coverage for tumor sample vcf records, defaults to 12\n"+
@@ -646,7 +886,7 @@ public class TNRunner2 {
 				"-w Non matched normal alignment directory (e.g. from NA12878) to use when no matched\n"+
 				"      normal is available for somatic variant calling. Needs to contain Bam/xxx_final.bam\n"+
 				"      and QC/xxx_Pass.bed.gz dirs and files with indexes.\n"+
-				
+
 				"\nJob Execution Options:\n"+
 				"-d Delete and restart FAILED jobs.\n"+
 				"-x Maximum # jobs to run at any given time, defaults to 35.\n"+
@@ -728,7 +968,7 @@ public class TNRunner2 {
 	}
 
 	public File[] getStrelkaJointGenotypingDocs() {
-		return strelkaJointGenotypingDocs;
+		return illuminaJointGenotypingDocs;
 	}
 
 	public String getGermlineVcfCallFreq() {
