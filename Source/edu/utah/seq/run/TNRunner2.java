@@ -112,6 +112,7 @@ public class TNRunner2 {
 	private boolean complete() {
 		if (gatkGroupProcessingComplete == false || gatkGroupProcessingFailed == true || illGroupProcessingComplete == false || illGroupProcessingFailed == true) return false;
 		for (TNSample2 t: tNSamples){
+			if (t == null) continue;
 			if (t.isFailed() || t.isRunning()) return false;
 		}
 		return true;
@@ -297,8 +298,9 @@ public class TNRunner2 {
 					//OK just completed, need to distribute files to individual Jobs
 					File logs = new File(jobDir, "Logs");
 					File runScripts = new File(jobDir, "RunScripts");
-					if (logs.exists() == false || runScripts.exists() == false) throw new IOException("\t"+jobDir.getName()+ 
-							" was marked COMPLETE but failed to find the Logs or RunScripts directories ");
+					File zip = new File(jobDir, "LogRunScripts.zip");
+					if (zip.exists()==false && (logs.exists() == false || runScripts.exists() == false)) throw new IOException("\t"+jobDir.getName()+ 
+							" was marked COMPLETE but failed to find the Logs or RunScripts directories or LogRunScripts.zip archive.");
 
 					//for each separate genotyped vcf
 					for (int i=0; i< genoVcfs.length; i++){
@@ -316,12 +318,19 @@ public class TNRunner2 {
 						if (verbose) IO.pl("\tMoving genotyped vcfs to "+resDir);
 
 						//copy and move over relevant files
-						File newLogDir = new File(resDir,"Logs");
-						newLogDir.mkdir();
-						File newRSDir = new File(resDir,"RunScripts");
-						newRSDir.mkdir();
-						IO.copyDirectoryRecursive(logs, newLogDir, null);
-						IO.copyDirectoryRecursive(runScripts, newRSDir, null);
+						if (zip.exists()) {
+							File newZip = new File(resDir,"LogRunScripts.zip");
+							IO.copyViaFileChannel(zip, newZip);
+						}
+						else {
+							File newLogDir = new File(resDir,"Logs");
+							newLogDir.mkdir();
+							File newRSDir = new File(resDir,"RunScripts");
+							newRSDir.mkdir();
+							IO.copyDirectoryRecursive(logs, newLogDir, null);
+							IO.copyDirectoryRecursive(runScripts, newRSDir, null);
+						}
+						
 						genoVcfs[i].renameTo(new File(resDir, genoVcfs[i].getName()));
 						File tbi = new File (genoVcfs[i].getCanonicalPath()+".tbi");
 						tbi.renameTo(new File(resDir, tbi.getName()));
@@ -400,23 +409,21 @@ public class TNRunner2 {
 
 			//OK just completed, need to distribute files to individual Sample dirs
 			File[] genoVcfIndexes = IO.extractFiles(res, "JointGenotyped.vcf.gz.tbi");
+		
+			
 			File logs = new File(jobDir, "Logs");
 			File runScripts = new File(jobDir, "RunScripts");
-			if (genoVcfs.length == 0 || genoVcfs.length != genoVcfIndexes.length) throw new IOException("\tThe JointGenotyping was marked COMPLETE but failed to find the final vcf files or their indexes in "+res);
+			File zip = new File(jobDir, "LogRunScripts.zip");
+			if (zip.exists()==false && (logs.exists() == false || runScripts.exists() == false)) throw new IOException("\t"+jobDir.getName()+ 
+					" was marked COMPLETE but failed to find the Logs or RunScripts directories or LogRunScripts.zip archive.");
 
 			//for each separate genotyped vcf
 			for (int i=0; i< genoVcfs.length; i++){
-
 				//Extract the sample name 
-				//HCI_P1_NormalDNA_Hg38_JointGenotyping_Hg38.vcf.gz
-				//1218982_NormalDNA_Hg38_JointGenotyped.vcf.gz
-				//1218982_Pancreas_NormalDNA_Hg38_JointGenotyped.vcf.gz
-
-				//how about just remove _NormalDNA_Hg38_JointGenotyped.vcf.gz?
-
+				//03GCDX0K5N-IDT-SL416271-SL419057-SL420350_JointGenotyped.vcf.gz
 
 				String fileName = genoVcfs[i].getName();			
-				String sampleName = fileName.replace("_GVCF_Hg38_JointGenotyped.vcf.gz", "");
+				String sampleName = fileName.replace("_JointGenotyped.vcf.gz", "");
 				if (sampleName.length() == fileName.length()) throw new IOException("\nERROR: Failed to parse the sample name from "+fileName);
 
 				File sampleDir = null;
@@ -437,25 +444,29 @@ public class TNRunner2 {
 				if (verbose) IO.pl("\tMoving genotyped vcfs to "+sampleDir);
 
 
-				//delete any existing germline folder
-				IO.deleteDirectoryViaCmdLine(new File(sampleDir, "GermlineVariantCalling"));
 				//create a folder for the incoming genotyped vcf in the sample folder
 				File resDir = new File(sampleDir, "GermlineVariantCalling/"+sampleName+"_GATK");
 				resDir.mkdirs();
 
 				//copy and move over relevant files
-				File newLogDir = new File(resDir,"Logs");
-				newLogDir.mkdir();
-				File newRSDir = new File(resDir,"RunScripts");
-				newRSDir.mkdir();
-				IO.copyDirectoryRecursive(logs, newLogDir, null);
-				IO.copyDirectoryRecursive(runScripts, newRSDir, null);
+				if (zip.exists()) {
+					File newZip = new File(resDir,"LogRunScripts.zip");
+					IO.copyViaFileChannel(zip, newZip);
+				}
+				else {
+					File newLogDir = new File(resDir,"Logs");
+					newLogDir.mkdir();
+					File newRSDir = new File(resDir,"RunScripts");
+					newRSDir.mkdir();
+					IO.copyDirectoryRecursive(logs, newLogDir, null);
+					IO.copyDirectoryRecursive(runScripts, newRSDir, null);
+				}
 
 				genoVcfs[i].renameTo(new File(resDir, genoVcfs[i].getName()));
 				genoVcfIndexes[i].renameTo(new File(resDir, genoVcfIndexes[i].getName()));
 
 				//launch germline annotator?
-				if (this.getVarAnnoDocs()!= null) toLaunch.annotateGermlineVcf("GATK");
+				if (getVarAnnoDocs()!= null) toLaunch.annotateGermlineVcf("GATK");
 			}
 			gatkGroupProcessingComplete = true;
 		}
@@ -824,7 +835,7 @@ public class TNRunner2 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                TNRunner2 : Nov 2021                              **\n" +
+				"**                                TNRunner2 : Dec 2021                              **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several containerized snakmake workflows on tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, \n"+

@@ -336,9 +336,10 @@ public class JointGenotypeVCFParser {
 		
 		formatValues.clear();
 		String[] values = Misc.COLON.split(sample);
-		if (ids.length != values.length) throw new Exception ("\t\tThe FORMAT length and sample values do not match");
+		if (debug && ids.length != values.length) IO.el("\t\tWARNING the FORMAT length and sample values do not match");
 		
-		for (int i=0; i< ids.length; i++) formatValues.put(ids[i], values[i]);
+		//GATK often includes a final PS id that isn't populated so load from values
+		for (int i=0; i< values.length; i++) formatValues.put(ids[i], values[i]);
 		
 		//check genotype
 		String gt = formatValues.get("GT");

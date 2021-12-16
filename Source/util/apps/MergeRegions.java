@@ -203,7 +203,7 @@ public class MergeRegions {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Merge Regions: March 2021                            **\n" +
+				"**                              Merge Regions: Dec 2021                             **\n" +
 				"**************************************************************************************\n" +
 				"Flattens tab delimited bed files (chr start stop ...). Assumes interbase coordinates.\n" +
 				"Set the -m threshold to restrict the output to bps with that minimum of overlapping\n"+
@@ -215,7 +215,7 @@ public class MergeRegions {
 				"-p Pad input regions +/- bps, defaults to 0\n"+
 				"-o Path to the merged output file, optional\n"+
 
-				"\nExample: java -Xmx4G -jar pathTo/Apps/MergeRegions -d PassingBedFiles/-m 3 -p 150\n\n" +
+				"\nExample: java -Xmx4G -jar pathTo/Apps/MergeRegions -r PassingBedFiles/ -m 3 -p 150\n\n" +
 
 		"************************************************************************************\n");
 	}

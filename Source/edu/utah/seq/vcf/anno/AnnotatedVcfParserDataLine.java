@@ -62,7 +62,7 @@ public class AnnotatedVcfParserDataLine {
 		alt = vcfFields[4];
 		qual = vcfFields[5];
 		filter = vcfFields[6];
-		this.clinvarFileDate = clinvarFileDate;
+		clinvarFileDate = clinvarFileDate;
 	}
 
 	public static final String headerSpreadSheet = "FileName\tIGVLink\tCHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tAlleleFreq\t"
@@ -71,7 +71,7 @@ public class AnnotatedVcfParserDataLine {
 	
 	public void println(Gzipper sumarySpreadSheet, HashSet<String> transcriptsToKeep) throws IOException {
 		//calc varUniOb
-		varUniOb = (int)Math.round(varAlleleFreq*(double)totalUniObDepth);
+		if (varUniOb == -1) varUniOb = (int)Math.round(varAlleleFreq*(double)totalUniObDepth);
 		ArrayList<String> al = new ArrayList<String>();
 		//FileName
 		al.add(trimmedFileName);
@@ -204,7 +204,7 @@ public class AnnotatedVcfParserDataLine {
 			"IGVLink\tClicking moves IGV to the variant location\n"+
 			"CHROM\tVcf record chromosome\n"+
 			"POS\tVcf record position\n"+
-			"ID\tVcf record ID\n"+
+			"ID\tVcf record ID, apps that called the variant\n"+
 			"REF\tVcf record reference base\n"+
 			"ALT\tVcf record alternative base\n"+
 			"QUAL\tVcf record quality store, larger the better, if from VCFBkz, should be > 3\n"+

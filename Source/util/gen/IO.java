@@ -1055,6 +1055,44 @@ public class IO {
 		return res;
 	}
 	
+	/**Uses ProcessBuilder to execute a cmd, combines standard error and standard out into one writes it to file and returns the exit code.*/
+	public static int executeViaProcessBuilderReturnExit(String[] command, File log){
+		Process proc = null;
+		PrintWriter out = null;
+		BufferedReader data = null;
+		try {
+			out = new PrintWriter(new FileWriter(log));
+			ProcessBuilder pb = new ProcessBuilder(command);
+			pb.redirectErrorStream(true);
+			proc = pb.start();
+
+			data = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+			String line;
+			while ((line = data.readLine()) != null) {
+				out.println(line);
+				out.flush();
+			}
+			data.close();
+			out.close();
+			
+			int numToWait = 100;
+			while (proc.isAlive()) {
+				Thread.currentThread().sleep(100);
+				if (numToWait-- < 0) throw new Exception("ERROR: Process failed to complete in timely fashion.");
+			}
+			return proc.exitValue();
+		} catch (Exception e) {
+			try {
+				out.flush();
+				proc.destroy();
+				data.close();
+				out.close();
+			} catch (IOException e1) {}
+			return 1;
+		}
+		
+	}
+	
 	/**Executes tokenized params on command line, use full paths.
 	 * Put each param in its own String.  
 	 * Returns the output, starting with ERROR if it encountered an issue

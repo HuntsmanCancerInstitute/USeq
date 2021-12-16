@@ -34,6 +34,7 @@ public class VCFConsensus {
 	private int numInCommon = 0;
 	private boolean verbose = true;
 	private boolean tossSampleInfo = false;
+	private boolean useFirstChrom = false;
 
 	public VCFConsensus(String[] args){
 		try {	
@@ -59,7 +60,7 @@ public class VCFConsensus {
 		secondaryVcfParser = new VCFParser(secondaryVcf, true, false, false);
 		
 		if (verbose) System.out.println("Merging headers...");
-		String[] mergedHeader = VCFParser.mergeHeaders(new VCFParser[]{primaryVcfParser, secondaryVcfParser}, tossSampleInfo);
+		String[] mergedHeader = VCFParser.mergeHeaders(new VCFParser[]{primaryVcfParser, secondaryVcfParser}, tossSampleInfo, useFirstChrom);
 		if (mergedHeader == null) Misc.printErrAndExit("\nError: hmm something is wrong when merging headers, are the #CHROM lines different?\n");
 		
 		//create a hash of chromPosRefAlt
@@ -152,6 +153,7 @@ public class VCFConsensus {
 					case 'o': mergedVcfFile = new File(args[++i]); break;
 					case 'q': primaryName = args[++i]; break;
 					case 't': secondaryName = args[++i]; break;
+					case 'u': useFirstChrom = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -173,10 +175,10 @@ public class VCFConsensus {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Consensus : June 2017                           **\n" +
+				"**                              VCF Consensus : Dec 2021                            **\n" +
 				"**************************************************************************************\n" +
-				"Merges VCF files with the same #CHROM line. Primary records with the same chrPosRefAlt\n"+
-				"as a secondary are saved after appending the ID and FILTER, the secondary\n"+
+				"Merges VCF files with the approx same #CHROM line. Primary records with the same \n"+
+				"chrPosRefAlt as a secondary are saved after appending the ID and FILTER, the secondary\n"+
 				"is dropped. Headers are joined keeping the primary header line when the same. Run\n" +
 				"iteratively with multiple VCF files you'd like to merge.  Good for combining multiple\n"+
 				"variant callers run on the same sample. The ID field lists which callers found each\n"+
@@ -190,6 +192,7 @@ public class VCFConsensus {
 				"\nOptional:\n" +
 				"-q Primary name to replace the ID column.\n" +
 				"-t Secondary name to replace the ID column.\n" +
+				"-u Use the primary #CHROM line and skip this header check. Not recommended!\n"+
 
 				"\n"+
 

@@ -339,7 +339,7 @@ public class VCFParser {
 	
 	/**Merges headers eliminating duplicate lines.  Does a bad ID name collision checking, silently keeps first one. Source's are concatenated with a _.
 	 * Returns null if CHROM lines differ. */
-	public static String[] mergeHeaders(VCFParser[] parsers, boolean tossSampleInfo) {
+	public static String[] mergeHeaders(VCFParser[] parsers, boolean tossSampleInfo, boolean useFirstCHROM) {
 		LinkedHashSet<String> other = new LinkedHashSet<String>();
 		LinkedHashSet<String> contig = new LinkedHashSet<String>();
 		LinkedHashSet<String> info = new LinkedHashSet<String>();
@@ -370,7 +370,7 @@ public class VCFParser {
 				}
 				else if (h.startsWith("#CHROM") && tossSampleInfo == false) {
 					if (chromLine == null) chromLine = h;
-					else if (chromLine.equals(h) == false) return null;
+					else if (useFirstCHROM==false && chromLine.equals(h) == false) return null;
 				}
 				else if (other.contains(h) == false) {
 					other.add(h);

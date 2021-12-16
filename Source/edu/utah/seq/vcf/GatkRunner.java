@@ -28,6 +28,7 @@ public class GatkRunner {
 	
 	//internal fields
 	GatkRunnerChunk[] runners;
+	private int maxBpPerRegion = 1000;
 	
 	//constructors
 	public GatkRunner(String[] args){
@@ -53,6 +54,8 @@ public class GatkRunner {
 		
 		//parse regions 
 		Bed[] regions = Bed.parseFile(bedFile, 0, 0);
+		regions = Bed.splitBigRegions(regions, maxBpPerRegion);
+		
 		if (randomizeRegions) Misc.randomize(regions, 0);
 		int numRegionsPerChunk = 1+ (int)Math.round( (double)regions.length/ (double)numberThreads );
 		
@@ -126,8 +129,8 @@ public class GatkRunner {
 	private void mergeBams() throws Exception{
 		File[] bams = new File[runners.length];
 		for (int i=0; i< runners.length; i++) bams[i] = runners[i].getBamOut();
-		File mergedBam = new File (saveDirectory, "mutect.realigned.bam");
-		MergeSams ms = new MergeSams(bams, mergedBam, false, true);
+		File mergedBam = new File (saveDirectory, "realigned.bam");
+		new MergeSams(bams, mergedBam, false, true);
 	}
 
 
@@ -230,10 +233,10 @@ public class GatkRunner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Gatk Runner: August 2021                           **\n" +
+				"**                               Gatk Runner: November 2021                         **\n" +
 				"**************************************************************************************\n" +
 				"Takes a bed file of target regions, splits it by the number of threads, writes out\n"+
-				"each, executes the GATK Gatktype caller, and merges the results. Set the -Xmx to the\n"+
+				"each, executes the GATK commands, and merges the results. Set the -Xmx to the\n"+
 				"maximum available on the machine to enable correct thread usage.\n"+
 
 				"\nOptions:\n"+

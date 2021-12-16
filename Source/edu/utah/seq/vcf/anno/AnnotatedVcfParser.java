@@ -28,6 +28,7 @@ public class AnnotatedVcfParser {
 	private String clinvarDate = null;
 	private int minimumDP = 0;
 	private double minimumAF = 0;
+	private double minimumAlt = 0;
 	private double maximumAF = 1;
 	private double maximumCF = 1;
 	private double maximumPopAF = 0;
@@ -69,6 +70,7 @@ public class AnnotatedVcfParser {
 	//counters
 	private int numRecords = 0;
 	private int numPassingDP = 0;
+	private int numPassingAlt = 0;
 	private int numPassingMaxAF = 0;
 	private int numPassingMinAF = 0;
 	private int numWithPopAF = 0;
@@ -181,7 +183,7 @@ public class AnnotatedVcfParser {
 				loadInfoHash(cells[7]);
 				dataLine = new AnnotatedVcfParserDataLine(trimmedFileName, cells, clinvarDate);
 				
-				boolean passDP=true, passAF=true, passImpact=true, passSplice=true, passID = true, passGermlineGenes = false;
+				boolean passDP=true, passAF=true, passImpact=true, passSplice=true, passID = true, passGermlineGenes = false, passAlt=true;
 				boolean[] passCF= null;
 				boolean[] passBKAF= null; 
 				boolean[] passPop= null;
@@ -192,6 +194,7 @@ public class AnnotatedVcfParser {
 				if (minimumDP != 0) 			passDP = checkDP();
 				if (maximumCF != 1) 			passCF = checkCF();
 				if (minimumAF != 0 || maximumAF != 1 || maxFracBKAFs != 0) passAF = checkAF(passGermlineGenes);
+				if (minimumAlt !=0)             passAlt = checkAlt(passGermlineGenes);
 				if (maximumPopAF != 0) 			passPop = checkPopFreq();
 				if (passingAnnImpact != null) 	passImpact = checkImpact();
 				if (passingClinSig != null || excludeClinSig != null) 	passClinSig = checkClinSig();
@@ -200,9 +203,9 @@ public class AnnotatedVcfParser {
 				if (passingIDKeys != null) 		passID = checkIDs(cells[2]);
 				
 				boolean pass;
-				if (somaticProcessing) pass =  passFoundationFiltering(passID, passDP, passAF, passImpact,passSplice, passPop, passBKAF,passClinSig, passCF); 
-				else if (orAnnos) pass = passWithOrAnnos(passID, passDP, passAF, passImpact, passSplice, passPop, passBKAF,passClinSig, passCF);
-				else pass = allPass(passID, passDP, passAF, passImpact, passSplice, passPop, passBKAF, passClinSig, passCF);
+				if (somaticProcessing) pass =  passFoundationFiltering(passID, passDP, passAF, passAlt, passImpact,passSplice, passPop, passBKAF,passClinSig, passCF); 
+				else if (orAnnos) pass = passWithOrAnnos(passID, passDP, passAF, passAlt, passImpact, passSplice, passPop, passBKAF,passClinSig, passCF);
+				else pass = allPass(passID, passDP, passAF, passAlt, passImpact, passSplice, passPop, passBKAF, passClinSig, passCF);
 				
 				if (pass){
 					numPassingVcf++;
@@ -237,10 +240,11 @@ public class AnnotatedVcfParser {
 
 
 	/**Requires all are true. Not if these aren't set off defaults then they default to true. Note if passID then returns true regardless of others.*/
-	private boolean allPass(boolean passID, boolean passDP, boolean passAF, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF) {
+	private boolean allPass(boolean passID, boolean passDP, boolean passAF, boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF) {
 		if (passingIDKeys != null && passID) return true;
 		if (passDP == false) return false;
 		if (passAF == false) return false;
+		if (passAlt == false) return false;
 		if (passCF!= null && passCF[0] == true && passCF[1] == false) return false;
 		boolean passBKAF2 = true;
 		if (passBKAF != null && passBKAF[0] == true) passBKAF2 = passBKAF[1];
@@ -262,10 +266,11 @@ public class AnnotatedVcfParser {
 	}
 	
 	/**Requires DP, AF, Pop, CF, BKAF are true if present. Only one of Clin, Splice, or Impact need be true, Note if passID then returns true regardless of others.*/
-	private boolean passWithOrAnnos(boolean passID, boolean passDP, boolean passAF, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF) {
+	private boolean passWithOrAnnos(boolean passID, boolean passDP, boolean passAF, boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF) {
 		if (passingIDKeys != null && passID) return true;
 		if (passDP == false) return false;
 		if (passAF == false) return false;
+		if (passAlt == false) return false;
 		if (passCF!= null && passCF[0] == true && passCF[1] == false) return false;
 		boolean passBKAF2 = true;
 		if (passBKAF != null && passBKAF[0] == true) passBKAF2 = passBKAF[1];
@@ -291,11 +296,11 @@ public class AnnotatedVcfParser {
 		for (String s: Misc.COMMA.split(acmgGenes)) passingGermlineGenes.add(s.trim());
 	}
 
-	private boolean passFoundationFiltering(boolean passID, boolean passDP, boolean passAF,  boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF){
+	private boolean passFoundationFiltering(boolean passID, boolean passDP, boolean passAF,  boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF){
 		//pass it if ID correct
 		if (passID) return true;
-		//fail it if DP or AF fails
-		if (passAF == false || passDP == false) return false;
+		//fail it if DP, AF, alt fails
+		if (passAF == false || passDP == false || passAlt == false) return false;
 		//if present and fails then fail
 		if (passPop[0] == true && passPop[1] == false) return false;
 		if (passBKAF[0] == true && passBKAF[1] == false) return false;
@@ -762,6 +767,35 @@ public class AnnotatedVcfParser {
 		}
 	}
 	
+	private boolean checkAlt(boolean passGermlineGene) throws Exception {
+		//look for db in data line
+		if (dataLine.totalUniObDepth == -1) {
+			checkDP();
+			if (dataLine.totalUniObDepth == -1) {
+				if (verbose) IO.pl("\tAlt Check\tfalse\tNo DP");
+				return false;
+			}
+		}
+		//look for af
+		if (dataLine.varAlleleFreq == -1) {
+			checkAF(passGermlineGene);
+			if (dataLine.varAlleleFreq == -1) {
+				if (verbose) IO.pl("\tAlt Check\tfalse\tNo AF");
+				return false;
+			}
+		}
+		
+		//calculate it
+		dataLine.varUniOb = (int)Math.round(dataLine.varAlleleFreq * (double)dataLine.totalUniObDepth);
+		boolean passAlt = dataLine.varUniOb >= minimumAlt;
+		if (verbose) IO.pl("\tAlt Check\t"+passAlt+"\t"+dataLine.varUniOb);
+		if (passAlt == false) return false;
+		else {
+			numPassingAlt++;
+			return true;
+		}
+	}
+	
 	private boolean[] checkCF() throws Exception {
 		boolean foundCF = false;
 		boolean passCF = false;
@@ -809,6 +843,7 @@ public class AnnotatedVcfParser {
 	
 	private void modifySettingsForFoundation() {
 		if (minimumDP == 0) minimumDP = 50;
+		if (minimumAlt == 0) minimumAlt = 3;
 		if (minimumAF == 0) minimumAF = 0.01;
 		if (maximumCF == 1.0) maximumCF = 0.1;
 		if (maxFracBKAFs == 0) maxFracBKAFs = 0.1;
@@ -854,6 +889,7 @@ public class AnnotatedVcfParser {
 					+ "\t\tFail it if Pop, BKAF, CF are present and they are false.\n");
 		}
 		if (minimumDP != 0) al.add("\t"+ minimumDP+"\t: Minimum DP read depth");
+		if (minimumAlt != 0) al.add("\t"+ minimumAlt+"\t: Minimum ALT observations");
 		if (minimumAF != 0 || maximumAF != 1 || maxFracBKAFs != 0) {
 			al.add("\t"+ minimumAF+"\t: Minimum AF allele frequency");
 			al.add("\t"+ maximumAF+"\t: Maximum AF allele frequency");
@@ -912,6 +948,7 @@ public class AnnotatedVcfParser {
 			IO.pl("\t"+ format(numPassingMinAF, numRecords)+"Passing MinAF");
 			IO.pl("\t"+ format(numPassingMaxAF, numRecords)+"Passing MaxAF");
 		}
+		if (minimumAlt != 0) IO.pl("\t"+ format(numPassingAlt, numRecords)+"Passing ALT Obs");
 		if (maximumCF != 1){
 			IO.pl("\t"+ format(numWithCF, numRecords)+"With CF");
 			IO.pl("\t"+ format(numPassingCF, numWithCF)+"Passing CF");
@@ -1016,6 +1053,7 @@ public class AnnotatedVcfParser {
 					case 'v': forExtraction = new File(args[++i]); break;
 					case 'T': transcriptList = new File(args[++i]); break;
 					case 'd': minimumDP = Integer.parseInt(args[++i]); break;
+					case 'w': minimumAlt = Integer.parseInt(args[++i]); break;
 					case 'm': minimumAF = Double.parseDouble(args[++i]); break;
 					case 'x': maximumAF = Double.parseDouble(args[++i]); break;
 					case 'p': maximumPopAF = Double.parseDouble(args[++i]); break;
@@ -1034,7 +1072,6 @@ public class AnnotatedVcfParser {
 					case 'i': passingIDKeys = Misc.COMMA.split(args[++i]); break;
 					case 'o': orAnnos = true; break;
 					case 'r': verbose = true; break;
-					case 'w': skipWarningTrans = false; break;
 					case 'k': onlyProteinCoding = false; break;
 					case 'f': somaticProcessing = true; break;
 					case 'l': justFrameShiftStartStop = true; break;
@@ -1095,14 +1132,14 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            Annotated Vcf Parser  Oct 2021                        **\n" +
+				"**                            Annotated Vcf Parser  Nov 2021                        **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+
 				"records. Use the -r option to inspect the effect of the various filters on each\n"+
 				"record. Use the VCFRegionFilter app to restrict variants to particular regions.\n"+
 				"A summary spreadsheet is exported with select information and excel hyperlinks for\n"+
-				"rapid inspection.\n"+
+				"rapid inspection. Must have AF (or T_AF) and DP in the INFO field for Alt filtering.\n"+
 
 				"\nOptions:\n"+
 				"-v File path or directory containing xxx.vcf(.gz/.zip OK) file(s) to filter.\n" +
@@ -1112,8 +1149,8 @@ public class AnnotatedVcfParser {
 				"-d Minimum DP alignment depth\n"+
 				"-m Minimum AF allele frequency\n"+
 				"-x Maximum AF allele frequency\n"+
+				"-w Minimum Alt observations\n"+
 				"-q Maximum CF prior call frequency\n"+
-				"-w Include WARNING_TRANSCRIPT in ANN, defaults to excluding\n"+
 				"-k Include non protein_coding transcripts in ANN, defaults to excluding\n"+
 				"-j Ignore the max AF filter for ACMG incidental germline gene variants.\n"+
                 "-p Maximum population allele frequency, only applies if present.\n"+
@@ -1129,7 +1166,7 @@ public class AnnotatedVcfParser {
                 "-t For CLINSIG=Conflicting_interpretations_of_pathogenicity, minimum fraction\n"+
                 "       pathogenicity, defaults to 0\n"+
                 "-u For CLINSIG=drug_response, only pass it if associated with these genes. Comma\n"+
-                "       delimited, no spaces. Defaults to all."+
+                "       delimited, no spaces. Defaults to all.\n"+
                 "-e Comma delimited list of CLINSIG terms to select against.\n"+
                 "-C CLINVAR file date for spreadsheet output.\n"+
 
@@ -1145,10 +1182,10 @@ public class AnnotatedVcfParser {
                 
 				
 				"\nExample: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/\n"+
-				"        -d 75 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a\n"+
+				"        -d 74 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a\n"+
 				"        HIGH,MODERATE -e Benign,Likely_benign -c Pathogenic,Likely_pathogenic,\n"+
 				"        Conflicting_interpretations_of_pathogenicity -t 0.51 -u RYR1 -T \n"+
-				"        ~/Ref/ACMGTranscripts.txt -C 2021-04-04\n\n"+
+				"        ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3\n\n"+
 
 
 				"**************************************************************************************\n");

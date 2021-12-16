@@ -161,6 +161,8 @@
 				
 					<a href="#GatkRunner">GatkRunner</a><br>
 				
+					<a href="#GatkJointGenotyper">GatkJointGenotyper</a><br>
+				
 					<a href="#GeneiASEParser">GeneiASEParser</a><br>
 				
 					<a href="#Graph2Bed">Graph2Bed</a><br>
@@ -356,6 +358,8 @@
 					<a href="#VCFCallFrequency">VCFCallFrequency</a><br>
 				
 					<a href="#VCFCenterFormatter">VCFCenterFormatter</a><br>
+				
+					<a href="#VCFCollapser">VCFCollapser</a><br>
 				
 					<a href="#VCFComparator">VCFComparator</a><br>
 				
@@ -696,14 +700,14 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/AnnotatedBed2UCSCRefFlat -b anno.bed.
 </pre><br><p>
 				
 					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                            Annotated Vcf Parser  Oct 2021                        **
+**                            Annotated Vcf Parser  Nov 2021                        **
 **************************************************************************************
 Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
 VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
 records. Use the -r option to inspect the effect of the various filters on each
 record. Use the VCFRegionFilter app to restrict variants to particular regions.
 A summary spreadsheet is exported with select information and excel hyperlinks for
-rapid inspection.
+rapid inspection. Must have AF (or T_AF) and DP in the INFO field for Alt filtering.
 
 Options:
 -v File path or directory containing xxx.vcf(.gz/.zip OK) file(s) to filter.
@@ -713,8 +717,8 @@ Options:
 -d Minimum DP alignment depth
 -m Minimum AF allele frequency
 -x Maximum AF allele frequency
+-w Minimum Alt observations
 -q Maximum CF prior call frequency
--w Include WARNING_TRANSCRIPT in ANN, defaults to excluding
 -k Include non protein_coding transcripts in ANN, defaults to excluding
 -j Ignore the max AF filter for ACMG incidental germline gene variants.
 -p Maximum population allele frequency, only applies if present.
@@ -730,7 +734,8 @@ Options:
 -t For CLINSIG=Conflicting_interpretations_of_pathogenicity, minimum fraction
        pathogenicity, defaults to 0
 -u For CLINSIG=drug_response, only pass it if associated with these genes. Comma
-       delimited, no spaces. Defaults to all.-e Comma delimited list of CLINSIG terms to select against.
+       delimited, no spaces. Defaults to all.
+-e Comma delimited list of CLINSIG terms to select against.
 -C CLINVAR file date for spreadsheet output.
 -i Comma delimited list of VCF ID keys to select for. If the VCF ID contains one or
        more, the record is passed regardless of other filters. The match is not exact.
@@ -742,10 +747,10 @@ Options:
 -y Path to a config txt file for setting the above.
 
 Example: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/
-        -d 75 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a
+        -d 74 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a
         HIGH,MODERATE -e Benign,Likely_benign -c Pathogenic,Likely_pathogenic,
         Conflicting_interpretations_of_pathogenicity -t 0.51 -u RYR1 -T 
-        ~/Ref/ACMGTranscripts.txt -C 2021-04-04
+        ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3
 
 **************************************************************************************
 </pre><br><p>
@@ -2379,10 +2384,10 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/GatkCalledSegmentAnnotator -r AnnoRes
 </pre><br><p>
 				
 					<a name="GatkRunner"><pre>**************************************************************************************
-**                               Gatk Runner: August 2021                           **
+**                               Gatk Runner: November 2021                         **
 **************************************************************************************
 Takes a bed file of target regions, splits it by the number of threads, writes out
-each, executes the GATK Gatktype caller, and merges the results. Set the -Xmx to the
+each, executes the GATK commands, and merges the results. Set the -Xmx to the
 maximum available on the machine to enable correct thread usage.
 
 Options:
@@ -2403,6 +2408,33 @@ Example: java -Xmx128G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -s
     -R /SS/human_g1k_v37.fasta --dbsnp /SS/dbsnp_138.b37.vcf 
     --cosmic /SS/v76_GRCh37_CosmicCodingMuts.vcf.gz -I:tumor /SS/sar.bam -I:normal 
     /SS/normal.bam' -u -a 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="GatkJointGenotyper"><pre>**************************************************************************************
+**                             Gatk Joint Genotyper: Nov 2021                       **
+**************************************************************************************
+The GJ takes a bed file of target regions, splits it into 250 jobs, executes the GATK
+GenomicsDBImporter and GenotypeGVCFs on each, and merges the results. Set the -Xmx for
+this app to the maximum available on the machine to enable correct thread usage.
+
+Options:
+-b Bed file (chr, start, stop,...) gz/zip OK, sorted to call variants. No overlaps,
+      Run the USeq MergeRegions if unsure.
+-g Directory containing GATK xxx.g.vcf.gz files to call, bgzippped, tabix indexed.
+-v Path to write the final results joint genotyped vcf file, must end with vcf.gz
+-t Tmp directory.
+-e Path to the gatk executable.
+-f Path to the indexed fasta reference.
+-r GB RAM per worker thread, defaults to 10, increase if memory errors occur.
+-c Number of chunks to split bed file, defaults to 100.
+-d Don't delete the tmp directory.
+
+Example: java -Xmx128G -jar pathToUSeq/Apps/GatkJointGenotyper
+-b hg38NimIdtMergedPad150bp.bed.gz -g ToGenotype/ -v jg.vcf.gz -r 20 
+-t /scratch/local/u0028003/4239066/ -e ~/BioApps/GATK/gatk-4.2.3.0/gatk
+-f ~/TNRunner/GATKResourceBundleAug2021/Homo_sapiens_assembly38.fasta
 
 **************************************************************************************
 </pre><br><p>
@@ -4834,7 +4866,7 @@ Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatien
 </pre><br><p>
 				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                TNRunner2 : Nov 2021                              **
+**                                TNRunner2 : Dec 2021                              **
 **************************************************************************************
 TNRunner is designed to execute several containerized snakmake workflows on tumor
 normal datasets via a slurm cluster.  Based on the availability of fastq, 
@@ -5275,6 +5307,20 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFCenterFormatter -v Calls/ -s CCall
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="VCFCollapser"><pre>**************************************************************************************
+**                               VCF Collapser : Nov 2021                           **
+**************************************************************************************
+Collapses vcf files, keeping only unique records. Outputs a sorted vcf with just
+CHROM POS REF and ALT.
+
+Required Params:
+-v Vcf file or directory containing such (xxx.vcf(.gz/.zip OK)) to merge
+-o Merged vcf output, must end with vcf.gz
+
+Example: java -Xmx9G -jar pathTo/USeq/Apps/VCFCollapser -v Vcfs/ -o sorted.vcf.gz
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="VCFComparator"><pre>**************************************************************************************
 **                             VCF Comparator : Feb 2021                            **
 **************************************************************************************
@@ -5312,10 +5358,10 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFComparator -a /NIST/NA12878/key.v
 </pre><br><p>
 				
 					<a name="VCFConsensus"><pre>**************************************************************************************
-**                              VCF Consensus : June 2017                           **
+**                              VCF Consensus : Dec 2021                            **
 **************************************************************************************
-Merges VCF files with the same #CHROM line. Primary records with the same chrPosRefAlt
-as a secondary are saved after appending the ID and FILTER, the secondary
+Merges VCF files with the approx same #CHROM line. Primary records with the same 
+chrPosRefAlt as a secondary are saved after appending the ID and FILTER, the secondary
 is dropped. Headers are joined keeping the primary header line when the same. Run
 iteratively with multiple VCF files you'd like to merge.  Good for combining multiple
 variant callers run on the same sample. The ID field lists which callers found each
@@ -5329,6 +5375,7 @@ Required:
 Optional:
 -q Primary name to replace the ID column.
 -t Secondary name to replace the ID column.
+-u Use the primary #CHROM line and skip this header check. Not recommended!
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFConsensus -p illumina.vcf -q Strelka
 -s stnd.indel.vcf.gz -t Scalpel -o indelCalls.vcf.gz 
