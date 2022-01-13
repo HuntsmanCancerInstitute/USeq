@@ -62,7 +62,7 @@ public class AnnotatedVcfParserDataLine {
 		alt = vcfFields[4];
 		qual = vcfFields[5];
 		filter = vcfFields[6];
-		clinvarFileDate = clinvarFileDate;
+		this.clinvarFileDate = clinvarFileDate;
 	}
 
 	public static final String headerSpreadSheet = "FileName\tIGVLink\tCHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tAlleleFreq\t"

@@ -1132,7 +1132,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            Annotated Vcf Parser  Nov 2021                        **\n" +
+				"**                            Annotated Vcf Parser  Jan 2022                        **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+
