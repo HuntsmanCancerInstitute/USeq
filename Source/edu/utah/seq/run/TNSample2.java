@@ -187,37 +187,58 @@ public class TNSample2 {
 			cancelDeleteJobDir(IO.fetchNamesAndFiles(jobDir), jobDir, info, true);
 			return;
 		}
-
+		
+		//is there a tumor DNA alignment?
+		if (tumorDNAFastqCram.isCramFastqDirExists()) {
+			//what's the status of the alignment
+			if (tumorDNAAlignment == null || tumorDNAAlignment.isComplete() == false) {
+				info.add("\tWaiting for tumor DNA alignment.");
+				return;
+			}
+		}
+		
+		//is there a normal DNA alignment?
+		if (normalDNAFastqCram.isCramFastqDirExists()) {
+			//what's the status of the alignment
+			if (normalDNAAlignment == null || normalDNAAlignment.isComplete() == false) {
+				info.add("\tWaiting for normal DNA alignment.");
+				return;
+			}
+		}
+		
+		//is there a tumor RNA alignment?
+		if (tumorTransFastqCram.isCramFastqDirExists()) {
+			//what's the status of the alignment
+			if (tumorRNAAlignment == null || tumorRNAAlignment.isComplete() == false) {
+				info.add("\tWaiting for tumor RNA alignment.");
+				return;
+			}
+		}
+		
+		//OK all alignments are complete see which is available for concordance
 		//check to see if the alignments are present, sometimes these datasets are never coming
 		boolean goT = false;
 		boolean goN = false;
 		boolean goTT = false;
-		
 		int numExist = 0;
-		if (tumorDNAFastqCram.isCramFastqDirExists()){
-			if (tumorDNAAlignment != null && tumorDNAAlignment.isComplete()) goT = true;
+		
+		if (tumorDNAAlignment != null && tumorDNAAlignment.isComplete()) {
+			goT = true;
 			numExist++;
 		}
-		else goT = true;
-		if (normalDNAFastqCram.isCramFastqDirExists()){
-			if (normalDNAAlignment != null && normalDNAAlignment.isComplete()) {
-				goN = true;
-				//skip the mock normal
-				if (normalDNAAlignment.getCramFile().getName().contains("NA12878")) numExist--;
-			}
+		
+		if (normalDNAAlignment != null && normalDNAAlignment.isComplete() && normalDNAAlignment.getCramFile().getName().contains("NA12878")==false) {
+			goN = true;
 			numExist++;
 		}
-		else goN = true;
 		
-		if (tumorTransFastqCram.isCramFastqDirExists()){
-			if (tumorRNAAlignment != null && tumorRNAAlignment.isComplete()) goTT = true;
+		if (tumorRNAAlignment != null && tumorRNAAlignment.isComplete()) {
+			goTT = true;
 			numExist++;
 		}
-		else goTT = true;
 		
-		
+		//too few?
 		if (numExist < 2) return;
-		if (goT == false || goN == false || goTT == false) return;
 
 		//make dir, ok if it already exists
 		jobDir.mkdirs();
@@ -226,7 +247,7 @@ public class TNSample2 {
 		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
 		if (nameFile.size() == 0) {
 			removeSampleConcordanceLinks(jobDir);
-			createSampleConcordanceLinks(jobDir);
+			createSampleConcordanceLinks(jobDir, goT, goN, goTT);
 			launch(jobDir, null, tnRunner.getSampleConcordanceDocs());
 		}
 
@@ -240,25 +261,25 @@ public class TNSample2 {
 		else {
 			if (checkJob(nameFile, jobDir, null, tnRunner.getSampleConcordanceDocs())){
 				removeSampleConcordanceLinks(jobDir);
-				createSampleConcordanceLinks(jobDir);
+				createSampleConcordanceLinks(jobDir, goT, goN, goTT);
 			}
 		}
 		
 	}
 
-	private void createSampleConcordanceLinks(File jobDir) throws IOException{
+	private void createSampleConcordanceLinks(File jobDir, boolean goT, boolean goN, boolean goTT) throws IOException{
 		File bPFileDir = new File (jobDir.getCanonicalFile(), "BamPileupFiles");
 		bPFileDir.mkdir();
-		if (tumorDNAAlignment != null && tumorDNAAlignment.isComplete()) {
+		if (goT) {
 			Files.createSymbolicLink(new File(bPFileDir, "tumorDNA.bp.txt.gz").toPath(), tumorDNAAlignment.getBpPileupFile().toPath());
 			Files.createSymbolicLink(new File(bPFileDir, "tumorDNA.bp.txt.gz.tbi").toPath(), tumorDNAAlignment.getBpIndexFile().toPath());
 		}
 		//don't include NA12878_NormalDNA_Hg38_final.bam, this is used as a mock normal 
-		if (normalDNAAlignment != null && normalDNAAlignment.isComplete() && normalDNAAlignment.getCramFile().getName().contains("NA12878")==false) {
+		if (goN) {
 			Files.createSymbolicLink(new File(bPFileDir, "normalDNA.bp.txt.gz").toPath(), normalDNAAlignment.getBpPileupFile().toPath());
 			Files.createSymbolicLink(new File(bPFileDir, "normalDNA.bp.txt.gz.tbi").toPath(), normalDNAAlignment.getBpIndexFile().toPath());
 		}
-		if (tumorRNAAlignment != null && tumorRNAAlignment.isComplete()) {
+		if (goTT) {
 			Files.createSymbolicLink(new File(bPFileDir, "tumorRNA.bp.txt.gz").toPath(), tumorRNAAlignment.getBpPileupFile().toPath());
 			Files.createSymbolicLink(new File(bPFileDir, "tumorRNA.bp.txt.gz.tbi").toPath(), tumorRNAAlignment.getBpIndexFile().toPath());
 		}
@@ -279,8 +300,8 @@ public class TNSample2 {
 	}
 
 	private void removeSampleConcordanceLinks(File jobDir) throws IOException{
-		IO.deleteFiles(jobDir, ".bp.txt.gz");
-		IO.deleteFiles(jobDir, ".bp.txt.gz.tbi");
+		File bPFileDir = new File (jobDir.getCanonicalFile(), "BamPileupFiles");
+		IO.deleteDirectory(bPFileDir);
 		File[] toDel = IO.extractFilesStartingWith(jobDir, "gender.");
 		if (toDel != null && toDel.length ==1) toDel[0].delete();
 		
@@ -1024,6 +1045,11 @@ public class TNSample2 {
 			info.add("\tQUEUED "+jobDir);
 			running = true;
 		}
+		//RUNME
+		else if (nameFile.containsKey("RUNME")){
+			info.add("\tRUNME "+jobDir);
+			running = true;
+		}
 		//STARTED
 		else if (nameFile.containsKey("STARTED")) {
 			if (TNSample2.checkQueue(nameFile, jobDir, info) == false) failed = true;
@@ -1046,19 +1072,25 @@ public class TNSample2 {
 	}
 	
 	private void launch(File jobDir, File[] toLink, File[] docs) throws IOException{
-		info.add("\tLAUNCHING "+jobDir);
+		if (tnRunner.isSbatch()) info.add("\tLAUNCHING "+jobDir);
+		else info.add("\tSETTING UP "+jobDir);
+
 		running = true;
 		if (toLink != null) IO.createSymbolicLinks(toLink, jobDir);
 		//replace any launch scripts with the current
 		File shellScript = TNSample2.copyInWorkflowDocs(docs, jobDir);
 		//clear any progress files
 		TNSample2.removeProgressFiles(jobDir);
-		//squeue the shell script
-		new File(jobDir, "QUEUED").createNewFile();
-		String alignDirPath = jobDir.getCanonicalPath();
-		String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
-		for (String o: output) info.add("\t\t"+o);
-		numJobsLaunched++;
+
+		if (tnRunner.isSbatch()) {
+			//squeue the shell script
+			new File(jobDir, "QUEUED").createNewFile();
+			String alignDirPath = jobDir.getCanonicalPath();
+			String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
+			for (String o: output) info.add("\t\t"+o);
+			numJobsLaunched++;
+		}
+		else new File(jobDir, "RUNME").createNewFile();
 	}
 
 	public FastqCramDataset getTumorDNAFastq() {

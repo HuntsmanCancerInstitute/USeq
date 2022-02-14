@@ -82,11 +82,12 @@ public class GatkJointGenotyper {
 				IO.copyDirectoryRecursive(tmpDirectory, failedTmp, null);
 				Misc.printErrAndExit("\nERROR: Failed runner, copying over TmpDir to "+failedTmp+", aborting! \n"+c.getCmd());
 			}
+			c = null;
 		}
 		
 		//merge vcf
 		System.out.println("\nMerging split vcfs...");
-		mergeSplitVcfs();
+		mergeSplitVcfsNoUniCheck();
 		
 		//delete tmp
 		if (deleteTmpDir) IO.deleteDirectory(tmpDirectory);
@@ -214,6 +215,30 @@ public class GatkJointGenotyper {
 		out.close();
 		System.out.println("\t"+uniqueRecords+"\tunique variants found in "+totalRecords+ " processed records.");
 	}
+	
+	private void mergeSplitVcfsNoUniCheck() throws Exception {
+		Gzipper out = new Gzipper(vcfResults);
+		long totalRecords = 0;
+		for (int i=0; i< splitBed.length; i++) {
+			String name = splitBed[i].getName().replace(".bed", "_temp.vcf");
+			File vcfFile = new File (tmpDirectory, name);
+			if (vcfFile.exists() == false) throw new IOException("ERROR: failed to find the tmp vcf for chunk "+vcfFile);
+			BufferedReader in = new BufferedReader( new FileReader(vcfFile));
+			String line = null;
+			while ((line = in.readLine())!= null) {
+				if (line.startsWith("#")) {
+					if (i==0) out.println(line);
+				}
+				else {
+					totalRecords++;
+					out.println(line);
+				}
+			}
+			in.close();
+		}
+		out.close();
+		System.out.println("\t"+totalRecords+ " processed vcf records.");
+	}
 
 	public static void main(String[] args) {
 		if (args.length ==0){
@@ -285,7 +310,7 @@ public class GatkJointGenotyper {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Gatk Joint Genotyper: Dec 2021                       **\n" +
+				"**                             Gatk Joint Genotyper: Jan 2022                       **\n" +
 				"**************************************************************************************\n" +
 				"The GJG takes a bed file of target regions, splits it into 250 jobs, executes the GATK\n"+
 				"GenomicsDBImporter and GenotypeGVCFs on each, and merges the results. Set the -Xmx for\n"+

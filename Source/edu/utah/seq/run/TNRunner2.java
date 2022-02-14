@@ -7,8 +7,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import edu.utah.hci.misc.Util;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -54,6 +52,7 @@ public class TNRunner2 {
 	private int numMinToSleep = 60;
 	private boolean niceJobs = true;
 	private String partition = "hci-rw";
+	private boolean sbatch = true;
 
 	private String pathToTrim = null;
 	private String nice = "";
@@ -223,6 +222,8 @@ public class TNRunner2 {
 				continue;
 			}
 		}
+		
+		//IO.pl("\nScaned samples done:"+done.size()+" torun:"+toRun.size()+" waitingForAlign:"+waitingForAlignment.size()+" noNorm:"+noNormal.size());
 
 		//any normals awaiting?
 		int numWaiting = waitingForAlignment.size();
@@ -237,7 +238,11 @@ public class TNRunner2 {
 		else if (toRun.size() !=0) {
 			jointGenotypeIlluminaSamples(toRun);
 		}
-		
+		//nothing to do 
+		else {
+			illGroupProcessingFailed = false;
+			illGroupProcessingComplete = true;
+		}	
 	}
 
 
@@ -353,7 +358,12 @@ public class TNRunner2 {
 			else if (nameFile.containsKey("QUEUED")){
 				info.add("\tQUEUED "+jobDir);
 				illGroupProcessingComplete = false;
-			}		
+			}	
+			//RUNME
+			else if (nameFile.containsKey("RUNME")){
+				info.add("\tRUNME "+jobDir);
+				illGroupProcessingComplete = false;
+			}
 			//STARTED
 			else if (nameFile.containsKey("STARTED")){
 				if (TNSample.checkQueue(nameFile, jobDir, info) == false) illGroupProcessingFailed = true;
@@ -481,7 +491,11 @@ public class TNRunner2 {
 		//QUEUED
 		else if (nameFile.containsKey("QUEUED")){
 			info.add("\tQUEUED "+jobDir);
-		}		
+		}	
+		//RUNME
+		else if (nameFile.containsKey("RUNME")){
+			info.add("\tRUNME "+jobDir);
+		}
 		//STARTED
 		else if (nameFile.containsKey("STARTED")){
 			if (TNSample.checkQueue(nameFile, jobDir, info) == false) gatkGroupProcessingFailed = true;
@@ -500,7 +514,11 @@ public class TNRunner2 {
 	}
 
 	private void launchGatkJointGenotyping(ArrayList<File> toGeno, File jobDir) throws IOException {
-		if (verbose) IO.pl("\tLAUNCHING "+jobDir);
+		if (verbose) {
+			if (sbatch) info.add("\tLAUNCHING "+jobDir);
+			else info.add("\tSETTING UP "+jobDir);
+		}
+		
 		//want to create/ replace the soft links
 		createJointGenotypingLinks(toGeno, jobDir);
 
@@ -515,23 +533,29 @@ public class TNRunner2 {
 		String [] cmd = null;
 		if (nice.length() !=0) cmd = new String[]{"sbatch", nice, "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
 		else cmd = new String[]{"sbatch", "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
-		String[] output = IO.executeViaProcessBuilder(cmd, false);
-		if (verbose) for (String o: output) IO.pl("\t\t"+o);
-		for (String o: output) {
-			if (o.toLowerCase().contains("error")) {
-				gatkGroupProcessingFailed = true;
-				IO.pl("\tERROR launching "+Misc.stringArrayToString(cmd, " "));
-				if (verbose == false) for (String x: output) IO.pl("\t\t"+x);
-				new File(jobDir, "FAILED").createNewFile();
-				return;
+		if (sbatch) {
+			String[] output = IO.executeViaProcessBuilder(cmd, false);
+			if (verbose) for (String o: output) IO.pl("\t\t"+o);
+			for (String o: output) {
+				if (o.toLowerCase().contains("error")) {
+					gatkGroupProcessingFailed = true;
+					IO.pl("\tERROR launching "+Misc.stringArrayToString(cmd, " "));
+					if (verbose == false) for (String x: output) IO.pl("\t\t"+x);
+					new File(jobDir, "FAILED").createNewFile();
+					return;
+				}
 			}
+			new File(jobDir, "QUEUED").createNewFile();
 		}
-		new File(jobDir, "QUEUED").createNewFile();
-
+		else new File(jobDir, "RUNME").createNewFile();
 	}
 
 	private void launchIlluminaJointGenotyping(ArrayList<File> toGeno, File jobDir) throws IOException {
-		if (verbose) IO.pl("\tLAUNCHING "+jobDir);
+		if (verbose) {
+			if (sbatch) info.add("\tLAUNCHING "+jobDir);
+			else info.add("\tSETTING UP "+jobDir);
+		}
+		
 		//want to create/ replace the soft links
 		createJointGenotypingLinks(toGeno, jobDir);
 
@@ -548,18 +572,21 @@ public class TNRunner2 {
 
 		if (nice.length() !=0) cmd = new String[]{"sbatch", nice, "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
 		else cmd = new String[]{"sbatch", "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
-		String[] output = IO.executeViaProcessBuilder(cmd, false);
-		if (verbose) for (String o: output) IO.pl("\t\t"+o);
-		for (String o: output) {
-			if (o.toLowerCase().contains("error")) {
-				illGroupProcessingFailed = true;
-				IO.pl("\tERROR launching "+Misc.stringArrayToString(cmd, " "));
-				if (verbose == false) for (String x: output) IO.pl("\t\t"+x);
-				new File(jobDir, "FAILED").createNewFile();
-				return;
+		if (sbatch) {
+			String[] output = IO.executeViaProcessBuilder(cmd, false);
+			if (verbose) for (String o: output) IO.pl("\t\t"+o);
+			for (String o: output) {
+				if (o.toLowerCase().contains("error")) {
+					illGroupProcessingFailed = true;
+					IO.pl("\tERROR launching "+Misc.stringArrayToString(cmd, " "));
+					if (verbose == false) for (String x: output) IO.pl("\t\t"+x);
+					new File(jobDir, "FAILED").createNewFile();
+					return;
+				}
 			}
+			new File(jobDir, "QUEUED").createNewFile();
 		}
-		new File(jobDir, "QUEUED").createNewFile();
+		else new File(jobDir, "RUNME").createNewFile();
 
 	}
 
@@ -589,7 +616,7 @@ public class TNRunner2 {
 			int numJobsLaunched = countNumberRunningJobs(partition);
 			tNSamples = new TNSample2[rootDirs.length];
 			for (int i=0; i< rootDirs.length; i++){
-				if (numJobsLaunched >= maxNumJobs) {
+				if (sbatch == true && numJobsLaunched >= maxNumJobs) {
 					IO.pl("\nMaximum number jobs launched, skipping remaining samples.");
 					return false;
 				}
@@ -662,6 +689,7 @@ public class TNRunner2 {
 						case 'i': minReadCoverageNormal = Integer.parseInt(args[++i]); break;
 						case 'x': maxNumJobs = Integer.parseInt(args[++i]); break;
 						case 'z': niceJobs = false; break;
+						case 'J': sbatch = false; break;
 						case 'l': loop = true; break;
 						case 'd': restartFailed = true; break;
 						case 'n': partition = args[++i]; break;
@@ -790,7 +818,7 @@ public class TNRunner2 {
 			//AnnotatedVcfParser options for germline and somatic filtering
 			if (germlineAnnotatedVcfParser == null) germlineAnnotatedVcfParser = "-d "+minReadCoverageNormal+" -m 0.075 -q 0.1 -p 0.01 -g D5S,D3S -n 4.4 -a HIGH -l -c "
 					+ "Pathogenic,Likely_pathogenic,Conflicting_interpretations_of_pathogenicity,Drug_response -t 0.51 -e Benign,Likely_benign -o -b 0.1 -z 3 -u RYR1";
-			if (somaticAnnotatedVcfParser == null) somaticAnnotatedVcfParser = "-d "+minReadCoverageTumor+" -f -m 0.025 -j";
+			if (somaticAnnotatedVcfParser == null) somaticAnnotatedVcfParser = "-d "+minReadCoverageTumor+" -f -m 0.025 -j ";
 
 			//set path to trim
 			pathToTrim = sampleDir.getCanonicalFile().getParentFile().getCanonicalPath()+"/";
@@ -819,6 +847,7 @@ public class TNRunner2 {
 				IO.pl("Somatic Annotated Vcf Parser options\t"+somaticAnnotatedVcfParser);
 
 				IO.pl("Delete and restart failed jobs\t"+restartFailed);
+				IO.pl("Just set up jobs, don't launch them\t"+ (sbatch==false));
 				IO.pl("Verbose logging\t"+verbose);
 				IO.pl("Max # jobs to launch\t"+maxNumJobs);
 				IO.pl("Nice jobs\t"+niceJobs);
@@ -835,7 +864,7 @@ public class TNRunner2 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                TNRunner2 : Dec 2021                              **\n" +
+				"**                                TNRunner2 : Feb 2022                              **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several containerized snakmake workflows on tumor\n"+
 				"normal datasets via a slurm cluster.  Based on the availability of fastq, \n"+
@@ -900,6 +929,7 @@ public class TNRunner2 {
 
 				"\nJob Execution Options:\n"+
 				"-d Delete and restart FAILED jobs.\n"+
+				"-J Just set up jobs, don't launch them via sbatch.\n"+
 				"-x Maximum # jobs to run at any given time, defaults to 35.\n"+
 				"-z Do not nice jobs (--nice=10000), run at maximum primority.\n"+
 				"-l Check and launch jobs every hour until all are complete.\n"+
@@ -908,7 +938,7 @@ public class TNRunner2 {
 				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/\n"+
 				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+
 				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/\n"+
-				"     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l \n"+
+				"     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 25 -l \n"+
 				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l \n"+
 
 
@@ -988,5 +1018,9 @@ public class TNRunner2 {
 
 	public String getSomaticVcfCallFreq() {
 		return somaticVcfCallFreq;
+	}
+
+	public boolean isSbatch() {
+		return sbatch;
 	}
 }

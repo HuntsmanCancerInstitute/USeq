@@ -28,7 +28,10 @@ public class NormalSample {
 
 		if (num == 1 && normalDnaFastqCram.get(0).getName().endsWith(".cram")) return true;
 		if (num == 2 && normalDnaFastqCram.get(0).getName().endsWith(".gz")) return true;
-		else Misc.printErrAndExit("ERROR: normal sample for patient "+patientId+ " Incorrect # number DNA fastq or cram files "+ num);
+		else {
+			IO.pl("Platform "+platformName+"  NormalName "+normalDnaName);
+			Misc.printErrAndExit("ERROR: normal sample for patient "+patientId+ " Incorrect # number DNA fastq or cram files "+ num+" NormalDnaName "+normalDnaName);
+		}
 		return false;
 	}
 

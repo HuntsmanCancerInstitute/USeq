@@ -19,7 +19,7 @@ public class Email{
 	private String contentType = "text/plain"; //ie "text/html" or "text/plain"
 	
 	public static void main (String[] args){
-		Email e = new Email("smtp.gmail.com", "david.austin.nix", "Sahib2013", "text/plain");
+		Email e = new Email("smtp.gmail.com", "david.austin.nix", "XXXXXXX", "text/plain");
 		System.out.println("Launching");
 		System.out.println(e.postMail(new String[]{"david.nix@hci.utah.edu"}, "Test", "Message", "david.austin.nix@gmail.com"));
 		System.out.println("Complete");

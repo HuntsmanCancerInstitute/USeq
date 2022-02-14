@@ -24,7 +24,6 @@ public class GatkRunner {
 	boolean useLowerCaseL = false;
 	boolean useUpperCaseO = false;
 	boolean bamOut = false;
-	boolean randomizeRegions = true;
 	
 	//internal fields
 	GatkRunnerChunk[] runners;
@@ -55,8 +54,7 @@ public class GatkRunner {
 		//parse regions 
 		Bed[] regions = Bed.parseFile(bedFile, 0, 0);
 		regions = Bed.splitBigRegions(regions, maxBpPerRegion);
-		
-		if (randomizeRegions) Misc.randomize(regions, 0);
+	
 		int numRegionsPerChunk = 1+ (int)Math.round( (double)regions.length/ (double)numberThreads );
 		
 		//split regions
@@ -71,65 +69,58 @@ public class GatkRunner {
 			executor.execute(runners[i]);
 		}
 		executor.shutdown();
+		
 		//spins here until the executer is terminated, e.g. all threads complete
-        while (!executor.isTerminated()) {
-        }
+        while (!executor.isTerminated()) {}
 		
 		//check runners and delete temp files
-        for (GatkRunnerChunk c: runners) {
-			if (c.isFailed()) Misc.printErrAndExit("\nERROR: Failed runner, aborting! \n"+c.getCmd());
-			c.getTempBed().deleteOnExit();
-			c.getTempVcf().deleteOnExit();
-			c.getTempLog().deleteOnExit();
-			new File (c.getTempVcf()+".idx").deleteOnExit();
+        File[] bams = new File[runners.length];
+        File[] vcfs = new File[runners.length];
+        for (int i=0; i< runners.length; i++) {
+			if (runners[i].isFailed()) Misc.printErrAndExit("\nERROR: Failed runner, aborting! \n"+runners[i].getCmd());
+			runners[i].getTempBed().deleteOnExit();
+			runners[i].getTempVcf().deleteOnExit();
+			runners[i].getTempLog().deleteOnExit();
+			new File (runners[i].getTempVcf()+".idx").deleteOnExit();
+			vcfs[i] = runners[i].getTempVcf();
+			bams[i] = runners[i].getBamOut();
 		}
 		
 		//merge vcf
 		System.out.println("\nMerging vcfs...");
-		mergeVcfs();
+		mergeVcfs(vcfs, new File( saveDirectory, "gatk.raw.vcf.gz") );
 		
 		//merge bams?
 		if (bamOut) {
 			System.out.println("\nMerging bams...");
-			mergeBams();
+			mergeBams(bams, new File (saveDirectory, "realigned.bam"));
 		}
-	}
-
-	private void mergeVcfs() throws Exception{
-		ArrayList<VCFRecord> recordsAL = new ArrayList<VCFRecord>();
-		VCFParser vp = null;
-		for (GatkRunnerChunk c: runners) {
-			vp = new VCFParser(c.getTempVcf(), true, false, false);
-			VCFRecord[] records = vp.getVcfRecords();
-			if (records == null) continue;
-			for (VCFRecord r: records) recordsAL.add(r);
-		}
-		VCFRecord[] all = new VCFRecord[recordsAL.size()];
-		recordsAL.toArray(all);
-		Arrays.sort(all);
-		PrintWriter out = new PrintWriter( new FileWriter( new File( saveDirectory, "gatk.raw.vcf")));
-		
-		//write out header
-		ArrayList<String> header = vp.getVcfComments().getOriginalComments();
-		for (String h : header) out.println(h);
-		
-		//write out unique records
-		HashSet<String> unique = new HashSet<String>();
-		for (VCFRecord r : all) {
-			String ori = r.getOriginalRecord();
-			if (unique.contains(ori) == false) {
-				out.println(ori);
-				unique.add(ori);
-			}
-		}
-		out.close();
-		System.out.println("\t"+unique.size()+"\tvariants found");
 	}
 	
-	private void mergeBams() throws Exception{
-		File[] bams = new File[runners.length];
-		for (int i=0; i< runners.length; i++) bams[i] = runners[i].getBamOut();
-		File mergedBam = new File (saveDirectory, "realigned.bam");
+	private void mergeVcfs(File[] vcfFiles, File gzippedVcfOut) throws Exception {
+		Gzipper out = new Gzipper(gzippedVcfOut);
+		long totalRecords = 0;
+		for (int i=0; i< vcfFiles.length; i++) {
+			File vcfFile = vcfFiles[i];
+			if (vcfFile.exists() == false) throw new IOException("ERROR: failed to find the tmp vcf for "+vcfFile);
+			BufferedReader in = new BufferedReader( new FileReader(vcfFile));
+			String line = null;
+			while ((line = in.readLine())!= null) {
+				if (line.startsWith("#")) {
+					if (i==0) out.println(line);
+				}
+				else {
+					totalRecords++;
+					out.println(line);
+				}
+			}
+			in.close();
+		}
+		out.close();
+		System.out.println("\t"+totalRecords+ " processed vcf records.");
+	}
+	
+	private void mergeBams(File[] bams, File mergedBam) throws Exception{
 		new MergeSams(bams, mergedBam, false, true);
 	}
 
@@ -164,7 +155,6 @@ public class GatkRunner {
 						i = si.i-1;
 						break;
 					}
-					case 'a': randomizeRegions = false; break;
 					case 'l': useLowerCaseL= true; break;
 					case 'u': useUpperCaseO= true; break;
 					case 'b': bamOut= true; break;
@@ -233,7 +223,7 @@ public class GatkRunner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               Gatk Runner: November 2021                         **\n" +
+				"**                               Gatk Runner: Jan 2022                              **\n" +
 				"**************************************************************************************\n" +
 				"Takes a bed file of target regions, splits it by the number of threads, writes out\n"+
 				"each, executes the GATK commands, and merges the results. Set the -Xmx to the\n"+
@@ -250,13 +240,12 @@ public class GatkRunner {
 				"-l Use lowercased -l for Lofreq compatability, defaults to -L\n"+
 				"-u Use uppercase -O for GATK 4 compatability, defaults to -o\n"+
 				"-b Add a -bamout argument and merge bam chunks.\n"+
-				"-a Don't randomize the regions for each job.\n"+
 				
 				"\nExample: java -Xmx128G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -s\n" +
 				"     /SS/HC/ -c 'java -Xmx4G -jar /SS/GenomeAnalysisTK.jar -T MuTect2 \n"+
 				"    -R /SS/human_g1k_v37.fasta --dbsnp /SS/dbsnp_138.b37.vcf \n"+
 				"    --cosmic /SS/v76_GRCh37_CosmicCodingMuts.vcf.gz -I:tumor /SS/sar.bam -I:normal \n"+
-				"    /SS/normal.bam' -u -a \n\n" +
+				"    /SS/normal.bam' -u \n\n" +
 
 				"**************************************************************************************\n");
 

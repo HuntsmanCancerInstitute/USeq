@@ -46,6 +46,7 @@ public class AlignmentDataset2{
 			File[] bam = IO.extractFiles(new File(alignDir, "Alignment"), ".bam");
 			File[] bamIndex = IO.extractFiles(new File(alignDir, "Alignment"), ".bai");
 			File[] passingBed = IO.extractFiles(new File(alignDir, "QC"), "PassRC.bed.gz");
+			if (passingBed == null || passingBed.length !=1) passingBed = IO.extractFiles(new File(alignDir, "QC"), "Pass.bed.gz");
 			File[] bp = IO.extractFiles(new File(alignDir, "Alignment"), "bp.txt.gz");
 			File[] bpIndex = IO.extractFiles(new File(alignDir, "Alignment"), "bp.txt.gz.tbi");
 

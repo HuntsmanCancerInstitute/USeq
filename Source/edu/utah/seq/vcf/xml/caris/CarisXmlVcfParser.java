@@ -14,7 +14,7 @@ import util.gen.*;
 import java.util.*;
 
 /**
- * Takes one or more patient xml reports from FoundationOne tests and converts most of the variants into vcf format.
+ * Takes one or more patient xml reports from Caris tests and converts most of the variants into vcf format.
  * Outputs a summary clinical data spreadsheet
  * @author david.nix@hci.utah.edu 
  **/

@@ -700,7 +700,7 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/AnnotatedBed2UCSCRefFlat -b anno.bed.
 </pre><br><p>
 				
 					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                            Annotated Vcf Parser  Nov 2021                        **
+**                            Annotated Vcf Parser  Jan 2022                        **
 **************************************************************************************
 Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
 VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
@@ -2384,7 +2384,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/GatkCalledSegmentAnnotator -r AnnoRes
 </pre><br><p>
 				
 					<a name="GatkRunner"><pre>**************************************************************************************
-**                               Gatk Runner: November 2021                         **
+**                               Gatk Runner: Jan 2022                              **
 **************************************************************************************
 Takes a bed file of target regions, splits it by the number of threads, writes out
 each, executes the GATK commands, and merges the results. Set the -Xmx to the
@@ -2401,27 +2401,26 @@ Options:
 -l Use lowercased -l for Lofreq compatability, defaults to -L
 -u Use uppercase -O for GATK 4 compatability, defaults to -o
 -b Add a -bamout argument and merge bam chunks.
--a Don't randomize the regions for each job.
 
 Example: java -Xmx128G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -s
      /SS/HC/ -c 'java -Xmx4G -jar /SS/GenomeAnalysisTK.jar -T MuTect2 
     -R /SS/human_g1k_v37.fasta --dbsnp /SS/dbsnp_138.b37.vcf 
     --cosmic /SS/v76_GRCh37_CosmicCodingMuts.vcf.gz -I:tumor /SS/sar.bam -I:normal 
-    /SS/normal.bam' -u -a 
+    /SS/normal.bam' -u 
 
 **************************************************************************************
 </pre><br><p>
 				
 					<a name="GatkJointGenotyper"><pre>**************************************************************************************
-**                             Gatk Joint Genotyper: Nov 2021                       **
+**                             Gatk Joint Genotyper: Jan 2022                       **
 **************************************************************************************
-The GJ takes a bed file of target regions, splits it into 250 jobs, executes the GATK
+The GJG takes a bed file of target regions, splits it into 250 jobs, executes the GATK
 GenomicsDBImporter and GenotypeGVCFs on each, and merges the results. Set the -Xmx for
 this app to the maximum available on the machine to enable correct thread usage.
 
 Options:
--b Bed file (chr, start, stop,...) gz/zip OK, sorted to call variants. No overlaps,
-      Run the USeq MergeRegions if unsure.
+-b Bed file of sorted regions (chr, start, stop,... gz/zip OK), to call variants. No
+      overlaps. Run the USeq MergeRegions if unsure.
 -g Directory containing GATK xxx.g.vcf.gz files to call, bgzippped, tabix indexed.
 -v Path to write the final results joint genotyped vcf file, must end with vcf.gz
 -t Tmp directory.
@@ -2906,7 +2905,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/MergePointData -p
 </pre><br><p>
 				
 					<a name="MergeRegions"><pre>**************************************************************************************
-**                             Merge Regions: March 2021                            **
+**                              Merge Regions: Dec 2021                             **
 **************************************************************************************
 Flattens tab delimited bed files (chr start stop ...). Assumes interbase coordinates.
 Set the -m threshold to restrict the output to bps with that minimum of overlapping
@@ -2918,7 +2917,7 @@ Options:
 -p Pad input regions +/- bps, defaults to 0
 -o Path to the merged output file, optional
 
-Example: java -Xmx4G -jar pathTo/Apps/MergeRegions -d PassingBedFiles/-m 3 -p 150
+Example: java -Xmx4G -jar pathTo/Apps/MergeRegions -r PassingBedFiles/ -m 3 -p 150
 
 ************************************************************************************
 </pre><br><p>
@@ -4866,7 +4865,7 @@ Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatien
 </pre><br><p>
 				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                TNRunner2 : Dec 2021                              **
+**                                TNRunner2 : Feb 2022                              **
 **************************************************************************************
 TNRunner is designed to execute several containerized snakmake workflows on tumor
 normal datasets via a slurm cluster.  Based on the availability of fastq, 
@@ -4931,6 +4930,7 @@ Setup Options:
 
 Job Execution Options:
 -d Delete and restart FAILED jobs.
+-J Just set up jobs, don't launch them via sbatch.
 -x Maximum # jobs to run at any given time, defaults to 35.
 -z Do not nice jobs (--nice=10000), run at maximum primority.
 -l Check and launch jobs every hour until all are complete.
@@ -4939,7 +4939,7 @@ Job Execution Options:
 Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/
      -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b 
      ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/
-     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l 
+     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 25 -l 
      -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l 
 
 **************************************************************************************
