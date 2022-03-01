@@ -15,6 +15,8 @@
 				
 					<a href="#AggregateQCStats">AggregateQCStats</a><br>
 				
+					<a href="#AggregateQCStats2">AggregateQCStats2</a><br>
+				
 					<a href="#AlignmentEndTrimmer">AlignmentEndTrimmer</a><br>
 				
 					<a href="#AllelicExpressionComparator">AllelicExpressionComparator</a><br>
@@ -347,6 +349,8 @@
 				
 					<a href="#VariantInfoAggregator">VariantInfoAggregator</a><br>
 				
+					<a href="#VariantPathwayComparator">VariantPathwayComparator</a><br>
+				
 					<a href="#VarScanVCFParser">VarScanVCFParser</a><br>
 				
 					<a href="#VCFBkz">VCFBkz</a><br>
@@ -358,8 +362,6 @@
 					<a href="#VCFCallFrequency">VCFCallFrequency</a><br>
 				
 					<a href="#VCFCenterFormatter">VCFCenterFormatter</a><br>
-				
-					<a href="#VCFCollapser">VCFCollapser</a><br>
 				
 					<a href="#VCFComparator">VCFComparator</a><br>
 				
@@ -476,6 +478,30 @@ Default Options:
 -e Replace Exome with DNA in all file reference names.
 
 Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -r QCStats/ -p TR774_ 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="AggregateQCStats2"><pre>**************************************************************************************
+**                            Aggregate QC Stats2: Feb 2022                         **
+**************************************************************************************
+Parses and aggregates alignment quality statistics from log and json files produced by
+the TNRunner2 DnaAlignQC and SampleConcordance workflows.
+
+Required Options:
+-j Directory containing TNRunner2 jobs.
+-s Directory for saving the AggQC results.
+
+Options:
+-a Alignment log file match, defaults to '.+_AlignHg38.log'
+-d Mark duplicates log file match, defaults to '.+_Markdup.log'
+-r Read coverage json file match, defaults to '.+_UniObRC.json.gz'
+-c Sample concordance json file match, defaults to '.+_SampleConcordance.json.gz'
+-i Clinical info json file match, defaults to '.+_AvatarInfo.json.gz'
+-n Normal DNA file match, defaults to '.+NormalDNA.+'
+-t Tumor DNA file match, defaults to '.+TumorDNA.+'
+
+Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats2 -j TNJobs/ -s QCStats/
 
 **************************************************************************************
 </pre><br><p>
@@ -4939,7 +4965,7 @@ Job Execution Options:
 Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/
      -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b 
      ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/
-     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 25 -l 
+     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 125 -l 
      -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l 
 
 **************************************************************************************
@@ -5107,7 +5133,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/USeq2Text -f
 					<a name="VariantInfoAggregator"><pre>**************************************************************************************
 **                            VariantInfoAggregator : Sept 2019                     **
 **************************************************************************************
-Parses and aggregates somatic and germline variant calls from many samples precessed
+Parses and aggregates somatic and germline variant calls from many samples processed
 by the USeq TNRunner application.
 
 Options:
@@ -5116,6 +5142,32 @@ Options:
 
 Example: java -jar -Xmx2G ~/USeqApps/VariantInfoAggregator -j AJobs/ -s 
     aggregatedVariantInfo.txt
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VariantPathwayComparator"><pre>**************************************************************************************
+**                           Variant Pathway Comparator : Feb 2022                  **
+**************************************************************************************
+For each pathway, VPC creates a 2x2 contingency table and calculates a Fisher's exact
+p-value that is subsequently multiple test corrected using Benjamini-Hochberg's
+method. The contingency table is the number of subjects from cohort A with one or more
+matching gene names, the number from A without any gene matches, and likewise for the
+subjects in cohort B. A variety of statistics, including the matching gene frequency,
+degree and directionality of change, and html links to each pathway are saved.
+
+Required Parameters:
+-a File containing cohort A gene sets, each line represents a subject's genes of
+     interest (e.g. those with HIGH impact mutations), tab delimited, the first cell
+     is the subject ID, subsequent cells are the gene names.
+-b File containing cohort B gene sets, ditto.
+-p File containing pathways to compare, each line represents one pathway, tab
+     delimited, the first cell is the pathway ID and description (e.g.
+     'hsa05210  Colorectal cancer'), subsequent cells, the associated genes.
+-r File to save results, should end with .xls
+
+Example: java -Xmx10G -jar pathTo/USeq/Apps/VariantPathwayComparator -a earlyCRC.txt
+   -b lateCRC.txt -p keggHumanPathways.txt -r earlyVsLateVPC.xls 
 
 **************************************************************************************
 </pre><br><p>
@@ -5304,20 +5356,6 @@ Options:
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFCenterFormatter -v Calls/ -s CCalls
 
-**************************************************************************************
-</pre><br><p>
-				
-					<a name="VCFCollapser"><pre>**************************************************************************************
-**                               VCF Collapser : Nov 2021                           **
-**************************************************************************************
-Collapses vcf files, keeping only unique records. Outputs a sorted vcf with just
-CHROM POS REF and ALT.
-
-Required Params:
--v Vcf file or directory containing such (xxx.vcf(.gz/.zip OK)) to merge
--o Merged vcf output, must end with vcf.gz
-
-Example: java -Xmx9G -jar pathTo/USeq/Apps/VCFCollapser -v Vcfs/ -o sorted.vcf.gz
 **************************************************************************************
 </pre><br><p>
 				

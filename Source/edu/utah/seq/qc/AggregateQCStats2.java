@@ -169,21 +169,21 @@ public class AggregateQCStats2 {
 					String name = f.getName();
 					//align log
 					if (alignLogPattern.matcher(name).matches()) {
-						int nto = fetchSource(name);
+						int nto = fetchSource(f);
 						if (nto == 0) normAlignLog = f;
 						else tumAlignLog = f;
 					}
 
 					//dup log
 					else if (dupLogPattern.matcher(name).matches()) {
-						int nto = fetchSource(name);
+						int nto = fetchSource(f);
 						if (nto == 0) normDupLog = f;
 						else tumDupLog = f;
 					}
 
 					//read coverage json
 					else if (readCovJsonPattern.matcher(name).matches()) {
-						int nto = fetchSource(name);
+						int nto = fetchSource(f);
 						if (nto == 0) normReadCovJson = f;
 						else tumReadCovJson = f;
 					}
@@ -210,10 +210,19 @@ public class AggregateQCStats2 {
 			}
 		}
 
-	private int fetchSource(String fileName) {
-		if (normalDNAPattern.matcher(fileName).matches()) return 0;
-		if (tumorDNAPattern.matcher(fileName).matches()) return 1;
-		IO.el("\nERROR: failed to parse the tumor DNA or normal DNA source from "+fileName);
+	private int fetchSource(File f) throws IOException {
+		
+		//attempt to pull from file name
+		String name = f.getName();
+		if (normalDNAPattern.matcher(name).matches()) return 0;
+		if (tumorDNAPattern.matcher(name).matches()) return 1;
+		
+		//attempt to pull from the path, not canonical path because some of these use soft links
+		name = f.getPath();
+		if (normalDNAPattern.matcher(name).matches()) return 0;
+		if (tumorDNAPattern.matcher(name).matches()) return 1;
+		
+		IO.el("\nERROR: failed to parse the tumor DNA or normal DNA source from "+f.getPath());
 		System.exit(1);
 		return -1;
 	}

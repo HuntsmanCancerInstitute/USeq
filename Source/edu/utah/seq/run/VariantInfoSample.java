@@ -279,7 +279,6 @@ public class VariantInfoSample {
 				else somaticAnnoVcf = f;
 			}
 		}
-		
 	}
 
 	public String getId() {

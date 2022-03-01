@@ -1,11 +1,10 @@
 package edu.utah.seq.vcf.xml.caris;
 
+import java.io.File;
 import java.io.IOException;
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
-import util.gen.IO;
-
 
 public class GenomicAlteration {
 
@@ -21,9 +20,6 @@ public class GenomicAlteration {
 	private String readDepth = null;
 	private String ref = null;
 	private String alt = null;
-	
-
-	
 	
 	public GenomicAlteration(NodeList nodes) throws IOException {
 		for (int j = 0; j < nodes.getLength(); j++) {

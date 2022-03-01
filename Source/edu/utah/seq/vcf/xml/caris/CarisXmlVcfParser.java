@@ -4,10 +4,7 @@ import java.io.*;
 import java.text.ParseException;
 import java.util.regex.*;
 import javax.xml.parsers.*;
-
-import org.apache.jasper.tagplugins.jstl.core.Out;
 import org.w3c.dom.*;
-import util.bio.annotation.Bed;
 import util.bio.parsers.UCSCGeneLine;
 import util.bio.parsers.UCSCGeneModelTableReader;
 import util.gen.*;
@@ -39,12 +36,12 @@ public class CarisXmlVcfParser {
 	//working data for a particular report
 	private File workingXmlFile;
 	private String workingReportName = null;
+	private int workingNumberFailedGenomicMatches = 0;
 
 	//vcf info
 	private File workingVcfFile;
 	private StringBuilder workingVcfHeader;
 	private LinkedHashMap<String, SimpleVcf> workingVcfs = new LinkedHashMap<String, SimpleVcf>();
-
 
 	//xml objects
 	private ArrayList<GenomicAlteration> workingGenomicAlterations = new ArrayList<GenomicAlteration>();
@@ -65,7 +62,7 @@ public class CarisXmlVcfParser {
 			
 			//print the stats lines
 			IO.pl("\nParsing Statistics:");
-			IO.pl("Name\tVcfRecords\tGenomicAlterationReports\tCNVs\tFusionReports\tIHCTests");
+			IO.pl("Name\tVcfRecords\tGenomicAlterationReports\tCNVs\tFusionReports\tIHCTests\tFailedGenomicAltMatches");
 			for (String s: statLines) IO.pl(s);
 
 			//finish and calc run time
@@ -104,6 +101,8 @@ public class CarisXmlVcfParser {
 		}
 		txtOut.close();
 	}
+	
+//Add it MGMT-Me methylation status like an IHC test to the spreadsheet
 
 	public void parseDatasets() throws Exception{
 
@@ -133,6 +132,7 @@ public class CarisXmlVcfParser {
 			workingCNVAlterations.clear();
 			workingTranslocations.clear();
 			workingExpressionAlterations.clear();
+			workingNumberFailedGenomicMatches = 0;
 
 			loadVcf();
 
@@ -161,7 +161,9 @@ public class CarisXmlVcfParser {
 			SimpleVcf vcf = workingVcfs.get(gaKey);
 			if (vcf == null) {
 				IO.el(ga.toString());
-				Misc.printErrAndExit("Failed to find the vcf for "+gaKey+"\n"+workingVcfs.keySet());
+				IO.el("Failed to find the vcf for the xml variant "+gaKey+" in the vcf file "+ workingVcfFile+ 
+						"\n"+workingVcfs.keySet()+"\nConsider manually matching by editing the xml file. Skipping xml variant.");
+				workingNumberFailedGenomicMatches++;
 			}
 			else {
 				patho = Misc.WHITESPACE.matcher(patho).replaceAll("_");
@@ -184,13 +186,15 @@ public class CarisXmlVcfParser {
 		al.add(new Integer(workingTranslocations.size()).toString());	
 		//# IHC alterations
 		al.add(new Integer(workingExpressionAlterations.size()).toString());
+		//# Failed to match genomic alterations
+		al.add(workingNumberFailedGenomicMatches+"");
 		return Misc.stringArrayListToString(al, "\t");
 	}
 
 	private void buildIHCHash() {
 		String[] ihcNames = {"PD-L1 (22c3)", "PD-L1 (SP142)", "PD-L1 FDA(SP142)", "PD-L1 FDA (28-8)", 
 				"MLH1", "PMS2", "MSH2", "MSH6", "ALK", "PTEN", "Mismatch Repair Status", "Her2/Neu", 
-				"TrkA/B/C", "Androgen Receptor" };
+				"TrkA/B/C", "Androgen Receptor", "Folfox Responder Similarity Score", "ROS1" };
 		ihcTestNames = new HashSet<String>();
 		for (String n: ihcNames) ihcTestNames.add(n);
 
@@ -356,12 +360,16 @@ public class CarisXmlVcfParser {
 					String testName = cNode.getTextContent().trim();
 					if (testName.equals("Exome Panel - Clinical Genes")) parseGenesTest(childNodes);
 					else if (testName.equals("Exome Panel - Additional Genes")) parseGenesTest(childNodes);
+					else if (testName.equals("Exome CND Panel - Clinical Genes")) parseCNVPanel(childNodes);
 					else if (testName.equals("Exome CNA Panel - Clinical Genes")) parseCNVPanel(childNodes);
 					else if (testName.equals("Exome CNA Panel - Additional Genes")) parseCNVPanel(childNodes);
 					else if (testName.equals("Transcriptome Detection_v1 Panel")) parseTranslocationPanel(childNodes);
 					else if (testName.equals("Transcriptome Detection_v1 Variant Panel")) parseTranslocationPanel(childNodes);
 					else if (ihcTestNames.contains(testName)) parseIHC(childNodes);
 					else if (testName.equals("Her2 CISH")) parseCNVPanel(childNodes);
+					else if (testName.equals("EBER ISH")){
+						IO.el("Skipping the parsing of 'EBER ISH' test for Epstein-Barr virus genome copy number\n");
+					}
 					else throw new IOException("Found an unknown test! "+testName);
 				}
 			}

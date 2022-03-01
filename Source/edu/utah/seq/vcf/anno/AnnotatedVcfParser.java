@@ -54,6 +54,7 @@ public class AnnotatedVcfParser {
 	private static final Pattern COMMA_SLASH = Pattern.compile(",|/");
 	private String appSettings = null;
 	private HashSet<String> transcriptFilter = null;
+	private Gzipper impactedGenes = null;
 	
 	//trackers
 	private Histogram afs = new Histogram(0, 1.01, 101);
@@ -106,8 +107,9 @@ public class AnnotatedVcfParser {
 		if (somaticProcessing) modifySettingsForFoundation();
 		
 		openSpreadSheet();
+		impactedGenes = new Gzipper( new File (saveDirectory, "impactedGenes.txt.gz"));
 		
-		IO.pl("Parsing (#pass #fail):");
+		IO.pl("Parsing (#fail #pass):");
 		for (File vcf: vcfFiles){
 			workingVcf = vcf;
 			System.out.print("\t"+workingVcf.getName());
@@ -119,6 +121,7 @@ public class AnnotatedVcfParser {
 		printStats();
 		printDistributions();
 		closeSpreadsheet();
+		impactedGenes.close();
 		
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
@@ -159,9 +162,12 @@ public class AnnotatedVcfParser {
 			trimmedFileName = Misc.removeExtension(workingVcf.getName());			
 			passVcf = new Gzipper( new File (saveDirectory, trimmedFileName + "_Pass.vcf.gz"));
 			failVcf = new Gzipper( new File (saveDirectory, trimmedFileName + "_Fail.vcf.gz"));
+			
+			
 			BufferedReader in = IO.fetchBufferedReader(workingVcf);
 			int numPassingVcf = 0;
 			int numFailingVcf = 0;
+			TreeSet<String> passingGeneNames = new TreeSet<String>();
 			//for each line in the file
 			while ((vcfLine = in.readLine()) != null){
 				vcfLine = vcfLine.trim();
@@ -209,6 +215,7 @@ public class AnnotatedVcfParser {
 				
 				if (pass){
 					numPassingVcf++;
+					passingGeneNames.addAll(dataLine.fetchPassingGeneNames());
 					passVcf.println(vcfLine);
 					dataLine.println(sumarySpreadSheet, transcriptFilter);
 				}
@@ -220,13 +227,13 @@ public class AnnotatedVcfParser {
 			}
 			numPass+=numPassingVcf;
 			
-			if (verbose == false) IO.pl("\t"+numPassingVcf+"\t"+numFailingVcf);
+			if (verbose == false) IO.pl("\t"+numFailingVcf+"\t"+numPassingVcf);
+			impactedGenes.println(trimmedFileName+"\t"+Misc.treeSetToString(passingGeneNames, "\t")); 
 			
 			//close io
 			in.close();
 			passVcf.close();
-			failVcf.close();
-			
+			failVcf.close();	
 	}
 	
 	private void loadInfoHash(String info) {

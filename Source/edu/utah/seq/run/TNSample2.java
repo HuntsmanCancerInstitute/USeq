@@ -291,6 +291,7 @@ public class TNSample2 {
 			File d = new File(rootDir, "ClinicalReport");
 			if (d.exists() == false) info= null;
 			info = IO.extractFiles(d, ".json");
+			if (info == null || info.length !=1) info = IO.extractFiles(d, ".xml");
 			if (info == null || info.length !=1) info= null;
 		}
 		
@@ -991,14 +992,18 @@ public class TNSample2 {
 		return shellScript;
 	}
 
-	/**Attempts to find a xxx.bai file in the same dir as the xxx.bam file.*/
-	public static final Pattern bamName = Pattern.compile("(.+)\\.bam");
+	/**Attempts to find a xxx.bai or xxx.crai file in the same dir as the xxx.bam/cram file.*/
 	public static File fetchBamIndex(File bam) throws IOException{
 		String path = bam.getCanonicalPath();
-		Matcher mat = bamName.matcher(path);
-		File index = null;
-		if (mat.matches()) index = new File(mat.group(1)+".bai");
-		if (index == null || index.exists() == false) throw new IOException("Failed to find the xxx.bai index file for "+bam);
+		String tPath = path.substring(0, path.length()-4);
+		File index = new File (tPath+".bai");
+		if (index.exists()) return index;
+		index = new File (path+".bai");
+		if (index.exists()) return index;
+		index = new File (tPath+".crai");
+		if (index.exists()) return index;
+		index = new File (path+".crai");
+		if (index.exists() == false) throw new IOException("Failed to find the xxx.bai/crai index file for "+bam);
 		return index;
 	}
 

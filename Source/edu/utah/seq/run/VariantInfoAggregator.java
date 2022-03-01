@@ -91,7 +91,7 @@ public class VariantInfoAggregator {
 				"**************************************************************************************\n" +
 				"**                            VariantInfoAggregator : Sept 2019                     **\n" +
 				"**************************************************************************************\n" +
-				"Parses and aggregates somatic and germline variant calls from many samples precessed\n"+
+				"Parses and aggregates somatic and germline variant calls from many samples processed\n"+
 				"by the USeq TNRunner application.\n"+
 
 				"\nOptions:\n"+

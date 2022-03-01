@@ -94,7 +94,7 @@ public class CNVAlteration {
 	public SimpleBed toBed(HashMap<String, UCSCGeneLine[]> name2GeneModels) throws IOException {
 		// Chr\tGeneStart\tGeneStop\tGeneName:Type\tScore\tGeneStrand
 		UCSCGeneLine[] genes = name2GeneModels.get(geneName);
-		if (genes == null) throw new IOException("ERROR: failed to find a gene model for cnv coordinate extraction for "+geneName);
+		if (genes == null) throw new IOException("ERROR: failed to find a gene model for cnv coordinate extraction for "+geneName+"\n"+toString());
 		UCSCGeneLine model = null;
 		if (chr != null) {
 			for (UCSCGeneLine line : genes) {

@@ -166,8 +166,16 @@ public class AnnotatedVcfParserDataLine {
 			}
 			sumarySpreadSheet.println();
 		}
-		
-		
+	}
+	
+	public HashSet<String> fetchPassingGeneNames(){
+		HashSet<String> passNames = new HashSet<String>();
+		for (AnnotatedGene ag: annoGenes) if (ag.passImpact) passNames.add(ag.geneName);
+		if (passesSplice && spliceGeneName !=null) {
+			String realName = spliceGeneName.substring(0,spliceGeneName.indexOf(":"));
+			passNames.add(realName);
+		}
+		return passNames;
 	}
 	
 	public String getIGVLink() {
