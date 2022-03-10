@@ -104,19 +104,30 @@ public class TNSample2 {
 		private void parseMergeClinicalVars() throws IOException {
 			info.add("Checking clinical variant integration...");
 			
-			//look for json file
+			//look for json file and xml vcfs
 			File[] jsonTestResults = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".json");
+			File[] xmls = null;
+			File[] vcfs = null;
+			File[] toLink = null;
+			
 			if (jsonTestResults == null || jsonTestResults.length !=1) {
-				info.add("\tJsonReport\tFAILED to find one xxx.json clinical test report file");
-				failed = true;
-				return;
+				
+				//look for caris xml and vcf.gz
+				xmls = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".xml");
+				vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf.gz");
+				if (xmls.length != 1 || vcfs.length != 1) {
+					info.add("\tJson/Xml/VcfReport\tFAILED to find one xxx.json or one xxx.vcf.gz and xxx.xml clinical test report file(s)");
+					failed = true;
+					return;
+				}
+				jsonTestResults = null;
+				toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), xmls[0], vcfs[0]};
 			}
+			else toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), jsonTestResults[0]};
 			
 			//make dir, ok if it already exists
 			File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_ClinicalVars");
 			jobDir.mkdirs();
-			
-			File[] toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), jsonTestResults[0]};
 
 			//any files?
 			HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);

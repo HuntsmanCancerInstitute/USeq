@@ -79,6 +79,8 @@
 				
 					<a href="#CalculatePerCycleErrorRate">CalculatePerCycleErrorRate</a><br>
 				
+					<a href="#CarisVcfComparator">CarisVcfComparator</a><br>
+				
 					<a href="#CarisXmlVcfParser">CarisXmlVcfParser</a><br>
 				
 					<a href="#ChIPSeq">ChIPSeq</a><br>
@@ -1368,26 +1370,47 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="CarisVcfComparator"><pre>**************************************************************************************
+**                           Caris Vcf Comparator: March 2022                       **
+**************************************************************************************
+CVC compares a Caris vcf generated with the CarisXmlVcfParser to a recalled vcf.
+Exact recall vars are so noted and removed. Caris vcf with no exact but one
+overlapping record can be merged with -k. Be sure to vt normalize each before running.
+Recall variants failing FILTER are not saved.
+
+Options:
+-c Path to a the Caris xml parsed vcf file, see the CarisXmlVcfParser app.
+-r Path to a recalled snv/indel vcf file.
+-m Path to named vcf file for saving the results.
+
+Example: java -Xmx2G -jar pathToUSeq/Apps/CarisVcfComparator -f TL-18-03CFD6.vcf
+     -r /F1/TL-18-03CFD6_recall.vcf.gz -g -c -m /F1/TL-18-93CFD6_merged.vcf.gz -k 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="CarisXmlVcfParser"><pre>**************************************************************************************
-**                           Caris Xml Vcf Parser: March 2021                       **
+**                           Caris Xml Vcf Parser: March 2022                       **
 **************************************************************************************
 This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml
 reported genomic alternations are annotated, bed files of copy number changes and gene
 fusions as well as a summary spreadsheet of the non NGS test results and report
-attributes.
+attributes. Use Vt to normalize the vcf output files. 
 
 Options:
 -d Path to a directory containing paired xml and vcf files from Caris.
--s Path to a directory for saving the results.
+-s Path to a directory for saving the results. Only impacting vcf, cnv, fusions are
+     saved, if none present, no file(s) are created.
 -u Path to a Hg38 UCSC RefFlat or RefSeq merged gene file for CNV and gene fusion
    coordinate extraction. See: http://www.genome.ucsc.edu/FAQ/FAQformat.html#format9
    (refSeqGeneName name2(optional) chr strand txStart txEnd cdsStart cdsEnd exonCount
    exonStarts exonEnds). Be sure to merge transcripts with the USeq MergeUCSCGeneTable
    app and remove non standard chromosomes.
 -i Include PHI in spreadsheet output, defaults to excluding.
+-a Include all vcf records in output, defaults to just those with an xml match.
 
 Example: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/
-     -s ParsedCarisReports/ -i -u ~/GRCh38/hg38RefSeq9Dec2020_MergedStdChr.ucsc.gz 
+     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq9Dec2020_MergedStdChr.ucsc.gz 
 
 **************************************************************************************
 </pre><br><p>
@@ -4891,7 +4914,7 @@ Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatien
 </pre><br><p>
 				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                TNRunner2 : Feb 2022                              **
+**                                TNRunner2 : March 2022                            **
 **************************************************************************************
 TNRunner is designed to execute several containerized snakmake workflows on tumor
 normal datasets via a slurm cluster.  Based on the availability of fastq, 
@@ -5165,9 +5188,11 @@ Required Parameters:
      delimited, the first cell is the pathway ID and description (e.g.
      'hsa05210  Colorectal cancer'), subsequent cells, the associated genes.
 -r File to save results, should end with .xls
+-k (Optional) Tab delimited file containing KEGG gene IDs and gene Names, one row
+      per gene, for highlighting impacted genes in each KEGG pathway hyperlink.
 
 Example: java -Xmx10G -jar pathTo/USeq/Apps/VariantPathwayComparator -a earlyCRC.txt
-   -b lateCRC.txt -p keggHumanPathways.txt -r earlyVsLateVPC.xls 
+   -b lateCRC.txt -p keggHumanPathways.txt -r earlyVsLateVPC.xls -k keggGeneIDName.txt
 
 **************************************************************************************
 </pre><br><p>
@@ -5335,7 +5360,7 @@ Options:
 -e Print verbose debugging output.
 
 Example: java -jar pathToUSeq/Apps/VCFCallFrequency -f Vcf/ -s CFVcfs -v 
-    Hg38/Somatic/Avatar/Vcf -b  -m 0.05 -d ~/GQuery/Data 
+    Hg38/Somatic/Avatar/Vcf -b  -m 0.07 -d ~/GQuery/Data 
 
 **************************************************************************************
 </pre><br><p>

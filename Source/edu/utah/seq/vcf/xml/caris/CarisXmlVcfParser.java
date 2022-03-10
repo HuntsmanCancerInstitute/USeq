@@ -11,7 +11,7 @@ import util.gen.*;
 import java.util.*;
 
 /**
- * Takes one or more patient xml reports from Caris tests and converts most of the variants into vcf format.
+ * Takes one or more patient xml reports from Caris tests and converts most of the variants into vcf format by using the Caris vcf to pull genomic coordinates which are not provided in the xml
  * Outputs a summary clinical data spreadsheet
  * @author david.nix@hci.utah.edu 
  **/
@@ -21,6 +21,7 @@ public class CarisXmlVcfParser {
 	private HashMap<String, File[]> xmlVcfFiles = null;
 	private File saveDirectory;
 	private boolean includePHI = false;
+	private boolean saveAllVcfRecords = false;
 
 	//internal fields
 	private String source;
@@ -48,6 +49,7 @@ public class CarisXmlVcfParser {
 	private ArrayList<CNVAlteration> workingCNVAlterations = new ArrayList<CNVAlteration>();
 	private ArrayList<Translocation> workingTranslocations = new ArrayList<Translocation>();
 	private ArrayList<ExpressionAlteration> workingExpressionAlterations = new ArrayList<ExpressionAlteration>();
+	private ArrayList<MethylationAlteration> workingMethylationAlterations = new ArrayList<MethylationAlteration>();
 
 
 	//constructors
@@ -76,7 +78,7 @@ public class CarisXmlVcfParser {
 	}
 
 	private void printSpreadsheet() throws IOException {
-		IO.pl("Exporting patient summary spreadsheet... ");
+		IO.pl("\nExporting patient summary spreadsheet... ");
 		//merge all the keys
 		LinkedHashSet<String> allKeys = new LinkedHashSet<String>();
 		for (LinkedHashMap<String,String> s : allReportAttributes) allKeys.addAll(s.keySet());
@@ -132,6 +134,7 @@ public class CarisXmlVcfParser {
 			workingCNVAlterations.clear();
 			workingTranslocations.clear();
 			workingExpressionAlterations.clear();
+			workingMethylationAlterations.clear();
 			workingNumberFailedGenomicMatches = 0;
 
 			loadVcf();
@@ -215,10 +218,13 @@ public class CarisXmlVcfParser {
 					workingVcfHeader.append(SimpleVcf.xrv);
 					workingVcfHeader.append(SimpleVcf.xrp);
 				}
-				workingVcfHeader.append(line); workingVcfHeader.append("\n");
+				//fix their malformed header line that is causing a vt to error
+				if (line.startsWith("##FORMAT=<ID=SA,")) line = "##FORMAT=<ID=SA,Number=1,Type=String,Description=\"Number of 1) forward ref alleles; 2) reverse ref; 3) forward non-ref; 4) reverse non-ref alleles, used in variant calling\">";
+				workingVcfHeader.append(line); 
+				workingVcfHeader.append("\n");
 			}
 			else {
-				SimpleVcf vcf = new SimpleVcf(line);
+				SimpleVcf vcf = new SimpleVcf(line,0);
 				String key = vcf.fetchCarisKey();
 				if (key == null) key = Misc.getRandomString(10);
 				workingVcfs.put(key, vcf);
@@ -233,14 +239,29 @@ public class CarisXmlVcfParser {
 		if (workingVcfs.size() == 0) return;
 		Gzipper out = null;
 		try {
+			//for each vcf record
+			ArrayList<String> toSave = new ArrayList<String>();
+			int counter = 1;
+			for (SimpleVcf sv : workingVcfs.values()) {
+				if (saveAllVcfRecords) {
+					sv.setId("Caris_"+counter);
+					counter++;
+					toSave.add(sv.toString());
+				}
+				else if (sv.getInfo().startsWith("XRV;XRP=")) {
+					sv.setId("Caris_"+counter);
+					counter++;
+					toSave.add(sv.toString());
+				}
+			}
+			//if (toSave.size() == 0) return; don't do this always want a vcf file output even if empty
+			
 			File vcf = new File (saveDirectory, workingReportName+".vcf.gz");
 			out = new Gzipper(vcf);
 
 			//add header
 			out.print(workingVcfHeader);
-
-			//for each vcf record
-			for (SimpleVcf sv : workingVcfs.values()) out.println(sv.toString());
+			for (String s: toSave) out.println(s);
 
 			out.close();
 		} catch (IOException e) {
@@ -258,19 +279,30 @@ public class CarisXmlVcfParser {
 		Gzipper out = null;
 		try {
 			
-			SimpleBed[] bedRegions = new SimpleBed[workingCNVAlterations.size()];
-			for (int i=0; i< bedRegions.length; i++) bedRegions[i] = workingCNVAlterations.get(i).toBed(name2GeneModels);
-			Arrays.sort(bedRegions);
 			
+			ArrayList<SimpleBed> bedToSave = new ArrayList<SimpleBed>();
+			for (int i=0; i< workingCNVAlterations.size(); i++) {
+				CNVAlteration cnv = workingCNVAlterations.get(i);
+				String res = cnv.getResult().toLowerCase();
+				if (res.contains("not detected") || res.contains("indeterminate")) continue;
+				bedToSave.add(cnv.toBed(name2GeneModels));
+			}
+			if (bedToSave.size() == 0) return;
+			
+			SimpleBed[] bedRegions = new SimpleBed[bedToSave.size()];
+			bedToSave.toArray(bedRegions);
+			Arrays.sort(bedRegions);
 			
 			File bedFile = new File (saveDirectory, workingReportName+".cnv.bed.gz");
 			out = new Gzipper(bedFile);
 
 			//add header
-			out.println("#Chr\tGeneStart\tGeneStop\tGeneName:Type\tScore\tGeneStrand\n#Hg38");
+			out.println("#ChrHg38\tGeneStart\tGeneStop\tGeneName:Type\tScore\tGeneStrand");
 
 			//for each bed
-			for (SimpleBed cnv: bedRegions) out.println(cnv);
+			for (SimpleBed cnv: bedRegions) {
+				if (cnv!= null) out.println(cnv);
+			}
 
 			out.close();
 		} catch (IOException e) {
@@ -291,9 +323,15 @@ public class CarisXmlVcfParser {
 			ArrayList<SimpleBed> beds = new ArrayList<SimpleBed>();
 			int num = workingTranslocations.size();
 			for (int i=0; i< num; i++) {
+				Translocation trans = workingTranslocations.get(i);
+				String res = trans.getResult().toLowerCase();
+				if (res.contains("not detected") || res.contains("indeterminate")) continue;
+				
 				SimpleBed[] sbs = workingTranslocations.get(i).toBed(name2GeneModels);
 				for (SimpleBed sb: sbs) if (sb!=null) beds.add(sb);
 			}
+			if (beds.size()==0) return;
+			
 			SimpleBed[] bedRegions = new SimpleBed[beds.size()];
 			beds.toArray(bedRegions);
 			Arrays.sort(bedRegions);
@@ -303,7 +341,7 @@ public class CarisXmlVcfParser {
 			out = new Gzipper(bedFile);
 
 			//add header
-			out.println("#Chr\tGeneStart\tGeneStop\tGeneName1:GeneName2:Type\tScore\tGeneStrand\n#Hg38");
+			out.println("#ChrHg38\tGeneStart\tGeneStop\tGeneName1:GeneName2:Type\tScore\tGeneStrand");
 
 			//for each bed
 			for (SimpleBed fus: bedRegions) out.println(fus);
@@ -365,10 +403,14 @@ public class CarisXmlVcfParser {
 					else if (testName.equals("Exome CNA Panel - Additional Genes")) parseCNVPanel(childNodes);
 					else if (testName.equals("Transcriptome Detection_v1 Panel")) parseTranslocationPanel(childNodes);
 					else if (testName.equals("Transcriptome Detection_v1 Variant Panel")) parseTranslocationPanel(childNodes);
+					else if (testName.equals("MGMT-Me")) parseMethyl(childNodes);
 					else if (ihcTestNames.contains(testName)) parseIHC(childNodes);
 					else if (testName.equals("Her2 CISH")) parseCNVPanel(childNodes);
 					else if (testName.equals("EBER ISH")){
-						IO.el("Skipping the parsing of 'EBER ISH' test for Epstein-Barr virus genome copy number\n");
+						IO.el("\nSkipping the parsing of 'EBER ISH' test for Epstein-Barr virus genome copy number\n");
+					}
+					else if (testName.equals("ROS1 FISH")){
+						IO.el("\nSkipping the parsing of 'ROS1 FISH' test for ROS1 cytogenic alteration.");
 					}
 					else throw new IOException("Found an unknown test! "+testName);
 				}
@@ -390,6 +432,27 @@ public class CarisXmlVcfParser {
 							String subName = n.getNodeName();
 							if (subName.equals("expressionAlteration")) this.workingExpressionAlterations.add( new ExpressionAlteration(this.workingReportAttributes, n.getChildNodes()));
 							else throw new IOException("Found something other than 'expressionAlteration' "+subName);
+						}
+					}
+				}
+			}
+		}
+	}
+	
+	private void parseMethyl(NodeList childNodes) throws IOException {
+		for (int j = 0; j < childNodes.getLength(); j++) {
+			Node cNode = childNodes.item(j);
+			if (cNode instanceof Element) {
+				String name = cNode.getNodeName();
+				//find testResults
+				if (name.equals("testResults")) {
+					NodeList subNodes = cNode.getChildNodes();
+					for (int i=0; i< subNodes.getLength(); i++) {
+						Node n = subNodes.item(i);
+						if (n instanceof Element) {
+							String subName = n.getNodeName();
+							if (subName.equals("epigeneticAlteration")) workingMethylationAlterations.add( new MethylationAlteration(workingReportAttributes, n.getChildNodes()));
+							else throw new IOException("Found something other than 'epigeneticAlteration' "+subName);
 						}
 					}
 				}
@@ -663,6 +726,9 @@ public class CarisXmlVcfParser {
 		System.out.println("\n"+ source +"\n");
 		File ucscFile = null;
 		File vcfXmlDir = null;
+		File singleCarisVcf = null;
+		File singleCarisXml = null;
+		
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -688,8 +754,8 @@ public class CarisXmlVcfParser {
 		saveDirectory.mkdirs();
 		if (saveDirectory.isDirectory() == false) Misc.printErrAndExit("\nError: your save directory does not appear to be a directory?\n");
 
-		if (vcfXmlDir == null || vcfXmlDir.isDirectory() == false) Misc.printErrAndExit("\nError: cannot find the directory containing your xml and vcf files?! "+vcfXmlDir);
-		parseXmlVcfFiles(vcfXmlDir);
+		if (vcfXmlDir != null && vcfXmlDir.exists()) parseXmlVcfFiles(vcfXmlDir);
+		else Misc.printErrAndExit("\nError: cannot find the directory -d containing your xml and vcf files?! ");
 
 		if (ucscFile == null || ucscFile.exists() == false) Misc.printErrAndExit("\nError: cannot find or read your hg38 merged UCSC refFlat gene table? "+ucscFile);
 
@@ -713,7 +779,10 @@ public class CarisXmlVcfParser {
 			String fullName = files[i].getName();
 			if (fullName.endsWith(".gz"))fullName = fullName.substring(0, fullName.length()-3);
 			String[] nameParts = Misc.UNDERSCORE.split(fullName);
-			if (fullName.endsWith(".vcf")) vcfs.put(nameParts[0], files[i]);
+			if (fullName.endsWith(".vcf")) {
+				boolean itIsACaris = carisVcf(files[i]);
+				if (itIsACaris) vcfs.put(nameParts[0], files[i]);
+			}
 			if (fullName.endsWith(".xml")) xmls.put(nameParts[0], files[i]);
 		}
 		//same number?
@@ -727,28 +796,52 @@ public class CarisXmlVcfParser {
 		}
 	}
 
+	private boolean carisVcf(File file) {
+		try {
+			BufferedReader in = IO.fetchBufferedReader(file);
+			String line = null;
+			while ((line = in.readLine())!=null) {
+				line = line.trim();
+				if (line.startsWith("##INFO=<ID=CI,Number=.,Type=String,Description=")) {
+					in.close();
+					return true;
+				}
+				if (line.startsWith("#CHROM")) {
+					in.close();
+					return false;
+				}
+			}
+			in.close();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return false;
+	}
+
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Caris Xml Vcf Parser: March 2021                       **\n" +
+				"**                           Caris Xml Vcf Parser: March 2022                       **\n" +
 				"**************************************************************************************\n" +
 				"This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml\n"+
 				"reported genomic alternations are annotated, bed files of copy number changes and gene\n"+
 				"fusions as well as a summary spreadsheet of the non NGS test results and report\n"+
-				"attributes.\n"+
+				"attributes. Use Vt to normalize the vcf output files. \n"+
 
 				"\nOptions:\n"+
 				"-d Path to a directory containing paired xml and vcf files from Caris.\n"+
-				"-s Path to a directory for saving the results.\n"+
+				"-s Path to a directory for saving the results. Only impacting vcf, cnv, fusions are\n"+
+				"     saved, if none present, no file(s) are created.\n"+
 				"-u Path to a Hg38 UCSC RefFlat or RefSeq merged gene file for CNV and gene fusion\n"+
 				"   coordinate extraction. See: http://www.genome.ucsc.edu/FAQ/FAQformat.html#format9\n"+
 				"   (refSeqGeneName name2(optional) chr strand txStart txEnd cdsStart cdsEnd exonCount\n"+
 				"   exonStarts exonEnds). Be sure to merge transcripts with the USeq MergeUCSCGeneTable\n"+
 				"   app and remove non standard chromosomes.\n"+
 				"-i Include PHI in spreadsheet output, defaults to excluding.\n"+
+				"-a Include all vcf records in output, defaults to just those with an xml match.\n"+
 
 				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/\n" +
-				"     -s ParsedCarisReports/ -i -u ~/GRCh38/hg38RefSeq9Dec2020_MergedStdChr.ucsc.gz \n\n" +
+				"     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq9Dec2020_MergedStdChr.ucsc.gz \n\n" +
 
 				"**************************************************************************************\n");
 	}

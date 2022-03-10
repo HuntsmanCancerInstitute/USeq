@@ -25,7 +25,6 @@ import org.json.JSONObject;
 import edu.utah.hci.query.MasterQuery;
 import edu.utah.hci.query.QueryRequest;
 import edu.utah.hci.query.UserQuery;
-import edu.utah.seq.vcf.anno.AnnotatedVcfParser;
 
 /**Calculates call frequencies for each vcf record from a db of vcf files and callable region files. 
  * Most mutated single site in p53 are seen at 0.039 across all cancers in TCGA.  0.57 for BRAF V600E across all cancers.*/
@@ -292,9 +291,10 @@ public class VCFCallFrequency {
 		//make a single use QueryRequest object
 		QueryRequest qr = new QueryRequest(masterQuery, null, options, null);
 		//any errors?
-		if (qr.getErrTxtForUser() != null || qr.getWarningTxtForUser().size()!=0) {
+		if (qr.getErrTxtForUser() != null ) {
+		//if (qr.getErrTxtForUser() != null || qr.getWarningTxtForUser().size()!=0) {
 			if (qr.getErrTxtForUser() !=null) Misc.printErrAndExit("\nInvalid request, "+qr.getErrTxtForUser()+ ",aborting.");
-			if (qr.getWarningTxtForUser().size() !=0) Misc.printErrAndExit("\n"+qr.getWarningTxtForUser()+", aborting.");
+			// already printed! so skip, if (qr.getWarningTxtForUser().size() !=0) Misc.printErrAndExit("\n"+qr.getWarningTxtForUser()+", might be an issue.");
 		}
 		//set results
 		else userQuery.setResults(qr.getJsonResults());
@@ -639,7 +639,7 @@ public class VCFCallFrequency {
 
 
 				"\nExample: java -jar pathToUSeq/Apps/VCFCallFrequency -f Vcf/ -s CFVcfs -v \n"+
-				"    Hg38/Somatic/Avatar/Vcf -b  -m 0.05 -d ~/GQuery/Data \n\n" +
+				"    Hg38/Somatic/Avatar/Vcf -b  -m 0.07 -d ~/GQuery/Data \n\n" +
 				"**************************************************************************************\n");
 
 	}

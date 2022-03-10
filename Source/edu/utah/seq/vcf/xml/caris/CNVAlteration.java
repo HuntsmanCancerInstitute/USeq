@@ -110,4 +110,9 @@ public class CNVAlteration {
 		if (score == null) score = ".";
 		return new SimpleBed(model.getChrom(), model.getTxStart(), model.getTxEnd(), geneName+":"+result.toLowerCase().replace(" ", "_"), score, model.getStrand());
 	}
+
+
+	public String getResult() {
+		return result;
+	}
 }

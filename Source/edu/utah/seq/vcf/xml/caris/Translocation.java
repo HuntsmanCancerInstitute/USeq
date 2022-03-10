@@ -117,6 +117,11 @@ public class Translocation {
 		else model = genes[0];
 		return model;
 	}
+
+
+	public String getResult() {
+		return result;
+	}
 	
 
 

@@ -11,10 +11,13 @@ public class VariantPathwayComparator {
 	private File groupAGeneHits;
 	private File groupBGeneHits;
 	private File pathwayGenes;
+	private File geneKeggIdName;
 	
 	//internal
 	private ArrayList<Pathway> pathways = new ArrayList<Pathway>();
 	private File resultsSpreadsheet = null;
+	private HashMap<String,String> keggGeneNameID = null;
+	private double minKeggFreq = 0.025;
 	
 	
 	//constructor
@@ -52,13 +55,13 @@ public class VariantPathwayComparator {
 		
 		try {
 			PrintWriter out = new PrintWriter( new FileWriter(this.resultsSpreadsheet));
-			out.println("NameHyperLink\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tBHits\tBNoHits\tFracBHits\tBGeneHits\tLog2(fracA/fracB)");
-			for (Pathway p: loadedPathways) out.println(p.toString());
+			if (geneKeggIdName == null) out.println("NameHyperLink\tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tBHits\tBNoHits\tFracBHits\tBGeneHits\tLog2(fracA/fracB)");
+			else out.println("NameHyperLink\tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tAGeneLinks\tBHits\tBNoHits\tFracBHits\tBGeneHits\tBGeneLinks\tLog2(fracA/fracB)");
+			for (Pathway p: loadedPathways) out.println(p.toString(keggGeneNameID));
 			out.close();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		
 		
 	}
 
@@ -173,6 +176,8 @@ public class VariantPathwayComparator {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nFailed to parse the pathway file "+pathwayGenes);
 		}
+		
+		if (geneKeggIdName!=null) keggGeneNameID = IO.loadFileIntoHash(geneKeggIdName, 1, 0);
 	}
 	
 	private class Pathway implements Comparable<Pathway>{
@@ -197,32 +202,34 @@ public class VariantPathwayComparator {
 		
 		
 		
-		public String toString() {
-			//name adjPval AHits, ANoHits, fracAHits, AGeneHits, BHits, BNoHits, fracBHits, BGeneHits, log2(fracA/fracB)
+		public String toString(HashMap<String,String>keggGeneNameId) {
+			//name pval, adjPval, AHits, ANoHits, fracAHits, AGeneHits, (ALinks,) BHits, BNoHits, fracBHits, BGeneHits, (BLinks), log2(fracA/fracB)
 			StringBuilder sb = new StringBuilder();
 			//attempt to parse the hsa0000 pathway number
 			Matcher mat = hsaPath.matcher(name);
+			String partialHyperLink = null;
 			if (mat.matches()) {
 				sb.append("=HYPERLINK(\"https://www.kegg.jp/pathway/");
 				sb.append(mat.group(1));
+				partialHyperLink = sb.toString();
 				sb.append("\",\"");
 				sb.append(name);
 				sb.append("\")");
 			}
-			else sb.append(name); 
-			sb.append("\t");
+			else sb.append(name); sb.append("\t");
+			sb.append(Num.formatNumber(pval, 5)); sb.append("\t");
 			sb.append(Num.formatNumber(adjPval, 5)); sb.append("\t");
 			sb.append(groupAHits.size()); sb.append("\t");
 			sb.append(groupANoHits.size()); sb.append("\t");
 			double aFrac = (double)groupAHits.size()/ (double)(groupAHits.size()+groupANoHits.size());
 			sb.append(Num.formatNumber(aFrac, 5)); sb.append("\t");
-			sb.append(convertToSortedFrequencies(aGenes)); sb.append("\t");
+			sb.append(convertToSortedFrequencies(aGenes, partialHyperLink)); sb.append("\t");
 			
 			sb.append(groupBHits.size()); sb.append("\t");
 			sb.append(groupBNoHits.size()); sb.append("\t");
 			double bFrac = (double)groupBHits.size()/ (double)(groupBHits.size()+groupBNoHits.size());
 			sb.append(Num.formatNumber(bFrac, 5)); sb.append("\t");
-			sb.append(convertToSortedFrequencies(bGenes)); sb.append("\t");
+			sb.append(convertToSortedFrequencies(bGenes, partialHyperLink)); sb.append("\t");
 
 			double rto = aFrac/bFrac;
 			sb.append(Num.formatNumber(Num.log2(rto), 5));
@@ -237,7 +244,7 @@ public class VariantPathwayComparator {
 		
 	}
 	
-	public static String convertToSortedFrequencies(HashMap<String,Integer> keyCounts) {
+	public String convertToSortedFrequencies(HashMap<String,Integer> keyCounts, String pathwayName) {
 		double totalCounts = 0;
 		for (String key: keyCounts.keySet()) totalCounts+= keyCounts.get(key);
 		GeneCount[] gc = new GeneCount[keyCounts.size()];
@@ -249,17 +256,43 @@ public class VariantPathwayComparator {
 			gc[count++] = new GeneCount(key, geneCount);
 		}
 		Arrays.sort(gc);
-		StringBuilder sb = new StringBuilder(gc[0].name);
-		sb.append("=");
-		sb.append(Num.formatNumber(gc[0].fraction, 3));
-		for (int i=1; i<gc.length; i++) {
-			sb.append(",");
-			sb.append(gc[i].name);
-			sb.append("=");
-			sb.append(Num.formatNumber(gc[i].fraction, 3));
+		
+		StringBuilder namesToView = new StringBuilder();
+		ArrayList<String> namesToLink = new ArrayList<String>();
+		int last = gc.length-1;
+		for (int i=0; i<gc.length; i++) {
+			namesToView.append(gc[i].name);
+			namesToView.append("=");
+			namesToView.append(Num.formatNumber(gc[i].fraction, 3));
+			if (i!=last)namesToView.append(",");
+			//any for linking?
+			if (gc[i].fraction >= minKeggFreq) namesToLink.add(gc[i].name);
 		}
+		String geneNamesToView = namesToView.toString();
+		if (keggGeneNameID != null) return geneNamesToView+ "\t"+ createGeneHyperLink(pathwayName, namesToLink, geneNamesToView);
+		return geneNamesToView;
+	}
+	private String createGeneHyperLink(String pathwayLink, ArrayList<String> namesToLink, String geneNamesToView) {
+		//https://www.kegg.jp/pathway/hsa03440
+		//must watch size, max 250
+		StringBuilder sb = new StringBuilder(pathwayLink);
+		for (String geneName: namesToLink) {
+			String id = keggGeneNameID.get(geneName);
+			int size = sb.length() + id.length()+1;
+			if (size > 250) break;
+			if (id != null) {
+				sb.append("+");
+				sb.append(id);
+			
+			}
+		}
+		sb.append("\",\"");
+		if (geneNamesToView.length()> 250) sb.append(geneNamesToView.subSequence(0, 247)+"...");
+		else sb.append(geneNamesToView);
+		sb.append("\")");
 		return sb.toString();
 	}
+
 	public static class GeneCount implements Comparable<GeneCount>{
 		double fraction = 0;
 		String name = null;
@@ -301,6 +334,7 @@ public class VariantPathwayComparator {
 					case 'a': groupAGeneHits = new File(args[++i]); break;
 					case 'b': groupBGeneHits = new File(args[++i]); break;
 					case 'p': pathwayGenes = new File(args[++i]); break;
+					case 'k': geneKeggIdName = new File(args[++i]); break;
 					case 'r': resultsSpreadsheet = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
@@ -341,9 +375,11 @@ public class VariantPathwayComparator {
 				"     delimited, the first cell is the pathway ID and description (e.g.\n"+
 		        "     'hsa05210  Colorectal cancer'), subsequent cells, the associated genes.\n"+
 				"-r File to save results, should end with .xls\n"+
+		        "-k (Optional) Tab delimited file containing KEGG gene IDs and gene Names, one row\n"+
+				"      per gene, for highlighting impacted genes in each KEGG pathway hyperlink.\n"+
 				
 				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/VariantPathwayComparator -a earlyCRC.txt\n"+
-				"   -b lateCRC.txt -p keggHumanPathways.txt -r earlyVsLateVPC.xls \n"+
+				"   -b lateCRC.txt -p keggHumanPathways.txt -r earlyVsLateVPC.xls -k keggGeneIDName.txt\n"+
 
 		"\n**************************************************************************************\n");
 
