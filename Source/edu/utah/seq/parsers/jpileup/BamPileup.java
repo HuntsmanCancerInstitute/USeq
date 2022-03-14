@@ -222,7 +222,7 @@ public class BamPileup {
 		tot[0] = IO.extractFiles(forExtraction, ".bam");
 		tot[1] = IO.extractFiles(forExtraction,".cram");
 		bamFiles = IO.collapseFileArray(tot);
-		if (bamFiles == null || bamFiles.length ==0 || bamFiles[0].canRead() == false) Misc.printExit("\nError: cannot find your xxx.bam or xxx.cram files!\n");		
+		if (bamFiles == null || bamFiles.length ==0 || bamFiles[0].canRead() == false) Misc.printErrAndExit("\nError: cannot find your xxx.bam or xxx.cram files!\n");		
 		Arrays.sort(bamFiles);
 		if (bamFiles.length == 1) printAll = true;
 		
@@ -232,10 +232,10 @@ public class BamPileup {
 		if (results == null ) Misc.printErrAndExit("\nError: please provide a results file that ends with xxx.gz");
 		
 		//pull tabix and bgzip
-		if (tabixBinDirectory == null) Misc.printExit("\nError: please point to your HTSlib directory containing the tabix and bgzip executables (e.g. ~/BioApps/HTSlib/1.10.2/bin/ )\n");
+		if (tabixBinDirectory == null) Misc.printErrAndExit("\nError: please point to your HTSlib directory containing the tabix and bgzip executables (e.g. ~/BioApps/HTSlib/1.10.2/bin/ )\n");
 		bgzip = new File (tabixBinDirectory, "bgzip");
 		tabix = new File (tabixBinDirectory, "tabix");
-		if (bgzip.canExecute() == false || tabix.canExecute() == false) Misc.printExit("\nCannot find or execute bgzip or tabix executables from "+tabixBinDirectory);
+		if (bgzip.canExecute() == false || tabix.canExecute() == false) Misc.printErrAndExit("\nCannot find or execute bgzip or tabix executables from "+tabixBinDirectory);
 
 				
 		//number of workers
@@ -248,7 +248,7 @@ public class BamPileup {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Bam Pileup:  Sept 2021                            **\n" +
+				"**                                Bam Pileup:  March 2022                           **\n" +
 				"**************************************************************************************\n" +
 				"BP extracts pileup information for each bam file over a list of regions. This includes\n"+
 				"the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available\n"+
