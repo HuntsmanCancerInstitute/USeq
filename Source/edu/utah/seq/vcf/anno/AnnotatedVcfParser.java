@@ -1139,7 +1139,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            Annotated Vcf Parser  Jan 2022                        **\n" +
+				"**                           Annotated Vcf Parser  March 2022                       **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+
@@ -1182,7 +1182,7 @@ public class AnnotatedVcfParser {
                 "-o Only require, if set or present, SnpEff ANN or CLINSIG or Splice to be true to pass.\n"+
                 "       Defaults to require that all set pass.\n"+
                 "-T Txt file containing a list of transcripts to keep, one per line, to use in filtering\n"+
-                "       the summary spreadsheet output.\n "+
+                "       the summary spreadsheet output.\n"+
 				"-r Verbose per record output.\n"+ 
                 "-y Path to a config txt file for setting the above.\n"+
 

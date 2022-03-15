@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.3.3.beta
+			<html><head><title>USeq Command Line Menus 9.3.3
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -728,7 +728,7 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/AnnotatedBed2UCSCRefFlat -b anno.bed.
 </pre><br><p>
 				
 					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                            Annotated Vcf Parser  Jan 2022                        **
+**                           Annotated Vcf Parser  March 2022                       **
 **************************************************************************************
 Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
 VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
@@ -771,7 +771,7 @@ Options:
        Defaults to require that all set pass.
 -T Txt file containing a list of transcripts to keep, one per line, to use in filtering
        the summary spreadsheet output.
- -r Verbose per record output.
+-r Verbose per record output.
 -y Path to a config txt file for setting the above.
 
 Example: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/
@@ -1003,7 +1003,7 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/BamMixer -r ~/TumorSim/
 </pre><br><p>
 				
 					<a name="BamPileup"><pre>**************************************************************************************
-**                                Bam Pileup:  Sept 2021                            **
+**                                Bam Pileup:  March 2022                           **
 **************************************************************************************
 BP extracts pileup information for each bam file over a list of regions. This includes
 the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available

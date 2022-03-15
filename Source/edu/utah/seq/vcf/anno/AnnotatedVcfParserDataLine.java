@@ -175,6 +175,17 @@ public class AnnotatedVcfParserDataLine {
 			String realName = spliceGeneName.substring(0,spliceGeneName.indexOf(":"));
 			passNames.add(realName);
 		}
+		//still nothing? then this passed clinvar but not Anno thus pull first high, then if nothing, then moderate
+		if (passNames.size() == 0) {
+			HashSet<String> high = new HashSet<String>();
+			HashSet<String> moderate = new HashSet<String>();
+			for (AnnotatedGene ag: annoGenes) {
+				if (ag.impact.equals("HIGH")) high.add(ag.geneName);
+				else if (ag.impact.equals("MODERATE")) moderate.add(ag.geneName);
+			}
+			if (high.size()!=0) passNames.addAll(high);
+			else if (moderate.size()!=0) passNames.addAll(moderate);
+		}
 		return passNames;
 	}
 	

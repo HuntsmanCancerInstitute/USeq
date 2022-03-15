@@ -237,8 +237,8 @@ public class VariantPathwayComparator {
 		}
 
 		public int compareTo(Pathway o) {
-			if (this.adjPval< o.adjPval) return -1;
-			if (this.adjPval> o.adjPval) return 1;
+			if (this.pval< o.pval) return -1;
+			if (this.pval> o.pval) return 1;
 			return 0;
 		}
 		
