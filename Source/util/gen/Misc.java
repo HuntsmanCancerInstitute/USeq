@@ -175,7 +175,7 @@ public class Misc {
 		return trueCount;
 	}
 	
-	/**Fetch random string constisting of ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890*/
+	/**Fetch random string consisting of ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890*/
 	private static String SALTCHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890";
 	public static String getRandomString(int length) {
         StringBuilder salt = new StringBuilder();

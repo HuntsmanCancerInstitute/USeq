@@ -185,7 +185,9 @@ public class TempusVariant{
 		sb.append("EG="); sb.append(gene5); sb.append(","); sb.append(gene3);
 		sb.append(";CL="); sb.append(variantSource);
 		sb.append(";FE="); sb.append(variantDescription.replaceAll(" ", "_"));
-		sb.append(";DESC="); sb.append(geneDescription.replaceAll(" ", "_"));
+		if (geneDescription != null) {
+			sb.append(";DESC="); sb.append(geneDescription.replaceAll(" ", "_"));
+		}
 		sb.append(";IMPRECISE;SVTYPE=BND");
 		String commonInfo = sb.toString();
 		
@@ -257,7 +259,12 @@ public class TempusVariant{
 
 	public void addCnvInfo(HashMap<String, Bed> cnvGeneNameBed, IndexedFastaSequenceFile fasta) throws IOException {
 		Bed b = cnvGeneNameBed.get(gene);
-		if (b == null) throw new IOException("Failed to find gene info in CNV lookup hash for "+ toString());
+		if (b == null) {
+			//ugg Tempus!
+			if (gene.equals("PD-L1")) b = cnvGeneNameBed.get("CD274");
+			else if (gene.equals("PD-L2")) b = cnvGeneNameBed.get("PDCD1LG2");
+			if (b == null) throw new IOException("Failed to find gene info in CNV lookup hash for "+ toString());
+		}
 		chromosome = b.getChromosome();
 		start = b.getStart();
 		pos = new Integer(start).toString();

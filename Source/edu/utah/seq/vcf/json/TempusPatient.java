@@ -50,7 +50,7 @@ public class TempusPatient {
 		diagnosisDate = Json.getStringAttribute(patient, "diagnosisDate");
 
 		//compute ageAtDiagnosis?
-		if (dateOfBirth != null && diagnosisDate != null) {
+		if (dateOfBirth != null && diagnosisDate != null && dateOfBirth.equals("xxx")==false && diagnosisDate.equals("xxx")==false) {
 			String[] dobSplit = Misc.DASH.split(dateOfBirth);
 			if (dobSplit.length != 3) throw new JSONException("\nFailed to parse three fields from DoB "+dateOfBirth);
 			LocalDate ldob = new LocalDate(Integer.parseInt(dobSplit[0]), Integer.parseInt(dobSplit[1]), Integer.parseInt(dobSplit[2]));

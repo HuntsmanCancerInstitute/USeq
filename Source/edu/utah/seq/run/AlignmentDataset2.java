@@ -41,14 +41,18 @@ public class AlignmentDataset2{
 
 		//COMPLETE
 		else if (nameFile.containsKey("COMPLETE")){
-			File[] cram = IO.extractFiles(new File(alignDir, "Alignment"), ".cram");
-			File[] cramIndex = IO.extractFiles(new File(alignDir, "Alignment"), ".crai");
-			File[] bam = IO.extractFiles(new File(alignDir, "Alignment"), ".bam");
-			File[] bamIndex = IO.extractFiles(new File(alignDir, "Alignment"), ".bai");
+			String dirName = "Bam";
+			if (new File(alignDir, dirName).exists()== false) dirName = "Alignment";
+			File[] cram = IO.extractFiles(new File(alignDir, dirName), ".cram");
+			File[] cramIndex = IO.extractFiles(new File(alignDir, dirName), ".crai");
+			File[] bam = IO.extractFiles(new File(alignDir, dirName), ".bam");
+			File[] bamIndex = IO.extractFiles(new File(alignDir, dirName), ".bai");
+			File[] bp = IO.extractFiles(new File(alignDir, dirName), "bp.txt.gz");
+			File[] bpIndex = IO.extractFiles(new File(alignDir, dirName), "bp.txt.gz.tbi");
+			
 			File[] passingBed = IO.extractFiles(new File(alignDir, "QC"), "PassRC.bed.gz");
 			if (passingBed == null || passingBed.length !=1) passingBed = IO.extractFiles(new File(alignDir, "QC"), "Pass.bed.gz");
-			File[] bp = IO.extractFiles(new File(alignDir, "Alignment"), "bp.txt.gz");
-			File[] bpIndex = IO.extractFiles(new File(alignDir, "Alignment"), "bp.txt.gz.tbi");
+
 
 			String problem = null;
 			

@@ -124,8 +124,8 @@ public class AnnotatedVcfParser {
 		impactedGenes.close();
 		
 		//finish and calc run time
-		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
-		System.out.println("\nDone! "+Math.round(diffTime)+" sec\n");
+		double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
+		System.out.println("\nDone! "+Math.round(diffTime)+" min\n");
 		
 		} catch (Exception e) {
 			System.err.println("\nERROR: parsing vcf file: "+workingVcf.getName()+"\nLine: "+vcfLine+"\n");

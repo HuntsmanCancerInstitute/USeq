@@ -89,11 +89,11 @@ public class AggregateQCStats2 {
 	}
 
 	private void printReadCoverageTxtSheet(boolean tumor) {
-		//fetch samples with given type
+		//fetch samples with given type, must watch out for old samples with diff jsons
 		ArrayList<SampleQC2> samplesAl = new ArrayList<SampleQC2>();
 		for (SampleQC2 s: samples){
-			if (tumor && s.getTumorDnaSample() != null) samplesAl.add(s);
-			else if (tumor == false && s.getNormalDnaSample() != null) samplesAl.add(s);
+			if (tumor && s.getTumorDnaSample()!= null && s.getTumorDnaSample().getFractionTargetBpsWithIndexedCoverage()!= null) samplesAl.add(s);
+			else if (tumor == false && s.getNormalDnaSample()!= null && s.getNormalDnaSample().getFractionTargetBpsWithIndexedCoverage() != null) samplesAl.add(s);
 		}
 		
 		//build header
@@ -110,6 +110,7 @@ public class AggregateQCStats2 {
 		//for each sample
 		for (SampleQC2 s: samplesAl){
 			int hit25 = 0;
+
 			if (tumor) hit25 = s.getTumorDnaSample().whenHit25ReadCoverage();
 			else hit25 = s.getNormalDnaSample().whenHit25ReadCoverage();			
 			if (hit25> max25) max25= hit25;
@@ -274,7 +275,7 @@ public class AggregateQCStats2 {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Aggregate QC Stats2: Feb 2022                         **\n" +
+				"**                           Aggregate QC Stats2: March 2022                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from log and json files produced by\n"+
 				"the TNRunner2 DnaAlignQC and SampleConcordance workflows.\n"+

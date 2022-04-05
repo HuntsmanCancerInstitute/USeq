@@ -23,7 +23,7 @@ public class TempusJson2Vcf {
 	private LinkedHashSet<String> keysToExport = null;
 	
 	//internal fields
-	private String[] acceptedSchema = {"1.3", "1.3.1", "1.3.2", "1.4"};
+	private String[] acceptedSchema = {"1.3", "1.3.1", "1.3.2", "1.4", "1.4.2"};
 	private IndexedFastaSequenceFile fasta = null;
 	private String source = null;
 	private HashMap<String, Bed> cnvGeneNameBed = null;

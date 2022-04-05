@@ -132,7 +132,7 @@ public class GatkJointGenotyper {
 		if (gvcfFiles == null || gvcfFiles.length == 0) throw new IOException("\nERROR: failed to find one or more xxx.vcf.gz files in "+gvcfDirectory);
 		String[] trimmedNames = new String[gvcfFiles.length];
 		for (int x=0; x<gvcfFiles.length; x++) trimmedNames[x] = gvcfFiles[x].getName();
-		trimmedNames = Misc.trimCommon(trimmedNames);
+		trimmedNames = Misc.trimCommonEnd(trimmedNames);
 		sampleMap = new File (tmpDirectory, "sampleMap.txt");
 		PrintWriter out = new PrintWriter (new FileWriter(sampleMap));
 		int num = 0;
@@ -310,7 +310,7 @@ public class GatkJointGenotyper {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Gatk Joint Genotyper: Jan 2022                       **\n" +
+				"**                           Gatk Joint Genotyper: March 2022                       **\n" +
 				"**************************************************************************************\n" +
 				"The GJG takes a bed file of target regions, splits it into 250 jobs, executes the GATK\n"+
 				"GenomicsDBImporter and GenotypeGVCFs on each, and merges the results. Set the -Xmx for\n"+

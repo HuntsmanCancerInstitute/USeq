@@ -92,7 +92,6 @@ public class DnaSample {
 	
 	/**At what index does the fraction hit or fall below 0.25?*/
 	public int whenHit25ReadCoverage() {
-
 		for (int i=0; i< fractionTargetBpsWithIndexedCoverage.length; i++){
 			if (fractionTargetBpsWithIndexedCoverage[i] <= 0.25) return i;
 		}

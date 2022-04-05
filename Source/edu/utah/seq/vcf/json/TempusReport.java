@@ -41,12 +41,14 @@ public class TempusReport {
 		if (notes != null) notes = Misc.WHITESPACE.matcher(notes).replaceAll(" ");
 		TempusJson2Vcf.add(bioInfPipeline, tempusJson2Vcf.bioInfPipelines);
 		
-		JSONObject workflow = report.getJSONObject("workflow");
+		if (report.has("workflow")) {
+			JSONObject workflow = report.getJSONObject("workflow");
+			//report status, watch this one, if qns then expect junk results
+			reportStatus = Json.getStringAttribute(workflow, "reportStatus");
+			if (reportStatus.contains("qns")) warningMessages.add("Report Status indicates quality control problem. View results with caution.");
+			TempusJson2Vcf.add(reportStatus, tempusJson2Vcf.reportStatus);
+		}
 		
-		//report status, watch this one, if qns then expect junk results
-		reportStatus = Json.getStringAttribute(workflow, "reportStatus");
-		if (reportStatus.contains("qns")) warningMessages.add("Report Status indicates quality control problem. View results with caution.");
-		TempusJson2Vcf.add(reportStatus, tempusJson2Vcf.reportStatus);
 	}
 
 	public String getReportId() {
