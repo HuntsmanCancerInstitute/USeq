@@ -91,8 +91,8 @@ public class TNRunner2 {
 
 
 			//finish and calc run time
-			double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
-			IO.pl("\nDone! "+Math.round(diffTime)+" Sec\n");
+			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
+			IO.pl("\nDone! "+Math.round(diffTime)+" Min\n");
 		} catch (IOException e) {
 			IO.el("\nERROR running TNRunner, aborting");
 			e.printStackTrace();
@@ -703,10 +703,12 @@ public class TNRunner2 {
 				}
 			}
 
-			//root patient dirs?
-			if (sampleDir == null || sampleDir.exists() == false) Misc.printErrAndExit("Error: failed to find your data directory? "+sampleDir);
-			rootDirs = IO.extractOnlyDirectories(sampleDir);
-			if (rootDirs == null || rootDirs.length == 0) Misc.printErrAndExit("Error: failed to find root directories to process? "+rootDirs);
+			//root patient dirs? Looks for Fastq dirs then pulls their parent folder.
+			if (sampleDir == null || sampleDir.exists() == false) Misc.printErrAndExit("Error: failed to find your starting data directory? "+sampleDir);
+			ArrayList<File> fastqDirs = IO.fetchDirectoriesRecursively(sampleDir, "Fastq");
+			rootDirs = IO.fetchParentDirectories(fastqDirs);
+			rootDirs = removeThoseWithComplete(rootDirs);
+			if (rootDirs == null || rootDirs.length == 0) Misc.printExit("WARNING: failed to find any job directories (those containing a 'Fastq' dir or those without a COMPLETE) to process? "+rootDirs);
 
 			//remove JointGenotyping if present
 			ArrayList<File> toKeep = new ArrayList<File>();
@@ -861,15 +863,27 @@ public class TNRunner2 {
 	}
 
 
+	private File[] removeThoseWithComplete(File[] dirs) {
+		IO.pl("\nChecking for job dirs for those marked COMPLETE...");
+		ArrayList<File> toReturn = new ArrayList<File>();
+		for (File d: dirs) {
+			if (new File(d,"COMPLETE").exists()== false) toReturn.add(d);
+			else IO.pl("\tSkipping "+d.getName());
+		}
+		File[] f = new File[toReturn.size()];
+		toReturn.toArray(f);
+		return f;
+	}
+
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                TNRunner2 : March 2022                            **\n" +
+				"**                                  TNRunner2 : May 2022                            **\n" +
 				"**************************************************************************************\n" +
-				"TNRunner is designed to execute several containerized snakmake workflows on tumor\n"+
-				"normal datasets via a slurm cluster.  Based on the availability of fastq, \n"+
+				"TNRunner is designed to execute several containerized workflows on tumor normal\n"+
+				"datasets via a slurm cluster.  Based on the availability of paired fastq datasets, \n"+
 				"alignments are run, somatic and germline variants are called, and concordance measured\n"+
-				"between sample bams. To execute TNRunner, create the following directory structure and\n"+
+				"between sample crams. To execute TNRunner, create the following directory structure,\n"+
 				"link or copy in the corresponding paired end Illumina gzipped fastq files. To run \n"+
 				"GATK Joint Genotyping on sample sets where this has been run before, delete the\n "+
 				"GermlineVariantCalling/GATK* and GATKJointGenotyping folders.\n"+
@@ -890,15 +904,17 @@ public class TNRunner2 {
 				"for which you have fastq.  Change the MyXXX to something relevant. TNRunner is\n"+
 				"stateless so as more Fastq becomes available or issues are addressed, relaunch the\n"+
 				"app. This won't effect running or queued slurm jobs. Relaunch periodically to assess\n"+
-				"the current processing status and queue additional tasks or set option -l. Download the\n"+
-				"latest workflows from \n"+
+				"the current processing status and queue additional tasks or set option -l. Download \n"+
+				"the latest workflows from \n"+
 				"https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38RunnerWorkflows \n"+
 				"and the matching resource bundle from\n"+
 				"https://hci-bio-app.hci.utah.edu/gnomex/gnomexFlex.jsp?analysisNumber=A5578 .\n"+
 				"All workflow docs are optional although some require output from prior Analysis.\n"+
 
 				"\nSetup Options:\n"+
-				"-p Directory containing one or more patient data directories to process.\n" +
+				"-p Directory containing one or more patient data directories with a 'Fastq' folder.\n" +
+				"      TNRunner looks for these recursively. Those patient dirs with a file named \n"+
+				"      COMPLETE will be skipped.\n"+
 				"-e Workflow docs for launching DNA alignments.\n"+
 				"-t Workflow docs for launching RNA alignments.\n"+
 				"-f Workflow docs for launching RNA fusion detection.\n"+
@@ -910,8 +926,8 @@ public class TNRunner2 {
 				"-q Workflow docs for launching Illumina germline joint genotyping.\n"+
 				"-h Workflow docs for launching GATK haplotype calling.\n"+
 				"-j Workflow docs for launching GATK germline joint genotyping.\n"+
-				"-v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder to\n"+
-				"      each patient dir containing the json formatted clinical information.\n"+
+				"-v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder \n"+
+				"      to each patient dir containing the json formatted clinical information.\n"+
 				"-k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio\n"+
 				"      background files.\n"+
 				"-g Germline AnnotatedVcfParser options, defaults to '-d 12 -m 0.075 -q 0.1 -p 0.01 -g\n"+
@@ -919,13 +935,15 @@ public class TNRunner2 {
 				"      interpretations_of_pathogenicity,Drug_response -t 0.51 -e Benign,Likely_benign\n"+
 				"      -o -b 0.1 -z 3 -u RYR1'\n"+
 				"-s Somatic AnnotatedVcfParser options, defaults to '-f -d 12 -m 0.025 -j'\n"+
-				"-G Germline VCFCallFrequency options, defaults to '-b Hg38/Germline/Avatar/Bed -v Hg38/Germline/Avatar/Vcf'\n"+
-				"-S Somatic VCFCallFrequency options, defaults to '-b Hg38/Somatic/Avatar/Bed -v Hg38/Somatic/Avatar/Vcf'\n"+
+				"-G Germline VCFCallFrequency options, defaults to '-b Hg38/Germline/Avatar/Bed -v \n"+
+				"      Hg38/Germline/Avatar/Vcf'\n"+
+				"-S Somatic VCFCallFrequency options, defaults to '-b Hg38/Somatic/Avatar/Bed -v \n"+
+				"      Hg38/Somatic/Avatar/Vcf'\n"+
 				"-u Minimum read coverage for tumor sample vcf records, defaults to 12\n"+
 				"-i Minimum read coverage for normal sample vcf records, defaults to 12\n"+
 				"-w Non matched normal alignment directory (e.g. from NA12878) to use when no matched\n"+
-				"      normal is available for somatic variant calling. Needs to contain Bam/xxx_final.bam\n"+
-				"      and QC/xxx_Pass.bed.gz dirs and files with indexes.\n"+
+				"      normal is available for somatic variant calling. Needs to contain \n"+
+				"      Bam/xxx_final.bam and QC/xxx_Pass.bed.gz dirs and files with indexes.\n"+
 
 				"\nJob Execution Options:\n"+
 				"-d Delete and restart FAILED jobs.\n"+

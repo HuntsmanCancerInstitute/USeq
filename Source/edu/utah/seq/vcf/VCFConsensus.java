@@ -35,6 +35,7 @@ public class VCFConsensus {
 	private boolean verbose = true;
 	private boolean tossSampleInfo = false;
 	private boolean useFirstChrom = false;
+	private boolean outputJustCoCalled = false;
 
 	public VCFConsensus(String[] args){
 		try {	
@@ -76,6 +77,7 @@ public class VCFConsensus {
 		for (VCFRecord r : primaryVcfParser.getVcfRecords()){
 			if (primaryName!= null) r.setRsNumber(primaryName+ "_"+ (primaryNameIndex++));
 			String prim = r.getChrPosRefAlt(false);
+			boolean inCommon = false;
 			if (secondaryRecords.containsKey(prim)){
 				String sec = secondaryRecords.get(prim).getRsNumber();
 				if (sec == null || sec.length()==0){
@@ -88,12 +90,17 @@ public class VCFConsensus {
 				r.appendFilter(secondaryRecords.get(prim).getFilter());
 				secondaryRecords.remove(prim);
 				numInCommon++;
+				inCommon = true;
 			}
-			toPrint.add(r);
+			//save it?
+			if (outputJustCoCalled) {
+				if (inCommon) toPrint.add(r);
+			}
+			else toPrint.add(r);
 		}
 		
 		//add on remaining secondaries
-		toPrint.addAll(secondaryRecords.values());
+		if (outputJustCoCalled==false) toPrint.addAll(secondaryRecords.values());
 		
 		if (verbose) System.out.println("Sorting and saving vcf records...");
 		VCFRecord[] mergedRecords = new VCFRecord[toPrint.size()];
@@ -154,6 +161,7 @@ public class VCFConsensus {
 					case 'q': primaryName = args[++i]; break;
 					case 't': secondaryName = args[++i]; break;
 					case 'u': useFirstChrom = true; break;
+					case 'c': outputJustCoCalled = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -175,7 +183,7 @@ public class VCFConsensus {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Consensus : Dec 2021                            **\n" +
+				"**                              VCF Consensus : May 2022                            **\n" +
 				"**************************************************************************************\n" +
 				"Merges VCF files with the approx same #CHROM line. Primary records with the same \n"+
 				"chrPosRefAlt as a secondary are saved after appending the ID and FILTER, the secondary\n"+
@@ -193,6 +201,7 @@ public class VCFConsensus {
 				"-q Primary name to replace the ID column.\n" +
 				"-t Secondary name to replace the ID column.\n" +
 				"-u Use the primary #CHROM line and skip this header check. Not recommended!\n"+
+				"-c Output just shared records, defaults to saving all.\n"+
 
 				"\n"+
 

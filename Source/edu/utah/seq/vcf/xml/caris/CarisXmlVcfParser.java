@@ -22,6 +22,7 @@ public class CarisXmlVcfParser {
 	private File saveDirectory;
 	private boolean includePHI = false;
 	private boolean saveAllVcfRecords = false;
+	private boolean skipUnPaired = false;
 
 	//internal fields
 	private String source;
@@ -50,6 +51,7 @@ public class CarisXmlVcfParser {
 	private ArrayList<Translocation> workingTranslocations = new ArrayList<Translocation>();
 	private ArrayList<ExpressionAlteration> workingExpressionAlterations = new ArrayList<ExpressionAlteration>();
 	private ArrayList<MethylationAlteration> workingMethylationAlterations = new ArrayList<MethylationAlteration>();
+
 
 
 	//constructors
@@ -136,6 +138,9 @@ public class CarisXmlVcfParser {
 			workingExpressionAlterations.clear();
 			workingMethylationAlterations.clear();
 			workingNumberFailedGenomicMatches = 0;
+			
+			//add xml name, often contains the patient id
+			workingReportAttributes.put("XmlFileName", Misc.removeExtension(workingXmlFile.getName()));
 
 			loadVcf();
 
@@ -157,15 +162,20 @@ public class CarisXmlVcfParser {
 	private void matchVcfWithGenomicAlts() {
 		//for each GermlineAlteration find the corresponding vcf record
 		for (GenomicAlteration ga: workingGenomicAlterations) {
+			
+			//check if present, HLA- tests don't have this nor any vcf like record so just skip
+			String patho = ga.getPathogenicity();
+			if (patho == null) continue;
+			
+			patho = patho.toLowerCase();
 			//skip wt
-			String patho = ga.getPathogenicity().toLowerCase();
 			if (patho.contains("wild") || patho.contains("indeterminate")) continue;
 			String gaKey = ga.fetchKey();
 			SimpleVcf vcf = workingVcfs.get(gaKey);
 			if (vcf == null) {
-				IO.el(ga.toString());
+				//IO.el(ga.toString());
 				IO.el("Failed to find the vcf for the xml variant "+gaKey+" in the vcf file "+ workingVcfFile+ 
-						"\n"+workingVcfs.keySet()+"\nConsider manually matching by editing the xml file. Skipping xml variant.");
+						"\nConsider manually matching by editing the xml file. Skipping xml variant.");
 				workingNumberFailedGenomicMatches++;
 			}
 			else {
@@ -195,9 +205,9 @@ public class CarisXmlVcfParser {
 	}
 
 	private void buildIHCHash() {
-		String[] ihcNames = {"PD-L1 (22c3)", "PD-L1 (SP142)", "PD-L1 FDA(SP142)", "PD-L1 FDA (28-8)", 
+		String[] ihcNames = {"p16","PD-L1 (SP263)", "PD-L1 (22c3)", "PD-L1 (SP142)", "PD-L1 FDA(SP142)", "PD-L1 FDA (28-8)", 
 				"MLH1", "PMS2", "MSH2", "MSH6", "ALK", "PTEN", "Mismatch Repair Status", "Her2/Neu", 
-				"TrkA/B/C", "Androgen Receptor", "Folfox Responder Similarity Score", "ROS1" };
+				"TrkA/B/C", "Androgen Receptor", "Folfox Responder Similarity Score", "ROS1", "ER" };
 		ihcTestNames = new HashSet<String>();
 		for (String n: ihcNames) ihcTestNames.add(n);
 
@@ -411,6 +421,12 @@ public class CarisXmlVcfParser {
 					}
 					else if (testName.equals("ROS1 FISH")){
 						IO.el("\nSkipping the parsing of 'ROS1 FISH' test for ROS1 cytogenic alteration.");
+					}
+					else if (testName.equals("RNA Expression")){
+						IO.el("\nSkipping the parsing of 'RNA Expression' test for a small set of genes.");
+					}
+					else if (testName.equals("eKarotypeGraph")){
+						//silently skip, this is a binary result
 					}
 					else throw new IOException("Found an unknown test! "+testName);
 				}
@@ -726,8 +742,6 @@ public class CarisXmlVcfParser {
 		System.out.println("\n"+ source +"\n");
 		File ucscFile = null;
 		File vcfXmlDir = null;
-		File singleCarisVcf = null;
-		File singleCarisXml = null;
 		
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
@@ -740,6 +754,7 @@ public class CarisXmlVcfParser {
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'u': ucscFile = new File(args[++i]); break;
 					case 'i': includePHI = true; break;
+					case 'k': skipUnPaired = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -786,13 +801,17 @@ public class CarisXmlVcfParser {
 			if (fullName.endsWith(".xml")) xmls.put(nameParts[0], files[i]);
 		}
 		//same number?
-		if (vcfs.size()==0 || (vcfs.size()!=xmls.size())) Misc.printErrAndExit("\nERROR: the # vcf and xml files differ in "+vcfXmlDir);
+		if (vcfs.size()==0 || (vcfs.size()!=xmls.size())) {
+			if (skipUnPaired == false) Misc.printErrAndExit("\nERROR: the # vcf and xml files differ in "+vcfXmlDir);
+		}
 		xmlVcfFiles = new HashMap<String, File[]>();
 		for (String name: xmls.keySet()) {
 			File xml = xmls.get(name);
 			File vcf = vcfs.get(name);
-			if (vcf == null) Misc.printErrAndExit("\nERROR: failed to find a matching vcf file for "+xml);
-			xmlVcfFiles.put(name, new File[] {xml,vcf});
+			if (vcf == null) {
+				if (skipUnPaired == false) Misc.printErrAndExit("\nERROR: failed to find a matching vcf file for "+xml);
+			}
+			else xmlVcfFiles.put(name, new File[] {xml,vcf});
 		}
 	}
 
@@ -821,7 +840,7 @@ public class CarisXmlVcfParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Caris Xml Vcf Parser: March 2022                       **\n" +
+				"**                           Caris Xml Vcf Parser: May 2022                         **\n" +
 				"**************************************************************************************\n" +
 				"This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml\n"+
 				"reported genomic alternations are annotated, bed files of copy number changes and gene\n"+
@@ -839,9 +858,10 @@ public class CarisXmlVcfParser {
 				"   app and remove non standard chromosomes.\n"+
 				"-i Include PHI in spreadsheet output, defaults to excluding.\n"+
 				"-a Include all vcf records in output, defaults to just those with an xml match.\n"+
+				"-k Skip datasets that are missing either an xml or vcf report.\n"+
 
 				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/\n" +
-				"     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq9Dec2020_MergedStdChr.ucsc.gz \n\n" +
+				"     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq13Dec2020_MergedStdChr.ucsc.gz \n\n" +
 
 				"**************************************************************************************\n");
 	}

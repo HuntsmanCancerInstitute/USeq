@@ -24,6 +24,7 @@ public class Misc {
 	public static final Pattern DASH = Pattern.compile("-");
 	public static final Pattern COLON = Pattern.compile(":");
 	public static final Pattern COMMA = Pattern.compile(",");
+	public static final Pattern SINGLE_QUOTE = Pattern.compile("'");
 	public static final Pattern SEMI_COLON = Pattern.compile(";");
 	public static final Pattern PIPE = Pattern.compile("\\|");
 	public static final Pattern FORWARD_PARENTHESIS = Pattern.compile("\\(");

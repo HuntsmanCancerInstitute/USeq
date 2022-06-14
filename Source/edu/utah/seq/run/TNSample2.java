@@ -115,6 +115,7 @@ public class TNSample2 {
 				//look for caris xml and vcf.gz
 				xmls = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".xml");
 				vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf.gz");
+				if (vcfs == null || vcfs.length == 0) vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf");
 				if (xmls.length != 1 || vcfs.length != 1) {
 					info.add("\tJson/Xml/VcfReport\tFAILED to find one xxx.json or one xxx.vcf.gz and xxx.xml clinical test report file(s)");
 					failed = true;
@@ -928,7 +929,7 @@ public class TNSample2 {
 		new File(f, "normal.bai").delete();
 	}
 
-	public static boolean checkQueue(HashMap<String, File> nameFile, File jobDir, ArrayList<String> info) throws IOException{
+	public static boolean checkQueue(HashMap<String, File> nameFile, File jobDir, ArrayList<String> info, boolean ignoreLackOfSlurmScript) throws IOException{
 		//find slurm script(s), pull the ID, and check it is still in the queue
 		ArrayList<File> jobs = new ArrayList<File>();
 		for (String s: nameFile.keySet()) {
@@ -937,8 +938,14 @@ public class TNSample2 {
 			}
 		}
 		if (jobs.size() == 0) {
-			info.add("\tThe job was marked as STARTED but couldn't find the slurm-xxx.out file in "+jobDir);
-			return false;
+			if (ignoreLackOfSlurmScript) {
+				info.add("\tQUEUED "+jobDir);
+				return true;
+			}
+			else {
+				info.add("\tThe job was marked as STARTED but couldn't find the slurm-xxx.out file in "+jobDir);
+				return false;
+			}
 		}
 		String slurm = null;
 		if (jobs.size() == 1) slurm = jobs.get(0).getName();
@@ -957,11 +964,12 @@ public class TNSample2 {
 		String[] res = IO.executeViaProcessBuilder(new String[]{"squeue", "-j", jobId}, false);
 		if (res.length < 2) {
 			new File(jobDir,"STARTED").delete();
+			new File(jobDir,"QUEUED").delete();
 			new File(jobDir,"FAILED").createNewFile();
-			info.add("The job was marked as STARTED but failed to find the "+slurm+" job in the queue for "+jobDir+", marking FAILED.");
+			info.add("The job was marked as STARTED or QUEUED but failed to find the "+slurm+" job in the queue for "+jobDir+", marking FAILED.");
 			return false;
 		}
-		info.add("\tSTARTED and in queue, "+jobDir+"\t"+res[1]);
+		info.add("\tSTARTED or QUEUED and in queue, "+jobDir+"\t"+res[1]);
 		return true;
 	}
 
@@ -1058,8 +1066,8 @@ public class TNSample2 {
 		}
 		//QUEUED
 		else if (nameFile.containsKey("QUEUED")){
-			info.add("\tQUEUED "+jobDir);
-			running = true;
+			if (TNSample2.checkQueue(nameFile, jobDir, info, true) == false) failed = true;
+			else running = true;
 		}
 		//RUNME
 		else if (nameFile.containsKey("RUNME")){
@@ -1068,7 +1076,7 @@ public class TNSample2 {
 		}
 		//STARTED
 		else if (nameFile.containsKey("STARTED")) {
-			if (TNSample2.checkQueue(nameFile, jobDir, info) == false) failed = true;
+			if (TNSample2.checkQueue(nameFile, jobDir, info, false) == false) failed = true;
 			else running = true;
 		}
 		//hmm no status files, probably something went wrong on the cluster? mark it as FAILED

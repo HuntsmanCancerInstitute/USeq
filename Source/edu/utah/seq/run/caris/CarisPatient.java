@@ -7,13 +7,6 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -21,8 +14,8 @@ public class CarisPatient {
 	
 	//fields
 	private String testID = null;
-	private String hciID = null;
 	private CarisDataWrangler cdw = null;
+	private boolean tooYoung = false;
 	private ArrayList<String[]> objectInfo = new ArrayList<String[]>();
 	private ArrayList<String> vcfNames = new ArrayList<String>();
 	private ArrayList<String> xmlNames = new ArrayList<String>();
@@ -30,12 +23,7 @@ public class CarisPatient {
 	private ArrayList<String> dnaNames = new ArrayList<String>();
 	private ArrayList<String> rnaNames = new ArrayList<String>();
 	
-	//for retrieving the hci patient id
-	private String firstName = null;
-	private String lastName = null;
-	private String dob = null;
-	private String gender = null;
-	private String mrn = null;
+	private CarisXmlParser carisXml = null;
 	
 	private File testDir = null;
 	private File clinReportDir = null;
@@ -58,13 +46,17 @@ public class CarisPatient {
 		checkDatasets();
 	}
 	
-	private void checkDatasets() {
+	private void checkDatasets() throws IOException {
 		boolean oneVcf = vcfNames.size() == 1;
 		boolean oneXml = xmlNames.size() == 1;
 		boolean twoDna = dnaNames.size() == 2;
 		boolean oneRna = rnaNames.size() == 1;
 		//must have a vcf, xml, and two dna fastq files; if rna present, must have two files
 		if (oneVcf == false || oneXml == false || twoDna == false || oneRna == true) ready = false;
+		//if false see if it's just an RNA submission
+		if (ready == false) {
+			if (oneXml && rnaNames.size()==2 && oneVcf==false && twoDna==false) ready = true;
+		}
 		IO.pl("\tXml\t"+oneXml+"\t"+ xmlNames);
 		IO.pl("\tVcf\t"+oneVcf+"\t"+ vcfNames);
 		IO.pl("\tDNA\t"+twoDna+"\t"+ dnaNames);
@@ -89,8 +81,10 @@ public class CarisPatient {
 			else if (fileName.endsWith(".xml")) xmlNames.add(fileName);
 			else if (fileName.endsWith(".vcf")) vcfNames.add(fileName);
 			else if (fileName.endsWith(".pdf")) pdfNames.add(fileName);
+			//stuff to ignore
+			else if (fileName.endsWith(".log")) {}
 			else {
-				cdw.getErrorMessages().add("Unknown type type "+tokens[3]);
+				cdw.getErrorMessages().add("Unknown file type type "+tokens[3]);
 				ready = false;
 				return false;
 			}
@@ -109,6 +103,7 @@ public class CarisPatient {
 			if (diffHours< minHours) {
 				IO.pl("\tTooYoung\t"+tokens[3]);
 				ready = false;
+				tooYoung = true;
 				return false;
 			}
 		}
@@ -122,15 +117,15 @@ public class CarisPatient {
 	public void downloadDatasets() throws Exception {
 		File fastqDir = new File (testDir, "Fastq");
 		fastqDir.mkdir();
-
 		//cp in vcf
-		cdw.cp(vcfNames.get(0), new File (clinReportDir, vcfNames.get(0)));
+		if (vcfNames.size()==1) cdw.cp(vcfNames.get(0), new File (clinReportDir, vcfNames.get(0)));
 		//cp in xml, already done so skip
 		//cdw.cp(xmlNames.get(0), new File (clinDir, xmlNames.get(0)));
-		//cp in DNA0
-		cdw.cp(dnaNames.get(0), new File (fastqDir, "/TumorDNA/"+dnaNames.get(0)));
-		//cp in DNA1
-		cdw.cp(dnaNames.get(1), new File (fastqDir, "/TumorDNA/"+dnaNames.get(1)));
+		//cp in DNA
+		if (dnaNames.size()==2) {
+			cdw.cp(dnaNames.get(0), new File (fastqDir, "/TumorDNA/"+dnaNames.get(0)));
+			cdw.cp(dnaNames.get(1), new File (fastqDir, "/TumorDNA/"+dnaNames.get(1)));
+		}
 		//any RNA?
 		if (rnaNames.size() == 2) {
 			//cp in RNA0
@@ -138,81 +133,42 @@ public class CarisPatient {
 			//cp in RNA1
 			cdw.cp(rnaNames.get(1), new File (fastqDir, "/TumorRNA/"+rnaNames.get(1)));
 		}
-
-		
-		
 	}
-
-	public void fetchHCIId() throws Exception {
-
-		//cp in xml
-		File xml = new File (cdw.getTmpDir(), xmlNames.get(0));
+	
+	public void fetchXmlAndLoad() throws Exception {
+		//cp from S3 the xml to the PHI directory
+		File xml = new File (cdw.getPhiDirectory(), xmlNames.get(0));
 		cdw.cp(xmlNames.get(0), xml);
-		
+				
 		//load patient info
-		loadPatientInfo(xml);
+		carisXml = new CarisXmlParser(xml);
+	}
+	public void makeJobDirsMoveXml(String coreId) throws Exception {
+		//parse the date from the xml, TN21-109147_2021-02-24_11_18.xml and TN20-170109_2021-01-20_21.31.xml
+		String xmlFileName = carisXml.getXmlFile().getName();
+		String[] tokens = Misc.UNDERSCORE.split(xmlFileName);
+		String date = tokens[1];
+		if (date.startsWith("20")==false || date.contains("-")==false) throw new IOException("\nERROR: failed to parse the date from "+xmlFileName);
 		
-//TODO: fetch HCI patient ID given the available PHI
-hciID = "PH_"+Misc.getRandomString(10);
-
-		//make the patient dir
-		testDir = new File (cdw.getJobsDirectory(), hciID+"/Caris/"+testID+"/");
+		testDir = new File (cdw.getJobsDirectory(), coreId+"/Caris/"+testID+"_"+date+"/");
 		testDir.mkdirs();
 		clinReportDir = new File (testDir, "/ClinicalReport/");
 		clinReportDir.mkdirs();
-		
 		//move the report into the ClinicalReport folder
-		xml.renameTo(new File(clinReportDir, xml.getName()));
-
+		File deIdXml = carisXml.getDeidentifiedXmlFile();
+		deIdXml.renameTo(new File(clinReportDir, deIdXml.getName()));
 	}
 
-	private void loadPatientInfo(File xml) throws Exception {
-		DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
-		DocumentBuilder builder = factory.newDocumentBuilder();
-		Document document = builder.parse(xml);
-		NodeList nodeList = document.getDocumentElement().getChildNodes();
-		for (int i = 0; i < nodeList.getLength(); i++) {
-			Node node = nodeList.item(i);
-			if (node instanceof Element) {
-				String nodeName = node.getNodeName();
-				if (nodeName.equals("patientInformation")) {
-					parsePatientInformation(node);
-					break;
-				}
-			}
-		}
+	public boolean isTooYoung() {
+		return tooYoung;
 	}
 
-	private void parsePatientInformation(Node node) {
-
-		//parse its children
-		NodeList childNodes = node.getChildNodes();
-		for (int j = 0; j < childNodes.getLength(); j++) {
-			Node cNode = childNodes.item(j);
-			if (cNode instanceof Element) {
-				String name = cNode.getNodeName();
-				//lastName
-				if (name.equals("lastName")) lastName = getLastChild("lastName",cNode);
-				//firstName
-				else if (name.equals("firstName")) firstName = getLastChild("firstName",cNode);
-				//dob
-				else if (name.equals("dob")) dob = getLastChild("dob",cNode);
-				//mrn
-				else if (name.equals("mrn")) mrn = getLastChild("mrn",cNode);
-				//gender
-				if (name.equals("gender")) gender = getLastChild("gender",cNode);
-			}
-		}
+	public CarisXmlParser getCarisXml() {
+		return carisXml;
 	}
 
-	/**Returns the last child if it exits*/
-	private String getLastChild(String key, Node node){
-		Node last = node.getLastChild();
-		if (last != null){
-			String x = last.getTextContent().trim();
-			return x;
-		}
-		return null;
+	public String getTestID() {
+		return testID;
 	}
 
 }

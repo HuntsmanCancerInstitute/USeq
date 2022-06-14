@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.3.3
+			<html><head><title>USeq Command Line Menus 9.3.4.beta
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -78,6 +78,8 @@
 					<a href="#BisStatRegionMaker">BisStatRegionMaker</a><br>
 				
 					<a href="#CalculatePerCycleErrorRate">CalculatePerCycleErrorRate</a><br>
+				
+					<a href="#CarisDataWrangler">CarisDataWrangler</a><br>
 				
 					<a href="#CarisVcfComparator">CarisVcfComparator</a><br>
 				
@@ -178,6 +180,8 @@
 					<a href="#IntersectKeyWithRegions">IntersectKeyWithRegions</a><br>
 				
 					<a href="#IntersectRegions">IntersectRegions</a><br>
+				
+					<a href="#JobCleaner">JobCleaner</a><br>
 				
 					<a href="#JointGenotypeVCFParser">JointGenotypeVCFParser</a><br>
 				
@@ -365,6 +369,8 @@
 				
 					<a href="#VCFCenterFormatter">VCFCenterFormatter</a><br>
 				
+					<a href="#VCFCollapser">VCFCollapser</a><br>
+				
 					<a href="#VCFComparator">VCFComparator</a><br>
 				
 					<a href="#VCFConsensus">VCFConsensus</a><br>
@@ -380,6 +386,8 @@
 					<a href="#VCFGeneFreqJointGenoComp">VCFGeneFreqJointGenoComp</a><br>
 				
 					<a href="#VCFGraphiteFilter">VCFGraphiteFilter</a><br>
+				
+					<a href="#VCFInfoAppender">VCFInfoAppender</a><br>
 				
 					<a href="#VCFMerger">VCFMerger</a><br>
 				
@@ -485,7 +493,7 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -r QCStats/ -p T
 </pre><br><p>
 				
 					<a name="AggregateQCStats2"><pre>**************************************************************************************
-**                            Aggregate QC Stats2: Feb 2022                         **
+**                           Aggregate QC Stats2: April 2022                        **
 **************************************************************************************
 Parses and aggregates alignment quality statistics from log and json files produced by
 the TNRunner2 DnaAlignQC and SampleConcordance workflows.
@@ -728,7 +736,7 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/AnnotatedBed2UCSCRefFlat -b anno.bed.
 </pre><br><p>
 				
 					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                           Annotated Vcf Parser  March 2022                       **
+**                           Annotated Vcf Parser  May 2022                         **
 **************************************************************************************
 Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
 VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
@@ -1370,6 +1378,33 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="CarisDataWrangler"><pre>**************************************************************************************
+**                             Caris Data Wrangler : May 2022                       **
+**************************************************************************************
+The Caris Data Wrangler downloads complete patient datasets from an AWS bucket, parses
+the xml test file for patient info, fetches/makes coreIds using the SubjectMatchMaker
+app and assembles TNRunner compatible analysis directories. If indicated, it will
+delete AWS objects that were successfully downloaded. A deidentified version of the
+xml report is saved. Do look at the log output at the failing patient datasets and
+resolve the issues (e.g. multiple xmls, multiple vcf, for the same Caris ID).
+
+Options:
+-b S3 URI where Caris files are placed
+-j Directory to build patient job folders
+-r Directory to place PHI Caris xml reports
+-s Directory to place temp files with PHI for Subject ID matching
+-c Directory containing the SubjectMatchMaker 'currentRegistry_' file
+-t Minimum hours old before downloading, defaults to 12
+-p Credentials profile, defaults to 'default'
+-d Delete S3 objects after successful download
+
+Example: java -jar pathToUSeq/Apps/CarisDataWrangler -b s3://hci-caris/ 
+     -j ~/Scratch/Caris/CJobs/ -r ~/Scratch/Caris/XmlReports_PHI/ -c 
+     ~/Scratch/SMM/Registry_PHI -s ~/Scratch/Caris/SMM_Tmp_PHI
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="CarisVcfComparator"><pre>**************************************************************************************
 **                           Caris Vcf Comparator: March 2022                       **
 **************************************************************************************
@@ -1390,7 +1425,7 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/CarisVcfComparator -f TL-18-03CFD6.vcf
 </pre><br><p>
 				
 					<a name="CarisXmlVcfParser"><pre>**************************************************************************************
-**                           Caris Xml Vcf Parser: March 2022                       **
+**                           Caris Xml Vcf Parser: May 2022                         **
 **************************************************************************************
 This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml
 reported genomic alternations are annotated, bed files of copy number changes and gene
@@ -1408,9 +1443,10 @@ Options:
    app and remove non standard chromosomes.
 -i Include PHI in spreadsheet output, defaults to excluding.
 -a Include all vcf records in output, defaults to just those with an xml match.
+-k Skip datasets that are missing either an xml or vcf report.
 
 Example: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/
-     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq9Dec2020_MergedStdChr.ucsc.gz 
+     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq13Dec2020_MergedStdChr.ucsc.gz 
 
 **************************************************************************************
 </pre><br><p>
@@ -2461,7 +2497,7 @@ Example: java -Xmx128G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -s
 </pre><br><p>
 				
 					<a name="GatkJointGenotyper"><pre>**************************************************************************************
-**                             Gatk Joint Genotyper: Jan 2022                       **
+**                           Gatk Joint Genotyper: March 2022                       **
 **************************************************************************************
 The GJG takes a bed file of target regions, splits it into 250 jobs, executes the GATK
 GenomicsDBImporter and GenotypeGVCFs on each, and merges the results. Set the -Xmx for
@@ -2604,6 +2640,24 @@ regions can also be used to calculate a p-value and fold enrichment.
 Example: java -Xmx1500M -jar pathTo/Apps/IntersectRegions -f /data/miRNAs.txt
       -s /data/DroshaLists/ -g 500 -n 10000 -r /data/InterrogatedRegions/
 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="JobCleaner"><pre>**************************************************************************************
+**                                Job Cleaner : May 2022                            **
+**************************************************************************************
+Zip archives particular folders, deletes particular files. Use to clean up analysis 
+result directories prior to cloud upload.
+
+Options:
+-r Root directory to recursively look for files and folders.
+-e File extensions and file names to delete, comma delimited, no spaces.
+-n Directory names to zip archive and then delete, comma delimited, no spaces.
+-d Dry run, just list the files and directories.
+
+Example: java -jar pathToUSeq/Apps/JobCleaner -d -n 'Logs,RunScripts' -r CJobs/ -e 
+    '.tbi,.crai,.bai,COMPLETE' 
 
 **************************************************************************************
 </pre><br><p>
@@ -4914,12 +4968,12 @@ Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatien
 </pre><br><p>
 				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                TNRunner2 : March 2022                            **
+**                                  TNRunner2 : May 2022                            **
 **************************************************************************************
-TNRunner is designed to execute several containerized snakmake workflows on tumor
-normal datasets via a slurm cluster.  Based on the availability of fastq, 
+TNRunner is designed to execute several containerized workflows on tumor normal
+datasets via a slurm cluster.  Based on the availability of paired fastq datasets, 
 alignments are run, somatic and germline variants are called, and concordance measured
-between sample bams. To execute TNRunner, create the following directory structure and
+between sample crams. To execute TNRunner, create the following directory structure,
 link or copy in the corresponding paired end Illumina gzipped fastq files. To run 
 GATK Joint Genotyping on sample sets where this has been run before, delete the
  GermlineVariantCalling/GATK* and GATKJointGenotyping folders.
@@ -4940,15 +4994,17 @@ The Fastq directory and sub directories must match this naming. Only include tho
 for which you have fastq.  Change the MyXXX to something relevant. TNRunner is
 stateless so as more Fastq becomes available or issues are addressed, relaunch the
 app. This won't effect running or queued slurm jobs. Relaunch periodically to assess
-the current processing status and queue additional tasks or set option -l. Download the
-latest workflows from 
+the current processing status and queue additional tasks or set option -l. Download 
+the latest workflows from 
 https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38RunnerWorkflows 
 and the matching resource bundle from
 https://hci-bio-app.hci.utah.edu/gnomex/gnomexFlex.jsp?analysisNumber=A5578 .
 All workflow docs are optional although some require output from prior Analysis.
 
 Setup Options:
--p Directory containing one or more patient data directories to process.
+-p Directory containing one or more patient data directories with a 'Fastq' folder.
+      TNRunner looks for these recursively. Those patient dirs with a file named 
+      COMPLETE will be skipped.
 -e Workflow docs for launching DNA alignments.
 -t Workflow docs for launching RNA alignments.
 -f Workflow docs for launching RNA fusion detection.
@@ -4960,8 +5016,8 @@ Setup Options:
 -q Workflow docs for launching Illumina germline joint genotyping.
 -h Workflow docs for launching GATK haplotype calling.
 -j Workflow docs for launching GATK germline joint genotyping.
--v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder to
-      each patient dir containing the json formatted clinical information.
+-v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder 
+      to each patient dir containing the json formatted clinical information.
 -k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio
       background files.
 -g Germline AnnotatedVcfParser options, defaults to '-d 12 -m 0.075 -q 0.1 -p 0.01 -g
@@ -4969,13 +5025,15 @@ Setup Options:
       interpretations_of_pathogenicity,Drug_response -t 0.51 -e Benign,Likely_benign
       -o -b 0.1 -z 3 -u RYR1'
 -s Somatic AnnotatedVcfParser options, defaults to '-f -d 12 -m 0.025 -j'
--G Germline VCFCallFrequency options, defaults to '-b Hg38/Germline/Avatar/Bed -v Hg38/Germline/Avatar/Vcf'
--S Somatic VCFCallFrequency options, defaults to '-b Hg38/Somatic/Avatar/Bed -v Hg38/Somatic/Avatar/Vcf'
+-G Germline VCFCallFrequency options, defaults to '-b Hg38/Germline/Avatar/Bed -v 
+      Hg38/Germline/Avatar/Vcf'
+-S Somatic VCFCallFrequency options, defaults to '-b Hg38/Somatic/Avatar/Bed -v 
+      Hg38/Somatic/Avatar/Vcf'
 -u Minimum read coverage for tumor sample vcf records, defaults to 12
 -i Minimum read coverage for normal sample vcf records, defaults to 12
 -w Non matched normal alignment directory (e.g. from NA12878) to use when no matched
-      normal is available for somatic variant calling. Needs to contain Bam/xxx_final.bam
-      and QC/xxx_Pass.bed.gz dirs and files with indexes.
+      normal is available for somatic variant calling. Needs to contain 
+      Bam/xxx_final.bam and QC/xxx_Pass.bed.gz dirs and files with indexes.
 
 Job Execution Options:
 -d Delete and restart FAILED jobs.
@@ -4988,7 +5046,7 @@ Job Execution Options:
 Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/
      -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b 
      ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/
-     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 125 -l 
+     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 31 -r' -x 125 -l 
      -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l 
 
 **************************************************************************************
@@ -5384,6 +5442,22 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFCenterFormatter -v Calls/ -s CCall
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="VCFCollapser"><pre>**************************************************************************************
+**                              VCF Collapser : June 2022                           **
+**************************************************************************************
+Merges records with the same CHROM	POS	ID	REF	ALT and outputs an unsorted stripped
+down vcf file. 
+
+Required Params:
+-d Directory containing  vcf files for merging (xxx.vcf(.gz/.zip OK))
+-v Path to a vcf file ending in .gz to write the unsorted results. 
+
+Example: java -Xmx100G -jar pathTo/USeq/Apps/VCFCollapser -d VcfsToMerge/
+       -v merged.vcf.gz && bcftools sort merged.vcf.gz > sorted.vcf 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="VCFComparator"><pre>**************************************************************************************
 **                             VCF Comparator : Feb 2021                            **
 **************************************************************************************
@@ -5421,7 +5495,7 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/VCFComparator -a /NIST/NA12878/key.v
 </pre><br><p>
 				
 					<a name="VCFConsensus"><pre>**************************************************************************************
-**                              VCF Consensus : Dec 2021                            **
+**                              VCF Consensus : May 2022                            **
 **************************************************************************************
 Merges VCF files with the approx same #CHROM line. Primary records with the same 
 chrPosRefAlt as a secondary are saved after appending the ID and FILTER, the secondary
@@ -5439,6 +5513,7 @@ Optional:
 -q Primary name to replace the ID column.
 -t Secondary name to replace the ID column.
 -u Use the primary #CHROM line and skip this header check. Not recommended!
+-c Output just shared records, defaults to saving all.
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFConsensus -p illumina.vcf -q Strelka
 -s stnd.indel.vcf.gz -t Scalpel -o indelCalls.vcf.gz 
@@ -5597,6 +5672,22 @@ Example: module load gcc/4.9.2; java -Xmx25G -jar USeq/Apps/VCFGraphiteFilter
 -v ssc.vcf.gz -b mergedTumor.bam -m mergedNormal.bam -s VGF/ -i ~/Ref/hg38.fa 
 -g ~/Apps/graphite -q 4 -e BKAF -f 0.001 -t 0.005 -n 0.1 -u 100 -a 4 -o 100 -d 0.0045 
 -r 3
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VCFInfoAppender"><pre>**************************************************************************************
+**                             VCF Info Appender : June 2022                        **
+**************************************************************************************
+Appends the FILTER and INFO from one vcf to the others with matching chr pos ref alt.
+
+Required Params:
+-d Directory containing  vcf files for appending info (xxx.vcf(.gz/.zip OK))
+-v Path to a master vcf file containing info to append.
+-s Save directory.
+
+Example: java -Xmx100G -jar pathTo/USeq/Apps/VCFInfoAppender -d VcfsToModify/
+       -v master.callFreq.vcf.gz -s VcfsAppended/ 
 
 **************************************************************************************
 </pre><br><p>

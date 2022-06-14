@@ -727,6 +727,15 @@ public class IO {
 		}
 	}
 	
+	/**Seems to work in most cases provided files aren't in use in the app.*/
+	public static boolean deleteDirectorySimple(File dir) {
+	    File[] allContents = dir.listFiles();
+	    if (allContents != null) {
+	        for (File file : allContents) deleteDirectory(file);
+	    }
+	    return dir.delete();
+	}
+	
 	/**Executes rm -f file.getCanonicalPath() 
 	 * Don't use this on soft links, will destroy the original file.*/
 	public static void deleteFileViaCmdLine(File file){
@@ -1517,6 +1526,86 @@ public class IO {
 		File[] list = new File[dirs.size()];
 		dirs.toArray(list);
 		return list;
+	}
+	
+	/**Fetches directories recursively with a given name.*/
+	public static ArrayList<File> fetchDirectoriesRecursively (File directory, String name){
+		ArrayList<File> dirs = new ArrayList<File>(); 
+		File[] list = directory.listFiles();
+		if (list != null){
+			for (int i=0; i< list.length; i++){
+				if (list[i].isDirectory()) {
+					if (list[i].getName().equals(name))dirs.add(list[i]);
+					dirs.addAll(fetchDirectoriesRecursively(list[i], name));
+				}				
+			}
+		}
+		return dirs;
+	}
+	
+	/**Zips the contents of the provided directory using relative paths.*/
+	public static boolean zipDirectory(File directory) throws IOException{
+		
+		String toTrim = directory.getParentFile().getCanonicalPath()+"/";
+		File zipFile = new File (directory.getCanonicalPath()+".zip"); //overwrites any existing 
+		ArrayList<File> filesToZip = fetchAllFilesAndDirsRecursively(directory);
+		
+		
+		byte[] buf = new byte[2048];	
+		try {
+			ZipOutputStream out = new ZipOutputStream(new FileOutputStream(zipFile));		
+			// Compress the files
+			for (int i=0; i<filesToZip.size(); i++) {
+				File f = filesToZip.get(i); 
+				String relPath = f.getCanonicalPath().replace(toTrim, "");			
+				if (f.isFile()) {
+					out.putNextEntry(new ZipEntry(relPath));
+					FileInputStream in = new FileInputStream(f);
+					int len;
+					while ((len = in.read(buf)) != -1) {
+						out.write(buf, 0, len);
+					}
+					out.closeEntry();
+					in.close();
+				}
+				//for directories add the /
+				else {
+					out.putNextEntry(new ZipEntry(relPath+"/"));
+					out.closeEntry();
+				}
+			}
+			out.close();
+		} catch (IOException e) {
+			IO.el("ERROR zip archiving the directory "+directory);
+			zipFile.delete();
+			e.printStackTrace();
+			return false;
+		}
+		return true;
+	}
+	
+	/**Fetches all of the files and dirs in the provided directory.*/
+	public static ArrayList<File> fetchAllFilesAndDirsRecursively (File directory) throws IOException{
+		ArrayList<File> files = new ArrayList<File>(); 
+		files.add(directory.getCanonicalFile());
+		File[] list = directory.listFiles();
+		if (list != null){
+			for (int i=0; i< list.length; i++){
+				if (list[i].isDirectory()) {
+					ArrayList<File> al = fetchAllFilesAndDirsRecursively (list[i]);
+					files.addAll(al);
+				}
+				else files.add(list[i].getCanonicalFile());				
+			}
+		}
+		return files;
+	}
+	
+	/**Fetch parent directories*/
+	public static File[] fetchParentDirectories (ArrayList<File> dirs){
+		File[] p = new File[dirs.size()];
+		for (int i=0; i< p.length; i++) p[i]=dirs.get(i).getParentFile();
+		return p;
 	}
 
 	/**Fetches all files with a given extension in a directory recursing through sub directories.

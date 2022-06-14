@@ -329,9 +329,15 @@ public class AnnotatedVcfParser {
 		double numBenign = 0;
 		String confString = infoKeyValue.get("CLNSIGCONF");
 		if (confString != null) {
+			//new CLNSIGCONF=Likely_pathogenic(1)|_Uncertain_significance(13)|_Likely_benign(3)
+			//old CLNSIGCONF=Benign(1),Likely_benign(2),Uncertain_significance(1)
+			//must watch for , in new format
+			if (confString.contains("|")) confString = Misc.COMMA.matcher(confString).replaceAll("|");
 			String[] type = Misc.COMMA.split(confString);
+			if (type.length<2) type = Misc.PIPE.split(confString);
 			dataLine.clinSigConf = confString;
 			for (String t: type) {
+				//remove the back )
 				String trimmed = t.substring(0, t.length()-1);
 				String[] nameNumber = Misc.FORWARD_PARENTHESIS.split(trimmed);
 				//IO.pl(nameNumber[0]);
@@ -1139,7 +1145,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Annotated Vcf Parser  March 2022                       **\n" +
+				"**                           Annotated Vcf Parser  May 2022                         **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+

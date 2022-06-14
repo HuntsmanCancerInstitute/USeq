@@ -228,10 +228,12 @@ public class JointGenotypeVCFParser {
 				}
 
 				//check whole line QUAL
-				double q = Double.parseDouble(fields[5]);
-				if (q < qual) {
-					numFailingQual++;
-					continue;
+				if (fields[5].equals(".") == false) {
+					double q = Double.parseDouble(fields[5]);
+					if (q < qual) {
+						numFailingQual++;
+						continue;
+					}
 				}
 
 				String[] format = Misc.COLON.split(fields[8]);

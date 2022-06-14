@@ -223,8 +223,7 @@ public class AggregateQCStats2 {
 		if (normalDNAPattern.matcher(name).matches()) return 0;
 		if (tumorDNAPattern.matcher(name).matches()) return 1;
 		
-		IO.el("\nERROR: failed to parse the tumor DNA or normal DNA source from "+f.getPath());
-		System.exit(1);
+		IO.el("\nWARNING: failed to parse the tumor DNA or normal DNA source from "+f.getPath());
 		return -1;
 	}
 
@@ -275,7 +274,7 @@ public class AggregateQCStats2 {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Aggregate QC Stats2: March 2022                        **\n" +
+				"**                           Aggregate QC Stats2: April 2022                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from log and json files produced by\n"+
 				"the TNRunner2 DnaAlignQC and SampleConcordance workflows.\n"+

@@ -10,6 +10,9 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import edu.utah.hci.bioinfo.smm.Subject;
+import edu.utah.hci.bioinfo.smm.SubjectMatchMaker;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -31,7 +34,10 @@ public class CarisDataWrangler {
 	//user defined fields
 	private String bucketURI = null;
 	private File jobsDirectory = null;
-	private int minimumHrsOld = 24;
+	private File phiDirectory = null;
+	private File smmDirectory = null;
+	private File smmRegistryDirectory = null;
+	private int minimumHrsOld = 12;
 	private String awsPath = "aws";
 	private String profile = "default";
 	private boolean deleteAfterDownload = false;
@@ -42,7 +48,9 @@ public class CarisDataWrangler {
 	private HashMap<String, String> envPropToAdd = new HashMap <String, String>();
 	private ArrayList<String> errorMessages = new ArrayList<String>();
 	private ArrayList<String> s3Objects2Delete = new ArrayList<String>();
-	private File tmpDir = null;
+	private ArrayList<String> partialPatientTestIDs = new ArrayList<String>();
+	private ArrayList<CarisPatient> workingPatients = new ArrayList<CarisPatient>();
+	private Subject[] queries = null;
 
 	public CarisDataWrangler (String[] args) {
 		try {
@@ -56,7 +64,7 @@ public class CarisDataWrangler {
 			loadPatientLines();
 			
 			//age, group, download, delete
-			int numReady = checkPatients();
+			checkPatients();
 			
 			//any errors?
 			if (errorMessages.size()!=0) {
@@ -64,30 +72,29 @@ public class CarisDataWrangler {
 			}
 			
 			//download files building TNRunner Analysis dirs
-			if (numReady !=0) {
-				pl("\n"+numReady+" patient datasets ready for processing from "+namePatient.size()+" tests...");
+			if (workingPatients.size() !=0) {
+				pl("\n"+workingPatients.size()+" patient datasets ready for processing from "+namePatient.size()+" tests...");
+				downloadXml();
 				downloadDatasets();
 				deleteDownloadedDatasets();
 			}
 			else pl("\nNo patient datasets ready for processing.");
-			IO.deleteDirectory(tmpDir);
 			
 			//finish and calc run time
-			double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
-			pl("\nDone! "+Math.round(diffTime)+" Sec\n");
+			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
+			pl("\nDone! "+Math.round(diffTime)+" Min\n");
 			
 		} catch (Exception e) {
-			IO.deleteDirectory(tmpDir);
 			IO.el("\nERROR running the CarisDataWrangler, aborting");
 			e.printStackTrace();
 			System.exit(1);
 		}
 	}
-	
-	
+
+
 	private void deleteDownloadedDatasets() throws Exception {
 		if (deleteAfterDownload) {
-			pl("\nDeleting downloaded datasets...");
+			pl("\nDeleting downloaded datasets from S3 "+bucketURI+"...");
 			File log = new File (jobsDirectory.getParentFile(), "downloadedDeleted"+Misc.getDateNoSpaces()+".txt");
 			PrintWriter out = new PrintWriter( new FileWriter(log));
 			out.println("Deleting aws s3 objects from "+bucketURI+ " on "+Misc.getDateTime());
@@ -111,34 +118,62 @@ public class CarisDataWrangler {
 			if (exitCode != 0) throw new IOException("Error: failed to upload the deletion log "+ log+" to "+bucketURI);
 			log.delete();
 		}
-		else pl("\nSkipping the deletion of downloaded datasets");
+		else pl("\nSkipping the deletion of downloaded datasets per option -d from "+bucketURI);
 	}
 
+	private void downloadXml() throws Exception {
+		pl("\nLoading xml files for ID matching...");
+		
+		//make IO for writing out queries
+		File queryFile = new File (smmDirectory, "carisPatientQueries_PHI.txt");
+		File queryResDir = new File (smmDirectory, "SMMQueryResults_PHI");
+		queryResDir.mkdirs();
+		
+		PrintWriter out = new PrintWriter (new FileWriter( queryFile));
+		
+		//write out each for lookup
+		for (CarisPatient cp : workingPatients) {
+			cp.fetchXmlAndLoad();
+			String att = cp.getCarisXml().fetchSubjectMatchMakerLine();
+			out.println(att);	
+		}
+		out.close();
+		
+		//run the SMM
+		String[] args = {
+				"-r", smmRegistryDirectory.getCanonicalPath(),
+				"-q", queryFile.getCanonicalPath(),
+				"-o", queryResDir.getCanonicalPath(),
+				"-v", //turn off verbosity
+				"-a" //adding queries not found to registry
+		};
+		SubjectMatchMaker smm = new SubjectMatchMaker(args);
+		queries = smm.getQuerySubjects();
+	}
+	
 	private void downloadDatasets() throws Exception {
 		pl("\nDownloading files and building TNRunner run folders...");
-		tmpDir = new File (jobsDirectory, "TempDownloadsDeleteMe");
-		tmpDir.mkdirs();
-		for (String testID : namePatient.keySet()) {
-			CarisPatient cp = namePatient.get(testID);
-			if (cp.isReady()== false) continue;
-			pl(testID);
-			cp.fetchHCIId();
+		for (int i=0; i< workingPatients.size(); i++) {
+			CarisPatient cp = workingPatients.get(i);
+			Subject s = queries[i];
+			String coreId = s.getCoreIdNewOrMatch();
+			pl("\t"+ coreId+"/"+cp.getTestID());
+			cp.makeJobDirsMoveXml(coreId);
 			cp.downloadDatasets();
 		}
-		
 	}
 
 
-	private int checkPatients() throws Exception {
+	private void checkPatients() throws Exception {
 		pl("\nChecking patient datasets...");
-		int numReady = 0;
 		for (String testID : namePatient.keySet()) {
 			pl(testID);
 			CarisPatient cp = namePatient.get(testID);
 			cp.parseFileLines(minimumHrsOld);
-			if (cp.isReady()) numReady++;
+			if (cp.isReady()) workingPatients.add(cp);
+			else if (cp.isTooYoung() == false) partialPatientTestIDs.add(testID);
 		}
-		return numReady;
+		pl(partialPatientTestIDs.size()+" PartialTestDatasets: "+Misc.stringArrayListToString(partialPatientTestIDs, " "));
 	}
 
 
@@ -150,8 +185,9 @@ public class CarisDataWrangler {
 		Pattern pat = Pattern.compile(".+[\\s_]+TN\\d\\d-.+"); // looks for '_TN##-' or ' TN##-'
 
 		for (String line: out) {
+			line = line.trim();
 			Matcher mat = pat.matcher(line);
-			if (mat.matches()) {
+			if (mat.matches() && line.endsWith(".log") == false) {
 				//pull the testID
 				//2022-03-16 12:00:11 11912006509 DNA_TN22-116244_S32.R1.fastq.gz
 				//    0          1         2                  3
@@ -197,6 +233,7 @@ public class CarisDataWrangler {
 
 			IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 			Pattern pat = Pattern.compile("-[a-zA-Z]");
+			File tmpDir = null;
 			for (int i = 0; i<args.length; i++){
 				Matcher mat = pat.matcher(args[i]);
 				if (mat.matches()){
@@ -205,6 +242,9 @@ public class CarisDataWrangler {
 						switch (test){
 						case 'b': bucketURI = args[++i]; break;
 						case 'j': jobsDirectory = new File(args[++i]); break;
+						case 'r': phiDirectory = new File(args[++i]); break;
+						case 's': tmpDir = new File(args[++i]); break;
+						case 'c': smmRegistryDirectory = new File(args[++i]); break;
 						case 't': minimumHrsOld = Integer.parseInt(args[++i]); break;
 						case 'p': profile =args[++i]; break;
 						case 'd': deleteAfterDownload = true; break;
@@ -229,38 +269,61 @@ public class CarisDataWrangler {
 			File credentialsFile = new File (awsCredentialsDir, "credentials").getCanonicalFile();
 			if (awsCredentialsDir.exists() == false)  Misc.printErrAndExit("Error: failed to find your aws credentials file "+credentialsFile);
 			
+			//check jobDirectory
+			if (jobsDirectory !=null) jobsDirectory.mkdirs();
+			if (jobsDirectory == null || jobsDirectory.exists() == false) Misc.printErrAndExit("Error: cannot find or make your jobs directory "+jobsDirectory);
+			
+			//check phiDirectory
+			if (phiDirectory !=null) phiDirectory.mkdirs();
+			if (phiDirectory == null || phiDirectory.exists() == false) Misc.printErrAndExit("Error: cannot find or make your xml report directory "+phiDirectory);
+			
+			//check smm registry directory
+			if (smmRegistryDirectory == null || smmRegistryDirectory.exists() == false || smmRegistryDirectory.isDirectory()==false) Misc.printErrAndExit("Error: cannot find your Subject Match Maker registry directory, "+smmRegistryDirectory);
+			
+			//check tmpDir for the subject match maker
+			if (tmpDir == null) Misc.printErrAndExit("Error: cannot find your temp subject ID directory "+tmpDir);
+			tmpDir.mkdirs();
+			if (tmpDir.exists() == false) Misc.printErrAndExit("Error: cannot make your temp subject ID directory "+tmpDir);
+			smmDirectory = new File (tmpDir, System.currentTimeMillis()+"_DeleteMe");
+			smmDirectory.mkdir();
+			
 			//set env var for the aws cli 
 			envPropToAdd.put("AWS_SHARED_CREDENTIALS_FILE", credentialsFile.getCanonicalPath());
 
 			//Only needed in Eclipse
-			if (true) {
+			if (false) {
 				envPropToAdd.put("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin");
 				awsPath="/usr/local/bin/aws";
 			}
 			
 	}
 
-
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                             Caris Data Wrangler : March 2022                     **\n" +
+				"**                             Caris Data Wrangler : May 2022                       **\n" +
 				"**************************************************************************************\n" +
 				"The Caris Data Wrangler downloads complete patient datasets from an AWS bucket, parses\n"+
-				"the xml test file for patient info, fetches/makes HCIPatientIDs, and assembles\n"+
-				"TNRunner compatible analysis directories. If indicated, will delete AWS objects that\n"+
-				"were successfully downloaded.\n"+
+				"the xml test file for patient info, fetches/makes coreIds using the SubjectMatchMaker\n"+
+				"app and assembles TNRunner compatible analysis directories. If indicated, it will\n"+
+				"delete AWS objects that were successfully downloaded. A deidentified version of the\n"+
+				"xml report is saved. Do look at the log output at the failing patient datasets and\n"+
+				"resolve the issues (e.g. multiple xmls, multiple vcf, for the same Caris ID).\n"+
 				
 				"\nOptions:\n"+
 				"-b S3 URI where Caris files are placed\n"+
 				"-j Directory to build patient job folders\n" +
-				"-t Minimum hours old before downloading, defaults to 24\n"+
+				"-r Directory to place PHI Caris xml reports\n"+
+				"-s Directory to place temp files with PHI for Subject ID matching\n"+
+				"-c Directory containing the SubjectMatchMaker 'currentRegistry_' file\n"+
+				"-t Minimum hours old before downloading, defaults to 12\n"+
 				"-p Credentials profile, defaults to 'default'\n"+
 				"-d Delete S3 objects after successful download\n"+
 				
 
 				"\nExample: java -jar pathToUSeq/Apps/CarisDataWrangler -b s3://hci-caris/ \n"+
-				"     -j ~/Scratch/Caris/CJobs/ \n"+
+				"     -j ~/Scratch/Caris/CJobs/ -r ~/Scratch/Caris/XmlReports_PHI/ -c \n"+
+				"     ~/Scratch/SMM/Registry_PHI -s ~/Scratch/Caris/SMM_Tmp_PHI\n"+
 
 				"\n**************************************************************************************\n");
 	}
@@ -361,7 +424,7 @@ public class CarisDataWrangler {
 		String fullS3Uri = bucketURI+awsObjectName;
 		if (localPath.exists()) IO.pl("\tSkipping, exists "+localPath);
 		else {
-			String[] cmd = {awsPath, "s3", "cp", fullS3Uri, localPath.getCanonicalPath(), "--profile", profile};
+			String[] cmd = {awsPath, "s3", "cp", fullS3Uri, localPath.getCanonicalPath(), "--profile", profile, "--no-progress"};
 			int exitCode = executeReturnExitCode(cmd, true, null);
 			if ( exitCode != 0) {
 				localPath.delete();
@@ -375,10 +438,8 @@ public class CarisDataWrangler {
 	public File getJobsDirectory() {
 		return jobsDirectory;
 	}
-
-
-	public File getTmpDir() {
-		return tmpDir;
+	public File getPhiDirectory() {
+		return phiDirectory;
 	}
 
 
