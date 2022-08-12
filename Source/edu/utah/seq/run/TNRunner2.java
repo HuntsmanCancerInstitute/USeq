@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.nio.file.*;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import util.gen.IO;
@@ -31,8 +32,10 @@ public class TNRunner2 {
 	private File[] msiDocs = null;
 	private File normalAlignmentDir = null;
 	private File[] nonMatchedNormal = null;
-	private File maleBkg = null;
-	private File femaleBkg = null;
+	private File copyRatioBkgDir = null;
+	private File[] copyRatioBkgHdf5Files = null;
+	private File[] copyRatioBkgIntervalListFiles = null;
+	private File bpileupFileOrDir = null;
 	private int minReadCoverageTumor = 12;
 	private int minReadCoverageNormal = 12;
 	private TNSample2[] tNSamples = null;
@@ -53,6 +56,7 @@ public class TNRunner2 {
 	private boolean niceJobs = true;
 	private String partition = "hci-rw";
 	private boolean sbatch = true;
+	private HashSet<String> panels2SkipForCopyRatio = null;
 
 	private String pathToTrim = null;
 	private String nice = "";
@@ -657,9 +661,9 @@ public class TNRunner2 {
 			File RNAWorkflowDir = null;
 			File rnaFuseDir = null;
 			File copyRatioDocsDir = null;
-			File copyRatioBkgDir = null;
 			File clinicalVcfDir = null;
 			File msiWorkflowDir = null;
+			String panel2Skip = null;
 			for (int i = 0; i<args.length; i++){
 				Matcher mat = pat.matcher(args[i]);
 				if (mat.matches()){
@@ -679,7 +683,9 @@ public class TNRunner2 {
 						case 'h': haploWorklfowDir = new File(args[++i]); break;
 						case 'y': copyRatioDocsDir = new File(args[++i]); break;
 						case 'k': copyRatioBkgDir = new File(args[++i]); break;
+						case 'P': panel2Skip = args[++i]; break;
 						case 'v': clinicalVcfDir = new File(args[++i]); break;
+						case 'B': bpileupFileOrDir = new File(args[++i]); break;
 						case 'w': normalAlignmentDir = new File(args[++i]); break;
 						case 'g': germlineAnnotatedVcfParser = args[++i]; break;
 						case 's': somaticAnnotatedVcfParser = args[++i]; break;
@@ -741,6 +747,8 @@ public class TNRunner2 {
 			if (somVarCallWorkflowDir != null){
 				if(somVarCallWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing somatic variant calling workflow docs? "+somVarCallWorkflowDir);
 				somaticVarCallDocs = IO.extractFiles(somVarCallWorkflowDir);
+				if (bpileupFileOrDir == null || bpileupFileOrDir.exists() == false) Misc.printErrAndExit("Error: failed to find the bpileup file or dir for somatic variant calling? "+bpileupFileOrDir);
+				bpileupFileOrDir = bpileupFileOrDir.getCanonicalFile();
 			}
 
 			//variant annotation
@@ -791,18 +799,12 @@ public class TNRunner2 {
 				copyRatioDocs = IO.extractFiles(copyRatioDocsDir);
 				//copy ratio analysis
 				if (copyRatioBkgDir == null || copyRatioBkgDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing copy ratio background files? "+copyRatioBkgDir);
-				File[] f = IO.extractFiles(copyRatioBkgDir, "PoN.hdf5");
-				if (f == null || f.length != 2) Misc.printErrAndExit("Error: failed to find two copy ratio background xxxPoN.hdf5 files in "+copyRatioBkgDir);
-				String name = f[0].getName().toLowerCase();
-				if (name.contains("female")) {
-					femaleBkg = f[0];
-					maleBkg = f[1];
+				extractCopyRtoFiles(copyRatioBkgDir);
+				//any panels 2 skip?
+				if (panel2Skip!= null) {
+					panels2SkipForCopyRatio = new HashSet<String>();
+					for (String x: Misc.COMMA.split(panel2Skip)) panels2SkipForCopyRatio.add(x);
 				}
-				else {
-					femaleBkg = f[1];
-					maleBkg = f[0];
-				}
-				if (maleBkg == null || femaleBkg == null) Misc.printErrAndExit("Error: failed to find male "+maleBkg+" and female "+femaleBkg+" background xxxFemalePoN.hdf5 or xxxMalePoN.hdf5 files in "+copyRatioBkgDir);
 			}
 
 			//non matched normal?
@@ -842,6 +844,7 @@ public class TNRunner2 {
 				IO.pl("Illumina Joint genotyping workflow directory\t"+illuminaJointGenoWorklfowDir);
 				IO.pl("Copy ratio workflow directory\t"+copyRatioDocsDir);
 				IO.pl("Copy ratio background directory\t"+copyRatioBkgDir);
+				if (panels2SkipForCopyRatio != null) IO.pl("Copy ratio panels to skip\t"+panels2SkipForCopyRatio);
 
 				IO.pl("Min tumor read coverage\t"+minReadCoverageTumor);
 				IO.pl("Min normal read coverage\t"+minReadCoverageNormal);
@@ -863,6 +866,24 @@ public class TNRunner2 {
 	}
 
 
+	private void extractCopyRtoFiles(File dir) {
+		ArrayList<File> hdf5 = new ArrayList<File>();
+		ArrayList<File> il = new ArrayList<File>();
+		File[] toCheck = IO.extractOnlyFiles(dir);
+		//xxx.hdf5 and xxx.interval_list
+		for (File f: toCheck) {
+			String name = f.getName();
+			if (name.endsWith(".hdf5")) hdf5.add(f);
+			else if (name.endsWith(".interval_list")) il.add(f);
+		}
+		//minimum of one each!
+		if (hdf5.size()< 1 || il.size()< 1) Misc.printErrAndExit("Error: failed to find at least one set of copy ratio bkgd files (xxx.hdf5 and xxx.interval_list in "+copyRatioBkgDir);
+		copyRatioBkgHdf5Files = new File[hdf5.size()];
+		hdf5.toArray(copyRatioBkgHdf5Files);
+		copyRatioBkgIntervalListFiles = new File[il.size()];
+		il.toArray(copyRatioBkgIntervalListFiles);
+	}
+
 	private File[] removeThoseWithComplete(File[] dirs) {
 		IO.pl("\nChecking for job dirs for those marked COMPLETE...");
 		ArrayList<File> toReturn = new ArrayList<File>();
@@ -878,7 +899,7 @@ public class TNRunner2 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                  TNRunner2 : May 2022                            **\n" +
+				"**                                 TNRunner2 : July 2022                            **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner is designed to execute several containerized workflows on tumor normal\n"+
 				"datasets via a slurm cluster.  Based on the availability of paired fastq datasets, \n"+
@@ -927,9 +948,16 @@ public class TNRunner2 {
 				"-h Workflow docs for launching GATK haplotype calling.\n"+
 				"-j Workflow docs for launching GATK germline joint genotyping.\n"+
 				"-v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder \n"+
-				"      to each patient dir containing the json formatted clinical information.\n"+
-				"-k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio\n"+
-				"      background files.\n"+
+				"      to each patient dir containing the json formatted clinical information. The file name\n"+
+				"      should contain the unique panel name and end with the sex if running copy ratio analysis,\n"+
+				"      e.g. TL-19-9DA8E2_XE.V2_M.json, \n"+
+				"-k Directory containing the sex and platform matched xxx.hdf5 and xxx.interval_list files\n"+
+				"      for somatic copy ratio analysis.\n"+
+				"      files with unique panel names, e.g. XE.V2_M.hdf5 and XE.V2_F.hdf5\n"+
+				"-P Comma delimited string of panels to skip for copy ratio analysis, no spaces.\n"+
+				"-B BamPileup file or directory containing such for somatic variant VCFBkz scoring,\n"+
+				"      These should end in xxx.bp.txt.gz with paired tbi indexes and contain unique\n"+
+				"      panel names, e.g. XE.V2.bp.txt.gz\n"+
 				"-g Germline AnnotatedVcfParser options, defaults to '-d 12 -m 0.075 -q 0.1 -p 0.01 -g\n"+
 				"      D5S,D3S -n 4.4 -a HIGH -l -c Pathogenic,Likely_pathogenic,Conflicting_\n"+
 				"      interpretations_of_pathogenicity,Drug_response -t 0.51 -e Benign,Likely_benign\n"+
@@ -999,13 +1027,6 @@ public class TNRunner2 {
 	public File[] getCopyRatioDocs() {
 		return copyRatioDocs;
 	}
-	public File getMaleBkg() {
-		return maleBkg;
-	}
-	public File getFemaleBkg() {
-		return femaleBkg;
-	}
-
 	public File[] getClinicalVcfDocs() {
 		return clinicalVcfDocs;
 	}
@@ -1040,5 +1061,20 @@ public class TNRunner2 {
 
 	public boolean isSbatch() {
 		return sbatch;
+	}
+
+	public File getBpileupFileOrDir() {
+		return bpileupFileOrDir;
+	}
+
+	public File[] getCopyRatioHdf5Files() {
+		return copyRatioBkgHdf5Files;
+	}
+	public File[] getCopyRatioIntervalListFiles() {
+		return copyRatioBkgIntervalListFiles;
+	}
+
+	public HashSet<String> getPanels2SkipForCopyRatio() {
+		return panels2SkipForCopyRatio;
 	}
 }

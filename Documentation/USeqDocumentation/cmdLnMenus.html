@@ -329,6 +329,8 @@
 				
 					<a href="#SubSamplePointData">SubSamplePointData</a><br>
 				
+					<a href="#TempusDataWrangler">TempusDataWrangler</a><br>
+				
 					<a href="#TempusJson2Vcf">TempusJson2Vcf</a><br>
 				
 					<a href="#TempusVcfComparator">TempusVcfComparator</a><br>
@@ -792,7 +794,7 @@ Example: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/
 </pre><br><p>
 				
 					<a name="AvatarAssembler"><pre>**************************************************************************************
-**                              Avatar Assembler : July 2020                        **
+**                              Avatar Assembler : June 2022                        **
 **************************************************************************************
 Tool for assembling fastq avatar datasets based on the results of several sql queries.
 See https://ri-confluence.hci.utah.edu/x/KwBFAg  Login on hci-clingen1.hci.utah.edu
@@ -4730,6 +4732,35 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/SubSamplePointData -n 10000000 -f
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="TempusDataWrangler"><pre>**************************************************************************************
+**                          Tempus Data Wrangler : August 2022                      **
+**************************************************************************************
+The Tempus Data Wrangler downloads complete patient datasets from an AWS bucket, parses
+the json test file for patient info, fetches/makes coreIds using the SubjectMatchMaker
+app and assembles TNRunner compatible analysis directories. If indicated, it will
+delete AWS objects that were successfully downloaded. Deidentified versions of the
+json reports are saved. Do look at the log output at the failing patient datasets and
+resolve the issues (e.g. broken/missing jsons, multiple DNA/RNA tars, etc.).
+
+Options:
+-b S3 URI where Tempus files are placed
+-j Directory to build patient job folders
+-r Directory to place PHI Tempus json reports
+-s Directory to place temp files with PHI for Subject ID matching
+-c Directory containing the SubjectMatchMaker 'currentRegistry_' file
+-t Minimum hours old before downloading, defaults to 48
+-p Credentials profile, defaults to 'default'
+-i File containing Tempus TL-xxx IDs to skip, one per line.  This will be read and then
+      appended with datasets downloaded. Required. Can be empty.
+
+Example: java -jar pathToUSeq/Apps/TempusDataWrangler -b s3://tm-huntsman/ 
+     -j ~/Scratch/Tempus/TJobs/ -r ~/Scratch/Tempus/JsonReports_PHI/ -c 
+     ~/Scratch/SMM/Registry_PHI -s ~/Scratch/Tempus/SMM_Tmp_PHI -i ~/Scratch/Tempus/
+     priorProcessedTestIds.txt
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="TempusJson2Vcf"><pre>**************************************************************************************
 **                             Tempus Json 2 Vcf: Oct 2021                          **
 **************************************************************************************
@@ -4968,7 +4999,7 @@ Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatien
 </pre><br><p>
 				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                  TNRunner2 : May 2022                            **
+**                                 TNRunner2 : July 2022                            **
 **************************************************************************************
 TNRunner is designed to execute several containerized workflows on tumor normal
 datasets via a slurm cluster.  Based on the availability of paired fastq datasets, 
@@ -5017,9 +5048,16 @@ Setup Options:
 -h Workflow docs for launching GATK haplotype calling.
 -j Workflow docs for launching GATK germline joint genotyping.
 -v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder 
-      to each patient dir containing the json formatted clinical information.
--k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio
-      background files.
+      to each patient dir containing the json formatted clinical information. The file name
+      should contain the unique panel name and end with the sex if running copy ratio analysis,
+      e.g. TL-19-9DA8E2_XE.V2_M.json, 
+-k Directory containing the sex and platform matched xxx.hdf5 and xxx.interval_list files
+      for somatic copy ratio analysis.
+      files with unique panel names, e.g. XE.V2_M.hdf5 and XE.V2_F.hdf5
+-P Comma delimited string of panels to skip for copy ratio analysis, no spaces.
+-B BamPileup file or directory containing such for somatic variant VCFBkz scoring,
+      These should end in xxx.bp.txt.gz with paired tbi indexes and contain unique
+      panel names, e.g. XE.V2.bp.txt.gz
 -g Germline AnnotatedVcfParser options, defaults to '-d 12 -m 0.075 -q 0.1 -p 0.01 -g
       D5S,D3S -n 4.4 -a HIGH -l -c Pathogenic,Likely_pathogenic,Conflicting_
       interpretations_of_pathogenicity,Drug_response -t 0.51 -e Benign,Likely_benign
@@ -5679,11 +5717,12 @@ Example: module load gcc/4.9.2; java -Xmx25G -jar USeq/Apps/VCFGraphiteFilter
 					<a name="VCFInfoAppender"><pre>**************************************************************************************
 **                             VCF Info Appender : June 2022                        **
 **************************************************************************************
-Appends the FILTER and INFO from one vcf to the others with matching chr pos ref alt.
+Appends the FILTER and INFO from one vcf to the others with matching chr_pos_ref_alt.
 
 Required Params:
 -d Directory containing  vcf files for appending info (xxx.vcf(.gz/.zip OK))
--v Path to a master vcf file containing info to append.
+-v Path to a master vcf file containing info to append. Use the VCFCollapser to merge
+      all the variants and then annotate it, e.g. VCFCallFrequency, VCFSpliceScanner
 -s Save directory.
 
 Example: java -Xmx100G -jar pathTo/USeq/Apps/VCFInfoAppender -d VcfsToModify/

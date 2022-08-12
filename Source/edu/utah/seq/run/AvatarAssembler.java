@@ -309,7 +309,7 @@ public class AvatarAssembler {
 				
 				//any double counts for this specimen?
 				if (numTe > 1 || numNe > 1 || numTT > 1) {
-					IO.pl("\nERROR: Multiple TE's ("+numTe+"), TN's("+numNe+"), or TT's("+numTT+") with the same specimen name("+specimenName+"), needs attention, skipping:\n"+this.toString());
+					IO.pl("\nERROR: Multiple TE's ("+numTe+"), NE's("+numNe+"), or TT's("+numTT+") with the same specimen name("+specimenName+"), needs attention, manual build, skipping:\n"+this.toJson().toString(4));
 					return;
 				}
 				
@@ -674,7 +674,7 @@ public class AvatarAssembler {
 		
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                              Avatar Assembler : July 2020                        **\n" +
+				"**                              Avatar Assembler : June 2022                        **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling fastq avatar datasets based on the results of several sql queries.\n"+
 				"See https://ri-confluence.hci.utah.edu/x/KwBFAg  Login on hci-clingen1.hci.utah.edu\n"+

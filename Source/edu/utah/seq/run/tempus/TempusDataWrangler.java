@@ -11,6 +11,7 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -20,7 +21,7 @@ import edu.utah.hci.bioinfo.smm.SubjectMatchMaker;
 import util.gen.IO;
 import util.gen.Misc;
 
-/**Queries the Tempus bucket, finds old files, downloads and deletes the objects, and builds TNRunner dirs.
+/**Queries the Tempus bucket, finds old files, downloads the objects, and builds TNRunner dirs.
  * 
  Seeing multiple test jsons, one contained new rnaFindings but none of the older dna seq info.  Thus need to merge these.
  This makes processing these difficult since we don't know if and when new json files will come over. Wait a week? a month?
@@ -33,18 +34,18 @@ public class TempusDataWrangler {
 	private File phiDirectory = null;
 	private File smmDirectory = null;
 	private File smmRegistryDirectory = null;
-	private int minimumHrsOld = 24;
+	private int minimumHrsOld = 48;
 	private String awsPath = "aws";
 	private String profile = "default";
-	private boolean deleteAfterDownload = false;
 	private boolean verbose = false;
+	private File testIDsToSkip = null;
 	
 	//internal
 	private HashMap<String, TempusPatient> namePatient = new HashMap<String, TempusPatient>();
 	private ArrayList<String[]> jsonFilePaths = new ArrayList<String[]>();
 	private HashMap<String, String> envPropToAdd = new HashMap <String, String>();
 	private ArrayList<String> errorMessages = new ArrayList<String>();
-	private ArrayList<String> s3Objects2Delete = new ArrayList<String>();
+	private HashSet<String> testIds2Skip = new HashSet<String>();
 	private ArrayList<String> partialPatientTestIDs = new ArrayList<String>();
 	private ArrayList<TempusPatient> workingPatients = new ArrayList<TempusPatient>();
 	
@@ -65,6 +66,9 @@ public class TempusDataWrangler {
 			
 			checkAwsCli();
 			
+			//load test IDs to skip, from prior processing, can't modify the tempus tar files in their bucket
+			if (testIDsToSkip != null) testIds2Skip = IO.loadFileIntoHashSet(testIDsToSkip);
+			
 			//pull bucket objects and load patient tar and json lines
 			loadPatientLines();
 			
@@ -84,7 +88,8 @@ public class TempusDataWrangler {
 				pl("\n"+workingPatients.size()+" patient datasets ready for processing from "+namePatient.size()+" tests...");
 				findMakeJobDir();
 				downloadDatasets();
-				deleteDownloadedDatasets();
+				writeOutProcessedTestIDs();
+				
 			}
 			else pl("\nNo patient datasets ready for processing.");
 			
@@ -114,42 +119,32 @@ public class TempusDataWrangler {
 			cp(tokens[3], jsonFiles[i], false);
 			
 			TempusJsonParser jd = new TempusJsonParser(jsonFiles[i], tokens[3]);
-			// did it parse? some are broken; is it a DNA test?
-			if (jd.isParsed() && jd.isDNATest()) {
-				//pull patient and if it exists, add the json
-				TempusPatient tp = namePatient.get(jd.getTestId());
-				if (tp != null) tp.getJsonDatasets().add(jd);
+			// did it parse? some are broken
+			if (jd.isParsed()) {
+				//in skip file?
+				if (testIds2Skip.contains(jd.getTestId()) == false) {
+					//pull patient and if it exists, add all of the json files
+					TempusPatient tp = namePatient.get(jd.getTestId());
+					if (tp != null) tp.getJsonDatasets().add(jd);
+				}
 			}
 		}
 	}
 
-	private void deleteDownloadedDatasets() throws Exception {
-		if (deleteAfterDownload) {
-			pl("\nDeleting downloaded datasets from S3 "+bucketURI+"...");
-			File log = new File (jobsDirectory.getParentFile(), "downloadedDeleted"+Misc.getDateNoSpaces()+".txt");
-			PrintWriter out = new PrintWriter( new FileWriter(log));
-			out.println("Deleting aws s3 objects from "+bucketURI+ " on "+Misc.getDateTime());
-
-			for (String s3Uri: s3Objects2Delete) {
-				String[] cmd = {awsPath, "s3", "rm", s3Uri, "--profile", profile};
-				int exitCode = executeReturnExitCode(cmd, true, null);
-				if (exitCode != 0) {
-					out.println("Failed to delete "+s3Uri);
-					out.close();
-					throw new IOException("Error: failed to delete "+ s3Uri);
-				}
-				else out.println("Deleted\t"+s3Uri);
-			}
-			out.close();
-			
-			//upload the log
-			pl("\nUploading the deletion dataset log to "+bucketURI+ log.getName());
-			String[] cmd = {awsPath, "s3", "cp", log.getCanonicalPath(), bucketURI+ log.getName(), "--profile", profile};
-			int exitCode = executeReturnExitCode(cmd, true, null);
-			if (exitCode != 0) throw new IOException("Error: failed to upload the deletion log "+ log+" to "+bucketURI);
-			log.delete();
-		}
-		else pl("\nSkipping the deletion of downloaded datasets per option -d from "+bucketURI);
+	private void writeOutProcessedTestIDs() throws Exception {
+		pl("\nWriting out processed test TL-xxxx IDs...");
+		
+		//add working dataset ids to hash
+		for (TempusPatient cp : workingPatients) testIds2Skip.add(cp.getTestID());
+		
+		File tmp = new File (testIDsToSkip.getCanonicalPath()+".tmp.delme");
+		
+		PrintWriter out = new PrintWriter (new FileWriter(tmp));
+		for (String id: testIds2Skip) out.println(id);	
+		out.close();
+		
+		//now replace original
+		tmp.renameTo(testIDsToSkip);
 	}
 
 	private void findMakeJobDir() throws Exception {
@@ -192,7 +187,7 @@ public class TempusDataWrangler {
 			pl("\t"+ coreId+"/"+cp.getTestID());
 			for (TempusJsonParser tjp: cp.getJsonDatasets()) tjp.printDeIDDocument();
 			cp.makeJobDirsMoveJson(coreId);
-//cp.downloadDatasets();
+			cp.downloadDatasets();
 		}
 	}
 
@@ -230,8 +225,10 @@ public class TempusDataWrangler {
 				String[] tokens = Misc.WHITESPACE.split(line);
 				if (tokens.length != 4) throw new IOException ("\nERROR: not seeing 4 parts of the .tar.gz line: "+line);
 
+				//skip?
+				if (testID != null && testIds2Skip.contains(testID) == true) pl("\tIn skip file\t"+line);
 				//check the age
-				if (checkAge(tokens) == false) pl("\tToo new\t"+line);
+				else if (checkAge(tokens) == false) pl("\tToo new\t"+line);
 				else {
 					//fetch or create the patient
 					if (testID != null) {
@@ -299,7 +296,7 @@ public class TempusDataWrangler {
 						case 'c': smmRegistryDirectory = new File(args[++i]); break;
 						case 't': minimumHrsOld = Integer.parseInt(args[++i]); break;
 						case 'p': profile =args[++i]; break;
-						case 'd': deleteAfterDownload = true; break;
+						case 'i': testIDsToSkip = new File(args[++i]); break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 						}
 					}
@@ -308,6 +305,11 @@ public class TempusDataWrangler {
 						Misc.printErrAndExit("\nSorry, something doesn't look right with this parameter: -"+test+"\n");
 					}
 				}
+			}
+			
+			//check prior proc files
+			if (testIDsToSkip == null || testIDsToSkip.exists() == false) {
+				Misc.printErrAndExit("Error: please provide a file containing Tempus TL-xxx IDs to skip, may be empty. Will be updated with the new tests that were successfully downloaded.");
 			}
 			
 			//check bucket
@@ -343,39 +345,41 @@ public class TempusDataWrangler {
 			envPropToAdd.put("AWS_SHARED_CREDENTIALS_FILE", credentialsFile.getCanonicalPath());
 
 			//Only needed in Eclipse
-			if (true) {
-				envPropToAdd.put("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin");
-				awsPath="/usr/local/bin/aws";
-			}
+			//if (1==2) {
+				//envPropToAdd.put("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin");
+				//awsPath="/usr/local/bin/aws";
+			//}
 			
 	}
 
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            Tempus Data Wrangler : May 2022                       **\n" +
+				"**                          Tempus Data Wrangler : August 2022                      **\n" +
 				"**************************************************************************************\n" +
 				"The Tempus Data Wrangler downloads complete patient datasets from an AWS bucket, parses\n"+
 				"the json test file for patient info, fetches/makes coreIds using the SubjectMatchMaker\n"+
 				"app and assembles TNRunner compatible analysis directories. If indicated, it will\n"+
-				"delete AWS objects that were successfully downloaded. A deidentified version of the\n"+
-				"xml report is saved. Do look at the log output at the failing patient datasets and\n"+
-				"resolve the issues (e.g. multiple/missing jsons, multiple DNA/RNA tars, etc.).\n"+
+				"delete AWS objects that were successfully downloaded. Deidentified versions of the\n"+
+				"json reports are saved. Do look at the log output at the failing patient datasets and\n"+
+				"resolve the issues (e.g. broken/missing jsons, multiple DNA/RNA tars, etc.).\n"+
 				
 				"\nOptions:\n"+
-				"-b S3 URI where Caris files are placed\n"+
+				"-b S3 URI where Tempus files are placed\n"+
 				"-j Directory to build patient job folders\n" +
-				"-r Directory to place PHI Caris xml reports\n"+
+				"-r Directory to place PHI Tempus json reports\n"+
 				"-s Directory to place temp files with PHI for Subject ID matching\n"+
 				"-c Directory containing the SubjectMatchMaker 'currentRegistry_' file\n"+
-				"-t Minimum hours old before downloading, defaults to 12\n"+
+				"-t Minimum hours old before downloading, defaults to 48\n"+
 				"-p Credentials profile, defaults to 'default'\n"+
-				"-d Delete S3 objects after successful download\n"+
+				"-i File containing Tempus TL-xxx IDs to skip, one per line.  This will be read and then\n"+
+				"      appended with datasets downloaded. Required. Can be empty.\n"+
 				
 
-				"\nExample: java -jar pathToUSeq/Apps/CarisDataWrangler -b s3://hci-caris/ \n"+
-				"     -j ~/Scratch/Caris/CJobs/ -r ~/Scratch/Caris/XmlReports_PHI/ -c \n"+
-				"     ~/Scratch/SMM/Registry_PHI -s ~/Scratch/Caris/SMM_Tmp_PHI\n"+
+				"\nExample: java -jar pathToUSeq/Apps/TempusDataWrangler -b s3://tm-huntsman/ \n"+
+				"     -j ~/Scratch/Tempus/TJobs/ -r ~/Scratch/Tempus/JsonReports_PHI/ -c \n"+
+				"     ~/Scratch/SMM/Registry_PHI -s ~/Scratch/Tempus/SMM_Tmp_PHI -i ~/Scratch/Tempus/\n"+
+				"     priorProcessedTestIds.txt\n"+
 
 				"\n**************************************************************************************\n");
 	}
@@ -429,8 +433,7 @@ public class TempusDataWrangler {
 	}
 	
 	private void checkAwsCli() throws Exception {
-		pl("\nChecking the aws cli...");
-		
+		pl("Checking the aws cli...");
 		String[] cmd = {awsPath, "--version"};
 		int exitCode = executeReturnExitCode(cmd, false, null);
 		if ( exitCode != 0) throw new IOException("Error: 'aws --version' failed to return an appropriate response.");
@@ -447,8 +450,7 @@ public class TempusDataWrangler {
 
 	public void cp(String awsObjectName, File localPath, boolean addToDeleteList) throws Exception {
 		String fullS3Uri = bucketURI+awsObjectName;
-		if (localPath.exists()) IO.pl("\tSkipping, exists "+localPath);
-		else {
+		if (localPath.exists() == false) {
 			String[] cmd = {awsPath, "s3", "cp", fullS3Uri, localPath.getCanonicalPath(), "--profile", profile, "--no-progress"};
 			int exitCode = executeReturnExitCode(cmd, true, null);
 			if ( exitCode != 0) {
@@ -456,15 +458,15 @@ public class TempusDataWrangler {
 				throw new IOException("Error: failed to cp "+ fullS3Uri + " to "+localPath); 
 			}
 		}
-		if (addToDeleteList) s3Objects2Delete.add(fullS3Uri);
 	}
-
-
 	public File getJobsDirectory() {
 		return jobsDirectory;
 	}
 	public File getPhiDirectory() {
 		return phiDirectory;
+	}
+	public String getBucketURI() {
+		return bucketURI;
 	}
 
 

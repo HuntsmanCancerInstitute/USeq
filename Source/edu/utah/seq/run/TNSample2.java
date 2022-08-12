@@ -22,6 +22,9 @@ public class TNSample2 {
 	private static final Pattern slurmJobId = Pattern.compile("slurm-(\\d+).out");
 	private ArrayList<String> info = new ArrayList<String>();
 	private boolean deleteSampleConcordance = false;
+	private PlatformGenderInfo platformGenderInfo = null;
+	// Tempus _RS.v RNASeq reqports
+	private String[] jsonFilesToSkip = new String[] {"_rs.v"};
 
 	//Fastq
 	private FastqCramDataset tumorDNAFastqCram = null;
@@ -58,7 +61,7 @@ public class TNSample2 {
 
 		//look for fastq folders and check they contain 2 xxx.gz files, some may be null
 		checkFastq();
-		
+
 		//RNA fusion, no alignments needed
 		if (tnRunner.getRNAFusionDocs() != null) rnaFusionAnalysis();
 
@@ -75,7 +78,7 @@ public class TNSample2 {
 
 			//sample concordance?
 			if (tnRunner.getSampleConcordanceDocs() != null) sampleConcordance();
-			
+
 			//haplotype calling on normal?
 			if (tnRunner.getHaplotypeCallDocs() != null) haplotypeCalling();
 
@@ -101,60 +104,79 @@ public class TNSample2 {
 	}
 
 
-		private void parseMergeClinicalVars() throws IOException {
-			info.add("Checking clinical variant integration...");
-			
-			//look for json file and xml vcfs
-			File[] jsonTestResults = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".json");
-			File[] xmls = null;
-			File[] vcfs = null;
-			File[] toLink = null;
-			
-			if (jsonTestResults == null || jsonTestResults.length !=1) {
-				
-				//look for caris xml and vcf.gz
-				xmls = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".xml");
-				vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf.gz");
-				if (vcfs == null || vcfs.length == 0) vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf");
-				if (xmls.length != 1 || vcfs.length != 1) {
-					info.add("\tJson/Xml/VcfReport\tFAILED to find one xxx.json or one xxx.vcf.gz and xxx.xml clinical test report file(s)");
-					failed = true;
-					return;
-				}
-				jsonTestResults = null;
-				toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), xmls[0], vcfs[0]};
-			}
-			else toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), jsonTestResults[0]};
-			
-			//make dir, ok if it already exists
-			File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_ClinicalVars");
-			jobDir.mkdirs();
+	private void parseMergeClinicalVars() throws IOException {
+		info.add("Checking clinical variant integration...");
 
-			//any files?
-			HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
-			if (nameFile.size() == 0) launch(jobDir, toLink, tnRunner.getClinicalVcfDocs());
+		//look for json file and xml vcfs
+		File[] jsonTestResults = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".json");
+		File[] xmls = null;
+		File[] vcfs = null;
+		File[] toLink = null;
+		
+		//more than one json file? exclude anything with RS.v
+		if (jsonTestResults.length>1)  jsonTestResults = filterJsonReports(jsonTestResults);
 
-			//OK some files are present
-			//COMPLETE
-			else if (nameFile.containsKey("COMPLETE")){
-				//find the final vcf file
-				File[] vcf = IO.extractFiles(new File(jobDir, "Vcfs"), "_final.vcf.gz");
-				if (vcf == null || vcf.length !=1) {
-					clearAndFail(jobDir, "\tThe clinical variant parsing and merging workflow was marked COMPLETE but failed to find the xxx_final.vcf.gz file in the Vcfs/ in "+jobDir);
-					return;
-				}
-				mergedSomaticVariants = vcf[0];
-				//remove the linked files
-				for (File f: toLink) new File(jobDir, f.getName()).delete();
-				info.add("\tCOMPLETE "+jobDir);
+		if (jsonTestResults == null || jsonTestResults.length !=1) {
+
+			//look for caris xml and vcf.gz
+			xmls = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".xml");
+			vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf.gz");
+			if (vcfs == null || vcfs.length == 0) vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf");
+			if (xmls.length != 1 || vcfs.length != 1) {
+				info.add("\tJson/Xml/VcfReport\tFAILED to find one xxx.json or one xxx.vcf.gz and xxx.xml clinical test report file(s)");
+				failed = true;
+				return;
 			}
-			
-			else checkJob(nameFile, jobDir, toLink, tnRunner.getClinicalVcfDocs());
+			jsonTestResults = null;
+			toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), xmls[0], vcfs[0]};
 		}
+		else toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), jsonTestResults[0]};
+
+		//make dir, ok if it already exists
+		File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_ClinicalVars");
+		jobDir.mkdirs();
+
+		//any files?
+		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+		if (nameFile.size() == 0) launch(jobDir, toLink, tnRunner.getClinicalVcfDocs());
+
+		//OK some files are present
+		//COMPLETE
+		else if (nameFile.containsKey("COMPLETE")){
+			//find the final vcf file
+			File[] vcf = IO.extractFiles(new File(jobDir, "Vcfs"), "_final.vcf.gz");
+			if (vcf == null || vcf.length !=1) {
+				clearAndFail(jobDir, "\tThe clinical variant parsing and merging workflow was marked COMPLETE but failed to find the xxx_final.vcf.gz file in the Vcfs/ in "+jobDir);
+				return;
+			}
+			mergedSomaticVariants = vcf[0];
+			//remove the linked files
+			for (File f: toLink) new File(jobDir, f.getName()).delete();
+			info.add("\tCOMPLETE "+jobDir);
+		}
+
+		else checkJob(nameFile, jobDir, toLink, tnRunner.getClinicalVcfDocs());
+	}
+
+	private File[] filterJsonReports(File[] jsonTestResults) {
+		ArrayList<File> toKeep = new ArrayList<File>();
+		for (File f: jsonTestResults) {
+			String lcName = f.getName().toLowerCase();
+			boolean keep = true;
+			for (String bad : jsonFilesToSkip) {
+				if (lcName.contains(bad)) keep = false;
+			}
+			if (keep) toKeep.add(f);
+		}
+		jsonTestResults = new File[toKeep.size()];
+		toKeep.toArray(jsonTestResults);
+		return jsonTestResults;
+	}
+
 
 	public void annotateGermlineVcf(String name) throws IOException {
 		info.add("Checking "+name+" germline variant annotation...");
-		
+
 		//look for genotyped vcf
 		File dir = new File (rootDir, "GermlineVariantCalling/"+id+"_"+ name);
 		if (dir.exists() == false) return;
@@ -199,7 +221,7 @@ public class TNSample2 {
 			cancelDeleteJobDir(IO.fetchNamesAndFiles(jobDir), jobDir, info, true);
 			return;
 		}
-		
+
 		//is there a tumor DNA alignment?
 		if (tumorDNAFastqCram.isCramFastqDirExists()) {
 			//what's the status of the alignment
@@ -208,7 +230,7 @@ public class TNSample2 {
 				return;
 			}
 		}
-		
+
 		//is there a normal DNA alignment?
 		if (normalDNAFastqCram.isCramFastqDirExists()) {
 			//what's the status of the alignment
@@ -217,7 +239,7 @@ public class TNSample2 {
 				return;
 			}
 		}
-		
+
 		//is there a tumor RNA alignment?
 		if (tumorTransFastqCram.isCramFastqDirExists()) {
 			//what's the status of the alignment
@@ -226,29 +248,29 @@ public class TNSample2 {
 				return;
 			}
 		}
-		
+
 		//OK all alignments are complete see which is available for concordance
 		//check to see if the alignments are present, sometimes these datasets are never coming
 		boolean goT = false;
 		boolean goN = false;
 		boolean goTT = false;
 		int numExist = 0;
-		
+
 		if (tumorDNAAlignment != null && tumorDNAAlignment.isComplete()) {
 			goT = true;
 			numExist++;
 		}
-		
+
 		if (normalDNAAlignment != null && normalDNAAlignment.isComplete() && normalDNAAlignment.getCramFile().getName().contains("NA12878")==false) {
 			goN = true;
 			numExist++;
 		}
-		
+
 		if (tumorRNAAlignment != null && tumorRNAAlignment.isComplete()) {
 			goTT = true;
 			numExist++;
 		}
-		
+
 		//too few?
 		if (numExist < 2) return;
 
@@ -269,14 +291,14 @@ public class TNSample2 {
 			removeSampleConcordanceLinks(jobDir);
 			info.add("\tCOMPLETE "+jobDir);
 		}
-		
+
 		else {
 			if (checkJob(nameFile, jobDir, null, tnRunner.getSampleConcordanceDocs())){
 				removeSampleConcordanceLinks(jobDir);
 				createSampleConcordanceLinks(jobDir, goT, goN, goTT);
 			}
 		}
-		
+
 	}
 
 	private void createSampleConcordanceLinks(File jobDir, boolean goT, boolean goN, boolean goTT) throws IOException{
@@ -303,12 +325,15 @@ public class TNSample2 {
 			File d = new File(rootDir, "ClinicalReport");
 			if (d.exists() == false) info= null;
 			info = IO.extractFiles(d, ".json");
+			
+			//more than one json file? all of them have sex/ gender
+			if (info.length>1)  info = new File[] {info[0]};
 			if (info == null || info.length !=1) info = IO.extractFiles(d, ".xml");
 			if (info == null || info.length !=1) info= null;
 		}
-		
-		if (info == null) throw new IOException( "ERROR: failed to find a json file containing gender information for SampleConcordance. See TNRunner menu.");
-		
+
+		if (info == null) throw new IOException( "ERROR: failed to find a json file containing gender information for SampleConcordance for id "+id);
+
 		Files.createSymbolicLink(new File(jobDir, "gender."+info[0].getName()).toPath(), info[0].toPath());
 	}
 
@@ -317,26 +342,26 @@ public class TNSample2 {
 		IO.deleteDirectory(bPFileDir);
 		File[] toDel = IO.extractFilesStartingWith(jobDir, "gender.");
 		if (toDel != null && toDel.length ==1) toDel[0].delete();
-		
+
 	}
 
 	private void annotateSomaticVcf() throws IOException {
 		info.add("Checking somatic variant annotation...");	
-		
+
 		//waiting on clinical vars?
 		if (tnRunner.getClinicalVcfDocs() != null && mergedSomaticVariants == null) {
 			running = true;
 			return;
 		}
-		
+
 		//make dir, ok if it already exists
 		File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_Anno");
 		jobDir.mkdirs();
-		
+
 		File[] toLink = null;
 		if (mergedSomaticVariants != null) toLink = new File[]{mergedSomaticVariants, new File(mergedSomaticVariants+".tbi")};
 		else toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi")};
-		
+
 		//any files?
 		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
 		if (nameFile.size() == 0) {
@@ -354,7 +379,7 @@ public class TNSample2 {
 			new File(jobDir, "vcfCallFrequency.config.txt").delete();
 			info.add("\tCOMPLETE "+jobDir);
 		}
-		
+
 		else {
 			if (checkJob(nameFile, jobDir, toLink, tnRunner.getVarAnnoDocs())){
 				IO.writeString(tnRunner.getSomaticAnnotatedVcfParser(), new File(jobDir, "annotatedVcfParser.config.txt"));
@@ -370,7 +395,8 @@ public class TNSample2 {
 			//no non matched so can't run som calling
 			if (tnRunner.getNonMatchedNormal() == null) return;
 		}
-		
+		parsePlatformGenderInfo();
+
 		//OK good to go
 		info.add("Checking somatic variant calling...");
 
@@ -402,11 +428,26 @@ public class TNSample2 {
 		}
 
 	}
-	
+
+	private PlatformGenderInfo parsePlatformGenderInfo() {
+		if (platformGenderInfo != null) return platformGenderInfo;
+		//attempt to parse platform and gender info
+		File[] toCheck = IO.extractFiles(new File(rootDir, "ClinicalReport"));
+		for (File f: toCheck) {
+			PlatformGenderInfo pgi = new PlatformGenderInfo(f.getName());
+			if (pgi.isParsed()) {
+				platformGenderInfo = pgi;
+				return platformGenderInfo;
+			}
+		}
+		return null;
+	}
+
+
 	private void haplotypeCalling() throws IOException {
-		
+
 		info.add("Checking germline haplotype calling status...");
-		
+
 		//look for normal cram files
 		if (normalDNAAlignment == null) {
 			info.add("\tMissing N alignment files.");
@@ -432,7 +473,7 @@ public class TNSample2 {
 				clearAndFail(jobDir, "\tThe haplotype status calling was marked COMPLETE but failed to find the final xxx.g.vcf.gz file in "+vcfDir);
 				return;
 			}
-			
+
 			//remove the linked files
 			removeHaplotypeCallingLinks(jobDir);
 			info.add("\tCOMPLETE "+jobDir);
@@ -441,7 +482,7 @@ public class TNSample2 {
 			if (checkJob(nameFile,jobDir,null, tnRunner.getHaplotypeCallDocs())) createHaplotypeCallingLinks(jobDir);
 		}
 	}
-	
+
 	private void createHaplotypeCallingLinks(File jobDir) throws IOException {
 		//remove any linked alignment files
 		removeHaplotypeCallingLinks(jobDir);
@@ -451,16 +492,16 @@ public class TNSample2 {
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.cram").toPath(), normalCram);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.crai").toPath(), normalCrai);
 	}
-	
+
 	private void removeHaplotypeCallingLinks(File jobDir) throws IOException{
 		File f = jobDir.getCanonicalFile();
 		new File(f, "normal.cram").delete();
 		new File(f, "normal.crai").delete();
 	}
-	
+
 	private void msiAnalysis() throws IOException {
 		info.add("Checking MSI status analysis...");
-		
+
 		//look for tumor and normal bam files
 		if (tumorDNAAlignment == null || normalDNAAlignment == null) {
 			info.add("\tMissing one or both T/N alignment files.");
@@ -523,7 +564,7 @@ public class TNSample2 {
 				clearAndFail(jobDir, "\tThe STAR Fusion workflow was marked COMPLETE but failed to find Spreadsheets/star-fusion.fusion_predictions.abridged.coding_effect.tsv.gz in "+jobDir);
 				return;
 			}
-			
+
 			//remove the linked files
 			File f = jobDir.getCanonicalFile();
 			new File(f, "1.fastq.gz").delete();
@@ -538,7 +579,7 @@ public class TNSample2 {
 			}
 		}
 	}
-	
+
 	private void createMsiLinks(File jobDir) throws IOException {
 		//remove any linked alignment files
 		removeMsiLinks(jobDir);
@@ -570,7 +611,7 @@ public class TNSample2 {
 			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.crai").toPath(), normalCrai);
 		}
 	}
-	
+
 	private void removeMsiLinks(File jobDir) throws IOException{
 		File f = jobDir.getCanonicalFile();
 		new File(f, "tumor.bam").delete();
@@ -584,12 +625,13 @@ public class TNSample2 {
 	}
 
 	private void copyRatioAnalysis() throws IOException {
-		if (tnRunner.getCopyRatioDocs() == null) return;
 		info.add("Checking copy ratio calling...");	
 		
+//need to skip XO.V and others without enough samples to build backgrounds
+
 		//look for tumor normal alignments
-		if (tumorDNAAlignment == null || normalDNAAlignment == null) return;
-		
+		if (tumorDNAAlignment == null || normalDNAAlignment == null ) return;
+
 		//look for germline vcf
 		if (germlineVcf == null) {
 			File vcf = null;
@@ -619,6 +661,15 @@ public class TNSample2 {
 			germlineVcf = new File[]{vcf, vcfIndex};
 		}
 		
+		//check if they want to skip this one
+		if (tnRunner.getPanels2SkipForCopyRatio()!=null) {
+			PlatformGenderInfo pgi = parsePlatformGenderInfo();
+			if (pgi.isParsed() && tnRunner.getPanels2SkipForCopyRatio().contains(pgi.getPanel())) {
+				info.add("\tSkipping panel "+pgi.getPanel());
+				return;
+			}
+		}
+
 		//make dir, ok if it already exists
 		File jobDir = new File (rootDir, "CopyAnalysis/"+id+"_GATKCopyRatio");
 		jobDir.mkdirs();
@@ -643,7 +694,7 @@ public class TNSample2 {
 			removeCopyRatioLinks(jobDir);
 			info.add("\tCOMPLETE "+jobDir);
 		}
-		
+
 		else {
 			if (checkJob(nameFile, jobDir, null, tnRunner.getCopyRatioDocs())){
 				createCopyRatioLinks(jobDir);
@@ -655,14 +706,10 @@ public class TNSample2 {
 		//remove any linked files
 		removeCopyRatioLinks(jobDir);
 
-		//pull gender from the xxxInfo.json.gz or .json info files
-		int gender = fetchGender(jobDir);
-		
-		if (gender == 0) throw new IOException("ERROR: failed to find or parse the gender/sex info from the .json file in "+rootDir);
-		Path bkg = null;
-		if (gender == 1) bkg = tnRunner.getMaleBkg().toPath();
-		else if (gender == 2 ) bkg = tnRunner.getFemaleBkg().toPath();
-		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"bkgPoN.hdf5").toPath(), bkg);
+		//fetch sex and platform matched copy ratio background file and the matching interval_list
+		File[] crBkg = fetchCopyRatioBackground();
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"bkgPoN.hdf5").toPath(), crBkg[0].toPath());
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"bkgPoN.interval_list").toPath(), crBkg[1].toPath());
 
 		//soft link in the new ones
 		Path tumorCram = tumorDNAAlignment.getCramFile().toPath();
@@ -680,42 +727,108 @@ public class TNSample2 {
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.vcf.gz.tbi").toPath(), normalTbi);
 	}
 
-	//throw new IOException("ERROR: failed to find the xxx_Info.json.gz file in "+rootDir);
-	private int fetchGender(File jobDir) throws IOException {
-		int gender = 0;
-	
-		//is it from Avatar?
-		File[] info = IO.extractFiles(rootDir, "Info.json.gz");
-		if (info == null || info.length !=1) {
-			//try to fetch from Tempus
-			File d = new File(rootDir, "ClinicalReport");
-			if (d.exists() == false) return 0;
-			info = IO.extractFiles(d, ".json");
-			if (info == null || info.length !=1) return 0;
+
+
+
+	/**Returns one hdf5 and one interval_list file set matched to the platform and sex*/
+	private File[] fetchCopyRatioBackground() throws IOException {
+		File hdf5 = null;
+		File il = null;
+		String gender = null;
+
+		//just one of each?
+		if (tnRunner.getCopyRatioHdf5Files().length == 1) hdf5 = tnRunner.getCopyRatioHdf5Files()[0];
+		if (tnRunner.getCopyRatioIntervalListFiles().length == 1) il = tnRunner.getCopyRatioIntervalListFiles()[0];
+		if (hdf5 != null && il != null ) return new File[] {hdf5, il};
+
+		//what is their gender
+		//is there a ClinicalReport dir? If so then try to get info from the file name
+		File crDir = new File(rootDir, "ClinicalReport");
+		if (crDir.exists()) {
+			PlatformGenderInfo pgi = parsePlatformGenderInfo();
+			if (pgi.isParsed() == false) throw new IOException("\nERROR: failed to parse gender info for copy ratio analysis from files in "+crDir);
+			if (pgi.getGender().startsWith("F")) gender = "F";
+			else if (pgi.getGender().startsWith("M")) gender = "M";
 		}
-		String[] lines = IO.loadFile(info[0]);
-		
-		for (String s: lines){
-			if (s.contains("Gender") || s.contains("\"sex\"")){
-				if (s.contains("F")) gender = 2;
-				else if (s.contains("M")) gender = 1;
+		else {
+			//pull gender from the xxxInfo.json.gz 
+			File[] info = IO.extractFiles(rootDir, "Info.json.gz");
+			if (info.length!=1) throw new IOException("\nERROR: failed to find the AVATAR xxxInfo.json.gz in "+rootDir);
+			String[] lines = IO.loadFile(info[0]);
+			for (String s: lines){
+				if (s.contains("Gender") || s.contains("\"sex\"")){
+					if (s.contains("F")) gender = "F";
+					else if (s.contains("M")) gender = "M";
+					break;
+				}
 			}
 		}
-		return gender;
-	}
+		if (gender == null) throw new IOException("\nERROR: failed to parse the gender from the AVATAR xxxInfo.json.gz or files in the ClinicalReport dirs for "+id);
 
+		//find a gender specific hdf5 file?
+		ArrayList<File> genderMatchedHdf5 = new ArrayList<File>();
+		if (hdf5 == null) {
+			for (File f: tnRunner.getCopyRatioHdf5Files()) {
+				String name = f.getName().toLowerCase();
+				if (gender.equals("F") && (name.contains("female") || name.endsWith("f.hdf5"))) genderMatchedHdf5.add(f);
+				else if (gender.equals("M") && (name.contains("male") || name.endsWith("m.hdf5"))) genderMatchedHdf5.add(f);
+			}
+		}
+		if (genderMatchedHdf5.size()==1) hdf5= genderMatchedHdf5.get(0);
+		else if (genderMatchedHdf5.size()==0) throw new IOException("\nERROR: failed to find any gender matching hdf5 "
+				+ "copy ratio files in  "+tnRunner.getCopyRatioHdf5Files()[0].getParent());
+		else {
+			//match platform
+			if (platformGenderInfo == null) throw new IOException("\nERROR: missing panel info to differentiate between the hdf5 files in "+crDir);
+			for (File f: genderMatchedHdf5) {
+				if (f.getName().contains(platformGenderInfo.getPanel())) {
+					hdf5 = f;
+					break;
+				}
+			}
+			if (hdf5 == null) throw new IOException ("\nERROR: failed to find a copy ratio hdf5 file that matches the panel "+
+					platformGenderInfo.getPanel()+" in "+tnRunner.getCopyRatioHdf5Files()[0].getParent()+" for "+id);
+		}
+
+		//find a panel and gender specific interval file?
+		ArrayList<File> genderMatchedInterval = new ArrayList<File>();
+		if (il == null) {
+			for (File f: tnRunner.getCopyRatioIntervalListFiles()) {
+				String name = f.getName().toLowerCase();
+				if (gender.equals("F") && (name.contains("female") || name.contains("_f."))) genderMatchedInterval.add(f);
+				else if (gender.equals("M") && (name.contains("male") || name.contains("_m."))) genderMatchedInterval.add(f);
+			}
+		}
+		if (genderMatchedInterval.size()==1) il= genderMatchedInterval.get(0);
+		else if (genderMatchedInterval.size()==0) throw new IOException("\nERROR: failed to find any gender matching interval_list "
+				+ "copy ratio files in  "+tnRunner.getCopyRatioHdf5Files()[0].getParent());
+		else {
+			//match platform
+			if (platformGenderInfo == null) throw new IOException("\nERROR: missing panel info to differentiate between the interval_list files in "+crDir);
+			for (File f: genderMatchedInterval) {
+				if (f.getName().contains(platformGenderInfo.getPanel())) {
+					il = f;
+					break;
+				}
+			}
+			if (il == null) throw new IOException ("\nERROR: failed to find a copy ratio interval_list file that matches the panel "+
+					platformGenderInfo.getPanel()+" in "+tnRunner.getCopyRatioHdf5Files()[0].getParent()+" for "+id);
+		}
+		return new File[] {hdf5, il};
+	}
 
 	private void removeCopyRatioLinks(File jobDir) throws IOException{
 		File f = jobDir.getCanonicalFile();
 		new File(f, "tumor.cram").delete();
 		new File(f, "tumor.crai").delete();
 		new File(f, "bkgPoN.hdf5").delete();
+		new File(f, "bkgPoN.interval_list").delete();
 		new File(f, "normal.cram").delete();
 		new File(f, "normal.crai").delete();
 		new File(f, "normal.vcf.gz").delete();
 		new File(f, "normal.vcf.gz.tbi").delete();
 	}
-	
+
 	/**Attempts to load the tumor and normal DNA File arrays and the tumor RNA*/
 	private boolean checkAlignments() throws IOException {
 		info.add("Checking alignments...");
@@ -725,7 +838,7 @@ public class TNSample2 {
 
 		//load with align dirs, if they exist check launch them
 		HashSet<String> keys = new HashSet<String>();
-		
+
 		if (alignDir.exists()) {
 			for (File ads: IO.extractOnlyDirectories(alignDir)) {
 				if (ads.getName().endsWith("_NormalDNA")) {
@@ -760,7 +873,7 @@ public class TNSample2 {
 				complete = false;
 			}
 		}
-		
+
 		if (tnRunner.getRNAAlignQCDocs() != null && tumorTransFastqCram.isGoodToAlign() && keys.contains("TumorRNA") == false) {
 			tumorRNAAlignment = RNAAlignQC(tumorTransFastqCram, null);
 			complete = false;
@@ -779,7 +892,7 @@ public class TNSample2 {
 
 		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
 		AlignmentDataset2 ad = new AlignmentDataset2(jobDir, info, true);
-		
+
 		//any files?
 		if (nameFile.size() == 0) {
 			createDNAAlignLinks(fd.getCramFastqs(), jobDir);
@@ -795,7 +908,7 @@ public class TNSample2 {
 			new File(f,"2.fastq.gz").delete();
 			new File(f, "rawSeq.cram").delete();
 		}
-		
+
 		else {
 			if (checkJob(nameFile, jobDir, null, tnRunner.getRNAAlignQCDocs())){
 				createDNAAlignLinks(fd.getCramFastqs(), jobDir);
@@ -803,7 +916,7 @@ public class TNSample2 {
 		}
 		return ad;
 	}
-	
+
 	private void clearAndFail(File jobDir, String infoLine) throws IOException{
 		if (infoLine != null) info.add(infoLine);
 		failed = true;
@@ -811,7 +924,7 @@ public class TNSample2 {
 		new File(jobDir, "FAILED").createNewFile();
 	}
 
-	
+
 	/**For DNAs, diff read coverage for passing bed generation
 	 * @throws IOException */
 	private AlignmentDataset2 DNAAlignQC(FastqCramDataset fd, File jobDir) throws IOException {
@@ -821,10 +934,10 @@ public class TNSample2 {
 			jobDir = new File (rootDir, "Alignment/"+id+"_"+fd.getName()).getCanonicalFile();
 			jobDir.mkdirs();
 		}
-		
+
 		AlignmentDataset2 ad = new AlignmentDataset2(jobDir, info, false);
 		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
-		
+
 		//no files so launch new alignment
 		if (nameFile.size() == 0) {
 			createDNAAlignLinks(fd.getCramFastqs(), jobDir);
@@ -836,14 +949,14 @@ public class TNSample2 {
 		else if (nameFile.containsKey("COMPLETE")) {
 			//were all the files found?
 			if (ad.isComplete() == false) clearAndFail(jobDir, null);
-			
+
 			//remove any linked fastq or cram files
 			File f = jobDir.getCanonicalFile();
 			new File(f, "1.fastq.gz").delete();
 			new File(f,"2.fastq.gz").delete();
 			new File(f, "rawSeq.cram").delete();
 		}
-		
+
 		//files present but not complete, check job
 		else {
 			if (checkJob(nameFile, jobDir, null, tnRunner.getDNAAlignQCDocs())){
@@ -875,7 +988,7 @@ public class TNSample2 {
 			Files.createSymbolicLink(new File(alignDir.getCanonicalFile(),"rawSeq.cram").toPath(), real1);
 		}
 	}
-	
+
 	private void createSomaticVariantLinks(File jobDir) throws IOException {
 		//remove any linked bam and bed files
 		removeSomaticLinks(jobDir);
@@ -884,7 +997,7 @@ public class TNSample2 {
 		Path tumorCram = tumorDNAAlignment.getCramFile().toPath();
 		Path tumorCrai = tumorDNAAlignment.getCramIndexFile().toPath();
 		Path tumorBed = tumorDNAAlignment.getBedFile().toPath();
-		
+
 		Path normalCram = null;
 		Path normalCrai = null;
 		Path normalBed = null;
@@ -902,7 +1015,7 @@ public class TNSample2 {
 			normalCrai = normalDNAAlignment.getCramIndexFile().toPath();
 			normalBed = normalDNAAlignment.getBedFile().toPath();
 		}
-		
+
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.cram").toPath(), tumorCram);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.crai").toPath(), tumorCrai);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bed.gz").toPath(), tumorBed);
@@ -915,7 +1028,40 @@ public class TNSample2 {
 			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.cram").toPath(), normalCram);
 			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.crai").toPath(), normalCrai);
 		}
+		//link in the bam pileup file
+		File[] bpileup = fetchBPileup();
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "bamPileup.bp.txt.gz").toPath(), bpileup[0].toPath());
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "bamPileup.bp.txt.gz.tbi").toPath(), bpileup[1].toPath());
 	}
+
+	private File[] fetchBPileup() throws IOException {
+		File bp = tnRunner.getBpileupFileOrDir();
+		if (bp.isFile()) {
+			IO.pl("\nBamPileup single file "+bp);
+			return new File[] {bp, new File(bp.getCanonicalPath()+".tbi")};
+		}
+		File[] bps = IO.extractFiles(bp, "bp.txt.gz");
+		if (bps.length == 0) throw new IOException("ERROR: failed to find any xxx.bp.txt.gz files in "+bp);
+		else if (bps.length == 1) {
+			IO.pl("\nBamPileup directory with single file "+bp);
+			return new File[] {bps[0], new File(bps[0].getCanonicalPath()+".tbi")};
+		}
+		else {
+			//more than one, any platform info?
+			if (platformGenderInfo == null) throw new IOException("ERROR: failed to find platform info for "+ id);
+			else {
+				String panel = platformGenderInfo.getPanel();
+				for (File f: bps) {
+					if (f.getName().contains(panel)) {
+						IO.pl("\nBamPileup file match "+f+ " for "+ platformGenderInfo.getOriginalName());						
+						return new File[] {f, new File(f.getCanonicalPath()+".tbi")};
+					}
+				}
+				throw new IOException("ERROR: failed to find a panel matched xxx.bp.txt.gz file in "+bp+" for "+platformGenderInfo.getOriginalName());
+			}	
+		}
+	}
+
 
 	private void removeSomaticLinks(File jobDir) throws IOException{
 		File f = jobDir.getCanonicalFile();
@@ -927,6 +1073,8 @@ public class TNSample2 {
 		new File(f, "normal.bed.gz").delete();
 		new File(f, "normal.bam").delete();
 		new File(f, "normal.bai").delete();
+		new File(f, "bamPileup.bp.txt.gz").delete();
+		new File(f, "bamPileup.bp.txt.gz.tbi").delete();
 	}
 
 	public static boolean checkQueue(HashMap<String, File> nameFile, File jobDir, ArrayList<String> info, boolean ignoreLackOfSlurmScript) throws IOException{
@@ -943,7 +1091,7 @@ public class TNSample2 {
 				return true;
 			}
 			else {
-				info.add("\tThe job was marked as STARTED but couldn't find the slurm-xxx.out file in "+jobDir);
+				info.add("\tThe job was marked as STARTED or QUEUED but couldn't find the slurm-xxx.out file in "+jobDir);
 				return false;
 			}
 		}
@@ -1040,13 +1188,13 @@ public class TNSample2 {
 		normalDNAFastqCram = new FastqCramDataset(fastqDir, "NormalDNA", info);
 		tumorTransFastqCram = new FastqCramDataset(fastqDir, "TumorRNA", info);
 	}
-	
+
 	public static File makeCheckFile(File parentDir, String fileName) throws IOException {
 		File f = new File(parentDir, fileName);
 		if (f.exists() == false) return null;
 		return f;
 	}
-	
+
 	/**Returns whether the job was restarted.*/
 	private boolean checkJob(HashMap<String, File> nameFile, File jobDir, File[] toSoftLink, File[] runDocs) throws IOException {
 		//force a restart?
@@ -1066,7 +1214,7 @@ public class TNSample2 {
 		}
 		//QUEUED
 		else if (nameFile.containsKey("QUEUED")){
-			if (TNSample2.checkQueue(nameFile, jobDir, info, true) == false) failed = true;
+			if (TNSample2.checkQueue(nameFile, jobDir, info, false) == false) failed = true;
 			else running = true;
 		}
 		//RUNME
@@ -1087,14 +1235,14 @@ public class TNSample2 {
 		}
 		return false;
 	}
-	
+
 	private void restart(File jobDir, File[] toSoftLink, File[] runDocs) throws IOException{
 		//launch it
 		launch(jobDir, toSoftLink, runDocs);
 		new File(jobDir, "RESTARTED").createNewFile();
 		info.add("\tRESTARTED");
 	}
-	
+
 	private void launch(File jobDir, File[] toLink, File[] docs) throws IOException{
 		if (tnRunner.isSbatch()) info.add("\tLAUNCHING "+jobDir);
 		else info.add("\tSETTING UP "+jobDir);

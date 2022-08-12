@@ -359,8 +359,8 @@ public class Misc {
 	 * If none found returns the original.
 	 */
 	public static String removeExtension(String txt) {
-		txt = txt.replaceAll(".gz", "");
-		txt = txt.replaceAll(".zip", "");
+		txt = txt.replaceAll("\\.gz", "");
+		txt = txt.replaceAll("\\.zip", "");
 		int index = txt.lastIndexOf(".");
 		if (index != -1)  return txt.substring(0,index);
 		return txt;

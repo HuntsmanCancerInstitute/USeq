@@ -2,8 +2,6 @@ package edu.utah.seq.run.tempus;
 
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import util.gen.IO;
 import util.gen.Json;
 
 public class TempusJsonOrder {
@@ -12,7 +10,6 @@ public class TempusJsonOrder {
 	private String accessionId = null;
 	private String testCode = null;
 	private String testDescription = null;
-	private String institution = null;
 	
 	/*
     "order": {
@@ -40,7 +37,6 @@ public class TempusJsonOrder {
 	 */
 	public TempusJsonOrder(JSONObject main) throws JSONException {
 		JSONObject order = main.getJSONObject("order");
-		institution = Json.getStringAttribute(order, "institution");
 		physician = Json.getStringAttribute(order, "physician");
 		accessionId = Json.getStringAttribute(order, "accessionId");
 		JSONObject test = order.getJSONObject("test");
@@ -50,9 +46,7 @@ public class TempusJsonOrder {
 	}
 
 	private void fixTestCode() {
-		if (testCode.contains(".")) return;
-		else testCode = testCode+".V1";
-		
+		if (testCode.contains(".") == false) testCode = testCode+".V1";
 	}
 
 	public String getPhysician() {

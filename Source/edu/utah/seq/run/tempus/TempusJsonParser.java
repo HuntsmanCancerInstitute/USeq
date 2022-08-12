@@ -155,10 +155,13 @@ public class TempusJsonParser {
 		//Male or Female
 		if (gender.equals("MALE")) gender = "M";
 		else if (gender.equals("FEMALE")) gender = "F";
-		else throw new Exception("ERROR: parsing gender, must be Male or Female, see <gender> in "+jsonFile.getCanonicalPath());
+		else {
+			gender = "NA";
+			throw new Exception("ERROR: parsing gender, must be Male or Female, see <sex> in "+jsonFile.getCanonicalPath());
+		}
 	}
 
-	private void parseDoB() throws IOException, Exception {
+	private void parseDoB() throws Exception {
 		if (dob == null || dob.length()==0) return;
 		//1965-06-15, 1950-07-26
 		String[] t = Misc.DASH.split(dob);

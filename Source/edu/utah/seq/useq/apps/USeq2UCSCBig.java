@@ -142,6 +142,7 @@ public class USeq2UCSCBig extends Thread{
 	}
 
 	private ArrayList<File> convertRegionData() throws Exception{
+		
 		String name = workingUSeqArchiveFile.getName().replace(USeqUtilities.USEQ_EXTENSION_WITH_PERIOD, "");
 		tempFile = new File (workingUSeqArchiveFile.getCanonicalPath() + ".bed");
 
@@ -227,7 +228,7 @@ public class USeq2UCSCBig extends Thread{
 	}
 
 	private ArrayList<File> convertGraphData() throws Exception{	
-		
+
 		USeq2Text useq2Text = new USeq2Text();
 		useq2Text.setPrintWigFormat(true);
 		String name = workingUSeqArchiveFile.getName().replace(USeqUtilities.USEQ_EXTENSION_WITH_PERIOD, "");
@@ -265,7 +266,7 @@ public class USeq2UCSCBig extends Thread{
 
 		}
 		else {
-			//convert all		
+			//convert all	
 			useq2Text.print2WigFile(workingUSeqArchiveFile, tempFile, null);
 			//convert text to binary, wigToBigWig in.wig chrom.sizes out.bw
 			convertedFile = new File (workingUSeqArchiveFile.getParentFile(), name + ".bw");

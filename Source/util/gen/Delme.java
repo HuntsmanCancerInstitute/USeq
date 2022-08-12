@@ -7,19 +7,33 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.apache.commons.text.similarity.LevenshteinDistance;
+
+import edu.utah.seq.run.PlatformGenderInfo;
  
 public class Delme {
  
 	public static void main(String[] args) {
 		
-		String x= "2021-07-27 14:28:33       4236 result_json/result_bbaa32a7-4fb2-4b11-b805-deea248aa231.json";
-		x=x.trim();
-		Pattern jsonPat = Pattern.compile(".+\\sresult_json/.+\\.json");
-		Matcher mat = pat.matcher(x);
-		if (mat.matches()) IO.pl("Match ");
+		String x= "TL-18-843E9B_XT.V1_2018-10-26_gz_Neeraj_Agarwal_F.json.txt.gz";
+		
+		IO.pl(x);
+		IO.pl(removeExtension(x));
 
 		
 	}
+	
+	/**Removes .gz, .zip. and then an extension if found xxx.txt.gz -> xxx
+	 * If none found returns the original.
+	 */
+	public static String removeExtension(String txt) {
+		txt = txt.replaceAll("\\.gz", "");
+		txt = txt.replaceAll("\\.zip", "");
+		int index = txt.lastIndexOf(".");
+		if (index != -1)  return txt.substring(0,index);
+		return txt;
+	}
+	
+	
 }
 	
 	

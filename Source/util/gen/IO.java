@@ -1102,6 +1102,25 @@ public class IO {
 		
 	}
 	
+	/**Uses ProcessBuilder to execute a cmd, returns the exit code.*/
+	public static int executeViaProcessBuilderReturnExit(String[] command){
+		Process proc = null;
+		try {
+			ProcessBuilder pb = new ProcessBuilder(command);
+			proc = pb.start();
+			int numToWait = 100000;
+			while (proc.isAlive()) {
+				Thread.currentThread().sleep(100);
+				if (numToWait-- < 0) throw new Exception("ERROR: Process failed to complete in timely fashion.");
+			}
+			return proc.exitValue();
+		} catch (Exception e) {
+			proc.destroy();
+			return 1;
+		}
+		
+	}
+	
 	/**Executes tokenized params on command line, use full paths.
 	 * Put each param in its own String.  
 	 * Returns the output, starting with ERROR if it encountered an issue
@@ -2165,9 +2184,6 @@ public class IO {
 			while ((line = in.readLine())!=null){
 				line = line.trim();
 				if (line.length() ==0) continue;
-				//if (names.contains(line)) {
-				//	System.out.println("\tDuplicate line found while loading hash -> "+line);
-				//}
 				names.add(line);
 			}
 			in.close();

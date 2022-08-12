@@ -2,11 +2,9 @@ package edu.utah.seq.run.tempus;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Date;
-import java.util.concurrent.TimeUnit;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -19,10 +17,11 @@ public class TempusPatient {
 	private ArrayList<TempusJsonParser> jsonDatasets = new ArrayList<TempusJsonParser>();
 	private ArrayList<String> dnaPaths = new ArrayList<String>();
 	private ArrayList<String> rnaPaths = new ArrayList<String>();
-	
 	private File testDir = null;
 	private File clinReportDir = null;
 	private boolean ready = true;
+	//TL-20-A73CBE_T_DSQ1_2.fastq.gz
+	private static final Pattern dnaSource = Pattern.compile(".+_([TN])_DSQ.+");
 	
 	
 	
@@ -51,7 +50,6 @@ public class TempusPatient {
 		//pull Json names
 		ArrayList<String> jsonFileNames = new ArrayList<String>();
 		for (TempusJsonParser tjp: jsonDatasets) jsonFileNames.add(tjp.getJsonFile().getName());
-if (jsonDatasets.size()>1) System.exit(0);
 		
 		IO.pl("\tJson\t"+oneJson+"\t"+ jsonFileNames);
 		IO.pl("\tDNA\t"+oneDna+"\t"+ dnaPaths);
@@ -92,15 +90,113 @@ if (jsonDatasets.size()>1) System.exit(0);
 		File fastqDir = new File (testDir, "Fastq");
 		fastqDir.mkdir();
 		
-		//must be one DNA, might contain tumor and normal		
-		cdw.cp(dnaPaths.get(0), new File (fastqDir, "/TarDNA/"+fetchName(dnaPaths.get(0))), true);
-			
+		//must be one DNA, might contain tumor and normal	
+		File tarDna = new File (fastqDir, "/TarDNA/"+fetchName(dnaPaths.get(0)));
+		File unpacked = new File(tarDna.getCanonicalPath()+".unpacked");
+		
+		if (unpacked.exists() == false) {
+			//download it
+			cdw.cp(dnaPaths.get(0), tarDna, true);
+			//untar, delete, replace with empty placeholder
+			unPackIt(tarDna);
+		}
+		
+		//move the fastq.gz files?
+		moveDNAFastq(tarDna.getParentFile(), fastqDir);
+		
+		
 		//any RNA?
 		if (rnaPaths.size() == 1) {
-			cdw.cp(rnaPaths.get(0), new File (fastqDir, "/TarRNA/"+fetchName(rnaPaths.get(0))), true);
+			File tarRna =  new File (fastqDir, "/TarRNA/"+fetchName(rnaPaths.get(0)));
+			unpacked = new File(tarRna.getCanonicalPath()+".unpacked");
+			
+			if (unpacked.exists() == false) {
+				//download it
+				cdw.cp(rnaPaths.get(0), tarRna, true);
+				//untar, delete, replace with empty placeholder
+				unPackIt(tarRna);
+			}
+
+			//any fastq.gz files?
+			moveRNAFastq(tarRna.getParentFile(), fastqDir);
 		}
 	}
 	
+	private void moveRNAFastq(File rnaDir, File fastqDir) throws IOException {
+		File[] gz = IO.extractFiles(rnaDir, "q.gz");
+		if (gz.length !=0) {
+			if (gz.length == 2) {
+				File tumorFastq = new File(fastqDir, "TumorRNA");
+				tumorFastq.mkdir();
+				for (File f: gz) {
+					File moved = new File(tumorFastq, f.getName());
+					f.renameTo(moved);
+				}
+			}
+			else throw new IOException("Failed to find two RNA fastq files in "+rnaDir);
+		}
+	}
+
+	
+	private void moveDNAFastq(File dnaDir, File fastqDir) throws IOException {
+		File[] gz = IO.extractFiles(dnaDir, "q.gz");		
+		if (gz.length !=0) {
+			File tumorFastq = null;
+			File normalFastq = null;
+			int numT = 0;
+			int numN = 0;
+			for (File f: gz) {
+				Matcher mat = dnaSource.matcher(f.getName());
+				if (mat.matches()) {
+					String source = mat.group(1);
+					if (source.equals("T")) {
+						if (tumorFastq == null) {
+							tumorFastq = new File(fastqDir, "TumorDNA");
+							tumorFastq.mkdir();
+						}
+						File moved = new File(tumorFastq, f.getName());
+						f.renameTo(moved);
+						numT++;
+					}
+					else if (source.equals("N")) {
+						if (normalFastq == null) {
+							normalFastq = new File(fastqDir, "NormalDNA");
+							normalFastq.mkdir();
+						}
+						File moved = new File(normalFastq, f.getName());
+						f.renameTo(moved);
+						numN++;
+					}
+					else throw new IOException("Failed to extract the correct DNA source (T or N) from "+f);
+				}
+				else throw new IOException("Failed to extract the DNA source (T or N) from "+f);
+			}
+			//check the numbers
+			if (numT!=0 && numT!=2) throw new IOException("Failed to find two TumorDNA fastq files in "+fastqDir);
+			if (numN!=0 && numN!=2) throw new IOException("Failed to find two NormalDNA fastq files in "+fastqDir);
+		}
+		
+	}
+
+	private void unPackIt(File tarGzFile) throws IOException {
+		
+		//untar it
+		String tarPath = tarGzFile.getCanonicalPath();
+		String[] cmd = {
+				"tar", "-xf", tarPath, 
+				"-C", tarGzFile.getCanonicalFile().getParent()+"/"
+		};		
+		int exitCode = IO.executeViaProcessBuilderReturnExit(cmd);		
+		if (exitCode !=0) throw new IOException("ERROR: failed to untar "+tarGzFile);
+
+		//delete it
+		if (tarGzFile.delete() == false) throw new IOException("ERROR: failed to delete "+tarGzFile);
+		
+		//create placeholder
+		File unpacked = new File(tarPath+".unpacked");
+		unpacked.createNewFile();
+	}
+
 	public String fetchName (String tarPath) {
 		String[] t = Misc.FORWARD_SLASH.split(tarPath);
 		return (t[t.length-1]);
@@ -112,10 +208,15 @@ if (jsonDatasets.size()>1) System.exit(0);
 		testDir.mkdirs();
 		clinReportDir = new File (testDir, "/ClinicalReport/");
 		clinReportDir.mkdirs();
-		//move the report(s) into the ClinicalReport folder
+		clinReportDir = clinReportDir.getCanonicalFile();
+		if (clinReportDir.exists() == false) throw new IOException("\nError: failed to make "+clinReportDir);
+		// for some reason the files won't move!  Wonder if it's a latency issue with creating the dir, nope seems to be an issue with rw disk mounts
+		//copy then set to delete, the report(s) into the ClinicalReport folder	
 		for (TempusJsonParser tjp : jsonDatasets) {
 			File deId = tjp.getDeidentifiedJsonFile();
-			deId.renameTo(new File(clinReportDir, deId.getName()));
+			File inClinRep = new File(clinReportDir, deId.getName());
+			if (IO.copyViaFileChannel(deId, inClinRep) == false) throw new IOException("\nError: failed to move "+deId+" to "+inClinRep);
+			else deId.deleteOnExit();
 		}
 		
 	}
