@@ -118,30 +118,38 @@ public class CarisPatient {
 		File fastqDir = new File (testDir, "Fastq");
 		fastqDir.mkdir();
 		//cp in vcf
-		if (vcfNames.size()==1) cdw.cp(vcfNames.get(0), new File (clinReportDir, vcfNames.get(0)));
+		if (vcfNames.size()==1) cdw.cp(vcfNames.get(0), new File (clinReportDir, vcfNames.get(0)), true);
 		//cp in xml, already done so skip
 		//cdw.cp(xmlNames.get(0), new File (clinDir, xmlNames.get(0)));
 		//cp in DNA
 		if (dnaNames.size()==2) {
-			cdw.cp(dnaNames.get(0), new File (fastqDir, "/TumorDNA/"+dnaNames.get(0)));
-			cdw.cp(dnaNames.get(1), new File (fastqDir, "/TumorDNA/"+dnaNames.get(1)));
+			cdw.cp(dnaNames.get(0), new File (fastqDir, "/TumorDNA/"+dnaNames.get(0)), true);
+			cdw.cp(dnaNames.get(1), new File (fastqDir, "/TumorDNA/"+dnaNames.get(1)), true);
 		}
 		//any RNA?
 		if (rnaNames.size() == 2) {
 			//cp in RNA0
-			cdw.cp(rnaNames.get(0), new File (fastqDir, "/TumorRNA/"+rnaNames.get(0)));
+			cdw.cp(rnaNames.get(0), new File (fastqDir, "/TumorRNA/"+rnaNames.get(0)), true);
 			//cp in RNA1
-			cdw.cp(rnaNames.get(1), new File (fastqDir, "/TumorRNA/"+rnaNames.get(1)));
+			cdw.cp(rnaNames.get(1), new File (fastqDir, "/TumorRNA/"+rnaNames.get(1)), true);
 		}
 	}
 	
 	public void fetchXmlAndLoad() throws Exception {
 		//cp from S3 the xml to the PHI directory
 		File xml = new File (cdw.getPhiDirectory(), xmlNames.get(0));
-		cdw.cp(xmlNames.get(0), xml);
+		cdw.cp(xmlNames.get(0), xml, false);
 				
-		//load patient info
-		carisXml = new CarisXmlParser(xml);
+		//load patient info, might be broken
+		try {
+			carisXml = new CarisXmlParser(xml);
+		} catch (Exception e) {
+			ready = false;
+			IO.el("\tError parsing xml file "+xml.getName()+" skipping patient processing "+e.getMessage());
+		}
+		
+		//add to delete
+		cdw.addObjectToDelete(xmlNames.get(0));
 	}
 	public void makeJobDirsMoveXml(String coreId) throws Exception {
 		//parse the date from the xml, TN21-109147_2021-02-24_11_18.xml and TN20-170109_2021-01-20_21.31.xml

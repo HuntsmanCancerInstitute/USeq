@@ -163,8 +163,9 @@ public class AvatarComparator {
 					int index = ad.getName().lastIndexOf("_");
 					if (index != -1) nameS3Fastq.remove(ad.getName().substring(index+1));
 					File bam = new File(ad, "Bam");
+					if (bam.exists() == false) bam = new File(ad, "Alignment");
 					if (bam.exists() == false) {
-						IO.pl(name+"\tERROR: Failed to find the Bam/ folder in "+ad+" alignment dir?!");
+						IO.pl(name+"\tERROR: Failed to find the Bam/ or Alignment/ folder in "+ad+" alignment dir?!");
 						needsAttention.add(patientDir);
 						continue;
 					}
@@ -253,7 +254,7 @@ public class AvatarComparator {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Avatar Comparator : June 2020                          **\n" +
+				"**                           Avatar Comparator : Sept 2022                          **\n" +
 				"**************************************************************************************\n" +
 				"Tool for identifying AVATAR datasets that are ready for analysis or need attention.\n"+
 

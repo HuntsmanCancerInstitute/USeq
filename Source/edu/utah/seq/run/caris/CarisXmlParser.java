@@ -49,31 +49,24 @@ public class CarisXmlParser {
 	public String fetchSubjectMatchMakerLine() {
 		StringBuilder sb = new StringBuilder();
 		if (lastName != null) sb.append(lastName);
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (firstName != null) sb.append(firstName);
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (dobMonth != -1) sb.append(new Integer(dobMonth).toString());
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (dobDay != -1) sb.append(new Integer(dobDay).toString());
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (dobYear != -1) sb.append(new Integer(dobYear).toString());
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (gender != null) sb.append(gender);
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (mrn != null) sb.append(mrn);
-		else sb.append(".");
 		return sb.toString();
 	}
 	

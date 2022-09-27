@@ -38,4 +38,8 @@ public class Patient {
 	public ArrayList<NormalSample> getNormalSamples() {
 		return normalSamples;
 	}
+
+	public void setGender(String gender) {
+		this.gender = gender;
+	}
 }

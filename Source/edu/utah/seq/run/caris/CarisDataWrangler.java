@@ -131,13 +131,18 @@ public class CarisDataWrangler {
 		
 		PrintWriter out = new PrintWriter (new FileWriter( queryFile));
 		
-		//write out each for lookup
+		//write out each for lookup, check some xmls are broken
+		ArrayList<CarisPatient> readyPatients = new ArrayList<CarisPatient>();
 		for (CarisPatient cp : workingPatients) {
 			cp.fetchXmlAndLoad();
-			String att = cp.getCarisXml().fetchSubjectMatchMakerLine();
-			out.println(att);	
+			if (cp.isReady()) {
+				String att = cp.getCarisXml().fetchSubjectMatchMakerLine();
+				out.println(att);
+				readyPatients.add(cp);
+			}
 		}
 		out.close();
+		workingPatients = readyPatients;
 		
 		//run the SMM
 		String[] args = {
@@ -145,7 +150,9 @@ public class CarisDataWrangler {
 				"-q", queryFile.getCanonicalPath(),
 				"-o", queryResDir.getCanonicalPath(),
 				"-v", //turn off verbosity
-				"-a" //adding queries not found to registry
+				"-a", //adding queries not found to registry
+				"-c", //making name matching case-insensitive for EDW
+				"-u"  //fill in info not found to registry entries from queries, e.g. missing mrns, otherIds
 		};
 		SubjectMatchMaker smm = new SubjectMatchMaker(args);
 		queries = smm.getQuerySubjects();
@@ -155,11 +162,13 @@ public class CarisDataWrangler {
 		pl("\nDownloading files and building TNRunner run folders...");
 		for (int i=0; i< workingPatients.size(); i++) {
 			CarisPatient cp = workingPatients.get(i);
-			Subject s = queries[i];
-			String coreId = s.getCoreIdNewOrMatch();
-			pl("\t"+ coreId+"/"+cp.getTestID());
-			cp.makeJobDirsMoveXml(coreId);
-			cp.downloadDatasets();
+			if (cp.isReady()) {
+				Subject s = queries[i];
+				String coreId = s.getCoreIdNewOrMatch();
+				pl("\t"+ coreId+"/"+cp.getTestID());
+				cp.makeJobDirsMoveXml(coreId);
+				cp.downloadDatasets();
+			}
 		}
 	}
 
@@ -301,7 +310,7 @@ public class CarisDataWrangler {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                             Caris Data Wrangler : May 2022                       **\n" +
+				"**                             Caris Data Wrangler : Aug 2022                       **\n" +
 				"**************************************************************************************\n" +
 				"The Caris Data Wrangler downloads complete patient datasets from an AWS bucket, parses\n"+
 				"the xml test file for patient info, fetches/makes coreIds using the SubjectMatchMaker\n"+
@@ -420,7 +429,7 @@ public class CarisDataWrangler {
 	}
 
 
-	public void cp(String awsObjectName, File localPath) throws Exception {
+	public void cp(String awsObjectName, File localPath, boolean addToDelete) throws Exception {
 		String fullS3Uri = bucketURI+awsObjectName;
 		if (localPath.exists()) IO.pl("\tSkipping, exists "+localPath);
 		else {
@@ -431,6 +440,11 @@ public class CarisDataWrangler {
 				throw new IOException("Error: failed to cp "+ fullS3Uri + " to "+localPath); 
 			}
 		}
+		s3Objects2Delete.add(fullS3Uri);
+	}
+	
+	public void addObjectToDelete(String awsObjectName) {
+		String fullS3Uri = bucketURI+awsObjectName;
 		s3Objects2Delete.add(fullS3Uri);
 	}
 

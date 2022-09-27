@@ -2,7 +2,9 @@ package util.gen;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.io.File;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.PrintWriter;
 
 import org.apache.log4j.Logger;
@@ -24,6 +26,7 @@ public class Misc {
 	public static final Pattern DASH = Pattern.compile("-");
 	public static final Pattern COLON = Pattern.compile(":");
 	public static final Pattern COMMA = Pattern.compile(",");
+	public static final Pattern PERIOD = Pattern.compile("\\.");
 	public static final Pattern SINGLE_QUOTE = Pattern.compile("'");
 	public static final Pattern SEMI_COLON = Pattern.compile(";");
 	public static final Pattern PIPE = Pattern.compile("\\|");
@@ -31,6 +34,37 @@ public class Misc {
 	public static final Pattern GREATER_THAN = Pattern.compile(">");
 	public static final Pattern AMP = Pattern.compile("&");
 	public static final Pattern CSV = Pattern.compile("\",\"");
+	
+	/**For identifying MolecularDataPatientIds, see edu.utah.hci.bioinfo.smm.CoreId */
+	public static final Pattern CORE_ID_Pattern = Pattern.compile("[A-Za-z&&[^OoIilL]]{2}[2-9][A-Za-z&&[^OoIilL]]{2}[2-9][A-Za-z&&[^OoIilL]]{2}");
+	
+	/**Attempts to parse a MolecularDataPatientID from the name separated by an underscore or from the path where the MDPID is used as a dir in the path
+	 * Returns null if not found or throws an error if a problem is an issue.*/
+	public static String fetchMDPID(File f) {
+		try {
+			//attempt to get it from the first part of the name, e.g. from hG9fu8Jx_TN22-135333_2022-05-20_10_47_deid_Neeraj_Agarwal
+			String[] split = UNDERSCORE.split(f.getName());
+			if (CORE_ID_Pattern.matcher(split[0]).matches()) return split[0];
+			
+			//attempt to get it from a sub dir in the path, e.g. /scratch/general/pe-nfs1/u0028003/Tempus/Runs/11Aug2022/TJobs/Rk7Ps4er/Tempus/TL-22-VUTSJR3Y/ClinicalReport/TL-22-VUTSJR3Y_XT.V4_2022-07-12_deid_Joe_Mendez_M.json
+			String cp = f.getCanonicalPath();
+			split = FORWARD_SLASH.split(cp);
+			String id = null;
+			for (String testId: split) {
+				if (CORE_ID_Pattern.matcher(testId).matches()) {
+					//not set?
+					if (id == null) id = testId;
+					//not same?
+					else if (id.equals(testId) == false) throw new IOException("ERROR, two different coreIds found: "+id+" "+testId);
+				}
+			}
+			return id;
+		} catch (IOException e) {
+			System.err.println("ERROR fetching coreId from "+f);
+			e.printStackTrace();
+			return null;
+		}
+	}
 	
 	/**Splits a comma and quotation split csv line.*/
 	public static String[] splitCsvLine(String line) {

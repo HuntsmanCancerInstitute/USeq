@@ -20,6 +20,7 @@ public class CarisXmlVcfParser {
 	//user defined fields
 	private HashMap<String, File[]> xmlVcfFiles = null;
 	private File saveDirectory;
+	private File nameXmlVcfFile = null;
 	private boolean includePHI = false;
 	private boolean saveAllVcfRecords = false;
 	private boolean skipUnPaired = false;
@@ -127,7 +128,6 @@ public class CarisXmlVcfParser {
 			File[] xv = xmlVcfFiles.get(workingReportName);
 			workingXmlFile = xv[0];
 			workingVcfFile = xv[1];
-//IO.pl("\tXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX\t"+workingReportName);
 
 			//clear any prior data
 			workingReportAttributes = new LinkedHashMap<String,String>();
@@ -139,8 +139,13 @@ public class CarisXmlVcfParser {
 			workingMethylationAlterations.clear();
 			workingNumberFailedGenomicMatches = 0;
 			
+			//attempt to add MDPID
+			addMDPID();
+			
 			//add xml name, often contains the patient id
 			workingReportAttributes.put("XmlFileName", Misc.removeExtension(workingXmlFile.getName()));
+			
+
 
 			loadVcf();
 
@@ -157,6 +162,11 @@ public class CarisXmlVcfParser {
 			statLines[index] = statParsing();
 			allReportAttributes[index++] = workingReportAttributes;
 		}
+	}
+	
+	private void addMDPID() throws IOException {
+		String mdpid = Misc.fetchMDPID(workingXmlFile);
+		if (mdpid != null) workingReportAttributes.put("MolecularDataPatientId", mdpid);
 	}
 
 	private void matchVcfWithGenomicAlts() {
@@ -207,7 +217,8 @@ public class CarisXmlVcfParser {
 	private void buildIHCHash() {
 		String[] ihcNames = {"p16","PD-L1 (SP263)", "PD-L1 (22c3)", "PD-L1 (SP142)", "PD-L1 FDA(SP142)", "PD-L1 FDA (28-8)", 
 				"MLH1", "PMS2", "MSH2", "MSH6", "ALK", "PTEN", "Mismatch Repair Status", "Her2/Neu", 
-				"TrkA/B/C", "Androgen Receptor", "Folfox Responder Similarity Score", "ROS1", "ER" };
+				"TrkA/B/C", "Androgen Receptor", "Folfox Responder Similarity Score", "ROS1", "ER", 
+				"BRAF V600E" };
 		ihcTestNames = new HashSet<String>();
 		for (String n: ihcNames) ihcTestNames.add(n);
 
@@ -425,6 +436,9 @@ public class CarisXmlVcfParser {
 					else if (testName.equals("RNA Expression")){
 						IO.el("\nSkipping the parsing of 'RNA Expression' test for a small set of genes.");
 					}
+					else if (testName.equals("HPV16") || testName.equals("HPV18")){
+						IO.el("\nSkipping the parsing of 'HPV16' or 'HPV18' test for a viral sequencing.");
+					}
 					else if (testName.equals("eKarotypeGraph")){
 						//silently skip, this is a binary result
 					}
@@ -446,7 +460,7 @@ public class CarisXmlVcfParser {
 						Node n = subNodes.item(i);
 						if (n instanceof Element) {
 							String subName = n.getNodeName();
-							if (subName.equals("expressionAlteration")) this.workingExpressionAlterations.add( new ExpressionAlteration(this.workingReportAttributes, n.getChildNodes()));
+							if (subName.equals("expressionAlteration")) workingExpressionAlterations.add( new ExpressionAlteration(this.workingReportAttributes, n.getChildNodes()));
 							else throw new IOException("Found something other than 'expressionAlteration' "+subName);
 						}
 					}
@@ -734,8 +748,9 @@ public class CarisXmlVcfParser {
 		new CarisXmlVcfParser(args);
 	}		
 
-	/**This method will process each argument and assign new varibles*/
-	public void processArgs(String[] args){
+	/**This method will process each argument and assign new varibles
+	 * @throws IOException */
+	public void processArgs(String[] args) throws IOException{
 		Pattern pat = Pattern.compile("-[a-z]");
 		String useqVersion = IO.fetchUSeqVersion();
 		source = useqVersion+" Args: "+ Misc.stringArrayToString(args, " ");
@@ -751,6 +766,7 @@ public class CarisXmlVcfParser {
 				try{
 					switch (test){
 					case 'd': vcfXmlDir = new File(args[++i]); break;
+					case 'f': nameXmlVcfFile = new File(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
 					case 'u': ucscFile = new File(args[++i]); break;
 					case 'i': includePHI = true; break;
@@ -770,7 +786,8 @@ public class CarisXmlVcfParser {
 		if (saveDirectory.isDirectory() == false) Misc.printErrAndExit("\nError: your save directory does not appear to be a directory?\n");
 
 		if (vcfXmlDir != null && vcfXmlDir.exists()) parseXmlVcfFiles(vcfXmlDir);
-		else Misc.printErrAndExit("\nError: cannot find the directory -d containing your xml and vcf files?! ");
+		else if (nameXmlVcfFile !=null) parseXmlVcfFilesFromFile(nameXmlVcfFile);
+		else Misc.printErrAndExit("\nError: cannot find the directory -d containing your xml and vcf files or your -f file?! ");
 
 		if (ucscFile == null || ucscFile.exists() == false) Misc.printErrAndExit("\nError: cannot find or read your hg38 merged UCSC refFlat gene table? "+ucscFile);
 
@@ -814,6 +831,19 @@ public class CarisXmlVcfParser {
 			else xmlVcfFiles.put(name, new File[] {xml,vcf});
 		}
 	}
+	
+	private void parseXmlVcfFilesFromFile(File nameXmlVcf) throws IOException {
+		xmlVcfFiles = new HashMap<String, File[]>();
+		String[] lines = IO.loadFileIntoStringArray(nameXmlVcf);
+		for (String xmlVcfLine: lines) {
+			String[] xv = Misc.TAB.split(xmlVcfLine);
+			String name = xv[0];
+			File xml = new File(xv[1]);
+			File vcf = new File(xv[2]);
+			if (xml.exists()==false || vcf.exists()==false) throw new IOException("ERROR: failed to find "+xml+" or "+vcf);
+			xmlVcfFiles.put(name, new File[] {xml,vcf});;
+		}
+	}
 
 	private boolean carisVcf(File file) {
 		try {
@@ -840,7 +870,7 @@ public class CarisXmlVcfParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Caris Xml Vcf Parser: May 2022                         **\n" +
+				"**                           Caris Xml Vcf Parser: Sept 2022                        **\n" +
 				"**************************************************************************************\n" +
 				"This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml\n"+
 				"reported genomic alternations are annotated, bed files of copy number changes and gene\n"+
@@ -849,6 +879,8 @@ public class CarisXmlVcfParser {
 
 				"\nOptions:\n"+
 				"-d Path to a directory containing paired xml and vcf files from Caris.\n"+
+				"-f Alternatively, a path to a tab delimited file where each line contains the dataset\n"+
+				"     name, the xml file path, and the vcf file.\n"+
 				"-s Path to a directory for saving the results. Only impacting vcf, cnv, fusions are\n"+
 				"     saved, if none present, no file(s) are created.\n"+
 				"-u Path to a Hg38 UCSC RefFlat or RefSeq merged gene file for CNV and gene fusion\n"+
@@ -861,7 +893,7 @@ public class CarisXmlVcfParser {
 				"-k Skip datasets that are missing either an xml or vcf report.\n"+
 
 				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/\n" +
-				"     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq13Dec2020_MergedStdChr.ucsc.gz \n\n" +
+				"     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq13Dec2020_MergedStdChr.ucsc.gz\n\n" +
 
 				"**************************************************************************************\n");
 	}

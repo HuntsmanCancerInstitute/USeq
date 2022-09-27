@@ -155,7 +155,7 @@ public class VCFCollapser {
 				"**************************************************************************************\n" +
 				"**                              VCF Collapser : June 2022                           **\n" +
 				"**************************************************************************************\n" +
-				"Merges records with the same CHROM	POS	ID	REF	ALT and outputs an unsorted stripped\n"+
+				"Merges records with the same CHROM POS ID REF ALT and outputs an unsorted stripped\n"+
 				"down vcf file. \n"+
 
 				"\nRequired Params:\n"+

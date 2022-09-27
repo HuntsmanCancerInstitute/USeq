@@ -11,7 +11,6 @@ public class TumorSample {
 
 	private String tumorDnaName = null;
 	private ArrayList<File> tumorDnaFastqCram = new ArrayList<File>();
-
 	private String tumorRnaName = null;
 	private ArrayList<File> tumorRnaFastqCram = new ArrayList<File>();
 

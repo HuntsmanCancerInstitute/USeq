@@ -12,8 +12,7 @@ public class NormalSample {
 	private String platformName = null;
 	private String normalDnaName = null;
 	private ArrayList<File> normalDnaFastqCram = new ArrayList<File>();
-
-
+	
 	public NormalSample (String normalDnaName, String platformName) {
 		this.normalDnaName = normalDnaName;
 		this.platformName = platformName;

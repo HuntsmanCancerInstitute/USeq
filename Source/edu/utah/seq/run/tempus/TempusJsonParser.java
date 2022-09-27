@@ -63,31 +63,24 @@ public class TempusJsonParser {
 	public String fetchSubjectMatchMakerLine() {
 		StringBuilder sb = new StringBuilder();
 		if (lastName != null) sb.append(lastName);
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (firstName != null) sb.append(firstName);
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (dobMonth != -1) sb.append(new Integer(dobMonth).toString());
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (dobDay != -1) sb.append(new Integer(dobDay).toString());
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (dobYear != -1) sb.append(new Integer(dobYear).toString());
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (gender != null) sb.append(gender);
-		else sb.append(".");
 		sb.append("\t");
 		
 		if (mrn != null) sb.append(mrn);
-		else sb.append(".");
 		return sb.toString();
 	}
 	
@@ -143,7 +136,7 @@ public class TempusJsonParser {
 		}
 	
 	public void printDeIDDocument() throws Exception {
-		//testId_testDate_gender_testCode_deid_firstNamePhy_lastNamePhy.json
+		//testId_testCode_deid_firstNamePhy_lastNamePhy_gender.json
 		String name = testId+"_"+testCode+"_"+testDate;
 		if (firstNamePhysician == null || lastNamePhysician == null) deidentifiedJsonFile = new File(jsonFile.getParentFile(), name+"_deid.json");
 		else deidentifiedJsonFile = new File(jsonFile.getParentFile(), name+"_deid_"+firstNamePhysician+"_"+lastNamePhysician+"_"+gender+".json");

@@ -770,10 +770,21 @@ public class TNSample2 {
 		if (hdf5 == null) {
 			for (File f: tnRunner.getCopyRatioHdf5Files()) {
 				String name = f.getName().toLowerCase();
-				if (gender.equals("F") && (name.contains("female") || name.endsWith("f.hdf5"))) genderMatchedHdf5.add(f);
-				else if (gender.equals("M") && (name.contains("male") || name.endsWith("m.hdf5"))) genderMatchedHdf5.add(f);
+
+				if (name.contains("female") || name.endsWith("f.hdf5")) {
+					if (gender.equals("F")) {
+						genderMatchedHdf5.add(f);
+						IO.pl("\t\tAdding female "+f.getName());
+					}
+				}
+				else if (name.contains("male") || name.endsWith("m.hdf5")) {				
+					if (gender.equals("M")) {
+						genderMatchedHdf5.add(f);
+						IO.pl("\t\tAdding male "+f.getName());	
+					}
+				}
 			}
-		}
+		}		
 		if (genderMatchedHdf5.size()==1) hdf5= genderMatchedHdf5.get(0);
 		else if (genderMatchedHdf5.size()==0) throw new IOException("\nERROR: failed to find any gender matching hdf5 "
 				+ "copy ratio files in  "+tnRunner.getCopyRatioHdf5Files()[0].getParent());
@@ -795,24 +806,34 @@ public class TNSample2 {
 		if (il == null) {
 			for (File f: tnRunner.getCopyRatioIntervalListFiles()) {
 				String name = f.getName().toLowerCase();
-				if (gender.equals("F") && (name.contains("female") || name.contains("_f."))) genderMatchedInterval.add(f);
-				else if (gender.equals("M") && (name.contains("male") || name.contains("_m."))) genderMatchedInterval.add(f);
-			}
-		}
-		if (genderMatchedInterval.size()==1) il= genderMatchedInterval.get(0);
-		else if (genderMatchedInterval.size()==0) throw new IOException("\nERROR: failed to find any gender matching interval_list "
-				+ "copy ratio files in  "+tnRunner.getCopyRatioHdf5Files()[0].getParent());
-		else {
-			//match platform
-			if (platformGenderInfo == null) throw new IOException("\nERROR: missing panel info to differentiate between the interval_list files in "+crDir);
-			for (File f: genderMatchedInterval) {
-				if (f.getName().contains(platformGenderInfo.getPanel())) {
-					il = f;
-					break;
+
+				if (name.contains("female") || name.contains("_f.")) {
+					if (gender.equals("F")) {
+						genderMatchedInterval.add(f);
+					}
+				}
+				else if (name.contains("male") || name.contains("_m.")) {				
+					if (gender.equals("M")) {
+						genderMatchedInterval.add(f);	
+					}
 				}
 			}
-			if (il == null) throw new IOException ("\nERROR: failed to find a copy ratio interval_list file that matches the panel "+
-					platformGenderInfo.getPanel()+" in "+tnRunner.getCopyRatioHdf5Files()[0].getParent()+" for "+id);
+
+			if (genderMatchedInterval.size()==1) il= genderMatchedInterval.get(0);
+			else if (genderMatchedInterval.size()==0) throw new IOException("\nERROR: failed to find any gender matching interval_list "
+					+ "copy ratio files in  "+tnRunner.getCopyRatioHdf5Files()[0].getParent());
+			else {
+				//match platform
+				if (platformGenderInfo == null) throw new IOException("\nERROR: missing panel info to differentiate between the interval_list files in "+crDir);
+				for (File f: genderMatchedInterval) {
+					if (f.getName().contains(platformGenderInfo.getPanel())) {
+						il = f;
+						break;
+					}
+				}
+				if (il == null) throw new IOException ("\nERROR: failed to find a copy ratio interval_list file that matches the panel "+
+						platformGenderInfo.getPanel()+" in "+tnRunner.getCopyRatioHdf5Files()[0].getParent()+" for "+id);
+			}
 		}
 		return new File[] {hdf5, il};
 	}

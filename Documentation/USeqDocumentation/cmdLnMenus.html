@@ -37,6 +37,8 @@
 				
 					<a href="#AvatarAssembler">AvatarAssembler</a><br>
 				
+					<a href="#AvatarDataWrangler">AvatarDataWrangler</a><br>
+				
 					<a href="#AvatarProjectAssembler">AvatarProjectAssembler</a><br>
 				
 					<a href="#AvatarComparator">AvatarComparator</a><br>
@@ -821,6 +823,38 @@ Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="AvatarDataWrangler"><pre>**************************************************************************************
+**                           Avatar Data Wrangler : Oct 2021                        **
+**************************************************************************************
+Tool for assembling directories for TNRunner based on files provided by M2Gen via
+download from DNAnexus, see
+HCI_Molecular_Data:/Avatar_MolecularData_hg38/Manifests_and_QC_Files/ Handles patient
+datasets from different exome capture platforms with multiple tumor samples.
+Each TNRunner Job will be named as 
+MolDataPatientID-Platform-NormalExomeID-TumorExomeID-TumorRNASeqID, when missing they will be
+labeled NA.
+Only assembles dirs for processing where the data is complete.
+
+Required Parameters:
+-r Path to a folder containing the following resource files.  Each must end with the
+     given extensions:
+        xxx_ClinicalMolLinkage_V4.csv - DNAnexus
+        xxx_WES_QC_Metrics.csv - DNAnexus
+        xxx_WesCramList.txt - DNAnexus
+        xxx_RNACramList.txt - DNAnexus
+        xxx_AWSRepoList.txt - AWS
+        xxx_PatientPHI.csv - RISR's PatientIdCoverter (optional)
+-p Print an example script to pull these resource files.
+-j Job dir to build out the patient dir structure.
+-t Directory to place temp files with PHI for Subject ID matching
+-s Directory containing the SubjectMatchMaker 'currentRegistry_' file
+-d Path to save a bash script for downloading the sequence read data.
+
+Example: java -jar ~/USeqApps/AvatarDataWrangler ... 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="AvatarProjectAssembler"><pre>**************************************************************************************
 **                          Avatar Project Assembler : Oct 2021                    **
 **************************************************************************************
@@ -854,7 +888,7 @@ Example: java -jar ~/USeqApps/AvatarProjectAssembler -l linkage.txt -g gender.tx
 </pre><br><p>
 				
 					<a name="AvatarComparator"><pre>**************************************************************************************
-**                           Avatar Comparator : June 2020                          **
+**                           Avatar Comparator : Sept 2022                          **
 **************************************************************************************
 Tool for identifying AVATAR datasets that are ready for analysis or need attention.
 
@@ -1381,7 +1415,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate
 </pre><br><p>
 				
 					<a name="CarisDataWrangler"><pre>**************************************************************************************
-**                             Caris Data Wrangler : May 2022                       **
+**                             Caris Data Wrangler : Aug 2022                       **
 **************************************************************************************
 The Caris Data Wrangler downloads complete patient datasets from an AWS bucket, parses
 the xml test file for patient info, fetches/makes coreIds using the SubjectMatchMaker
@@ -1427,7 +1461,7 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/CarisVcfComparator -f TL-18-03CFD6.vcf
 </pre><br><p>
 				
 					<a name="CarisXmlVcfParser"><pre>**************************************************************************************
-**                           Caris Xml Vcf Parser: May 2022                         **
+**                           Caris Xml Vcf Parser: Sept 2022                        **
 **************************************************************************************
 This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml
 reported genomic alternations are annotated, bed files of copy number changes and gene
@@ -1436,6 +1470,8 @@ attributes. Use Vt to normalize the vcf output files.
 
 Options:
 -d Path to a directory containing paired xml and vcf files from Caris.
+-f Alternatively, a path to a tab delimited file where each line contains the dataset
+     name, the xml file path, and the vcf file.
 -s Path to a directory for saving the results. Only impacting vcf, cnv, fusions are
      saved, if none present, no file(s) are created.
 -u Path to a Hg38 UCSC RefFlat or RefSeq merged gene file for CNV and gene fusion
@@ -1448,7 +1484,7 @@ Options:
 -k Skip datasets that are missing either an xml or vcf report.
 
 Example: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/
-     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq13Dec2020_MergedStdChr.ucsc.gz 
+     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq13Dec2020_MergedStdChr.ucsc.gz
 
 **************************************************************************************
 </pre><br><p>
@@ -2386,7 +2422,7 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/FoundationVcfComparator -f /F1/TRF145.
 </pre><br><p>
 				
 					<a name="FoundationXml2Vcf"><pre>**************************************************************************************
-**                           Foundation Xml 2 Vcf: Sept 2020                        **
+**                           Foundation Xml 2 Vcf: Sept 2022                        **
 **************************************************************************************
 Parses xml foundation reports to vcf. This is an inprecise process with some
 insertions, multi snv, and multi vars. Output vcf variants have not been normalized.
@@ -2403,7 +2439,7 @@ Options:
      spaces. Defaults to all.
 
 Example: java -Xmx2G -jar pathToUSeq/Apps/FoundationXml2Vcf -x FXmlReports/
-     -f /Ref/b37.fasta -s FVcfs/ -a ReportId,Gender,SubmittedDiagnosis,MSI,TMB
+     -f /Ref/b37.fasta -s FVcfs/ -a ReportId,Gender,SubmittedDiagnosis,MSI,TMB 
 
 **************************************************************************************
 </pre><br><p>
@@ -4762,12 +4798,12 @@ Example: java -jar pathToUSeq/Apps/TempusDataWrangler -b s3://tm-huntsman/
 </pre><br><p>
 				
 					<a name="TempusJson2Vcf"><pre>**************************************************************************************
-**                             Tempus Json 2 Vcf: Oct 2021                          **
+**                             Tempus Json 2 Vcf: Sept 2022                         **
 **************************************************************************************
 Parses json Tempus reports to vcf. Leave in PHI to enable calculating age at
 diagnosis. Summary statistics calculated for all reports. Vcfs will contain a mix of 
 somatic and inherited snvs, indels, and cnvs. Be sure to vt normalize the exported
-vcfs, https://github.com/atks/vt . Works with schemas 1.3, 1.3.1, 1.3.2
+vcfs, https://github.com/atks/vt . Works with schemas 1.3, 1.3.1, 1.3.2 
 
 Options:
 -j Path to Tempus json report or directory containing such, xxx.json(.gz/.zip OK)
@@ -5483,7 +5519,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFCenterFormatter -v Calls/ -s CCall
 					<a name="VCFCollapser"><pre>**************************************************************************************
 **                              VCF Collapser : June 2022                           **
 **************************************************************************************
-Merges records with the same CHROM	POS	ID	REF	ALT and outputs an unsorted stripped
+Merges records with the same CHROM POS ID REF ALT and outputs an unsorted stripped
 down vcf file. 
 
 Required Params:

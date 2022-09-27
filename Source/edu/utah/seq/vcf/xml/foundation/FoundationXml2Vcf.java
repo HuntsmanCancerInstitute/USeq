@@ -285,6 +285,8 @@ public class FoundationXml2Vcf {
 
 	private void convert() {
 		try {
+			addFileNameAndMDPID();
+			
 			//Load and Parse the XML document
 			Document document = builder.parse(workingXmlFile);
 
@@ -334,6 +336,12 @@ public class FoundationXml2Vcf {
 		}
 	}
 	
+	private void addFileNameAndMDPID() throws IOException {
+		reportAttributes.put("XmlFileName", workingXmlFile.getCanonicalPath());
+		String mdpid = Misc.fetchMDPID(workingXmlFile);
+		if (mdpid != null) reportAttributes.put("MolecularDataPatientId", mdpid);
+	}
+
 	/**Parses the variant-report section
 	 * @throws ParseException 
 	 * @throws DOMException */
@@ -663,7 +671,7 @@ public class FoundationXml2Vcf {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Foundation Xml 2 Vcf: Sept 2020                        **\n" +
+				"**                           Foundation Xml 2 Vcf: Sept 2022                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses xml foundation reports to vcf. This is an inprecise process with some\n"+
 				"insertions, multi snv, and multi vars. Output vcf variants have not been normalized.\n"+
@@ -680,7 +688,7 @@ public class FoundationXml2Vcf {
 				"     spaces. Defaults to all.\n"+
 				
 				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/FoundationXml2Vcf -x FXmlReports/\n" +
-				"     -f /Ref/b37.fasta -s FVcfs/ -a ReportId,Gender,SubmittedDiagnosis,MSI,TMB\n\n" +
+				"     -f /Ref/b37.fasta -s FVcfs/ -a ReportId,Gender,SubmittedDiagnosis,MSI,TMB \n\n" +
 
 				"**************************************************************************************\n");
 

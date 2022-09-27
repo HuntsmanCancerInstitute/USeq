@@ -170,7 +170,9 @@ public class TempusDataWrangler {
 				"-q", queryFile.getCanonicalPath(),
 				"-o", queryResDir.getCanonicalPath(),
 				"-v", //turn off verbosity
-				"-a" //adding queries not found to registry
+				"-a", //adding queries not found to registry
+				"-c", //making name matching case-insensitive for EDW
+				"-u"  //fill in info not found to registry entries from queries, e.g. missing mrns, otherIds
 		};
 		
 		SubjectMatchMaker smm = new SubjectMatchMaker(args);

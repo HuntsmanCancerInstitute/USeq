@@ -144,9 +144,8 @@ public class TempusJson2Vcf {
 			//process file
 			workingJsonFile = jsonFiles[i];
 			IO.p(workingJsonFile.getName());
-			convert();
 			
-			//build vcf
+			convert();
 			writeVcf();
 			
 			//finish line and output counters for this json file
@@ -168,6 +167,11 @@ public class TempusJson2Vcf {
 		//close the fasta lookup fetcher
 		if (indexedFasta != null) fasta.close();
 
+	}
+	
+	private void addMDPID() throws IOException {
+		String mdpid = Misc.fetchMDPID(workingJsonFile);
+		if (mdpid != null) reportAttributes.put("MolecularDataPatientId", mdpid);
 	}
 	
 	private void printSpreadsheet() throws IOException {
@@ -354,6 +358,7 @@ public class TempusJson2Vcf {
 	        //schema
 	        checkSchema(object);
 	        reportAttributes = new LinkedHashMap<String,String>();
+			addMDPID();
 	        reportAttributes.put("jsonFile", workingJsonFile.getCanonicalPath());
 	        
 	        //report
@@ -546,12 +551,12 @@ public class TempusJson2Vcf {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             Tempus Json 2 Vcf: Oct 2021                          **\n" +
+				"**                             Tempus Json 2 Vcf: Sept 2022                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses json Tempus reports to vcf. Leave in PHI to enable calculating age at\n"+
 				"diagnosis. Summary statistics calculated for all reports. Vcfs will contain a mix of \n"+
 				"somatic and inherited snvs, indels, and cnvs. Be sure to vt normalize the exported\n"+
-				"vcfs, https://github.com/atks/vt . Works with schemas 1.3, 1.3.1, 1.3.2\n"+
+				"vcfs, https://github.com/atks/vt . Works with schemas 1.3, 1.3.1, 1.3.2 \n"+
 
 				"\nOptions:\n"+
 				"-j Path to Tempus json report or directory containing such, xxx.json(.gz/.zip OK)\n"+
