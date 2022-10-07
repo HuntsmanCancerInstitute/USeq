@@ -5,8 +5,6 @@ import java.util.ArrayList;
 import edu.utah.seq.parsers.jpileup.BaseCount;
 import edu.utah.seq.parsers.jpileup.BpileupLine;
 import edu.utah.seq.parsers.jpileup.BamPileupTabixLoaderSingle;
-import util.gen.IO;
-import util.gen.Misc;
 import util.gen.Num;
 
 public class HeterozygousVar {
@@ -145,6 +143,7 @@ public class HeterozygousVar {
 		
 		//set AFs
 		somAltRefGermAltRef = new int[] {somAlt, somRef, germAlt, germRef};
+		
 		double total = somAlt+somRef;
 		somaticAf = (double)somAlt/ total;
 		total = germAlt+germRef;
@@ -158,14 +157,6 @@ public class HeterozygousVar {
 		int sum = 0;
 		for (int i: counts) sum+=i;
 		return sum;
-	}
-
-	public BpileupLine getGermlineBP() {
-		return germlineBP;
-	}
-
-	public BpileupLine getSomaticBP() {
-		return somaticBP;
 	}
 
 	public double getAlleleFractionGermline() throws IOException {

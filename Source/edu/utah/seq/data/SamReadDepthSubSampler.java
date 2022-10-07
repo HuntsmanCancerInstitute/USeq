@@ -34,7 +34,6 @@ public class SamReadDepthSubSampler{
 	private boolean keepPairsTogether = false;
 	
 	//internal fields
-	private String samHeader = null;
 	private Gzipper out = null;
 	private File workingGzippedFile = null;
 	private File workingBamFile = null;
@@ -102,8 +101,8 @@ public class SamReadDepthSubSampler{
 			workingBamFile = new File(bamFile.getParentFile(), fileName+".bam");
 			workingGzippedFile.deleteOnExit();
 			out = new Gzipper(workingGzippedFile);
-			samHeader = sfh.getTextHeader().trim();
-			out.println(samHeader);
+			SAMFileHeader h = reader.getFileHeader();
+			out.println(h.getSAMString().trim());
 			
 			//for each chrom
 			for (String chr: chrRegions.keySet()){
@@ -338,7 +337,7 @@ public class SamReadDepthSubSampler{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                         Sam Read Depth Sub Sampler: Feb 2019                     **\n" +
+				"**                         Sam Read Depth Sub Sampler: Oct 2022                     **\n" +
 				"**************************************************************************************\n" +
 				"Filters, randomizes, and subsamples a coordinate sorted bam alignment file to a target\n"+
 				"base level read depth over each of the provided regions. Depending on the gaps between\n"+

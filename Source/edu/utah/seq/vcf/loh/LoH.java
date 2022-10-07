@@ -309,14 +309,25 @@ public class LoH {
 	private void printAfStats() throws IOException {
 		float[] germAf = new float[hetVcfRecords.length];
 		float[] somAf = new float[hetVcfRecords.length];
+		float[] germDp = new float[hetVcfRecords.length];
+		float[] somDp = new float[hetVcfRecords.length];
+		
 		for (int i=0; i< hetVcfRecords.length; i++) {
 			germAf[i] = (float)hetVcfRecords[i].getAlleleFractionGermline();
 			somAf[i] = (float)hetVcfRecords[i].getAlleleFractionSomatic();
+			int[] sAltRefgAltRef = hetVcfRecords[i].fetchSomAltRefGermAltRefCounts();
+			somDp[i] = (float)(sAltRefgAltRef[0]+ sAltRefgAltRef[1]);
+			germDp[i] = (float)(sAltRefgAltRef[2]+ sAltRefgAltRef[3]);
 		}
 		IO.pl("\nGermline AF:");
 		Num.statFloatArray(germAf,false);
 		IO.pl("Somatic AF:");
 		Num.statFloatArray(somAf,false);
+		
+		IO.pl("\nGermline DP:");
+		Num.statFloatArray(germDp,false);
+		IO.pl("Somatic DP:");
+		Num.statFloatArray(somDp,false);
 	}
 
 	private void addBamPileupObservations() throws Exception {
@@ -536,28 +547,33 @@ public class LoH {
 
 
 	/* Crazy number of preprocessing steps, need to do in a workflow
-jj USeq_9.3.4.beta/Apps/VCF2Bed -v merged.vcf.gz
-jj USeq_9.3.4.beta/Apps/MergeRegions -r mergedPad0bp.bed.gz -o var0bp.merged.bed
-jj USeq_9.3.4.beta/Apps/MergeAdjacentRegions -b var0bp.merged.bed -r finalVars0bp.bed.gz -m 250
-jj ~/USeqApps/BedTabix -v finalVars0bp.bed.gz -t ~/BioApps/HtsLib/1.15/bin/
+java -jar -Xmx100G ~/USeqApps/VCFConsensus -p *_JointGenotyped.vcf.gz -s *_NormalDNA_Hg38_JointGenotyped.vcf.gz -o gatkIllum.vcf.gz -u -c
+java -jar -Xmx100G ~/USeqApps/VCF2Bed -v gatkIllum.vcf.gz
+java -jar -Xmx100G ~/USeqApps/MergeRegions -r gatkIllumPad0bp.bed.gz -o gatkIllum.merged.bed
+java -jar -Xmx100G ~/USeqApps/MergeAdjacentRegions -b gatkIllum.merged.bed -r finalRegions.bed.gz -m 500
+java -jar -Xmx100G ~/USeqApps/BedTabix -v finalRegions.bed.gz -t ~/BioApps/HtsLib/1.15/bin/
 module load samtools/1.16
-samtools view -L finalVars0bp.bed.gz -@ 10 -T ~/TNRunner/Indexes/B38IndexForBwa-0.7.17/hs38DH.fa -o normal0bp.bam ../../1274232_21-0012878_NormalDNA_Hg38.cram
-samtools view -L finalVars0bp.bed.gz -@ 10 -T ~/TNRunner/Indexes/B38IndexForBwa-0.7.17/hs38DH.fa -o tumor0bp.bam ../../1274232_21-0012878_TumorDNA_Hg38.cram
-samtools index -b normal0bp.bam
-samtools index -b tumor0bp.bam
-jj ../USeq_9.3.4.beta/Apps/SamAlignmentDepthMatcher -m normal0bp.bam -s tumor0bp.bam -o tumor0bpSub.sam.gz -b finalVars0bp.bed.gz -t 10
-	Or run SamReadDepthSubSampler on both tumor and normal setting it to 200?
-samtools view -H tumor0bpSub.sam.gz > header.sam
-samtools view tumor0bpSub.sam.gz | sort -u > body.sam
-cat header.sam body.sam > tumorMatchedDept.sam
-samtools sort -o tumor0bpSub.bam tumorMatchedDept.sam
-rm *sam *sam.gz
-samtools index -b tumor0bpSub.bam
-jj ../USeq_9.3.4.beta/Apps/BamPileup -b tumor0bpSub.bam -r finalVars0bp.bed.gz -f ~/TNRunner/Indexes/B38IndexForBwa-0.7.17/hs38DH.fa -s tumor0bpSub.bp.txt.gz -t ~/BioApps/HtsLib/1.15/bin/ -q 13 -p 10
-jj ../USeq_9.3.4.beta/Apps/BamPileup -b normal0bp.bam -r finalVars0bp.bed.gz -f ~/TNRunner/Indexes/B38IndexForBwa-0.7.17/hs38DH.fa -s normal0bp.bp.txt.gz -t ~/BioApps/HtsLib/1.15/bin/ -q 13 -p 10
+samtools view -L finalRegions.bed.gz -@ 10 -T ~/TNRunner/Indexes/B38IndexForBwa-0.7.17/hs38DH.fa -o normal.bam *_NormalDNA_Hg38.cram &
+samtools view -L finalRegions.bed.gz -@ 10 -T ~/TNRunner/Indexes/B38IndexForBwa-0.7.17/hs38DH.fa -o tumor.bam *_TumorDNA_Hg38.cram && echo DONE &
+samtools index -b normal.bam &
+samtools index -b tumor.bam &
+java -jar -Xmx100G ~/USeqApps/SamReadDepthSubSampler -a normal.bam -b finalRegions.bed.gz -t 200 -p -x 1000 -q 13 &
+java -jar -Xmx100G ~/USeqApps/SamReadDepthSubSampler -a tumor.bam -b finalRegions.bed.gz -t 200 -p -x 1000 -q 13 &
 
-LoH 
-jj ~/USeqApps/AnnotateBedWithGenes -u /Users/u0028003/HCI/Annotations/GRCh38/hg38RefSeq9Dec2020_MergedStdChr.ucsc.gz -b ~/LoH/WithNoPadding/loh.bed -r ~/LoH/WithNoPadding/loh.anno.bed.gz -p 1000
+##jj ../USeq_9.3.4.beta/Apps/SamAlignmentDepthMatcher -m normal0bp.bam -s tumor0bp.bam -o tumor0bpSub.sam.gz -b finalVars0bp.bed.gz -t 10
+##samtools view -H tumor0bpSub.sam.gz > header.sam
+##samtools view tumor0bpSub.sam.gz | sort -u > body.sam
+##cat header.sam body.sam > tumorMatchedDept.sam
+##samtools sort -o tumor0bpSub.bam tumorMatchedDept.sam
+##rm *sam *sam.gz
+##samtools index -b tumor0bpSub.bam
+
+java -jar -Xmx100G ~/USeqApps/BamPileup -b tumorRDSub200.bam -r finalRegions.bed.gz -f ~/TNRunner/Indexes/B38IndexForBwa-0.7.17/hs38DH.fa -s tumor.sub.bp.txt.gz -t ~/BioApps/HtsLib/1.15/bin/ -q 13 -p 10
+java -jar -Xmx100G ~/USeqApps/BamPileup -b normalRDSub200.bam -r finalRegions.bed.gz -f ~/TNRunner/Indexes/B38IndexForBwa-0.7.17/hs38DH.fa -s normal.sub.bp.txt.gz -t ~/BioApps/HtsLib/1.15/bin/ -q 13 -p 10
+
+java -jar -Xmx100G  ~/USeqApps/LoH -v gatkIllum.vcf.gz -g normal.sub.bp.txt.gz -s tumor.sub.bp.txt.gz -o LoH
+
+java -jar -Xmx100G  ~/USeqApps/AnnotateBedWithGenes -u ~/TNRunner/AnnotatorData/UCSC/9Dec2020/hg38RefSeq9Dec2020_MergedStdChr.ucsc.gz -b ~/LoH/loh.bed.gz -r ~/LoH/WithNoPadding/loh.anno.bed.gz -p 1000
 */
 
 
@@ -570,9 +586,7 @@ jj ~/USeqApps/AnnotateBedWithGenes -u /Users/u0028003/HCI/Annotations/GRCh38/hg3
 				"sequencing datasets to identify potential loss of heterozygousity events. LoH is\n"+
 				"defined here as a significant increase in the somatic allele fraction (AF) relative to\n"+
 				"the matched germline. Adjacent variants passing p-value and AF difference thresholds\n"+
-				"are merged and a combine p-value calculated for the window block. For best results,\n"+
-				"use the USeq SamReadDepthSubSampler to limit the read depth over the variants in each\n"+
-				"dataset to < 200.\n"+
+				"are merged and a combine p-value calculated for the window block.\n"+
 
 				"\nRequired:\n"+
 				"-v Path to a germline, single sample, variant xxx.vcf(.gz/.zip OK) file. These should\n"+
@@ -598,7 +612,7 @@ jj ~/USeqApps/AnnotateBedWithGenes -u /Users/u0028003/HCI/Annotations/GRCh38/hg3
                 "-w Window BP padding for reporting significant LoH regions, defaults to 100\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/LoH -v gatkStrelkaGermline.vcf.gz \n"+
-				"-g normal0bp.bp.txt.gz -s tumor0bpSub.bp.txt.gz -b loh.bed -d 0.15 -m 5000\n\n"+
+				"-g normal.bp.txt.gz -s tumor.bp.txt.gz -o LoHResults/ -d 0.15 -m 5000\n\n"+
 
 				"**************************************************************************************\n");
 	}
