@@ -9,14 +9,14 @@ public class HetWindow {
 	//these pvals have been -10Log10(pval) transformed!
 	private float pvalue;
 	private float adjPvalue;
-	private HeterozygousSnv[] hetSnvs;  //pvalues in these have not been transformed
+	private HeterozygousVar[] hetVars;  //pvalues in these have not been transformed
 	private float meanAfSomatic = -1f;
 	private float meanAfGermline = -1f;
 	private boolean passesThresholds = false;
 	
-	public HetWindow (float pvalue, HeterozygousSnv[] hetSnvs) {
+	public HetWindow (float pvalue, HeterozygousVar[] hetVars) {
 		this.pvalue = pvalue;
-		this.hetSnvs = hetSnvs;
+		this.hetVars = hetVars;
 	}
 	
 	public String toStringBedFormat(int bpPadding) throws IOException {
@@ -24,10 +24,10 @@ public class HetWindow {
 		//chr,start,stop,name,score
 		addCoordinatesRegion(bpPadding, sb, true, "\t");
 		sb.append("\t");
-		//Name #Snvs_MeanDiff_-10Log10(AdjPval)
+		//Name #Vars_MeanDiff_-10Log10(AdjPval)
 		String p = Num.formatNumberNoComma(adjPvalue, 1);
 		String diff = Num.formatNumber(getMeanAfDiff(), 3);
-		sb.append("LoH_"+hetSnvs.length+"_"+diff+"_"+p);
+		sb.append("LoH_"+hetVars.length+"_"+diff+"_"+p);
 		sb.append("\t");
 		//score
 		p = Num.formatNumberNoComma(pvalue, 0);
@@ -43,7 +43,7 @@ public class HetWindow {
 		StringBuilder sb = new StringBuilder();
 		sb.append("LoHBlock=");
 		addCoordinatesRegion(bpPadding, sb, false, "-"); sb.append(",");
-		sb.append(hetSnvs.length); sb.append(",");
+		sb.append(hetVars.length); sb.append(",");
 		String diff = Num.formatNumber(getMeanAfDiff(), 3);
 		sb.append(diff); sb.append(",");
 		String p = Num.formatNumberNoComma(pvalue, 1);
@@ -54,17 +54,17 @@ public class HetWindow {
 		
 		//for each variant
 		StringBuilder vcfs = new StringBuilder();
-		for (int i=0; i< hetSnvs.length; i++) {
+		for (int i=0; i< hetVars.length; i++) {
 			//#CHROM POS ID REF ALT QUAL FILTER INFO FORMAT SAMPLES
 			//   0    1   2  3   4   5      6    7     8       9+
-			String[] vcfFields = hetSnvs[i].getVcfRecord();
+			String[] vcfFields = hetVars[i].getVcfRecord();
 			for (int x=0; x<7; x++) {
 				vcfs.append(vcfFields[x]);
 				vcfs.append("\t");
 			}
 			//add the info fields
 			vcfs.append(blockInfo);
-			vcfs.append(hetSnvs[i].toStringVcf());
+			vcfs.append(hetVars[i].toStringVcf());
 			vcfs.append(vcfFields[7]);
 			
 			//add the rest
@@ -86,9 +86,9 @@ public class HetWindow {
 			addCoordinates(sb);
 			sb.append("\n\tMeanAFDiff "+diff +" ("+meanAfSomatic+"-"+meanAfGermline+")");
 			sb.append("\n\t-10Log10(combPVal) "+pvalue+ "\t-10Log10(adjP)  "+adjPvalue);
-			sb.append("\nLoH block snvs:\n");
-			for (int i=0; i< hetSnvs.length; i++) {
-				sb.append(hetSnvs[i]);
+			sb.append("\nLoH block vars:\n");
+			for (int i=0; i< hetVars.length; i++) {
+				sb.append(hetVars[i]);
 				sb.append("\n");
 			}
 
@@ -99,9 +99,9 @@ public class HetWindow {
 	}
 	
 	private void addCoordinates(StringBuilder sb) {
-		String firstPos = hetSnvs[0].getVcfRecord()[1];
-		String lastPos = hetSnvs[hetSnvs.length-1].getVcfRecord()[1];
-		sb.append(hetSnvs[0].getVcfRecord()[0]); //chrom
+		String firstPos = hetVars[0].getVcfRecord()[1];
+		String lastPos = hetVars[hetVars.length-1].getVcfRecord()[1];
+		sb.append(hetVars[0].getVcfRecord()[0]); //chrom
 		sb.append(":");
 		sb.append(firstPos);
 		sb.append("-");
@@ -109,10 +109,10 @@ public class HetWindow {
 	}
 	
 	private void addCoordinatesRegion(int bpPadding, StringBuilder sb, boolean includeChr, String delimiter) {
-		Integer firstPos = hetSnvs[0].getPosition()- bpPadding;
-		Integer lastPos = hetSnvs[hetSnvs.length-1].getPosition()+bpPadding;
+		Integer firstPos = hetVars[0].getPosition()- bpPadding;
+		Integer lastPos = hetVars[hetVars.length-1].getPosition()+bpPadding;
 		if (includeChr) {
-			sb.append(hetSnvs[0].getVcfRecord()[0]); //chrom
+			sb.append(hetVars[0].getVcfRecord()[0]); //chrom
 			sb.append(delimiter);
 		}
 		
@@ -133,11 +133,11 @@ public class HetWindow {
 		if (meanAfSomatic != -1) return meanAfSomatic - meanAfGermline;
 		double somAfSum = 0;
 		double germAfSum = 0;
-		for (HeterozygousSnv h: hetSnvs) {
+		for (HeterozygousVar h: hetVars) {
 			somAfSum += h.getAlleleFractionSomatic();
 			germAfSum += h.getAlleleFractionGermline();
 		}
-		double count = hetSnvs.length;
+		double count = hetVars.length;
 		meanAfSomatic = (float)(somAfSum/count);
 		meanAfGermline = (float)(germAfSum/count);
 		return meanAfSomatic - meanAfGermline;
@@ -151,8 +151,8 @@ public class HetWindow {
 		this.adjPvalue = adjPvalue;
 	}
 
-	public HeterozygousSnv[] getHetSnvs() {
-		return hetSnvs;
+	public HeterozygousVar[] getHetVars() {
+		return hetVars;
 	}
 
 	public HetWindow compare(HetWindow other) throws IOException {

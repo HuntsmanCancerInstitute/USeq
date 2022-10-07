@@ -2,21 +2,12 @@ package edu.utah.seq.parsers.jpileup;
 
 import java.io.File;
 import java.io.IOException;
-import java.text.NumberFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
 import edu.utah.seq.query.QueryIndexFileLoader;
-import edu.utah.seq.vcf.VCFBkz;
 import htsjdk.tribble.readers.TabixReader;
-import util.bio.annotation.Bed;
 import util.bio.annotation.Coordinate;
 import util.gen.IO;
 import util.gen.Misc;
-import util.gen.Num;
 
 /**Pulls bpileup lines that overlap vcf records.*/
 public class BamPileupTabixLoaderSingle {
@@ -94,7 +85,7 @@ public class BamPileupTabixLoaderSingle {
 	
 
 	/**Return GATC or ID for indels*/
-	private static char fetchAllele(String[] fields) throws IOException {
+	public static char fetchAllele(String[] fields) throws IOException {
 		if (fields[4].contains(",") || fields[4].startsWith("<")) throw new IOException("Cannot interpret multi alts or those with <, deconvolute? "+Misc.stringArrayToString(fields,  "\t"));
 		//#CHROM	POS	ID	REF	ALT
 		int lenRef = fields[3].length();

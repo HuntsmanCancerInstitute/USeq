@@ -15,6 +15,7 @@ import edu.utah.seq.parsers.jpileup.BamPileupTabixLoaderSingle;
 import edu.utah.seq.parsers.jpileup.BpileupLine;
 import util.gen.CombinePValues;
 import util.gen.FisherExact;
+import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
@@ -30,22 +31,22 @@ public class LoH {
 	private double minimumQUAL = 20;
 	private double minimumGQ = 20;
 	private int minimumDP = 20;
-	private int maxGapBetweenSnvs = 1000;
+	private int maxGapBetweenVars = 1000;
 	private int windowBpPadding = 100;
 	private File resultsDir = null;
 
 	//window
 	private float minAdjTransWindowPval = 8.239f; //.15
 	private float minMeanAfWindowDiff = 0.1f;
-	//het snv
-	private double minSnvPval = 0.1;
-	private double minSnvAfDiff = 0.1;
+	//het var
+	private double minVarPval = 0.1;
+	private double minVarAfDiff = 0.1;
 	private String gqSelector = "GQ";
 
 	//internal
 	private HashMap<String, String> formatValues = new HashMap<String,String>();
-	private HeterozygousSnv[] hetVcfRecords = null;
-	private LinkedHashMap<String,HeterozygousSnv[]> chromHets = null;
+	private HeterozygousVar[] hetVcfRecords = null;
+	private LinkedHashMap<String,HeterozygousVar[]> chromHets = null;
 	private CombinePValues combinePValues = new CombinePValues();
 	private int maxSizeForFishers = 0;
 	private HetWindow[] hetWindow = null;
@@ -61,7 +62,7 @@ public class LoH {
 			IO.pl("Thresholds:\n"+fetchThresholds(""));
 
 			//fetch heterozygous germline variants
-			fetchHeterozygousSnvs();
+			fetchHeterozygousVars();
 
 			//bam pileup counts from the somatic and germline datasets, could thread this!
 			addBamPileupObservations();
@@ -96,8 +97,8 @@ public class LoH {
 	}
 	
 	private void printVcf() throws IOException {
-		File vcfFile = new File(resultsDir, "loh.vcf");
-		PrintWriter out = new PrintWriter(new FileWriter(vcfFile));
+		File vcfFile = new File(resultsDir, "loh.vcf.gz");
+		Gzipper out = new Gzipper(vcfFile);
 		out.println(Misc.stringArrayListToString(vcfHeader, "\n"));
 		
 		//for each block
@@ -115,22 +116,22 @@ public class LoH {
 		sb.append(prePend); sb.append("minimumVcfGQ"); sb.append("\t"); sb.append(minimumGQ); sb.append("\n");
 		sb.append(prePend); sb.append("minimumVcfDP"); sb.append("\t"); sb.append(minimumDP); sb.append("\n");
 		
-		//het snv
-		sb.append(prePend); sb.append("minSnvPval"); sb.append("\t"); sb.append(minSnvPval); sb.append("\n");
-		sb.append(prePend); sb.append("minSnvAfDiff"); sb.append("\t"); sb.append(minSnvAfDiff); sb.append("\n");
+		//het var
+		sb.append(prePend); sb.append("minVarPval"); sb.append("\t"); sb.append(minVarPval); sb.append("\n");
+		sb.append(prePend); sb.append("minVarAfDiff"); sb.append("\t"); sb.append(minVarAfDiff); sb.append("\n");
 		
 		//window
 		sb.append(prePend); sb.append("min-10Log10(AdjWindowPval)"); sb.append("\t"); sb.append(minAdjTransWindowPval); sb.append("\n");
 		sb.append(prePend); sb.append("minMeanAfWindowDiff"); sb.append("\t"); sb.append(minMeanAfWindowDiff); sb.append("\n");
-		sb.append(prePend); sb.append("maxGapBetweenWindowSnvs"); sb.append("\t"); sb.append(maxGapBetweenSnvs); sb.append("\n");
+		sb.append(prePend); sb.append("maxGapBetweenWindowVars"); sb.append("\t"); sb.append(maxGapBetweenVars); sb.append("\n");
 		sb.append(prePend); sb.append("bpPaddingForLoHWindow"); sb.append("\t"); sb.append(windowBpPadding); 
 		
 		return sb.toString();
 	}
 
 	private void printBed() throws IOException {
-		File bedFile = new File(resultsDir, "loh.bed");
-		PrintWriter out = new PrintWriter(new FileWriter(bedFile));
+		File bedFile = new File(resultsDir, "loh.bed.gz");
+		Gzipper out = new Gzipper(bedFile);
 		//fraction LoH
 		out.println("# FractionLoH\t"+fractionLoH);
 		
@@ -138,14 +139,14 @@ public class LoH {
 		out.println(fetchThresholds("# "));
 		
 		//for each window
-		out.println("# Chr\tStart\tStop\tLoH_#Snvs_MeanAFDiff_-10Log10(AdjWindowPValue)\t-10Log10(WindowPValue)\tGeneAnnotation");
+		out.println("# Chr\tStart\tStop\tLoH_#Vars_MeanAFDiff_-10Log10(AdjWindowPValue)\t-10Log10(WindowPValue)");
 		for (HetWindow w: hetWindow) if (w.isPassesThresholds()) out.println(w.toStringBedFormat(windowBpPadding));
 		
 		out.close();
 	}
 
 	private void scoreWindows() throws IOException {
-		IO.pl("Scoring windows and snvs...\n\nLoH Window Blocks:");
+		IO.pl("Scoring windows and vars...\n\nLoH Window Blocks:");
 		for (HetWindow w: hetWindow) {
 			if (w.getTransAdjPVal()< this.minAdjTransWindowPval || w.getMeanAfDiff() < this.minMeanAfWindowDiff) w.setPassesThresholds(false);
 			else {
@@ -156,13 +157,13 @@ public class LoH {
 	}
 
 	private void windowScoreIndividualHets() throws IOException {
-		//IO.pl("LoH snvs:");
+		//IO.pl("LoH vars:");
 		//for each of the windows
 		for (HetWindow w: hetWindow) {
 			
 			//for each of the hets, add window scores if better
 			//actually now the het only belongs to one window
-			for (HeterozygousSnv s: w.getHetSnvs()) {
+			for (HeterozygousVar s: w.getHetVars()) {
 				if (s.getBestHetWindow() == null) s.setBestHetWindow(w);
 				else {
 					HetWindow pastBest = s.getBestHetWindow();
@@ -171,17 +172,17 @@ public class LoH {
 				}
 			}
 		}
-		int numLoHSnvs = 0;
-		for (HeterozygousSnv s: hetVcfRecords) {
+		int numLoHVars = 0;
+		for (HeterozygousVar s: hetVcfRecords) {
 			if (s.getBestHetWindow().isPassesThresholds()) {
-				numLoHSnvs++;
+				numLoHVars++;
 				//IO.pl(s.toString());
 			}
 		}
 		
-		float frac = (float)numLoHSnvs/ (float)hetVcfRecords.length;
-		fractionLoH = frac+" ("+numLoHSnvs+"/"+hetVcfRecords.length+")";
-		IO.pl(fractionLoH+ " : Fraction heterozygous germline snvs showing LoH in the tumor");
+		float frac = (float)numLoHVars/ (float)hetVcfRecords.length;
+		fractionLoH = frac+" ("+numLoHVars+"/"+hetVcfRecords.length+")";
+		IO.pl(fractionLoH+ " : Fraction heterozygous germline snvs and indels with a significant increase in their allele fraction in the tumor");
 		
 		
 	}
@@ -189,7 +190,7 @@ public class LoH {
 	private void calculateFisherPValues() throws IOException {
 		IO.pl("\nCalculating Fisher's Exact PValues...");
 		FisherExact fe = new FisherExact(maxSizeForFishers);
-		for (HeterozygousSnv s: hetVcfRecords) {
+		for (HeterozygousVar s: hetVcfRecords) {
 			int[] c = s.fetchSomAltRefGermAltRefCounts();
 			//fe.getRightTailedP(somAlt, somRef, germAlt, germRef), only interested in a higher somatic AF relative to germline
 			double pval = fe.getRightTailedP(c[0], c[1], c[2], c[3]);
@@ -198,13 +199,13 @@ public class LoH {
 	}
 
 	private void splitHetsByChrom() throws IOException {
-		chromHets = new LinkedHashMap<String,HeterozygousSnv[]>();
-		ArrayList<HeterozygousSnv> al = new ArrayList<HeterozygousSnv>();
+		chromHets = new LinkedHashMap<String,HeterozygousVar[]>();
+		ArrayList<HeterozygousVar> al = new ArrayList<HeterozygousVar>();
 		String currChrom = hetVcfRecords[0].getVcfRecord()[0];
 
 		for (int i=0; i< hetVcfRecords.length; i++){
 			if (hetVcfRecords[i].getVcfRecord()[0].equals(currChrom) == false){
-				HeterozygousSnv[] sub = new HeterozygousSnv[al.size()];
+				HeterozygousVar[] sub = new HeterozygousVar[al.size()];
 				al.toArray(sub);
 				chromHets.put(currChrom, sub);
 				al.clear();
@@ -214,7 +215,7 @@ public class LoH {
 			al.add(hetVcfRecords[i]);
 		}
 		//add last to hash
-		HeterozygousSnv[] sub = new HeterozygousSnv[al.size()];
+		HeterozygousVar[] sub = new HeterozygousVar[al.size()];
 		al.toArray(sub);
 		chromHets.put(currChrom, sub);
 
@@ -224,10 +225,10 @@ public class LoH {
 		IO.pl("Walking chromosomes...");
 
 		ArrayList<HetWindow> hetWindowAl = new ArrayList<HetWindow>();
-		ArrayList<HeterozygousSnv> hetAl = new ArrayList<HeterozygousSnv>();
+		ArrayList<HeterozygousVar> hetAl = new ArrayList<HeterozygousVar>();
 		//for each chrom
 		for (String chr: chromHets.keySet()) {
-			HeterozygousSnv[] hets = chromHets.get(chr);
+			HeterozygousVar[] hets = chromHets.get(chr);
 			
 			//for each het attempt to make a window of <= maxSize, might be only one het in the window
 			for (int i=0; i< hets.length; i++) {
@@ -236,19 +237,19 @@ public class LoH {
 				hetAl.add(hets[i]);
 				
 				//does that het pass thresholds?
-				if (hets[i].getPvalue() <= minSnvPval && hets[i].getAlleleFractionDifference() >= minSnvAfDiff ) {
+				if (hets[i].getPvalue() <= minVarPval && hets[i].getAlleleFractionDifference() >= minVarAfDiff ) {
 					
 
 					//look at next het
 					for (int j=i+1; j< hets.length; j++) {				
 						//check distance, can't be too far away
 						int dist = hets[j].getPosition() - startBp;
-						if (dist > maxGapBetweenSnvs )  {
+						if (dist > maxGapBetweenVars )  {
 							break;
 						}
 						
 						//check thresholds
-						if (hets[j].getPvalue() > minSnvPval || hets[j].getAlleleFractionDifference() < minSnvAfDiff ) {	
+						if (hets[j].getPvalue() > minVarPval || hets[j].getAlleleFractionDifference() < minVarAfDiff ) {	
 							break;
 						}
 						
@@ -260,7 +261,7 @@ public class LoH {
 				}
 				
 				
-				HeterozygousSnv[] winHets = new HeterozygousSnv[hetAl.size()];
+				HeterozygousVar[] winHets = new HeterozygousVar[hetAl.size()];
 				hetAl.toArray(winHets);
 				
 				//calculate a combine pvalue?
@@ -321,30 +322,33 @@ public class LoH {
 	private void addBamPileupObservations() throws Exception {
 		BamPileupTabixLoaderSingle bpg = new BamPileupTabixLoaderSingle(germlineBamPileup, 0);
 		BamPileupTabixLoaderSingle bps = new BamPileupTabixLoaderSingle(somaticBamPileup, 0);
-		ArrayList<HeterozygousSnv> passing = new ArrayList<HeterozygousSnv>();
+		ArrayList<HeterozygousVar> passing = new ArrayList<HeterozygousVar>();
 
-		for (HeterozygousSnv hs: hetVcfRecords) {
+		for (HeterozygousVar hs: hetVcfRecords) {
 			ArrayList<BpileupLine> germ = bpg.fetchBpileupRecords(hs.getVcfRecord());
 			hs.setGermlineBPs(germ, minimumDP);
 			ArrayList<BpileupLine> som = bps.fetchBpileupRecords(hs.getVcfRecord());
 			hs.setSomaticBPs(som, minimumDP);
+			
 			if (hs.isPassing()== false) continue;
 			passing.add(hs);
+			
 			//check total counts
 			int totalCounts = hs.getTotalRefAltCount();
 			if (totalCounts > maxSizeForFishers) maxSizeForFishers = totalCounts;
+		
 		}
 
-		hetVcfRecords = new HeterozygousSnv[passing.size()];
+		hetVcfRecords = new HeterozygousVar[passing.size()];
 		passing.toArray(hetVcfRecords);
 
 		//close the readers
 		bpg.getTabixReader().close();
 		bps.getTabixReader().close();
 	}
-
-	private void fetchHeterozygousSnvs() throws Exception {
-		ArrayList<HeterozygousSnv> hetVcfRec = new ArrayList<HeterozygousSnv>();
+	
+	private void fetchHeterozygousVars() throws Exception {
+		ArrayList<HeterozygousVar> hetVcfRec = new ArrayList<HeterozygousVar>();
 		int numRecords = 0;
 		int numFailingRecords = 0;
 		int numPassingIndel = 0;
@@ -359,7 +363,7 @@ public class LoH {
 		String lohBlock = "##INFO=<ID=LoHBlock,Number=1,Type=String,Description=\"Loss of Heterozygosity block: startBP-stopBP, number het vars in block, "
 				+ "mean allele fraction differences between the somatic and germline, Fisher's -10Log10(combine p-value) for the block, Benjamini-Hochberg "
 				+ "adjusted window -10Log10(combine pvalue)\">";
-		//LoHSnv=afS,afG,diff,sAlt/Ref,gAlt/Ref,pval;
+		//LoHVar=afS,afG,diff,sAlt/Ref,gAlt/Ref,pval;
 		String lohVar = "##INFO=<ID=LoHVar,Number=1,Type=String,Description=\"Loss of Heterozygosity Variant: allele fraction somatic, allele fraction germline, "
 				+ "allele fraction difference, somatic ALT/REF counts, germline ALT/REF counts, Fisher's Exact -10log10(p-value)\">";
 		while ((line = in.readLine()) != null){
@@ -409,30 +413,32 @@ public class LoH {
 				numFailingRecords++;
 				continue;
 			}
-
-			//check if indel
-			if (fields[3].length()!=1 || fields[4].length()!=1) {
-				numPassingIndel++;
-				continue;
-			}
-
+			
 			if (hetHom == 1) numPassingHom++;
+			
 			else {
-				numPassingHet++;
-				hetVcfRec.add(new HeterozygousSnv(fields));
+				if (fields[3].length()!=1 || fields[4].length()!=1) {
+					numPassingIndel++;
+					hetVcfRec.add(new HeterozygousVar(fields));
+				}
+				else {
+					numPassingHet++;
+					hetVcfRec.add(new HeterozygousVar(fields));
+				}
 			}
 		}
 		in.close();
-		hetVcfRecords = new HeterozygousSnv[hetVcfRec.size()];
+		hetVcfRecords = new HeterozygousVar[hetVcfRec.size()];
 		hetVcfRec.toArray(hetVcfRecords);
 
 		IO.pl("\nGermline VCF Parsing Statistics:");
 		IO.pl(numRecords + "\t# Records");
 		IO.pl(numFailingRecords + "\t# Failing Records");
-		IO.pl(numPassingIndel + "\t# Passing Indels");
-		IO.pl(numPassingHom + "\t# Passing Hom Snvs");
+		IO.pl(numPassingHom + "\t# Passing Hom Vars and Indels");
+		IO.pl(numPassingIndel + "\t# Passing Het Indels");
 		IO.pl(numPassingHet + "\t# Passing Het Snvs");
 	}
+
 
 
 	/**Returns null if fails, otherwise returns 0 for het, 1 for hom */
@@ -490,7 +496,7 @@ public class LoH {
 					case 'g': germlineBamPileup = new File(args[++i]); break;
 					case 's': somaticBamPileup = new File(args[++i]); break;
 					case 'o': resultsDir = new File(args[++i]); break;
-					case 'm': maxGapBetweenSnvs = Integer.parseInt(args[++i]); break;
+					case 'm': maxGapBetweenVars = Integer.parseInt(args[++i]); break;
 					case 'r': minimumDP = Integer.parseInt(args[++i]); break;
 					case 'w': windowBpPadding = Integer.parseInt(args[++i]); break;
 					case 'q': minimumQUAL = Double.parseDouble(args[++i]); break;
@@ -498,8 +504,8 @@ public class LoH {
 					case 'x': gqSelector = "GQX"; break;
 					case 'p': minAdjTransWindowPval = Float.parseFloat(args[++i]); break;
 					case 'd': minMeanAfWindowDiff = Float.parseFloat(args[++i]); break;
-					case 'l': minSnvPval = Double.parseDouble(args[++i]); break;
-					case 'f': minSnvAfDiff = Double.parseDouble(args[++i]); break;
+					case 'l': minVarPval = Double.parseDouble(args[++i]); break;
+					case 'f': minVarAfDiff = Double.parseDouble(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -558,36 +564,37 @@ jj ~/USeqApps/AnnotateBedWithGenes -u /Users/u0028003/HCI/Annotations/GRCh38/hg3
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                  LoH : May 2021                                  **\n" +
+				"**                                    LoH : Oct 2022                                **\n" +
 				"**************************************************************************************\n" +
-				"LoH compares heterozygous germline snv allele counts against the somatic counts to\n"+
-				"identify potential loss of heterozygousity events.  Adjacent snvs passing pvalue and\n"+
-				"allele fraction difference thresholds are merged and a pvalue for the window block\n"+
-				"calculated. For best results, use the USeq SamReadDepthSubSampler to limit the read\n"+
-				"depth over the snvs to 200.\n"+
+				"LoH compares heterozygous snv and indel allele counts between germline and somatic\n"+
+				"sequencing datasets to identify potential loss of heterozygousity events. LoH is\n"+
+				"defined here as a significant increase in the somatic allele fraction (AF) relative to\n"+
+				"the matched germline. Adjacent variants passing p-value and AF difference thresholds\n"+
+				"are merged and a combine p-value calculated for the window block. For best results,\n"+
+				"use the USeq SamReadDepthSubSampler to limit the read depth over the variants in each\n"+
+				"dataset to < 200.\n"+
 
 				"\nRequired:\n"+
 				"-v Path to a germline, single sample, variant xxx.vcf(.gz/.zip OK) file. These should\n"+
-				"     be high confidence, e.g. called by both GATK and Strelka\n" +
-				"-g Path to the germline bampileup file. First run the SamReadDepthSubSampler to\n"+
-				"     limit the alignment depth to 200 or less over the germline variants, then run\n"+
-				"     the BamPileup tool to generate the xxx.bp.txt.gz and tabix index file.\n"+
+				"     be filtered, high confidence, vt normalized and decomposed short variants.\n" +
+				"-g Path to the germline bampileup file, use the USeq BamPileup tool to generate the\n"+
+				"     xxx.bp.txt.gz and tabix index files.\n"+
 				"-s Path to the somatic bampileup file, ditto.\n"+
                 "-o Path to directory to write the bed and vcf output results.\n"+
 
 				"\nOptional:\n" +
-				"-q Minimum VCF record QUAL, defaults to 20\n"+
-                "-e Minimum VCF record sample GQ, defaults to 20\n"+
+				"-q Minimum vcf record QUAL, defaults to 20\n"+
+                "-e Minimum vcf record sample GQ, defaults to 20\n"+
                 "-x Use Strelka's recalibrated GQX genotype score, defaults to GQ\n"+
-                "-r Minimum unique observation snv read depth for both germline and tumor samples,\n"+
+                "-r Minimum unique observation variant read depth for both germline and tumor samples,\n"+
                 "     defaults to 20\n"+
-                "-l Minimum Fisher Exact pvalue for grouping snvs into a window block, defaults to 0.1\n"+
-                "-f Minimum difference in allele fraction between the somatic and germline samples for\n"+
-                "     grouping snvs into a window block, defaults to 0.1\n"+
-                "-m Maximum bp gap between snvs for grouping into a window block, defaults to 1000\n"+
-                "-p Minimum Benjamini-Hochberg adjusted window -10Log10(combine pvalue), defaults to\n"+
+                "-l Minimum Fisher exact p-value for including a variant in a block, defaults to 0.1\n"+
+                "-f Minimum difference in AF between the somatic and germline samples for including\n"+
+                "     a variant into a block, defaults to 0.1\n"+
+                "-m Maximum bp gap between variants for grouping into a block, defaults to 1000\n"+
+                "-p Minimum Benjamini-Hochberg adjusted window -10Log10(combine p-value), defaults to\n"+
                 "     8.239 (0.15)\n"+
-                "-d Minimum window mean difference in allele fractions, defaults to 0.1\n"+
+                "-d Minimum window mean difference in AFs, defaults to 0.1\n"+
                 "-w Window BP padding for reporting significant LoH regions, defaults to 100\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/LoH -v gatkStrelkaGermline.vcf.gz \n"+

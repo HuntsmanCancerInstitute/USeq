@@ -43,6 +43,10 @@ public class BaseCount {
 	public double getPassingReadCoverageSnv() {
 		return g+a+t+c;
 	}
+	public double getPassingReadCoverageIndel(boolean isD) {
+		if (isD) return g+a+t+c+del;
+		return g+a+t+c+ins;
+	}
 	public double getTotalReadCoverage() {
 		return g+a+t+c+ins+del+n+failQual;
 	}
