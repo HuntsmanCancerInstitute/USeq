@@ -585,7 +585,7 @@ public class AvatarDataWrangler {
 			}
 		}
 		//dx cmd file
-		if (dxCmdLineFile == null || dxCmdLineFile.getParentFile().canWrite() == false) Misc.printErrAndExit("\nERROR: please provide a file path to save the DNAnexus download cmds. Aborting. "+dxCmdLineFile);
+		if (dxCmdLineFile == null) Misc.printErrAndExit("\nERROR: please provide a file path to save the DNAnexus download cmds. Aborting. "+dxCmdLineFile);
 		
 		
 		//jobDir
@@ -643,13 +643,11 @@ public class AvatarDataWrangler {
 				"**                           Avatar Data Wrangler : Sept 2022                       **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling directories for TNRunner based on files provided by M2Gen via\n"+
-				"download from DNAnexus, see\n"+
-				"HCI_Molecular_Data:/Avatar_MolecularData_hg38/Manifests_and_QC_Files/ Handles patient\n"+
-				"datasets from different exome capture platforms with multiple tumor samples.\n"+
-				"Each TNRunner Job will be named as \n"+
-				"MolDataPatientID-Platform-NormalExomeID-TumorExomeID-TumorRNASeqID, when missing they will be\n"+
-				"labeled NA.\n"+
-				"Only assembles dirs for processing where the data is complete.\n"+
+				"download from DNAnexus. Handles patient datasets from different exome capture\n"+
+				"platforms with multiple tumor and normal samples.\n"+
+				"Each TNRunner Job will be named as AvatarID-NormalExomeID-TumorExomeID-TumorRNASeqID.\n"+
+				"When missing they will be labeled NA. Uses the SubjectMatchMaker to fetch or make\n"+
+				"molecular data patient ids shared with the other clinically processed datasets.\n"+
 
 				"\nRequired Parameters:\n"+
 				"-r Path to a folder containing the following resource files.  Each must end with the\n"+
@@ -659,14 +657,15 @@ public class AvatarDataWrangler {
 				"        xxx_WesCramList.txt - DNAnexus\n"+
 				"        xxx_RNACramList.txt - DNAnexus\n"+
 				"        xxx_AWSRepoList.txt - AWS\n"+
-				"        xxx_PatientPHI.csv - RISR's PatientIdCoverter (optional)\n"+
+				"        (optional) xxx_PatientPHI.csv - RISR's PatientIdCoverter\n"+
 				"-p Print an example script to pull these resource files.\n"+
 				"-j Job dir to build out the patient dir structure.\n"+
 				"-t Directory to place temp files with PHI for Subject ID matching\n"+
 				"-s Directory containing the SubjectMatchMaker 'currentRegistry_' file\n"+
 				"-d Path to save a bash script for downloading the sequence read data.\n"+
 
-                "\nExample: java -jar ~/USeqApps/AvatarDataWrangler ... \n\n"+
+                "\nExample: java -jar ~/USeqApps/AvatarDataWrangler -r Resources/ -j AJobs -t SMM_PHI\n"+
+                "   -s ~/PHI/SmmRegistry/ -d dxDownloadCmds.sh \n\n"+
 
 
 				"**************************************************************************************\n");

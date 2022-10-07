@@ -25,7 +25,7 @@ public class SamAlignmentDepthMatcher{
 	
 	//internal
 	private Bed[] regions;
-	private int numberThreads = 0;
+	private int numberThreads = -1;
 	private File tempDir;
 	private SamAlignmentDepthLoader[] loaders;
 	private SamReaderFactory readerFactory;
@@ -74,7 +74,8 @@ public class SamAlignmentDepthMatcher{
 		if (bamReader.getFileHeader().getSortOrder().equals(SortOrder.coordinate) == false || bamReader.hasIndex() == false) throw new IOException ("\nError: you bam file must be sorted by coordinate");
 		
 		SAMFileHeader h = bamReader.getFileHeader();
-		String[] shLines = Misc.RETURN.split(h.getTextHeader()); //this gets the original header, setting SamSort.unsorted doesn't change it. Ugg.
+		
+		String[] shLines = Misc.RETURN.split(h.getSAMString().trim()); //this gets the original header, setting SamSort.unsorted doesn't change it. Ugg.
 		bamReader.close();
 		for (int i=0; i< shLines.length; i++){
 			if (shLines[i].contains("SO:coordinate")){
@@ -143,6 +144,7 @@ public class SamAlignmentDepthMatcher{
 					case 's': toSubSampleBam = new File(args[++i]); break;
 					case 'o': finalMatchedSam = new File(args[++i]); break;
 					case 'b': targetRegionsFile = new File(args[++i]); break;
+					case 't': numberThreads = Integer.parseInt(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -169,18 +171,20 @@ public class SamAlignmentDepthMatcher{
 		tempDir.mkdirs();
 		
 		//threads to use
-		numberThreads = Runtime.getRuntime().availableProcessors() - 1;
+		if (numberThreads == -1) numberThreads = Runtime.getRuntime().availableProcessors() - 1;
 	}	
 	
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            SamAlignmentDepthMatcher: Oct 2018                    **\n" +
+				"**                           SamAlignmentDepthMatcher: Oct 2022                     **\n" +
 				"**************************************************************************************\n" +
 				"Performs a region by region alignment depth subsampling to output a sam file with\n"+
 				"matching alignment depths. Alignments are extracted, mates matched, randomized, then\n"+
-				"saved to match the count from the other file. Uses all threads available.\n"+
+				"saved to match the count from the other file. Set memory to the maximum. Depending on\n"+
+				"the gaps between your regions, you may need to remove duplicate lines, e.g. 'sort -u \n"+
+				"body.sam > uni.sam'n"+
 
 				"\nRequired options:\n"+
 				"-m Bam file, coordinate sorted with index, to use in calculating the alignment depths\n"+
@@ -189,9 +193,10 @@ public class SamAlignmentDepthMatcher{
 				"      this is significantly bigger than -m .\n"+
 				"-o Gzipped sam file to write the unsorted alignments from -s, must end in xxx.sam.gz\n"+
 				"-b Bed file of regions in which to match alignment depths, xxx.bed(.gz/.zip OK).\n"+
+				"-t Number of threads to use, defaults to all.\n"+
 
-				"\nExample: java -Xmx25G -jar pathToUSeq/Apps/SamAlignmentDepthMatcher -m tumor.bam\n" +
-				"      -s bigMockTumor.bam -o matchedMock.sam.gz -b exomeCaptureTargets.bed.gz\n\n" +
+				"\nExample: java -Xmx25G -jar pathToUSeq/Apps/SamAlignmentDepthMatcher -m normal.bam\n" +
+				"      -s tumor.bam -o subSampTumor.sam.gz -b germlineVariants.bed.gz -t 10 \n\n" +
 
 
 		        "**************************************************************************************\n");
@@ -209,11 +214,6 @@ public class SamAlignmentDepthMatcher{
 	public File getTempDir() {
 		return tempDir;
 	}
-
-
-
-
-
 
 	public SamReaderFactory getReaderFactory() {
 		return readerFactory;
