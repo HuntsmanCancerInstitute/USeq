@@ -37,7 +37,6 @@ public class HetWindow {
 	
 	public String toStringVcfFormat(int bpPadding) throws IOException {
 		
-		
 		//build the Block INFO string
 		//LoHBlock=start-stop,#vars,meanAfDiffSomGerm,pval,adjpval;
 		StringBuilder sb = new StringBuilder();
@@ -97,7 +96,7 @@ public class HetWindow {
 		}
 		return sb.toString();
 	}
-	
+
 	private void addCoordinates(StringBuilder sb) {
 		String firstPos = hetVars[0].getVcfRecord()[1];
 		String lastPos = hetVars[hetVars.length-1].getVcfRecord()[1];

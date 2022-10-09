@@ -11,14 +11,19 @@ import java.util.LinkedHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import edu.utah.seq.its.Interval;
+import edu.utah.seq.its.IntervalTree;
 import edu.utah.seq.parsers.jpileup.BamPileupTabixLoaderSingle;
 import edu.utah.seq.parsers.jpileup.BpileupLine;
+import edu.utah.seq.useq.data.RegionScoreText;
+import util.bio.annotation.Bed;
 import util.gen.CombinePValues;
 import util.gen.FisherExact;
 import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
+import util.gen.Passwords;
 
 /**
  * @author Nix*/
@@ -34,6 +39,7 @@ public class LoH {
 	private int maxGapBetweenVars = 1000;
 	private int windowBpPadding = 100;
 	private File resultsDir = null;
+	private File bedCopyRatioFile = null;
 
 	//window
 	private float minAdjTransWindowPval = 8.239f; //.15
@@ -52,6 +58,7 @@ public class LoH {
 	private HetWindow[] hetWindow = null;
 	private String fractionLoH = null;
 	private ArrayList<String> vcfHeader = new ArrayList<String>();
+	private HashMap<String,IntervalTree<RegionScoreText>> chrRegionIntervalTrees = null;
 
 	//constructor
 	public LoH(String[] args){
@@ -81,9 +88,19 @@ public class LoH {
 
 			windowScoreIndividualHets();
 			
+			if (bedCopyRatioFile != null) {
+				IO.pl("Intersecting LoH variants with copy ratio calls...");
+				createIntervalTrees();
+				intersectHetVarsWithCopyRatios();
+			}
+			
+			printPassingWindows();
+			
 			printBed();
 			
 			printVcf();
+			
+			IO.pl(fractionLoH+ " : Fraction heterozygous germline snvs and indels with a significant increase in their allele fraction in the tumor");
 
 
 		} catch (Exception e) {
@@ -144,15 +161,19 @@ public class LoH {
 		
 		out.close();
 	}
+	
+	private void printPassingWindows() throws IOException {
+		IO.pl("Passing LoH Window Blocks:");
+		for (HetWindow w: hetWindow) {
+			if (w.isPassesThresholds()) IO.pl(w);
+		}
+	}
 
 	private void scoreWindows() throws IOException {
-		IO.pl("Scoring windows and vars...\n\nLoH Window Blocks:");
+		IO.pl("Scoring windows and vars...");
 		for (HetWindow w: hetWindow) {
 			if (w.getTransAdjPVal()< this.minAdjTransWindowPval || w.getMeanAfDiff() < this.minMeanAfWindowDiff) w.setPassesThresholds(false);
-			else {
-				w.setPassesThresholds(true);
-				IO.pl(w);
-			}
+			else w.setPassesThresholds(true);
 		}
 	}
 
@@ -160,7 +181,6 @@ public class LoH {
 		//IO.pl("LoH vars:");
 		//for each of the windows
 		for (HetWindow w: hetWindow) {
-			
 			//for each of the hets, add window scores if better
 			//actually now the het only belongs to one window
 			for (HeterozygousVar s: w.getHetVars()) {
@@ -182,9 +202,6 @@ public class LoH {
 		
 		float frac = (float)numLoHVars/ (float)hetVcfRecords.length;
 		fractionLoH = frac+" ("+numLoHVars+"/"+hetVcfRecords.length+")";
-		IO.pl(fractionLoH+ " : Fraction heterozygous germline snvs and indels with a significant increase in their allele fraction in the tumor");
-		
-		
 	}
 
 	private void calculateFisherPValues() throws IOException {
@@ -377,6 +394,9 @@ public class LoH {
 		//LoHVar=afS,afG,diff,sAlt/Ref,gAlt/Ref,pval;
 		String lohVar = "##INFO=<ID=LoHVar,Number=1,Type=String,Description=\"Loss of Heterozygosity Variant: allele fraction somatic, allele fraction germline, "
 				+ "allele fraction difference, somatic ALT/REF counts, germline ALT/REF counts, Fisher's Exact -10log10(p-value)\">";
+		//LoHCR=lg2R,lg2T,lg2N,#Obs,Coor
+		String lohCR = "##INFO=<ID=LoHCR,Number=1,Type=String,Description=\"Loss of Heterozygosity Copy Ratio: Log2Ratio(Tum/Germ), Log2Tumor, Log2Germline, #Observations, Coordinates of the Copy Ratio window block)\">";
+
 		while ((line = in.readLine()) != null){
 			line = line.trim();
 			if (line.length()==0) continue;
@@ -385,6 +405,7 @@ public class LoH {
 				added = true;
 				vcfHeader.add(lohBlock);
 				vcfHeader.add(lohVar);
+				vcfHeader.add(lohCR);
 			}
 			if (line.startsWith("#CHROM")) break;
 		}
@@ -483,6 +504,60 @@ public class LoH {
 		if (gt.equals("1/1")) return 1;
 		return null;
 	}
+	
+	private void intersectHetVarsWithCopyRatios() {
+		//for each chr of HetVars
+		for (String chr: chromHets.keySet()) {
+			IntervalTree<RegionScoreText> regions = chrRegionIntervalTrees.get(chr);
+			//any regions to intersect? 
+			if (regions != null) {
+				//for each HetVar
+				for (HeterozygousVar hv: chromHets.get(chr)) {
+					if (hv.getBestHetWindow().isPassesThresholds()) {
+						ArrayList<RegionScoreText> hits = fetchRecords(hv.getVcfRecord(), regions);
+						if (hits.size()!=0) {
+							hv.setCopyRatioRegion(hits.get(0));
+						}
+					}
+				}
+			}
+		}	
+	}
+
+	private ArrayList<RegionScoreText> fetchRecords(String[] vcfTokens, IntervalTree<RegionScoreText> regions) {
+		//calc start stop to fetch, interbase coordinates
+		int size = vcfTokens[4].length();
+		int sizeRef = vcfTokens[3].length();
+		if (size < sizeRef) size = sizeRef;
+		int position = Integer.parseInt(vcfTokens[1]) -1;
+		return regions.search(position, position+size+2);
+	}
+	
+	private void createIntervalTrees() {
+			//load bed regions 
+			HashMap<String, RegionScoreText[]> chrRegions = Bed.parseBedFile(bedCopyRatioFile, true, false);
+			//make HashMap of trees
+			chrRegionIntervalTrees = new HashMap<String,IntervalTree<RegionScoreText>>();
+			long numRegions = 0;
+			for (String chr : chrRegions.keySet()){
+				RegionScoreText[] regions = chrRegions.get(chr);
+				numRegions+= regions.length;
+				ArrayList<Interval<RegionScoreText>> ints = new ArrayList<Interval<RegionScoreText>>();
+				for (int i =0; i< regions.length; i++) {
+					int start = regions[i].getStart();
+					if (start < 0) start = 0;
+					ints.add(new Interval<RegionScoreText>(start, regions[i].getStop(), regions[i]));
+					//check text
+					if (regions[i].getText().length() == 0) {
+						Misc.printErrAndExit("\nERROR loading the bed file, each line must contain a text field to use in adding to the FILTER field in the VCF record. See "+regions[i].getBedLine(chr));
+					}
+				}
+				IntervalTree<RegionScoreText> tree = new IntervalTree<RegionScoreText>(ints, false);
+				chrRegionIntervalTrees.put(chr, tree);
+			}
+			System.out.println("\tLoaded "+numRegions+" copy ratio regions\n");
+
+	}
 
 	public static void main(String[] args) {
 		if (args.length ==0){
@@ -507,6 +582,7 @@ public class LoH {
 					case 'g': germlineBamPileup = new File(args[++i]); break;
 					case 's': somaticBamPileup = new File(args[++i]); break;
 					case 'o': resultsDir = new File(args[++i]); break;
+					case 'c': bedCopyRatioFile = new File(args[++i]); break;
 					case 'm': maxGapBetweenVars = Integer.parseInt(args[++i]); break;
 					case 'r': minimumDP = Integer.parseInt(args[++i]); break;
 					case 'w': windowBpPadding = Integer.parseInt(args[++i]); break;
@@ -597,6 +673,7 @@ java -jar -Xmx100G  ~/USeqApps/AnnotateBedWithGenes -u ~/TNRunner/AnnotatorData/
                 "-o Path to directory to write the bed and vcf output results.\n"+
 
 				"\nOptional:\n" +
+				"-c Bed file containing passing regions from the TNRunner2 CopyRatio workflow.\n"+
 				"-q Minimum vcf record QUAL, defaults to 20\n"+
                 "-e Minimum vcf record sample GQ, defaults to 20\n"+
                 "-x Use Strelka's recalibrated GQX genotype score, defaults to GQ\n"+
@@ -612,7 +689,8 @@ java -jar -Xmx100G  ~/USeqApps/AnnotateBedWithGenes -u ~/TNRunner/AnnotatorData/
                 "-w Window BP padding for reporting significant LoH regions, defaults to 100\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/LoH -v gatkStrelkaGermline.vcf.gz \n"+
-				"-g normal.bp.txt.gz -s tumor.bp.txt.gz -o LoHResults/ -d 0.15 -m 5000\n\n"+
+				"-g normal.bp.txt.gz -s tumor.bp.txt.gz -o LoHResults/ -d 0.15 -m 5000 -b\n"+
+				"GATKCopyRatio_Hg38.called.seg.pass.bed.gz\n\n"+
 
 				"**************************************************************************************\n");
 	}
