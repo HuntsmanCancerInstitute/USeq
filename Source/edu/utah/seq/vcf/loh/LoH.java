@@ -2,15 +2,12 @@ package edu.utah.seq.vcf.loh;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
 import edu.utah.seq.its.Interval;
 import edu.utah.seq.its.IntervalTree;
 import edu.utah.seq.parsers.jpileup.BamPileupTabixLoaderSingle;
@@ -23,7 +20,6 @@ import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
-import util.gen.Passwords;
 
 /**
  * @author Nix*/
@@ -59,6 +55,8 @@ public class LoH {
 	private String fractionLoH = null;
 	private ArrayList<String> vcfHeader = new ArrayList<String>();
 	private HashMap<String,IntervalTree<RegionScoreText>> chrRegionIntervalTrees = null;
+	private int numHetVarsIntersectCopyRatioRegions = 0;
+	private int numLoHPassHetVars = 0;
 
 	//constructor
 	public LoH(String[] args){
@@ -101,7 +99,12 @@ public class LoH {
 			printVcf();
 			
 			IO.pl(fractionLoH+ " : Fraction heterozygous germline snvs and indels with a significant increase in their allele fraction in the tumor");
-
+			
+			if (bedCopyRatioFile != null) {
+				float frac = (float)numHetVarsIntersectCopyRatioRegions/ (float)numLoHPassHetVars;
+				String fractionCR = frac+" ("+numHetVarsIntersectCopyRatioRegions+"/"+numLoHPassHetVars+")";
+				IO.pl(fractionCR+ " : Fraction passing variants that intersect a copy ratio region");
+			}
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -192,16 +195,16 @@ public class LoH {
 				}
 			}
 		}
-		int numLoHVars = 0;
+		
 		for (HeterozygousVar s: hetVcfRecords) {
 			if (s.getBestHetWindow().isPassesThresholds()) {
-				numLoHVars++;
+				numLoHPassHetVars++;
 				//IO.pl(s.toString());
 			}
 		}
 		
-		float frac = (float)numLoHVars/ (float)hetVcfRecords.length;
-		fractionLoH = frac+" ("+numLoHVars+"/"+hetVcfRecords.length+")";
+		float frac = (float)numLoHPassHetVars/ (float)hetVcfRecords.length;
+		fractionLoH = frac+" ("+numLoHPassHetVars+"/"+hetVcfRecords.length+")";
 	}
 
 	private void calculateFisherPValues() throws IOException {
@@ -395,7 +398,7 @@ public class LoH {
 		String lohVar = "##INFO=<ID=LoHVar,Number=1,Type=String,Description=\"Loss of Heterozygosity Variant: allele fraction somatic, allele fraction germline, "
 				+ "allele fraction difference, somatic ALT/REF counts, germline ALT/REF counts, Fisher's Exact -10log10(p-value)\">";
 		//LoHCR=lg2R,lg2T,lg2N,#Obs,Coor
-		String lohCR = "##INFO=<ID=LoHCR,Number=1,Type=String,Description=\"Loss of Heterozygosity Copy Ratio: Log2Ratio(Tum/Germ), Log2Tumor, Log2Germline, #Observations, Coordinates of the Copy Ratio window block)\">";
+		String lohCR = "##INFO=<ID=LoHCR,Number=1,Type=String,Description=\"Loss of Heterozygosity Copy Ratio: Log2Ratio(Tum/Germ), Log2(Mean Tumor CRs), Log2(Mean Germline CRs), #CopyRatio Observations, Coordinates of the Copy Ratio window block)\">";
 
 		while ((line = in.readLine()) != null){
 			line = line.trim();
@@ -466,7 +469,7 @@ public class LoH {
 		IO.pl("\nGermline VCF Parsing Statistics:");
 		IO.pl(numRecords + "\t# Records");
 		IO.pl(numFailingRecords + "\t# Failing Records");
-		IO.pl(numPassingHom + "\t# Passing Hom Vars and Indels");
+		IO.pl(numPassingHom + "\t# Passing Hom Snvs and Indels");
 		IO.pl(numPassingIndel + "\t# Passing Het Indels");
 		IO.pl(numPassingHet + "\t# Passing Het Snvs");
 	}
@@ -517,6 +520,7 @@ public class LoH {
 						ArrayList<RegionScoreText> hits = fetchRecords(hv.getVcfRecord(), regions);
 						if (hits.size()!=0) {
 							hv.setCopyRatioRegion(hits.get(0));
+							numHetVarsIntersectCopyRatioRegions++;
 						}
 					}
 				}
