@@ -743,6 +743,7 @@ public class TNSample2 {
 
 		//what is their gender
 		//is there a ClinicalReport dir? If so then try to get info from the file name
+		//now being used by the AvatarProjectAssembler
 		File crDir = new File(rootDir, "ClinicalReport");
 		if (crDir.exists()) {
 			PlatformGenderInfo pgi = parsePlatformGenderInfo();

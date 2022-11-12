@@ -30,6 +30,14 @@ public class PlatformGenderInfo {
 				}
 			}
 		}
+		//AvatarID_Panel_Gender.json
+		//ZBG7MKFOZ1_IDT.V1_M.json
+		else if (fields.length == 3 && clinInfoFile.endsWith("_M.json") || clinInfoFile.endsWith("_F.json")) {
+			platform = "Avatar";
+			panel = fields[1];
+			gender = fields[2].substring(0, 1);
+			parsed = true;
+		}
 	}
 
 	public boolean isParsed() {

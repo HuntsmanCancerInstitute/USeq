@@ -39,6 +39,10 @@ public class Bed extends Coordinate implements Serializable{
 		this.score = nsss.getScore();
 		this.strand = strand;
 	}
+	
+	public Bed (String chromosome, int start, int stop){
+		super(chromosome, start, stop);
+	}
 
 
 	public Bed(String[] tokens) {
@@ -702,6 +706,12 @@ public class Bed extends Coordinate implements Serializable{
 	public String toStringNoStrandNoName(){
 		return chromosome+"\t"+start+"\t"+stop+"\t"+score;
 	}
+	public String toStringNoStrandNoScore(){
+		return chromosome+":"+start+"-"+stop+"_"+name;
+	}
+	public String toStringCoordinates(){
+		return start+"-"+stop;
+	}
 	public String toString(){
 		return chromosome+"\t"+start+"\t"+stop+"\t"+name+"\t"+score+"\t"+strand;
 	}
@@ -725,6 +735,9 @@ public class Bed extends Coordinate implements Serializable{
 
 	public char getStrand() {
 		return strand;
+	}
+	public String getNameScoreStrand() {
+		return name+"\t"+score+"\t"+strand;
 	}
 
 	public void setStrand(char strand) {

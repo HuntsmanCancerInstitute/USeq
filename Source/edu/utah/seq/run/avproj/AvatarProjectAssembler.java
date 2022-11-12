@@ -118,21 +118,21 @@ public class AvatarProjectAssembler {
 			//No tumor samples just yet?
 			if (numTum == 0) {
 				//create patient dir, patientID-Platform-NormalExomeID-TumorExomeID-TumorRNAID 
-				File dir = new File(jobDir, p.getPatientId()+"-"+ns.getPlatformName()+"-"+ns.getNormalDnaName()+"-NA-NA");
+				File dir = new File(jobDir, p.getPatientId()+"_"+ns.getPlatformName()+"_"+ns.getNormalDnaName()+"_NA_NA");
 				dir.mkdirs();
 				addNormalSample(ns, dir);
-				addGender(p.getGender(),dir);
+				addGenderWithPlatform(p.getGender(),dir);
 				numJobDirs++;
 			}
 			else {
 				for (TumorSample ts: tumorSamples) {
 					if (ts.getTumorDnaName() != null && ts.getTumorDnaFastqCram().size() ==0) {
-						IO.el("\tWARNING: subject "+p.getPatientId()+" is missing tumor DNA fastq/cram file(s) for "+ts.getTumorDnaName()+", putting dataset name in job dir name but no files to link in! Find them and rerun." );
+						IO.el("\tWARNING: subject "+p.getPatientId()+" is missing Tumor DNA fastq/cram file(s) for "+ts.getTumorDnaName()+", putting dataset name in job dir name but no files to link in! Find them and rerun." );
 					}
 					if (ts.getTumorRnaName() != null && ts.getTumorRnaFastqCram().size() ==0) {
-						IO.el("\tWARNING: subject "+p.getPatientId()+" is missing tumor RNA fastq/cram file(s) for "+ts.getTumorRnaName()+", putting dataset name in job dir name but no files to link in! Find them and rerun." );
+						IO.el("\tWARNING: subject "+p.getPatientId()+" is missing Tumor RNA fastq/cram file(s) for "+ts.getTumorRnaName()+", putting dataset name in job dir name but no files to link in! Find them and rerun." );
 					}
-					//create patient dir, patientID-Platform-NormalExomeID-TumorExomeID-TumorRNAID 
+					//create patient dir, patientID_Platform_NormalExomeID_TumorExomeID_TumorRNAID 
 					String platform = "NA";
 					if (ts.getPlatformName() != null) platform = ts.getPlatformName();
 					String normDnaName = "NA";
@@ -159,7 +159,7 @@ public class AvatarProjectAssembler {
 					String tumorRnaName = "NA";
 					if (ts.getTumorRnaName() != null) tumorRnaName = ts.getTumorRnaName();
 						
-					File dir = new File(jobDir, p.getPatientId()+"-"+platform+"-"+normDnaName+"-"+tumorDnaName+"-"+tumorRnaName);
+					File dir = new File(jobDir, p.getPatientId()+"_"+platform+"_"+normDnaName+"_"+tumorDnaName+"_"+tumorRnaName);
 					dir.mkdirs();
 					addNormalSample(ns, dir);
 					if (normalWarning) {
@@ -169,7 +169,7 @@ public class AvatarProjectAssembler {
 					}
 					addTumorDnaSample(ts, dir);
 					addTumorRnaSample(ts, dir);
-					addGender(p.getGender(),dir);
+					addGenderWithPlatform(p.getGender(),dir);
 					numJobDirs++;
 				}
 				
@@ -177,13 +177,30 @@ public class AvatarProjectAssembler {
 		}
 		
 	}
-
-	private void addGender(String gender, File dir) {
-		if (gender == null) return;
+	
+	private void addGenderWithPlatform(String gender, File dir) {
 		File clinDir = new File (dir, "ClinicalReport");
 		clinDir.mkdir();
-		File json = new File(clinDir, "gender.json");
-		IO.writeString("Gender "+gender, json);
+		
+		//From Tempus
+		//TL-18-843E9B_XT.V1_2018-10-26_deid_Neeraj_Agarwal_M.json
+		//	     0         1        2       3     4      5    6
+
+		//For Avatar
+		//AvatarID_Platform_Gender.json
+		//ZBG7MKFOZ1_IDT.V1_M.json
+		//File dir = new File(jobDir, p.getPatientId()+"_"+platform+"_"+normDnaName+"_"+tumorDnaName+"_"+tumorRnaName);
+		//                                   0                 1
+		String[] info = Misc.UNDERSCORE.split(dir.getName());
+		//convert platform from NIM and IDT to be NIM.V1 ditto for IDT, there is an IDT.V2 coming!
+		if (info[1].contains(".V") == false) info[1] = info[1]+".V1";
+		
+		String genderLetter = null;
+		if (gender.toLowerCase().equals("female")) genderLetter = "F";
+		else if (gender.toLowerCase().equals("male")) genderLetter = "M";
+
+		File json = new File(clinDir, info[0]+"_"+ info[1]+"_"+ genderLetter+ ".json");
+		IO.writeString("Gender "+gender+"\n", json);
 		if (verbose) IO.pl("\tAdding gender info file to "+json);
 	}
 
@@ -290,6 +307,7 @@ public class AvatarProjectAssembler {
 
 		//for each subsequent line
 		String line = null;
+		try {
 		while ((line = in.readLine()) != null) {
 			fields = Misc.TAB.split(line);
 			String patientId = fields[keyIndex];
@@ -325,6 +343,11 @@ public class AvatarProjectAssembler {
 				in.close();
 				Misc.printErrAndExit("\nERROR: didn't find 'Tumor' or 'Germline' in the type column for "+line);
 			}
+		}
+		} catch (ArrayIndexOutOfBoundsException e) {
+			IO.el("\nERROR parsing line "+line);
+			e.printStackTrace();
+			System.exit(1);
 		}
 	}
 
@@ -398,7 +421,7 @@ public class AvatarProjectAssembler {
 
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                          Avatar Project Assembler : Oct 2021                    **\n" +
+				"**                          Avatar Project Assembler : Nov 2022                    **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling directories for TNRunner based on files provided by M2Gen.\n"+
 				"Handles patient datasets from different exome capture platforms with multiple tumor\n"+

@@ -33,3 +33,4 @@ jar.select=edu/utah/seq/analysis/AggregatePlotter,\
 # edu/utah/seq/parsers/Tag2Point,\
 # edu/utah/pysano/TomatoFarmer,\
 # edu/utah/seq/vcf/SomaticSniperVCFParser,\
+# edu/utah/seq/run/TNRunner,\

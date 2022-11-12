@@ -5200,5 +5200,41 @@ public class Num {
 		}
 		return ss;
 	}
+	
+	/**Splits the region defined by the start and stop (not included) into chunks of the chunkSize or larger*/
+	public static int[][] chunkRegionExact(int minSize, int start, int stop) {
+		//how many?
+		double size = stop - start;	
+		int numCuts = (int)(size/(double)minSize);
+		if (size <= minSize || numCuts == 1) {
+			int[][] toReturn = new int[1][2];
+			toReturn[0] = new int[]{start,stop};
+			return toReturn;
+		}
+		
+		int bpPerCut = (int)(size/(double)numCuts);
+		if (bpPerCut < minSize) bpPerCut = minSize;
+
+		int begin = start;
+		int[][] ss = new int[(int)numCuts][2];
+		int finalIndex = (int)numCuts -1;
+		for (int i=0; i< numCuts; i++){
+			int end = begin + bpPerCut;
+			//last one?
+			if (i == finalIndex) {
+				ss[i] = new int[]{begin, stop};
+				break;
+			}
+			else {
+				ss[i] = new int[]{begin, end};
+				begin = end;
+			}
+		}
+		return ss;
+	}
+
+
+	
+	
 
 }

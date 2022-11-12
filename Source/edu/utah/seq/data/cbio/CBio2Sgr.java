@@ -27,6 +27,7 @@ public class CBio2Sgr {
 
 
 	private void parseTsv(File f) {
+		IO.pl("DatasetName\tNumSkippedRecords\tNumUniqueRecords\tNumTotalParsedRecords");
 		IO.p(f.getName());
 		String name = Misc.removeExtension(f.getName());
 		File svg = new File (f.getParentFile(), name+".sgr");
@@ -65,16 +66,21 @@ public class CBio2Sgr {
 		String[] fields = Misc.TAB.split(line);
 		HashMap<String, Integer> keyIndex = new HashMap<String, Integer>();
 		for (int i=0; i< fields.length; i++) keyIndex.put(fields[i], i);
-		int sampleIdIndex = keyIndex.get("Sample ID");
-		int chromosomeIndex = keyIndex.get("Chromosome");
-		int startPosIndex = keyIndex.get("Start Pos");
-		int endPosIndex = keyIndex.get("End Pos");
-		int refIndex = keyIndex.get("Ref");
-		int varIndex = keyIndex.get("Var");
+		Integer sampleIdIndex = keyIndex.get("Sample ID");
+		Integer chromosomeIndex = keyIndex.get("Chromosome");
+		Integer startPosIndex = keyIndex.get("Start Pos");
+		Integer endPosIndex = keyIndex.get("End Pos");
+		Integer refIndex = keyIndex.get("Ref");
+		Integer varIndex = keyIndex.get("Var");
+		
+		if (sampleIdIndex==null || chromosomeIndex==null || startPosIndex==null || endPosIndex==null || refIndex==null || varIndex==null) {
+			throw new IOException("\nFAILED to find one or more of the column indexes: \n'Sample ID', 'Chromosome', 'Start Pos', 'End Pos', 'Ref', 'Var' in:\n"+line);
+		}
 
 		//parse the rest
 		int numTotal = 0;
 		int unique = 0;
+		int numSkipped = 0;
 		ArrayList<CBioVar> vars = new ArrayList<CBioVar>();
 		HashSet<String> keys = new HashSet<String>();
 		try {
@@ -82,7 +88,10 @@ public class CBio2Sgr {
 				numTotal++;
 				String[] f = Misc.TAB.split(line);
 				//no chrom or start pos
-				if (f[chromosomeIndex].contains("NA") || f[startPosIndex].contains("-1")) continue;
+				if (f[chromosomeIndex].contains("NA") || f[startPosIndex].contains("-1") || f[endPosIndex].length()==0) {
+					numSkipped++;
+					continue;
+				}
 				CBioVar cbv = new CBioVar(f[sampleIdIndex], f[chromosomeIndex], Integer.parseInt(f[startPosIndex])-1, Integer.parseInt(f[endPosIndex]), f[refIndex], f[varIndex]);
 				String key = cbv.fetchKey();
 				if (keys.contains(key) == false) {
@@ -92,12 +101,12 @@ public class CBio2Sgr {
 				}
 			}
 			in.close();
-		} catch ( NumberFormatException e) {
+		} catch ( Exception e) {
 			e.printStackTrace();
-			IO.el(line);
+			IO.el("\nPROBLEM LINE: "+line+"\n");
 			throw new IOException (e.getMessage());
 		}
-		IO.pl("\t"+ unique+"\t"+ numTotal);
+		IO.pl("\t"+ numSkipped+"\t"+unique+"\t"+ numTotal);
 
 		CBioVar[] finalVars = new CBioVar[vars.size()];
 		vars.toArray(finalVars);

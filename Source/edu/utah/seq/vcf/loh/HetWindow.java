@@ -38,9 +38,11 @@ public class HetWindow {
 	public String toStringVcfFormat(int bpPadding) throws IOException {
 		
 		//build the Block INFO string
-		//LoHBlock=start-stop,#vars,meanAfDiffSomGerm,pval,adjpval;
+		//LoHBlock=PASS,start-stop,#vars,meanAfDiffSomGerm,pval,adjpval;
 		StringBuilder sb = new StringBuilder();
 		sb.append("LoHBlock=");
+		if (passesThresholds) sb.append("PASS,");
+		else sb.append("FAIL,");
 		addCoordinatesRegion(bpPadding, sb, false, "-"); sb.append(",");
 		sb.append(hetVars.length); sb.append(",");
 		String diff = Num.formatNumber(getMeanAfDiff(), 3);

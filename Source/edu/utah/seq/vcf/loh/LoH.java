@@ -46,6 +46,7 @@ public class LoH {
 	private String gqSelector = "GQ";
 
 	//internal
+	private Gzipper nonPassVcf = null;
 	private HashMap<String, String> formatValues = new HashMap<String,String>();
 	private HeterozygousVar[] hetVcfRecords = null;
 	private LinkedHashMap<String,HeterozygousVar[]> chromHets = null;
@@ -92,6 +93,8 @@ public class LoH {
 				intersectHetVarsWithCopyRatios();
 			}
 			
+			nonPassVcf.closeNoException();
+			
 			printPassingWindows();
 			
 			printBed();
@@ -108,6 +111,7 @@ public class LoH {
 
 		} catch (Exception e) {
 			e.printStackTrace();
+			System.exit(1);
 		} finally {
 
 			//finish and calc run time
@@ -122,10 +126,11 @@ public class LoH {
 		out.println(Misc.stringArrayListToString(vcfHeader, "\n"));
 		
 		//for each block
-		for (HetWindow w: hetWindow) if (w.isPassesThresholds()) out.print(w.toStringVcfFormat(windowBpPadding));
-		
+		for (HetWindow w: hetWindow) {
+			//if (w.isPassesThresholds()) out.print(w.toStringVcfFormat(windowBpPadding));
+			out.print(w.toStringVcfFormat(windowBpPadding));
+		}
 		out.close();
-		
 	}
 
 	private String fetchThresholds(String prePend) {
@@ -179,7 +184,7 @@ public class LoH {
 			else w.setPassesThresholds(true);
 		}
 	}
-
+	
 	private void windowScoreIndividualHets() throws IOException {
 		//IO.pl("LoH vars:");
 		//for each of the windows
@@ -259,7 +264,6 @@ public class LoH {
 				//does that het pass thresholds?
 				if (hets[i].getPvalue() <= minVarPval && hets[i].getAlleleFractionDifference() >= minVarAfDiff ) {
 					
-
 					//look at next het
 					for (int j=i+1; j< hets.length; j++) {				
 						//check distance, can't be too far away
@@ -279,7 +283,6 @@ public class LoH {
 						i=j;  
 					}
 				}
-				
 				
 				HeterozygousVar[] winHets = new HeterozygousVar[hetAl.size()];
 				hetAl.toArray(winHets);
@@ -361,7 +364,10 @@ public class LoH {
 			ArrayList<BpileupLine> som = bps.fetchBpileupRecords(hs.getVcfRecord());
 			hs.setSomaticBPs(som, minimumDP);
 			
-			if (hs.isPassing()== false) continue;
+			if (hs.isPassing()== false) {
+				nonPassVcf.println(Misc.stringArrayToString(hs.getVcfRecord(), "\t"));
+				continue;
+			}
 			passing.add(hs);
 			
 			//check total counts
@@ -390,8 +396,9 @@ public class LoH {
 
 		//save and modify the header
 		boolean added = false;
-		//LoHBlock=start-stop,#vars,meanAfDiffSomGerm,pval,adjpval;
-		String lohBlock = "##INFO=<ID=LoHBlock,Number=1,Type=String,Description=\"Loss of Heterozygosity block: startBP-stopBP, number het vars in block, "
+		//LoHBlock=PASS|FAIL,start-stop,#vars,meanAfDiffSomGerm,pval,adjpval;
+		String lohBlock = "##INFO=<ID=LoHBlock,Number=1,Type=String,Description=\"Loss of Heterozygosity block: PASS or FAIL block thresholds (adjPval>="
+				+ minAdjTransWindowPval+",afDiff>="+minMeanAfWindowDiff+"), startBP-stopBP, number het vars in block, "
 				+ "mean allele fraction differences between the somatic and germline, Fisher's -10Log10(combine p-value) for the block, Benjamini-Hochberg "
 				+ "adjusted window -10Log10(combine pvalue)\">";
 		//LoHVar=afS,afG,diff,sAlt/Ref,gAlt/Ref,pval;
@@ -399,7 +406,7 @@ public class LoH {
 				+ "allele fraction difference, somatic ALT/REF counts, germline ALT/REF counts, Fisher's Exact -10log10(p-value)\">";
 		//LoHCR=lg2R,lg2T,lg2N,#Obs,Coor
 		String lohCR = "##INFO=<ID=LoHCR,Number=1,Type=String,Description=\"Loss of Heterozygosity Copy Ratio: Log2Ratio(Tum/Germ), Log2(Mean Tumor CRs), Log2(Mean Germline CRs), #CopyRatio Observations, Coordinates of the Copy Ratio window block)\">";
-
+			
 		while ((line = in.readLine()) != null){
 			line = line.trim();
 			if (line.length()==0) continue;
@@ -412,6 +419,10 @@ public class LoH {
 			}
 			if (line.startsWith("#CHROM")) break;
 		}
+		
+		File vcfFile = new File(resultsDir, "nonPassQCHetAndHom.vcf.gz");
+		nonPassVcf = new Gzipper(vcfFile);
+		nonPassVcf.println(Misc.stringArrayListToString(vcfHeader, "\n"));
 
 		//for each data line in the file
 		while ((line = in.readLine()) != null){
@@ -421,23 +432,18 @@ public class LoH {
 			//   0    1   2  3   4   5     6      7     8      9       10
 			String[] fields = Misc.TAB.split(line);
 
-			//check FILTER
-			String lc = fields[6].toUpperCase();
-			if (lc.contains("PASS") == false && lc.equals(".") == false) {
-				numFailingRecords++;
-				continue;
-			}
-
 			//check whole line QUAL
 			double q = Double.parseDouble(fields[5]);
 			if (q < minimumQUAL) {
 				numFailingRecords++;
+				nonPassVcf.println(line);
 				continue;
 			}
 
 			//check ref and alt
 			if (fields[3].equals("*") || fields[4].equals("*") || fields[4].contains(",")) {
 				numFailingRecords++;
+				nonPassVcf.println(line);
 				continue;
 			}
 
@@ -446,6 +452,7 @@ public class LoH {
 			Integer hetHom = checkSample(format, fields[9]);
 			if (hetHom == null) {
 				numFailingRecords++;
+				nonPassVcf.println(line);
 				continue;
 			}
 			
@@ -674,7 +681,7 @@ java -jar -Xmx100G  ~/USeqApps/AnnotateBedWithGenes -u ~/TNRunner/AnnotatorData/
 				"-g Path to the germline bampileup file, use the USeq BamPileup tool to generate the\n"+
 				"     xxx.bp.txt.gz and tabix index files.\n"+
 				"-s Path to the somatic bampileup file, ditto.\n"+
-                "-o Path to directory to write the bed and vcf output results.\n"+
+                "-o Path to directory to write the bed and vcf output result files.\n"+
 
 				"\nOptional:\n" +
 				"-c Bed file containing passing regions from the TNRunner2 CopyRatio workflow.\n"+
