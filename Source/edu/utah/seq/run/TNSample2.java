@@ -93,6 +93,9 @@ public class TNSample2 {
 
 			//msi
 			if (tnRunner.getMsiDocs() != null) msiAnalysis();
+			
+			//loh
+			if (tnRunner.getLoHDocs() != null) lohAnalysis();
 		}
 
 		//print messages?
@@ -726,7 +729,35 @@ public class TNSample2 {
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.vcf.gz").toPath(), normalVcf);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.vcf.gz.tbi").toPath(), normalTbi);
 	}
+	
+	private void createLoHLinks(File jobDir, File copyRatioBed, File annoGermlineVcf) throws IOException {
+		//remove any linked files
+		removeLoHLinks(jobDir);
 
+		//soft link in bamPileupFiles and indexes
+		Path tumorBamPileup = tumorDNAAlignment.getBpPileupFile().toPath();
+		Path tumorBamPileupIndex = tumorDNAAlignment.getBpIndexFile().toPath();
+		Path normalBamPileup = normalDNAAlignment.getBpPileupFile().toPath();
+		Path normalBamPileupIndex = normalDNAAlignment.getBpIndexFile().toPath();
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bp.txt.gz").toPath(), tumorBamPileup);
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bp.txt.gz.tbi").toPath(), tumorBamPileupIndex);
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.bp.txt.gz").toPath(), normalBamPileup);
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.bp.txt.gz.tbi").toPath(), normalBamPileupIndex);
+		
+		//soft link in the bed and vcf files, no need for the indexes
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"germline.vcf.gz").toPath(), annoGermlineVcf.toPath());
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"copyRatio.bed.gz").toPath(), copyRatioBed.toPath());
+	}
+	
+	private void removeLoHLinks(File jobDir) throws IOException{
+		File f = jobDir.getCanonicalFile();
+		new File(f, "tumor.bp.txt.gz").delete();
+		new File(f, "tumor.bp.txt.gz.tbi").delete();
+		new File(f, "normal.bp.txt.gz").delete();
+		new File(f, "normal.bp.txt.gz.tbi").delete();
+		new File(f, "germline.vcf.gz").delete();
+		new File(f, "copyRatio.bed.gz").delete();
+	}
 
 
 
@@ -775,13 +806,13 @@ public class TNSample2 {
 				if (name.contains("female") || name.endsWith("f.hdf5")) {
 					if (gender.equals("F")) {
 						genderMatchedHdf5.add(f);
-						IO.pl("\t\tAdding female "+f.getName());
+						//IO.pl("\t\tAdding female "+f.getName());
 					}
 				}
 				else if (name.contains("male") || name.endsWith("m.hdf5")) {				
 					if (gender.equals("M")) {
 						genderMatchedHdf5.add(f);
-						IO.pl("\t\tAdding male "+f.getName());	
+						//IO.pl("\t\tAdding male "+f.getName());	
 					}
 				}
 			}
@@ -850,6 +881,87 @@ public class TNSample2 {
 		new File(f, "normal.vcf.gz").delete();
 		new File(f, "normal.vcf.gz.tbi").delete();
 	}
+	
+	private void lohAnalysis() throws IOException {
+		info.add("Checking LoH analysis...");	
+
+		//look for tumor normal alignments
+		if (tumorDNAAlignment == null || normalDNAAlignment == null ) {
+			info.add("\tWaiting for tumor and normal alignments.");
+			return;
+		}
+
+		//look for copy ratio analysis bed file, TL-20-B70ACE/CopyAnalysis/TL-20-B70ACE_GATKCopyRatio/Results/TL-20-B70ACE_GATKCopyRatio_Hg38.called.seg.pass.bed.gz
+		File crDir = new File (rootDir, "CopyAnalysis");
+		if (crDir.exists()== false) {
+			info.add("\tWaiting for CopyRatio analysis.");
+			return;
+		}
+		File[] crDirs = IO.extractFiles(crDir, "_GATKCopyRatio");
+		if (crDirs == null || crDirs.length !=1) {
+			info.add("\tWaiting for CopyRatio/xxx_GATKCopyRatio directory");
+			return;
+		}
+		File crResDir = new File (crDirs[0], "Results");
+		File[] bed = IO.extractFiles(crResDir, "called.seg.pass.bed.gz");
+		if (bed == null || bed.length!=1) {
+			info.add("\tFAILED to find a xxx.called.seg.pass.bed.gz in "+ crResDir);
+			return;
+		}
+		File crBed = bed[0];
+
+
+		//look for annotated germline vcf, GermlineVariantCalling/TL-20-B70ACE_GATK_Anno/Vcfs/TL-20-B70ACE_GATK_Anno_Hg38.anno.vcf.gz 
+		//or Illumina                      GermlineVariantCalling/R0JJZPXHE6_IDT_SL413749_NA_NA_Illumina_Anno/Vcfs/R0JJZPXHE6_IDT_SL413749_NA_NA_Illumina_Anno_Hg38.anno.vcf.gz
+		File vcf = null;
+		File gvc = new File (rootDir, "GermlineVariantCalling");
+		if (gvc.exists()==false) {
+			info.add("\tWaiting for germline variant calling.");
+			return;
+		}
+		File[] dirs = IO.extractFiles(gvc, "_Anno");
+		if (dirs == null || dirs.length ==0) {
+			info.add("\tWaiting for an annotated germline variant calling vcf.");
+			return;
+		}
+		File vcfDir = new File(dirs[0],"Vcfs");
+		File[] vcfs = IO.extractFiles(vcfDir, ".anno.vcf.gz");
+		if (vcfs == null || vcfs.length!=1){
+			info.add("\tFAILED to find a xxx.anno.vcf.gz in "+dirs[0]);
+			return;
+		}
+		vcf = vcfs[0];
+
+		//make dir, ok if it already exists
+		File jobDir = new File (rootDir, "CopyAnalysis/"+id+"_LoH");
+		jobDir.mkdirs();
+
+		//any files?
+		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+		if (nameFile.size() == 0) {
+			createLoHLinks(jobDir, crBed, vcf);
+			launch(jobDir, null, tnRunner.getLoHDocs());
+		}
+
+		//OK some files are present
+		//COMPLETE
+		else if (nameFile.containsKey("COMPLETE")){
+			//find the final vcf file,  "Results/"+ nameBuild+ ".loh.vcf.gz.tbi",
+			File[] segs = IO.extractFiles(new File(jobDir, "Results"), ".loh.vcf.gz.tbi");
+			if (segs == null || segs.length !=1) {
+				clearAndFail(jobDir, "\tThe LoH calling was marked COMPLETE but failed to find the final xxx.loh.vcf.gz.tbi file in the Results/ dir in "+jobDir);
+				return;
+			}
+			//remove the linked fastq
+			removeLoHLinks(jobDir);
+			info.add("\tCOMPLETE "+jobDir);
+		}
+
+		else {
+			if (checkJob(nameFile, jobDir, null, tnRunner.getLoHDocs())) createLoHLinks(jobDir, crBed, vcf);
+		}
+	}
+
 
 	/**Attempts to load the tumor and normal DNA File arrays and the tumor RNA*/
 	private boolean checkAlignments() throws IOException {
@@ -1279,8 +1391,8 @@ public class TNSample2 {
 		if (tnRunner.isSbatch()) {
 			//squeue the shell script
 			new File(jobDir, "QUEUED").createNewFile();
-			String alignDirPath = jobDir.getCanonicalPath();
-			String[] output = IO.executeViaProcessBuilder(new String[]{"sbatch", "-J", alignDirPath.replace(tnRunner.getPathToTrim(), ""), "-D", alignDirPath, shellScript.getCanonicalPath()}, false);
+			String[] cmd = tnRunner.buildSBatchCommand (jobDir, shellScript);
+			String[] output = IO.executeViaProcessBuilder(cmd, false);
 			for (String o: output) info.add("\t\t"+o);
 			numJobsLaunched++;
 		}

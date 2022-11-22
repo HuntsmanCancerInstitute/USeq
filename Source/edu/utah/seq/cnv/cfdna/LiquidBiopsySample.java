@@ -3,6 +3,7 @@ package edu.utah.seq.cnv.cfdna;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 
@@ -13,19 +14,20 @@ import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 
+/**Data related to one cfDNA and matched germline sample set for all of the genes with their group of unique observations.*/
 public class LiquidBiopsySample {
 	
 	//fields
 	private String sampleName;
 	private File cfAlignment;
-	private File normalAlignment;
+	private File germlineAlignment;
 	private LookupJob[] cfJobs = null;
 	private SamReader cfReader = null;
-	private LookupJob[] normalJobs = null;
-	private SamReader normalReader = null;
+	private LookupJob[] germlineJobs = null;
+	private SamReader germlineReader = null;
 	private File resultsDir = null;
 	private Gzipper cfBedOut = null;
-	private Gzipper normalBedOut = null;
+	private Gzipper germlineBedOut = null;
 	
 	//constructor
 	public LiquidBiopsySample (File parentDir, File resultsDir) throws IOException {
@@ -34,16 +36,16 @@ public class LiquidBiopsySample {
 		
 		//extract and check for the 4 required files (cfAlignment, cfIndex, normAlignment, normIndex)
 		File[] allFiles = IO.extractFiles(parentDir);
-		if (allFiles.length !=4) throw new IOException("ERROR: failed to find just four files representing the cfDNA and normal alignment files and their indexes for sample -> "+parentDir);
+		if (allFiles.length !=4) throw new IOException("ERROR: failed to find just four files representing the cfDNA and germline alignment files and their indexes for sample -> "+parentDir);
 		boolean normIndexFound = false;
 		boolean cfIndexFound = false;
 		for (File f: allFiles) {
 			String name = f.getName().toLowerCase();
-			//is it the normal sample?
+			//is it the germline sample?
 			if (name.contains("norm")) {
 				if (name.endsWith(".bam") || name.endsWith(".cram")) {
-					if (normalAlignment != null) throw new IOException("ERROR: found two 'norm' alignment files, should only be one, for sample -> "+parentDir);
-					else normalAlignment = f;
+					if (germlineAlignment != null) throw new IOException("ERROR: found two 'norm' alignment files, should only be one, for sample -> "+parentDir);
+					else germlineAlignment = f;
 				}
 				else {
 					if (name.endsWith(".crai") || name.endsWith(".bai")) normIndexFound = true;
@@ -62,7 +64,7 @@ public class LiquidBiopsySample {
 				}
 			}
 		}
-		if (normIndexFound == false || cfIndexFound == false || cfAlignment == null || normalAlignment == null) {
+		if (normIndexFound == false || cfIndexFound == false || cfAlignment == null || germlineAlignment == null) {
 			throw new IOException("ERROR: failed to find all 4 required files (cfAlignment, cfIndex, normAlignment, normIndex) in sample -> "+parentDir);
 		}
 	}
@@ -82,19 +84,39 @@ public class LiquidBiopsySample {
 		return cfJobs;
 	}
 	
-	public LookupJob[] buildNormalJobs (LinkedHashMap<String, ArrayList<Bed>> blockNameRegions, SamReaderFactory samFactory, int minMQ) throws IOException {
+	public LookupJob[] buildGermlineJobs (LinkedHashMap<String, ArrayList<Bed>> blockNameRegions, SamReaderFactory samFactory, int minMQ) throws IOException {
 		//make a reader
-		normalReader = samFactory.open(normalAlignment);
-		String name = Misc.removeExtension(normalAlignment.getParentFile().getName()+"_"+normalAlignment.getName());
+		germlineReader = samFactory.open(germlineAlignment);
+		String name = Misc.removeExtension(germlineAlignment.getParentFile().getName()+"_"+germlineAlignment.getName());
 		File bed = new File(resultsDir,  name+".bed.gz");
-		normalBedOut = new Gzipper(bed);
+		germlineBedOut = new Gzipper(bed);
 		LookupJob[] jobs = new LookupJob[blockNameRegions.size()];
 		int index = 0;
 		for (String blockName: blockNameRegions.keySet()) {
-			jobs[index++] = new LookupJob(blockNameRegions.get(blockName), normalReader, minMQ, blockName+"_"+name, normalBedOut);
+			jobs[index++] = new LookupJob(blockNameRegions.get(blockName), germlineReader, minMQ, blockName+"_"+name, germlineBedOut);
 		}
-		normalJobs = jobs;
-		return normalJobs;
+		germlineJobs = jobs;
+		return germlineJobs;
+	}
+	
+	public float[] getCfCounts(int totalNumberRegions) {
+		float[] allCounts = new float[totalNumberRegions];
+		int counter = 0;
+		for (LookupJob lj: cfJobs) {
+			int[] counts = lj.getCounts();
+			for (int i=0; i< counts.length; i++) allCounts[counter++] = counts[i];
+		}
+		return allCounts;
+	}
+	
+	public float[] getGermlineCounts(int totalNumberRegions) {
+		float[] allCounts = new float[totalNumberRegions];
+		int counter = 0;
+		for (LookupJob lj: germlineJobs) {
+			int[] counts = lj.getCounts();
+			for (int i=0; i< counts.length; i++) allCounts[counter++] = counts[i];
+		}
+		return allCounts;
 	}
 
 	public String getSampleName() {
@@ -105,32 +127,50 @@ public class LiquidBiopsySample {
 		return cfAlignment;
 	}
 
-	public File getNormalAlignment() {
-		return normalAlignment;
+	public File getGermlineAlignment() {
+		return germlineAlignment;
 	}
 
 	public SamReader getCfReader() {
 		return cfReader;
 	}
 
-	public SamReader getNormalReader() {
-		return normalReader;
+	public SamReader getGermlineReader() {
+		return germlineReader;
 	}
 
 	public LookupJob[] getCfJobs() {
 		return cfJobs;
 	}
 
-	public LookupJob[] getNormalJobs() {
-		return normalJobs;
+	public LookupJob[] getGermlineJobs() {
+		return germlineJobs;
 	}
 
 	public Gzipper getCfBedOut() {
 		return cfBedOut;
 	}
 
-	public Gzipper getNormalBedOut() {
-		return normalBedOut;
+	public Gzipper getGermlineBedOut() {
+		return germlineBedOut;
 	}
 
+	public void addCfCounts(PrintWriter out) {
+		//Gene_Region#_Type count
+		//for each lookup job
+		for (LookupJob lj: cfJobs) {
+			String gene = lj.getRegions().get(0).getName();
+			int[] counts = lj.getCounts();
+			for (int i=0; i<counts.length; i++)out.println(gene+"_"+i+"S\t"+counts[i]);
+		}
+	}
+	public void addGermlineCounts(PrintWriter out) {
+		//Gene_Region#_Type count
+		//for each lookup job
+		for (LookupJob lj: germlineJobs) {
+			String gene = lj.getRegions().get(0).getName();
+			int[] counts = lj.getCounts();
+			for (int i=0; i<counts.length; i++)out.println(gene+"_"+i+"G\t"+counts[i]);
+		}
+	}
 }

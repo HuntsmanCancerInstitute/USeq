@@ -72,6 +72,6 @@
 	<classpathentry kind="lib" path="LibraryJars/picard_2.22.4.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/GQueryCLI.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/commons-text-1.9.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/SubjectMatchMaker_0.1.jar"/>
+	<classpathentry kind="lib" path="LibraryJars/SubjectMatchMaker_0.3.jar"/>
 	<classpathentry kind="output" path="Classes"/>
 </classpath>

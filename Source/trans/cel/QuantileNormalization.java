@@ -57,7 +57,12 @@ public class QuantileNormalization {
 			File cela = new File (files[i].getParentFile(), Misc.removeExtension(files[i].getName()) +"_Norm.cela");
 			IO.saveObject(cela, intensities[i]);
 		}
-		
+	}
+	
+	public QuantileNormalization (float[][] intensities) {
+		this.intensities = intensities;
+		quantileNormalize();
+		this.intensities = extractNormalizedValues();
 	}
 	
 	public static void main(String[] args){

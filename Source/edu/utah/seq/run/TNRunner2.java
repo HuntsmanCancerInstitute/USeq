@@ -30,6 +30,7 @@ public class TNRunner2 {
 	private File[] copyRatioDocs = null;
 	private File[] clinicalVcfDocs = null;
 	private File[] msiDocs = null;
+	private File[] lohDocs = null;
 	private File normalAlignmentDir = null;
 	private File[] nonMatchedNormal = null;
 	private File copyRatioBkgDir = null;
@@ -59,7 +60,8 @@ public class TNRunner2 {
 	private HashSet<String> panels2SkipForCopyRatio = null;
 
 	private String pathToTrim = null;
-	private String nice = "";
+	private String nice = null;
+	private String accountOverride = null;
 
 	public TNRunner2 (String[] args) {
 		try {
@@ -67,32 +69,28 @@ public class TNRunner2 {
 
 			processArgs(args);
 
-			//loop?
-			int iterations = 1;
-			int i=0;
-			if (loop) iterations = 1000;
-
-			for (; i< iterations; i++){
+			//loop?			
+			for (int i=0; i< 1000; i++){
+				//check samples
 				if (processIndividualSamples()){
 					processGATKSampleGroup();
 					processIlluminaSampleGroup();
+					//check germline processing
 					if (complete()) {
 						IO.pl("\nALL COMPLETE!");
-						break;
+						loop = false;
 					}
 					else IO.pl("\nNOT COMPLETE!");
 				}
+				//samples still running
 				else IO.pl("\nNOT COMPLETE!");
-				if (iterations !=1){
-					try {
-						IO.pl("\nWaiting... "+i);
-						Thread.sleep(1000*60*numMinToSleep);
-					} catch (InterruptedException e) {}
-				}
+
+				//sleep or exit
+				if (loop) sleep(i);
+				else i=1000;
 			}
 
 			printSamplesWithFastqIssues();
-
 
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
@@ -102,6 +100,13 @@ public class TNRunner2 {
 			e.printStackTrace();
 			System.exit(1);
 		}
+	}
+	
+	private void sleep(int i) {
+		try {
+			IO.pl("\nWaiting... "+i);
+			Thread.sleep(1000*60*numMinToSleep);
+		} catch (InterruptedException e) {}
 	}
 
 	private void printSamplesWithFastqIssues() {
@@ -386,7 +391,7 @@ public class TNRunner2 {
 				illGroupProcessingComplete = false;
 			}
 			//check samples to run annotator?
-			if (checkSamples) processIndividualSamples();
+			//if (checkSamples) processIndividualSamples();
 		}
 		if (verbose) {
 			IO.pl("\tAll complete? "+illGroupProcessingComplete);
@@ -570,12 +575,7 @@ public class TNRunner2 {
 		TNSample.removeProgressFiles(jobDir);
 
 		//squeue the shell script
-		String alignDirPath = jobDir.getCanonicalPath();
-		String [] cmd = null;
-		
-
-		if (nice.length() !=0) cmd = new String[]{"sbatch", nice, "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
-		else cmd = new String[]{"sbatch", "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
+		String [] cmd = buildSBatchCommand (jobDir, shellScript);
 		if (sbatch) {
 			String[] output = IO.executeViaProcessBuilder(cmd, false);
 			if (verbose) for (String o: output) IO.pl("\t\t"+o);
@@ -592,6 +592,23 @@ public class TNRunner2 {
 		}
 		else new File(jobDir, "RUNME").createNewFile();
 
+	}
+	
+	String[] buildSBatchCommand (File jobDir, File shellScript) throws IOException {
+		ArrayList<String> cmds = new ArrayList<String>();
+		String jobDirPath = jobDir.getCanonicalPath();
+		//{"sbatch", nice, accountOverride "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()}
+		cmds.add("sbatch");
+		if (nice != null) cmds.add(nice);
+		if (accountOverride != null) cmds.add(accountOverride);
+		cmds.add("-J");
+		cmds.add(jobDirPath.replace(pathToTrim, ""));
+		cmds.add("-D");
+		cmds.add(jobDirPath);
+		cmds.add(shellScript.getCanonicalPath());
+		String[] cmd = new String[cmds.size()];
+		cmds.toArray(cmd);		
+		return cmd;
 	}
 
 	private static int countNumberRunningJobs(String partition) throws IOException {
@@ -663,6 +680,7 @@ public class TNRunner2 {
 			File copyRatioDocsDir = null;
 			File clinicalVcfDir = null;
 			File msiWorkflowDir = null;
+			File lohWorkflowDir = null;
 			String panel2Skip = null;
 			for (int i = 0; i<args.length; i++){
 				Matcher mat = pat.matcher(args[i]);
@@ -678,6 +696,7 @@ public class TNRunner2 {
 						case 'a': annoWorkflowDir = new File(args[++i]); break;
 						case 'b': sampleConWorkflowDir = new File(args[++i]); break;
 						case 'm': msiWorkflowDir = new File(args[++i]); break;
+						case 'L': lohWorkflowDir = new File(args[++i]); break;
 						case 'j': gatkJointGenoWorklfowDir = new File(args[++i]); break;
 						case 'q': illuminaJointGenoWorklfowDir = new File(args[++i]); break;
 						case 'h': haploWorklfowDir = new File(args[++i]); break;
@@ -699,6 +718,7 @@ public class TNRunner2 {
 						case 'l': loop = true; break;
 						case 'd': restartFailed = true; break;
 						case 'n': partition = args[++i]; break;
+						case 'A': accountOverride = args[++i]; break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 						}
 					}
@@ -786,6 +806,12 @@ public class TNRunner2 {
 				if (msiWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing msi workflow docs? "+msiWorkflowDir);
 				msiDocs = IO.extractFiles(msiWorkflowDir);
 			}
+			
+			//loh
+			if (lohWorkflowDir != null){
+				if (lohWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing LoH workflow docs? "+lohWorkflowDir);
+				lohDocs = IO.extractFiles(lohWorkflowDir);
+			}
 
 			//clinical vcf merging workflow
 			if (clinicalVcfDir != null){
@@ -828,6 +854,8 @@ public class TNRunner2 {
 			pathToTrim = sampleDir.getCanonicalFile().getParentFile().getCanonicalPath()+"/";
 
 			if (niceJobs) nice = "--nice=10000";
+			
+			if (accountOverride!=null) accountOverride = "--account="+accountOverride;
 
 			if (verbose){
 				IO.pl("Run parameters:");
@@ -839,6 +867,7 @@ public class TNRunner2 {
 				IO.pl("Variant annotation workflow directory\t"+annoWorkflowDir);
 				IO.pl("Sample concordance workflow directory\t"+sampleConWorkflowDir);
 				IO.pl("MSI workflow directory\t"+msiWorkflowDir);
+				IO.pl("LoH workflow directory\t"+lohWorkflowDir);
 				IO.pl("GATK haplotype calling workflow directory\t"+haploWorklfowDir);
 				IO.pl("GATK Joint genotyping workflow directory\t"+gatkJointGenoWorklfowDir);
 				IO.pl("Illumina Joint genotyping workflow directory\t"+illuminaJointGenoWorklfowDir);
@@ -857,6 +886,7 @@ public class TNRunner2 {
 				IO.pl("Max # jobs to launch\t"+maxNumJobs);
 				IO.pl("Nice jobs\t"+niceJobs);
 				IO.pl("Job Partition\t"+partition);
+				IO.pl("Override cluster account\t"+accountOverride);
 				IO.pl("Relaunch jobs until complete\t"+loop);
 			}
 		} catch (IOException e) {
@@ -899,9 +929,9 @@ public class TNRunner2 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TNRunner2 : July 2022                            **\n" +
+				"**                                 TNRunner2 : Nov 2022                             **\n" +
 				"**************************************************************************************\n" +
-				"TNRunner is designed to execute several containerized workflows on tumor normal\n"+
+				"TNRunner2 is designed to execute several containerized workflows on tumor normal\n"+
 				"datasets via a slurm cluster.  Based on the availability of paired fastq datasets, \n"+
 				"alignments are run, somatic and germline variants are called, and concordance measured\n"+
 				"between sample crams. To execute TNRunner, create the following directory structure,\n"+
@@ -947,6 +977,8 @@ public class TNRunner2 {
 				"-q Workflow docs for launching Illumina germline joint genotyping.\n"+
 				"-h Workflow docs for launching GATK haplotype calling.\n"+
 				"-j Workflow docs for launching GATK germline joint genotyping.\n"+
+				"-L Workflow docs for launching LoH analysis. Requires an annotated germline and\n"+
+				"      copy ratio analysis.\n"+
 				"-v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder \n"+
 				"      to each patient dir containing the json formatted clinical information. The file name\n"+
 				"      should contain the unique panel name and end with the sex if running copy ratio analysis,\n"+
@@ -980,6 +1012,7 @@ public class TNRunner2 {
 				"-z Do not nice jobs (--nice=10000), run at maximum primority.\n"+
 				"-l Check and launch jobs every hour until all are complete.\n"+
 				"-n Cluster partitian, defaults to hci-rw\n"+
+				"-A Cluster account override, e.g. -A hci-collab\n"+
 
 				"\nExample: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/\n"+
 				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+
@@ -996,9 +1029,6 @@ public class TNRunner2 {
 	}
 	public File[] getDNAAlignQCDocs() {
 		return DNAAlignQCDocs;
-	}
-	public String getPathToTrim() {
-		return pathToTrim;
 	}
 	public File[] getSomaticVarCallDocs() {
 		return somaticVarCallDocs;
@@ -1033,6 +1063,10 @@ public class TNRunner2 {
 
 	public File[] getMsiDocs() {
 		return msiDocs;
+	}
+	
+	public File[] getLoHDocs() {
+		return lohDocs;
 	}
 
 	public File[] getNonMatchedNormal() {
@@ -1076,5 +1110,9 @@ public class TNRunner2 {
 
 	public HashSet<String> getPanels2SkipForCopyRatio() {
 		return panels2SkipForCopyRatio;
+	}
+
+	public String getAccountOverride() {
+		return accountOverride;
 	}
 }

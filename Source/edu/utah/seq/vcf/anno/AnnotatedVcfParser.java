@@ -55,6 +55,7 @@ public class AnnotatedVcfParser {
 	private String appSettings = null;
 	private HashSet<String> transcriptFilter = null;
 	private Gzipper impactedGenes = null;
+	private boolean removeMulitAlt = false;
 	
 	//trackers
 	private Histogram afs = new Histogram(0, 1.01, 101);
@@ -189,7 +190,7 @@ public class AnnotatedVcfParser {
 				loadInfoHash(cells[7]);
 				dataLine = new AnnotatedVcfParserDataLine(trimmedFileName, cells, clinvarDate);
 				
-				boolean passDP=true, passAF=true, passImpact=true, passSplice=true, passID = true, passGermlineGenes = false, passAlt=true;
+				boolean passDP=true, passAF=true, passImpact=true, passSplice=true, passID = true, passGermlineGenes = false, passAlt=true, passMulti=true;
 				boolean[] passCF= null;
 				boolean[] passBKAF= null; 
 				boolean[] passPop= null;
@@ -201,6 +202,7 @@ public class AnnotatedVcfParser {
 				if (maximumCF != 1) 			passCF = checkCF();
 				if (minimumAF != 0 || maximumAF != 1 || maxFracBKAFs != 0) passAF = checkAF(passGermlineGenes);
 				if (minimumAlt !=0)             passAlt = checkAlt(passGermlineGenes);
+				if (removeMulitAlt)             passMulti = vcfLine.contains("MULTIALLELIC")==false;
 				if (maximumPopAF != 0) 			passPop = checkPopFreq();
 				if (passingAnnImpact != null) 	passImpact = checkImpact();
 				if (passingClinSig != null || excludeClinSig != null) 	passClinSig = checkClinSig();
@@ -209,9 +211,9 @@ public class AnnotatedVcfParser {
 				if (passingIDKeys != null) 		passID = checkIDs(cells[2]);
 				
 				boolean pass;
-				if (somaticProcessing) pass =  passFoundationFiltering(passID, passDP, passAF, passAlt, passImpact,passSplice, passPop, passBKAF,passClinSig, passCF); 
-				else if (orAnnos) pass = passWithOrAnnos(passID, passDP, passAF, passAlt, passImpact, passSplice, passPop, passBKAF,passClinSig, passCF);
-				else pass = allPass(passID, passDP, passAF, passAlt, passImpact, passSplice, passPop, passBKAF, passClinSig, passCF);
+				if (somaticProcessing) pass =  passFoundationFiltering(passID, passDP, passAF, passAlt, passImpact,passSplice, passPop, passBKAF,passClinSig, passCF, passMulti); 
+				else if (orAnnos) pass = passWithOrAnnos(passID, passDP, passAF, passAlt, passImpact, passSplice, passPop, passBKAF,passClinSig, passCF, passMulti);
+				else pass = allPass(passID, passDP, passAF, passAlt, passImpact, passSplice, passPop, passBKAF, passClinSig, passCF, passMulti);
 				
 				if (pass){
 					numPassingVcf++;
@@ -247,11 +249,12 @@ public class AnnotatedVcfParser {
 
 
 	/**Requires all are true. Not if these aren't set off defaults then they default to true. Note if passID then returns true regardless of others.*/
-	private boolean allPass(boolean passID, boolean passDP, boolean passAF, boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF) {
+	private boolean allPass(boolean passID, boolean passDP, boolean passAF, boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF, boolean passMulti) {
 		if (passingIDKeys != null && passID) return true;
 		if (passDP == false) return false;
 		if (passAF == false) return false;
 		if (passAlt == false) return false;
+		if (passMulti == false) return false;
 		if (passCF!= null && passCF[0] == true && passCF[1] == false) return false;
 		boolean passBKAF2 = true;
 		if (passBKAF != null && passBKAF[0] == true) passBKAF2 = passBKAF[1];
@@ -273,11 +276,12 @@ public class AnnotatedVcfParser {
 	}
 	
 	/**Requires DP, AF, Pop, CF, BKAF are true if present. Only one of Clin, Splice, or Impact need be true, Note if passID then returns true regardless of others.*/
-	private boolean passWithOrAnnos(boolean passID, boolean passDP, boolean passAF, boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF) {
+	private boolean passWithOrAnnos(boolean passID, boolean passDP, boolean passAF, boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF, boolean passMulti) {
 		if (passingIDKeys != null && passID) return true;
 		if (passDP == false) return false;
 		if (passAF == false) return false;
 		if (passAlt == false) return false;
+		if (passMulti == false) return false;
 		if (passCF!= null && passCF[0] == true && passCF[1] == false) return false;
 		boolean passBKAF2 = true;
 		if (passBKAF != null && passBKAF[0] == true) passBKAF2 = passBKAF[1];
@@ -303,11 +307,11 @@ public class AnnotatedVcfParser {
 		for (String s: Misc.COMMA.split(acmgGenes)) passingGermlineGenes.add(s.trim());
 	}
 
-	private boolean passFoundationFiltering(boolean passID, boolean passDP, boolean passAF,  boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF){
+	private boolean passFoundationFiltering(boolean passID, boolean passDP, boolean passAF,  boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF, boolean passMulti){
 		//pass it if ID correct
 		if (passID) return true;
 		//fail it if DP, AF, alt fails
-		if (passAF == false || passDP == false || passAlt == false) return false;
+		if (passAF == false || passDP == false || passAlt == false || passMulti == false) return false;
 		//if present and fails then fail
 		if (passPop[0] == true && passPop[1] == false) return false;
 		if (passBKAF[0] == true && passBKAF[1] == false) return false;
@@ -911,7 +915,7 @@ public class AnnotatedVcfParser {
 		if (maximumPopAF != 0) al.add("\t"+ maximumPopAF+"\t: Maximum population AF from dbNSFP_ExAC_AF or dbNSFP_1000Gp3_AF");
 		if (maxFracBKAFs != 0) al.add("\t"+ maxFracBKAFs+"\t: Maximum fraction of background samples with an AF >= observed AF");
 		if (minimumBKZ != 0) al.add("\t"+ minimumBKZ+"\t: Minimum BKZ quality score");
-
+		al.add("\t"+ removeMulitAlt+"\t: Remove variants with a MULTIALLELIC INFO key");
 		al.add("\t"+ skipWarningTrans+"\t: Ignore transcripts labeled WARNING_TRANSCRIPT_XXX");
 		al.add("\t"+ onlyProteinCoding+"\t: Only consider protein_coding transcripts");
 		if (transcriptFilter != null) al.add("\t"+ transcriptList+"\t: Select annotations that match transcript IDs in this file.");
@@ -1085,6 +1089,7 @@ public class AnnotatedVcfParser {
 					case 'i': passingIDKeys = Misc.COMMA.split(args[++i]); break;
 					case 'o': orAnnos = true; break;
 					case 'r': verbose = true; break;
+					case 'R': removeMulitAlt = true; break;
 					case 'k': onlyProteinCoding = false; break;
 					case 'f': somaticProcessing = true; break;
 					case 'l': justFrameShiftStartStop = true; break;
@@ -1145,7 +1150,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Annotated Vcf Parser  May 2022                         **\n" +
+				"**                           Annotated Vcf Parser  Nov 2022                         **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+
@@ -1182,6 +1187,7 @@ public class AnnotatedVcfParser {
                 "       delimited, no spaces. Defaults to all.\n"+
                 "-e Comma delimited list of CLINSIG terms to select against.\n"+
                 "-C CLINVAR file date for spreadsheet output.\n"+
+                "-R Remove variants containing a 'MULTIALLELIC' INFO key. Typically from vt decompose.\n"+
 
                 "-i Comma delimited list of VCF ID keys to select for. If the VCF ID contains one or\n"+
                 "       more, the record is passed regardless of other filters. The match is not exact.\n"+
@@ -1198,7 +1204,7 @@ public class AnnotatedVcfParser {
 				"        -d 74 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a\n"+
 				"        HIGH,MODERATE -e Benign,Likely_benign -c Pathogenic,Likely_pathogenic,\n"+
 				"        Conflicting_interpretations_of_pathogenicity -t 0.51 -u RYR1 -T \n"+
-				"        ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3\n\n"+
+				"        ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3 -R \n\n"+
 
 
 				"**************************************************************************************\n");

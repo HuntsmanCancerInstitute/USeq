@@ -150,11 +150,13 @@ public class BamPileup {
 		if (verbose) IO.pl();
 		
 		//check loaders fetch files
+		int maxNumReadsProc = 0;
 		for (BamPileupLoader l: loaders) {
 			if (l.isFailed()) throw new IOException("ERROR: File Loader issue! \n");
 			tempPileupFiles.add(l.getPileupFile());
+			if (l.getMaxNumReads()> maxNumReadsProc) maxNumReadsProc = l.getMaxNumReads();
 		}
-		
+		if (verbose) IO.pl("\tMaxNumReadProc "+maxNumReadsProc);
 		procTempFiles();
 
 	}
@@ -248,7 +250,7 @@ public class BamPileup {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Bam Pileup:  March 2022                           **\n" +
+				"**                                  Bam Pileup:  Nov 2022                           **\n" +
 				"**************************************************************************************\n" +
 				"BP extracts pileup information for each bam file over a list of regions. This includes\n"+
 				"the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available\n"+

@@ -34,3 +34,4 @@ jar.select=edu/utah/seq/analysis/AggregatePlotter,\
 # edu/utah/pysano/TomatoFarmer,\
 # edu/utah/seq/vcf/SomaticSniperVCFParser,\
 # edu/utah/seq/run/TNRunner,\
+edu/utah/seq/qc/AggregateQCStats,\

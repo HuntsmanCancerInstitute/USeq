@@ -11,7 +11,7 @@ import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
-/**Splits and filters a joint genotyped vcf file.*/
+/**Splits and filters a joint genotyped vcf files from GATK and Strelka.*/
 public class JointGenotypeVCFParser {
 
 	private File vcfFile;

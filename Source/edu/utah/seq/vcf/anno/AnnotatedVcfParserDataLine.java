@@ -21,6 +21,7 @@ public class AnnotatedVcfParserDataLine {
 	String alt = null;
 	String qual = null;
 	String filter = null;
+	String info = null;
 	
 	String priorCallFreq = null;
 	String bkz = null;
@@ -62,7 +63,12 @@ public class AnnotatedVcfParserDataLine {
 		alt = vcfFields[4];
 		qual = vcfFields[5];
 		filter = vcfFields[6];
+		info = vcfFields[7];
 		this.clinvarFileDate = clinvarFileDate;
+		if (info.contains("MULTIALLELIC")) {
+			if (filter.length()<2) filter = "MULTIALLELIC";
+			else filter = filter+",MULTIALLELIC";
+		}
 	}
 
 	public static final String headerSpreadSheet = "FileName\tIGVLink\tCHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tAlleleFreq\t"
@@ -227,7 +233,7 @@ public class AnnotatedVcfParserDataLine {
 			"REF\tVcf record reference base\n"+
 			"ALT\tVcf record alternative base\n"+
 			"QUAL\tVcf record quality store, larger the better, if from VCFBkz, should be > 3\n"+
-			"FILTER\tVcf record filter field, anything present other than PASS or . Indicates a potential problem with the variant call\n"+
+			"FILTER\tVcf record filter field, anything present other than PASS or . Indicates a potential problem with the variant call. Check the alignment stack of every MULTIALLELIC.\n"+
 			"AlleleFreq\tVariant allele frequency\n"+
 			"UniOb\tNumber of  unique observations of the variant, e.g. no duplicate or overlapping paired alignments\n"+
 			"ReadDepth\tTotal number of unique observations\n"+

@@ -33,6 +33,7 @@ public class BamPileupLoader implements Runnable {
 	private boolean includeOverlaps;
 	private boolean printAll;
 	private boolean verbose; 
+	private int maxNumReads = 0;
 
 
 	public BamPileupLoader (BamPileup bamPileup, int loaderIndex, Bed[] regions) throws IOException{
@@ -160,13 +161,13 @@ public class BamPileupLoader implements Runnable {
 			it.close();
 			return bc;
 		}
-
+		int numReadsProcessed = 0;
 		//for each record
 		while (it.hasNext()){
-
+			
 			SAMRecord sam = it.next();
 			if (sam.getMappingQuality() < minMappingQuality || sam.isSecondaryOrSupplementary() || sam.getDuplicateReadFlag() || sam.getReadFailsVendorQualityCheckFlag()) continue;
-
+			numReadsProcessed++;
 			//make a layout
 			SamAlignment sa = new SamAlignment(sam.getSAMString().trim(), true);
 			SamLayoutForMutation layout = new SamLayoutForMutation(sa);
@@ -254,6 +255,7 @@ public class BamPileupLoader implements Runnable {
 				counter++;
 			}
 		}
+		if (numReadsProcessed > maxNumReads) maxNumReads = numReadsProcessed;
 		it.close();
 		return bc;
 	}
@@ -264,5 +266,9 @@ public class BamPileupLoader implements Runnable {
 
 	public File getPileupFile() {
 		return pileupFile;
+	}
+
+	public int getMaxNumReads() {
+		return maxNumReads;
 	}
 }

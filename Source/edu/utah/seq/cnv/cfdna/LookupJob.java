@@ -14,6 +14,7 @@ import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Num;
 
+/**Data related to one sample cram and one gene with it's >~ 20 unique observations.*/
 public class LookupJob {
 
 	//fields
@@ -23,6 +24,7 @@ public class LookupJob {
 	private int minMappingQuality = 0;
 	private String jobName = null;
 	private int[] counts = null;
+	private float[] normalizedCounts = null;
 	private Gzipper out = null;
 	private int numMidInt = 0;
 	private int numMidNotInt = 0;
@@ -99,8 +101,8 @@ public class LookupJob {
 		}
 		countedReadNames = null;
 		readNameAlignments = null;
-		IO.pl(jobName+"\t"+numMidInt+"\t"+numMidNotInt);
-		IO.pl("\t"+Num.intArrayToString(counts, ","));
+		IO.pl("\t"+ jobName+"\t"+numMidInt+"\t"+numMidNotInt);
+		//IO.pl("\t"+Num.intArrayToString(counts, ","));
 	}
 
 	private int calculateMiddle(ArrayList<SAMRecord> sams) throws IOException {
@@ -143,6 +145,16 @@ public class LookupJob {
 
 	public ArrayList<Bed> getRegions() {
 		return regions;
+	}
+
+
+	public float[] getNormalizedCounts() {
+		return normalizedCounts;
+	}
+
+
+	public void setNormalizedCounts(float[] normalizedCounts) {
+		this.normalizedCounts = normalizedCounts;
 	}
 
 
