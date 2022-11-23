@@ -39,19 +39,20 @@ public class AnnotateBedWithGenes {
 			//parse genes
 			parseFiles();
 
-			//for each bed chrom
-			intersect();
-			
-			//sumary stats
-			if (verbose)  {
-				IO.pl("\n\nIntersection stats:");
-				IO.pl("\t"+numIntersectingRegions+"\tNum intersecting regions");
-				IO.pl("\t"+(totalNumberRegions-numIntersectingRegions)+"\tNum non intersecting regions");
-				if (addGeneFeature) {
-					IO.pl("\t"+numIntersecting5UTRs+"\tNum intersecting 5pUTRs");
-					IO.pl("\t"+numIntersecting3UTRs+"\tNum intersecting 3pUTRs");
-					IO.pl("\t"+numIntersectingExons+"\tNum intersecting Exons");
-					IO.pl("\t"+numIntersectingIntrons+"\tNum intersecting Introns");
+			if (totalNumberRegions != 0) {
+				//for each bed chrom
+				intersect();
+				//sumary stats
+				if (verbose)  {
+					IO.pl("\n\nIntersection stats:");
+					IO.pl("\t"+numIntersectingRegions+"\tNum intersecting regions");
+					IO.pl("\t"+(totalNumberRegions-numIntersectingRegions)+"\tNum non intersecting regions");
+					if (addGeneFeature) {
+						IO.pl("\t"+numIntersecting5UTRs+"\tNum intersecting 5pUTRs");
+						IO.pl("\t"+numIntersecting3UTRs+"\tNum intersecting 3pUTRs");
+						IO.pl("\t"+numIntersectingExons+"\tNum intersecting Exons");
+						IO.pl("\t"+numIntersectingIntrons+"\tNum intersecting Introns");
+					}
 				}
 			}
 
@@ -62,13 +63,13 @@ public class AnnotateBedWithGenes {
 			e.printStackTrace();
 		}
 	}
-	
+
 	/**Adds genes that intersect onto the Bed.name as name+"\t"+gene1,gene2...*/
 	public AnnotateBedWithGenes(File ucscTableFile, Bed[] bed, boolean intersectExons){
 		try {
 			verbose = false;
 			this.intersectExons = intersectExons;
-			
+
 			UCSCGeneModelTableReader tr = new UCSCGeneModelTableReader(ucscTableFile, 0);
 			chrGenes = tr.getChromSpecificGeneLines();
 
@@ -76,7 +77,7 @@ public class AnnotateBedWithGenes {
 			chrBed = Bed.splitBedByChrom(bed);
 
 			intersect();
-			
+
 		} catch (Exception e) {
 			System.err.println("\nError annotating regions!");
 			e.printStackTrace();
@@ -86,7 +87,7 @@ public class AnnotateBedWithGenes {
 	private void intersect() throws IOException {
 		HashSet<String> toAdd = new HashSet<String>();
 		if (verbose)  System.out.print("\n\t");
-		
+
 		//for each chrom of bed regions
 		for (String chr: chrBed.keySet()){
 			if (verbose)  System.out.print(chr+" ");
@@ -188,19 +189,20 @@ public class AnnotateBedWithGenes {
 		chrGenes = tr.getChromSpecificGeneLines();
 		if (verbose)  IO.pl(tr.getGeneLines().length+"\tGenes parsed");
 
-		//parse bed
-		Bed[] regions = Bed.parseFilePutLineInNameNoScoreOrStrand(bedFile, bpPad, (-1*bpPad), coorIndexes);
-		Arrays.sort(regions);
-		chrBed = Bed.splitBedByChrom(regions);	
-		totalNumberRegions = regions.length;
-		if (verbose)  IO.pl(totalNumberRegions+"\tRegions to intersect");
-
 		//make writer
 		out = new Gzipper(resultsFile);
-		
 		//add header if present to output
 		String header = IO.fetchHeader(bedFile);
 		if (header != null && header.length()!=0) out.print(header);
+
+		//parse bed
+		Bed[] regions = Bed.parseFilePutLineInNameNoScoreOrStrand(bedFile, bpPad, (-1*bpPad), coorIndexes);
+		totalNumberRegions = regions.length;
+		if (verbose)  IO.pl(totalNumberRegions+"\tRegions to intersect");
+		if (totalNumberRegions != 0) {
+			Arrays.sort(regions);
+			chrBed = Bed.splitBedByChrom(regions);
+		}
 	}
 
 
@@ -248,7 +250,7 @@ public class AnnotateBedWithGenes {
 	public static void printDocs(){ 
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Annotate Bed With Genes   May 2019                     **\n" +
+				"**                           Annotate Bed With Genes   Nov 2022                     **\n" +
 				"**************************************************************************************\n" +
 				"Takes a bed like file and a UCSC gene table, intersects them and adds a new column to\n"+
 				"the file with the gene names that intersect the gene exons or regions. \n\n"+
@@ -263,7 +265,7 @@ public class AnnotateBedWithGenes {
 				"-p Bp padding to expand the bed regions when intersecting with genes.\n"+
 				"-g Intersect gene regions with bed, not gene exons.\n"+
 				"-f Include gene feature in annotations (5pUTR->3pUTR->All Exons->Intron)\n"+
-				
+
 
 				"\nExample: java -Xmx2G -jar pathTo/USeq/Apps/AnnotateBedWithGenes -p 100 -g -i 1,2,3\n" +
 				"      -b targetRegions.bed -r targetsWithGenes.txt.gz -u hg19EnsGenes.ucsc.gz -f\n"+
