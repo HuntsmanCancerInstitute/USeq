@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.3.4.beta
+			<html><head><title>USeq Command Line Menus 9.3.5.beta
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -12,8 +12,6 @@
 			
 		
 					<a href="#AggregatePlotter">AggregatePlotter</a><br>
-				
-					<a href="#AggregateQCStats">AggregateQCStats</a><br>
 				
 					<a href="#AggregateQCStats2">AggregateQCStats2</a><br>
 				
@@ -86,6 +84,8 @@
 					<a href="#CarisVcfComparator">CarisVcfComparator</a><br>
 				
 					<a href="#CarisXmlVcfParser">CarisXmlVcfParser</a><br>
+				
+					<a href="#CBio2Sgr">CBio2Sgr</a><br>
 				
 					<a href="#ChIPSeq">ChIPSeq</a><br>
 				
@@ -189,7 +189,11 @@
 				
 					<a href="#KnownSpliceJunctionScanner">KnownSpliceJunctionScanner</a><br>
 				
+					<a href="#LiquidBiopsyCA">LiquidBiopsyCA</a><br>
+				
 					<a href="#LofreqVCFParser">LofreqVCFParser</a><br>
+				
+					<a href="#LoH">LoH</a><br>
 				
 					<a href="#MafParser">MafParser</a><br>
 				
@@ -343,8 +347,6 @@
 				
 					<a href="#Telescriptor">Telescriptor</a><br>
 				
-					<a href="#TNRunner">TNRunner</a><br>
-				
 					<a href="#TNRunner2">TNRunner2</a><br>
 				
 					<a href="#TRunner">TRunner</a><br>
@@ -462,36 +464,6 @@ Options:
 Example: java -Xmx1500M -jar pathTo/USeq/Apps/AggregatePlotter -t
       /Data/PolIIRep1/,/Data/PolIIRep2/ -b /Anno/tssSites.bed -p 73 -u 1
       -l 
-
-**************************************************************************************
-</pre><br><p>
-				
-					<a name="AggregateQCStats"><pre>**************************************************************************************
-**                            Aggregate QC Stats: Nov 2020                          **
-**************************************************************************************
-Parses and aggregates alignment quality statistics from json files produced by the
-SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, BamConcordance, Fastq, and
-RemoveDuplicates rules in the TNRunner workflows.
-
-Options:
--j Directory containing xxx.json.gz files for parsing. Recurses through all other
-      directories contained within.
--r Results directory for writing the summary xls spreadsheets for graphing.
-
-Default Options:
--f FastqCount regex for parsing sample name, note the name must be identical across
-   the json files, defaults to (.+)_FastqCount.json.gz, case insensitive.
--s SAE regex, defaults to (.+)_SamAlignmentExtractor.json.gz
--m MPA regex, defaults to (.+)_MergePairedAlignments.json.gz
--u S2U regex, defaults to (.+)_Sam2USeq.json.gz
--b BC regex, defaults to (.+)_BamConcordance.json.gz
--b DUP regex, defaults to (.+)_RemoveDuplicates.json.gz
--p String to prepend onto output file names.
--c Don't calculate detailed region read coverage statistics, saves memory and time.
--v Print verbose debugging output.
--e Replace Exome with DNA in all file reference names.
-
-Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -r QCStats/ -p TR774_ 
 
 **************************************************************************************
 </pre><br><p>
@@ -700,7 +672,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/AllelicMethylationDetector -s AMD
 </pre><br><p>
 				
 					<a name="AnnotateBedWithGenes"><pre>**************************************************************************************
-**                           Annotate Bed With Genes   May 2019                     **
+**                           Annotate Bed With Genes   Nov 2022                     **
 **************************************************************************************
 Takes a bed like file and a UCSC gene table, intersects them and adds a new column to
 the file with the gene names that intersect the gene exons or regions. 
@@ -740,7 +712,7 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/AnnotatedBed2UCSCRefFlat -b anno.bed.
 </pre><br><p>
 				
 					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                           Annotated Vcf Parser  May 2022                         **
+**                           Annotated Vcf Parser  Nov 2022                         **
 **************************************************************************************
 Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
 VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
@@ -777,6 +749,7 @@ Options:
        delimited, no spaces. Defaults to all.
 -e Comma delimited list of CLINSIG terms to select against.
 -C CLINVAR file date for spreadsheet output.
+-R Remove variants containing a 'MULTIALLELIC' INFO key. Typically from vt decompose.
 -i Comma delimited list of VCF ID keys to select for. If the VCF ID contains one or
        more, the record is passed regardless of other filters. The match is not exact.
 -o Only require, if set or present, SnpEff ANN or CLINSIG or Splice to be true to pass.
@@ -790,7 +763,7 @@ Example: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/
         -d 74 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a
         HIGH,MODERATE -e Benign,Likely_benign -c Pathogenic,Likely_pathogenic,
         Conflicting_interpretations_of_pathogenicity -t 0.51 -u RYR1 -T 
-        ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3
+        ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3 -R 
 
 **************************************************************************************
 </pre><br><p>
@@ -824,16 +797,14 @@ Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/
 </pre><br><p>
 				
 					<a name="AvatarDataWrangler"><pre>**************************************************************************************
-**                           Avatar Data Wrangler : Oct 2021                        **
+**                           Avatar Data Wrangler : Sept 2022                       **
 **************************************************************************************
 Tool for assembling directories for TNRunner based on files provided by M2Gen via
-download from DNAnexus, see
-HCI_Molecular_Data:/Avatar_MolecularData_hg38/Manifests_and_QC_Files/ Handles patient
-datasets from different exome capture platforms with multiple tumor samples.
-Each TNRunner Job will be named as 
-MolDataPatientID-Platform-NormalExomeID-TumorExomeID-TumorRNASeqID, when missing they will be
-labeled NA.
-Only assembles dirs for processing where the data is complete.
+download from DNAnexus. Handles patient datasets from different exome capture
+platforms with multiple tumor and normal samples.
+Each TNRunner Job will be named as AvatarID-NormalExomeID-TumorExomeID-TumorRNASeqID.
+When missing they will be labeled NA. Uses the SubjectMatchMaker to fetch or make
+molecular data patient ids shared with the other clinically processed datasets.
 
 Required Parameters:
 -r Path to a folder containing the following resource files.  Each must end with the
@@ -843,20 +814,21 @@ Required Parameters:
         xxx_WesCramList.txt - DNAnexus
         xxx_RNACramList.txt - DNAnexus
         xxx_AWSRepoList.txt - AWS
-        xxx_PatientPHI.csv - RISR's PatientIdCoverter (optional)
+        (optional) xxx_PatientPHI.csv - RISR's PatientIdCoverter
 -p Print an example script to pull these resource files.
 -j Job dir to build out the patient dir structure.
 -t Directory to place temp files with PHI for Subject ID matching
 -s Directory containing the SubjectMatchMaker 'currentRegistry_' file
 -d Path to save a bash script for downloading the sequence read data.
 
-Example: java -jar ~/USeqApps/AvatarDataWrangler ... 
+Example: java -jar ~/USeqApps/AvatarDataWrangler -r Resources/ -j AJobs -t SMM_PHI
+   -s ~/PHI/SmmRegistry/ -d dxDownloadCmds.sh 
 
 **************************************************************************************
 </pre><br><p>
 				
 					<a name="AvatarProjectAssembler"><pre>**************************************************************************************
-**                          Avatar Project Assembler : Oct 2021                    **
+**                          Avatar Project Assembler : Nov 2022                    **
 **************************************************************************************
 Tool for assembling directories for TNRunner based on files provided by M2Gen.
 Handles patient datasets from different exome capture platforms with multiple tumor
@@ -1047,7 +1019,7 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/BamMixer -r ~/TumorSim/
 </pre><br><p>
 				
 					<a name="BamPileup"><pre>**************************************************************************************
-**                                Bam Pileup:  March 2022                           **
+**                                  Bam Pileup:  Nov 2022                           **
 **************************************************************************************
 BP extracts pileup information for each bam file over a list of regions. This includes
 the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available
@@ -1204,17 +1176,22 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/Bed2UCSCRefFlat -u refSeqJun2015.ucsc
 </pre><br><p>
 				
 					<a name="BedRegionSplitter"><pre>**************************************************************************************
-**                             Bed Region Splitter : June 2017                      **
+**                             Bed Region Splitter : Nov 2022                       **
 **************************************************************************************
-Regions exceeding the chunk size are split into multiple parts.
+Regions exceeding the chunk size are split into multiple parts, each the minimum or
+larger. The split regions can also be padded up to a provided length without 
+overlapping adjacent regions.
 
 Required:
--d Path to a file or directory containing such to chunk.
+-d Path to a file or directory containing just bed files to split and or pad.
 
 Optional:
--c BP chunk size, defaults to 2000.
+-c Minimum BP chunk size, defaults to 2000.
+-p Pad the split regions up to the pad size without intersecting adjacent split
+     regions. Note the input bed files must not have overlapping regions for this to
+     work. If in doubt run the MergeRegions app first.
 
-Example: java -Xmx4G -jar pathTo/USeq/Apps/BedRegionSplitter -d ToSplit/ -c 5000 
+Example: java -Xmx4G -jar pathTo/USeq/Apps/BedRegionSplitter -d ToSplit/ -c 150 -p 200 
 
 **************************************************************************************
 </pre><br><p>
@@ -1485,6 +1462,20 @@ Options:
 
 Example: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/
      -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq13Dec2020_MergedStdChr.ucsc.gz
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="CBio2Sgr"><pre>**************************************************************************************
+**                                CBio 2 Sgr : Dec 2022                             **
+**************************************************************************************
+Converts the cBioPortal mutation table download tsv file to a center position svg file
+for subsequent mutation density plotting. Removes duplicate sample variants.
+Options:
+-d Directory containing xxx.tsv files for parsing.
+-s Skip adding sample names to output.
+
+Example: java -Xmx1500M -jar pathTo/USeq/Apps/CBio2Sgr -d GeneTableFiles 
 
 **************************************************************************************
 </pre><br><p>
@@ -2756,6 +2747,26 @@ Example: java -Xmx10G -jar ~/USeq/Apps/KnownSpliceJunctionScanner -f ~/Hg19/hg19
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="LiquidBiopsyCA"><pre>**************************************************************************************
+**                             LiquidBiopsyCopyAnalysis:  Nov 2022                  **
+**************************************************************************************
+
+
+Required Options:
+-s Path to a directory containing sample specific sub directories with two aligment files representing the cfDNA and matched germline cram or bam files with their indexes. The germline file name should contain the 'germ' string.
+-b Path to a bed file of non overlapping regions to estimate copy ratio differences, xxx.bed.gz/.zip OK. The name column will be used to group each region into a larger area for merged copy ratio differences.
+-r Path to the reference fasta with xxx.fai index used for alignment.
+-o Path to the output results directory.
+
+Default Options:
+-m Minimum alignment mapping quality, defaults to 13
+-p Number processors to use, defaults to all, reduce if out of memory errors occur.
+
+Example: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="LofreqVCFParser"><pre>**************************************************************************************
 **                             Lofreq VCF Parser: May 2018                          **
 **************************************************************************************
@@ -2778,6 +2789,46 @@ Optional Params:
 
 Example: java -jar pathToUSeq/Apps/LofreqVCFParser -v VCFFiles/ -m 32 -i -f -a
       -s FilteredLofreqVcfs/ -r 3 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="LoH"><pre>**************************************************************************************
+**                                    LoH : Nov 2022                                **
+**************************************************************************************
+LoH compares heterozygous snv and indel allele counts between germline and somatic
+sequencing datasets to identify potential loss of heterozygousity events. LoH is
+defined here as a significant increase in the somatic allele fraction (AF) relative to
+the matched germline. Adjacent variants passing p-value and AF difference thresholds
+are merged and a combine p-value calculated for the window block.
+
+Required:
+-v Path to a germline, single sample, variant xxx.vcf(.gz/.zip OK) file. These should
+     be filtered, high confidence, vt normalized and decomposed short variants.
+-g Path to the germline bampileup file, use the USeq BamPileup tool to generate the
+     xxx.bp.txt.gz and tabix index files.
+-s Path to the somatic bampileup file, ditto.
+-o Path to directory to write the bed and vcf output result files.
+
+Optional:
+-c Bed file containing passing regions from the TNRunner2 CopyRatio workflow.
+-q Minimum vcf record QUAL, defaults to 20
+-e Minimum vcf record sample GQ, defaults to 20
+-x Use Strelka's recalibrated GQX genotype score, defaults to GQ
+-r Minimum unique observation variant read depth for both germline and tumor samples,
+     defaults to 20
+-l Minimum Fisher exact p-value for including a variant in a block, defaults to 0.1
+-f Minimum difference in AF between the somatic and germline samples for including
+     a variant into a block, defaults to 0.1
+-m Maximum bp gap between variants for grouping into a block, defaults to 1000
+-p Minimum Benjamini-Hochberg adjusted window -10Log10(combine p-value), defaults to
+     8.239 (0.15)
+-d Minimum window mean difference in AFs, defaults to 0.1
+-w Window BP padding for reporting significant LoH regions, defaults to 100
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/LoH -v gatkStrelkaGermline.vcf.gz 
+-g normal.bp.txt.gz -s tumor.bp.txt.gz -o LoHResults/ -d 0.15 -m 5000 -b
+GATKCopyRatio_Hg38.called.seg.pass.bed.gz
 
 **************************************************************************************
 </pre><br><p>
@@ -4160,12 +4211,13 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/Sam2USeq -f /Data/SamFiles/ -r
 </pre><br><p>
 				
 					<a name="SamAlignmentDepthMatcher"><pre>**************************************************************************************
-**                            SamAlignmentDepthMatcher: Oct 2018                    **
+**                           SamAlignmentDepthMatcher: Oct 2022                     **
 **************************************************************************************
 Performs a region by region alignment depth subsampling to output a sam file with
 matching alignment depths. Alignments are extracted, mates matched, randomized, then
-saved to match the count from the other file. Uses all threads available.
-
+saved to match the count from the other file. Set memory to the maximum. Depending on
+the gaps between your regions, you may need to remove duplicate lines, e.g. 'sort -u 
+body.sam > uni.sam'n
 Required options:
 -m Bam file, coordinate sorted with index, to use in calculating the alignment depths
       to match.
@@ -4173,9 +4225,10 @@ Required options:
       this is significantly bigger than -m .
 -o Gzipped sam file to write the unsorted alignments from -s, must end in xxx.sam.gz
 -b Bed file of regions in which to match alignment depths, xxx.bed(.gz/.zip OK).
+-t Number of threads to use, defaults to all.
 
-Example: java -Xmx25G -jar pathToUSeq/Apps/SamAlignmentDepthMatcher -m tumor.bam
-      -s bigMockTumor.bam -o matchedMock.sam.gz -b exomeCaptureTargets.bed.gz
+Example: java -Xmx25G -jar pathToUSeq/Apps/SamAlignmentDepthMatcher -m normal.bam
+      -s tumor.bam -o subSampTumor.sam.gz -b germlineVariants.bed.gz -t 10 
 
 **************************************************************************************
 </pre><br><p>
@@ -4369,7 +4422,7 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/SamSplitter -f /Novo/Run7/exome.bam
 </pre><br><p>
 				
 					<a name="SamReadDepthSubSampler"><pre>**************************************************************************************
-**                         Sam Read Depth Sub Sampler: Feb 2019                     **
+**                         Sam Read Depth Sub Sampler: Oct 2022                     **
 **************************************************************************************
 Filters, randomizes, and subsamples a coordinate sorted bam alignment file to a target
 base level read depth over each of the provided regions. Depending on the gaps between
@@ -4953,91 +5006,10 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="TNRunner"><pre>**************************************************************************************
-**                                  TNRunner : Nov 2021                             **
-**************************************************************************************
-TNRunner is designed to execute several containerized snakmake workflows on tumor
-normal datasets via a slurm cluster.  Based on the availability of fastq, 
-alignments are run, somatic and germline variants are called, and concordance measured
-between sample bams. To execute TNRunner, create the following directory structure and
-link or copy in the corresponding paired end Illumina gzipped fastq files. To run 
-Joint Genotyping on sample sets where this has been run before, delete the
- GermlineVariantCalling and JointGenotyping folders.
-
-MyPatientSampleDatasets
-   MyPatientA
-      Fastq
-         NormalDNA
-         TumorDNA
-         TumorRNA
-   MyPatientB
-      Fastq
-         TumorDNA
-         TumorRNA
-   MyPatientC....
-
-The Fastq directory and sub directories must match this naming. Only include those
-for which you have fastq.  Change the MyXXX to something relevant. TNRunner is
-stateless so as more Fastq becomes available or issues are addressed, relaunch the
-app. This won't effect running or queued slurm jobs. Relaunch periodically to assess
-the current processing status and queue additional tasks or set option -l. Download the
-latest workflows from 
-https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38RunnerWorkflows 
-and the matching resource bundle from
-https://hci-bio-app.hci.utah.edu/gnomex/gnomexFlex.jsp?analysisNumber=A5578 .
-All workflow docs are optional although some require output from prior Analysis.
-
-Setup Options:
--p Directory containing one or more patient data directories to process.
--e Workflow docs for launching DNA alignments.
--t Workflow docs for launching RNA alignments.
--f Workflow docs for launching RNA fusion detection.
--c Workflow docs for launching somatic variant calling.
--m Workflow docs for launching MSI status calling.
--a Workflow docs for launching variant annotation.
--b Workflow docs for launching bam concordance.
--j Workflow docs for launching joint genotyping.
--y Workflow docs for launching somatic copy analysis.
--v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder to
-      each patient dir containing the json formatted clinical information.
--o Other patient's directory, containing additional xxx_final.bam files to include in
-   sample concordance. The patient directory naming must match.
--k Directory containing xxxMalePoN.hdf5 and xxxFemalePoN.hdf5 GATK copy ratio
-      background files.
--g Germline AnnotatedVcfParser options, defaults to '-d 15 -m 0.1 -q 0.1 -p 0.01 -g
-      D5S,D3S -n 4.4 -a HIGH -l -c Pathogenic,Likely_pathogenic,Conflicting_
-      interpretations_of_pathogenicity,Drug_response -t 0.51 -e Benign,Likely_benign
-      -o -b 0.1 -z 3 -u RYR1'
--s Somatic AnnotatedVcfParser options, defaults to '-d 20 -f'
--u Minimum read coverage for tumor DNA samples, defaults to 20
--i Minimum read coverage for normal DNA samples, defaults to 15
--w Non matched normal alignment directory (e.g. from NA12878) to use when no matched
-      normal is available for somatic variant calling. Needs to contain Bam/xxx_final.bam
-      and QC/xxx_Pass.bed.gz dirs and files with indexes.
-
-Job Execution Options:
--r Attempt to restart FAILED jobs from last successfully completed rule.
--d Delete and restart FAILED jobs.
--h Force a restart of all running, queued, failed, and uncompleted jobs.
--q Quite output.
--x Maximum # jobs to run at any given time, defaults to 25.
--z Do not nice jobs (--nice=10000), run at maximum primority.
--l Check and launch jobs every hour until all are complete.
--n Cluster partitian, defaults to hci-rw
-
-Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/
-     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b 
-     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/
-     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 10 -l 
-     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l 
-
-**************************************************************************************
-</pre><br><p>
-				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                 TNRunner2 : July 2022                            **
+**                                 TNRunner2 : Dec 2022                             **
 **************************************************************************************
-TNRunner is designed to execute several containerized workflows on tumor normal
+TNRunner2 is designed to execute several containerized workflows on tumor normal
 datasets via a slurm cluster.  Based on the availability of paired fastq datasets, 
 alignments are run, somatic and germline variants are called, and concordance measured
 between sample crams. To execute TNRunner, create the following directory structure,
@@ -5083,6 +5055,8 @@ Setup Options:
 -q Workflow docs for launching Illumina germline joint genotyping.
 -h Workflow docs for launching GATK haplotype calling.
 -j Workflow docs for launching GATK germline joint genotyping.
+-L Workflow docs for launching LoH analysis. Requires an annotated germline and
+      copy ratio analysis.
 -v Workflow docs for launching clinical test variant info. Add a ClinicalReport folder 
       to each patient dir containing the json formatted clinical information. The file name
       should contain the unique panel name and end with the sex if running copy ratio analysis,
@@ -5116,11 +5090,12 @@ Job Execution Options:
 -z Do not nice jobs (--nice=10000), run at maximum primority.
 -l Check and launch jobs every hour until all are complete.
 -n Cluster partitian, defaults to hci-rw
+-A Cluster account override, e.g. -A hci-collab
 
 Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatients/
      -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b 
      ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/
-     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 31 -r' -x 125 -l 
+     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 125 -l 
      -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l 
 
 **************************************************************************************

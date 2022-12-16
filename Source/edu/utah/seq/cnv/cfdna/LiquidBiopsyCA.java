@@ -52,9 +52,8 @@ public class LiquidBiopsyCA {
 	}
 	
 	public void doWork() throws Exception {
-		//create reader factory, try without the reference, no need to add in the sequence
-		if (fastaFile!=null) samFactory = SamReaderFactory.makeDefault().referenceSource(new ReferenceSource(fastaFile)).validationStringency(ValidationStringency.SILENT);
-		else samFactory = SamReaderFactory.makeDefault().validationStringency(ValidationStringency.SILENT);
+		//create reader factory
+		samFactory = SamReaderFactory.makeDefault().referenceSource(new ReferenceSource(fastaFile)).validationStringency(ValidationStringency.SILENT);
 		
 		//load and split the bed into gene name blocks
 		parseBed();
@@ -81,12 +80,10 @@ public class LiquidBiopsyCA {
 			if (l.isFailed()) throw new IOException("\nERROR: Lookup Loader issue, aborting!");	
 		}
 		
-//saveCountTable();
+		normalizeCounts();
+		saveCountTable();
 		saveCountsForR();
-		
-		//normalizeCounts();
-		
-		//wilcoxonTestPairedData();
+		wilcoxonTestPairedData();
 
 	}
 	
@@ -130,7 +127,7 @@ public class LiquidBiopsyCA {
 	}
 
 	private void normalizeCounts() {
-		IO.pl("\nQuantile germlineizing target counts...");
+		IO.pl("\nQuantile normalizing target counts...");
 		// TODO Auto-generated method stub
 		float[][] intensities = new float[samples.length*2][];
 		int index = 0;
@@ -247,11 +244,15 @@ public class LiquidBiopsyCA {
 		IO.pl("\nSaving Counts For R...");
 		File forR = new File(resultsDirectory, "countsForR.txt");
 		PrintWriter out = new PrintWriter( new FileWriter(forR));
+		File forRatios = new File(resultsDirectory, "ratiosForR.txt");
+		PrintWriter outRatios = new PrintWriter( new FileWriter(forRatios));
 		for (LiquidBiopsySample s: samples) {
 			s.addCfCounts(out);
 			s.addGermlineCounts(out);
+			s.addNormalizedLog2Ratio(outRatios);
 		}
 		out.close();
+		outRatios.close();
 	}
 
 	private void closeSamReaders() throws IOException {
@@ -339,7 +340,7 @@ public class LiquidBiopsyCA {
 		samples = new LiquidBiopsySample[sampleDirectories.length];
 		for (int i=0; i< samples.length; i++) samples[i] = new LiquidBiopsySample(sampleDirectories[i], resultsDirectory);
 		
-		//if (fastaFile == null || fastaFile.canRead() == false)  Misc.printErrAndExit("\nError: please provide an reference genome fasta file and it's index.");		
+		if (fastaFile == null || fastaFile.canRead() == false)  Misc.printErrAndExit("\nError: please provide an reference genome fasta file and it's index.");		
 		if (bedFile == null ||  bedFile.canRead() == false) Misc.printErrAndExit("\nError: please provide a file of regions in bed format.");
 		if (resultsDirectory == null ) Misc.printErrAndExit("\nError: please provide a directory for saving the output results");
 		resultsDirectory.mkdirs();
@@ -360,7 +361,7 @@ public class LiquidBiopsyCA {
 				"\n"+
 				
 				"\nRequired Options:\n"+
-				"-s Path to a directory containing sample specific sub directories with two aligment files representing the cfDNA and matched germline cram or bam files with their indexes. The germline file name should contain the 'norm' string.\n"+
+				"-s Path to a directory containing sample specific sub directories with two aligment files representing the cfDNA and matched germline cram or bam files with their indexes. The germline file name should contain the 'germ' string.\n"+
 				"-b Path to a bed file of non overlapping regions to estimate copy ratio differences, xxx.bed.gz/.zip OK. The name column will be used to group each region into a larger area for merged copy ratio differences.\n"+
 				"-r Path to the reference fasta with xxx.fai index used for alignment.\n"+
 				"-o Path to the output results directory.\n"+

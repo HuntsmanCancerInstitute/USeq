@@ -18,6 +18,7 @@ public class CBio2Sgr {
 
 	//fields
 	private File[] tsvFiles = null;
+	private boolean skipSampleNames = true;
 
 	public CBio2Sgr(String[] args){
 		processArgs(args);
@@ -38,7 +39,7 @@ public class CBio2Sgr {
 			CBioVar[] vars = fetchVars(f);
 			for (CBioVar v: vars) {
 				out.println(v.getSvg());
-				bedOut.println(v.getBed());
+				bedOut.println(v.getBed(skipSampleNames));
 			}
 			out.close();
 			bedOut.close();
@@ -72,9 +73,10 @@ public class CBio2Sgr {
 		Integer endPosIndex = keyIndex.get("End Pos");
 		Integer refIndex = keyIndex.get("Ref");
 		Integer varIndex = keyIndex.get("Var");
+		Integer proteinIndex = keyIndex.get("Protein Change");
 		
-		if (sampleIdIndex==null || chromosomeIndex==null || startPosIndex==null || endPosIndex==null || refIndex==null || varIndex==null) {
-			throw new IOException("\nFAILED to find one or more of the column indexes: \n'Sample ID', 'Chromosome', 'Start Pos', 'End Pos', 'Ref', 'Var' in:\n"+line);
+		if (sampleIdIndex==null || chromosomeIndex==null || startPosIndex==null || endPosIndex==null || refIndex==null || varIndex==null || proteinIndex==null) {
+			throw new IOException("\nFAILED to find one or more of the column indexes: \n'Sample ID', 'Chromosome', 'Start Pos', 'End Pos', 'Ref', 'Var', 'Protein Change' in:\n"+line);
 		}
 
 		//parse the rest
@@ -92,7 +94,7 @@ public class CBio2Sgr {
 					numSkipped++;
 					continue;
 				}
-				CBioVar cbv = new CBioVar(f[sampleIdIndex], f[chromosomeIndex], Integer.parseInt(f[startPosIndex])-1, Integer.parseInt(f[endPosIndex]), f[refIndex], f[varIndex]);
+				CBioVar cbv = new CBioVar(f[sampleIdIndex], f[chromosomeIndex], Integer.parseInt(f[startPosIndex])-1, Integer.parseInt(f[endPosIndex]), f[refIndex], f[varIndex], f[proteinIndex]);
 				String key = cbv.fetchKey();
 				if (keys.contains(key) == false) {
 					unique++;
@@ -135,6 +137,7 @@ public class CBio2Sgr {
 				try{
 					switch (test){
 					case 'd': tsvFiles = IO.extractFiles(args[++i], ".tsv"); break;
+					case 's': skipSampleNames = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -155,13 +158,14 @@ public class CBio2Sgr {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                CBio 2 Sgr : July 2011                             **\n" +
+				"**                                CBio 2 Sgr : Dec 2022                             **\n" +
 				"**************************************************************************************\n" +
 				"Converts the cBioPortal mutation table download tsv file to a center position svg file\n" +
 				"for subsequent mutation density plotting. Removes duplicate sample variants.\n"+
 
 				"Options:\n"+
 				"-d Directory containing xxx.tsv files for parsing.\n"+
+				"-s Skip adding sample names to output.\n"+
 
 				"\n"+
 

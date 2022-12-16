@@ -719,11 +719,12 @@ public class TNSample2 {
 		Path tumorCrai = tumorDNAAlignment.getCramIndexFile().toPath();
 		Path normalCram = normalDNAAlignment.getCramFile().toPath();
 		Path normalCrai = normalDNAAlignment.getCramIndexFile().toPath();
-
+		Path tumorPassBed = tumorDNAAlignment.getBedFile().toPath();
 		Path normalVcf = germlineVcf[0].toPath();
 		Path normalTbi = germlineVcf[1].toPath();
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.cram").toPath(), tumorCram);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.crai").toPath(), tumorCrai);
+		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.pass.bed.gz").toPath(), tumorPassBed);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.cram").toPath(), normalCram);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.crai").toPath(), normalCrai);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.vcf.gz").toPath(), normalVcf);
@@ -778,7 +779,7 @@ public class TNSample2 {
 		File crDir = new File(rootDir, "ClinicalReport");
 		if (crDir.exists()) {
 			PlatformGenderInfo pgi = parsePlatformGenderInfo();
-			if (pgi.isParsed() == false) throw new IOException("\nERROR: failed to parse gender info for copy ratio analysis from files in "+crDir);
+			if (pgi == null || pgi.isParsed() == false) throw new IOException("\nERROR: failed to parse gender info for copy ratio analysis from files in "+crDir);
 			if (pgi.getGender().startsWith("F")) gender = "F";
 			else if (pgi.getGender().startsWith("M")) gender = "M";
 		}
@@ -874,6 +875,7 @@ public class TNSample2 {
 		File f = jobDir.getCanonicalFile();
 		new File(f, "tumor.cram").delete();
 		new File(f, "tumor.crai").delete();
+		new File(f, "tumor.pass.bed.gz").delete();
 		new File(f, "bkgPoN.hdf5").delete();
 		new File(f, "bkgPoN.interval_list").delete();
 		new File(f, "normal.cram").delete();
@@ -905,7 +907,7 @@ public class TNSample2 {
 		File crResDir = new File (crDirs[0], "Results");
 		File[] bed = IO.extractFiles(crResDir, "called.seg.pass.bed.gz");
 		if (bed == null || bed.length!=1) {
-			info.add("\tFAILED to find a xxx.called.seg.pass.bed.gz in "+ crResDir);
+			info.add("\tWaiting for xxx.called.seg.pass.bed.gz in "+ crResDir);
 			return;
 		}
 		File crBed = bed[0];

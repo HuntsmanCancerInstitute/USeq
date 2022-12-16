@@ -15,8 +15,8 @@ public class PlatformGenderInfo {
 		//TL-18-843E9B_XT.V1_2018-10-26_deid_Neeraj_Agarwal_M.json
 		//     0         1        2       3     4      5    6
 		String[] fields = Misc.UNDERSCORE.split(clinInfoFile);
-		if (fields.length == 7) {
-			if (fields[3].equals("deid") && fields[6].startsWith("M.") || fields[6].startsWith("F.")) {
+		if (fields.length == 7 && clinInfoFile.endsWith("_M.json") || clinInfoFile.endsWith("_F.json")) {
+			if (fields[3].equals("deid")) {
 				//platform
 				if (fields[0].startsWith("TL-")) {
 					platform = "Tempus";
@@ -29,8 +29,18 @@ public class PlatformGenderInfo {
 					parsed = true;
 				}
 			}
+			//New Avatar Format, AvatarID_NE_TE_TT_platform_submittingGroup_Gender.json
+			//                      0      1  2  3     4         5            6
+			//                   A028564_A61031_A60999_NA_IDTv1_GU_M.json 
+			//                       0      1      2    3   4   5  6 
+			else {
+				platform = "Avatar";
+				panel = fields[4];
+				gender = fields[6].substring(0, 1);
+				parsed = true;
+			}
 		}
-		//AvatarID_Panel_Gender.json
+		//Old Avatar format, AvatarID_Panel_Gender.json 
 		//ZBG7MKFOZ1_IDT.V1_M.json
 		else if (fields.length == 3 && clinInfoFile.endsWith("_M.json") || clinInfoFile.endsWith("_F.json")) {
 			platform = "Avatar";

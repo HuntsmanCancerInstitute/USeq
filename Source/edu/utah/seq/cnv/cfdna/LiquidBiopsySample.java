@@ -13,6 +13,7 @@ import util.bio.annotation.Bed;
 import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
+import util.gen.Num;
 
 /**Data related to one cfDNA and matched germline sample set for all of the genes with their group of unique observations.*/
 public class LiquidBiopsySample {
@@ -42,9 +43,9 @@ public class LiquidBiopsySample {
 		for (File f: allFiles) {
 			String name = f.getName().toLowerCase();
 			//is it the germline sample?
-			if (name.contains("norm")) {
+			if (name.contains("germ")) {
 				if (name.endsWith(".bam") || name.endsWith(".cram")) {
-					if (germlineAlignment != null) throw new IOException("ERROR: found two 'norm' alignment files, should only be one, for sample -> "+parentDir);
+					if (germlineAlignment != null) throw new IOException("ERROR: found two 'germ' alignment files, should only be one, for sample -> "+parentDir);
 					else germlineAlignment = f;
 				}
 				else {
@@ -161,7 +162,8 @@ public class LiquidBiopsySample {
 		for (LookupJob lj: cfJobs) {
 			String gene = lj.getRegions().get(0).getName();
 			int[] counts = lj.getCounts();
-			for (int i=0; i<counts.length; i++)out.println(gene+"_"+i+"S\t"+counts[i]);
+			float[] nCounts = lj.getNormalizedCounts();
+			for (int i=0; i<counts.length; i++)out.println(gene+"_"+i+"S\t"+counts[i]+"\t"+nCounts[i]);
 		}
 	}
 	public void addGermlineCounts(PrintWriter out) {
@@ -170,7 +172,28 @@ public class LiquidBiopsySample {
 		for (LookupJob lj: germlineJobs) {
 			String gene = lj.getRegions().get(0).getName();
 			int[] counts = lj.getCounts();
-			for (int i=0; i<counts.length; i++)out.println(gene+"_"+i+"G\t"+counts[i]);
+			float[] nCounts = lj.getNormalizedCounts();
+			for (int i=0; i<counts.length; i++)out.println(gene+"_"+i+"G\t"+counts[i]+"\t"+nCounts[i]);
 		}
 	}
+	
+	public void addNormalizedLog2Ratio(PrintWriter out) {
+		//Gene_Region#_Type count
+		//for each lookup job
+		for (int i=0; i< germlineJobs.length; i++) {
+			float[] sCounts = germlineJobs[i].getNormalizedCounts();
+			float[] gCounts = cfJobs[i].getNormalizedCounts();
+			String gene = cfJobs[i].getRegions().get(0).getName();
+			//for each region in the gene group
+			for (int j=0; j<sCounts.length; j++) {
+				double rto = sCounts[j]/ gCounts[j];
+				rto = Num.log2(rto);
+				out.println(gene+"\t"+j+"\t"+rto);
+			}
+		}
+	}
+	
+	
+	
+		
 }

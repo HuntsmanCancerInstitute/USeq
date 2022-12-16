@@ -246,7 +246,7 @@ public class LoH {
 
 	}
 	
-	private void walkVariants() {
+	private void walkVariants() throws Exception {
 		IO.pl("Walking chromosomes...");
 
 		ArrayList<HetWindow> hetWindowAl = new ArrayList<HetWindow>();
@@ -297,8 +297,12 @@ public class LoH {
 						pvals[x] = winHets[x].getPvalue();
 						if (pvals[x]< min) min = pvals[x];
 					}
-					//might return zero! in that case set it to the smallest
-					windowPVal = combinePValues.calculateCombinePValues(pvals);
+					//might return zero or fail to converge! in that case set it to the smallest
+					try {
+						windowPVal = combinePValues.calculateCombinePValues(pvals);
+					} catch (Exception e) {
+						windowPVal = 0.0;
+					}
 					if (windowPVal == 0.0) windowPVal = min;
 					
 				}
@@ -667,7 +671,7 @@ java -jar -Xmx100G  ~/USeqApps/AnnotateBedWithGenes -u ~/TNRunner/AnnotatorData/
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                    LoH : Oct 2022                                **\n" +
+				"**                                    LoH : Nov 2022                                **\n" +
 				"**************************************************************************************\n" +
 				"LoH compares heterozygous snv and indel allele counts between germline and somatic\n"+
 				"sequencing datasets to identify potential loss of heterozygousity events. LoH is\n"+

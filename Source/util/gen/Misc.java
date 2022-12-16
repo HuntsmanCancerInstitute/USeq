@@ -36,8 +36,8 @@ public class Misc {
 	public static final Pattern CSV = Pattern.compile("\",\"");
 	
 	/**For identifying MolecularDataPatientIds, see edu.utah.hci.bioinfo.smm.CoreId */
-	public static final Pattern CORE_ID_Pattern = Pattern.compile("[A-Za-z&&[^OoIilL]]{2}[2-9][A-Za-z&&[^OoIilL]]{2}[2-9][A-Za-z&&[^OoIilL]]{2}");
-	
+	public static final Pattern CORE_ID_Pattern = Pattern.compile("[A-Za-z&&[^OoIilL]]{2,3}[2-9][A-Za-z&&[^OoIilL]]{2}[2-9][A-Za-z&&[^OoIilL]]{2,3}");
+
 	/**Attempts to parse a MolecularDataPatientID from the name separated by an underscore or from the path where the MDPID is used as a dir in the path
 	 * Returns null if not found or throws an error if a problem is an issue.*/
 	public static String fetchMDPID(File f) {

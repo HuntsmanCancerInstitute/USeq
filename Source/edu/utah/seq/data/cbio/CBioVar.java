@@ -10,8 +10,9 @@ public class CBioVar implements Comparable<CBioVar> {
 	private int stop; 
 	private String ref; 
 	private String alt;
+	private String proteinChange;
 	
-	public CBioVar (String sampleId, String chrom, int startMinOne, int stop, String ref, String alt) {
+	public CBioVar (String sampleId, String chrom, int startMinOne, int stop, String ref, String alt, String proteinChange) {
 		this.sampleId = sampleId;
 		this.chrom = chrom;
 		if (chrom.equals("23")) chrom = "X";
@@ -20,6 +21,7 @@ public class CBioVar implements Comparable<CBioVar> {
 		this.stop = stop;
 		this.ref = ref;
 		this.alt = alt;
+		this.proteinChange = proteinChange;
 	}
 	
 	public String fetchKey() {
@@ -42,8 +44,10 @@ public class CBioVar implements Comparable<CBioVar> {
 		return chrom+"\t"+pos+"\t1";
 	}
 	
-	public String getBed() {
-		return chrom+"\t"+startMinOne+"\t"+stop+"\t"+sampleId+"_"+ref+"_"+alt+"\t0\t.";
+	public String getBed(boolean skipSampleName) {
+		String si = "";
+		if (skipSampleName==false) si = sampleId+"_";
+		return chrom+"\t"+startMinOne+"\t"+stop+"\t"+si+ref+"_"+alt+"_"+proteinChange+ "\t0\t.";
 	}
 	
 	/**Sorts by chromsome, start position, length (smallest to largest).*/
