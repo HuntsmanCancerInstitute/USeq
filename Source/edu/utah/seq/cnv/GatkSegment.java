@@ -42,17 +42,23 @@ public class GatkSegment implements Comparable<GatkSegment>{
 		call = tokens[5];
 	}
 	
-	public void calculateMeans(){
+	public void calculateMeans(boolean normalPresent){
 		float[] tumorCRs = Num.antiLog(Num.arrayListOfFloatToArray(tumorCopyRatios), 2);
 		double tumorCRMean = Num.mean(tumorCRs);
 		if (tumorCRMean != 0) logMeanTumorCopyRatios = Num.log2(tumorCRMean);
 		
-		float[] normalCRs = Num.antiLog(Num.arrayListOfFloatToArray(normalCopyRatios), 2);
-		double normalCRMean = Num.mean(normalCRs);
-		if (normalCRMean != 0) logMeanNormalCopyRatios = Num.log2(normalCRMean);
+		if (normalPresent) {
+			float[] normalCRs = Num.antiLog(Num.arrayListOfFloatToArray(normalCopyRatios), 2);
+			double normalCRMean = Num.mean(normalCRs);
+			if (normalCRMean != 0) logMeanNormalCopyRatios = Num.log2(normalCRMean);
+			double[] tnRatios = Num.ratio(tumorCRs, normalCRs);
+			lgMeanTNRatios = Num.log2(Num.mean(tnRatios));  
+			//watch for when the ratio goes off the rail reporting values of 30! don't use?  
+			//double lgDiff = logMeanTumorCopyRatios - logMeanNormalCopyRatios;
+			//if (Math.abs(lgDiff) < Math.abs(lgMeanTNRatios)) lgMeanTNRatios = lgDiff;
+
+		}
 		
-		double[] tnRatios = Num.ratio(tumorCRs, normalCRs);
-		lgMeanTNRatios = Num.log2(Num.mean(tnRatios));
 		//could do a t-test here if >2 obs...
 		
 		//probably should match the AFs and calc individual ratios then the mean of the ratios.  Prob is these aren't always present in each set.

@@ -116,10 +116,14 @@ public class AvatarAnalysisJob {
 			platform = ns.getPlatformName();
 		}
 		
-		//group
+		//group from tumor DNA sample then try from tumor RNA sample
 		String group = "NA";
 		if (tumorSample.getTumorDnaName() != null) {
 			group = linkage.getKeyDiseaseType().get(patient.getPatientId()+"_"+tumorSample.getTumorDnaName());
+			if (group == null) throw new IOException("\nFailed to find a disease type for the tumor sample "+tumorSample.getTumorDnaName());
+		}
+		else if (tumorSample.getTumorRnaName() != null) {
+			group = linkage.getKeyDiseaseType().get(patient.getPatientId()+"_"+tumorSample.getTumorRnaName());
 			if (group == null) throw new IOException("\nFailed to find a disease type for the tumor sample "+tumorSample.getTumorDnaName());
 		}
 		

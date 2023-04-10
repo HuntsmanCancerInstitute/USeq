@@ -28,7 +28,8 @@ public class TempusJson2Vcf {
 	private String source = null;
 	private HashMap<String, Bed> cnvGeneNameBed = null;
 	private String jsonSchema = null;
-	
+	private boolean justParsingClinInfo = false;
+	private ArrayList<TempusJsonSummary> summaries = new ArrayList<TempusJsonSummary>();
 	private LinkedHashMap<String,String>[] allReportAttributes = null;
 	
 	//counters across all datasets
@@ -117,53 +118,68 @@ public class TempusJson2Vcf {
 		}
 	}
 	
+	//from the LoadPMR app
+	public TempusJson2Vcf(File[] jsonFiles) throws Exception{
+		this.jsonFiles = jsonFiles;
+		justParsingClinInfo = true;
+		doWork();
+		printStatsMinimal();
+	}
+	
 	public void doWork() throws Exception{
-		
+
 		//Create fasta fetcher
 		if (indexedFasta != null) {
 			fasta = new IndexedFastaSequenceFile(indexedFasta);
 			if (fasta.isIndexed() == false) Misc.printErrAndExit("\nError: cannot find your xxx.fai index or the multi fasta file isn't indexed\n"+ indexedFasta);
 		}
-		
+
 		//create container for each report attributes
 		allReportAttributes = new LinkedHashMap[jsonFiles.length];
 
-		IO.pl("Parsing and coverting...\n");
-		IO.pl("Name\t"
-				+ "NumSomPotActMuts\t"
-				+ "NumSomVUS\t"
-				+ "NumSomBioRelVars\t"
-				+ "NumSomPotActCNVs\t"
-				+ "NumInhRelVars\t"
-				+ "NumInhIncFinds\t"
-				+ "NumInhVUS\t"
-				+ "NumFusVars");
-		
+		if (justParsingClinInfo == false) {
+			IO.pl("Parsing and coverting...\n");
+			IO.pl("Name\t"
+					+ "NumSomPotActMuts\t"
+					+ "NumSomVUS\t"
+					+ "NumSomBioRelVars\t"
+					+ "NumSomPotActCNVs\t"
+					+ "NumInhRelVars\t"
+					+ "NumInhIncFinds\t"
+					+ "NumInhVUS\t"
+					+ "NumFusVars");
+		}
+
 		for (int i=0; i< jsonFiles.length; i++){
-			
+
 			//process file
 			workingJsonFile = jsonFiles[i];
-			IO.p(workingJsonFile.getName());
-			
+			if (justParsingClinInfo == false)IO.p(workingJsonFile.getName());
+
 			convert();
-			writeVcf();
 			
-			//finish line and output counters for this json file
-			IO.pl("\t"+
-					workingNumSomaticPotentiallyActionableMutations+"\t"+
-					workingNumSomaticVariantsOfUnknownSignificance+"\t"+
-					workingNumSomaticBiologicallyRelevantVariants+"\t"+
-					workingNumSomaticPotentiallyActionableCopyNumberVariants+"\t"+
-					workingNumInheritedRelevantVariants+"\t"+
-					workingNumInheritedIncidentalFindings+"\t"+
-					workingNumInheritedVariantsOfUnknownSignificance+"\t"+
-					workingNumFusionVariants);
-			
+			if (justParsingClinInfo == false) {
+				writeVcf();
+				//finish line and output counters for this json file
+				IO.pl("\t"+
+						workingNumSomaticPotentiallyActionableMutations+"\t"+
+						workingNumSomaticVariantsOfUnknownSignificance+"\t"+
+						workingNumSomaticBiologicallyRelevantVariants+"\t"+
+						workingNumSomaticPotentiallyActionableCopyNumberVariants+"\t"+
+						workingNumInheritedRelevantVariants+"\t"+
+						workingNumInheritedIncidentalFindings+"\t"+
+						workingNumInheritedVariantsOfUnknownSignificance+"\t"+
+						workingNumFusionVariants);
+			}
+			else {
+				TempusJsonSummary sum = new TempusJsonSummary(workingOrder, workingPatient, workingReport, workingSpecimens);
+				summaries.add(sum);
+			}
 			resetWorkingCounters();
-			
+
 			allReportAttributes[i] = reportAttributes;
 		}
-		
+
 		//close the fasta lookup fetcher
 		if (indexedFasta != null) fasta.close();
 
@@ -378,11 +394,13 @@ public class TempusJson2Vcf {
 	        TempusSpecimen.addAttributes(reportAttributes, workingSpecimens);
 	        
 	        //results
-	        workingResults = new TempusResults(object, this);
-	        workingResults.addAttributes(reportAttributes);
-	        
-	        //check variant ref bps
-	        if (indexedFasta != null) checkRefSeqs();
+	        if (justParsingClinInfo == false) {
+	        	workingResults = new TempusResults(object, this);
+	        	workingResults.addAttributes(reportAttributes);
+
+	        	//check variant ref bps
+	        	if (indexedFasta != null) checkRefSeqs();
+	        }
 	        
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -418,20 +436,21 @@ public class TempusJson2Vcf {
 	}
 
 	public void printStats(){
-		IO.pl("\nSummary Stats:\n");
-		
-		IO.pl(jsonFiles.length+ "\tNum Json files parsed");
-		
-		IO.pl(numSomaticPotentiallyActionableMutations+  			"\tNum Somatic Potentially Actionable Mutations");
-		IO.pl(numSomaticVariantsOfUnknownSignificance+   			"\tNum Somatic Variants Of Unknown Significance");
-		IO.pl(numSomaticBiologicallyRelevantVariants+   			"\tNum Somatic Biologically Relevant Variants");
-		IO.pl(numSomaticPotentiallyActionableCopyNumberVariants+  	"\tNum Somatic Potentially Actionable Copy Number Variants");
-		
-		IO.pl(numInheritedRelevantVariants+              "\tNum Inherited Relevant Variants");
-		IO.pl(numInheritedIncidentalFindings+            "\tNum Inherited Incidental Findings");
-		IO.pl(numInheritedVariantsOfUnknownSignificance+ "\tNum Inherited Variants Of Unknown Significance");
-		IO.pl(numFusionVariants+						 "\tNum Fusion Variants");
-		
+
+		if (justParsingClinInfo == false) {
+			IO.pl("\nSummary Stats:\n");
+			IO.pl(jsonFiles.length+ "\tNum Json files parsed");
+			IO.pl(numSomaticPotentiallyActionableMutations+  			"\tNum Somatic Potentially Actionable Mutations");
+			IO.pl(numSomaticVariantsOfUnknownSignificance+   			"\tNum Somatic Variants Of Unknown Significance");
+			IO.pl(numSomaticBiologicallyRelevantVariants+   			"\tNum Somatic Biologically Relevant Variants");
+			IO.pl(numSomaticPotentiallyActionableCopyNumberVariants+  	"\tNum Somatic Potentially Actionable Copy Number Variants");
+
+			IO.pl(numInheritedRelevantVariants+              "\tNum Inherited Relevant Variants");
+			IO.pl(numInheritedIncidentalFindings+            "\tNum Inherited Incidental Findings");
+			IO.pl(numInheritedVariantsOfUnknownSignificance+ "\tNum Inherited Variants Of Unknown Significance");
+			IO.pl(numFusionVariants+						 "\tNum Fusion Variants");
+		}
+
 		IO.pl("\nBioInf Pipelines");
 		Misc.printTreeMap(bioInfPipelines, "\t", "\t");
 		IO.pl("\nPhysicians:");
@@ -450,26 +469,44 @@ public class TempusJson2Vcf {
 		Misc.printTreeMap(sampleSites, "\t", "\t");
 		IO.pl("\nSample Types:");
 		Misc.printTreeMap(sampleTypes, "\t", "\t");
-		
-		IO.pl("\nGene Mutations:");
-		Misc.printTreeMap(genes, "\t", "\t");
-		IO.pl("\nReference Genome:");
-		Misc.printTreeMap(referenceGenome, "\t", "\t");
-		IO.pl("\nVariant Type:");
-		Misc.printTreeMap(variantType, "\t", "\t");
-		IO.pl("\nVariant Description:");
-		Misc.printTreeMap(variantDescription, "\t", "\t");
-		
 		IO.pl("\nPercent Tumor in Sample");
 		tumorPercentages.printScaledHistogram();
-		IO.pl("\nTumor Variant Allele Percentages");
-		tumorAF.printScaledHistogram();
-		IO.pl("\nTumor Variant Read Depth");
-		tumorDP.printScaledHistogram();
-		IO.pl("\nAge at Diagnosis");
-		ageAtDiagnosis.printScaledHistogram();
 		
+		if (justParsingClinInfo == false) {
+			IO.pl("\nGene Mutations:");
+			Misc.printTreeMap(genes, "\t", "\t");
+			IO.pl("\nReference Genome:");
+			Misc.printTreeMap(referenceGenome, "\t", "\t");
+			IO.pl("\nVariant Type:");
+			Misc.printTreeMap(variantType, "\t", "\t");
+			IO.pl("\nVariant Description:");
+			Misc.printTreeMap(variantDescription, "\t", "\t");
+			IO.pl("\nTumor Variant Allele Percentages");
+			tumorAF.printScaledHistogram();
+			IO.pl("\nTumor Variant Read Depth");
+			tumorDP.printScaledHistogram();
+			IO.pl("\nAge at Diagnosis");
+			ageAtDiagnosis.printScaledHistogram();
+		}
+
 	}
+	
+	public void printStatsMinimal(){
+		IO.pl("\tTempus BioInf Pipelines: "+bioInfPipelines);
+		IO.pl("\tTempus Physicians: "+physicians);
+		IO.pl("\tTempus Report Status (qns is failed): "+reportStatus);
+		IO.pl("\tTempus Test Codes: "+testCodes);
+		IO.pl("\tTempus Test Descriptions: "+testDescriptions);
+		IO.pl("\tTempus Diagnosis: "+diagnosis);
+		IO.pl("\tTempus Sample Categories: "+sampleCategories);
+		IO.pl("\tTempus Sample Sites: "+sampleSites);
+		IO.pl("\tTempus Sample Types: "+sampleTypes);
+		//IO.pl("\nTempus Percent Tumor in Sample");
+		//tumorPercentages.printScaledHistogram();
+	}
+	
+	
+
 	
 	public static void add(String key, TreeMap<String, Integer> map){
 		if (key == null) return;
@@ -643,6 +680,10 @@ public class TempusJson2Vcf {
 
 	public String getJsonSchema() {
 		return jsonSchema;
+	}
+
+	public ArrayList<TempusJsonSummary> getSummaries() {
+		return summaries;
 	}
 	
 }

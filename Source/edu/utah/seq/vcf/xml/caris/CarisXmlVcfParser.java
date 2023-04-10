@@ -79,6 +79,25 @@ public class CarisXmlVcfParser {
 			Misc.printErrAndExit("\nProblem running the CarisXmlVcfParser app.");
 		}
 	}
+	
+	//for working with the patient molecular repository
+	public CarisXmlVcfParser(File[] xmlFiles) throws Exception {
+		
+		//Get the DOM Builder Factory and builder
+		factory = DocumentBuilderFactory.newInstance();
+		builder = factory.newDocumentBuilder();
+		allReportAttributes = new LinkedHashMap[xmlFiles.length];
+		
+		for (int i=0; i< xmlFiles.length; i++) {
+			workingReportAttributes = new LinkedHashMap<String,String>();
+			workingXmlFile = xmlFiles[i];
+			loadXml(false);
+			allReportAttributes[i] = workingReportAttributes;
+			//IO.pl(workingXmlFile.getName()+" : "+allReportAttributes[i]);
+		}
+	}
+
+
 
 	private void printSpreadsheet() throws IOException {
 		IO.pl("\nExporting patient summary spreadsheet... ");
@@ -144,12 +163,10 @@ public class CarisXmlVcfParser {
 			
 			//add xml name, often contains the patient id
 			workingReportAttributes.put("XmlFileName", Misc.removeExtension(workingXmlFile.getName()));
-			
-
 
 			loadVcf();
 
-			loadXml();
+			loadXml(true);
 
 			matchVcfWithGenomicAlts();
 
@@ -379,7 +396,7 @@ public class CarisXmlVcfParser {
 	}
 
 
-	private void loadXml() {
+	private void loadXml(boolean parseTests) {
 		try {
 			//Load and Parse the XML document
 			Document document = builder.parse(workingXmlFile);
@@ -393,7 +410,7 @@ public class CarisXmlVcfParser {
 					else if (nodeName.equals("patientInformation")) parsePatientInformation(node);
 					else if (nodeName.equals("physicianInformation")) parsePhysicianInformation(node);
 					else if (nodeName.equals("specimenInformation")) parseSpecimenInformation(node);
-					else if (nodeName.equals("tests")) parseTests(node);
+					else if (nodeName.equals("tests") && parseTests) parseTests(node);
 				}
 			}
 
@@ -896,6 +913,10 @@ public class CarisXmlVcfParser {
 				"     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq13Dec2020_MergedStdChr.ucsc.gz\n\n" +
 
 				"**************************************************************************************\n");
+	}
+
+	public LinkedHashMap<String, String>[] getAllReportAttributes() {
+		return allReportAttributes;
 	}
 
 }

@@ -57,11 +57,14 @@ public class JobCleaner {
 			IO.pl("\nZip archiving and then deleting the following files and directories...");
 			for (File d: toZip) {
 				IO.pl("\t"+d.toString());
+				if (d.exists()== false) IO.pl("\t\tMissing, already zipped?! "+d.toString());
+				else {
 				boolean zipped = IO.zipDirectory(d);
 				if (zipped == false) throw new IOException("Failed to zip: "+d);
 				
 				boolean deleted = IO.deleteDirectorySimple(d);
 				if (deleted == false) throw new IOException("Failed to delete directory after zipping: "+d);
+				}
 			}
 		}
 	}

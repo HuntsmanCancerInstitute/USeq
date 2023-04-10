@@ -38,14 +38,17 @@ public class ClinicalMolLinkage {
 		//pull indexes
 		int tumGermType = headerKeyIndex.get("Tumor/Germline");
 		int slIds = headerKeyIndex.get("WES");
+		int rnaSlIds = headerKeyIndex.get("RNASeq");
 		int disType = headerKeyIndex.get("Disease Type");
 		//for each patient
 		for (String avatarKey: avatarIdDataLines.keySet()) {
 			//for each data line
 			for (String[] line: avatarIdDataLines.get(avatarKey)) {
 				//is it a Tumor? and the SLID isn't empty
-				if (line[tumGermType].contains("Tumor") && line[slIds].length()!=0) {
-					String key = avatarKey+"_"+line[slIds];
+				if (line[tumGermType].contains("Tumor") && (line[slIds].length()!=0 || line[rnaSlIds].length()!=0)) {
+					String key = null;
+					if (line[slIds].length()!=0) key = avatarKey+"_"+line[slIds];
+					else key = avatarKey+"_"+line[rnaSlIds];
 					// GYN - Endometrial Cancer; GYN - Ovarian Cancer; SAR - Sarcoma; HEM - Myeloma Spectrum; HEM - Leukemia; NEU - Brain Cancer; GU - Prostate Cancer; NEU - Other Neurologic Cancer; GI - Gastric Cancer; H&N - Head and Neck Cancer; GU - Bladder Cancer; GI - Pancreatic Cancer; HEM - Lymphoma; GI - Other GI Cancer; GU - Kidney Cancer; THO - Lung Cancer; GYN - Other GYN Cancer; END - Thyroid Cancer; GI - Colorectal Cancer; BRE - Breast Cancer; CUT - Melanoma; GU - Other GU Cancer; HEM - Other HEME Disease; THO - Other Thoracic Cancer; CUT - Other Cutaneous Cancer; GI - Esophageal Cancer; GI - Liver Cancer; OTH - Other Cancer, NOS
 					String value = line[disType];
 					//watch out for H&N

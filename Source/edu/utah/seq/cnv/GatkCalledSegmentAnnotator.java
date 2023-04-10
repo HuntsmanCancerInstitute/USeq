@@ -29,6 +29,7 @@ public class GatkCalledSegmentAnnotator {
 	private double minAbsLg2TumorCopyRatio = 0.15;
 	private int maxGapGeneIntersection = 1000;
 	private File ucscGeneTableFile;
+	private boolean normalPresent = true;
 	
 	//internal fields
 	private GatkSegment[] gatkSegments;
@@ -95,7 +96,17 @@ public class GatkCalledSegmentAnnotator {
 		int numPass = 0;
 		int numFail = 0;
 		for (GatkSegment gs : gatkSegments) {
-			if (Math.abs(gs.getLgMeanTNRatios()) >= minCopyRatioMeanTNRatios && Math.abs(gs.getLogMeanNormalCopyRatios()) <= maxAbsLg2NormalCopyRatio && Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) {
+			if (normalPresent == false) {
+				if (Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) {
+					out.println(gs.toSeg(passName));
+					numPass++;
+				}
+				else {
+					out.println(gs.toSeg(failName));
+					numFail++;
+				}
+			}
+			else if (Math.abs(gs.getLgMeanTNRatios()) >= minCopyRatioMeanTNRatios && Math.abs(gs.getLogMeanNormalCopyRatios()) <= maxAbsLg2NormalCopyRatio && Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) {
 				out.println(gs.toSeg(passName));
 				numPass++;
 			}
@@ -120,7 +131,11 @@ public class GatkCalledSegmentAnnotator {
 
 		for (GatkSegment gs : gatkSegments) {
 			boolean passThres;
-			if (Math.abs(gs.getLgMeanTNRatios()) >= minCopyRatioMeanTNRatios && Math.abs(gs.getLogMeanNormalCopyRatios()) <= maxAbsLg2NormalCopyRatio && Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) passThres = true;
+			if (normalPresent == false) {
+				if (Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) passThres = true;
+				else passThres = false;
+			}
+			else if (Math.abs(gs.getLgMeanTNRatios()) >= minCopyRatioMeanTNRatios && Math.abs(gs.getLogMeanNormalCopyRatios()) <= maxAbsLg2NormalCopyRatio && Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) passThres = true;
 			else passThres = false;
 			out.println(gs.toSpreadSheet(passThres));
 		}
@@ -134,12 +149,15 @@ public class GatkCalledSegmentAnnotator {
 		out.println("#Chr Start Stop Info Lg2(meanTumCRs/meanNormCRs) Call");
 		out.println("##Info numOb = number of copy ratio observations, typically exons");
 		out.println("##Info lg2Tum = log2 of mean tumor copy ratio observations");
-		out.println("##Info lg2Norm = log2 of mean normal copy ratio observations");
+		if (normalPresent) out.println("##Info lg2Norm = log2 of mean normal copy ratio observations");
 		out.println("##Info genes = affected genes");
 		out.println("##Call + for amplification, - for loss");
 
 		for (GatkSegment gs : gatkSegments) {
-			if (Math.abs(gs.getLgMeanTNRatios()) >= minCopyRatioMeanTNRatios && Math.abs(gs.getLogMeanNormalCopyRatios()) <= maxAbsLg2NormalCopyRatio && Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) {
+			if (normalPresent == false) {
+				if (Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) out.println(gs.toBed());
+			}
+			else if (Math.abs(gs.getLgMeanTNRatios()) >= minCopyRatioMeanTNRatios && Math.abs(gs.getLogMeanNormalCopyRatios()) <= maxAbsLg2NormalCopyRatio && Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) {
 				out.println(gs.toBed());
 			}
 		}
@@ -148,8 +166,8 @@ public class GatkCalledSegmentAnnotator {
 
 	private void checkCopyRatios() {
 		for (GatkSegment gs : gatkSegments) {
-			gs.calculateMeans();
-			if (gs.copyRatiosOK() == false){
+			gs.calculateMeans(normalPresent);
+			if (normalPresent && gs.copyRatiosOK() == false){
 				IO.el("Problem with number of copy ratio points? These should be identical:");
 				gs.printData();
 				System.exit(1);
@@ -158,6 +176,7 @@ public class GatkCalledSegmentAnnotator {
 	}
 
 	private void addNormalAlleleFrequencies() throws IOException {
+		if (normalPresent == false) return;
 		TabixReader tr = new TabixReader(normalAlleleFreqFile.toString());
 		String line;
 		TabixReader.Iterator it;
@@ -238,6 +257,7 @@ public class GatkCalledSegmentAnnotator {
 	}
 	
 	private void addNormalCopyRatios() throws IOException {
+		if (normalPresent == false) return;
 		TabixReader tr = new TabixReader(normalCopyRatioFile.toString());
 		String line;
 		TabixReader.Iterator it;
@@ -334,7 +354,15 @@ public class GatkCalledSegmentAnnotator {
 		resultsDirectory.mkdirs();
 		
 		//check files
-		File[] files = new File[]{segFile, tumorCopyRatioFile, normalCopyRatioFile, tumorAlleleFreqFile, normalAlleleFreqFile, ucscGeneTableFile};
+		File[] files = null;
+		if (normalCopyRatioFile == null && normalAlleleFreqFile == null) {
+			normalPresent = false;
+			files = new File[]{segFile, tumorCopyRatioFile, tumorAlleleFreqFile, ucscGeneTableFile};
+		}
+		else {
+			normalPresent = true;
+			files = new File[]{segFile, tumorCopyRatioFile, normalCopyRatioFile, tumorAlleleFreqFile, normalAlleleFreqFile, ucscGeneTableFile};
+		}
 		boolean pass = true;
 		for (File f: files) {
 			if (f== null || f.exists() == false) {
@@ -358,15 +386,15 @@ public class GatkCalledSegmentAnnotator {
 		IO.pl("Settings:");
 		IO.pl("\t-s SegFile\t"+segFile);
 		IO.pl("\t-t TumorCopyRatioFile\t"+tumorCopyRatioFile);
-		IO.pl("\t-n NormalCopyRatioFile\t"+normalCopyRatioFile);
+		if (normalPresent) IO.pl("\t-n NormalCopyRatioFile\t"+normalCopyRatioFile);
 		IO.pl("\t-u TumorAlleleFreqFile\t"+tumorAlleleFreqFile);
-		IO.pl("\t-o NormalAlleleFreqFile\t"+normalAlleleFreqFile);
+		if (normalPresent) IO.pl("\t-o NormalAlleleFreqFile\t"+normalAlleleFreqFile);
 		IO.pl("\t-r ResultsDirectory\t"+resultsDirectory);
 		IO.pl("\t-g RefFlatGeneFile\t"+ucscGeneTableFile);
 		IO.pl("\t-a MaxGapForGeneIntersection\t"+maxGapGeneIntersection);
-		IO.pl("\t-m MinimumAbsLg2TNRatioOfCopyRatios\t"+minCopyRatioMeanTNRatios);
+		if (normalPresent) IO.pl("\t-m MinimumAbsLg2TNRatioOfCopyRatios\t"+minCopyRatioMeanTNRatios);
 		IO.pl("\t-c MinimumAbsLg2TumorCopyRatio\t"+minAbsLg2TumorCopyRatio);
-		IO.pl("\t-x MaximumAbsLg2NormalCopyRatio\t"+maxAbsLg2NormalCopyRatio);
+		if (normalPresent) IO.pl("\t-x MaximumAbsLg2NormalCopyRatio\t"+maxAbsLg2NormalCopyRatio);
 		IO.pl();
 	}
 
@@ -375,14 +403,14 @@ public class GatkCalledSegmentAnnotator {
 		
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                      Gatk Called Segment Annotator: August 2019                  **\n" +
+				"**                      Gatk Called Segment Annotator: April 2023                   **\n" +
 				"**************************************************************************************\n" +
 				"Annotates GATKs CallCopyRatioSegments output with denoised copy ratio and heterozygous\n"+
 				"allele frequency data from the tumor and matched normal samples. Enables filtering\n"+
 				"using these values to remove copy ratio calls with high normal background. Adds \n"+
 				"intersecting gene names.\n"+
 
-				"\nRequired Options:\n"+
+				"\nOptions:\n"+
 				"-r Results directory to save the passing and failing segments.\n"+
 				"-s Called segment file from GATKs CallCopyRatioSegments app, e.g. xxx.called.seg\n"+
 				"-t Tumor denoised copy ratio file, from GATKs DenoiseReadCounts app. Bgzip compress\n"+
@@ -390,16 +418,14 @@ public class GatkCalledSegmentAnnotator {
 				"      grep -vE '(@|CONTIG)' tumor.cr.tsv > tumor.cr.txt\n"+
 				"      ~/HTSLib/bgzip tumor.cr.txt\n"+
 				"      ~/HTSLib/tabix -s 1 -b 2 -e 3 tumor.cr.txt.gz\n"+
-				"-n Normal denoised copy ratio file, ditto.\n"+
+				"-n (Optional) Normal denoised copy ratio file, ditto.\n"+
 				"-u Tumor allele frequency file, from GATKs ModelSegments app. Bgzip compress\n"+
 				"      and tabix index it with https://github.com/samtools/htslib :\n"+
 				"      grep -vE '(@|CONTIG)' gbm7.hets.tsv > gbm7.hets.txt\n"+
 				"      ~/HTSLib/bgzip gbm7.hets.txt\n"+
 				"      ~/HTSLib/tabix -s 1 -b 2 -e 2 gbm7.hets.txt.gz\n"+
-				"-o Normal allele frequency file, ditto.\n"+
+				"-o (Optional) Normal allele frequency file, ditto.\n"+
 				"-g RefFlat UCSC gene file, run USeq's MergeUCSCGeneTable to collapse transcripts.\n"+
-				
-				"\nDefault Options:\n"+
 				"-c Minimum absolute tumor log2 copy ratio, defaults to 0.15\n"+
 				"-x Maximum absolute normal log2 copy ratio, defaults to 0.5\n"+
 				"-m Minimum absolute log2 TN ratio of copy ratios, defaults to 0.15\n"+

@@ -1173,13 +1173,13 @@ public class TNSample2 {
 	private File[] fetchBPileup() throws IOException {
 		File bp = tnRunner.getBpileupFileOrDir();
 		if (bp.isFile()) {
-			IO.pl("\nBamPileup single file "+bp);
+			//IO.pl("\nBamPileup single file "+bp);
 			return new File[] {bp, new File(bp.getCanonicalPath()+".tbi")};
 		}
 		File[] bps = IO.extractFiles(bp, "bp.txt.gz");
 		if (bps.length == 0) throw new IOException("ERROR: failed to find any xxx.bp.txt.gz files in "+bp);
 		else if (bps.length == 1) {
-			IO.pl("\nBamPileup directory with single file "+bp);
+			//IO.pl("\nBamPileup directory with single file "+bp);
 			return new File[] {bps[0], new File(bps[0].getCanonicalPath()+".tbi")};
 		}
 		else {
@@ -1189,7 +1189,7 @@ public class TNSample2 {
 				String panel = platformGenderInfo.getPanel();
 				for (File f: bps) {
 					if (f.getName().contains(panel)) {
-						IO.pl("\nBamPileup file match "+f+ " for "+ platformGenderInfo.getOriginalName());						
+						//IO.pl("\nBamPileup file match "+f+ " for "+ platformGenderInfo.getOriginalName());						
 						return new File[] {f, new File(f.getCanonicalPath()+".tbi")};
 					}
 				}

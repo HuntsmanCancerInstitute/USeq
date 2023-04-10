@@ -140,10 +140,10 @@ public class AvatarDataWrangler {
 				"-r", smmRegistryDirectory.getCanonicalPath(),
 				"-q", queryFile.getCanonicalPath(),
 				"-o", queryResDir.getCanonicalPath(),
-				"-v", //turn off verbosity
 				"-c", //making name matching case-insensitive for EDW
 				"-a", //adding queries not found to registry
 				"-u" //fill in info not found to registry entries from queries, e.g. missing mrns, otherIds
+				//"-v", //turn off verbosity
 		};
 		
 		SubjectMatchMaker smm = new SubjectMatchMaker(args);
@@ -257,6 +257,7 @@ public class AvatarDataWrangler {
 		//      A59554_st_g_markdup.cram
 		String[] wesCrams = IO.loadFileIntoStringArray(wesCramsFile);
 		for (String wc: wesCrams) {
+			if (wc.startsWith("#")) continue;
 			String[] f = Misc.UNDERSCORE.split(wc);
 			if (f.length != 4) throw new IOException ("Failed to find 4 parts in this wes cram file entry "+wc);
 			if (slIdWesCramName.containsKey(f[0])) throw new IOException ("Found duplicate SLID "+f[0]);
@@ -267,6 +268,7 @@ public class AvatarDataWrangler {
 		//     SL316725.genome.cram
 		String[] rnaCrams = IO.loadFileIntoStringArray(rnaCramsFile);
 		for (String wc: rnaCrams) {
+			if (wc.startsWith("#")) continue;
 			String[] f = Misc.PERIOD.split(wc);
 			if (f.length != 3) throw new IOException ("Failed to find 3 parts in this RNA cram file entry "+wc);
 			if (slIdRnaCramName.containsKey(f[0])) throw new IOException ("Found duplicate SLID "+f[0]);
@@ -292,67 +294,76 @@ public class AvatarDataWrangler {
 		//split normal samples by platform
 		HashMap<String, ArrayList<NormalSampleADW>> platformNormalSamples = splitNormalSamplesByPlatform(p);
 
-		//split tumor samples by trimmed generic specimineId
+		//split tumor samples by trimmed generic specimineId 
 		HashMap<String, ArrayList<TumorSampleADW>> specimineIdTumorSamples = splitTumorSamplesBySpecimine(p.getTumorSamples());
 
-		//for each tumor specimine
+//Delete this test
+/*		if (p.getPatientId().equals("A018344")) {
+			for (String specimineId: specimineIdTumorSamples.keySet()) {
+				IO.pl(specimineId);
+				ArrayList<TumorSampleADW> tumorSamples = specimineIdTumorSamples.get(specimineId);
+				for (TumorSampleADW t: tumorSamples) {
+					IO.pl("Tum "+t.getPlatformName()+" "+t.getTumorDnaName()+" "+t.getTumorRnaName());
+				}
+				IO.pl();
+			}
+		}
+*/
+		
+		//for each tumor specimen
 		for (String specimineId: specimineIdTumorSamples.keySet()) {
 
-			/////////////
 			//Define the Tumor exome and rna samples
 			ArrayList<TumorSampleADW> tumorSamples = specimineIdTumorSamples.get(specimineId);
 
-			//attempt to merge those with separate RNA and Exome ids
+			//attempt to merge those with separate RNA and Exome ids on different lines
 			tumorSamples = mergeSplitTumorExomeRNADatasets(tumorSamples);
-			int numTumSamp = tumorSamples.size();
 
-			//more than one?
-			if (numTumSamp !=1) throw new IOException("\nFailed to merge tumor samples with the same trimmed specimineId for patient "+p.getPatientId());
-			TumorSampleADW tumorSample = tumorSamples.get(0);
+			//sometimes there is more than one due to multiple tumor exomes with multiple tumor rna
+			for (TumorSampleADW tumorSample: tumorSamples) {
 
-			////////////
-			//Define the Normal? do so only for Tumor samples with a exome
-			ArrayList<NormalSampleADW> normalSamplesToAdd = new ArrayList<NormalSampleADW>();
-			boolean matchedPlatform = true;
-			
-			if (tumorSample.getTumorDnaName() != null) {
-				ArrayList<NormalSampleADW> normalSamples = platformNormalSamples.get(tumorSample.getPlatformName());
-				int numNorm = 0;
-				if (normalSamples != null) numNorm = normalSamples.size();
+				//Define the Normal? do so only for Tumor samples with a exome
+				ArrayList<NormalSampleADW> normalSamplesToAdd = new ArrayList<NormalSampleADW>();
+				boolean matchedPlatform = true;
+
+				if (tumorSample.getTumorDnaName() != null) {
+					ArrayList<NormalSampleADW> normalSamples = platformNormalSamples.get(tumorSample.getPlatformName());
+					int numNorm = 0;
+					if (normalSamples != null) numNorm = normalSamples.size();
 
 
-				//more than one normal? 
-				if (numNorm > 1) {
-					IO.pl("\tWARNING: multiple normal files found in the same platform, these will all be added to the Fastq dir for merging: ");
-					for (NormalSampleADW ns: normalSamples) {
-						IO.pl("\t\t"+ns.getNormalWesCramFileNameToFetch());
-						normalSamplesToAdd.add(ns);
-					}
-				}
-
-				//one normal
-				else if (numNorm == 1) normalSamplesToAdd.add(normalSamples.get(0));
-
-				//for zero platform normals, will try to link in another platform one below
-				else {
-					//any normals?
-					if (p.getNormalSamples().size() == 0) {
-						IO.pl("\tWARNING: no normal found.");
-					}
-					else {
-						IO.pl("\tWARNING: no normal found in the same platform, will add those from all other platforms for merging:");
-						for (NormalSampleADW ns: p.getNormalSamples()) {
+					//more than one normal? 
+					if (numNorm > 1) {
+						IO.pl("\tWARNING: multiple normal files found in the same platform, these will all be added to the Fastq dir for merging: ");
+						for (NormalSampleADW ns: normalSamples) {
+							IO.pl("\t\t"+ns.getNormalWesCramFileNameToFetch());
 							normalSamplesToAdd.add(ns);
-							IO.pl("\t\t"+ns.getPlatformName()+"\t"+ ns.getNormalWesCramFileNameToFetch());
-							matchedPlatform = false;
+						}
+					}
+
+					//one normal
+					else if (numNorm == 1) normalSamplesToAdd.add(normalSamples.get(0));
+
+					//for zero platform normals, will try to link in another platform one below
+					else {
+						//any normals?
+						if (p.getNormalSamples().size() == 0) {
+							IO.pl("\tWARNING: no normal found.");
+						}
+						else {
+							IO.pl("\tWARNING: no normal found in the same platform, will add those from all other platforms for merging:");
+							for (NormalSampleADW ns: p.getNormalSamples()) {
+								normalSamplesToAdd.add(ns);
+								IO.pl("\t\t"+ns.getPlatformName()+"\t"+ ns.getNormalWesCramFileNameToFetch());
+								matchedPlatform = false;
+							}
 						}
 					}
 				}
+				//add the job to the patient
+				AvatarAnalysisJob adJob = new AvatarAnalysisJob(p, tumorSample, normalSamplesToAdd, matchedPlatform);
+				p.getAnalysisJobs().add(adJob);
 			}
-			//add the job to the patient
-			AvatarAnalysisJob adJob = new AvatarAnalysisJob(p, tumorSample, normalSamplesToAdd, matchedPlatform);
-			p.getAnalysisJobs().add(adJob);
-
 		}
 
 		//just normal samples?
@@ -484,6 +495,9 @@ public class AvatarDataWrangler {
 					if (platform == null) {
 						Misc.printErrAndExit("\nERROR: failed to find a platform type for "+tumorGermline+" sample "+
 								wesId+" for patient ID "+patientId+" Aborting.");
+						//IO.el("\nERROR: failed to find a platform type for "+tumorGermline+" sample "+
+								//wesId+" for patient ID "+patientId+" Aborting.");
+						//continue;
 					}
 				}
 				
@@ -640,7 +654,7 @@ public class AvatarDataWrangler {
 
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Avatar Data Wrangler : Sept 2022                       **\n" +
+				"**                           Avatar Data Wrangler : March 2023                      **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling directories for TNRunner based on files provided by M2Gen via\n"+
 				"download from DNAnexus. Handles patient datasets from different exome capture\n"+

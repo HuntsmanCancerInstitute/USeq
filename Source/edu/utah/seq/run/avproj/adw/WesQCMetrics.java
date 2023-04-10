@@ -12,7 +12,7 @@ import util.gen.IO;
 import util.gen.Misc;
 
 public class WesQCMetrics {
-	
+
 	//fields
 	private boolean parsed = false;
 	private String header = null;
@@ -20,18 +20,18 @@ public class WesQCMetrics {
 	private HashMap<String, ArrayList<String[]>> avatarIdDataLines = new HashMap<String, ArrayList<String[]>>();
 	private HashMap<String, String> slidPlatform = new HashMap<String, String>();
 	private HashSet<String> baitSets = new HashSet<String>();
-	
+
 	public static final Pattern commaQuote = Pattern.compile("\",\"");
 	public static final Pattern quote = Pattern.compile("\"");
 
 	public WesQCMetrics( File wesQcMetrics) throws IOException {
-		
+
 		parseIt(wesQcMetrics);
-		
+
 		makeHeaderLookup();
-		
+
 		loadSlidBaitSets();
-		
+
 	}
 
 	private void loadSlidBaitSets() throws IOException {
@@ -44,7 +44,7 @@ public class WesQCMetrics {
 			for (String[] d: data) {
 				String slid = d[indexOfSLID];
 				//does it already exist?
-				if (slidPlatform.containsKey(slid)) throw new IOException ("Duplicate SLID "+slid);
+				if (slidPlatform.containsKey(slid)) continue;
 				String baitSet = d[indexOfBaitSet];
 				baitSets.add(baitSet);
 				//hg38_lifted_SeqCap_EZ_Exome_v3_capture_baits
@@ -53,7 +53,14 @@ public class WesQCMetrics {
 				if (baitSet.contains("SeqCap_EZ_Exome_v3")) slidPlatform.put(slid, "NIM");
 				else if (baitSet.contains("_IDT_merged")) slidPlatform.put(slid, "IDTv1");
 				else if (baitSet.contains("M2GEN_CustomePlus_Exv2")) slidPlatform.put(slid, "IDTv2");
-				else throw new IOException("Failed to match a platform to "+baitSet);
+				else if (baitSet.contains("hg38_exome_comp_spikein_v2-0-2")) slidPlatform.put(slid, "TWSv2");
+				else throw new IOException("\nFailed to match a platform to "+baitSet);
+				
+				//NIM		hg38_lifted_SeqCap_EZ_Exome_v3_capture_baits
+				//IDTv1		hg38_lifted_IDT_merged_custom_single_double_probes
+				//IDTv2		M2GEN_CustomePlus_Exv2_probes_hg38
+				//TWSv2		hg38_exome_comp_spikein_v2-0-2_TE-95000264_TE-99225628_targets_sorted, from Oliver CaptureKit “TWIST”, calling it v2 given their description, there is no v1
+				
 			}
 		}
 	}
@@ -69,13 +76,13 @@ public class WesQCMetrics {
 			BufferedReader in = IO.fetchBufferedReader(cvsFromM2Gen);
 			while ((line = in.readLine()) !=null) {
 				line = line.trim();
-				if (line.length() == 0) continue;
+				if (line.length() == 0 || line.startsWith("#")) continue;
 				//swap out "," for tabs
 				line = commaQuote.matcher(line).replaceAll("\t");
 				line = quote.matcher(line).replaceAll("");
 				if (line.startsWith("ORIENAvatarKey")) header = line;
 				else addToHash(line);
-				
+
 			}
 			in.close();
 			parsed = true;
@@ -95,7 +102,7 @@ public class WesQCMetrics {
 		}
 		al.add(f);
 	}
-	
+
 	public static void main (String[] args) throws IOException {
 		File test = new File ("/Users/u0028003/HCI/AvatarORIEN/AutoAvatar/20220824_HCI_WES_QC_Metrics.csv");
 		WesQCMetrics cml = new WesQCMetrics(test);

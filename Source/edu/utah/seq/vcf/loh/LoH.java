@@ -674,7 +674,7 @@ java -jar -Xmx100G  ~/USeqApps/AnnotateBedWithGenes -u ~/TNRunner/AnnotatorData/
 				"**                                    LoH : Nov 2022                                **\n" +
 				"**************************************************************************************\n" +
 				"LoH compares heterozygous snv and indel allele counts between germline and somatic\n"+
-				"sequencing datasets to identify potential loss of heterozygousity events. LoH is\n"+
+				"sequencing datasets to identify potential loss of heterozygosity events. LoH is\n"+
 				"defined here as a significant increase in the somatic allele fraction (AF) relative to\n"+
 				"the matched germline. Adjacent variants passing p-value and AF difference thresholds\n"+
 				"are merged and a combine p-value calculated for the window block.\n"+

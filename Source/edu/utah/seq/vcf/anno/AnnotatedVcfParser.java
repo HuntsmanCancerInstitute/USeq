@@ -32,7 +32,7 @@ public class AnnotatedVcfParser {
 	private double maximumAF = 1;
 	private double maximumCF = 1;
 	private double maximumPopAF = 0;
-	private double maxFracBKAFs = 0; //maximum number of background samples with >= AF, measure as fraction of total samples, 50 for foundation so 5 max
+	private double maxFracBKAFs = 0; //maximum number of background samples with >= sample AF*0.9, measure as fraction of total samples, 50 for foundation so 5 max
 	private double minimumBKZ = 0;
 	private double minFractionPathogenic = 0.51;
 	private String[] passingIDKeys = null;
@@ -438,7 +438,10 @@ public class AnnotatedVcfParser {
 				double[] afs = Num.stringArrayToDouble(bkafs, ",");
 				//score
 				double numFailing = 0;
-				for (double af: afs) if (af>= obsAF) numFailing++;
+				for (double af: afs) {
+					af = af*1.1;
+					if (af>= obsAF) numFailing++;
+				}
 				double fractFailing = numFailing/(double)afs.length;
 				boolean passingBkaf = fractFailing <= maxFracBKAFs; 
 				if (verbose) IO.pl("\tBKAF Check\t"+passingBkaf+"\t"+fractFailing+"\t"+bkafs);
@@ -680,6 +683,7 @@ public class AnnotatedVcfParser {
 		boolean foundPop = false;
 		boolean passDbNSFPExAC = true;
 		boolean passExAC_AF = true;
+		boolean passGnomAD_AF = true;
 		boolean pass1K = true;
 		double maxPopFreq = -1;
 		
@@ -705,6 +709,19 @@ public class AnnotatedVcfParser {
 				if (popAF> maxPopFreq) maxPopFreq = popAF;
 			}
 		}
+		
+		//From gnomAD
+		String gnomadAFString = infoKeyValue.get("GnomAD_AF");
+		if (gnomadAFString != null){
+			if (gnomadAFString.equals(".") == false){
+				foundPop = true;
+				double popAF = Double.parseDouble(gnomadAFString);
+				if (popAF > maximumPopAF) passGnomAD_AF = false;
+				if (verbose) IO.pl("\tgnomAD AF Check\t"+passGnomAD_AF+"\t"+popAF);
+				if (popAF> maxPopFreq) maxPopFreq = popAF;
+			}
+		}
+		
 		//1K genomes
 		String KString = infoKeyValue.get("dbNSFP_1000Gp3_AF");
 		if (KString != null){
@@ -719,15 +736,15 @@ public class AnnotatedVcfParser {
 		if (foundPop) {
 			dataLine.varPopAlleleFreq = maxPopFreq;
 			numWithPopAF++;
-			if (passDbNSFPExAC == true && pass1K == true && passExAC_AF) {
+			//all must pass
+			if (passDbNSFPExAC == true && pass1K == true && passExAC_AF == true && passGnomAD_AF == true) {
 				numPassingPopAF++;
 				return new boolean[]{true, true};
-				
 			}
 			else return new boolean[]{true, false};
 		}
 		else {
-			if (verbose) IO.pl("\tPopFreq Check\tNA\tNo dbNSFP_1000Gp3_AF, dbNSFP_ExAC_AF, or ExAC_AF");
+			if (verbose) IO.pl("\tPopFreq Check\tNA\tNo dbNSFP_1000Gp3_AF, dbNSFP_ExAC_AF, ExAC_AF, or GnomAD_");
 			return new boolean[]{false, false};
 		}
 	}
@@ -913,7 +930,7 @@ public class AnnotatedVcfParser {
 		}
 		if (maximumCF != 1) al.add("\t"+ maximumCF+"\t: Maximum CF prior call frequency");
 		if (maximumPopAF != 0) al.add("\t"+ maximumPopAF+"\t: Maximum population AF from dbNSFP_ExAC_AF or dbNSFP_1000Gp3_AF");
-		if (maxFracBKAFs != 0) al.add("\t"+ maxFracBKAFs+"\t: Maximum fraction of background samples with an AF >= observed AF");
+		if (maxFracBKAFs != 0) al.add("\t"+ maxFracBKAFs+"\t: Maximum fraction of background samples with an AF >= observed AF * 0.9");
 		if (minimumBKZ != 0) al.add("\t"+ minimumBKZ+"\t: Minimum BKZ quality score");
 		al.add("\t"+ removeMulitAlt+"\t: Remove variants with a MULTIALLELIC INFO key");
 		al.add("\t"+ skipWarningTrans+"\t: Ignore transcripts labeled WARNING_TRANSCRIPT_XXX");
@@ -1150,7 +1167,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Annotated Vcf Parser  Nov 2022                         **\n" +
+				"**                           Annotated Vcf Parser  March 2023                       **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+
@@ -1173,7 +1190,7 @@ public class AnnotatedVcfParser {
 				"-j Ignore the max AF filter for ACMG incidental germline gene variants.\n"+
                 "-p Maximum population allele frequency, only applies if present.\n"+
 				"-z Minimum BKZ when present.\n"+
-                "-b Maximum fraction of BKAF samples with allele frequency >= VCF AF, only applies\n"+
+                "-b Maximum fraction of BKAF samples with allele frequency >= VCF AF*0.9, only applies\n"+
                 "       if present.\n"+
                 "-g Splice junction types to scan.\n"+
                 "-n Minimum difference in splice junction scores, only applies if present.\n"+
