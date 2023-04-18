@@ -2,7 +2,7 @@ package edu.utah.seq.pmr;
 
 import java.io.File;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.Iterator;
 
 import org.json.JSONArray;
@@ -11,11 +11,11 @@ import util.gen.IO;
 
 public class AvatarClinicalInfo {
 	
-	private HashMap<String, String> patient = new HashMap<String, String>();
-	private HashMap<String, String> root = new HashMap<String, String>();
-	private HashMap<String, String> tumorDna = new HashMap<String, String>();
-	private HashMap<String, String> tumorRna = new HashMap<String, String>();
-	private ArrayList<HashMap<String, String>> normalDna = new ArrayList<HashMap<String, String>>();
+	private LinkedHashMap<String, String> patient = new LinkedHashMap<String, String>();
+	private LinkedHashMap<String, String> root = new LinkedHashMap<String, String>();
+	private LinkedHashMap<String, String> tumorDna = new LinkedHashMap<String, String>();
+	private LinkedHashMap<String, String> tumorRna = new LinkedHashMap<String, String>();
+	private ArrayList<LinkedHashMap<String, String>> normalDna = new ArrayList<LinkedHashMap<String, String>>();
 	
 	public static final String TUMOR_DNA_NAME = "TumorDNA";
 	public static final String TUMOR_RNA_NAME = "TumorRNA";
@@ -29,16 +29,16 @@ public class AvatarClinicalInfo {
 		Iterator it = mainJsonObject.keys();
 		while (it.hasNext()) {
 			String key = (String)it.next();
-			if (key.equals(PATIENT_NAME)) loadHashMap(patient,  mainJsonObject.getJSONObject(key));
-			else if (key.equals(TUMOR_DNA_NAME)) loadHashMap(tumorDna,  mainJsonObject.getJSONObject(key));
-			else if (key.equals(TUMOR_RNA_NAME)) loadHashMap(tumorRna,  mainJsonObject.getJSONObject(key));
+			if (key.equals(PATIENT_NAME)) loadLinkedHashMap(patient,  mainJsonObject.getJSONObject(key));
+			else if (key.equals(TUMOR_DNA_NAME)) loadLinkedHashMap(tumorDna,  mainJsonObject.getJSONObject(key));
+			else if (key.equals(TUMOR_RNA_NAME)) loadLinkedHashMap(tumorRna,  mainJsonObject.getJSONObject(key));
 			else if (key.equals(NORMAL_DNA_NAME)) {
 				JSONArray allNorm = mainJsonObject.getJSONArray(key);
 				int num = allNorm.length();
 				for (int i=0; i< num; i++) {
 					JSONObject no = allNorm.getJSONObject(i);
-					HashMap<String, String> normal = new HashMap<String, String>();
-					loadHashMap(normal, no);
+					LinkedHashMap<String, String> normal = new LinkedHashMap<String, String>();
+					loadLinkedHashMap(normal, no);
 					normalDna.add(normal);
 				}
 			}
@@ -51,19 +51,40 @@ public class AvatarClinicalInfo {
 	
 	public String toString() {
 		StringBuilder sb = new StringBuilder();
-		sb.append("Patient:\t"+ patient+"\n");
-		sb.append("Root:\t"+ root+"\n");
-		sb.append("TumorDNA:\t"+ tumorDna+"\n");
-		sb.append("TumorRNA:\t"+ tumorRna+"\n");
-		for (HashMap<String, String> n: normalDna) {
-			sb.append("NormalDNA:\t"+ n+"\n");
+		sb.append("  Patient:\n");
+		addLinkedHashMap(patient, sb);
+		sb.append("  Root:\n");
+		addLinkedHashMap(root, sb);
+		if (normalDna.size()!=0) {
+			for (LinkedHashMap<String, String> n: normalDna) {
+				sb.append("  NormalDNA:\n");
+				addLinkedHashMap(n, sb);
+			}
+		}
+		if (tumorDna.size()!=0) {
+			sb.append("  TumorDNA:\n");
+			addLinkedHashMap(tumorDna, sb);
+		}
+		if (tumorRna.size()!=0) {
+			sb.append("  TumorRNA:\n");
+			addLinkedHashMap(tumorRna, sb);
 		}
 		return sb.toString();
 	}
 	
+	private void addLinkedHashMap(LinkedHashMap<String,String> lhm, StringBuilder sb) {
+		for (String key : lhm.keySet()) {
+			sb.append("    ");
+			sb.append(key);
+			sb.append(" : ");
+			sb.append(lhm.get(key));
+			sb.append("\n");
+		}
+	}
+	
 
 
-	private void loadHashMap(HashMap<String, String> hm, JSONObject j) {
+	private void loadLinkedHashMap(LinkedHashMap<String, String> hm, JSONObject j) {
 		Iterator it = j.keys();
 		while (it.hasNext()) {
 			String key = (String)it.next();
@@ -71,23 +92,23 @@ public class AvatarClinicalInfo {
 		}
 	}
 
-	public HashMap<String, String> getPatient() {
+	public LinkedHashMap<String, String> getPatient() {
 		return patient;
 	}
 
-	public HashMap<String, String> getRoot() {
+	public LinkedHashMap<String, String> getRoot() {
 		return root;
 	}
 
-	public HashMap<String, String> getTumorDna() {
+	public LinkedHashMap<String, String> getTumorDna() {
 		return tumorDna;
 	}
 
-	public HashMap<String, String> getTumorRna() {
+	public LinkedHashMap<String, String> getTumorRna() {
 		return tumorRna;
 	}
 
-	public ArrayList<HashMap<String, String>> getNormalDna() {
+	public ArrayList<LinkedHashMap<String, String>> getNormalDna() {
 		return normalDna;
 	}
 

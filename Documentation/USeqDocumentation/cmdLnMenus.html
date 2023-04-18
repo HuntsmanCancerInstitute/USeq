@@ -31,6 +31,8 @@
 				
 					<a href="#AnnotatedBed2UCSCRefFlat">AnnotatedBed2UCSCRefFlat</a><br>
 				
+					<a href="#AnnotatedVcfFilter">AnnotatedVcfFilter</a><br>
+				
 					<a href="#AnnotatedVcfParser">AnnotatedVcfParser</a><br>
 				
 					<a href="#AvatarAssembler">AvatarAssembler</a><br>
@@ -88,8 +90,6 @@
 					<a href="#CBio2Sgr">CBio2Sgr</a><br>
 				
 					<a href="#ChIPSeq">ChIPSeq</a><br>
-				
-					<a href="#ClusterMultiSampleVCF">ClusterMultiSampleVCF</a><br>
 				
 					<a href="#CompareIntersectingRegions">CompareIntersectingRegions</a><br>
 				
@@ -258,6 +258,8 @@
 					<a href="#ParseIntersectingAlignments">ParseIntersectingAlignments</a><br>
 				
 					<a href="#ParsePointDataContexts">ParsePointDataContexts</a><br>
+				
+					<a href="#PatientMolecularRepoSearch">PatientMolecularRepoSearch</a><br>
 				
 					<a href="#PeakShiftFinder">PeakShiftFinder</a><br>
 				
@@ -711,8 +713,33 @@ Example: java -Xmx2G -jar pathTo/USeq/Apps/AnnotatedBed2UCSCRefFlat -b anno.bed.
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="AnnotatedVcfFilter"><pre>**************************************************************************************
+**                          Annotated Vcf Filter: Feb 2023                          **
+**************************************************************************************
+Filters vcf records that have T_DP, N_DP, T_AF, and N_AF INFO field attributes.
+
+Options:
+-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
+-s Directory to save the parsed files.
+-t Minimum tumor allele frequency (AF), defaults to 0.
+-n Maximum normal AF, defaults to 1.
+-u Minimum tumor alignment depth, defaults to 0.
+-a Minimum tumor alt count, defaults to 0.
+-o Minimum normal alignment depth, defaults to 0.
+-d Minimum T-N AF difference, defaults to 0.
+-r Minimum T/N AF ratio, defaults to 0.
+-q Minimum QUAL score, defaults to 0.
+-f Comma delimited list of FILTER keys to fail records.
+
+Example: java -jar pathToUSeq/Apps/TNScopeVCFParser -v ToParse/ -n 0.5 -u 100
+        -o 20 -d 0.05 -r 2 -a 3 -t 50 -p -s FilteredVcfFiles/ -f
+        multi_event_alt_allele_in_normal,str_contraction 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                           Annotated Vcf Parser  Nov 2022                         **
+**                           Annotated Vcf Parser  March 2023                       **
 **************************************************************************************
 Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
 VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
@@ -735,7 +762,7 @@ Options:
 -j Ignore the max AF filter for ACMG incidental germline gene variants.
 -p Maximum population allele frequency, only applies if present.
 -z Minimum BKZ when present.
--b Maximum fraction of BKAF samples with allele frequency >= VCF AF, only applies
+-b Maximum fraction of BKAF samples with allele frequency >= VCF AF*0.9, only applies
        if present.
 -g Splice junction types to scan.
 -n Minimum difference in splice junction scores, only applies if present.
@@ -797,7 +824,7 @@ Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/
 </pre><br><p>
 				
 					<a name="AvatarDataWrangler"><pre>**************************************************************************************
-**                           Avatar Data Wrangler : Sept 2022                       **
+**                           Avatar Data Wrangler : March 2023                      **
 **************************************************************************************
 Tool for assembling directories for TNRunner based on files provided by M2Gen via
 download from DNAnexus. Handles patient datasets from different exome capture
@@ -1525,25 +1552,6 @@ Advanced Options:
 Example: java -Xmx2G -jar pathTo/USeq/Apps/ChIPSeq -y eland -v D_rerio_Dec_2008 -t 
       /Data/PolIIRep1/,/Data/PolIIRep2/ -c /Data/PolIINRep1/,/Data/PolIINRep2/ -s
       /Data/Results/WtVsNull -f /Anno/satelliteRepeats.bed
-
-**************************************************************************************
-</pre><br><p>
-				
-					<a name="ClusterMultiSampleVCF"><pre>**************************************************************************************
-**                          Cluster Multi Sample VCF: Nov 2014                      **
-**************************************************************************************
-Clusters samples based on the genotypes of each that differ in one or more samples.
-
-Options:
--v Full path to a multi sample vcf file (xxx.vcf/xxx.vcf.gz)). Note, Java often fails
-       to parse tabix compressed vcf files.  Best to uncompress.
-
--r Minimum record QUAL score, defaults to 20.
--g Minimum sample genotype GT score, defaults to 20.
--i Use sample index instead of trimmed name in output.
--c Minimum # samples with given genotype, defaults to 1.
-
-Example: java -Xmx2G -jar pathTo/USeq/Apps/ClusterMultiSampleVCF -v ~/UGP/suicide.vcf
 
 **************************************************************************************
 </pre><br><p>
@@ -2460,14 +2468,14 @@ Example: java -jar pathToUSeq/Apps/FreebayesVCFParser -v /VCFFiles/ -t 0.05 -n 0
 </pre><br><p>
 				
 					<a name="GatkCalledSegmentAnnotator"><pre>**************************************************************************************
-**                      Gatk Called Segment Annotator: August 2019                  **
+**                      Gatk Called Segment Annotator: April 2023                   **
 **************************************************************************************
 Annotates GATKs CallCopyRatioSegments output with denoised copy ratio and heterozygous
 allele frequency data from the tumor and matched normal samples. Enables filtering
 using these values to remove copy ratio calls with high normal background. Adds 
 intersecting gene names.
 
-Required Options:
+Options:
 -r Results directory to save the passing and failing segments.
 -s Called segment file from GATKs CallCopyRatioSegments app, e.g. xxx.called.seg
 -t Tumor denoised copy ratio file, from GATKs DenoiseReadCounts app. Bgzip compress
@@ -2475,16 +2483,14 @@ Required Options:
       grep -vE '(@|CONTIG)' tumor.cr.tsv > tumor.cr.txt
       ~/HTSLib/bgzip tumor.cr.txt
       ~/HTSLib/tabix -s 1 -b 2 -e 3 tumor.cr.txt.gz
--n Normal denoised copy ratio file, ditto.
+-n (Optional) Normal denoised copy ratio file, ditto.
 -u Tumor allele frequency file, from GATKs ModelSegments app. Bgzip compress
       and tabix index it with https://github.com/samtools/htslib :
       grep -vE '(@|CONTIG)' gbm7.hets.tsv > gbm7.hets.txt
       ~/HTSLib/bgzip gbm7.hets.txt
       ~/HTSLib/tabix -s 1 -b 2 -e 2 gbm7.hets.txt.gz
--o Normal allele frequency file, ditto.
+-o (Optional) Normal allele frequency file, ditto.
 -g RefFlat UCSC gene file, run USeq's MergeUCSCGeneTable to collapse transcripts.
-
-Default Options:
 -c Minimum absolute tumor log2 copy ratio, defaults to 0.15
 -x Maximum absolute normal log2 copy ratio, defaults to 0.5
 -m Minimum absolute log2 TN ratio of copy ratios, defaults to 0.15
@@ -2797,7 +2803,7 @@ Example: java -jar pathToUSeq/Apps/LofreqVCFParser -v VCFFiles/ -m 32 -i -f -a
 **                                    LoH : Nov 2022                                **
 **************************************************************************************
 LoH compares heterozygous snv and indel allele counts between germline and somatic
-sequencing datasets to identify potential loss of heterozygousity events. LoH is
+sequencing datasets to identify potential loss of heterozygosity events. LoH is
 defined here as a significant increase in the somatic allele fraction (AF) relative to
 the matched germline. Adjacent variants passing p-value and AF difference thresholds
 are merged and a combine p-value calculated for the window block.
@@ -3670,6 +3676,21 @@ Options:
 
 Example: java -Xmx12G -jar pathTo/USeq/Apps/ParsePointDataContexts -c '..CG.' -s
       /Data/PointData/CG -f /Genomes/Hg18/Fastas -p /Data/PointData/All/  
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="PatientMolecularRepoSearch"><pre>**************************************************************************************
+**                       Patient Molecular Repo Search : April 2023                 **
+**************************************************************************************
+Interactive iterative searching of the clinical information in the json and xml
+reports in the HCI PMR /ClinicalReport/ folders to identify molecular datasets for
+further analysis. Press return after loading to see the search menu.
+Options:
+-d  Directory to save the clinical xml and json reports and the AWS repo URI list.
+-v  Verbose output.
+
+Example: java -jar pathToUSeq/Apps/PatientMolecularRepoSearch -c ~/PMRFiles/ -v
 
 **************************************************************************************
 </pre><br><p>

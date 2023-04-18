@@ -5,6 +5,10 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 
 import edu.utah.seq.vcf.json.TempusJsonSummary;
+import edu.utah.seq.vcf.json.TempusOrder;
+import edu.utah.seq.vcf.json.TempusPatient;
+import edu.utah.seq.vcf.json.TempusReport;
+import edu.utah.seq.vcf.json.TempusSpecimen;
 
 public class Dataset {
 	
@@ -19,6 +23,45 @@ public class Dataset {
 	public Dataset(String source, String datasetId) {
 		this.source = source;
 		this.datasetId = datasetId;
+	}
+	
+	public String toString(String patientMolecularRepoId) {
+		StringBuilder sb = new StringBuilder();
+		sb.append(patientMolecularRepoId+"\n");
+		//Avatar?
+		if (avatarClinicalInfo != null) sb.append(avatarClinicalInfo.toString());
+		//Caris
+		else if (carisClinicalInfo != null) {
+			for (String key: carisClinicalInfo.keySet()) {
+				sb.append("  ");
+				sb.append(key); 
+				sb.append(" : "); 
+				sb.append(carisClinicalInfo.get(key)); 
+				sb.append("\n");
+			}
+		}
+		//Tempus
+		else {
+			LinkedHashMap<String, String> meta = new LinkedHashMap<String, String>();
+			tempusJsonReportInfo.getTempusPatient().addAttributes(meta, false);
+			tempusJsonReportInfo.getTempusOrder().addAttributes(meta);
+			tempusJsonReportInfo.getTempusReport().addAttributes(meta);
+			TempusSpecimen.addAttributes(meta, tempusJsonReportInfo.getTempusSpecimens());
+			tempusJsonReportInfo.getTempusReport().addAttributes(meta);
+			for (String key: meta.keySet()) {
+				sb.append("  ");
+				sb.append(key); 
+				sb.append(" : "); 
+				sb.append(meta.get(key)); 
+				sb.append("\n");
+			}
+		}
+		return sb.toString();
+	}
+	
+	public String checkForMissing(String val) {
+		if (val == null || val.length()==0 || val.toLowerCase().contains("null")) return null;
+		return val;
 	}
 
 	public String getSource() {

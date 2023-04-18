@@ -61,7 +61,15 @@ public class PatientMolecularRepoSearch {
 	private TreeMap<String, TreeSet<String>> sex_DatasetName = null;
 	private String sexSearchString = null;
 	private TreeSet<String> datasetKeysFound = null;
+	
 
+	
+	
+	/*HERE
+	
+	Print All clinical Info about the search result datasets
+	Roll back search
+	History*/
 
 	public PatientMolecularRepoSearch (String[] args) {
 		long startTime = System.currentTimeMillis();
@@ -111,7 +119,7 @@ public class PatientMolecularRepoSearch {
 			String lcInput = input.toLowerCase();
 
 			//empty? print menu
-			if (input.length() == 0) printInteractiveMenu();
+			if (input.length() == 0) UserSearch.printInteractiveMenu();
 			else if (lcInput.contains("exit")) {
 				s.close();
 				return;
@@ -134,25 +142,37 @@ public class PatientMolecularRepoSearch {
 					if (datasetKeysFound != null) IO.pl("Selecting from prior search of "+datasetKeysFound.size()+" datasets...");
 					TreeSet<String> foundSearchKeys = searchForDatasets(us);
 					if (datasetKeysFound == null) datasetKeysFound = foundSearchKeys;
+					else if (us.isAddMatches()) datasetKeysFound.addAll(foundSearchKeys);
 					else datasetKeysFound.retainAll(foundSearchKeys);
 					IO.pl("\n"+datasetKeysFound.size()+" datasets selected");
 				}
 				
+				
 				//print dataset files?
 				if (us.isPrintMatchedDatasetURIs()) printURIs();
+				
+				//print dataset info?
+				if (us.isPrintDatasetInfo()) printDatasetInfo();
 			}
 		}
 	}
 	
+	private void printDatasetInfo() {
+		IO.pl("\nDataset Info, also download and examine the ClinicalReport/xxx.json/.xml files:");
+		for (String datasetId: datasetKeysFound) {
+			Dataset d = idDataset.get(datasetId);
+			IO.p("\n"+ d.toString(datasetId));
+		}
+	}
+	
+	
 	private void printURIs() {
-		
 		IO.pl("\nFile URIs for each matched dataset:");
 		for (String datasetId: datasetKeysFound) {
 			IO.pl("\n"+datasetId);
 			Dataset d = idDataset.get(datasetId);
-			for (String p: d.getPartialPaths()) IO.pl("\t"+awsPatientDirUri+p);
+			for (String p: d.getPartialPaths()) IO.pl("\t"+awsPatientDirUri+datasetId+"/"+p);
 		}
-		
 	}
 
 	private void printDataTable(String whatCategory) {
@@ -161,7 +181,6 @@ public class PatientMolecularRepoSearch {
 		if (whatCategory.equals("Diagnosis")) {
 			if (diagnosis_DatasetName == null) makeDiagnosisMap();
 			catKeys_DatasetName = diagnosis_DatasetName;
-			
 		}
 		else if (whatCategory.equals("PhysicianDiseaseGroups")) {
 			if (disGrpPhy_DatasetName == null) makeDiseaseGroupPhysician();
@@ -189,21 +208,6 @@ public class PatientMolecularRepoSearch {
 			System.err.flush();
 		}
 		printTreeMapTreeSet(catKeys_DatasetName);
-	}
-
-	private void printInteractiveMenu() {
-		StringBuilder sb = new StringBuilder("\nInteractive Search Options:\n");
-		sb.append("\t-d Data table to search, choose from: Diagnosis, PhysicianDiseaseGroups, SpecimenSites, SpecimenIds, Sex, DatasetIds\n");
-		sb.append("\t-s Search terms, comma delimited, no spaces\n");
-		sb.append("\t-c Terms are case sensitive.\n");
-		sb.append("\t-e Terms are exact, no partial matching.\n");
-		sb.append("\t-a All terms must match.\n");
-		sb.append("\t-n New search, clear any prior results.\n");
-		sb.append("\t-p Print the contents of the named data table, see -d\n");
-		sb.append("\t-f Print the available file AWS URIs for the matched datasets.\n");
-		sb.append("\t-v Verbose output.\n");
-		sb.append("\te.g. '-d Diagnosis -s Liver,Metastasis -a' then '-d Sex -s F' then '-f'\n");
-		IO.p(sb.toString());
 	}
 
 	/**Searches for datasets that match particular strings
@@ -253,7 +257,7 @@ public class PatientMolecularRepoSearch {
 			System.err.flush();
 			return null;
 		}
-		IO.pl("\nRunning a '"+whatCategory+"' search for '"+Misc.stringArrayToString(us.getSearchTerms(), "','")+"' caseInsensitve? "+us.isCaseInsensitive()+
+		IO.pl("\nSearching data table: '"+whatCategory+"' for search term(s): '"+Misc.stringArrayToString(us.getSearchTerms(), "','")+"' caseInsensitve? "+us.isCaseInsensitive()+
 				", requireAll? "+us.isAllTermsMustMatch()+", partialMatch? "+us.isAllTermsMustMatch());
 
 		TreeSet<String> datasets = null;
