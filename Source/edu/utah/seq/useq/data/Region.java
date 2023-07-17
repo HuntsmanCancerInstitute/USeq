@@ -1,6 +1,8 @@
 package edu.utah.seq.useq.data;
 import java.util.*;
 import java.io.*;
+
+import util.bio.annotation.Coordinate;
 import util.gen.*;
 
 /**
@@ -25,6 +27,22 @@ public class Region implements Comparable<Region>, Serializable {
 	public boolean intersects (int start, int stop){
 		if (stop <= this.start || start >= this.stop) return false;
 		return true;
+	}
+	
+	/**Returns -1 for no overlap, 0 for complete overlap, or a positive int for the # bases of overlap.
+	 * Assumes coordinates are inclusive.*/
+	public int bpsIntersection(Region other){
+		// is other left of this
+		if (other.getStop() < start) return -1;
+		// is other right of this
+		if (other.getStart() > stop ) return -1;
+		// must overlap
+		//left side
+		if (start>=other.getStart() && start<=other.getStop() && stop > other.getStop()) return other.getStop() - start +1;
+		//right side
+		if (stop >= other.getStart() && stop <= other.getStop() && start < other.getStart()) return stop-other.getStart() +1;
+		//contained within
+		return 0;
 	}
 
 	/**Checks to see if each start is <= the stop*/

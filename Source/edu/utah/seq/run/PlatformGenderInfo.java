@@ -15,7 +15,7 @@ public class PlatformGenderInfo {
 		//TL-18-843E9B_XT.V1_2018-10-26_deid_Neeraj_Agarwal_M.json
 		//     0         1        2       3     4      5    6
 		String[] fields = Misc.UNDERSCORE.split(clinInfoFile);
-		if (fields.length == 7 && clinInfoFile.endsWith("_M.json") || clinInfoFile.endsWith("_F.json")) {
+		if (fields.length == 7 && (clinInfoFile.endsWith("_M.json") || clinInfoFile.endsWith("_F.json"))) {
 			if (fields[3].equals("deid")) {
 				//platform
 				if (fields[0].startsWith("TL-")) {
@@ -42,7 +42,8 @@ public class PlatformGenderInfo {
 		}
 		//Old Avatar format, AvatarID_Panel_Gender.json 
 		//ZBG7MKFOZ1_IDT.V1_M.json
-		else if (fields.length == 3 && clinInfoFile.endsWith("_M.json") || clinInfoFile.endsWith("_F.json")) {
+		//YLD7EH98AF_NIM.V1_M.json
+		else if (fields.length == 3 && (clinInfoFile.endsWith("_M.json") || clinInfoFile.endsWith("_F.json"))) {
 			platform = "Avatar";
 			panel = fields[1];
 			gender = fields[2].substring(0, 1);

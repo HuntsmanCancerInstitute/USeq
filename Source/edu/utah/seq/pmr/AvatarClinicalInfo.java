@@ -16,6 +16,7 @@ public class AvatarClinicalInfo {
 	private LinkedHashMap<String, String> tumorDna = new LinkedHashMap<String, String>();
 	private LinkedHashMap<String, String> tumorRna = new LinkedHashMap<String, String>();
 	private ArrayList<LinkedHashMap<String, String>> normalDna = new ArrayList<LinkedHashMap<String, String>>();
+	private File jsonFile = null;
 	
 	public static final String TUMOR_DNA_NAME = "TumorDNA";
 	public static final String TUMOR_RNA_NAME = "TumorRNA";
@@ -24,6 +25,7 @@ public class AvatarClinicalInfo {
 	
 	
 	public AvatarClinicalInfo (File json) {
+		this.jsonFile = json;
 		String jString = IO.loadFile(json, " ", true);
 		JSONObject mainJsonObject = new JSONObject(jString);
 		Iterator it = mainJsonObject.keys();
@@ -110,6 +112,10 @@ public class AvatarClinicalInfo {
 
 	public ArrayList<LinkedHashMap<String, String>> getNormalDna() {
 		return normalDna;
+	}
+
+	public File getJsonFile() {
+		return jsonFile;
 	}
 
 }

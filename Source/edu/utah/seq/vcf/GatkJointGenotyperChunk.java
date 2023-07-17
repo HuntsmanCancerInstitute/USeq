@@ -34,7 +34,7 @@ public class GatkJointGenotyperChunk implements Runnable{
 			while ((tempBed = gatkRunner.getNextBed())!= null){
 
 				long startTime = System.currentTimeMillis();
-	
+
 				String name = tempBed.getName().replace(".bed", "");
 
 				//make temp vcf
@@ -90,18 +90,33 @@ public class GatkJointGenotyperChunk implements Runnable{
 					return;
 				}
 
-				//build and execute GenomicsDBImport call
-				cmd = new String[]{
-						gatkRunner.getGatkExecutable().getCanonicalPath(), 
-						"--java-options", "-Xmx"+gbRam+"G",
-						"GenotypeGVCFs",
-						"--reference", gatkRunner.getFasta().getCanonicalPath(),
-						"--tmp-dir", tmpDirThread.getCanonicalPath(),
-						"-V", "gendb://"+tempChrGdb.getCanonicalPath(),
-						"--allow-old-rms-mapping-quality-annotation-data",
-						"-O", tempVcf.getCanonicalPath()
-				};
-				
+				//build and execute GenotypeGVCFs call
+				if (gatkRunner.getGermlineResource() == null) {
+					cmd = new String[]{
+							gatkRunner.getGatkExecutable().getCanonicalPath(), 
+							"--java-options", "-Xmx"+gbRam+"G",
+							"GenotypeGVCFs",
+							"--reference", gatkRunner.getFasta().getCanonicalPath(),
+							"--tmp-dir", tmpDirThread.getCanonicalPath(),
+							"-V", "gendb://"+tempChrGdb.getCanonicalPath(),
+							"--allow-old-rms-mapping-quality-annotation-data",
+							"-O", tempVcf.getCanonicalPath()
+					};
+				}
+				//or build and execute CreateSomaticPanelOfNormals call
+				else {
+					cmd = new String[]{
+							gatkRunner.getGatkExecutable().getCanonicalPath(), 
+							"--java-options", "-Xmx"+gbRam+"G",
+							"CreateSomaticPanelOfNormals",
+							"--reference", gatkRunner.getFasta().getCanonicalPath(),
+							"--tmp-dir", tmpDirThread.getCanonicalPath(),
+							"-V", "gendb://"+tempChrGdb.getCanonicalPath(),
+							"--germline-resource",  gatkRunner.getGermlineResource().getCanonicalPath(),
+							"-O", tempVcf.getCanonicalPath()
+					};
+				}
+
 				for (int i=1; i<= numRetries; i++) {
 					IO.pl(name+"."+i+" Launching GenotypeGVCFs "+Misc.stringArrayToString(cmd, " "));
 					exitCode = IO.executeViaProcessBuilderReturnExit(cmd, tempJGLog);

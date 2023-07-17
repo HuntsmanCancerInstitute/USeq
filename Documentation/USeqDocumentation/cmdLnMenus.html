@@ -87,6 +87,8 @@
 				
 					<a href="#CarisXmlVcfParser">CarisXmlVcfParser</a><br>
 				
+					<a href="#CBiBilling">CBiBilling</a><br>
+				
 					<a href="#CBio2Sgr">CBio2Sgr</a><br>
 				
 					<a href="#ChIPSeq">ChIPSeq</a><br>
@@ -243,6 +245,8 @@
 				
 					<a href="#Mutect4VCFParser">Mutect4VCFParser</a><br>
 				
+					<a href="#NonLoH">NonLoH</a><br>
+				
 					<a href="#NonReferenceRegionMaker">NonReferenceRegionMaker</a><br>
 				
 					<a href="#NovoalignBisulfiteParser">NovoalignBisulfiteParser</a><br>
@@ -259,7 +263,7 @@
 				
 					<a href="#ParsePointDataContexts">ParsePointDataContexts</a><br>
 				
-					<a href="#PatientMolecularRepoSearch">PatientMolecularRepoSearch</a><br>
+					<a href="#PMRSearch">PMRSearch</a><br>
 				
 					<a href="#PeakShiftFinder">PeakShiftFinder</a><br>
 				
@@ -855,7 +859,7 @@ Example: java -jar ~/USeqApps/AvatarDataWrangler -r Resources/ -j AJobs -t SMM_P
 </pre><br><p>
 				
 					<a name="AvatarProjectAssembler"><pre>**************************************************************************************
-**                          Avatar Project Assembler : Nov 2022                    **
+**                          Avatar Project Assembler : June 2023                    **
 **************************************************************************************
 Tool for assembling directories for TNRunner based on files provided by M2Gen.
 Handles patient datasets from different exome capture platforms with multiple tumor
@@ -869,7 +873,7 @@ Required Parameters:
      'ORIENAvatarKey' 'Tumor/Germline' 'WES' 'RNASeq', see 
      xxx_ClinicalMolLinkage_V4.txt 
 -g Patient gender file with just two tab delimited columns for the ORIENAvatarKey and
-     Sex, see xxx__PatientMaster_V4.txt 
+     Sex, see xxx_PatientMaster_V4.txt 
 -p Sample exome platform file with just two tab delimited columns, the sample IDs that
      match those in the 'WES' linkage file and the platform type NIM or IDT, see
      xxx_WES_Resource_table.txt 
@@ -1465,7 +1469,7 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/CarisVcfComparator -f TL-18-03CFD6.vcf
 </pre><br><p>
 				
 					<a name="CarisXmlVcfParser"><pre>**************************************************************************************
-**                           Caris Xml Vcf Parser: Sept 2022                        **
+**                            Caris Xml Vcf Parser: Apr 2023                        **
 **************************************************************************************
 This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml
 reported genomic alternations are annotated, bed files of copy number changes and gene
@@ -1488,7 +1492,24 @@ Options:
 -k Skip datasets that are missing either an xml or vcf report.
 
 Example: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/
-     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq13Dec2020_MergedStdChr.ucsc.gz
+     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq25Dec2020_MergedStdChr.ucsc.gz
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="CBiBilling"><pre>**************************************************************************************
+**                                Correlate:    Nov 2008                            **
+**************************************************************************************
+Calculates all pair-wise Pearson correlation coefficients (r) and if indicated will
+perform a hierarchical clustering on the files.
+
+Parameters:
+-d The full path directory text containing serialized java float[] files (xxx.celp
+      see CelProcessor app).
+-a Files provided are float[][] files (xxx.cela) and need to be collapsed to float[]
+-c Cluster files.
+
+Example: java -Xmx256M -jar pathTo/T2/Apps/Correlate -d /Mango/PCels/ -c -a
 
 **************************************************************************************
 </pre><br><p>
@@ -2000,7 +2021,7 @@ Example: java -Xmx500M -jar pathTo/USeq/Apps/EnrichedRegionMaker -f /solexa/zest
 </pre><br><p>
 				
 					<a name="EstimateErrorRates"><pre>**************************************************************************************
-**                            Estimate Error Rates: Jan 2017                        **
+**                            Estimate Error Rates: May 2023                        **
 **************************************************************************************
 EER scans an mpileup file looking for short windows of adjacent bps (default 7) where
 1) each base exceeds a minimum read depth of high quality bases (>100)
@@ -2532,11 +2553,12 @@ Example: java -Xmx128G -jar pathToUSeq/Apps/GatkRunner -b -r /SS/targets.bed -s
 </pre><br><p>
 				
 					<a name="GatkJointGenotyper"><pre>**************************************************************************************
-**                           Gatk Joint Genotyper: March 2022                       **
+**                           Gatk Joint Genotyper: July 2023                       **
 **************************************************************************************
 The GJG takes a bed file of target regions, splits it into 250 jobs, executes the GATK
 GenomicsDBImporter and GenotypeGVCFs on each, and merges the results. Set the -Xmx for
-this app to the maximum available on the machine to enable correct thread usage.
+this app to the maximum available on the machine to enable correct thread usage. This
+app also works for CreateSomaticPanelOfNormals, just provide -p.
 
 Options:
 -b Bed file of sorted regions (chr, start, stop,... gz/zip OK), to call variants. No
@@ -2547,8 +2569,9 @@ Options:
 -e Path to the gatk executable.
 -f Path to the indexed fasta reference.
 -r GB RAM per worker thread, defaults to 10, increase if memory errors occur.
--c Number of chunks to split bed file, defaults to 100.
+-c Number of chunks to split bed file, defaults to 250.
 -d Don't delete the tmp directory.
+-p (Only For Som PoN, beta) Path to a germline resource like af-only-gnomad.hg38.vcf.gz
 
 Example: java -Xmx128G -jar pathToUSeq/Apps/GatkJointGenotyper
 -b hg38NimIdtMergedPad150bp.bed.gz -g ToGenotype/ -v jg.vcf.gz -r 20 
@@ -3010,7 +3033,7 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/MaxEntScanScore5 -s ~/MES/splicemode
 </pre><br><p>
 				
 					<a name="MergeAdjacentRegions"><pre>**************************************************************************************
-**                           Merge Adjacent Regions: Oct  2018                      **
+**                           Merge Adjacent Regions: April 2022                     **
 **************************************************************************************
 Merges regions within a max bp gap and tracks the number merged.  Regions must not
 overlap. Best run the MergeRegions app if in doubt.
@@ -3449,6 +3472,47 @@ Example: java -jar pathToUSeq/Apps/Mutect4VCFParser -v /VCFFiles/ -t 0.06 -n 0.5
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="NonLoH"><pre>**************************************************************************************
+**                                   Non LoH : Nov 2022                             **
+**************************************************************************************
+LoH compares heterozygous snv and indel allele counts between normal and somatic
+sequencing datasets to identify potential loss of heterozygosity events. LoH is
+defined here as a significant increase in the somatic allele fraction (AF) relative to
+the matched normal. Adjacent variants passing p-value and AF difference thresholds
+are merged and a combine p-value calculated for the window block.
+
+Required:
+-v Path to a normal, single sample, variant xxx.vcf(.gz/.zip OK) file. These should
+     be filtered, high confidence, vt normalized and decomposed short variants.
+-g Path to the normal bampileup file, use the USeq BamPileup tool to generate the
+     xxx.bp.txt.gz and tabix index files.
+-s Path to the somatic bampileup file, ditto.
+-p Path to a directory containing normal sample bampileup files for the PoN
+-o Path to directory to write the bed and vcf output result files.
+
+Optional:
+-c Bed file containing passing regions from the TNRunner2 CopyRatio workflow.
+-q Minimum vcf record QUAL, defaults to 20
+-e Minimum vcf record sample GQ, defaults to 20
+-x Use Strelka's recalibrated GQX genotype score, defaults to GQ
+-r Minimum unique observation variant read depth for both normal and tumor samples,
+     defaults to 20
+-l Minimum Fisher exact p-value for including a variant in a block, defaults to 0.1
+-f Minimum difference in AF between the somatic and normal samples for including
+     a variant into a block, defaults to 0.1
+-m Maximum bp gap between variants for grouping into a block, defaults to 1000
+-p Minimum Benjamini-Hochberg adjusted window -10Log10(combine p-value), defaults to
+     8.239 (0.15)
+-d Minimum window mean difference in AFs, defaults to 0.1
+-w Window BP padding for reporting significant LoH regions, defaults to 100
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/LoH -v gatkStrelkaNormal.vcf.gz 
+-g normal.bp.txt.gz -s tumor.bp.txt.gz -o LoHResults/ -d 0.15 -m 5000 -b
+GATKCopyRatio_Hg38.called.seg.pass.bed.gz
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="NonReferenceRegionMaker"><pre>**************************************************************************************
 **                           Non Reference Region Maker: Jan 2018                   **
 **************************************************************************************
@@ -3680,18 +3744,24 @@ Example: java -Xmx12G -jar pathTo/USeq/Apps/ParsePointDataContexts -c '..CG.' -s
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="PatientMolecularRepoSearch"><pre>**************************************************************************************
+					<a name="PMRSearch"><pre>**************************************************************************************
 **                       Patient Molecular Repo Search : April 2023                 **
 **************************************************************************************
-Interactive iterative searching of the clinical information in the json and xml
-reports in the HCI PMR /ClinicalReport/ folders to identify molecular datasets for
-further analysis. Press return after loading to see the search menu.
+Interactive searching of the clinical and sample attribute information in the json/xml
+reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.
+Press return after loading to see the search menu. Assumes the AWS CLI:
+https://docs.aws.amazon.com/cli/ is installed in your path and you have read access
+to the PMR. For searching for particular mutations, fusions, or cnvs, use GQuery:
+https://github.com/HuntsmanCancerInstitute/GQuery
+
 Options:
--d  Directory to save the clinical xml and json reports and the AWS repo URI list.
+-d  Directory to save the PHI redacted clinical xml and json reports.
+-u  S3 URI containing the patient molecular repo, defaults to
+      s3://hcibioinfo-patient-molecular-repo/Patients/ 
+-p  AWS credential profile, defaults to 'default'
 -v  Verbose output.
 
-Example: java -jar pathToUSeq/Apps/PatientMolecularRepoSearch -c ~/PMRFiles/ -v
-
+Example: java -jar pathToUSeq/Apps/PMRSearch -d ~/PMRFiles/
 **************************************************************************************
 </pre><br><p>
 				

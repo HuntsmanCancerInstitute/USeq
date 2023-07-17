@@ -22,6 +22,7 @@ public class Misc {
 	public static final Pattern TAB = Pattern.compile("\t");
 	public static final Pattern RETURN = Pattern.compile("\n");
 	public static final Pattern WHITESPACE = Pattern.compile("\\s+");
+	public static final Pattern COMMA_WHITESPACE = Pattern.compile("[,\\s]+");
 	public static final Pattern UNDERSCORE = Pattern.compile("_");
 	public static final Pattern DASH = Pattern.compile("-");
 	public static final Pattern COLON = Pattern.compile(":");
@@ -66,7 +67,8 @@ public class Misc {
 		}
 	}
 	
-	/**Splits a comma and quotation split csv line.*/
+	/**Splits a comma and quotation split csv line where cells are delimited by "," with a " on either end, e.g. "xxxxxxx","yyyyyyyy"
+	 * */
 	public static String[] splitCsvLine(String line) {
 		String[] split = CSV.split(line);
 		split[0] = split[0].substring(1);

@@ -6,7 +6,6 @@ import edu.utah.seq.parsers.jpileup.BaseCount;
 import edu.utah.seq.parsers.jpileup.BpileupLine;
 import edu.utah.seq.useq.data.RegionScoreText;
 import edu.utah.seq.parsers.jpileup.BamPileupTabixLoaderSingle;
-import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
@@ -23,7 +22,9 @@ public class HeterozygousVar {
 	private double pvalue = -1;
 	private boolean passing = true;
 	private double somaticAf;
+	private int somaticDp;
 	private double germlineAf;
+	private int germlineDp;
 	private HetWindow bestHetWindow = null;
 	private RegionScoreText copyRatioRegion = null;
 	
@@ -51,12 +52,11 @@ public class HeterozygousVar {
 		if (data== null || data.size() == 0) passing = false;
 		else {
 			germlineBP = data.get(0);
-			int dp = -1;
 			//snv?
-			if (isSnv) dp = (int)Math.round(germlineBP.getSamples()[0].getPassingReadCoverageSnv());
+			if (isSnv) germlineDp = (int)Math.round(germlineBP.getSamples()[0].getPassingReadCoverageSnv());
 			//indel
-			else dp = (int)Math.round(germlineBP.getSamples()[0].getPassingReadCoverageIndel(isDeletion));
-			if (dp < minimumDepth) passing = false;
+			else germlineDp = (int)Math.round(germlineBP.getSamples()[0].getPassingReadCoverageIndel(isDeletion));
+			if (germlineDp < minimumDepth) passing = false;
 		}
 	}
 	
@@ -64,13 +64,31 @@ public class HeterozygousVar {
 		if (data== null || data.size() == 0) passing = false;
 		else {
 			somaticBP = data.get(0);
-			int dp = -1;
 			//snv?
-			if (isSnv) dp = (int)Math.round(germlineBP.getSamples()[0].getPassingReadCoverageSnv());
+			if (isSnv) somaticDp = (int)Math.round(somaticBP.getSamples()[0].getPassingReadCoverageSnv());
 			//indel
-			else dp = (int)Math.round(germlineBP.getSamples()[0].getPassingReadCoverageIndel(isDeletion));
-			if (dp < minimumDepth) passing = false;
+			else somaticDp = (int)Math.round(somaticBP.getSamples()[0].getPassingReadCoverageIndel(isDeletion));
+			if (somaticDp < minimumDepth) passing = false;
 		}
+	}
+	
+	public void setGermlineBPs(BpileupLine line, int minimumDepth) throws IOException {
+		germlineBP = line;
+		//snv?
+		if (isSnv) germlineDp = (int)Math.round(germlineBP.getSamples()[0].getPassingReadCoverageSnv());
+		//indel
+		else germlineDp = (int)Math.round(germlineBP.getSamples()[0].getPassingReadCoverageIndel(isDeletion));
+		if (germlineDp < minimumDepth) passing = false;
+
+	}
+
+	public void setSomaticBPs(BpileupLine line, int minimumDepth) throws IOException {
+		somaticBP = line;
+		//snv?
+		if (isSnv) somaticDp = (int)Math.round(somaticBP.getSamples()[0].getPassingReadCoverageSnv());
+		//indel
+		else somaticDp = (int)Math.round(somaticBP.getSamples()[0].getPassingReadCoverageIndel(isDeletion));
+		if (somaticDp < minimumDepth) passing = false;
 	}
 	
 	public String toStringVcf() throws IOException {
@@ -145,6 +163,10 @@ public class HeterozygousVar {
 		return sb.toString();
 	}
 	
+	public double getReadDepthTNRatio() {
+		return (double)somaticDp / (double)germlineDp;
+	}
+	
 	private String getCopyRatioInfoScreen() {
 		StringBuilder sb = new StringBuilder();
 		String score = Num.formatNumber(copyRatioRegion.getScore(), 3);
@@ -212,7 +234,7 @@ public class HeterozygousVar {
 	}
 	
 	public double getAlleleFractionDifference() {
-		return somaticAf - germlineAf;
+		return Math.abs(somaticAf - germlineAf);
 	}
 
 	public boolean isPassing() {
@@ -250,5 +272,13 @@ public class HeterozygousVar {
 	public void setCopyRatioRegion(RegionScoreText copyRatioRegion) {
 		this.copyRatioRegion= copyRatioRegion;
 		
+	}
+
+	public int getSomaticDp() {
+		return somaticDp;
+	}
+
+	public int getGermlineDp() {
+		return germlineDp;
 	}
 }

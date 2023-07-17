@@ -3,7 +3,6 @@ package edu.utah.seq.parsers.mpileup;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import util.bio.seq.Seq;
-import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 

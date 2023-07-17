@@ -119,6 +119,7 @@ public class CarisPatient {
 		fastqDir.mkdir();
 		//cp in vcf
 		if (vcfNames.size()==1) cdw.cp(vcfNames.get(0), new File (clinReportDir, vcfNames.get(0)), true);
+		
 		//cp in xml, already done so skip
 		//cdw.cp(xmlNames.get(0), new File (clinDir, xmlNames.get(0)));
 		//cp in DNA
@@ -164,7 +165,9 @@ public class CarisPatient {
 		clinReportDir.mkdirs();
 		//move the report into the ClinicalReport folder
 		File deIdXml = carisXml.getDeidentifiedXmlFile();
-		deIdXml.renameTo(new File(clinReportDir, deIdXml.getName()));
+		if (deIdXml.renameTo(new File(clinReportDir, deIdXml.getName())) == false) {
+			throw new IOException("FAILED to move "+deIdXml+" to "+clinReportDir);
+		}
 	}
 
 	public boolean isTooYoung() {

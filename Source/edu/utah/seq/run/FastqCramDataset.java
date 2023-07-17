@@ -14,7 +14,7 @@ public class FastqCramDataset{
 	private String name = null;
 	private boolean incorrectNumberCramFastq = false;
 
-	public FastqCramDataset (File fastqDir, String name, ArrayList<String> info) throws IOException{
+	public FastqCramDataset (File fastqDir, String name, ArrayList<String> info, TNSample2 tnSample) throws IOException{
 		if (fastqDir != null) {
 			this.name = name;
 			File dir = new File(fastqDir, name);
@@ -25,8 +25,9 @@ public class FastqCramDataset{
 				//if not found look for cram
 				if (cramFastqs == null) cramFastqs = checkNumberFiles(dir, ".cram", 1);
 				if (cramFastqs == null) {
-					info.add("\tDid not find two fastq files or one cram file within "+dir);
+					info.add("\tFAILED: Did not find two fastq files or one cram file within "+dir);
 					incorrectNumberCramFastq = true;
+					tnSample.setFailed(true);
 				}
 				else info.add("\tREADY "+dir);
 			}

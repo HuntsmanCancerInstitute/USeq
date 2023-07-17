@@ -172,6 +172,7 @@ public class AvatarDataWrangler {
 			ArrayList<AvatarAnalysisJob> jobsToKeep = new ArrayList<AvatarAnalysisJob>();
 			for (AvatarAnalysisJob j: p.getAnalysisJobs()) {
 				String key = j.getComparisonKey(p.getPatientId());
+				//doing an exact comparision
 				if (avatarJobDirNames.contains(key)) numExcluded++;
 				else {
 					jobsToKeep.add(j);
@@ -182,7 +183,6 @@ public class AvatarDataWrangler {
 			if (jobsToKeep.size()>0) patientsWithJobsToRun.add(p);
 		}
 		//assign filtered patients
-		
 		IO.pl("\t"+ numExcluded+ "\t# Analysis Jobs identified here that are already uploaded to AWS and are thus skipped.");
 		IO.pl("\t"+ numKept+ "\t# New Analysis Jobs to run");
 	}

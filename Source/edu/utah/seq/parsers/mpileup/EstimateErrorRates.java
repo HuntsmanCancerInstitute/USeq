@@ -121,7 +121,9 @@ public class EstimateErrorRates{
 			while ((line=in.readLine())!= null){
 				if (line.startsWith("#") || line.trim().length() == 0) continue;
 				MpileupLine ml = new MpileupLine(line, minBaseQuality);
-				if (ml.getChr() == null) continue;
+				
+				//watch out for missing chrom names and if the ref base is N
+				if (ml.getChr() == null || ml.getRef().equals("N")) continue;
 				if (outCounts != null) saveCounts(ml);
 
 				//merge sample counts?
@@ -374,7 +376,7 @@ public class EstimateErrorRates{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Estimate Error Rates: Jan 2017                        **\n" +
+				"**                            Estimate Error Rates: May 2023                        **\n" +
 				"**************************************************************************************\n" +
 				"EER scans an mpileup file looking for short windows of adjacent bps (default 7) where\n"+
 				"1) each base exceeds a minimum read depth of high quality bases (>100)\n"+

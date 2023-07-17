@@ -9,6 +9,7 @@ import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import util.gen.IO;
+import util.gen.Misc;
 
 public class AWSRepoList {
 	
@@ -24,6 +25,7 @@ public class AWSRepoList {
 		BufferedReader in = new BufferedReader (new FileReader(awsRepoListFile));
 		while ((line = in.readLine())!= null) {
 			split = SPACES.split(line);
+			//Misc.printExit(line+"  "+split.length);
 			//2022-05-31    14:35:19   23107   Patients/AC4Nx5JK/Caris/TN21-177236_2021-12-10/Alignment/TN21-177236_2021-12-10_TumorDNA/Logs.zip
 			if (split.length == 4) awsObjectNames.add(split[3]);
 		}
@@ -44,9 +46,14 @@ public class AWSRepoList {
 	}
 	
 	public static void main(String[] args) throws IOException {
-		File test = new File("/Users/u0028003/HCI/AvatarORIEN/AutoAvatar/ResourceFiles/22Sep2022_AWSRepoList.txt");
+		File test = new File("/Users/u0028003/Downloads/PatientMolecularRepoFiles/awsRepoList19Apr2023.txt");
 		AWSRepoList arl = new AWSRepoList(test);
-		HashSet<String> subDirs = arl.parseSubDirNamesAfterParent("Caris");
+		IO.pl("NumObs: "+arl.getAwsObjectNames().size());
+		HashSet<String> subDirs = arl.parseSubDirNamesAfterParent("Avatar");
 		IO.pl(subDirs);
+	}
+
+	public ArrayList<String> getAwsObjectNames() {
+		return awsObjectNames;
 	}
 }

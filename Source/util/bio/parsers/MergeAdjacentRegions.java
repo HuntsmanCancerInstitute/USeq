@@ -23,6 +23,7 @@ public class MergeAdjacentRegions {
 	private Gzipper out = null;
 	private int totalRegions = 0;
 	private int finalRegions = 0;
+	private boolean verbose = true;
 
 	/**Merges regions within max gap and tracks number that were merged.  Assumes they do not overlap, thus run MergeRegions on the bed first.*/
 	public  MergeAdjacentRegions(String[] args) {
@@ -33,13 +34,13 @@ public class MergeAdjacentRegions {
 		HashMap<String, Region[]> regions = Bed.parseRegions(bedFile, true);
 
 		//for each chrom strand
-		System.out.println("Processing...");
+		if (verbose) System.out.println("Processing...");
 		try {
 			out = new Gzipper(resultsFile);
 			//for each chromosome
 			for (String chrom: regions.keySet()){
 				String chr = chrom.substring(0, chrom.length()-1);
-				IO.pl("\t"+chr);
+				if (verbose) IO.pl("\t"+chr);
 				Region[] sortedRegions = regions.get(chrom);
 				totalRegions += sortedRegions.length;
 				walkRegions(sortedRegions, chr);
@@ -50,7 +51,7 @@ public class MergeAdjacentRegions {
 			e.printStackTrace();
 		}
 		
-		IO.pl("\n"+totalRegions+ " regions merged to "+finalRegions);
+		if (verbose) IO.pl("\n"+totalRegions+ " regions merged to "+finalRegions);
 	}
 
 		
@@ -92,7 +93,7 @@ public class MergeAdjacentRegions {
 	/**This method will process each argument and assign new variables*/
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
-		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
+		
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -103,6 +104,7 @@ public class MergeAdjacentRegions {
 					case 'b': bedFile = new File (args[++i]); break;
 					case 'r': resultsFile = new File (args[++i]); break;
 					case 'm': maxGap = Integer.parseInt(args[++i]); break;
+					case 'q': verbose = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -114,6 +116,8 @@ public class MergeAdjacentRegions {
 		}
 		if (bedFile == null || bedFile.canRead() == false) Misc.printErrAndExit("\nError: cannot find your bed file?\n");
 		if (resultsFile == null) Misc.printErrAndExit("\nError: please provide a xxx.bed.gz file to save the results.\n");
+		
+		if (verbose) System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
 
 	}	
 
@@ -121,7 +125,7 @@ public class MergeAdjacentRegions {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Merge Adjacent Regions: Oct  2018                      **\n" +
+				"**                           Merge Adjacent Regions: April 2022                     **\n" +
 				"**************************************************************************************\n" +
 				"Merges regions within a max bp gap and tracks the number merged.  Regions must not\n"+
 				"overlap. Best run the MergeRegions app if in doubt.\n\n" +

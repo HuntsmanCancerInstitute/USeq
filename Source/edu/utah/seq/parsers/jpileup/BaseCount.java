@@ -159,6 +159,22 @@ public class BaseCount {
 		return aCount/aTotal;
 	}
 	
+	/**Returns the AF of the background excluding ref and alt counts, includes INDEL counts so only useful for snvs*/
+	public double findNonRefAltSnvBackground(char alt){
+		
+		double total = g+a+t+c+ins+del;
+		double sum = 0.0;
+		sum+= del;
+		sum+= ins;
+		
+		if (ref != 'G' && alt !='G') sum+= g;
+		if (ref != 'A' && alt !='A') sum+= a;
+		if (ref != 'T' && alt !='T') sum+= t;
+		if (ref != 'C' && alt !='C') sum+= c;
+			
+		return sum/total;
+	}
+	
 	/**Returns maximum non reference SNV double[]{maxAF, maxIndex}, null if ref isn't GATC*/
 	public double[] findMaxNonReferenceSnvAFAndIndex(){
 		//public static final int G_INDEX = 0;

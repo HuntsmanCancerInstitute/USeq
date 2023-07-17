@@ -50,10 +50,9 @@ public class TumorSample {
 		
 		int numR = tumorRnaFastqCram.size();
 		if (tumorRnaName != null) {
-			if (numR == 1 || numR > 2) failedRna = "Incorrect # tumor RNA fastq samples "+ numR;
+			if (numR == 0 || numR > 2) failedRna = "Incorrect # tumor RNA fastq samples "+ numR;
 			if (numR == 1 && tumorRnaFastqCram.get(0).getName().endsWith(".cram") == false) failedRna = "Incorrect # tumor RNA fastq cram samples "+ numR;
 			if (numR == 2 && tumorRnaFastqCram.get(0).getName().endsWith(".gz") == false) failedRna = "Incorrect # tumor RNA fastq samples "+ numR;
-			if (numR > 2) failedRna = "Incorrect # tumor RNA fastq cram samples "+ numR;
 		}
 		
 		if (failedDna != null || failedRna != null) {

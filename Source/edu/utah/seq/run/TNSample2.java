@@ -1320,9 +1320,9 @@ public class TNSample2 {
 	private void checkFastq() throws IOException {
 		info.add("Checking fastq availability...");
 		File fastqDir = makeCheckFile(rootDir, "Fastq");
-		tumorDNAFastqCram = new FastqCramDataset(fastqDir, "TumorDNA", info);
-		normalDNAFastqCram = new FastqCramDataset(fastqDir, "NormalDNA", info);
-		tumorTransFastqCram = new FastqCramDataset(fastqDir, "TumorRNA", info);
+		tumorDNAFastqCram = new FastqCramDataset(fastqDir, "TumorDNA", info, this);
+		normalDNAFastqCram = new FastqCramDataset(fastqDir, "NormalDNA", info, this);
+		tumorTransFastqCram = new FastqCramDataset(fastqDir, "TumorRNA", info, this);
 	}
 
 	public static File makeCheckFile(File parentDir, String fileName) throws IOException {
@@ -1419,6 +1419,10 @@ public class TNSample2 {
 
 	public boolean isFailed() {
 		return failed;
+	}
+	
+	public void setFailed(boolean failed) {
+		this.failed = failed;
 	}
 
 	public boolean isRunning() {

@@ -421,7 +421,7 @@ public class AvatarProjectAssembler {
 
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                          Avatar Project Assembler : Nov 2022                    **\n" +
+				"**                          Avatar Project Assembler : June 2023                    **\n" +
 				"**************************************************************************************\n" +
 				"Tool for assembling directories for TNRunner based on files provided by M2Gen.\n"+
 				"Handles patient datasets from different exome capture platforms with multiple tumor\n"+
@@ -436,7 +436,7 @@ public class AvatarProjectAssembler {
 				"     'ORIENAvatarKey' 'Tumor/Germline' 'WES' 'RNASeq', see \n"+
 				"     xxx_ClinicalMolLinkage_V4.txt \n" +
 				"-g Patient gender file with just two tab delimited columns for the ORIENAvatarKey and\n"+
-				"     Sex, see xxx__PatientMaster_V4.txt \n"+
+				"     Sex, see xxx_PatientMaster_V4.txt \n"+
 				"-p Sample exome platform file with just two tab delimited columns, the sample IDs that\n"+
 				"     match those in the 'WES' linkage file and the platform type NIM or IDT, see\n"+
 				"     xxx_WES_Resource_table.txt \n"+

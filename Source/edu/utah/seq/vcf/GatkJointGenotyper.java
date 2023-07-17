@@ -22,6 +22,7 @@ public class GatkJointGenotyper {
 	private File gatkExecutable = null;
 	private File fasta = null;
 	private File vcfResults = null;
+	private File germlineResource = null;
 	private double numberGBPerChunk = 10.0;
 	private boolean deleteTmpDir = true;
 	
@@ -270,6 +271,7 @@ public class GatkJointGenotyper {
 					case 'c': numChunks = Integer.parseInt(args[++i]); break;
 					case 'f': fasta = new File(args[++i]); break;
 					case 'd': deleteTmpDir = false; break;
+					case 'p': germlineResource = new File(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -310,11 +312,12 @@ public class GatkJointGenotyper {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Gatk Joint Genotyper: March 2022                       **\n" +
+				"**                           Gatk Joint Genotyper: July 2023                       **\n" +
 				"**************************************************************************************\n" +
 				"The GJG takes a bed file of target regions, splits it into 250 jobs, executes the GATK\n"+
 				"GenomicsDBImporter and GenotypeGVCFs on each, and merges the results. Set the -Xmx for\n"+
-				"this app to the maximum available on the machine to enable correct thread usage.\n"+
+				"this app to the maximum available on the machine to enable correct thread usage. This\n"+
+				"app also works for CreateSomaticPanelOfNormals, just provide -p.\n"+
 
 				"\nOptions:\n"+
 				"-b Bed file of sorted regions (chr, start, stop,... gz/zip OK), to call variants. No\n"+
@@ -325,8 +328,9 @@ public class GatkJointGenotyper {
 				"-e Path to the gatk executable.\n"+
 				"-f Path to the indexed fasta reference.\n"+
 				"-r GB RAM per worker thread, defaults to 10, increase if memory errors occur.\n"+
-				"-c Number of chunks to split bed file, defaults to 100.\n"+
+				"-c Number of chunks to split bed file, defaults to 250.\n"+
 				"-d Don't delete the tmp directory.\n"+
+				"-p (Only For Som PoN, beta) Path to a germline resource like af-only-gnomad.hg38.vcf.gz\n"+
 
 				"\nExample: java -Xmx128G -jar pathToUSeq/Apps/GatkJointGenotyper\n"+
 				"-b hg38NimIdtMergedPad150bp.bed.gz -g ToGenotype/ -v jg.vcf.gz -r 20 \n"+
@@ -359,5 +363,9 @@ public class GatkJointGenotyper {
 
 	public synchronized void setKeepRunning(boolean keepRunning) {
 		this.keepRunning = keepRunning;
+	}
+
+	public File getGermlineResource() {
+		return germlineResource;
 	}
 }

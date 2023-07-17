@@ -45,7 +45,7 @@ public class BamPileupTabixLoaderSingle {
 		return fetchLines(tabixCoor);
 	}
 	
-	private ArrayList<BpileupLine> fetchLines(String tabixCoor) throws IOException, Exception {
+	public ArrayList<BpileupLine> fetchLines(String tabixCoor) throws IOException, Exception {
 		ArrayList<BpileupLine> al = new ArrayList<BpileupLine>();
 		TabixReader.Iterator it = fetchInteratorOnCoordinates(tabixCoor);
 		if (it == null) {

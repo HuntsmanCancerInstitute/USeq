@@ -26,7 +26,7 @@ import util.gen.IO;
 import util.gen.Misc;
 
 /**Loads the HCI Patient Molecular Repository*/
-public class PatientMolecularRepoSearch {
+public class PMRSearch {
 	
 	//user defined fields
 	private File clinicalReportDir = null;
@@ -61,17 +61,8 @@ public class PatientMolecularRepoSearch {
 	private TreeMap<String, TreeSet<String>> sex_DatasetName = null;
 	private String sexSearchString = null;
 	private TreeSet<String> datasetKeysFound = null;
-	
 
-	
-	
-	/*HERE
-	
-	Print All clinical Info about the search result datasets
-	Roll back search
-	History*/
-
-	public PatientMolecularRepoSearch (String[] args) {
+	public PMRSearch (String[] args) {
 		long startTime = System.currentTimeMillis();
 		try {
 			processArgs(args);
@@ -153,6 +144,9 @@ public class PatientMolecularRepoSearch {
 				
 				//print dataset info?
 				if (us.isPrintDatasetInfo()) printDatasetInfo();
+				
+				//print dataset info?
+				if (us.isPrintDatasetNames()) printDatasetNames();
 			}
 		}
 	}
@@ -163,6 +157,11 @@ public class PatientMolecularRepoSearch {
 			Dataset d = idDataset.get(datasetId);
 			IO.p("\n"+ d.toString(datasetId));
 		}
+	}
+	
+	private void printDatasetNames() {
+		IO.pl("\nDataset Names:");
+		for (String datasetId: datasetKeysFound) IO.pl(datasetId);
 	}
 	
 	
@@ -258,7 +257,7 @@ public class PatientMolecularRepoSearch {
 			return null;
 		}
 		IO.pl("\nSearching data table: '"+whatCategory+"' for search term(s): '"+Misc.stringArrayToString(us.getSearchTerms(), "','")+"' caseInsensitve? "+us.isCaseInsensitive()+
-				", requireAll? "+us.isAllTermsMustMatch()+", partialMatch? "+us.isAllTermsMustMatch());
+				", requireAll? "+us.isAllTermsMustMatch()+", partialMatch? "+(us.isAllTermsMustMatch()==false));
 
 		TreeSet<String> datasets = null;
 		for (String toSearch: us.getSearchTerms() ) {
@@ -279,7 +278,7 @@ public class PatientMolecularRepoSearch {
 		//more than one search term?
 		if (us.getSearchTerms().length > 1) {
 			if (us.isVerbose()) IO.pl("Total matches for '"+whatCategory+"' "+finalDatasetIds.size()+" "+finalDatasetIds);
-			else IO.pl("Total matches to '"+whatCategory+"'"+finalDatasetIds.size());
+			else IO.pl("Total matches to '"+whatCategory+"' "+finalDatasetIds.size());
 		}
 		return finalDatasetIds;
 	}
@@ -561,16 +560,6 @@ public class PatientMolecularRepoSearch {
 			}
 			datasets.add(id);
 		}
-	}
-
-	private HashMap<String, Dataset> fetchDatasetsFromSource(String source) {
-		HashMap<String, Dataset> coreDatasetIds = new HashMap<String, Dataset>();
-		for (Patient p: idPatient.values()) {
-			for (Dataset d: p.getIdDataSets().values()) {
-				if (d.getSource().equals(source)) coreDatasetIds.put(p.getCoreId()+"/"+source+"/"+d.getDatasetId(), d);
-			}
-		}
-		return coreDatasetIds;
 	}
 
 	private void summarizeAvatarClinicalInfo() {
@@ -1042,7 +1031,7 @@ public class PatientMolecularRepoSearch {
 			printDocs();
 			System.exit(0);
 		}
-		new PatientMolecularRepoSearch(args);
+		new PMRSearch(args);
 	}		
 
 	/**This method will process each argument and assign new variables
@@ -1059,8 +1048,8 @@ public class PatientMolecularRepoSearch {
 				try{
 					switch (test){
 					case 'd': clinicalReportDir = new File(args[++i]).getCanonicalFile(); break;
-					case 'v': verbose = true; break;
 					case 'x': awsPatientDirUri = args[++i]; break;
+					case 'p': profile =args[++i]; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -1088,10 +1077,11 @@ public class PatientMolecularRepoSearch {
 		envPropToAdd.put("AWS_SHARED_CREDENTIALS_FILE", credentialsFile.getCanonicalPath());
 
 		//Only needed in Eclipse
+		/*
 		if (true) {
 			envPropToAdd.put("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin");
 			awsPath="/usr/local/bin/aws";
-		}
+		}*/
 
 
 	}
@@ -1102,17 +1092,23 @@ public class PatientMolecularRepoSearch {
 				"**************************************************************************************\n" +
 				"**                       Patient Molecular Repo Search : April 2023                 **\n" +
 				"**************************************************************************************\n" +
-				"Interactive iterative searching of the clinical information in the json and xml\n"+
-				"reports in the HCI PMR /ClinicalReport/ folders to identify molecular datasets for\n"+
-				"further analysis. Press return after loading to see the search menu.\n"+
+				"Interactive searching of the clinical and sample attribute information in the json/xml\n"+
+				"reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.\n"+
+				"Press return after loading to see the search menu. Assumes the AWS CLI:\n"+
+				"https://docs.aws.amazon.com/cli/ is installed in your path and you have read access\n"+
+				"to the PMR. For searching for particular mutations, fusions, or cnvs, use GQuery:\n"+
+				"https://github.com/HuntsmanCancerInstitute/GQuery\n"+
 
-				"Options:\n"+
-				"-d  Directory to save the clinical xml and json reports and the AWS repo URI list.\n"+
+				"\nOptions:\n"+
+				"-d  Directory to save the PHI redacted clinical xml and json reports.\n"+
+				"-u  S3 URI containing the patient molecular repo, defaults to\n"+
+				"      s3://hcibioinfo-patient-molecular-repo/Patients/ \n"+
+				"-p  AWS credential profile, defaults to 'default'\n"+
 				"-v  Verbose output.\n"+
 				
 	
-				"\nExample: java -jar pathToUSeq/Apps/PatientMolecularRepoSearch -c ~/PMRFiles/ -v\n"+
+				"\nExample: java -jar pathToUSeq/Apps/PMRSearch -d ~/PMRFiles/\n"+
 
-				"\n**************************************************************************************\n");
+				"**************************************************************************************\n");
 	}
 }

@@ -21,6 +21,7 @@ public class UserSearch {
 	private boolean goodToSearch = false;
 	private boolean addMatches = false;
 	private boolean printDatasetInfo = false;
+	private boolean printDatasetNames = false;
 	private boolean verbose = false;
 
 	public UserSearch(String input) throws IOException {
@@ -29,18 +30,19 @@ public class UserSearch {
 	
 	public static void printInteractiveMenu() {
 		StringBuilder sb = new StringBuilder("\nInteractive Search Options:\n");
-		sb.append("\t-d Data table to search, choose from: Diagnosis, PhysicianDiseaseGroups, SpecimenSites, SpecimenIds, Sex, DatasetIds\n");
-		sb.append("\t-s Search terms, comma delimited, no spaces\n");
-		sb.append("\t-c Terms are case sensitive.\n");
-		sb.append("\t-e Terms are exact, no partial matching.\n");
-		sb.append("\t-a All terms must match.\n");
-		sb.append("\t-m Add matches to the prior result set.\n");
-		sb.append("\t-n New search, clear any prior results.\n");
-		sb.append("\t-p Print the contents of the named data table, see -d\n");
-		sb.append("\t-f Print the available file AWS URIs for the matched datasets.\n");
-		sb.append("\t-i Print the clinical and test details for the matched datasets.\n");
-		sb.append("\t-v Verbose output.\n");
-		sb.append("\te.g. '-d Diagnosis -s Liver,Metastasis -a' then '-d Sex -s F' then '-f'\n");
+		sb.append("   -d Data table to search, choose from: Diagnosis, PhysicianDiseaseGroups, SpecimenSites, SpecimenIds, Sex, DatasetIds\n");
+		sb.append("   -s Search terms, comma delimited, no spaces\n");
+		sb.append("   -c Terms are case sensitive.\n");
+		sb.append("   -e Terms are exact, no partial matching.\n");
+		sb.append("   -m All terms must match.\n");
+		sb.append("   -a Add matches to the prior result set.\n");
+		sb.append("   -x New search, clear any prior results.\n");
+		sb.append("   -p Print the contents of the named data table, see -d\n");
+		sb.append("   -f Print the available file AWS URIs for the matched datasets.\n");
+		sb.append("   -i Print the clinical and test details for the matched datasets.\n");
+		sb.append("   -n Print the matched dataset names.\n");
+		sb.append("   -v Verbose output.\n");
+		sb.append("      e.g. '-d Diagnosis -s Liver,Metastasis -m' then '-d Sex -s F' then '-i -f'\n");
 		IO.p(sb.toString());
 	}
 	
@@ -66,12 +68,13 @@ public class UserSearch {
 					case 's': searchTerms = Misc.COMMA.split(args[++i]); break;
 					case 'c': caseInsensitive = false; break;
 					case 'e': partialMatchesAllowed = false; break;
-					case 'a': allTermsMustMatch = true; break;
-					case 'm': addMatches = true; break;
-					case 'n': clearPriorResults = true; break;
+					case 'm': allTermsMustMatch = true; break;
+					case 'a': addMatches = true; break;
+					case 'x': clearPriorResults = true; break;
 					case 'v': verbose = true; break;
 					case 'f': printMatchedDatasetURIs = true; break;
 					case 'i': printDatasetInfo = true; break;
+					case 'n': printDatasetNames = true; break;
 					case 'p': printDataTable = args[++i]; break;
 					default: Misc.printErrAndExit("\nProblem, unknown search option! " + mat.group());
 					}
@@ -134,6 +137,10 @@ public class UserSearch {
 
 	public boolean isPrintDatasetInfo() {
 		return printDatasetInfo;
+	}
+
+	public boolean isPrintDatasetNames() {
+		return printDatasetNames;
 	}
 
 }

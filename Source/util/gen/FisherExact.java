@@ -200,12 +200,47 @@ public class FisherExact {
         }
         return p;
     }
+    
+    /**Returns OR, lower, upper*/
+    public static double[] getOddsRatioAnd95thConfidenceInterval(double a, double b, double c, double d) {
+    	
+    	//Where zeros cause problems with computation of the odds ratio or its standard error, 0.5 is added to all cells (a, b, c, d) (Pagano & Gauvreau, 2000; Deeks & Higgins, 2010).
+    	if (a==0.0 || b==0.0 || c==0.0 || d==0.0) {
+    		a+=0.5;
+    		b+=0.5;
+    		c+=0.5;
+    		d+=0.5;
+    	}
+
+    	double oddsRatio = (a * d) / (b * c);
+    	
+    	double inner = 1.96 * Math.sqrt(1.0/a + 1.0/b + 1.0/c + 1.0/d);
+    	double lnOR = Math.log(oddsRatio);
+
+    	//Upper 95% CI = e ^ [ln(OR) + 1.96 sqrt(1/a + 1/b + 1/c + 1/d)] 
+    	double upper = Math.pow(Math.E, (lnOR + inner));
+    			
+    	//Lower 95% CI = e ^ [ln(OR) - 1.96 sqrt(1/a + 1/b + 1/c + 1/d)] 
+    	double lower = Math.pow(Math.E, (lnOR - inner));
+    	
+    	return new double[] {oddsRatio, lower, upper};
+    }
+    
+    /**Measure of how far from independence the 2x2 table is. 1= independent. Ratio of ratios. Will return Infinity or 0 if cells are zero.*/
+    public static double getOddsRatio(double a, double b, double c, double d) {
+    	return ((a * d) / (b * c));
+    }
 
 
     public static void main(String[] args) {
 
-        int[][] argInts = new int[15][4];
-        argInts[0] = new int[]{3011, 30, 2020, 20};
+        int[][] argInts = new int[3][4];
+        argInts[0] = new int[]{1, 2, 1, 10};
+        argInts[1] = new int[]{10, 20, 10, 100};
+        argInts[2] = new int[]{8, 2, 4, 6};
+        
+        //argInts[0] = new int[]{17, 83, 1, 99};
+        /*
         argInts[1] = new int[]{3011, 30, 2020, 5};
         argInts[2] = new int[]{3011, 30, 2020, 60};
         argInts[3] = new int[]{1, 2, 0, 3};
@@ -219,27 +254,30 @@ public class FisherExact {
         argInts[11] = new int[]{9, 2, 2, 4};
         argInts[12] = new int[]{6, 5, 5, 1};
         argInts[13] = new int[]{8, 3, 3, 3};
-        argInts[14] = new int[]{7, 4, 4, 2};
+        argInts[14] = new int[]{7, 4, 4, 2};*/
 
-        FisherExact fe = new FisherExact(6000);
+        FisherExact fe = new FisherExact(200);
 
         for (int i = 0; i < argInts.length; i++) {
             System.out.println("\na=" + argInts[i][0] + " b=" + argInts[i][1] + " c=" + argInts[i][2] + " d=" + argInts[i][3]);
-            System.out.print("*****Original algorithm: ");
-            double cumulativeP = fe.getCumlativeP(argInts[i][0], argInts[i][1], argInts[i][2], argInts[i][3]);
-            System.out.println("\tcumulativeP = " + cumulativeP);
-
-            System.out.print("*****Left Tailed: ");
-            double leftTailedP = fe.getLeftTailedP(argInts[i][0], argInts[i][1], argInts[i][2], argInts[i][3]);
-            System.out.println("\tleftTailedP = " + leftTailedP);
-
-            System.out.print("*****Right Tailed: ");
-            double rightTailedP = fe.getRightTailedP(argInts[i][0], argInts[i][1], argInts[i][2], argInts[i][3]);
-            System.out.println("\trightTailedP = " + rightTailedP);
-
-            System.out.print("*****Two Tailed: ");
+            
+           // double cumulativeP = fe.getCumlativeP(argInts[i][0], argInts[i][1], argInts[i][2], argInts[i][3]);
+            //System.out.println("\ncumulativeP = " + cumulativeP);
+            
             double twoTailedP = fe.getTwoTailedP(argInts[i][0], argInts[i][1], argInts[i][2], argInts[i][3]);
-            System.out.println("\ttwoTailedP = " + twoTailedP);
+            System.out.println("twoTailedP = " + twoTailedP);
+
+            double leftTailedP = fe.getLeftTailedP(argInts[i][0], argInts[i][1], argInts[i][2], argInts[i][3]);
+            System.out.println("leftTailedP = " + leftTailedP);
+
+            double rightTailedP = fe.getRightTailedP(argInts[i][0], argInts[i][1], argInts[i][2], argInts[i][3]);
+            System.out.println("rightTailedP = " + rightTailedP);
+       
+            
+            double[] orLowerUpper = fe.getOddsRatioAnd95thConfidenceInterval(argInts[i][0], argInts[i][1], argInts[i][2], argInts[i][3]);
+            System.out.println("OR = " + orLowerUpper[0]);
+            System.out.println("Lower = " + orLowerUpper[1]);
+            System.out.println("Upper = " + orLowerUpper[2]);
         }
     }
 }
