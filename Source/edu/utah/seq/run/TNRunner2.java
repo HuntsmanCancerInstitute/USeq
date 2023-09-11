@@ -21,7 +21,8 @@ public class TNRunner2 {
 	private File[] DNAAlignQCDocs = null;
 	private File[] RNAAlignQCDocs = null;
 	private File[] RNAFusionDocs = null;
-	private File[] somaticVarCallDocs = null;
+	private File[] illuminaSomaticVarCallDocs = null;
+	private File[] gatkSomaticVarCallDocs = null;
 	private File[] sampleConcordanceDocs = null;
 	private File[] varAnnoDocs = null;
 	private File[] haplotypeCallDocs = null;
@@ -641,6 +642,7 @@ public class TNRunner2 {
 					IO.pl("\nMaximum number jobs launched, skipping remaining samples.");
 					return false;
 				}
+//IO.p("\t"+rootDirs[i].getName());
 				if (verbose == false) IO.p("\t"+rootDirs[i].getName());
 				tNSamples[i] = new TNSample2(rootDirs[i].getCanonicalFile(), this);
 				idSample.put(tNSamples[i].getId(), tNSamples[i]);
@@ -669,7 +671,8 @@ public class TNRunner2 {
 			IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 			Pattern pat = Pattern.compile("-[a-zA-Z]");
 			File DNAWorkflowDir = null;
-			File somVarCallWorkflowDir = null;
+			File illSomVarCallWorkflowDir = null;
+			File gatkSomVarCallWorkflowDir = null;
 			File annoWorkflowDir = null;
 			File sampleConWorkflowDir = null;
 			File gatkJointGenoWorklfowDir = null;
@@ -692,7 +695,8 @@ public class TNRunner2 {
 						case 'e': DNAWorkflowDir = new File(args[++i]); break;
 						case 't': RNAWorkflowDir = new File(args[++i]); break;
 						case 'f': rnaFuseDir = new File(args[++i]); break;
-						case 'c': somVarCallWorkflowDir = new File(args[++i]); break;
+						case 'c': illSomVarCallWorkflowDir = new File(args[++i]); break;
+						case 'C': gatkSomVarCallWorkflowDir = new File(args[++i]); break;
 						case 'a': annoWorkflowDir = new File(args[++i]); break;
 						case 'b': sampleConWorkflowDir = new File(args[++i]); break;
 						case 'm': msiWorkflowDir = new File(args[++i]); break;
@@ -763,12 +767,18 @@ public class TNRunner2 {
 				RNAFusionDocs = IO.extractFiles(rnaFuseDir);
 			}
 
-			//variant calling docs
-			if (somVarCallWorkflowDir != null){
-				if(somVarCallWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing somatic variant calling workflow docs? "+somVarCallWorkflowDir);
-				somaticVarCallDocs = IO.extractFiles(somVarCallWorkflowDir);
-				if (bpileupFileOrDir == null || bpileupFileOrDir.exists() == false) Misc.printErrAndExit("Error: failed to find the bpileup file or dir for somatic variant calling? "+bpileupFileOrDir);
+			//variant calling docs using Manta and Strelka
+			if (illSomVarCallWorkflowDir != null){
+				if(illSomVarCallWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing Illumina somatic variant calling workflow docs? "+illSomVarCallWorkflowDir);
+				illuminaSomaticVarCallDocs = IO.extractFiles(illSomVarCallWorkflowDir);
+				if (bpileupFileOrDir == null || bpileupFileOrDir.exists() == false) Misc.printErrAndExit("Error: failed to find the bpileup file or dir for the Illumina somatic variant calling? "+bpileupFileOrDir);
 				bpileupFileOrDir = bpileupFileOrDir.getCanonicalFile();
+			}
+			
+			//variant calling docs using Mutect2 GATK
+			if (gatkSomVarCallWorkflowDir != null){
+				if(gatkSomVarCallWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing GATK somatic variant calling workflow docs? "+gatkSomVarCallWorkflowDir);
+				gatkSomaticVarCallDocs = IO.extractFiles(gatkSomVarCallWorkflowDir);
 			}
 
 			//variant annotation
@@ -862,7 +872,8 @@ public class TNRunner2 {
 				IO.pl("Patient sample directory\t"+rootDirs[0].getParent());
 				IO.pl("DNA alignment workflow directory\t"+DNAWorkflowDir);
 				IO.pl("RNA alignment workflow directory\t"+RNAWorkflowDir);
-				IO.pl("Somatic variant workflow directory\t"+somVarCallWorkflowDir);
+				IO.pl("Illumina somatic variant workflow directory\t"+illSomVarCallWorkflowDir);
+				IO.pl("GATK somatic variant workflow directory\t"+ gatkSomVarCallWorkflowDir);
 				if (normalAlignmentDir != null) IO.pl("Non matched normal alignment directory for somatic calling\t"+normalAlignmentDir);
 				IO.pl("Variant annotation workflow directory\t"+annoWorkflowDir);
 				IO.pl("Sample concordance workflow directory\t"+sampleConWorkflowDir);
@@ -929,7 +940,7 @@ public class TNRunner2 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TNRunner2 : Dec 2022                             **\n" +
+				"**                                 TNRunner2 : Aug 2023                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner2 is designed to execute several containerized workflows on tumor normal\n"+
 				"datasets via a slurm cluster.  Based on the availability of paired fastq datasets, \n"+
@@ -969,7 +980,8 @@ public class TNRunner2 {
 				"-e Workflow docs for launching DNA alignments.\n"+
 				"-t Workflow docs for launching RNA alignments.\n"+
 				"-f Workflow docs for launching RNA fusion detection.\n"+
-				"-c Workflow docs for launching somatic variant calling.\n"+
+				"-c Workflow docs for launching Illumina somatic variant calling.\n"+
+				"-C Workflow docs for launching GATK somatic variant calling.\n"+
 				"-m Workflow docs for launching MSI status calling.\n"+
 				"-a Workflow docs for launching variant annotation.\n"+
 				"-b Workflow docs for launching sample concordance.\n"+
@@ -1030,8 +1042,11 @@ public class TNRunner2 {
 	public File[] getDNAAlignQCDocs() {
 		return DNAAlignQCDocs;
 	}
-	public File[] getSomaticVarCallDocs() {
-		return somaticVarCallDocs;
+	public File[] getIlluminaSomaticVarCallDocs() {
+		return illuminaSomaticVarCallDocs;
+	}
+	public File[] getGatkSomaticVarCallDocs() {
+		return gatkSomaticVarCallDocs;
 	}
 	public File[] getVarAnnoDocs() {
 		return varAnnoDocs;

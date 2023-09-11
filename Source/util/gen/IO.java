@@ -2111,6 +2111,58 @@ public class IO {
 		return names;
 	}
 	
+	/**Loads a file's lines into a hash first column is the key, second the value. Splits on tab.
+	 * Keeps first key. If value is a duplicate, it is appended with the unique key and separated by the delimiter.
+	 * Thus both the keys and the values are unique.
+	 * Keys and values are trims keys and values of whitespace.
+	 * @return null if an error is encountered.
+	 * */
+	public static HashMap<String,String> loadFileIntoHashMapUniqueValues(File file, String duplicateValueDelimiter){
+		HashMap<String,String> names = new HashMap<String,String>(1000);
+		try{
+			BufferedReader in = IO.fetchBufferedReader(file);
+			String line;
+			String[] keyValue;
+			HashSet<String> values = new HashSet<String>();
+			HashMap<String, String> keyDupValues = new HashMap<String, String>();
+			while ((line = in.readLine())!=null){
+				keyValue = Misc.TAB.split(line);
+				if (keyValue.length !=2 || keyValue[0].startsWith("#")) continue;
+				String key = keyValue[0].trim();
+				if (key.length()==0)continue;
+				
+				//check if key is already present
+				if (names.containsKey(key)) {
+					IO.el("\tDup key, skipping -> "+line);
+					continue;
+				}
+				
+				//check if value is a duplicate
+				String value = keyValue[1].trim();
+				if (value.length()==0)continue;
+				if (values.contains(value)) keyDupValues.put(key, value);
+				else values.add(value);
+				
+				//always add irregardless of value duplicates
+				names.put(key, value);
+			}
+			
+			//for each duplicate value, append the key and replace them in the names hashmap
+			for (String key: keyDupValues.keySet()) {
+				String dupValue = keyDupValues.get(key);
+				dupValue = dupValue+ duplicateValueDelimiter+ key;
+				names.put(key, dupValue);
+				IO.el("\tDup value, appending key to value -> "+key+"\t"+dupValue);
+			}
+			
+			in.close();
+		}catch(Exception e){
+			e.printStackTrace();
+			names = null;
+		}
+		return names;
+	}
+	
 	/**Loads a file's lines into a hash first column is the key, second the value.
 	 * */
 	public static HashMap<String,String> loadFileIntoHashMapLowerCaseKey(File file){

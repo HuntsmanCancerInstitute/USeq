@@ -35,13 +35,15 @@ public class VariantInfoAggregator {
 		if (dirs.length == 0) Misc.printErrAndExit("\nFailed to find any sample dirs in "+jobDir);
 		
 		PrintWriter out = new PrintWriter(resultSpreadsheet);
-		out.println(VariantInfoSample.header);
+		//out.println(VariantInfoSample.header);
+		out.println(TumorInfoSample.toStringHeader);
 		//for each sample dir
 		IO.pl("Processing...");
 		for (File dir: dirs) {
-			IO.pl("\t"+dir);
-			VariantInfoSample s = new VariantInfoSample(dir);
-			out.println(s.toString());
+			IO.pl("\t"+dir.getName());
+			//VariantInfoSample s = new VariantInfoSample(dir);
+			TumorInfoSample t = new TumorInfoSample(dir);
+			out.println(t.toString());
 		}
 		
 		out.close();
@@ -79,8 +81,7 @@ public class VariantInfoAggregator {
 				}
 			}
 		}
-		if (jobDir == null || resultSpreadsheet == null) Misc.printErrAndExit("\nPlease provide both a directory containing TNRunner results directories and the name of a spreadsheet results file.\n"); 
-		jobDir.mkdirs();
+		if (jobDir == null || jobDir.exists()== false || resultSpreadsheet == null) Misc.printErrAndExit("\nPlease provide both a directory containing TNRunner results directories and the name of a spreadsheet results file.\n"); 
 		
 	}
 
@@ -89,10 +90,10 @@ public class VariantInfoAggregator {
 		
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            VariantInfoAggregator : Sept 2019                     **\n" +
+				"**                            VariantInfoAggregator : July 2022                     **\n" +
 				"**************************************************************************************\n" +
-				"Parses and aggregates somatic and germline variant calls from many samples processed\n"+
-				"by the USeq TNRunner application.\n"+
+				"Parses and aggregates somatic and germline variant info from TNRunner output. MSI, TMB\n"+
+				"LoH, CopyAnalysis, etc.\n"+
 
 				"\nOptions:\n"+
 				"-j Job directory containing directories for each patient results TNRunner. \n" +

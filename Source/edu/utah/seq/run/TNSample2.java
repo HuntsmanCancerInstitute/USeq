@@ -67,8 +67,11 @@ public class TNSample2 {
 
 		if (checkAlignments()) {
 
-			//launch t/n somatic DNA analysis?
-			if (tnRunner.getSomaticVarCallDocs() != null) somDNACall();
+			//launch t/n somatic DNA analysis with Illumina's Manta and Strelka?
+			if (tnRunner.getIlluminaSomaticVarCallDocs() != null) illSomDNACall();
+			
+			//launch t/n somatic DNA analysis with GATKs Mutect2?
+			if (tnRunner.getGatkSomaticVarCallDocs() != null) gatkSomDNACall();
 
 			//merge somatic vars with clinical test results?
 			if (tnRunner.getClinicalVcfDocs()!= null && somaticVariants != null) parseMergeClinicalVars();
@@ -390,7 +393,7 @@ public class TNSample2 {
 		}
 	}
 
-	private void somDNACall() throws IOException {
+	private void illSomDNACall() throws IOException {
 		if (tumorDNAAlignment == null) return;
 		if (normalDNAAlignment == null) {
 			//still waiting for normal alignment
@@ -401,7 +404,7 @@ public class TNSample2 {
 		parsePlatformGenderInfo();
 
 		//OK good to go
-		info.add("Checking somatic variant calling...");
+		info.add("Checking Illumina somatic variant calling...");
 
 		//make dir, ok if it already exists
 		File jobDir = new File (rootDir,"SomaticVariantCalls/"+id+"_Illumina");
@@ -410,15 +413,15 @@ public class TNSample2 {
 		//any files?
 		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
 		if (nameFile.size() == 0) {
-			createSomaticVariantLinks(jobDir);
-			launch(jobDir, null, tnRunner.getSomaticVarCallDocs());
+			createSomaticVariantLinks(jobDir, true);
+			launch(jobDir, null, tnRunner.getIlluminaSomaticVarCallDocs());
 		}
 		//COMPLETE
 		else if (nameFile.containsKey("COMPLETE")){
 			//find the final vcf file
 			File[] vcf = IO.extractFiles(new File(jobDir, "Vcfs"), "_final.vcf.gz");
 			if (vcf == null || vcf.length !=1) {
-				clearAndFail(jobDir, "\tThe somatic variant calling was marked COMPLETE but failed to find the final vcf file in the Vcfs/ in "+jobDir);
+				clearAndFail(jobDir, "\tThe Illumina somatic variant calling was marked COMPLETE but failed to find the final vcf file in the Vcfs/ in "+jobDir);
 				return;
 			}
 			somaticVariants = vcf[0];
@@ -427,7 +430,49 @@ public class TNSample2 {
 			info.add("\tCOMPLETE "+jobDir);
 		}
 		else {
-			if (checkJob(nameFile,jobDir,null, tnRunner.getSomaticVarCallDocs())) createSomaticVariantLinks(jobDir);
+			if (checkJob(nameFile,jobDir,null, tnRunner.getIlluminaSomaticVarCallDocs())) createSomaticVariantLinks(jobDir, true);
+		}
+
+	}
+	
+	private void gatkSomDNACall() throws IOException {
+		if (tumorDNAAlignment == null) return;
+		if (normalDNAAlignment == null) {
+			//still waiting for normal alignment
+			if (normalDNAFastqCram.isCramFastqDirExists()) return;
+			//no non matched so can't run som calling
+			if (tnRunner.getNonMatchedNormal() == null) return;
+		}
+
+		//OK good to go
+		info.add("Checking GATK somatic variant calling...");
+
+		//make dir, ok if it already exists
+		File jobDir = new File (rootDir,"SomaticVariantCalls/"+id+"_GATK");
+		jobDir.mkdirs();
+
+		//any files?
+		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+		if (nameFile.size() == 0) {
+			createSomaticVariantLinks(jobDir, false);
+			launch(jobDir, null, tnRunner.getGatkSomaticVarCallDocs());
+		}
+		//COMPLETE
+		else if (nameFile.containsKey("COMPLETE")){
+			//find the final vcf file
+			File[] vcf = IO.extractFiles(new File(jobDir, "Vcfs"), "_unfiltered.vcf.gz");
+			if (vcf == null || vcf.length !=1) {
+				clearAndFail(jobDir, "\tThe GATK somatic variant calling was marked COMPLETE but failed to find the xxx_unfiltered.vcf.gz vcf file in the Vcfs/ in "+jobDir);
+				return;
+			}
+			// don't set it at this time, 
+			//somaticVariants = vcf[0];
+			//remove the linked fastq
+			removeSomaticLinks(jobDir);
+			info.add("\tCOMPLETE "+jobDir);
+		}
+		else {
+			if (checkJob(nameFile,jobDir,null, tnRunner.getGatkSomaticVarCallDocs())) createSomaticVariantLinks(jobDir, false);
 		}
 
 	}
@@ -921,12 +966,22 @@ public class TNSample2 {
 			info.add("\tWaiting for germline variant calling.");
 			return;
 		}
-		File[] dirs = IO.extractFiles(gvc, "_Anno");
-		if (dirs == null || dirs.length ==0) {
+		File[] dirs = IO.extractFiles(gvc, "_Anno"); //this will pull both GATK and Illumina
+		if (dirs == null || dirs.length ==0 ) {
 			info.add("\tWaiting for an annotated germline variant calling vcf.");
 			return;
 		}
-		File vcfDir = new File(dirs[0],"Vcfs");
+		//QUEUED or STARTED ?
+		for (File annoDir: dirs) {
+			File q = new File (annoDir, "QUEUED");
+			File s = new File (annoDir, "STARTED");
+			if (q.exists() || s.exists()) {
+				info.add("\tQUEUED or STARTED, waiting for an annotated germline variant calling vcf.");
+				return;
+			}
+		}
+		
+		File vcfDir = new File(dirs[0],"Vcfs");  // taking first
 		File[] vcfs = IO.extractFiles(vcfDir, ".anno.vcf.gz");
 		if (vcfs == null || vcfs.length!=1){
 			info.add("\tFAILED to find a xxx.anno.vcf.gz in "+dirs[0]);
@@ -1064,7 +1119,7 @@ public class TNSample2 {
 	/**For DNAs, diff read coverage for passing bed generation
 	 * @throws IOException */
 	private AlignmentDataset2 DNAAlignQC(FastqCramDataset fd, File jobDir) throws IOException {
-
+		
 		//make dir if null
 		if (jobDir == null) {
 			jobDir = new File (rootDir, "Alignment/"+id+"_"+fd.getName()).getCanonicalFile();
@@ -1125,7 +1180,7 @@ public class TNSample2 {
 		}
 	}
 
-	private void createSomaticVariantLinks(File jobDir) throws IOException {
+	private void createSomaticVariantLinks(File jobDir, boolean isIllumina) throws IOException {
 		//remove any linked bam and bed files
 		removeSomaticLinks(jobDir);
 
@@ -1154,8 +1209,8 @@ public class TNSample2 {
 
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.cram").toPath(), tumorCram);
 		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.crai").toPath(), tumorCrai);
-		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bed.gz").toPath(), tumorBed);
-		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.bed.gz").toPath(), normalBed);
+		if (isIllumina) Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"tumor.bed.gz").toPath(), tumorBed);
+		if (isIllumina) Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.bed.gz").toPath(), normalBed);
 		if (normalDNAAlignment == null) {
 			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.bam").toPath(), normalCram);
 			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.bai").toPath(), normalCrai);
@@ -1165,9 +1220,11 @@ public class TNSample2 {
 			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(),"normal.crai").toPath(), normalCrai);
 		}
 		//link in the bam pileup file
-		File[] bpileup = fetchBPileup();
-		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "bamPileup.bp.txt.gz").toPath(), bpileup[0].toPath());
-		Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "bamPileup.bp.txt.gz.tbi").toPath(), bpileup[1].toPath());
+		if (isIllumina)  {
+			File[] bpileup = fetchBPileup();
+			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "bamPileup.bp.txt.gz").toPath(), bpileup[0].toPath());
+			Files.createSymbolicLink(new File(jobDir.getCanonicalFile(), "bamPileup.bp.txt.gz.tbi").toPath(), bpileup[1].toPath());
+		}
 	}
 
 	private File[] fetchBPileup() throws IOException {
@@ -1284,14 +1341,19 @@ public class TNSample2 {
 	}
 
 	public static File copyInWorkflowDocs(File[] workflowDocs, File jobDir) throws IOException {
+
 		File shellScript = null;
-		for (File f: workflowDocs) {
-			if (f.isDirectory()) continue;
-			File copy = new File(jobDir, f.getName());
-			IO.copyViaFileChannel(f, copy);
-			if (copy.getName().endsWith(".sh")) shellScript = f;
+		try {
+			for (File f: workflowDocs) {
+				if (f.isDirectory()) continue;
+				File copy = new File(jobDir, f.getName());
+				IO.copyViaFileChannel(f, copy);
+				if (copy.getName().endsWith(".sh")) shellScript = f;
+			}
+			if (shellScript == null) throw new IOException("Failed to find the workflow xxx.sh file in "+workflowDocs[0].getParent());
+		} catch (NullPointerException e) {
+			throw new IOException ("Problem launching "+jobDir.getCanonicalPath()+" see \n"+e.getMessage());
 		}
-		if (shellScript == null) throw new IOException("Failed to find the workflow xxx.sh file in "+workflowDocs[0].getParent());
 		return shellScript;
 	}
 

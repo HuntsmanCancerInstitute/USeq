@@ -52,6 +52,8 @@ public class CBiBilling {
 		
 		parseAWSAccounts();
 		
+		//add missing cloud WAFs!
+		
 		printInvoices();
 		
 		masterAccountInfo.saveUpdatedInfo();
@@ -61,7 +63,7 @@ public class CBiBilling {
 	}
 
 
-	private void printInvoices() {
+	private void printInvoices() throws IOException {
 		IO.pl("\nPrinting Invoices...");
 		HashMap<String, Float> groupNameHoursBilled = this.masterAccountInfo.getGroupNameHoursBilled();
 		
@@ -117,6 +119,7 @@ public class CBiBilling {
 			
 			//pull non cancer
 			String cancerStatus = masterAccountInfo.getGroupNameCancerStatus().get(groupName);
+			if (cancerStatus == null) throw new IOException ("ERROR: failed to find the cancer status for "+groupName);
 			if (cancerStatus.contains("Non")) {
 				float additionalBilling = hscCostSharing * totalHoursToBill;
 				nonCancerBilling.add(groupName+"\t"+Num.formatNumber(totalHoursToBill,3)+"\t$"+ Num.formatNumber(additionalBilling, 2));
@@ -150,11 +153,10 @@ public class CBiBilling {
 	
 	private void printHSCBilling() {
 		IO.pl("\nHSC Invoice...");
-		IO.pl("GroupName\tHoursBilled\tHSCShare($"+(int)hscCostSharing+"/hour)");
+		IO.pl("GroupName\tHoursBilled\tHSCShare($"+(int)hscCostSharing+"/hour)\tHourlyChartfieldsOnFile");
 		for (String gl: nonCancerBilling) IO.pl(gl);
 		IO.pl("\nTotalHSCCostSharing:\t$"+ Num.formatNumber(totalHscBilling, 2));
 	}
-
 
 	private void printJustCloudInvoices() {
 		//remove any account numbers that were already printed with the hourly invoices
@@ -271,8 +273,8 @@ public class CBiBilling {
 	}
 
 
-	private void parseAWSAccounts() {
-		IO.pl("\nParsing AWS accounts...");
+	private void parseAWSAccounts() throws IOException {
+		IO.pl("\nParsing Carahsoft AWS account files...");
 		//any cloud reports?
 		if (cloudReportsDirectory != null) {
 			carahsoftParser = new CarahsoftXlsxParser(cloudReportsDirectory, debug);
@@ -503,7 +505,7 @@ public class CBiBilling {
 		}
 
 		//check it contains the required cells
-		String[] toFind = {"Work Type", "Account Name", "Issue Key", "Full name", "Billed Hours", "Issue summary", "Work Description"};
+		String[] toFind = {"CBI - Work Type", "Account Name", "Issue Key", "Full name", "Billed Hours", "Issue summary", "Work Description"};
 
 		for (String tf: toFind) {
 			if (headerKeyIndex.containsKey(tf) == false) throw new IOException("Failed to find the '"+tf+"' header key in "+headerKeyIndex);
@@ -577,18 +579,20 @@ public class CBiBilling {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Correlate:    Nov 2008                            **\n" +
+				"**                               CBI Billing:    Sept 2023                          **\n" +
 				"**************************************************************************************\n" +
-				"Calculates all pair-wise Pearson correlation coefficients (r) and if indicated will\n" +
-				"perform a hierarchical clustering on the files.\n\n"+				
+				"Generates billing reports for the Cancer Bioinformatics Shared Resource.\n\n"+				
 
-				"Parameters:\n" +
-				"-d The full path directory text containing serialized java float[] files (xxx.celp\n"+
-				"      see CelProcessor app).\n"+
-				"-a Files provided are float[][] files (xxx.cela) and need to be collapsed to float[]\n"+
-				"-c Cluster files.\n\n" +
+				"Required Parameters:\n" +
+				"-j Path to the exported cvs Jira 'Logged Time' report.\n"+
+				"-m Path to the masterAccountInfo.xlsx spreadsheet updated from the prior month.\n"+
+				"-w Path to a dir containing the hourly and cloud 'WAF Tracking Schedule' xlsx files.\n" +
+				"-c Path to a dir containing the cloud AWS Carahsoft xlsx expense reports. May be empty\n"+
+				"      if are none available.\n"+
+				"-o Path to write the results.\n"+
 
-				"Example: java -Xmx256M -jar pathTo/T2/Apps/Correlate -d /Mango/PCels/ -c -a\n\n" +
+				"\nExample: java -Xmx256M -jar pathTo/USeq/Apps/CBiBilling -j jiraTime.cvs -m \n"+
+				"   masterAccountInfo.xlsx -w WAFs/ -c Carahsoft/ -o Invoices\n" +
 
 
 		"**************************************************************************************\n");		

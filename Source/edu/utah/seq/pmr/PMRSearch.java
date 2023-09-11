@@ -102,7 +102,7 @@ public class PMRSearch {
 		while (true) {  
 			IO.p("\nEnter a query, hit return for the help menu, or type 'exit'");
 			if (datasetKeysFound != null && datasetKeysFound.size() > 0) {
-				IO.pl(". ("+datasetKeysFound.size()+" datasets selected. Use -n to clear.)");
+				IO.pl(". ("+datasetKeysFound.size()+" datasets selected. Use -x to clear.)");
 			}
 			else IO.pl();
 			Util.p("> ");
@@ -860,7 +860,7 @@ public class PMRSearch {
 	}
 
 	private boolean download(String s3Uri, File j) throws Exception {
-		if (verbose) IO.pl("Fetching file from AWS "+s3Uri+ " -> "+j);
+		if (verbose) IO.pl("\tDownloading "+s3Uri+ " -> "+j);
 		String[] cmd = {awsPath, "s3", "cp", s3Uri, j.getCanonicalPath(), "--profile", profile};
 		int exitCode = executeReturnExitCode(cmd);
 		if (exitCode != 0 || j.exists()==false) return false;
@@ -880,11 +880,15 @@ public class PMRSearch {
 			//    0            1        2         3
 			fields = Misc.TAB.split(line);
 			if (fields.length != 4) throw new IOException("Failed to find 4 fields in "+line);
+			
 
 			//Patients   AA2mF6Vy   Avatar   A032049_SL419345_SL419548_SL420681     ClinicalReport/A032049_SL419345_SL419548_SL420681_IDTv1_SAR_F.json
 			//   0          1         2                 3                                  4
 			keys = Misc.FORWARD_SLASH.split(fields[3]);
-			if (keys.length < 5) throw new IOException("Failed to find more then 4 dirs in "+line);
+			if (keys.length < 5) {
+				if (line.contains("blacklisted")) continue;
+				else throw new IOException("Failed to find more then 4 dirs in "+line);
+			}
 
 			Patient p = fetchPatient(keys[1]);
 
@@ -1090,7 +1094,7 @@ public class PMRSearch {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                       Patient Molecular Repo Search : April 2023                 **\n" +
+				"**                       Patient Molecular Repo Search : August 2023                **\n" +
 				"**************************************************************************************\n" +
 				"Interactive searching of the clinical and sample attribute information in the json/xml\n"+
 				"reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.\n"+

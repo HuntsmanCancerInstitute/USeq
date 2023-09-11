@@ -21,9 +21,10 @@ public class CarahsoftXlsxParser {
 	private int finalCostIndex = -1;
 	private int numParsedLines = 0;
 
-	public CarahsoftXlsxParser(File dir, boolean debug) {
+	public CarahsoftXlsxParser(File dir, boolean debug) throws IOException {
 		File[] xlsxFiles = IO.extractFiles(dir, ".xlsx");
-
+		if (xlsxFiles == null || xlsxFiles.length ==0) throw new IOException("ERROR: failed to find xlsx Carahsoft files in "+dir);
+		
 		for (File xlsx: xlsxFiles) parseIt(xlsx);
 
 		float awsTotal = 0.0f;
@@ -48,7 +49,7 @@ public class CarahsoftXlsxParser {
 		}
 	}
 
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
 		CarahsoftXlsxParser p = new CarahsoftXlsxParser(new File ("/Users/u0028003/HCI/CoreAdmin/Billing/AllBillingReports/2023/6_BSR_June_2023/CarahsoftMay2023"), true);
 
 	}
