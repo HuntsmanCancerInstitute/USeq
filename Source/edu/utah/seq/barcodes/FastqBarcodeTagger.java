@@ -6,7 +6,8 @@ import java.util.regex.*;
 import util.gen.*;
 
 /**Takes three fastq files (paired end reads and a third containing barcodes), appends the barcode and quality to the fastq header.
- * @author david.nix@aruplab.com
+ * Can also parse inline barcodes and trim the fastq seq and qual appropriately
+ * @author david.nix@hci.utah.edu
  **/
 public class FastqBarcodeTagger{
 	
@@ -16,8 +17,9 @@ public class FastqBarcodeTagger{
 	private File barcodeFastq;
 	private File resultsDirectory;
 	private boolean interlace = false;
-	private int maxLengthBarcode = 0;
 	private boolean appendLineNumber = false;
+	private int barcodeLength = -1;
+	private int bpToTrim = -1;
 	
 	//internal fields
 	private BufferedReader firstFastqIn;
@@ -29,7 +31,7 @@ public class FastqBarcodeTagger{
 	private String[] second = new String[4];
 	private String[] barcode = new String[4];
 	private long lineNumber = 0;
-	private boolean extract3Mer = false;
+	private boolean extractInline = false;
 	private Pattern badEnding = Pattern.compile(".+/\\d");
 
 	//constructors
@@ -108,6 +110,7 @@ public class FastqBarcodeTagger{
 		}
 	}
 	
+
 	
 	/**For parsing IDTs 3N,skip2,insert from read 1 and 2 and creating the 6mer UMI*/
 	private void extract3MerUMI() {
@@ -115,28 +118,37 @@ public class FastqBarcodeTagger{
 		barcode[0] = first[0];
 		
 		//line 1, seq
-		String readOneSeq = first[1].substring(0, 3);
-		String readTwoSeq = second[1].substring(0, 3);
+		//String readOneSeq = first[1].substring(0, 3);
+		//String readTwoSeq = second[1].substring(0, 3);
+		String readOneSeq = first[1].substring(0, barcodeLength);
+		String readTwoSeq = second[1].substring(0, barcodeLength);
 		barcode[1] = readOneSeq + readTwoSeq;
+		
 		//change first and second seqs
-		first[1] = first[1].substring(5);
-		second[1] = second[1].substring(5);
+		//first[1] = first[1].substring(5);
+		//second[1] = second[1].substring(5);
+		first[1] = first[1].substring(bpToTrim);
+		second[1] = second[1].substring(bpToTrim);
 		
 		//line 2, name
 		barcode[2] = first[2];
 		
 		//line 3, qual
-		String readOneQual = first[3].substring(0, 3);
-		String readTwoQual = second[3].substring(0, 3);
+		//String readOneQual = first[3].substring(0, 3);
+		//String readTwoQual = second[3].substring(0, 3);
+		String readOneQual = first[3].substring(0, barcodeLength);
+		String readTwoQual = second[3].substring(0, barcodeLength);
 		barcode[3] = readOneQual + readTwoQual;
 
 		//change first and second quals
-		first[3] = first[3].substring(5);
-		second[3] = second[3].substring(5);	
+		//first[3] = first[3].substring(5);
+		//second[3] = second[3].substring(5);	
+		first[3] = first[3].substring(bpToTrim);
+		second[3] = second[3].substring(bpToTrim);
 	}
 
 	public void parse() throws IOException {		
-		if (extract3Mer == false){
+		if (extractInline == false){
 			while (loadARead()){
 				checkAndAssignFastqNames();
 				printReads();
@@ -173,12 +185,6 @@ public class FastqBarcodeTagger{
 		//check that name is the same from first, second, and barcode
 		if (f[0].equals(s[0]) == false) Misc.printErrAndExit("\nError, looks like your first and second fastq names differ? \nFirst\t"+f[0]+"\nSecond\t"+s[0]);
 		if (f[0].equals(b[0]) == false) Misc.printErrAndExit("\nError, looks like your first and barcode fastq names differ? \nFirst\t"+f[0]+"\nBarcode\t"+b[0]);
-		
-		//trim 3' end of barcode?
-		if (maxLengthBarcode !=0){
-			barcode[1] = barcode[1].substring(0, maxLengthBarcode);
-			barcode[3] = barcode[3].substring(0, maxLengthBarcode);
-		}
 		
 		//make new frag name with appended barcode
 		StringBuilder fn = new StringBuilder(f[0]);
@@ -230,7 +236,7 @@ public class FastqBarcodeTagger{
 		//readers
 		firstFastqIn = IO.fetchBufferedReader(firstReadFastq);
 		secondFastqIn = IO.fetchBufferedReader(secondReadFastq);
-		if (extract3Mer == false) barcodeFastqIn = IO.fetchBufferedReader(barcodeFastq);
+		if (extractInline == false) barcodeFastqIn = IO.fetchBufferedReader(barcodeFastq);
 
 		//writers
 		if (interlace == false){
@@ -243,7 +249,7 @@ public class FastqBarcodeTagger{
 		//close readers
 		firstFastqIn.close();
 		secondFastqIn.close();
-		if (extract3Mer == false) barcodeFastqIn.close();
+		if (extractInline == false) barcodeFastqIn.close();
 		//close writers
 		if (interlace == false){
 			firstFastqOut.close();
@@ -273,10 +279,10 @@ public class FastqBarcodeTagger{
 					case 's': secondReadFastq = new File(args[++i]); break;
 					case 'b': barcodeFastq = new File(args[++i]); break;
 					case 'r': resultsDirectory = new File(args[++i]); break;
+					case 'l': barcodeLength = Integer.parseInt(args[++i]); break;
+					case 't': bpToTrim = Integer.parseInt(args[++i]); break;
 					case 'i': interlace = true; break;
 					case 'a': appendLineNumber = true; break;
-					case 'l': maxLengthBarcode = Integer.parseInt(args[++i]); break;
-					case 'e': extract3Mer = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -293,10 +299,20 @@ public class FastqBarcodeTagger{
 		//check fields
 		if (firstReadFastq == null || firstReadFastq.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your first read fastq file -> "+firstReadFastq);
 		if (secondReadFastq == null || secondReadFastq.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your second read fastq file -> "+secondReadFastq);
-		if (extract3Mer == false){
-			if (barcodeFastq == null || barcodeFastq.canRead() == false) Misc.printErrAndExit("\nError: cannot find or read your barcode fastq file -> "+barcodeFastq);
+		
+		//barcode file?
+		if (barcodeFastq != null) {
+			extractInline = false;
+			if (barcodeLength != -1 || bpToTrim != -1) Misc.printErrAndExit("\nError: cannot provide a barcode file AND set inline barcode length info");
+			if (barcodeFastq.canRead()==false) Misc.printErrAndExit("\nError: cannot find or read your barcode fastq file -> "+barcodeFastq);
 		}
-
+		//must be inline
+		else {
+			extractInline = true;
+			if (barcodeLength == -1) Misc.printErrAndExit("\nError: if a barcode file is not provided, then please set a barcode length value for inline UMI extraction.");
+			if (bpToTrim == -1) bpToTrim = barcodeLength;
+		}
+		
 		if (interlace == false) {
 			if (resultsDirectory != null) resultsDirectory.mkdirs();
 			else resultsDirectory = firstReadFastq.getParentFile();
@@ -305,38 +321,25 @@ public class FastqBarcodeTagger{
 			if (resultsDirectory != null) Misc.printErrAndExit("\nError: it doesn't make sense to designate a results directory when writing output to stdout!");
 		}
 	}
-	
-	
-	/*cmd to be fixed
-    "{java7} -jar -Xmx2G {useq}/FastqBarcodeTagger -a -f {fastqReadOne} -s {fastqReadTwo} "
-	"-e -i 2>> {log} | "
-	
-	adapters to fix
-	"{cutadapt} --interleaved -a NNNNNAGATCGGAAGAGCACACGTCTGAACTCCAGTCAC "
-	"-A NNNNNAGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTAGATCTCGGTGGTCGCCGTATCATT --mask-adapter - 2>> {log} | "
-	*/
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                          Fastq Barcode Tagger: Jan 2020                       **\n" +
+				"**                          Fastq Barcode Tagger: Oct 2023                          **\n" +
 				"**************************************************************************************\n" +
 				"Takes 2 or 3 fastq files (paired end reads and possibly a third containing unique \n"+
-				"molecular barcodes/ indexes), appends the barcode and quality to the fastq header, and\n"+
-				"writes out the modified records. For IDT inline 2 fastq UMI data sets, the barcode is\n"+
-				"parsed from the beginning of each fastq. Be sure to clip 5Ns from the 3' end when\n"+
-				"adapter trimming.\n"+
+				"molecular indexes/ barcodes), appends the barcode and quality to the fastq header, and\n"+
+				"writes out the modified records. For inline UMI datasets, provide a length to extract\n"+
+				"the UMI from beginning of each fastq.\n"+
 
 				"\nOptions:\n"+
 				"-f First fastq file, .gz/.zip OK.\n" +
 				"-s Second fastq file, .gz/.zip OK.\n" +
 				"-b Barcode fastq file, .gz/.zip OK, or set -e\n" + 
-				"-e Parse barcodes from the first 3bp of each read and combine the two 3mers into a\n"+
-				"      6mer barcode. 5bp are trimmed from the ends of each read to remove the UMI and\n"+
-				"      2bp constant seq as well as an potential read through. IDT's current strategy.\n"+
+				"-l For inline, length of barcode to parse from the beginning of each fastq file.\n"+
+				"-t For inline, length to trim the fastqs, defaults to -l\n"+
 				"-i Write interlaced fastq to stdout for direct piping to other apps\n"+
 				"-r Directory to save the modified fastqs, defaults to the parent of -f\n"+
-				"-l Max length of barcode, defaults to all. Use to trim 3' end.\n"+
 				"-a Append the line number to the read name to uniquify.\n"+
 
 				"\nExample: java -Xmx1G -jar pathToUSeq/Apps/FastqBarcodeTagger -f lob_1.fastq.gz\n" +

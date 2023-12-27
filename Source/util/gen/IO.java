@@ -1313,6 +1313,13 @@ public class IO {
 			Files.createSymbolicLink(link, real);
 		}
 	}
+	
+	/**Creates symbolicLinks in the destinationDir*/
+	public static void createSymbolicLinks(ArrayList<File>filesToLink, File destinationDir) throws IOException {
+		File[] toLink = new File[filesToLink.size()];
+		filesToLink.toArray(toLink);
+		createSymbolicLinks(toLink, destinationDir);
+	}
 
 	/**Extracts the full path file names of all the files in a given directory with a given extension (ie txt or .txt).
 	 * If the dirFile is a file and ends with the extension then it returns a File[] with File[0] the
@@ -2214,6 +2221,8 @@ public class IO {
 			String line;
 			String[] fields;
 			while ((line = in.readLine())!=null){
+				line = line.trim();
+				if (line.length()==0 || line.startsWith("#")) continue;
 				fields = Misc.TAB.split(line);
 				names.put(fields[keyIndex].trim(), fields[valueIndex].trim());
 			}

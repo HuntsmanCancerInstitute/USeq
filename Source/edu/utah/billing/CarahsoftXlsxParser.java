@@ -50,7 +50,7 @@ public class CarahsoftXlsxParser {
 	}
 
 	public static void main(String[] args) throws IOException {
-		CarahsoftXlsxParser p = new CarahsoftXlsxParser(new File ("/Users/u0028003/HCI/CoreAdmin/Billing/AllBillingReports/2023/6_BSR_June_2023/CarahsoftMay2023"), true);
+		CarahsoftXlsxParser p = new CarahsoftXlsxParser(new File ("/Users/u0028003/HCI/CoreAdmin/Billing/AllBillingReports/2023/9_CBI_Sept_2023/Carahsoft"), true);
 
 	}
 
@@ -85,6 +85,8 @@ public class CarahsoftXlsxParser {
 
 		//check that data lines were parsed
 		if (numParsedLines == 0) Misc.printErrAndExit("\nFailed to parse any data lines from "+inputFile+" .\nDid you open, allow Excel to fix, then save overwritting the origin? These come broken from Carahsoft.");
+
+		
 	}
 
 	private void parseRow(Row row) {
@@ -94,7 +96,7 @@ public class CarahsoftXlsxParser {
 		String[] cellStrings = new String[numCells];
 		for (int c=0;c < numCells; c++) {
 			Cell cell = row.getCell(c);
-			if (cell != null) cellStrings[c] = cell.toString(); 
+			if (cell != null) cellStrings[c] = cell.toString().trim(); 
 		}
 
 		//header row

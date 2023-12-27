@@ -12,12 +12,13 @@ public class VariantPathwayComparator {
 	private File groupBGeneHits;
 	private File pathwayGenes;
 	private File geneKeggIdName;
+	private boolean addOne = false;
 	
 	//internal
 	private ArrayList<Pathway> pathways = new ArrayList<Pathway>();
 	private File resultsSpreadsheet = null;
 	private HashMap<String,String> keggGeneNameID = null;
-	private double minKeggFreq = 0.025;
+	private double minKeggFreq = 0.001;
 	
 	
 	//constructor
@@ -57,7 +58,7 @@ public class VariantPathwayComparator {
 			PrintWriter out = new PrintWriter( new FileWriter(this.resultsSpreadsheet));
 			if (geneKeggIdName == null) out.println("NameHyperLink\tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tBHits\tBNoHits\tFracBHits\tBGeneHits\tLog2(fracA/fracB)");
 			else out.println("NameHyperLink\tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tAGeneLinks\tBHits\tBNoHits\tFracBHits\tBGeneHits\tBGeneLinks\tLog2(fracA/fracB)");
-			for (Pathway p: loadedPathways) out.println(p.toString(keggGeneNameID));
+			for (Pathway p: loadedPathways) out.println(p.toString(keggGeneNameID, addOne));
 			out.close();
 		} catch (IOException e) {
 			e.printStackTrace();
@@ -202,7 +203,7 @@ public class VariantPathwayComparator {
 		
 		
 		
-		public String toString(HashMap<String,String>keggGeneNameId) {
+		public String toString(HashMap<String,String>keggGeneNameId, boolean addOne) {
 			//name pval, adjPval, AHits, ANoHits, fracAHits, AGeneHits, (ALinks,) BHits, BNoHits, fracBHits, BGeneHits, (BLinks), log2(fracA/fracB)
 			StringBuilder sb = new StringBuilder();
 			//attempt to parse the hsa0000 pathway number
@@ -231,6 +232,17 @@ public class VariantPathwayComparator {
 			sb.append(Num.formatNumber(bFrac, 5)); sb.append("\t");
 			sb.append(convertToSortedFrequencies(bGenes, partialHyperLink)); sb.append("\t");
 
+			//correct for zero log2Rto?
+			if (addOne) {
+				if (aFrac == 0) {
+					double a = 1;
+					aFrac = a/ (a+(double)groupANoHits.size());
+				}
+				if (bFrac == 0) {
+					double b = 1;
+					bFrac = b/ (b+(double)groupBNoHits.size());
+				}
+			}
 			double rto = aFrac/bFrac;
 			sb.append(Num.formatNumber(Num.log2(rto), 5));
 			return sb.toString();
@@ -336,6 +348,8 @@ public class VariantPathwayComparator {
 					case 'p': pathwayGenes = new File(args[++i]); break;
 					case 'k': geneKeggIdName = new File(args[++i]); break;
 					case 'r': resultsSpreadsheet = new File(args[++i]); break;
+					case 'm': minKeggFreq = Double.parseDouble(args[++i]); break;
+					case 'l': addOne = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -357,7 +371,7 @@ public class VariantPathwayComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Variant Pathway Comparator : Feb 2022                  **\n" +
+				"**                           Variant Pathway Comparator : Nov 2023                  **\n" +
 				"**************************************************************************************\n" +
 				"For each pathway, VPC creates a 2x2 contingency table and calculates a Fisher's exact\n"+
 				"p-value that is subsequently multiple test corrected using Benjamini-Hochberg's\n"+
@@ -377,9 +391,11 @@ public class VariantPathwayComparator {
 				"-r File to save results, should end with .xls\n"+
 		        "-k (Optional) Tab delimited file containing KEGG gene IDs and gene Names, one row\n"+
 				"      per gene, for highlighting impacted genes in each KEGG pathway hyperlink.\n"+
+		        "-m Minimum gene hit frequency for inclusion in KEGG hyperlink, defaults to 0.001\n"+
+				"-l Add one to zero count A or B fractions when calculating the log2Rto(fracA/fracB)\n"+
 				
 				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/VariantPathwayComparator -a earlyCRC.txt\n"+
-				"   -b lateCRC.txt -p keggHumanPathways.txt -r earlyVsLateVPC.xls -k keggGeneIDName.txt\n"+
+				"   -l -b lateCRC.txt -p keggPathways.txt -r earlyVsLateVPC.xls -k keggGeneIDName.txt\n"+
 
 		"\n**************************************************************************************\n");
 

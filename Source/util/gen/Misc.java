@@ -20,6 +20,7 @@ public class Misc {
 	public static final Pattern PATTERN_EQUALS = Pattern.compile("=");
 	public static final Pattern FORWARD_SLASH = Pattern.compile("/");
 	public static final Pattern TAB = Pattern.compile("\t");
+	public static final Pattern TAB_MULTIPLE = Pattern.compile("\t+");
 	public static final Pattern RETURN = Pattern.compile("\n");
 	public static final Pattern WHITESPACE = Pattern.compile("\\s+");
 	public static final Pattern COMMA_WHITESPACE = Pattern.compile("[,\\s]+");
@@ -29,7 +30,9 @@ public class Misc {
 	public static final Pattern COMMA = Pattern.compile(",");
 	public static final Pattern PERIOD = Pattern.compile("\\.");
 	public static final Pattern SINGLE_QUOTE = Pattern.compile("'");
+	public static final Pattern DOUBLE_QUOTE = Pattern.compile("\"");
 	public static final Pattern SEMI_COLON = Pattern.compile(";");
+	public static final Pattern SEMI_COLON_SPACE = Pattern.compile("\\s*;\\s*");
 	public static final Pattern PIPE = Pattern.compile("\\|");
 	public static final Pattern FORWARD_PARENTHESIS = Pattern.compile("\\(");
 	public static final Pattern GREATER_THAN = Pattern.compile(">");

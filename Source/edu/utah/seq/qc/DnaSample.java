@@ -36,7 +36,7 @@ public class DnaSample {
 	private void parseReadCoverageJson(File readCovJson) throws Exception {
 		if (readCovJson == null) return;
 		JSONObject jo = new JSONObject(IO.loadFile(readCovJson, " ", true));
-		meanOnTargetCoverage = Double.parseDouble(jo.getString("meanCoverage"));
+		meanOnTargetCoverage = Double.parseDouble(jo.getString("meanCoverage").replaceAll(",", ""));
 		coverageAt095OfTargetBps = jo.getInt("coverageAt0.95OfTargetBps");
 		coverageAt090OfTargetBps = jo.getInt("coverageAt0.90OfTargetBps");
 		JSONArray ja = jo.getJSONArray("fractionTargetBpsWithIndexedCoverage");

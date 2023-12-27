@@ -153,12 +153,14 @@ public class CBiBilling {
 	
 	private void printHSCBilling() {
 		IO.pl("\nHSC Invoice...");
-		IO.pl("GroupName\tHoursBilled\tHSCShare($"+(int)hscCostSharing+"/hour)\tHourlyChartfieldsOnFile");
+		IO.pl("GroupName\tHoursBilled\tHSCShare($"+(int)hscCostSharing+"/hour)");
 		for (String gl: nonCancerBilling) IO.pl(gl);
 		IO.pl("\nTotalHSCCostSharing:\t$"+ Num.formatNumber(totalHscBilling, 2));
 	}
 
 	private void printJustCloudInvoices() {
+		if (cloudReportsDirectory == null) return;
+		
 		//remove any account numbers that were already printed with the hourly invoices
 		TreeMap<String, Float> accountNumberTotals = carahsoftParser.getAwsAccountNumberTotals();
 		for (String ac: accountNumbersCloudBilled) accountNumberTotals.remove(ac);
@@ -226,7 +228,7 @@ public class CBiBilling {
 		float totalAwsCost = 0f;
 		
 		//any cloud reports? often these aren't available for a given month
-		if (carahsoftParser.getAwsAccountNumberTotals().size()!=0) {
+		if (cloudReportsDirectory!= null && carahsoftParser.getAwsAccountNumberTotals().size()!=0) {
 			TreeMap<String, Float> awsAccountNumberTotals = carahsoftParser.getAwsAccountNumberTotals();
 			TreeMap<String, String> awsAccountGroupName = awsXlsxAccountParser.getAwsAccountGroupName();
 
@@ -274,9 +276,9 @@ public class CBiBilling {
 
 
 	private void parseAWSAccounts() throws IOException {
-		IO.pl("\nParsing Carahsoft AWS account files...");
 		//any cloud reports?
 		if (cloudReportsDirectory != null) {
+			IO.pl("\nParsing Carahsoft AWS account files...");
 			carahsoftParser = new CarahsoftXlsxParser(cloudReportsDirectory, debug);
 			//anything parsed
 			if (carahsoftParser.getAwsAccountNumberTotals().size()!=0) {
@@ -292,7 +294,7 @@ public class CBiBilling {
 				
 				//any missing account numbers
 				if (missingAccountNumber.size()!=0) {
-					for (String acc: missingAccountNumber) IO.el("\tMissing "+acc+" in "+awsAccountsFile+", correct and restart.");
+					for (String acc: missingAccountNumber) IO.el("\tMissing '"+acc+"' in "+awsAccountsFile+", correct and restart.");
 					System.exit(1);
 				}
 				
@@ -324,7 +326,7 @@ public class CBiBilling {
 		
 		//the only groups left here are Hourly ticket holders
 		boolean missingAlias = false;
-		for (String jg: groupNameTickets.keySet()) {
+		for (String jg: groupNameTickets.keySet()) {		
 			if (aliasesMap.containsKey(jg) == false) {
 				missingGroups.add("Missing alias entry for -> "+jg);
 				missingAlias = true;
@@ -344,44 +346,6 @@ public class CBiBilling {
 		for (String me: missingGroups) IO.pl("\t"+me);
 		if (missingAlias) Misc.printErrAndExit("\t\tCorrect missing alias and restart");
 	}
-
-
-/*
-	private void parseAliases() {
-		
-		aliases = new AliasXlsxParser(groupNameAliasesFile, debug);
-		
-		ArrayList<String> missingGroups = new ArrayList<String>();
-		TreeMap<String, HashSet<String>> aliasesMap = aliases.getGroupNameAliases();
-		TreeMap<String, ArrayList<String[]>> userWafs = hourly.getGroupNameWafLines();
-		
-		//check jira tickets
-		IO.pl("\nChecking Aliases and if Jira tickets have an Hourly WAF... ");
-		
-		//the only groups left here are Hourly ticket holders
-		boolean missingAlias = false;
-		for (String jg: groupNameTickets.keySet()) {
-			if (aliasesMap.containsKey(jg) == false) {
-				missingGroups.add("Missing alias entry for -> "+jg);
-				missingAlias = true;
-			}
-			else {
-				//check for WAF entry
-				boolean found = false;
-				for (String a: aliasesMap.get(jg)) {
-					if (userWafs.containsKey(a)) {
-						found = true;
-						break;
-					}
-				}
-				if (found == false) missingGroups.add("Missing Hourly WAF entry for -> "+jg);
-			}
-		}
-		for (String me: missingGroups) IO.pl("\t"+me);
-		if (missingAlias) Misc.printErrAndExit("\t\tCorrect missing alias and restart");
-	}
-	*/
-
 
 	private void parseJiraHours() throws IOException {
 		IO.pl("\nParsing the Jira ticket report...");
@@ -409,7 +373,7 @@ public class CBiBilling {
 						al = new ArrayList<JiraTicketSummary>();
 						groupNameTickets.put(groupName, al);
 					}
-					al.add(jts);
+					al.add(jts);					
 				}
 				if (jts.getJiraTicket()==null) {
 					Misc.printErrAndExit("Missing jt#: ");
@@ -448,7 +412,7 @@ public class CBiBilling {
 				errorsFound = true;
 				IO.pl("\tMixed FTE and Hourly tickets were found for "+groupName);
 				for (JiraTicketSummary jts: groupNameTickets.get(groupName)) {
-					IO.pl("\t\t"+jts.toString());
+					IO.pl("\t\t"+jts.getWorkType()+"\t"+jts.toString());
 				}
 			}
 		}
@@ -527,12 +491,6 @@ public class CBiBilling {
 		
 	}
 
-
-
-
-
-
-
 	public static void main(String[] args) throws Exception {
 		if (args.length ==0){
 			printDocs();
@@ -586,6 +544,7 @@ public class CBiBilling {
 				"Required Parameters:\n" +
 				"-j Path to the exported cvs Jira 'Logged Time' report.\n"+
 				"-m Path to the masterAccountInfo.xlsx spreadsheet updated from the prior month.\n"+
+				"-a Path to the awsAccounts.xlsx spreadsheet.\n"+
 				"-w Path to a dir containing the hourly and cloud 'WAF Tracking Schedule' xlsx files.\n" +
 				"-c Path to a dir containing the cloud AWS Carahsoft xlsx expense reports. May be empty\n"+
 				"      if are none available.\n"+

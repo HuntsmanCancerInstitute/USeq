@@ -5,6 +5,7 @@ import java.util.HashMap;
 
 import trans.anno.BindingRegion;
 import util.gen.IO;
+import util.gen.Misc;
 
 /**Base class for holding info about a genomic coordinate.*/
 public class Coordinate implements Comparable<Coordinate>, Serializable{
@@ -21,10 +22,10 @@ public class Coordinate implements Comparable<Coordinate>, Serializable{
 		this.stop = stop;
 	}
 	/**Sorts by chromsome, start position, length (smallest to largest).*/
-	public int compareTo(Coordinate otherCoor){
+	public int compareTo(Coordinate otherCoor) {
 		//sort by chromosome
 		int compare = otherCoor.chromosome.compareTo(chromosome);
-		if (compare !=0) return compare * -1;;
+		if (compare !=0) return compare * -1;
 		//sort by start position
 		if (start<otherCoor.start) return -1;
 		if (start>otherCoor.start) return 1;

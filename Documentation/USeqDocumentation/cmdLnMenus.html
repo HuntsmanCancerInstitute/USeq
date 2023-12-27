@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.3.5.beta
+			<html><head><title>USeq Command Line Menus 9.3.6.beta
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -12,6 +12,8 @@
 			
 		
 					<a href="#AggregatePlotter">AggregatePlotter</a><br>
+				
+					<a href="#AggregateQCStats">AggregateQCStats</a><br>
 				
 					<a href="#AggregateQCStats2">AggregateQCStats2</a><br>
 				
@@ -169,6 +171,8 @@
 				
 					<a href="#GatkCalledSegmentAnnotator">GatkCalledSegmentAnnotator</a><br>
 				
+					<a href="#GatkCopyRatioFilter">GatkCopyRatioFilter</a><br>
+				
 					<a href="#GatkRunner">GatkRunner</a><br>
 				
 					<a href="#GatkJointGenotyper">GatkJointGenotyper</a><br>
@@ -184,6 +188,8 @@
 					<a href="#IntersectKeyWithRegions">IntersectKeyWithRegions</a><br>
 				
 					<a href="#IntersectRegions">IntersectRegions</a><br>
+				
+					<a href="#InvitaeBulkCsvParser">InvitaeBulkCsvParser</a><br>
 				
 					<a href="#JobCleaner">JobCleaner</a><br>
 				
@@ -249,6 +255,8 @@
 				
 					<a href="#NonReferenceRegionMaker">NonReferenceRegionMaker</a><br>
 				
+					<a href="#NormalizedCountCBioFormater">NormalizedCountCBioFormater</a><br>
+				
 					<a href="#NovoalignBisulfiteParser">NovoalignBisulfiteParser</a><br>
 				
 					<a href="#NovoalignIndelParser">NovoalignIndelParser</a><br>
@@ -264,6 +272,8 @@
 					<a href="#ParsePointDataContexts">ParsePointDataContexts</a><br>
 				
 					<a href="#PMRSearch">PMRSearch</a><br>
+				
+					<a href="#PmrVcfBedMerger">PmrVcfBedMerger</a><br>
 				
 					<a href="#PeakShiftFinder">PeakShiftFinder</a><br>
 				
@@ -330,6 +340,8 @@
 					<a href="#Sgr2Bar">Sgr2Bar</a><br>
 				
 					<a href="#SimpleSomaticCaller">SimpleSomaticCaller</a><br>
+				
+					<a href="#SimpleSomaticParser">SimpleSomaticParser</a><br>
 				
 					<a href="#Simulator">Simulator</a><br>
 				
@@ -470,6 +482,36 @@ Options:
 Example: java -Xmx1500M -jar pathTo/USeq/Apps/AggregatePlotter -t
       /Data/PolIIRep1/,/Data/PolIIRep2/ -b /Anno/tssSites.bed -p 73 -u 1
       -l 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="AggregateQCStats"><pre>**************************************************************************************
+**                            Aggregate QC Stats: Nov 2020                          **
+**************************************************************************************
+Parses and aggregates alignment quality statistics from json files produced by the
+SamAlignmentExtractor, MergePairedAlignments, Sam2USeq, BamConcordance, Fastq, and
+RemoveDuplicates rules in the TNRunner workflows.
+
+Options:
+-j Directory containing xxx.json.gz files for parsing. Recurses through all other
+      directories contained within.
+-r Results directory for writing the summary xls spreadsheets for graphing.
+
+Default Options:
+-f FastqCount regex for parsing sample name, note the name must be identical across
+   the json files, defaults to (.+)_FastqCount.json.gz, case insensitive.
+-s SAE regex, defaults to (.+)_SamAlignmentExtractor.json.gz
+-m MPA regex, defaults to (.+)_MergePairedAlignments.json.gz
+-u S2U regex, defaults to (.+)_Sam2USeq.json.gz
+-b BC regex, defaults to (.+)_BamConcordance.json.gz
+-b DUP regex, defaults to (.+)_RemoveDuplicates.json.gz
+-p String to prepend onto output file names.
+-c Don't calculate detailed region read coverage statistics, saves memory and time.
+-v Print verbose debugging output.
+-e Replace Exome with DNA in all file reference names.
+
+Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -r QCStats/ -p TR774_ 
 
 **************************************************************************************
 </pre><br><p>
@@ -1498,19 +1540,21 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/
 </pre><br><p>
 				
 					<a name="CBiBilling"><pre>**************************************************************************************
-**                                Correlate:    Nov 2008                            **
+**                               CBI Billing:    Sept 2023                          **
 **************************************************************************************
-Calculates all pair-wise Pearson correlation coefficients (r) and if indicated will
-perform a hierarchical clustering on the files.
+Generates billing reports for the Cancer Bioinformatics Shared Resource.
 
-Parameters:
--d The full path directory text containing serialized java float[] files (xxx.celp
-      see CelProcessor app).
--a Files provided are float[][] files (xxx.cela) and need to be collapsed to float[]
--c Cluster files.
+Required Parameters:
+-j Path to the exported cvs Jira 'Logged Time' report.
+-m Path to the masterAccountInfo.xlsx spreadsheet updated from the prior month.
+-a Path to the awsAccounts.xlsx spreadsheet.
+-w Path to a dir containing the hourly and cloud 'WAF Tracking Schedule' xlsx files.
+-c Path to a dir containing the cloud AWS Carahsoft xlsx expense reports. May be empty
+      if are none available.
+-o Path to write the results.
 
-Example: java -Xmx256M -jar pathTo/T2/Apps/Correlate -d /Mango/PCels/ -c -a
-
+Example: java -Xmx256M -jar pathTo/USeq/Apps/CBiBilling -j jiraTime.cvs -m 
+   masterAccountInfo.xlsx -w WAFs/ -c Carahsoft/ -o Invoices
 **************************************************************************************
 </pre><br><p>
 				
@@ -2160,24 +2204,21 @@ Example: java -Xmx1000M -jar pathTo/T2/Apps/ExportTrimmedGenes -u -g
 </pre><br><p>
 				
 					<a name="FastqBarcodeTagger"><pre>**************************************************************************************
-**                          Fastq Barcode Tagger: Jan 2020                       **
+**                          Fastq Barcode Tagger: Oct 2023                          **
 **************************************************************************************
 Takes 2 or 3 fastq files (paired end reads and possibly a third containing unique 
-molecular barcodes/ indexes), appends the barcode and quality to the fastq header, and
-writes out the modified records. For IDT inline 2 fastq UMI data sets, the barcode is
-parsed from the beginning of each fastq. Be sure to clip 5Ns from the 3' end when
-adapter trimming.
+molecular indexes/ barcodes), appends the barcode and quality to the fastq header, and
+writes out the modified records. For inline UMI datasets, provide a length to extract
+the UMI from beginning of each fastq.
 
 Options:
 -f First fastq file, .gz/.zip OK.
 -s Second fastq file, .gz/.zip OK.
 -b Barcode fastq file, .gz/.zip OK, or set -e
--e Parse barcodes from the first 3bp of each read and combine the two 3mers into a
-      6mer barcode. 5bp are trimmed from the ends of each read to remove the UMI and
-      2bp constant seq as well as an potential read through. IDT's current strategy.
+-l For inline, length of barcode to parse from the beginning of each fastq file.
+-t For inline, length to trim the fastqs, defaults to -l
 -i Write interlaced fastq to stdout for direct piping to other apps
 -r Directory to save the modified fastqs, defaults to the parent of -f
--l Max length of barcode, defaults to all. Use to trim 3' end.
 -a Append the line number to the read name to uniquify.
 
 Example: java -Xmx1G -jar pathToUSeq/Apps/FastqBarcodeTagger -f lob_1.fastq.gz
@@ -2524,6 +2565,27 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/GatkCalledSegmentAnnotator -r AnnoRes
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="GatkCopyRatioFilter"><pre>**************************************************************************************
+**                        Gatk Copy Ratio Filter: Nov 2023                          **
+**************************************************************************************
+Filters and aggregates the copy ratio calls from the GatkCalledSegmentAnnotator. Use
+it to refine the calls in batch from the GCSA.
+
+Options:
+-b Directory containing the xxx.bed.gz files from the GatkCalledSegmentAnnotator
+-r Directory to save the filtered bed files and the impacted genes aggregate file
+-g File containing gene names to keep in the impacted gene aggregate file. One gene
+      per line.
+-c Minimum absolute tumor log2 copy ratio, defaults to 0.585 (1.5x)
+-x Maximum absolute normal log2 copy ratio, defaults to 0.202 (1.15x)
+-m Minimum absolute log2 TN ratio of copy ratios, defaults to 0.322 (1.25x)
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/GatkCopyRatioFilter -r FilteredResults/
+       -b PassingBedFiles -g ~/UCSC/stndHg38RefSeqGenes.txt -m 0.585 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="GatkRunner"><pre>**************************************************************************************
 **                               Gatk Runner: Jan 2022                              **
 **************************************************************************************
@@ -2698,6 +2760,33 @@ regions can also be used to calculate a p-value and fold enrichment.
 Example: java -Xmx1500M -jar pathTo/Apps/IntersectRegions -f /data/miRNAs.txt
       -s /data/DroshaLists/ -g 500 -n 10000 -r /data/InterrogatedRegions/
 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="InvitaeBulkCsvParser"><pre>**************************************************************************************
+**                           Invitae Bulk Csv Parser : Oct 2023                     **
+**************************************************************************************
+The IBCP parses the two Invitae bulk export patient and variant spreadsheets into
+Patient Molecular Repository (PMR) compatible vcf, bed, and json files. It uses the
+patient PHI to fetch or make PMR Ids using the SubjectMatchMaker
+app and assembles PMR directories. For each patient's test, it writes out a bed file
+of tested genes, a json file of info from the patient cvs, and a vcf file of variants
+including <DUP> <DEL> copy number. Run vt normalization and CrossMap to convert the
+hg19 vcf coordinates to hg38.
+
+Options:
+-p Invitae patients csv file
+-v Invitae variants csv file
+-f Hg19 indexed fasta
+-t Directory to place temp files with PHI for Subject ID matching
+-c Directory containing the SubjectMatchMaker 'currentRegistry_' file. This will be
+     updated with new patient IDs.
+-g Hg38 all Invitae interrogated gene coordinate file.
+
+Example: java -jar -Xmx2G pathToUSeq/Apps/InvitaeBulkCsvParser -t TempPHIDelme 
+     -g invitaeGeneRegions17Oct2023.txt -p Huntsman_patients_20230815.csv -v
+     Huntsman_variants_20230815.csv -f ~/Indexes/hg19.fasta -c ~/PMRRepo/
 
 **************************************************************************************
 </pre><br><p>
@@ -3535,6 +3624,22 @@ Example: samtools mpileup -B -d 1000000 -f $faIndex -l $bed $bam | java
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="NormalizedCountCBioFormater"><pre>**************************************************************************************
+**                          NormalizedCountCBioFormater:  August 2023               **
+**************************************************************************************
+Parses a DESeq2 or RSEM output file containing normalized counts, converts the ensembl
+gene names to HUGO symbols, and saves the output ready for import into cBioPortal.
+
+Required Options:
+-e Path a tab delimited txt file containing Ensembl IDs and Gene Symbols.
+-n Path to a normalized count file from DESeq2, e.g. 
+   write.table(assay(vst(dds, blind=FALSE)), file = 'vst.txt',quote=FALSE, sep ='\t')'
+
+Example: java -jar pathTo/Apps/NormalizedCountCBioFormater -e ensembIDsGeneSym.txt
+   -n vst.txt
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="NovoalignBisulfiteParser"><pre>**************************************************************************************
 **                        Novoalign Bisulfite Parser: May 2016                      **
 **************************************************************************************
@@ -3745,7 +3850,7 @@ Example: java -Xmx12G -jar pathTo/USeq/Apps/ParsePointDataContexts -c '..CG.' -s
 </pre><br><p>
 				
 					<a name="PMRSearch"><pre>**************************************************************************************
-**                       Patient Molecular Repo Search : April 2023                 **
+**                       Patient Molecular Repo Search : August 2023                **
 **************************************************************************************
 Interactive searching of the clinical and sample attribute information in the json/xml
 reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.
@@ -3762,6 +3867,25 @@ Options:
 -v  Verbose output.
 
 Example: java -jar pathToUSeq/Apps/PMRSearch -d ~/PMRFiles/
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="PmrVcfBedMerger"><pre>**************************************************************************************
+**                             Pmr Vcf Bed Merger: Oct 2023                         **
+**************************************************************************************
+Parses directories of Vcf and Bed files named such that the first underscore separated
+field represents a subject's ID.  These will be used to group the vcf and bed files
+and merge them by removing duplicate lines.
+
+Options:
+-v Directory containing xxx.vcf.gz files
+-b Directory containing xxx.bed.gz files
+-c Directory to save the merged vcf files
+-e Directory to save the merged bed files
+
+Example: java -jar pathToUSeq/Apps/PmrVcfBedMerger -v VcfFiles/ -c MergedVcfs/
+        -b BedFiles/ -e MergedBeds/ 
+
 **************************************************************************************
 </pre><br><p>
 				
@@ -4788,6 +4912,28 @@ Example: java -jar pathToUSeq/Apps/SimpleSomaticCaller -v bcfTools.vcf.gz -f 0.0
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="SimpleSomaticParser"><pre>**************************************************************************************
+**                          Simple Somatic Parser: Oct 2023                         **
+**************************************************************************************
+Takes vcf output from Bcftools mpileup and norm applications (http://www.htslib.org)
+run on one or more bam files and filters the variants for those meeting several hard
+thresholds regarding allele fraction, read depth, and number of alt observations.
+Only one of the samples must pass these criteria to save the entire vcf record.
+
+Params:
+-i Path to the bcftools xxx.vcf(.gz/.zip OK) file.
+-o Path to write out the passing variants, xxx.vcf.gz
+-a Minimum allele fraction (AF), defaults to 0.01
+-d Minimum alignment depth (DP), defaults to 12
+-t Minimum alt count, defaults to 2
+-b Print example bcftools bash script.
+
+Example: java -jar pathToUSeq/Apps/SimpleSomaticParser -i bcfTools.vcf.gz -a 0.025 
+ -u 100 -t 3 -o passing.vcf.gz
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="Simulator"><pre>**************************************************************************************
 **                               Simulator: Nov 2008                                **
 **************************************************************************************
@@ -5098,7 +5244,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 </pre><br><p>
 				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                 TNRunner2 : Dec 2022                             **
+**                                 TNRunner2 : Aug 2023                             **
 **************************************************************************************
 TNRunner2 is designed to execute several containerized workflows on tumor normal
 datasets via a slurm cluster.  Based on the availability of paired fastq datasets, 
@@ -5138,7 +5284,8 @@ Setup Options:
 -e Workflow docs for launching DNA alignments.
 -t Workflow docs for launching RNA alignments.
 -f Workflow docs for launching RNA fusion detection.
--c Workflow docs for launching somatic variant calling.
+-c Workflow docs for launching Illumina somatic variant calling.
+-C Workflow docs for launching GATK somatic variant calling.
 -m Workflow docs for launching MSI status calling.
 -a Workflow docs for launching variant annotation.
 -b Workflow docs for launching sample concordance.
@@ -5352,10 +5499,10 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/USeq2Text -f
 </pre><br><p>
 				
 					<a name="VariantInfoAggregator"><pre>**************************************************************************************
-**                            VariantInfoAggregator : Sept 2019                     **
+**                            VariantInfoAggregator : July 2022                     **
 **************************************************************************************
-Parses and aggregates somatic and germline variant calls from many samples processed
-by the USeq TNRunner application.
+Parses and aggregates somatic and germline variant info from TNRunner output. MSI, TMB
+LoH, CopyAnalysis, etc.
 
 Options:
 -j Job directory containing directories for each patient results TNRunner. 
@@ -5368,7 +5515,7 @@ Example: java -jar -Xmx2G ~/USeqApps/VariantInfoAggregator -j AJobs/ -s
 </pre><br><p>
 				
 					<a name="VariantPathwayComparator"><pre>**************************************************************************************
-**                           Variant Pathway Comparator : Feb 2022                  **
+**                           Variant Pathway Comparator : Nov 2023                  **
 **************************************************************************************
 For each pathway, VPC creates a 2x2 contingency table and calculates a Fisher's exact
 p-value that is subsequently multiple test corrected using Benjamini-Hochberg's
@@ -5388,9 +5535,11 @@ Required Parameters:
 -r File to save results, should end with .xls
 -k (Optional) Tab delimited file containing KEGG gene IDs and gene Names, one row
       per gene, for highlighting impacted genes in each KEGG pathway hyperlink.
+-m Minimum gene hit frequency for inclusion in KEGG hyperlink, defaults to 0.001
+-l Add one to zero count A or B fractions when calculating the log2Rto(fracA/fracB)
 
 Example: java -Xmx10G -jar pathTo/USeq/Apps/VariantPathwayComparator -a earlyCRC.txt
-   -b lateCRC.txt -p keggHumanPathways.txt -r earlyVsLateVPC.xls -k keggGeneIDName.txt
+   -l -b lateCRC.txt -p keggPathways.txt -r earlyVsLateVPC.xls -k keggGeneIDName.txt
 
 **************************************************************************************
 </pre><br><p>

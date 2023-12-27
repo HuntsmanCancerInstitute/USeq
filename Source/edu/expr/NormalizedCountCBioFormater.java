@@ -143,15 +143,16 @@ public class NormalizedCountCBioFormater {
 				"**************************************************************************************\n" +
 				"**                          NormalizedCountCBioFormater:  August 2023               **\n" +
 				"**************************************************************************************\n" +
-				"Parses a DESeq2 output file containing normalized counts, converts the ensembl gene\n" +
-				"names to HUGO gene symbols, and saves the output ready for import into cBioPortal.\n"+
+				"Parses a DESeq2 or RSEM output file containing normalized counts, converts the ensembl\n"+
+				"gene names to HUGO symbols, and saves the output ready for import into cBioPortal.\n"+
 				
+				"\nRequired Options:\n"+
 				"-e Path a tab delimited txt file containing Ensembl IDs and Gene Symbols.\n" +
 				"-n Path to a normalized count file from DESeq2, e.g. \n"+
-				"write.table(assay(vst(dds, blind=FALSE)), file = 'vst.txt', quote=FALSE, sep ='\\t')'.\n" +
+				"   write.table(assay(vst(dds, blind=FALSE)), file = 'vst.txt',quote=FALSE, sep ='\\t')'\n" +
 				
-				"Example: java -jar pathTo/Apps/NormalizedCountCBioFormater -e ensembIDsGeneSym.txt\n"+
-				"    -n vst.txt\n" +	
+				"\nExample: java -jar pathTo/Apps/NormalizedCountCBioFormater -e ensembIDsGeneSym.txt\n"+
+				"   -n vst.txt\n" +	
 		"**************************************************************************************\n");		
 	}
 	
