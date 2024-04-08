@@ -18,8 +18,9 @@ public class AggregateQCStats2 {
 	private File saveDirectory;
 	private File jobDirectory;
 	private String prependString = "";
+	private boolean removeNAColumns = true;
 
-	private String alignLogMatch = ".+AlignHg38.log";
+	private String alignLogMatch = ".+Align.log";
 	private String dupLogMatch = ".+Markdup.log";
 	private String readCovJsonMatch = ".+UniObRC.json.gz";
 	private String scJsonMatch = ".+SampleConcordance.json.gz";
@@ -274,7 +275,7 @@ public class AggregateQCStats2 {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Aggregate QC Stats2: April 2022                        **\n" +
+				"**                           Aggregate QC Stats2: March 2024                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from log and json files produced by\n"+
 				"the TNRunner2 DnaAlignQC and SampleConcordance workflows.\n"+
@@ -284,7 +285,7 @@ public class AggregateQCStats2 {
 				"-s Directory for saving the AggQC results.\n"+
 
 				"\nOptions:\n"+
-				"-a Alignment log file match, defaults to '.+_AlignHg38.log'\n"+
+				"-a Alignment log file match, defaults to '.+_Align.log'\n"+
 				"-d Mark duplicates log file match, defaults to '.+_Markdup.log'\n"+
 				"-r Read coverage json file match, defaults to '.+_UniObRC.json.gz'\n"+
 				"-c Sample concordance json file match, defaults to '.+_SampleConcordance.json.gz'\n"+

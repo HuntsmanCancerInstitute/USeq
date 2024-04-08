@@ -1344,24 +1344,26 @@ public class ScanSeqs {
 		if (saveDirectory == null) Misc.printExit("\nError: enter a directory text to save results.\n");
 		if (saveDirectory.exists() == false) saveDirectory.mkdir();
 
-		//check for R and required libraries
-		if (fullPathToR == null || fullPathToR.canExecute()== false) {
-			Misc.printExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
-		}
-		else {
-			/*String errors = IO.runRCommandLookForError("library(DESeq)", fullPathToR, saveDirectory);
+		//check for R and required libraries?
+		if (controlPointDirs != null) {
+			if (fullPathToR == null || fullPathToR.canExecute()== false) {
+				Misc.printExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
+			}
+			else {
+				/*String errors = IO.runRCommandLookForError("library(DESeq)", fullPathToR, saveDirectory);
 			if (errors == null || errors.length() !=0){
 				Misc.printExit("\nError: Cannot find the required R library.  Did you install DESeq " +
 						"(http://www-huber.embl.de/users/anders/DESeq/)?  See the author's websites for installation instructions. Once installed, " +
 						"launch an R terminal and type 'library(DESeq)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
 			}*/
-			String errors = IO.runRCommandLookForError("library(qvalue)", fullPathToR, saveDirectory);
-			if (errors == null || errors.length() !=0){
-				Misc.printExit("\nError: Cannot find the required R library.  Did you install qvalue " +
-						"(http://genomics.princeton.edu/storeylab/qvalue/)?  See the author's websites for installation instructions. Once installed, " +
-						"launch an R terminal and type 'library(qvalue)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
-			}
-		} 
+				String errors = IO.runRCommandLookForError("library(qvalue)", fullPathToR, saveDirectory);
+				if (errors == null || errors.length() !=0){
+					Misc.printExit("\nError: Cannot find the required R library.  Did you install qvalue " +
+							"(http://genomics.princeton.edu/storeylab/qvalue/)?  See the author's websites for installation instructions. Once installed, " +
+							"launch an R terminal and type 'library(qvalue)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
+				}
+			} 
+		}
 
 		//set score items
 		setScoreStrings();
@@ -1379,7 +1381,7 @@ public class ScanSeqs {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  Scan Seqs: July 2015                            **\n" +
+				"**                                  Scan Seqs: Jan 2024                             **\n" +
 				"**************************************************************************************\n" +
 				"Takes unshifted stranded chromosome specific PointData and uses a sliding window to\n" +
 				"calculate several smoothed window statistics. These include a binomial p-value, a\n" +

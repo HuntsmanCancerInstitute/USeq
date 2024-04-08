@@ -2,6 +2,8 @@ package util.apps;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashMap;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import util.gen.IO;
@@ -15,6 +17,7 @@ public class JobCleaner {
 	private String[] fileExtensionsToDelete = null;
 	private String[] directoryNamesToZip = null;
 	private boolean dryRun = false;
+	private boolean mergeInDirectory = false;
 	
 	//internal
 	private boolean lookForFiles;
@@ -53,17 +56,57 @@ public class JobCleaner {
 			for (File f: toZip) IO.pl("\t"+f.toString());
 		}
 		else {
-			
+
 			IO.pl("\nZip archiving and then deleting the following files and directories...");
-			for (File d: toZip) {
-				IO.pl("\t"+d.toString());
-				if (d.exists()== false) IO.pl("\t\tMissing, already zipped?! "+d.toString());
-				else {
-				boolean zipped = IO.zipDirectory(d);
-				if (zipped == false) throw new IOException("Failed to zip: "+d);
-				
-				boolean deleted = IO.deleteDirectorySimple(d);
-				if (deleted == false) throw new IOException("Failed to delete directory after zipping: "+d);
+			if (mergeInDirectory) {
+				//split by parent directory
+				HashMap<String, ArrayList<File>> parentDirs = new HashMap<String, ArrayList<File>>();
+				for (File d: toZip) {
+					IO.pl("\t"+d.toString());
+					if (d.exists()== false) IO.pl("\t\tMissing, already zipped?! Skipping "+d.toString());
+					else {
+						String parent = d.getParentFile().getCanonicalPath();
+						ArrayList<File> al = parentDirs.get(parent);
+						if (al == null) {
+							al = new ArrayList<File>();
+							parentDirs.put(parent, al);
+						}
+						al.add(d);
+					}
+				}
+				//for each parent dir, zip the children dirs into a combine archive
+				for (String par: parentDirs.keySet()) {
+					ArrayList<File> children = parentDirs.get(par);
+					File[] toCombine = new File[children.size()];
+					children.toArray(toCombine);
+					Arrays.sort(toCombine);
+					StringBuilder comboName = new StringBuilder(par);
+					comboName.append("/");
+					for (File f: toCombine) comboName.append(f.getName());
+					comboName.append(".zip");
+					File zipFile = new File (comboName.toString());
+					boolean zipped = IO.zipDirectoriesInSameParentDirectory(toCombine, zipFile);
+					if (zipped == false) throw new IOException("Failed to zip: "+comboName);
+
+					//delete the individual dirs
+					for (File f: toCombine) {
+						boolean deleted = IO.deleteDirectorySimple(f);
+						if (deleted == false) throw new IOException("Failed to delete directory after zipping: "+f);
+					}
+					
+				}
+			}
+			else {
+				for (File d: toZip) {
+					IO.pl("\t"+d.toString());
+					if (d.exists()== false) IO.pl("\t\tMissing, already zipped?! "+d.toString());
+					else {
+						boolean zipped = IO.zipDirectory(d);
+						if (zipped == false) throw new IOException("Failed to zip: "+d);
+
+						boolean deleted = IO.deleteDirectorySimple(d);
+						if (deleted == false) throw new IOException("Failed to delete directory after zipping: "+d);
+					}
 				}
 			}
 		}
@@ -146,6 +189,7 @@ public class JobCleaner {
 						case 'e': fileExtensionsToDelete = Misc.COMMA.split(args[++i]); break;
 						case 'n': directoryNamesToZip = Misc.COMMA.split(args[++i]); break;
 						case 'd': dryRun = true; break;
+						case 'm': mergeInDirectory = true; break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 						}
 					}
@@ -165,7 +209,7 @@ public class JobCleaner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                Job Cleaner : May 2022                            **\n" +
+				"**                                Job Cleaner : Jan 2024                            **\n" +
 				"**************************************************************************************\n" +
 				"Zip archives particular folders, deletes particular files. Use to clean up analysis \n"+
 				"result directories prior to cloud upload.\n"+
@@ -174,10 +218,13 @@ public class JobCleaner {
 				"-r Root directory to recursively look for files and folders.\n"+
 				"-e File extensions and file names to delete, comma delimited, no spaces.\n" +
 				"-n Directory names to zip archive and then delete, comma delimited, no spaces.\n"+
+				"-m Create a merged zip archive for directories defined in -n that exist in the same\n"+
+				"      parent directory, e.g. LogsRunScripts.zip instead of Logs.zip and RunScripts.zip\n"+
 				"-d Dry run, just list the files and directories.\n"+
 
+
 				"\nExample: java -jar pathToUSeq/Apps/JobCleaner -d -n 'Logs,RunScripts' -r CJobs/ -e \n"+
-				"    '.tbi,.crai,.bai,COMPLETE' \n"+
+				"    '.tbi,.crai,.bai,COMPLETE' -m \n"+
 
 				"\n**************************************************************************************\n");
 	}

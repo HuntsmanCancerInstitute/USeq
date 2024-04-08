@@ -24,6 +24,7 @@ public class Misc {
 	public static final Pattern RETURN = Pattern.compile("\n");
 	public static final Pattern WHITESPACE = Pattern.compile("\\s+");
 	public static final Pattern COMMA_WHITESPACE = Pattern.compile("[,\\s]+");
+	public static final Pattern COMMA_WHITESPACE_FWDSLASH = Pattern.compile("[,\\s/]+");
 	public static final Pattern UNDERSCORE = Pattern.compile("_");
 	public static final Pattern DASH = Pattern.compile("-");
 	public static final Pattern COLON = Pattern.compile(":");
@@ -292,6 +293,21 @@ public class Misc {
 	
 	/**Converts a hash to a String using the delimiter to join.*/
 	public static String treeSetToString(TreeSet hash, String delimiter){
+		if (hash.size() == 0) return "";
+		Iterator it = hash.iterator();
+		StringBuilder s = new StringBuilder();
+		Object obj = (Object)it.next();
+		s.append(obj.toString());
+		while (it.hasNext()){
+			obj = it.next();
+			s.append(delimiter);
+			s.append(obj.toString());
+		}
+		return s.toString();
+	}
+	
+	/**Converts a hash to a String using the delimiter to join.*/
+	public static String linkedSetToString(LinkedHashSet hash, String delimiter){
 		if (hash.size() == 0) return "";
 		Iterator it = hash.iterator();
 		StringBuilder s = new StringBuilder();

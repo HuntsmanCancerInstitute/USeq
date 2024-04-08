@@ -20,23 +20,30 @@ import util.gen.Misc;
 public class AwsXlsxAccountParser {
 
 	private TreeMap<String, String> awsAccountGroupName = new TreeMap<String, String>();
+	private ArrayList<String> missingAliases = new ArrayList<String>();
 
-	public AwsXlsxAccountParser(File xlsx, boolean debug) {
-		parseIt(xlsx);
+	public AwsXlsxAccountParser(File xlsx, boolean debug, HashMap<String, HashSet<String>> aliases) {
+		parseIt(xlsx, aliases);
 		
 		if (debug) {
 			for (String s: awsAccountGroupName.keySet()) {
 				IO.pl(s+"\t"+awsAccountGroupName.get(s));
 			}
 		}
+		
+		if (missingAliases.size()!=0) {
+			for (String a: missingAliases)IO.el("\tMissing entry in masterAccountInfo for "+a+" from "+xlsx.getName());
+			IO.el("\t\tCorrect and restart.\n");
+			System.exit(1);
+		}
 	}
 
 	public static void main(String[] args) {
-		AwsXlsxAccountParser p = new AwsXlsxAccountParser(new File ("/Users/u0028003/HCI/CoreAdmin/Billing/AllBillingReports/2023/6_BSR_June_2023/awsAccounts.xlsx"), true);
+		//AwsXlsxAccountParser p = new AwsXlsxAccountParser(new File ("/Users/u0028003/HCI/CoreAdmin/Billing/AllBillingReports/2023/6_BSR_June_2023/awsAccounts.xlsx"), true);
 
 	}
 
-	private void parseIt(File inputFile) {
+	private void parseIt(File inputFile, HashMap<String, HashSet<String>> aliases) {
 		try {
 
 			//Open up xlsx file
@@ -50,7 +57,7 @@ public class AwsXlsxAccountParser {
 			int numRows = sheet.getPhysicalNumberOfRows();
 			for (int r = 0; r< numRows; r++) {
 				Row row = sheet.getRow(r);
-				if (row != null) addAccount(row);
+				if (row != null) addAccount(row, aliases);
 			} 
 		} catch (Exception e) {
 			System.out.println("Aws Accounts xlsx file is not in the correct format, exiting");
@@ -59,7 +66,7 @@ public class AwsXlsxAccountParser {
 		} 
 	}
 
-	private void addAccount(Row row) {
+	private void addAccount(Row row, HashMap<String, HashSet<String>> aliases) {
 		int numCells = row.getLastCellNum()+1;
 		if (numCells < 2) return;
 		
@@ -74,6 +81,7 @@ public class AwsXlsxAccountParser {
 				String accountNumber = cell.toString().trim();
 				if (accountNumber.length()!=0) {
 					awsAccountGroupName.put(accountNumber, groupName);
+					if (aliases.containsKey(groupName) == false) missingAliases.add(groupName);
 				}
 			}
 		} 

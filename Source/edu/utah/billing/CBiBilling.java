@@ -18,6 +18,7 @@ public class CBiBilling {
 	private File masterAcountInfo;
 	private File cloudReportsDirectory;
 	private File awsAccountsFile;
+	private File expenseFile;
 	
 	//internal fields
 	private CarahsoftXlsxParser carahsoftParser;
@@ -25,6 +26,7 @@ public class CBiBilling {
 	private WafXlsxParser cloud = null;
 	private MasterAccountInfoParser masterAccountInfo = null;
 	private AwsXlsxAccountParser awsXlsxAccountParser;
+	private MiscExpenseXlsxParser expenseParser = null;
 	private boolean debug = false;
 	private LinkedHashMap<String, Integer> headerKeyIndex = null;
 	private TreeMap<String, ArrayList<JiraTicketSummary>> groupNameTickets = new TreeMap<String, ArrayList<JiraTicketSummary>>();
@@ -44,15 +46,19 @@ public class CBiBilling {
 	public CBiBilling (String[] args) throws Exception{
 		processArgs (args);
 		
+		masterAccountInfo = new MasterAccountInfoParser(masterAcountInfo, debug);
+		
 		parseWafs();
+		
+		awsXlsxAccountParser = new AwsXlsxAccountParser(awsAccountsFile, debug, masterAccountInfo.getGroupNameAliases());
+		
+		if (expenseFile != null) expenseParser = new MiscExpenseXlsxParser(expenseFile, debug);
+		
+		parseCloudAccountInvoice();
 
 		parseJiraHours();
 		
 		parseMasterAccountInfo();
-		
-		parseAWSAccounts();
-		
-		//add missing cloud WAFs!
 		
 		printInvoices();
 		
@@ -65,7 +71,7 @@ public class CBiBilling {
 
 	private void printInvoices() throws IOException {
 		IO.pl("\nPrinting Invoices...");
-		HashMap<String, Float> groupNameHoursBilled = this.masterAccountInfo.getGroupNameHoursBilled();
+		HashMap<String, Float> groupNameHoursBilled = masterAccountInfo.getGroupNameHoursBilled();
 		
 		//two sources of billing, AWS and Hourly
 		//Hourly
@@ -75,6 +81,7 @@ public class CBiBilling {
 			txtOut.add("HCI Cancer Bioinformatics Invoice\t\t"+date+"\n\n"+groupName+"\n");
 			//pull Aliases
 			HashSet<String> nameAliases = masterAccountInfo.getGroupNameAliases().get(groupName);
+			
 			//pull Hourly WAF
 			ArrayList<String[]> wafLines = null;
 			for (String a: nameAliases) {
@@ -125,13 +132,28 @@ public class CBiBilling {
 				nonCancerBilling.add(groupName+"\t"+Num.formatNumber(totalHoursToBill,3)+"\t$"+ Num.formatNumber(additionalBilling, 2));
 				totalHscBilling+= additionalBilling;
 			}
+			
+			//any misc expenses?
+			float miscExpenses = 0;
+			TreeMap<String, ArrayList<MiscExpense>> nameExpense = expenseParser.getGroupNameExpense();
+			if (expenseParser != null) {
+				ArrayList<MiscExpense> es = null;
+				HashSet<String> ali = masterAccountInfo.getGroupNameAliases().get(groupName);
+				for (String a: ali) {
+					if (nameExpense.containsKey(a)) {
+						es = nameExpense.get(a);
+						break;
+					}
+				}
 				
+			}
+			
 			
 			//look for Aws billing
 			float cloudExpenses = printCloudInvoice(nameAliases,txtOut);
 			IO.pl("TotalExpenses:\t$"+Num.formatNumber(hourlyExpenses+cloudExpenses, 2));
 			IO.pl();
-			totalExpenses += (hourlyExpenses+cloudExpenses);
+			totalExpenses += (hourlyExpenses+cloudExpenses+miscExpenses);
 			txtOut.add("\n$"+Num.formatNumber(hourlyExpenses+cloudExpenses, 2)+"\tTotal Expenses");
 			
 			//write out the txt file details
@@ -202,7 +224,7 @@ public class CBiBilling {
 				float totalAwsCost = 0f;
 				for (String line : groupNameBillingInfo.get(groupName)) {
 					String[] tokens = Misc.TAB.split(line);
-					float cost = Float.parseFloat(tokens[1].substring(1));
+					float cost = Float.parseFloat(Misc.COMMA.matcher(tokens[1].substring(1)).replaceAll(""));
 					totalAwsCost+= cost;
 					IO.pl("CloudBilling:\t"+ line);
 					txtOut.add(line);
@@ -216,14 +238,12 @@ public class CBiBilling {
 				txtOut.add("$"+totalString+"\tTotal Expenses");
 				
 				//write out the txt file details
-				String fileName = Misc.COMMA_WHITESPACE.matcher(groupName).replaceAll("_")+".txt";
+				String fileName = Misc.COMMA_WHITESPACE_FWDSLASH.matcher(groupName).replaceAll("_")+".txt";
 				IO.writeString(Misc.stringArrayListToString(txtOut, "\n"), new File (outputDirectory, fileName));
-				
 			}
 		}
 	}
 
-	
 	private float printCloudInvoice(HashSet<String> groupAliases, ArrayList<String> txtOut) {
 		float totalAwsCost = 0f;
 		
@@ -265,6 +285,7 @@ public class CBiBilling {
 						for (String[] cw: cloudWafs.get(gn)) {
 							IO.pl("CloudWAFLine:\t"+Misc.stringArrayToString(cw, "\t"));
 						}
+						break;
 					}
 				}
 				if (wafFound ==false) IO.pl("CloudWAFLine:\tNo Cloud WAF");
@@ -275,32 +296,34 @@ public class CBiBilling {
 	}
 
 
-	private void parseAWSAccounts() throws IOException {
+	private void parseCloudAccountInvoice() throws IOException {
 		//any cloud reports?
 		if (cloudReportsDirectory != null) {
-			IO.pl("\nParsing Carahsoft AWS account files...");
+			
+			IO.pl("\nParsing Carahsoft AWS account invoice...");
 			carahsoftParser = new CarahsoftXlsxParser(cloudReportsDirectory, debug);
+			
 			//anything parsed
 			if (carahsoftParser.getAwsAccountNumberTotals().size()!=0) {
-				//parse the Aws Accounts
-				awsXlsxAccountParser = new AwsXlsxAccountParser(awsAccountsFile, debug);
+
 				//for each carasoft account charge, look to see if it's in the aws accounts
 				TreeMap<String, String> awsAccountGroupName = awsXlsxAccountParser.getAwsAccountGroupName();
 				TreeMap<String, Float> awsAccountNumberTotals = carahsoftParser.getAwsAccountNumberTotals();
+				
 				ArrayList<String> missingAccountNumber = new ArrayList<String>();
 				for (String awsAccountNumber: awsAccountNumberTotals.keySet()) {
 					if (awsAccountGroupName.containsKey(awsAccountNumber)==false) missingAccountNumber.add(awsAccountNumber);
 				}
-				
 				//any missing account numbers
 				if (missingAccountNumber.size()!=0) {
-					for (String acc: missingAccountNumber) IO.el("\tMissing '"+acc+"' in "+awsAccountsFile+", correct and restart.");
+					for (String acc: missingAccountNumber) IO.el("\tMissing '"+acc+"' in "+awsAccountsFile.getName()+", correct and restart.");
 					System.exit(1);
 				}
 				
 				//check for the WAFs
 				//for each account number from Carahsoft with charges
 				TreeMap<String, ArrayList<String[]>> cloudWafs = cloud.getGroupNameWafLines();
+				
 				for (String awsAccountNumber: awsAccountNumberTotals.keySet()) {
 					//fetch the name from the aws accounts
 					String groupName = awsAccountGroupName.get(awsAccountNumber);
@@ -314,8 +337,6 @@ public class CBiBilling {
 	}
 	
 	private void parseMasterAccountInfo() {
-		
-		masterAccountInfo = new MasterAccountInfoParser(masterAcountInfo, debug);
 		
 		ArrayList<String> missingGroups = new ArrayList<String>();
 		HashMap<String, HashSet<String>> aliasesMap = masterAccountInfo.getGroupNameAliases();
@@ -482,8 +503,8 @@ public class CBiBilling {
 		File[] xlsFiles = IO.extractFiles(wafDirectory, ".xlsx");
 		for (File f: xlsFiles) {
 			if (f.getName().contains("WAF") && f.getName().startsWith("~")== false) {
-				if (f.getName().contains("Cloud")) cloud = new WafXlsxParser(f, debug);
-				else if (f.getName().contains("Cloud") == false) hourly = new WafXlsxParser(f, debug);
+				if (f.getName().contains("Cloud")) cloud = new WafXlsxParser(f, debug, masterAccountInfo.getGroupNameAliases());
+				else if (f.getName().contains("Cloud") == false) hourly = new WafXlsxParser(f, debug, masterAccountInfo.getGroupNameAliases());
 			}
 		}
 		if (cloud == null || hourly == null) Misc.printErrAndExit("\nFailed to parse both an hourly and cloud WAF tracking schedule xlsx file.");
@@ -537,7 +558,7 @@ public class CBiBilling {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                               CBI Billing:    Sept 2023                          **\n" +
+				"**                               CBI Billing:    Jan 2024                           **\n" +
 				"**************************************************************************************\n" +
 				"Generates billing reports for the Cancer Bioinformatics Shared Resource.\n\n"+				
 
@@ -546,8 +567,7 @@ public class CBiBilling {
 				"-m Path to the masterAccountInfo.xlsx spreadsheet updated from the prior month.\n"+
 				"-a Path to the awsAccounts.xlsx spreadsheet.\n"+
 				"-w Path to a dir containing the hourly and cloud 'WAF Tracking Schedule' xlsx files.\n" +
-				"-c Path to a dir containing the cloud AWS Carahsoft xlsx expense reports. May be empty\n"+
-				"      if are none available.\n"+
+				"-c If available, path to a dir with the cloud AWS Carahsoft xlsx expense reports.\n"+
 				"-o Path to write the results.\n"+
 
 				"\nExample: java -Xmx256M -jar pathTo/USeq/Apps/CBiBilling -j jiraTime.cvs -m \n"+

@@ -4,7 +4,11 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+
+import org.json.JSONArray;
 import org.json.JSONObject;
+
+import util.gen.Misc;
 
 
 public class TumorSampleADW {
@@ -15,19 +19,19 @@ public class TumorSampleADW {
 
 	//Tumor Exome
 	private String platformName = null;
-	private String tumorDnaName = null;
-	private ArrayList<File> tumorDnaFastqCram = new ArrayList<File>();
-	private String tumorWesCramFileNameToFetch = null;
+	private String tumorDnaSampleName = null;
+	private ArrayList<File> tumorDnaFastqFiles = new ArrayList<File>();
+	private ArrayList<String[]>  tumorWesFastqPathsToFetch = null;
 	
 	//Tumor RNA
-	private String tumorRnaName = null;
-	private ArrayList<File> tumorRnaFastqCram = new ArrayList<File>();
-	private String tumorRnaCramFileNameToFetch = null;
+	private String tumorRnaSampleName = null;
+	private ArrayList<File> tumorRnaFastqFiles = new ArrayList<File>();
+	private ArrayList<String[]>  tumorRnaFastqPathsToFetch = null;
 	
 
 	public TumorSampleADW (String tumorDnaName, String tumorRnaName, String platformName, String trimmedSpecimineId, String[] tumorLinkageDataLine) {
-		this.tumorDnaName = tumorDnaName;
-		this.tumorRnaName = tumorRnaName;
+		this.tumorDnaSampleName = tumorDnaName;
+		this.tumorRnaSampleName = tumorRnaName;
 		this.platformName = platformName;
 		this.genericSpecimineId = trimmedSpecimineId;
 		tumorLinkageDataLines.add(tumorLinkageDataLine);
@@ -37,19 +41,43 @@ public class TumorSampleADW {
 		JSONObject jo = new JSONObject();
 		jo.put("capturePlatform", platformName);
 		jo.put("trimmedSpecimineId", genericSpecimineId);
-		jo.put("tumorDNASeqFile", tumorWesCramFileNameToFetch);
-		jo.put("tumorDNASampleLibraryId", tumorDnaName);
-		addLinkageInfo(tumorDnaName, jo, linkage, tumorLinkageDataLines, true);
+		JSONArray ja = new JSONArray();
+		String[] paths = mergePairedFastqPaths(tumorWesFastqPathsToFetch);
+		ja.put(paths[0]);
+		ja.put(paths[1]);
+		jo.put("tumorDNASeqPaths", ja);
+		jo.put("tumorDNASampleLibraryId", tumorDnaSampleName);
+		addLinkageInfo(tumorDnaSampleName, jo, linkage, tumorLinkageDataLines, true);
 		return jo;
 	}
 	
 	public JSONObject fetchTumorRnaJson(ClinicalMolLinkage linkage) throws IOException {
 		JSONObject jo = new JSONObject();
 		jo.put("trimmedSpecimineId", genericSpecimineId);
-		jo.put("tumorRNASeqFile", tumorRnaCramFileNameToFetch);
-		jo.put("tumorRNASampleLibraryId", tumorRnaName);
-		addLinkageInfo(tumorRnaName, jo, linkage, tumorLinkageDataLines, false);
+		JSONArray ja = new JSONArray();
+		String[] paths = mergePairedFastqPaths(tumorRnaFastqPathsToFetch);
+		ja.put(paths[0]);
+		ja.put(paths[1]);
+		jo.put("tumorRNASeqPaths", ja);
+		jo.put("tumorRNASampleLibraryId", tumorRnaSampleName);
+		addLinkageInfo(tumorRnaSampleName, jo, linkage, tumorLinkageDataLines, false);
 		return jo;
+	}
+	
+	public static String[] mergePairedFastqPaths(ArrayList<String[]> al) throws IOException {
+		if (al.size()!=2 ) throw new IOException("\nDidn't find two fastq file paths.");
+		// removing leading /
+		String merged1 = Misc.stringArrayToString(al.get(0), "/").substring(1);
+		String merged2 = Misc.stringArrayToString(al.get(1), "/").substring(1);
+		return new String[] {merged1, merged2};
+	}
+	
+	public static String fetchFastqPathDir(ArrayList<String[]> al) {
+		//  /Avatar_MolecularData_hg38/2023_06_30/Whole_Exome/FASTq/FT-SA212052_R1.fastq.gz
+		//  /           1                   2          3        4        5
+		// look at just first, they will be the same; skip the actual fastq.gz
+		String merged = Misc.stringArrayToString(al.get(0), "/");
+		return merged.substring(0,merged.lastIndexOf('/'));
 	}
 	
 	public static void addLinkageInfo (String sampleName, JSONObject jo, ClinicalMolLinkage linkage, ArrayList<String[]> linkageDataLines, boolean isWes) throws IOException {
@@ -79,35 +107,35 @@ public class TumorSampleADW {
 	}
 
 	public String getTumorDnaName() {
-		return tumorDnaName;
+		return tumorDnaSampleName;
 	}
 
-	public ArrayList<File> getTumorDnaFastqCram() {
-		return tumorDnaFastqCram;
+	public ArrayList<File> getTumorDnaFastqFiles() {
+		return tumorDnaFastqFiles;
 	}
 
 	public String getTumorRnaName() {
-		return tumorRnaName;
+		return tumorRnaSampleName;
 	}
 
-	public ArrayList<File> getTumorRnaFastqCram() {
-		return tumorRnaFastqCram;
+	public ArrayList<File> getTumorRnaFastqFiles() {
+		return tumorRnaFastqFiles;
 	}
 
-	public String getTumorWesCramFileNameToFetch() {
-		return tumorWesCramFileNameToFetch;
+	public ArrayList<String[]>  getTumorWesFastqPathsToFetch() {
+		return tumorWesFastqPathsToFetch;
 	}
 
-	public void setTumorWesCramFileNameToFetch(String tumorWesCramFileNameToFetch) {
-		this.tumorWesCramFileNameToFetch = tumorWesCramFileNameToFetch;
+	public void setTumorWesFastqPathsToFetch(ArrayList<String[]>  tumorWesFastqPathsToFetch) {
+		this.tumorWesFastqPathsToFetch = tumorWesFastqPathsToFetch;
 	}
 
-	public String getTumorRnaCramFileNameToFetch() {
-		return tumorRnaCramFileNameToFetch;
+	public ArrayList<String[]>  getTumorRnaFastqPathsToFetch() {
+		return tumorRnaFastqPathsToFetch;
 	}
 
-	public void setTumorRnaCramFileNameToFetch(String tumorRnaCramFileNameToFetch) {
-		this.tumorRnaCramFileNameToFetch = tumorRnaCramFileNameToFetch;
+	public void setTumorRnaPathsToFetch(ArrayList<String[]>  tumorRnaFastqPathsToFetch) {
+		this.tumorRnaFastqPathsToFetch = tumorRnaFastqPathsToFetch;
 	}
 
 	public String getGenericSpecimineId() {
@@ -115,7 +143,7 @@ public class TumorSampleADW {
 	}
 
 	public void setTumorRnaName(String tumorRnaName) {
-		this.tumorRnaName = tumorRnaName;
+		this.tumorRnaSampleName = tumorRnaName;
 	}
 
 	public ArrayList<String[]> getTumorLinkageDataLines() {

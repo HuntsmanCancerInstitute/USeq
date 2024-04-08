@@ -4,37 +4,39 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import edu.utah.hci.misc.Util;
 import util.gen.IO;
 import util.gen.Misc;
 
 /**Represents one patients tumor and normal datasets for TNRunner2 processing.  Some patients will have several of these due to multiple tumor samples and or multiple platforms. 
  * The tumor exome and tumor RNA are merged into the same Tumor Sample*/
 public class AvatarAnalysisJob {
-	
+
 	//fields
 	private TumorSampleADW tumorSample = null;
 	private ArrayList<NormalSampleADW> normalSamples = new ArrayList<NormalSampleADW>();
 	private boolean matchedPlatform = true;
 	private String submittingGroup = null;
 	private PatientADW patient = null;
-	
+
 	public AvatarAnalysisJob(PatientADW patient, TumorSampleADW tumorSample, ArrayList<NormalSampleADW> normalSamples, boolean matchedPlatform) {
 		this.patient = patient;
 		this.tumorSample = tumorSample;
 		this.normalSamples = normalSamples;
 		this.matchedPlatform = matchedPlatform;
 	}
-	
+
 	/**Returns patientId_normalId1-normalId2_tumorExomeId_tumorRnaId most will have just one normal*/
 	public String getComparisonKey(String patientId) {
 		StringBuilder sb = new StringBuilder();
 		//patientId
 		sb.append(patientId); 
-		
+
 		//normalIds
 		if (normalSamples.size()==0) sb.append("_NA");
 		else {
@@ -45,17 +47,17 @@ public class AvatarAnalysisJob {
 				sb.append(normalSamples.get(i).getNormalDnaName());
 			}
 		}
-		
+
 		//tumorExomeId
 		sb.append("_");
 		if (tumorSample.getTumorDnaName() == null) sb.append("NA");
 		else sb.append(tumorSample.getTumorDnaName());
-		
+
 		//tumorRnaId
 		sb.append("_");
 		if (tumorSample.getTumorRnaName() == null) sb.append("NA");
 		else sb.append(tumorSample.getTumorRnaName());
-		
+
 		return sb.toString();
 	}
 
@@ -71,7 +73,70 @@ public class AvatarAnalysisJob {
 		return matchedPlatform;
 	}
 
-	public void makeAnalysisJob(String nameAJ, File testDir, ArrayList<String> dxCmds, ClinicalMolLinkage linkage) throws IOException {
+	public void makeAnalysisJobAster(File fastqDownloadRoot, String nameAJ, File testDir, ArrayList<String> cmds, ClinicalMolLinkage linkage, HashSet<String> dirPathsToDownload) throws IOException {
+		String downloadRoot = fastqDownloadRoot.getCanonicalPath();
+
+		//Fastq
+		File fastq = new File (testDir, "Fastq");
+		fastq.mkdir();
+		//TumorDNA
+		if (tumorSample.getTumorDnaName() != null) {
+			tumorSample.getTumorDnaFastqFiles();
+			File tumorDNA = new File (fastq, "TumorDNA");
+			tumorDNA.mkdir();
+			String tumorFastqDir = tumorDNA.getCanonicalPath()+"/";
+
+			//make link commands, downloads with Aster are a major issue
+			for (String[] s: tumorSample.getTumorWesFastqPathsToFetch()) {
+				String path = Util.stringArrayToString(s, "/");
+				String ln = "ln -s "+ downloadRoot+ path+ " "+ tumorFastqDir;
+				cmds.add(ln);
+			}
+			//update the dirPathsToDownload
+			dirPathsToDownload.add(TumorSampleADW.fetchFastqPathDir(tumorSample.getTumorWesFastqPathsToFetch()));
+		}
+		//TumorRNA
+		if (tumorSample.getTumorRnaName()!= null) {
+			File tumorRNA = new File (fastq, "TumorRNA");
+			tumorRNA.mkdir();
+			String tumorFastqDir = tumorRNA.getCanonicalPath()+"/";
+
+			//make link commands, downloads with Aster are a major issue
+			for (String[] s: tumorSample.getTumorRnaFastqPathsToFetch()) {
+				String path = Util.stringArrayToString(s, "/");
+				String ln = "ln -s "+ downloadRoot+ path+ " "+ tumorFastqDir;
+				cmds.add(ln);
+			}
+			
+			//update the dirPathsToDownload
+			dirPathsToDownload.add(TumorSampleADW.fetchFastqPathDir(tumorSample.getTumorRnaFastqPathsToFetch()));
+			
+		}
+		//NormalDNAs
+		if (normalSamples.size()!=0) {
+			File normalDNA = new File (fastq, "NormalDNA");
+			normalDNA.mkdir();
+			String normalFastqDir = normalDNA.getCanonicalPath()+"/";
+			for (NormalSampleADW ns: normalSamples) {
+
+				//make link commands, downloads with Aster are a major issue
+				for (String[] s: ns.getNormalWesFastqPathsToFetch()) {
+					String path = Util.stringArrayToString(s, "/");
+					String ln = "ln -s "+ downloadRoot+ path+ " "+ normalFastqDir;
+					cmds.add(ln);
+				}
+				
+				//update the dirPathsToDownload
+				dirPathsToDownload.add(TumorSampleADW.fetchFastqPathDir(ns.getNormalWesFastqPathsToFetch()));
+			} 
+		}
+		//ClinicalReport
+		File clinicalReport = new File (testDir, "ClinicalReport");
+		clinicalReport.mkdir();
+		writeJson(nameAJ, clinicalReport, linkage);
+	}
+
+	public void makeAnalysisJobDnaNexus(String nameAJ, File testDir, ArrayList<String> dxCmds, ClinicalMolLinkage linkage) throws IOException {
 		//Fastq
 		File fastq = new File (testDir, "Fastq");
 		fastq.mkdir();
@@ -79,14 +144,14 @@ public class AvatarAnalysisJob {
 		if (tumorSample.getTumorDnaName() != null) {
 			File tumorDNA = new File (fastq, "TumorDNA");
 			tumorDNA.mkdir();
-			String dx = "dx download -f --no-progress HCI_ORIEN_AVATAR_MOLECULAR_DATA:/Whole_Exome/alignment_crams/"+tumorSample.getTumorWesCramFileNameToFetch()+" -o "+tumorDNA.getCanonicalPath()+"/";
+			String dx = "dx download -f --no-progress HCI_ORIEN_AVATAR_MOLECULAR_DATA:/Whole_Exome/alignment_crams/"+tumorSample.getTumorWesFastqPathsToFetch()+" -o "+tumorDNA.getCanonicalPath()+"/";
 			dxCmds.add(dx);
 		}
 		//TumorRNA
 		if (tumorSample.getTumorRnaName()!= null) {
 			File tumorRNA = new File (fastq, "TumorRNA");
 			tumorRNA.mkdir();
-			String dx = "dx download -f --no-progress HCI_ORIEN_AVATAR_MOLECULAR_DATA:/RNAseq/alignment_crams/"+tumorSample.getTumorRnaCramFileNameToFetch()+" -o "+tumorRNA.getCanonicalPath()+"/";
+			String dx = "dx download -f --no-progress HCI_ORIEN_AVATAR_MOLECULAR_DATA:/RNAseq/alignment_crams/"+tumorSample.getTumorRnaFastqPathsToFetch()+" -o "+tumorRNA.getCanonicalPath()+"/";
 			dxCmds.add(dx);
 		}
 		//NormalDNAs
@@ -94,10 +159,10 @@ public class AvatarAnalysisJob {
 			File normalDNA = new File (fastq, "NormalDNA");
 			normalDNA.mkdir();
 			for (NormalSampleADW ns: normalSamples) {
-				String dx = "dx download -f --no-progress HCI_ORIEN_AVATAR_MOLECULAR_DATA:/Whole_Exome/alignment_crams/"+ns.getNormalWesCramFileNameToFetch()+" -o "+ normalDNA.getCanonicalPath()+"/";
+				String dx = "dx download -f --no-progress HCI_ORIEN_AVATAR_MOLECULAR_DATA:/Whole_Exome/alignment_crams/"+ns.getNormalWesFastqPathsToFetch()+" -o "+ normalDNA.getCanonicalPath()+"/";
 				dxCmds.add(dx);
 			}
-			 
+
 		}
 		//ClinicalReport
 		File clinicalReport = new File (testDir, "ClinicalReport");
@@ -115,7 +180,7 @@ public class AvatarAnalysisJob {
 			NormalSampleADW ns = normalSamples.get(0);
 			platform = ns.getPlatformName();
 		}
-		
+
 		//group from tumor DNA sample then try from tumor RNA sample
 		String group = "NA";
 		if (tumorSample.getTumorDnaName() != null) {
@@ -126,14 +191,14 @@ public class AvatarAnalysisJob {
 			group = linkage.getKeyDiseaseType().get(patient.getPatientId()+"_"+tumorSample.getTumorRnaName());
 			if (group == null) throw new IOException("\nFailed to find a disease type for the tumor sample "+tumorSample.getTumorDnaName());
 		}
-		
+
 		//testId_platform_groupId_gender.json
 		File json = new File (clinicalReport, nameAJ+"_"+platform+"_"+group+"_"+patient.getSubjectMatchMaker().getGender()+".json"); 
 
 		if (platform == null) {
 			Misc.printErrAndExit("Null plat "+this.getComparisonKey(patient.getPatientId()));
 		}
-		
+
 		//non matched?
 		boolean mixed = false;
 		if (platform.equals("Mixed")) {
@@ -170,9 +235,9 @@ public class AvatarAnalysisJob {
 				ja.put(nj);
 			}
 			main.put("NormalDNA", ja);
-			
+
 		}
-		
+
 		IO.writeString(main.toString(3), json);
 	}
 

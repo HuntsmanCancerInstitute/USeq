@@ -33,7 +33,9 @@ public class DnaSample {
 		parseReadCoverageJson(readCovJson);
 	}
 	
+	//looking for info from the uniObRC json stats file
 	private void parseReadCoverageJson(File readCovJson) throws Exception {
+
 		if (readCovJson == null) return;
 		JSONObject jo = new JSONObject(IO.loadFile(readCovJson, " ", true));
 		meanOnTargetCoverage = Double.parseDouble(jo.getString("meanCoverage").replaceAll(",", ""));
@@ -46,6 +48,7 @@ public class DnaSample {
 		readCovParsed = true;
 	}
 
+	//looking for info from samtools markdups
 	private void parseDupLog(File dupLog) throws Exception {
 		if (dupLog == null) return;
 		String line;
@@ -72,6 +75,7 @@ public class DnaSample {
 		}
 	}
 
+	//looking for info from cut adapt
 	private void parseAlignLog(File alignLog) throws Exception {
 		if (alignLog == null) return;
 		String line;

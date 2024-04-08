@@ -310,7 +310,7 @@ public class CarisDataWrangler {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                             Caris Data Wrangler : Aug 2022                       **\n" +
+				"**                             Caris Data Wrangler : Mar 2024                       **\n" +
 				"**************************************************************************************\n" +
 				"The Caris Data Wrangler downloads complete patient datasets from an AWS bucket, parses\n"+
 				"the xml test file for patient info, fetches/makes coreIds using the SubjectMatchMaker\n"+

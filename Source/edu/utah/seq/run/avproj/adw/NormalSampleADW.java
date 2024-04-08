@@ -8,14 +8,13 @@ import org.json.JSONObject;
 public class NormalSampleADW {
 
 	private String platformName = null;
-	private String normalDnaName = null;
-	private ArrayList<File> normalDnaFastqCram = new ArrayList<File>();
-	private String normalWesCramFileNameToFetch = null;
+	private String normalDnaSampleName = null;
+	private ArrayList<File> normalDnaFastqFiles = new ArrayList<File>();
+	private ArrayList<String[]>  normalWesFastqPathsToFetch = null;
 	private String[] linkageDataLine = null;
 
-
 	public NormalSampleADW (String normalDnaName, String platformName, String[] linkageDataLine) {
-		this.normalDnaName = normalDnaName;
+		this.normalDnaSampleName = normalDnaName;
 		this.platformName = platformName;
 		this.linkageDataLine = linkageDataLine;
 	}
@@ -23,11 +22,11 @@ public class NormalSampleADW {
 	public JSONObject fetchJson(ClinicalMolLinkage linkage) throws IOException {
 		JSONObject jo = new JSONObject();
 		jo.put("capturePlatform", platformName);
-		jo.put("normalDNASeqFile", normalWesCramFileNameToFetch);
-		jo.put("normalDNASampleLibraryId", normalDnaName);
+		jo.put("normalDNASeqPaths", TumorSampleADW.mergePairedFastqPaths(normalWesFastqPathsToFetch));
+		jo.put("normalDNASampleLibraryId", normalDnaSampleName);
 		ArrayList<String[]> al = new ArrayList<String[]>();
 		al.add(linkageDataLine);
-		TumorSampleADW.addLinkageInfo(normalDnaName, jo, linkage, al, true);
+		TumorSampleADW.addLinkageInfo(normalDnaSampleName, jo, linkage, al, true);
 		return jo;
 	}
 
@@ -36,19 +35,19 @@ public class NormalSampleADW {
 	}
 
 	public String getNormalDnaName() {
-		return normalDnaName;
+		return normalDnaSampleName;
 	}
 
-	public ArrayList<File> getNormalDnaFastqCram() {
-		return normalDnaFastqCram;
+	public ArrayList<File> getNormalDnaFastqFiles() {
+		return normalDnaFastqFiles;
 	}
 
-	public String getNormalWesCramFileNameToFetch() {
-		return normalWesCramFileNameToFetch;
+	public ArrayList<String[]>  getNormalWesFastqPathsToFetch() {
+		return normalWesFastqPathsToFetch;
 	}
 
-	public void setNormalWesCramFileNameToFetch(String normalWesCramFileNameToFetch) {
-		this.normalWesCramFileNameToFetch = normalWesCramFileNameToFetch;
+	public void setNormalWesFastqPathsToFetch(ArrayList<String[]>  normalWesFastqPathsToFetch) {
+		this.normalWesFastqPathsToFetch = normalWesFastqPathsToFetch;
 	}
 
 	public String[] getLinkageDataLine() {

@@ -25,11 +25,12 @@ public class WafXlsxParser {
 	private boolean debug = false;
 
 
-	public WafXlsxParser(File xlsx, boolean debug) {
+	public WafXlsxParser(File xlsx, boolean debug, HashMap<String, HashSet<String>> aliases) {
 		this.debug = debug;
 		
-		parseIt(xlsx);
+		parseIt(xlsx, aliases);
 		headerTabbed = Misc.stringArrayListToString(header, "\t");
+		
 
 		if (debug) {
 			IO.pl("Header:\t"+ header);
@@ -47,13 +48,13 @@ public class WafXlsxParser {
 
 	public static void main(String[] args) {
 		//hourly
-		new WafXlsxParser(new File ("/Users/u0028003/HCI/CoreAdmin/Billing/AllBillingReports/2023/6_BSR_June_2023/WAF/Bioinformatics WAF Tracking Schedule - FY23.xlsx"), true);
+		//new WafXlsxParser(new File ("/Users/u0028003/HCI/CoreAdmin/Billing/AllBillingReports/2023/6_BSR_June_2023/WAF/Bioinformatics WAF Tracking Schedule - FY23.xlsx"), true);
 
 		//cloud
-		new WafXlsxParser(new File ("/Users/u0028003/HCI/CoreAdmin/Billing/AllBillingReports/2023/6_BSR_June_2023/WAF/Bioinformatics SB Cloud WAF Tracking Schedule - FY23.xlsx"), true);
+		//new WafXlsxParser(new File ("/Users/u0028003/HCI/CoreAdmin/Billing/AllBillingReports/2023/6_BSR_June_2023/WAF/Bioinformatics SB Cloud WAF Tracking Schedule - FY23.xlsx"), true);
 	}
 
-	private void parseIt(File inputFile) {
+	private void parseIt(File inputFile, HashMap<String, HashSet<String>> aliases) {
 		try {
 
 			//Open up xlsx file
@@ -63,6 +64,8 @@ public class WafXlsxParser {
 			Sheet sheet = wb.getSheet("Account Table");
 			if (sheet == null) throw new IOException("Could not find sheet 'Account Table' in "+inputFile+" ?");
 
+			ArrayList<String> missingAnAlias = new ArrayList<String>();
+			
 			//Iterate through rows
 			int numRows = sheet.getPhysicalNumberOfRows();
 			for (int r = 0; r< numRows; r++) {
@@ -110,13 +113,24 @@ public class WafXlsxParser {
 						ArrayList<String[]> al = groupNameWafLines.get(cellsToSave[0]);
 						if (al == null) {
 							al = new ArrayList<String[]>();
-							groupNameWafLines.put(cellsToSave[0], al);
+							
+							//fetch aliases
+							HashSet<String> als = aliases.get(cellsToSave[0]);
+							if (als == null) missingAnAlias.add(cellsToSave[0]);
+							else {
+								for (String a: als) groupNameWafLines.put(a, al);
+							}
 						}
 						al.add(cellsToSave);
 					}
-
 				}
-			} 
+			}
+			//any missing aliases?
+			if (missingAnAlias.size()!=0) {
+				for (String a: missingAnAlias)IO.el("\tMissing entry in masterAccountInfo for "+a+" from "+inputFile.getName());
+				IO.el("\t\tCorrect and restart.\n");
+				System.exit(1);
+			}
 		} catch (Exception e) {
 			System.out.println("Xlsx file is not in the correct format, exiting -> "+inputFile);
 			e.printStackTrace();

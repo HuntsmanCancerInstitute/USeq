@@ -517,7 +517,7 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -r QCStats/ -p T
 </pre><br><p>
 				
 					<a name="AggregateQCStats2"><pre>**************************************************************************************
-**                           Aggregate QC Stats2: April 2022                        **
+**                           Aggregate QC Stats2: March 2024                        **
 **************************************************************************************
 Parses and aggregates alignment quality statistics from log and json files produced by
 the TNRunner2 DnaAlignQC and SampleConcordance workflows.
@@ -527,7 +527,7 @@ Required Options:
 -s Directory for saving the AggQC results.
 
 Options:
--a Alignment log file match, defaults to '.+_AlignHg38.log'
+-a Alignment log file match, defaults to '.+_Align.log'
 -d Mark duplicates log file match, defaults to '.+_Markdup.log'
 -r Read coverage json file match, defaults to '.+_UniObRC.json.gz'
 -c Sample concordance json file match, defaults to '.+_SampleConcordance.json.gz'
@@ -870,7 +870,7 @@ Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/
 </pre><br><p>
 				
 					<a name="AvatarDataWrangler"><pre>**************************************************************************************
-**                           Avatar Data Wrangler : March 2023                      **
+**                           Avatar Data Wrangler : Feb 2024                        **
 **************************************************************************************
 Tool for assembling directories for TNRunner based on files provided by M2Gen via
 download from DNAnexus. Handles patient datasets from different exome capture
@@ -893,9 +893,10 @@ Required Parameters:
 -t Directory to place temp files with PHI for Subject ID matching
 -s Directory containing the SubjectMatchMaker 'currentRegistry_' file
 -d Path to save a bash script for downloading the sequence read data.
+-a Path to where the Aster datasets will be downloaded.
 
 Example: java -jar ~/USeqApps/AvatarDataWrangler -r Resources/ -j AJobs -t SMM_PHI
-   -s ~/PHI/SmmRegistry/ -d dxDownloadCmds.sh 
+   -s ~/PHI/SmmRegistry/ -d dxDownloadCmds.sh -a AsterDownloads
 
 **************************************************************************************
 </pre><br><p>
@@ -1465,7 +1466,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate
 </pre><br><p>
 				
 					<a name="CarisDataWrangler"><pre>**************************************************************************************
-**                             Caris Data Wrangler : Aug 2022                       **
+**                             Caris Data Wrangler : Mar 2024                       **
 **************************************************************************************
 The Caris Data Wrangler downloads complete patient datasets from an AWS bucket, parses
 the xml test file for patient info, fetches/makes coreIds using the SubjectMatchMaker
@@ -1540,7 +1541,7 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/
 </pre><br><p>
 				
 					<a name="CBiBilling"><pre>**************************************************************************************
-**                               CBI Billing:    Sept 2023                          **
+**                               CBI Billing:    Jan 2024                           **
 **************************************************************************************
 Generates billing reports for the Cancer Bioinformatics Shared Resource.
 
@@ -1549,8 +1550,7 @@ Required Parameters:
 -m Path to the masterAccountInfo.xlsx spreadsheet updated from the prior month.
 -a Path to the awsAccounts.xlsx spreadsheet.
 -w Path to a dir containing the hourly and cloud 'WAF Tracking Schedule' xlsx files.
--c Path to a dir containing the cloud AWS Carahsoft xlsx expense reports. May be empty
-      if are none available.
+-c If available, path to a dir with the cloud AWS Carahsoft xlsx expense reports.
 -o Path to write the results.
 
 Example: java -Xmx256M -jar pathTo/USeq/Apps/CBiBilling -j jiraTime.cvs -m 
@@ -2792,7 +2792,7 @@ Example: java -jar -Xmx2G pathToUSeq/Apps/InvitaeBulkCsvParser -t TempPHIDelme
 </pre><br><p>
 				
 					<a name="JobCleaner"><pre>**************************************************************************************
-**                                Job Cleaner : May 2022                            **
+**                                Job Cleaner : Jan 2024                            **
 **************************************************************************************
 Zip archives particular folders, deletes particular files. Use to clean up analysis 
 result directories prior to cloud upload.
@@ -2801,10 +2801,12 @@ Options:
 -r Root directory to recursively look for files and folders.
 -e File extensions and file names to delete, comma delimited, no spaces.
 -n Directory names to zip archive and then delete, comma delimited, no spaces.
+-m Create a merged zip archive for directories defined in -n that exist in the same
+      parent directory, e.g. LogsRunScripts.zip instead of Logs.zip and RunScripts.zip
 -d Dry run, just list the files and directories.
 
 Example: java -jar pathToUSeq/Apps/JobCleaner -d -n 'Logs,RunScripts' -r CJobs/ -e 
-    '.tbi,.crai,.bai,COMPLETE' 
+    '.tbi,.crai,.bai,COMPLETE' -m 
 
 **************************************************************************************
 </pre><br><p>
@@ -4718,7 +4720,7 @@ Example: java -Xmx25G -jar pathToUSeq/Apps/SamSubsampler -x 240 -q 20 -a
 </pre><br><p>
 				
 					<a name="ScanSeqs"><pre>**************************************************************************************
-**                                  Scan Seqs: July 2015                            **
+**                                  Scan Seqs: Jan 2024                             **
 **************************************************************************************
 Takes unshifted stranded chromosome specific PointData and uses a sliding window to
 calculate several smoothed window statistics. These include a binomial p-value, a

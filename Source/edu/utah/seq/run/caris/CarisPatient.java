@@ -165,9 +165,11 @@ public class CarisPatient {
 		clinReportDir.mkdirs();
 		//move the report into the ClinicalReport folder
 		File deIdXml = carisXml.getDeidentifiedXmlFile();
-		if (deIdXml.renameTo(new File(clinReportDir, deIdXml.getName())) == false) {
-			throw new IOException("FAILED to move "+deIdXml+" to "+clinReportDir);
-		}
+		File dest = new File(clinReportDir, deIdXml.getName());
+		//debugging, no longer working with move, trying copy and delete
+		//if (deIdXml.renameTo(dest) == false) throw new IOException("FAILED to move "+deIdXml+" to "+clinReportDir);
+		if (IO.copyViaFileChannel(deIdXml, dest) == false) throw new IOException("FAILED to copy "+deIdXml+" to "+clinReportDir);
+		else deIdXml.deleteOnExit();
 	}
 
 	public boolean isTooYoung() {

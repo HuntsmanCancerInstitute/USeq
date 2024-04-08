@@ -1610,6 +1610,49 @@ public class IO {
 		return true;
 	}
 	
+	/**Zips the contents of the provided directories using relative paths. Make sure your zipFile ends in .zip */
+	public static boolean zipDirectoriesInSameParentDirectory(File[] dirs, File zipFile) throws IOException{
+		boolean success = false;
+		ZipOutputStream out = null;
+		try {
+			out = new ZipOutputStream(new FileOutputStream(zipFile));
+			byte[] buf = new byte[2048];
+			
+			for (File d: dirs) {
+				String toTrim = d.getParentFile().getCanonicalPath()+"/";
+				ArrayList<File> filesToZip = fetchAllFilesAndDirsRecursively(d);
+	
+				// Compress the files with a relative path
+				for (File f: filesToZip) {
+					String relPath = f.getCanonicalPath().replace(toTrim, "");			
+					if (f.isFile()) {
+						out.putNextEntry(new ZipEntry(relPath));
+						FileInputStream in = new FileInputStream(f);
+						int len;
+						while ((len = in.read(buf)) != -1) out.write(buf, 0, len);
+						out.closeEntry();
+						in.close();
+					}
+					//for directories add the /
+					else {
+						out.putNextEntry(new ZipEntry(relPath+"/"));
+						out.closeEntry();
+					}
+				}
+			}
+			success = true;
+		} catch (IOException e) {
+			IO.el("ERROR zip archiving "+zipFile);
+			zipFile.delete();
+			e.printStackTrace();
+
+		} finally {
+			out.close();
+		}
+		return success;
+	}
+	
+	
 	/**Fetches all of the files and dirs in the provided directory.*/
 	public static ArrayList<File> fetchAllFilesAndDirsRecursively (File directory) throws IOException{
 		ArrayList<File> files = new ArrayList<File>(); 
@@ -1761,7 +1804,6 @@ public class IO {
 			e.printStackTrace();
 		} 
 		return null;
-
 	}
 
 	/**Fetches a BufferedReader from a url, zip/gz OK.*/

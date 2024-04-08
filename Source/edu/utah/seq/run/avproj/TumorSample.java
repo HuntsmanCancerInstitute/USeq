@@ -34,7 +34,9 @@ public class TumorSample {
 		}
 		else {
 			for (String name : nameFastq.keySet()) {
-				 if (name.startsWith(tumorRnaName)) tumorRnaFastqCram.add(nameFastq.get(name));
+				 if (name.startsWith(tumorRnaName)) {
+					if (nameFastq.get(name)!=null) tumorRnaFastqCram.add(nameFastq.get(name));
+				 }
 			}
 		}
 		

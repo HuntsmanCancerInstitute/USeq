@@ -735,6 +735,7 @@ public class TNRunner2 {
 
 			//root patient dirs? Looks for Fastq dirs then pulls their parent folder.
 			if (sampleDir == null || sampleDir.exists() == false) Misc.printErrAndExit("Error: failed to find your starting data directory? "+sampleDir);
+			
 			ArrayList<File> fastqDirs = IO.fetchDirectoriesRecursively(sampleDir, "Fastq");
 			rootDirs = IO.fetchParentDirectories(fastqDirs);
 			rootDirs = removeThoseWithComplete(rootDirs);
