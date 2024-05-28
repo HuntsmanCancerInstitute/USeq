@@ -146,7 +146,7 @@ public class BillingGroup {
 			
 			//Any AWS compute expenses?
 			for (AwsAccountExpense aae: awsAccountExpenses) {
-				String ae = "\tCloud AWS Acc:\t"+aae.getAwsAccountNumber()+"\t$"+Num.formatNumber(aae.getTotalExpense(), 2);
+				String ae = "\tCloud Amazon Web Services (AWS) Acc:\t"+aae.getAwsAccountNumber()+"\t$"+Num.formatNumber(aae.getTotalExpense(), 2);
 				txtOut.add(ae);
 			}
 			//Any Misc compute expenses?
@@ -169,6 +169,17 @@ public class BillingGroup {
 		
 		return Misc.stringArrayListToString(txtOut, "\n");
 	}
+	
+	public String generateHscBillingLine(int wafIndex, Integer[] indexesToPull) {
+		String[] fields = hourlyWafs.get(wafIndex);
+		StringBuilder sb = new StringBuilder(fields[indexesToPull[0]]);
+		for (int i=1; i< indexesToPull.length; i++) {
+			sb.append("\t");
+			sb.append(fields[indexesToPull[i]]);
+		}
+		return sb.toString();
+	}
+
 
 	public boolean isCancerCenterMember() {
 		return cancerCenterMember;

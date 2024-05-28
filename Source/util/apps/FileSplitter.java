@@ -5,6 +5,7 @@ import java.util.regex.Pattern;
 import java.util.zip.GZIPOutputStream;
 
 import util.gen.IO;
+import util.gen.Misc;
 
 /**
  * Application for splitting a large text file into smaller files given a maximum number of lines.
@@ -17,6 +18,7 @@ public class FileSplitter {
 	private File[] files;
 	private long numLinesPerFile = 0;
 	private int fileNumber = 1;
+	private int maxNumFiles = 0;
 	private boolean gzip = false;
 
 	/**This method will process each argument and assign any new varibles*/
@@ -30,7 +32,8 @@ public class FileSplitter {
 				try{
 					switch (test){
 					case 'f': files = IO.extractFiles(new File(args[++i])); break;
-					case 'n': numLinesPerFile=Long.parseLong(args[i+1]); i++; break;
+					case 'l': numLinesPerFile=Long.parseLong(args[i+1]); i++; break;
+					case 'n': maxNumFiles= Integer.parseInt(args[i+1]); i++; break;
 					case 'g': gzip = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: System.out.println("\nProblem, unknown option! " + mat.group());
@@ -48,26 +51,29 @@ public class FileSplitter {
 			System.out.println("\nCannot find your file!\n");
 			System.exit(0);
 		}
-		if (numLinesPerFile == 0){
-			System.out.println("\nEnter a maximum number of lines to place in each split file!\n");
+		if (numLinesPerFile == 0 && maxNumFiles ==0){
+			System.out.println("\nEnter a target number of lines or target of number of files.\n");
 			System.exit(0);
 		}
+		if (numLinesPerFile !=0 && maxNumFiles !=0) Misc.printErrAndExit("\nEnter either a target number of lines or target of number of files.\n");
 
 	}
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            File Splitter: April 2020                             **\n" +
+				"**                            File Splitter: April 2024                             **\n" +
 				"**************************************************************************************\n" +
-				"Splits a big text file into smaller files given a maximum number of lines.\n\n"+
+				"Splits a big text file into smaller files given a maximum number of lines or target\n" +
+				"number of split files.\n\n"+
 
 				"Required Parameters:\n"+
 				"-f Full path file text or directory for the text file(s) (.zip/.gz OK).\n" +
-				"-n Maximum number of lines to place in each.\n" +
-				"-g GZip split files.\n"+
+				"-l Maximum number of lines to place in each.\n" +
+				"-n Or, number of split files.\n"+
+				"-g GZip files after splitting.\n"+
 
 				"\n" +
-				"Example: java -Xmx256M -jar pathTo/T2/FileSplitter -f /affy/bpmap.txt -n 50000\n" +
+				"Example: java -Xmx256M -jar pathTo/T2/FileSplitter -f /affy/bpmap.txt -l 50000\n" +
 				"\n" +
 		"**************************************************************************************\n");
 	}	
@@ -78,6 +84,7 @@ public class FileSplitter {
 		}
 		System.out.println("Launching FileSplitter...");
 		new FileSplitter(args);
+		IO.pl("\tComplete!");
 	}
 
 	public FileSplitter(String[] args){
@@ -88,6 +95,14 @@ public class FileSplitter {
 			for (int i=0; i< files.length; i++){
 				fileNumber = 1;
 				BufferedReader in = IO.fetchBufferedReader(files[i]);
+				
+				//are they after a set number of files?
+				if (maxNumFiles !=0) {
+					long numLines = IO.countNumberOfLines(files[i]);
+					numLinesPerFile = Math.round((double)numLines/(double)maxNumFiles);
+					if (numLinesPerFile < 1) numLinesPerFile = 1;
+					IO.pl("\tSetting numLines to "+numLinesPerFile);
+				}
 
 				if (gzip){
 					byte[] cr = "\n".getBytes(); 

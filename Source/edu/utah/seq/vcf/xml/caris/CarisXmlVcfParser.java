@@ -235,7 +235,7 @@ public class CarisXmlVcfParser {
 		String[] ihcNames = {"p16","PD-L1 (SP263)", "PD-L1 (22c3)", "PD-L1 (SP142)", "PD-L1 FDA(SP142)", "PD-L1 FDA (28-8)", 
 				"MLH1", "PMS2", "MSH2", "MSH6", "ALK", "PTEN", "Mismatch Repair Status", "Her2/Neu", 
 				"TrkA/B/C", "Androgen Receptor", "Folfox Responder Similarity Score", "ROS1", "ER", 
-				"BRAF V600E", "EGFR L858R", "EGFR ex19del" };
+				"BRAF V600E", "EGFR L858R", "EGFR ex19del", "PR", "CLDN18" };
 		ihcTestNames = new HashSet<String>();
 		for (String n: ihcNames) ihcTestNames.add(n);
 
@@ -887,7 +887,7 @@ public class CarisXmlVcfParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Caris Xml Vcf Parser: Apr 2023                        **\n" +
+				"**                            Caris Xml Vcf Parser: May 2024                        **\n" +
 				"**************************************************************************************\n" +
 				"This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml\n"+
 				"reported genomic alternations are annotated, bed files of copy number changes and gene\n"+

@@ -22,7 +22,8 @@ public class TDSynnexXlsxParser {
 	//column names and their found indexes
 	private String accountName = "Account";
 	private int accountIndex = -1;
-	private String expenseName = "`"; //really weird!
+	private String expenseName1 = "`"; //really weird!
+	private String expenseName2 = "Price"; //really weird!
 	private int expenseIndex = -1;
 	private int numParsedLines = 0;
 
@@ -76,7 +77,10 @@ public class TDSynnexXlsxParser {
 
 			//Find appropriate sheet 
 			Sheet sheet = wb.getSheet("Detail");
-			if (sheet == null) throw new IOException("Could not find the 'Detail' sheet in "+inputFile+" ?");
+			if (sheet == null) {
+				sheet = wb.getSheet("Sheet1");
+				if (sheet == null) throw new IOException("Could not find the 'Detail' or 'Sheet1' sheet in "+inputFile+" ?");
+			}
 
 			//Iterate through rows
 			int numRows = sheet.getPhysicalNumberOfRows();
@@ -113,7 +117,7 @@ public class TDSynnexXlsxParser {
 				for (int i=1; i< numCells; i++) {
 					if (cellStrings[i]!= null) {
 						if (cellStrings[i].equals(accountName)) accountIndex = i;
-						else if (cellStrings[i].equals(expenseName)) expenseIndex = i;
+						else if (cellStrings[i].equals(expenseName2) || cellStrings[i].equals(expenseName1)) expenseIndex = i;
 					}
 				}
 			}

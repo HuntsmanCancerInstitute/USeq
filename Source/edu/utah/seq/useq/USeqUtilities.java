@@ -362,8 +362,6 @@ public class USeqUtilities {
 		ArrayList<String> al = new ArrayList<String>();		
 		try {
 			Runtime rt = Runtime.getRuntime();
-			rt.traceInstructions(true); //for debugging
-			rt.traceMethodCalls(true); //for debugging
 			Process p = rt.exec(command);
 			//Process p = rt.exec(Misc.stringArrayToString(command, " "));
 			BufferedReader data = new BufferedReader(new InputStreamReader(p.getInputStream()));

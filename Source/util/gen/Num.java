@@ -33,6 +33,23 @@ public class Num {
 	    return String.format("%.1f %sB", (double)v / (1L << (z*10)), " KMGTPE".charAt(z));
 	}
 	
+	/**100 GB (107,374,182,400 bytes) of data in Amazon S3 Standard*/
+	public static double gigaBytes(double bytes) {
+		return bytes / 1073741824.0;
+	}
+	
+	/**100 TB (109,951,162,777,600 bytes) of data in Amazon S3 Standard*/
+	public static double teraBytes(double bytes) {
+		return bytes / 1099511627776.0;
+	}
+	
+	public static final NumberFormat dollarFormatter = NumberFormat.getCurrencyInstance();
+	public static String formatBytesToAwsCost (long bytes, double costPerTB) {
+		double tb = teraBytes(bytes);
+		double cost = tb/costPerTB;
+		return dollarFormatter.format(cost);
+	}
+	
 	/**Does a linear regression type interpolation, assumes 2's are > 1's.*/
 	public static float interpolateY(float x1, float y1, float x2, float y2, float testX){
 		float diffX = x2-x1;

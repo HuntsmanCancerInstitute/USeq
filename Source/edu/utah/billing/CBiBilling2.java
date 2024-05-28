@@ -242,6 +242,30 @@ public class CBiBilling2 {
 		}
 		
 		IO.pl("####################### Non Cancer Center Members With HSC Cost Sharing #########################\n");
+		
+		if (bgsToBillNonCancerWithHSCCostSharing.size()!= 0) {
+			IO.pl("HSC Single Line Summaries:\n");
+			IO.pl("Investigator\tHoursBilled\tHSCShare($"+(int)hscCostSharing+"/hour)\tChartfield Line Count\tBU\tORG\tFUND\tPROJECT/ACTIVITY\tACCOUNT\tSTART DATE\tEND DATE\tWAF Dollar Limit\tACCOUNT CONTACT");
+			Integer[] indexesToPull = fetchHscWafIndexes(hourlyWafParser.getHeaderKeyIndex());
+			
+			for (BillingGroup bg: bgsToBillNonCancerWithHSCCostSharing) {
+				double hscCost = bg.getTotalHoursToBill()*hscCostSharing;
+				String first = bg.getGroupName()+"\t"+Num.formatNumber(bg.getTotalHoursBilled(), 3)+"\t$"+Num.formatNumber(hscCost, 2)+"\t";
+				String second = bg.getGroupName()+"\t\t\t";
+				ArrayList<String[]> wafs = bg.getHourlyWafs();
+				if (wafs.size()==0) IO.pl(first+"0\tNo Hourly WAF");
+				else {
+					//first line
+					IO.pl(first+"1\t"+bg.generateHscBillingLine(0, indexesToPull));
+					//subsequent lines
+					for (int i=1; i< wafs.size(); i++) {
+						IO.pl(second+(i+1)+"\t"+bg.generateHscBillingLine(i, indexesToPull));
+					}
+				}	
+			}
+			IO.pl("\nDetailed Information:");
+		}
+		
 		for (BillingGroup bg: bgsToBillNonCancerWithHSCCostSharing) {
 			IO.pl("----------------------------------------------------------------\n");
 			String invoice = bg.generateInvoice(date, hourlyWafParser.getHeaderTabbed(), cloudWafParser.getHeaderTabbed(), true, false);
@@ -257,6 +281,35 @@ public class CBiBilling2 {
 			IO.writeString(invoice, new File (outputDirectory, fileName));
 		}		
 	}
+
+	private Integer[] fetchHscWafIndexes(HashMap<String, Integer> headerKeyIndex) {
+		Integer[] indexesToReturn = new Integer[9];
+		//BU
+		indexesToReturn[0] = headerKeyIndex.get("BU");
+		//ORG
+		indexesToReturn[1] = headerKeyIndex.get("ORG");
+		//FUND
+		indexesToReturn[2] = headerKeyIndex.get("FUND");
+		//PROJECT/ACTIVITY
+		indexesToReturn[3] = headerKeyIndex.get("PROJECT/ACTIVITY");
+		//ACCOUNT
+		indexesToReturn[4] = headerKeyIndex.get("ACCOUNT");
+		//START DATE
+		indexesToReturn[5] = headerKeyIndex.get("START DATE");
+		//END DATE
+		indexesToReturn[6] = headerKeyIndex.get("END DATE");
+		//WAF Dollar Limit
+		indexesToReturn[7] = headerKeyIndex.get("WAF Dollar Limit");
+		//ACCOUNT CONTACT
+		indexesToReturn[8] = headerKeyIndex.get("ACCOUNT CONTACT");
+		//check if any null
+		for (int i=0; i< indexesToReturn.length; i++) {
+			if (indexesToReturn[i]==null) Misc.printErrAndExit("\nERROR: one or more of the requested Hourly WAF keys is missing, check and fix.");
+
+		}
+		return indexesToReturn;
+	}
+
 
 	private void parseAWSCloudAccountInvoices() throws IOException {
 		IO.pl("\nParsing TDSynnex AWS account invoices...");

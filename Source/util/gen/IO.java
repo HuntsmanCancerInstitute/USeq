@@ -940,11 +940,9 @@ public class IO {
 	 * Writes lines to a file.
 	 */
 	public static String[] executeCommandLine(String[] command, File txtOutPutFile, String[] env){
-		ArrayList al = new ArrayList();
+		ArrayList<String> al = new ArrayList<String>();
 		try {
 			Runtime rt = Runtime.getRuntime();
-			rt.traceInstructions(true); //for debugging
-			rt.traceMethodCalls(true); //for debugging
 			Process p = rt.exec(command, env);
 			BufferedReader data = new BufferedReader(new InputStreamReader(p.getInputStream()));
 			BufferedReader error = new BufferedReader(new InputStreamReader(p.getErrorStream())); //for debugging
@@ -982,8 +980,6 @@ public class IO {
 		ArrayList<String> al = new ArrayList<String>();		
 		try {
 			Runtime rt = Runtime.getRuntime();
-			rt.traceInstructions(true); //for debugging
-			rt.traceMethodCalls(true); //for debugging
 			Process p = rt.exec(command);
 			//Process p = rt.exec(Misc.stringArrayToString(command, " "));
 			BufferedReader data = new BufferedReader(new InputStreamReader(p.getInputStream()));
@@ -1130,8 +1126,6 @@ public class IO {
 		ArrayList<String> al = new ArrayList<String>();		
 		try {
 			Runtime rt = Runtime.getRuntime();
-			rt.traceInstructions(true);
-			rt.traceMethodCalls(true); 
 			Process p = rt.exec(command);
 			BufferedReader data = new BufferedReader(new InputStreamReader(p.getInputStream()));
 			BufferedReader error = new BufferedReader(new InputStreamReader(p.getErrorStream())); 

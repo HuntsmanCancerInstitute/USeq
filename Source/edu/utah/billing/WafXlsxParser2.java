@@ -137,4 +137,8 @@ public class WafXlsxParser2 {
 	public String getHeaderTabbed() {
 		return headerTabbed;
 	}
+
+	public HashMap<String, Integer> getHeaderKeyIndex() {
+		return headerKeyIndex;
+	}
 }
