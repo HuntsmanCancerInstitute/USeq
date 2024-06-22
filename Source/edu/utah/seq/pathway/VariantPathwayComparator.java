@@ -1,4 +1,4 @@
-package edu.utah.seq.vcf;
+package edu.utah.seq.pathway;
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
@@ -56,8 +56,8 @@ public class VariantPathwayComparator {
 		
 		try {
 			PrintWriter out = new PrintWriter( new FileWriter(this.resultsSpreadsheet));
-			if (geneKeggIdName == null) out.println("NameHyperLink\tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tBHits\tBNoHits\tFracBHits\tBGeneHits\tLog2(fracA/fracB)");
-			else out.println("NameHyperLink\tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tAGeneLinks\tBHits\tBNoHits\tFracBHits\tBGeneHits\tBGeneLinks\tLog2(fracA/fracB)");
+			if (geneKeggIdName == null) out.println("#NameHyperLink\tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tBHits\tBNoHits\tFracBHits\tBGeneHits\tLog2(fracA/fracB)");
+			else out.println("#NameHyperLink\tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tAGeneLinks\tBHits\tBNoHits\tFracBHits\tBGeneHits\tBGeneLinks\tLog2(fracA/fracB)");
 			for (Pathway p: loadedPathways) out.println(p.toString(keggGeneNameID, addOne));
 			out.close();
 		} catch (IOException e) {
@@ -218,7 +218,8 @@ public class VariantPathwayComparator {
 				sb.append("\")");
 			}
 			else sb.append(name); sb.append("\t");
-			sb.append(Num.formatNumber(pval, 5)); sb.append("\t");
+			//sb.append(Num.formatNumber(pval, 5)); sb.append("\t");
+			sb.append(pval); sb.append("\t");
 			sb.append(Num.formatNumber(adjPval, 5)); sb.append("\t");
 			sb.append(groupAHits.size()); sb.append("\t");
 			sb.append(groupANoHits.size()); sb.append("\t");

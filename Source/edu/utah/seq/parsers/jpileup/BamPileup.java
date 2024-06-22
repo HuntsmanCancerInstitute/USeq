@@ -250,7 +250,7 @@ public class BamPileup {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  Bam Pileup:  Nov 2022                           **\n" +
+				"**                                 Bam Pileup:  June 2024                           **\n" +
 				"**************************************************************************************\n" +
 				"BP extracts pileup information for each bam file over a list of regions. This includes\n"+
 				"the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available\n"+
@@ -276,7 +276,6 @@ public class BamPileup {
 				"-p Number processors to use, defaults to all, reduce if out of memory errors occur.\n"+
 				"-x Max length of region chunk, defaults to 1000, set smaller if out of memory errors\n"+
 				"      occur.\n"+
-				"-c Maximum read coverage stats calculated, defaults to 1000.\n"+
 				"-a Alignment chroms and reference don't start with chr yet bed file does.\n"+
 
 				"\nExample: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b CramFiles/ -r target.bed\n"+

@@ -7,6 +7,7 @@ import java.nio.file.Files;
 import java.nio.file.attribute.FileTime;
 
 import edu.utah.seq.data.ComparatorPointAscendingScore;
+import edu.utah.seq.data.ComparatorPointDecendingScore;
 import edu.utah.seq.data.ComparatorPointPosition;
 import edu.utah.seq.data.Point;
 import edu.utah.seq.data.SmoothingWindow;
@@ -76,6 +77,16 @@ public class Num {
 		double length = end - start;
 		double halfLength = length/2.0;
 		return (int)Math.round(halfLength) + start;
+	}
+	
+	/**Sums the abs(diff)/a*100 at each index.*/
+	public static double sumPercentDifference(double[] a, double[] b){
+		double pDiff = 0;
+		for (int i=0; i< a.length; i++) {
+			double diff = Math.abs((a[i] - b[i])/((a[i]+b[i])/2) * 100);
+			pDiff += diff;
+		}
+		return pDiff;
 	}
 
 	/**Expands the double[] length to that indicated, if even # in double[] then just inserts zeros at the mid point. 
@@ -1017,6 +1028,7 @@ public class Num {
 		} 
 		return rResults;
 	}
+
 
 	/**Assumes sorted pvalues, descending. Alters the input array.*/
 	public static void benjaminiHochbergCorrect(double[] sortedPValDecending){
@@ -5248,6 +5260,21 @@ public class Num {
 			}
 		}
 		return ss;
+	}
+
+	/**Multiplies each double value by the multiplier returning a new array.*/
+	public static double[] scale(double[] a, double multiplier) {
+		double[] scaled = new double[a.length];
+		for (int i=0; i< a.length; i++) scaled[i] = a[i]*multiplier;
+		return scaled;
+	}
+	
+	/**Calculates the scalar needed to scale the test to the ref based on means.
+	 * @return meanRef/meanTest*/
+	public static double calculateScalar(double[] ref, double[] test) {
+		double meanRef = Num.mean(ref);
+		double meanTest = Num.mean(test);
+		return meanRef/meanTest;
 	}
 
 

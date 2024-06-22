@@ -30,6 +30,9 @@ public class CombinePValues {
 		double[] pvals = {0.11, 0.12, 0.21, 0.08};
 		CombinePValues cp = new CombinePValues();
 		IO.pl(cp.calculateCombinePValues(pvals)); //0.03195265009643111
+		
+		pvals = new double[]{0.06277, 0.020672779};
+		IO.pl(cp.calculateCombinePValues(pvals)); //0.009923258826133319
 	}
 
 }

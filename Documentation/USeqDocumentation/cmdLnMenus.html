@@ -179,6 +179,10 @@
 				
 					<a href="#GeneiASEParser">GeneiASEParser</a><br>
 				
+					<a href="#GeneSetPathwayComparator">GeneSetPathwayComparator</a><br>
+				
+					<a href="#GeneSetPathwayComparatorKeggMedicus">GeneSetPathwayComparatorKeggMedicus</a><br>
+				
 					<a href="#Graph2Bed">Graph2Bed</a><br>
 				
 					<a href="#Gr2Bar">Gr2Bar</a><br>
@@ -194,6 +198,8 @@
 					<a href="#JobCleaner">JobCleaner</a><br>
 				
 					<a href="#JointGenotypeVCFParser">JointGenotypeVCFParser</a><br>
+				
+					<a href="#JointPathwayComparator">JointPathwayComparator</a><br>
 				
 					<a href="#KnownSpliceJunctionScanner">KnownSpliceJunctionScanner</a><br>
 				
@@ -380,6 +386,8 @@
 					<a href="#VariantInfoAggregator">VariantInfoAggregator</a><br>
 				
 					<a href="#VariantPathwayComparator">VariantPathwayComparator</a><br>
+				
+					<a href="#VariantPathwayComparatorKeggMedicus">VariantPathwayComparatorKeggMedicus</a><br>
 				
 					<a href="#VarScanVCFParser">VarScanVCFParser</a><br>
 				
@@ -1093,7 +1101,7 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/BamMixer -r ~/TumorSim/
 </pre><br><p>
 				
 					<a name="BamPileup"><pre>**************************************************************************************
-**                                  Bam Pileup:  Nov 2022                           **
+**                                 Bam Pileup:  June 2024                           **
 **************************************************************************************
 BP extracts pileup information for each bam file over a list of regions. This includes
 the # A,C,G,T,N,Del,Ins,FailingBQ bps for each bam. Provide the max memory available
@@ -1119,7 +1127,6 @@ Default Options:
 -p Number processors to use, defaults to all, reduce if out of memory errors occur.
 -x Max length of region chunk, defaults to 1000, set smaller if out of memory errors
       occur.
--c Maximum read coverage stats calculated, defaults to 1000.
 -a Alignment chroms and reference don't start with chr yet bed file does.
 
 Example: java -Xmx100G -jar pathTo/USeq/Apps/BamPileup -b CramFiles/ -r target.bed
@@ -1512,7 +1519,7 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/CarisVcfComparator -f TL-18-03CFD6.vcf
 </pre><br><p>
 				
 					<a name="CarisXmlVcfParser"><pre>**************************************************************************************
-**                            Caris Xml Vcf Parser: Apr 2023                        **
+**                            Caris Xml Vcf Parser: May 2024                        **
 **************************************************************************************
 This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml
 reported genomic alternations are annotated, bed files of copy number changes and gene
@@ -2398,16 +2405,18 @@ Example: java -jar pathTo/T2/Apps/FileJoiner -f /affy/SplitFiles/
 </pre><br><p>
 				
 					<a name="FileSplitter"><pre>**************************************************************************************
-**                            File Splitter: April 2020                             **
+**                            File Splitter: April 2024                             **
 **************************************************************************************
-Splits a big text file into smaller files given a maximum number of lines.
+Splits a big text file into smaller files given a maximum number of lines or target
+number of split files.
 
 Required Parameters:
 -f Full path file text or directory for the text file(s) (.zip/.gz OK).
--n Maximum number of lines to place in each.
--g GZip split files.
+-l Maximum number of lines to place in each.
+-n Or, number of split files.
+-g GZip files after splitting.
 
-Example: java -Xmx256M -jar pathTo/T2/FileSplitter -f /affy/bpmap.txt -n 50000
+Example: java -Xmx256M -jar pathTo/T2/FileSplitter -f /affy/bpmap.txt -l 50000
 
 **************************************************************************************
 </pre><br><p>
@@ -2660,6 +2669,64 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/AllelicExpressionDetector -b Bam/RPEN
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="GeneSetPathwayComparator"><pre>**************************************************************************************
+**                       Gene Set Pathway Comparator : June 2023                    **
+**************************************************************************************
+GSPC uses the interrogatedGeneList to filter the selectGeneList and pathwayGenes sets,
+intersects the filtered selectGeneList against each filtered pathwayGene sets and
+calculates a p-value for the degree of intersection using a hypergeometric
+distribution. These are subsequently multiple test corrected using Benjamini-
+Hochberg FDR method.
+
+Required Parameters:
+-i File containing all of the interrogated genes in the study, one gene symbol per
+     line.
+-g File containing the selected genes of interest, ditto.
+-p File containing pathways to compare, each line represents one pathway, tab
+     delimited, the first cell is the pathway ID and description (e.g.
+     'hsa05210  Colorectal cancer'), subsequent cells, the associated genes.
+-s File to save the results spreadsheet, should end with .txt
+-r File path to the R application.
+-t Directory in which to save temporary files.
+
+Example: java -Xmx10G -jar pathTo/USeq/Apps/GeneSetPathwayComparator -i 
+   allGenes.txt -g diffExpGenes.txt -p keggPathways.txt -s earlyVsLate.xls -t Temp
+   -r /usr/bin/R 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="GeneSetPathwayComparatorKeggMedicus"><pre>**************************************************************************************
+**                       Gene Set Pathway Comparator : June 2023                    **
+**************************************************************************************
+GSPC uses the interrogatedGeneList to filter the selectGeneList and pathwayGenes sets,
+intersects the filtered selectGeneList against each filtered pathwayGene sets and
+calculates a p-value for the degree of intersection using a hypergeometric
+distribution. These are subsequently multiple test corrected using Benjamini-
+Hochberg FDR method. Use the same KEGG MEDICUS reference files as used by the USeq
+VariantPathwayComparatorKeggMedicus app then run the USeq JointPathwayComparator to
+calculate combine p-values for each.
+
+Required Parameters:
+-i File containing all of the interrogated genes in the study, one per line.
+-g File containing the selected genes of interest, ditto.
+-p File containing KEGG MEDICUS pathways to compare, each line represents one pathway,
+     tab delimited, the first cell is the unique pathway name (e.g.
+     'REFERENCE_ATR_SIGNALING'), the second the network id (e.g. N01451), and
+     subsequent cells, the associated gene symbols.
+-l  File containing KEGG network IDs, pathway links, and their descriptions (e.g.
+    N01486 hsa04110+N01486 CellCycle), one network per row, tab delimited.
+-r File to save the txt results, should end with .xls
+-e File path to the R executable.
+-t Directory in which to save temporary files.
+
+Example: java -Xmx10G -jar pathTo/USeq/Apps/GeneSetPathwayComparator -i allGenes.txt
+   -g diffExpGenes.txt -l keggLinks.txt -p keggPathways.txt -r earlyVsLateRnaSeq.xls
+   -t Temp -e /usr/bin/R 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="Graph2Bed"><pre>**************************************************************************************
 **                                 Graph 2 Bed: Feb 2011                            **
 **************************************************************************************
@@ -2839,6 +2906,24 @@ Optional Params:
 
 Example: java -jar -Xmx2G pathToUSeq/Apps/HaplotypeVCFParser -d 20 -a 0.05 -g 30 
       -v jointGenotyped.decomp.vcf.gz -s SplitFilteredVcfs/ -q 30 -c 3 -i 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="JointPathwayComparator"><pre>**************************************************************************************
+**                        Joint Pathway Comparator : June 2023                      **
+**************************************************************************************
+JPC parses the output of the GeneSet and Variant Pathway Comparators when run on the
+same pathway set, combines the pvalues using Fisher's method, and multiple test
+corrects these using the Benjamini-Hochberg FDR method.
+
+Required Parameters:
+-g File containing the GeneSetPathwayComparator txt results.
+-v File containing the VariantPathwayComparator txt results.
+-s File to save the spreadsheet results, should end with .txt
+
+Example: java -Xmx10G -jar pathTo/USeq/Apps/JointPathwayComparator -s 
+   joint.kegg.txt -g gene.kegg.txt -v var.kegg.txt 
 
 **************************************************************************************
 </pre><br><p>
@@ -5542,6 +5627,41 @@ Required Parameters:
 
 Example: java -Xmx10G -jar pathTo/USeq/Apps/VariantPathwayComparator -a earlyCRC.txt
    -l -b lateCRC.txt -p keggPathways.txt -r earlyVsLateVPC.xls -k keggGeneIDName.txt
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="VariantPathwayComparatorKeggMedicus"><pre>**************************************************************************************
+**                 Variant Pathway Comparator Kegg Medicus : June 2024              **
+**************************************************************************************
+For each KEGG MEDICUS pathway, VKPC creates a 2x2 contingency table and calculates a
+Fisher's exact p-value that is subsequently multiple test corrected using Benjamini-
+Hochberg's method. The contingency table is the number of subjects from cohort A with
+one or more matching gene names, the number from A without any gene matches, and
+likewise for the subjects in cohort B. A variety of statistics, including the
+matching gene frequency, degree and directionality of change, and html links to each
+pathway are saved. For TNRunner processed somatic variant files, use the USeq 
+AnnotatedVcfParser to select high impact, loss of function/ CLINVAR patho/likely-
+pathogenic variants.
+
+Required Parameters:
+-a File containing cohort A gene sets, each line represents a subject's genes of
+     interest (e.g. those with HIGH impact mutations), tab delimited, the first cell
+     is the subject ID, subsequent cells are the gene names.
+-b File containing cohort B gene sets, ditto.
+-p File containing KEGG MEDICUS pathways to compare, each line represents one pathway,
+     tab delimited, the first cell is the unique pathway name (e.g.
+     'REFERENCE_ATR_SIGNALING'), the second the network id (e.g. N01451), and
+     subsequent cells, the associated gene symbols.
+-l  File containing KEGG network IDs, pathway links, and their descriptions (e.g.
+    N01486 hsa04110+N01486 CellCycle), one network per row, tab delimited.
+-r File to save the txt results, should end with .xls
+-m Minimum gene hit frequency for inclusion in output, defaults to 0.0005
+-o Add one to zero count A or B fractions when calculating the log2Rto(fracA/fracB)
+
+Example: java -Xmx10G -jar pathTo/USeq/Apps/VariantPathwayComparatorKegg -a 
+   earlyCRC.txt -l keggLinks.txt -p keggPathways.txt -a eCRC.txt -b lCRC.txt -o
+   -r earlyVsLateVPCKM.xls 
 
 **************************************************************************************
 </pre><br><p>
