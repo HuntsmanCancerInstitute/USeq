@@ -19,7 +19,6 @@ public class CaptureRegion {
 	private double ponStdDev = -1;
 	
 	//Test dataset
-	private double rawTestCount = -1;
 	private double scaledTestCount = -1;
 	
 	public CaptureRegion (String rep) {
@@ -47,9 +46,10 @@ public class CaptureRegion {
 	}
 	
 	/**for each of the pons, save the scaled counts and calculate the mean*/
-	public void setPonScaledCounts (double[] ponScaledCounts) {
+	public void setPonScaledCountsCalculateStats (double[] ponScaledCounts) {
 		this.ponScaledCounts = ponScaledCounts;
 		ponScaledMean = Num.mean(ponScaledCounts);
+		ponStdDev = Num.standardDeviation(ponScaledCounts, ponScaledMean);
 	}
 	
 
@@ -81,20 +81,16 @@ public class CaptureRegion {
 		return ponScaledMean;
 	}
 
-	public double getRawTestCount() {
-		return rawTestCount;
-	}
-
-	public void setRawTestCount(double rawTestCount) {
-		this.rawTestCount = rawTestCount;
-	}
-
 	public double getScaledTestCount() {
 		return scaledTestCount;
 	}
 
 	public void setScaledTestCount(double scaledTestCount) {
 		this.scaledTestCount = scaledTestCount;
+	}
+
+	public double[] getPonScaledCounts() {
+		return ponScaledCounts;
 	}
 
 }

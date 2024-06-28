@@ -11,6 +11,8 @@ public class KohliSample {
 	private String sampleId = null;
 	private String type = null;
 	private String dateString = null;
+	private boolean excludeFromPon = false;
+	private boolean germlineSample;
 	
 	private HashMap<String, AccuGenProbeCounts> accuGenProbeCounts = new HashMap<String, AccuGenProbeCounts>();
 	
@@ -20,9 +22,10 @@ public class KohliSample {
 	private double meanRegionCounts = -1.0;
 	private double regionCountScalar = -1.0;
 	
-	public KohliSample (String sampleId, String type, String dateString) {
+	public KohliSample (String sampleId, boolean isGermline, String dateString) {
 		this.sampleId = sampleId;
-		this.type = type.toLowerCase();
+		if (isGermline) germlineSample = true;
+		else germlineSample = false;
 		this.dateString = dateString;
 	}
 	
@@ -68,14 +71,12 @@ public class KohliSample {
 	}
 	
 	public double getMeanRegionCounts(ArrayList<CaptureRegion> regions) {
-		if (meanRegionCounts == -1.0) {
-			double total = 0;
-			for (CaptureRegion p: regions) {
-				Double count = readCoverageCounts.get(p.getOriginalInput());
-				total+= count;
-			}
-			meanRegionCounts = total/(double)regions.size();
+		double total = 0;
+		for (CaptureRegion p: regions) {
+			Double count = readCoverageCounts.get(p.getOriginalInput());
+			total+= count;
 		}
+		meanRegionCounts = total/(double)regions.size();
 		return meanRegionCounts;
 	}
 	
@@ -91,19 +92,16 @@ public class KohliSample {
 		return scaled;
 	}
 	
-	/**Returns the old map if it isn't null.*/
-	public HashMap<String, Double> getScaledRegionCountMap(ArrayList<CaptureRegion> regions, double targetMean) {
-		if (scaledReadCoverageCounts != null) return scaledReadCoverageCounts;
-		
-		regionCountScalar = targetMean / getMeanRegionCounts(regions);
+	public void createScaledRegionCountMap(ArrayList<CaptureRegion> regionsForScalarCalc,  ArrayList<CaptureRegion> regionsToScale, double targetMean) {
+		regionCountScalar = targetMean / getMeanRegionCounts(regionsForScalarCalc);
+		//IO.pl("Scaling using just one gene for "+this.sampleId+ " numRegionsInGene "+regionsForScalarCalc.size()+" scalar "+regionCountScalar);
 		scaledReadCoverageCounts = new HashMap<String, Double>();
-		//probe info
-		for (int i=0; i< regions.size(); i++) {
-			String regionId = regions.get(i).getOriginalInput();
+		//probe info	
+		for (int i=0; i< regionsToScale.size(); i++) {
+			String regionId = regionsToScale.get(i).getOriginalInput();
 			Double count = readCoverageCounts.get(regionId);
 			scaledReadCoverageCounts.put(regionId, count * regionCountScalar);
 		}
-		return scaledReadCoverageCounts;
 	}
 	
 	
@@ -113,10 +111,6 @@ public class KohliSample {
 
 	public String getSampleId() {
 		return sampleId;
-	}
-
-	public String getType() {
-		return type;
 	}
 
 	public String getDateString() {
@@ -138,6 +132,22 @@ public class KohliSample {
 
 	public HashMap<String, Double> getReadCoverageCounts() {
 		return readCoverageCounts;
+	}
+
+	public HashMap<String, Double> getScaledReadCoverageCounts() {
+		return scaledReadCoverageCounts;
+	}
+
+	public boolean isExcludeFromPon() {
+		return excludeFromPon;
+	}
+
+	public void setExcludeFromPon(boolean excludeFromPon) {
+		this.excludeFromPon = excludeFromPon;
+	}
+
+	public boolean isGermlineSample() {
+		return germlineSample;
 	}
 	
 }

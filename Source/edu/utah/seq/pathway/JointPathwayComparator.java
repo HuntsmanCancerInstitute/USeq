@@ -46,8 +46,10 @@ public class JointPathwayComparator {
 	private void savePathways() {
 		try {
 			PrintWriter out = new PrintWriter( new FileWriter(resultsSpreadsheet));
-			//name pval, adjPval, #UniquePathwayGenes, #FoundUniquePathwayGenes, #DiffExpGenes, #GenesIntersect, GenesIntersect/DiffExpGenes, IntersectingGenes
-			out.println("Name\tGenePVal\tVariantPVal\tCombinePVal\tFDR");
+			String header = "#Pathway Page Link\tDiff Exp PVal\tDiff Exp FDR\tDiff Exp Gene Symb\tDiff Exp Gene LgRtos\t"+
+              "Som Var PVal\tSom Var FDR\tSom Var Genes\tSom Var LgRto\t"+
+              "Combine PVal\tCombine FDR\tCombine Genes\tPathway Map Links...";			
+			out.println(header);
 			for (Pathway p: pathways.values()) out.println(p.toString());
 			out.close();
 		} catch (IOException e) {
@@ -61,12 +63,13 @@ public class JointPathwayComparator {
 		Pathway[] pathwayArray = new Pathway[pathways.size()];
 		int counter = 0;
 		for (Pathway p: pathways.values()) {
-			toCombine[0] = p.genePVal;
+			toCombine[0] = p.diffExpPVal;
 			toCombine[1] = p.variantPVal; 
-			p.combinePVal = cp.calculateCombinePValues(toCombine);
+			//watch out with 1's can cause non convergence
+			if (p.diffExpPVal ==1.0 || p.variantPVal==1.0) p.combinePVal = 1.0;
+			else p.combinePVal = cp.calculateCombinePValues(toCombine);
 			pathwayArray[counter++] = p;
 		}
-		
 		//convert the pvals to fdrs
 		Arrays.sort(pathwayArray); //largest to smallest
 		
@@ -74,7 +77,7 @@ public class JointPathwayComparator {
 		for (int i=0; i< pathwayArray.length; i++) pvalsLargeToSmall[i] = pathwayArray[i].combinePVal;
 		
 		Num.benjaminiHochbergCorrect(pvalsLargeToSmall);
-		for (int i=0; i< pathwayArray.length; i++) pathwayArray[i].adjPval = pvalsLargeToSmall[i];
+		for (int i=0; i< pathwayArray.length; i++) pathwayArray[i].combineAdjPval = pvalsLargeToSmall[i];
 	}
 	
 	private void loadVariantResults() {
@@ -86,12 +89,12 @@ public class JointPathwayComparator {
 			String[] cells;
 			while ((line=in.readLine())!=null) {
 				line = line.trim();
-				if (line.startsWith("#") || line.startsWith("Name") || line.length() == 0) continue;
+				if (line.startsWith("#") || line.length() == 0) continue;
 				//#NameHyperLink\tPval
 				cells = Misc.TAB.split(line);
 				Pathway p = pathways.get(cells[0]);
 				if (p==null) missingPathways.add(cells[0]);
-				else p.variantPVal = Double.parseDouble(cells[1]);
+				else p.addSomVarInfo(cells);;
 			}
 			in.close();
 			
@@ -99,7 +102,7 @@ public class JointPathwayComparator {
 			if (missingPathways.size()!=0) Misc.printErrAndExit("\tMissing the following pathways from the gene results: "+missingPathways);
 			missingPathways.clear();
 			for (Pathway p : pathways.values()) {
-				if (p.variantPVal == -1.0) missingPathways.add(p.name);
+				if (p.variantPVal == -1.0) missingPathways.add(p.pathwayPageLink);
 			}
 			if (missingPathways.size()!=0) Misc.printErrAndExit("\tMissing the following pathways from the variant results: "+missingPathways);
 		} catch (IOException e) {
@@ -129,16 +132,60 @@ public class JointPathwayComparator {
 	}
 	
 	private class Pathway implements Comparable<Pathway>{
-		String name;
-		double genePVal = -1.0;
+		String pathwayPageLink;
+		ArrayList<String> subPathwayLinks = new ArrayList<String>();
+		
+		//diffExp
+		double diffExpPVal = -1.0;
+		double diffExpAdjPVal = -1.0;
+		String diffExpGenes = null;
+		String diffExpGeneLgRtos = null;
+		
+		//somVar
 		double variantPVal = -1.0;
+		double variantAdjPVal = -1.0;
+		String variantLog2Rto = null;
+		String variantGenes = null;
+		
+		
+		//combine
 		double combinePVal = -1.0;
-		double adjPval = -1.0;
+		double combineAdjPval = -1.0;
+		String combineGenes = null;
 		
 		Pathway(String[] cells){
-			//name pval, adjPval, #UniquePathwayGenes, #FoundUniquePathwayGenes, #DiffExpGenes, #GenesIntersect, GenesIntersect/DiffExpGenes, IntersectingGenes
-			name = cells[0];
-			genePVal = Double.parseDouble(cells[1]);
+			//diffExp
+			//	      0        1        2           8               9                        10...
+			//#PathwayLink	Pval	AdjPval	IntGeneSymbols	IntGenesLgRtos	PathwayMapLinksWithTopMapDescription...
+			pathwayPageLink = cells[0];
+			diffExpPVal = Double.parseDouble(cells[1]);
+			diffExpAdjPVal = Double.parseDouble(cells[2]);
+			diffExpGenes = cells[8];
+			diffExpGeneLgRtos = cells[9];
+			for (int i=10; i< cells.length; i++) subPathwayLinks.add(cells[i]);
+			
+		}
+		
+		
+		
+		public void addSomVarInfo (String[] cells) {
+			//	      0      1     2           11             12                     13
+			//#PathwayLink Pval AdjPval Log2(fracA/fracB) AllGeneHits PathwayMapLinksWithTopMapDescription...
+			variantPVal = Double.parseDouble(cells[1]);
+			variantAdjPVal = Double.parseDouble(cells[2]);
+			variantLog2Rto = cells[11];
+			variantGenes = cells[12];
+			
+			//make merged gene symbols
+			TreeSet<String> allGenes = new TreeSet<String>();
+			if (diffExpGenes.trim().length()!=0) {
+				for (String s: Misc.WHITESPACE.split(diffExpGenes)) allGenes.add(s);
+			}
+			if (variantGenes.trim().length()!=0) {
+				for (String s: Misc.WHITESPACE.split(variantGenes)) allGenes.add(s);
+			}
+			combineGenes = Misc.treeSetToString(allGenes, " ");
+
 		}
 		
 		public int compareTo(Pathway o) {
@@ -148,12 +195,30 @@ public class JointPathwayComparator {
 		}
 		
 		public String toString() {
+            
 			StringBuilder sb = new StringBuilder();
-			sb.append(name); sb.append("\t");
-			sb.append(genePVal); sb.append("\t");
+			sb.append(pathwayPageLink); sb.append("\t");
+			
+			sb.append(diffExpPVal); sb.append("\t");
+			sb.append(diffExpAdjPVal); sb.append("\t");
+			sb.append(diffExpGenes); sb.append("\t");
+			sb.append(diffExpGeneLgRtos); sb.append("\t");;
+			
 			sb.append(variantPVal); sb.append("\t");
+			sb.append(variantAdjPVal); sb.append("\t");
+			sb.append(variantGenes); sb.append("\t");
+			sb.append(variantLog2Rto); sb.append("\t");
+			
+			
 			sb.append(combinePVal); sb.append("\t");
-			sb.append(adjPval);
+			sb.append(combineAdjPval);sb.append("\t");
+			sb.append(combineGenes);
+			
+			for (String ml: this.subPathwayLinks) {
+				sb.append("\t");
+				sb.append(ml);
+			}
+			
 			return sb.toString();
 		}
 	}
@@ -210,7 +275,7 @@ public class JointPathwayComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Joint Pathway Comparator : June 2023                      **\n" +
+				"**                        Joint Pathway Comparator : June 2024                      **\n" +
 				"**************************************************************************************\n" +
 				"JPC parses the output of the GeneSet and Variant Pathway Comparators when run on the\n"+
 				"same pathway set, combines the pvalues using Fisher's method, and multiple test\n"+
@@ -219,7 +284,7 @@ public class JointPathwayComparator {
 				"\nRequired Parameters:\n"+
 				"-g File containing the GeneSetPathwayComparator txt results.\n"+
 				"-v File containing the VariantPathwayComparator txt results.\n"+
-				"-s File to save the spreadsheet results, should end with .txt\n"+
+				"-s File to save the spreadsheet results, should end with .txt or .xls\n"+
 
 				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/JointPathwayComparator -s \n"+
 				"   joint.kegg.txt -g gene.kegg.txt -v var.kegg.txt \n"+

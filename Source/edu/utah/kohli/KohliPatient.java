@@ -10,7 +10,9 @@ public class KohliPatient {
 	public KohliPatient (String[] tokens) {
 		// #HCIPersonID 	SampleID	Type	DateDrawn
 		this.hciPatientId = tokens[0];
-		samples.add(new KohliSample(tokens[1], tokens[2], tokens[3]));
+		boolean isGermline = false;
+		if (tokens[0].toLowerCase().contains("germline")) isGermline = true;
+		samples.add(new KohliSample(tokens[1], isGermline, tokens[3]));
 	}
 	
 	public String toString() {

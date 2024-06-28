@@ -3,6 +3,7 @@ package edu.utah.kohli;
 import java.util.ArrayList;
 
 import util.gen.IO;
+import util.gen.Num;
 
 public class KohliGene {
 	
@@ -37,25 +38,60 @@ public class KohliGene {
 		}
 		return scaledPonCounts;
 	}
-	public double[] getTestCounts() {
-		double[] testCounts = new double[captureRegions.size()];
-		for (int i=0; i< testCounts.length; i++) {
-			testCounts[i] = captureRegions.get(i).getRawTestCount();
-		}
-		return testCounts;
-	}
+	
 	public String getGeneName() {
 		return geneName;
 	}
-	public double compareTestvsPoN() {
-		//how about a paired Wilcoxon signed-rank test?
+	public CopyTestResult compareTestvsPoN() {
+
+		double[] zscores = new double[captureRegions.size()];
+		double[] scaledTestCounts = new double[captureRegions.size()];
+		double[][] scaledGermlineCounts = new double[captureRegions.size()][];
 		
-		//for each CaptureRegion, calculate z-score of test against PoN
-		double totalZScore = 0;
-		for (CaptureRegion cr: captureRegions) {
-			totalZScore += cr.calculateZScoreFromPoN(cr.getScaledTestCount());
+		//for each CaptureRegion in the gene, calculate z-score of test against PoN
+		for (int i=0; i< zscores.length; i++) {
+			CaptureRegion cr = captureRegions.get(i);
+			scaledTestCounts[i] = cr.getScaledTestCount();
+			scaledGermlineCounts[i] = cr.getPonScaledCounts();
+			zscores[i] = cr.calculateZScoreFromPoN(cr.getScaledTestCount());
 		}
-		return totalZScore/(double)captureRegions.size();
+		return new CopyTestResult(this, zscores, scaledTestCounts, scaledGermlineCounts);
+	}
+	
+	public class CopyTestResult {
+		
+		private KohliGene kohliGene;  //contains CaptureRegion ArrayList
+		
+		private double[] captureRegionZScores;
+		private double[] scaledTestCounts;
+		private double[][] scaledGermlineCounts;
+		
+		public CopyTestResult(KohliGene kohliGene, double[] captureRegionZScores, double[] scaledTestCounts, double[][] scaledGermlineCounts) {
+			this.kohliGene = kohliGene;
+			this.captureRegionZScores = captureRegionZScores;
+			this.scaledTestCounts = scaledTestCounts;
+			this.scaledGermlineCounts = scaledGermlineCounts;
+		}
+		
+		public double getMeanZScore() {
+			return Num.mean(captureRegionZScores);
+		}
+
+		public KohliGene getKohliGene() {
+			return kohliGene;
+		}
+
+		public double[] getCaptureRegionZScores() {
+			return captureRegionZScores;
+		}
+
+		public double[] getScaledTestCounts() {
+			return scaledTestCounts;
+		}
+
+		public double[][] getScaledGermlineCounts() {
+			return scaledGermlineCounts;
+		}
 	}
 
 }

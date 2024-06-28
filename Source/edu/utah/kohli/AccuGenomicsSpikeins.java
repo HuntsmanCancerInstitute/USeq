@@ -3,9 +3,11 @@ package edu.utah.kohli;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.TreeMap;
 
+import edu.utah.kohli.KohliGene.CopyTestResult;
 import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
@@ -17,16 +19,24 @@ public class AccuGenomicsSpikeins {
 	private ArrayList<AccuGenProbe> accuGenProbes = new ArrayList<AccuGenProbe>();
 	private ArrayList<CaptureRegion> captureRegions = new ArrayList<CaptureRegion>();
 	private LinkedHashMap<String, KohliGene> genes = null;
+	private HashMap<String, NormalizerGene> geneNameNormalizedGene = new HashMap<String, NormalizerGene>();
+	private File boxPlotDirectory = null;
+	private ArrayList<String> germlineSamplesToRemoveFromPoN = null;
+	private LinkedHashMap<String, CopyAnalysisTest> copyAnalysisTests = new LinkedHashMap<String, CopyAnalysisTest>();
 
 	public static void main(String[] args) {
 		File anno = new File ("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/FinalAggregateAnalysis/sampleMatchingPersonGNomIDs_13June2024.txt");
 		File vcfCountData = new File("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/FinalAggregateAnalysis/BcfToolsForAccGen/justVcfSampleCounts.txt");
 		File regionCountData = new File("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/FinalAggregateAnalysis/CopyRatio/Split150bp/medianMergedSplit150ProbeCountsQCed.txt");
-		
-		new AccuGenomicsSpikeins(anno, vcfCountData, regionCountData);
+		File boxPlotDirectory = new File("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/FinalAggregateAnalysis/CopyRatio/Split150bp/BoxPlotDataFiles");
+		ArrayList<String> germlineSamplesToRemoveFromPoN = new ArrayList<String>();
+		germlineSamplesToRemoveFromPoN.add("23802X11");
+		new AccuGenomicsSpikeins(anno, vcfCountData, regionCountData, boxPlotDirectory, germlineSamplesToRemoveFromPoN);
 	}
 	
-	public AccuGenomicsSpikeins(File anno, File vcfCountData, File regionCountData) {
+	public AccuGenomicsSpikeins(File anno, File vcfCountData, File regionCountData, File boxPlotDirectory, ArrayList<String> germlineSamplesToRemoveFromPoN) {
+		this.boxPlotDirectory = boxPlotDirectory;
+		this.germlineSamplesToRemoveFromPoN = germlineSamplesToRemoveFromPoN;
 		
 		//load patient sample annotations
 		loadPatients(anno);
@@ -56,7 +66,7 @@ public class AccuGenomicsSpikeins {
 		//meanScaleReadCoverageDatasetsBoxPlot(1000.0,"germline");
 		
 		//mean scale the germline samples
-		meanScaleGermlineReadCoverageDatasets(1000.0);
+		//meanScaleGermlineReadCoverageDatasetsAllGenes(1000.0);
 		
 		//print out the genes
 		//IO.pl("Genes, their capture regions, the mean of all of the germline samples and the individual values");
@@ -64,46 +74,125 @@ public class AccuGenomicsSpikeins {
 		//	IO.pl(kg.toString());
 		//}
 		
-		//pick a sample to test and a gene to normalize to
-		String testSampleId = "23802X10";  //one of the germline samples used in the boxplot
-		String normalizerGeneName = "TP53";
-		String boxplotData = scaleTestCountsUsingGene(testSampleId, normalizerGeneName);
-		IO.pl(boxplotData);
 		
-		//compare
-		for (KohliGene kg: genes.values()) {
-			double compScore = kg.compareTestvsPoN();
-			IO.pl(kg.getGeneName()+"\t"+ kg.compareTestvsPoN());
-			
-IO.pl("Here");
-			
-		}
+		//scan the pon to define the accepted range for each normalizer gene
+		generatePonBackground();
 		
+		//test a sample against the PoN
+		test("22712X1");
+		//test("23802X1");
+		//for (String sampleId : samples.keySet()) {
+			//test(sampleId);
+		//}
 		
-		//scan the pon to define the accepted range for each gene
 	}
 	
-	private String scaleTestCountsUsingGene(String testSampleId, String normalizerGeneName) {
-		//get the testSample
-		KohliSample testSample = samples.get(testSampleId);
-		//add in raw test values to all of the CaptureRegions
-		for (CaptureRegion cr: captureRegions) {
-			String crId = cr.getOriginalInput();
-			double count = testSample.getReadCoverageCounts().get(crId);
-			cr.setRawTestCount(count);
+	private void test(String sampleIdToTest) {
+		
+//IO.pl("Testing, "+sampleIdToTest+"...");
+		CopyAnalysisTest cat = new CopyAnalysisTest(sampleIdToTest);
+		copyAnalysisTests.put(sampleIdToTest, cat);
+		
+		KohliSample ks = samples.get(sampleIdToTest);
+		
+		//@TODO: print out min gene norm box plots and max gene norm box plots
+		//vis inspect to see oddity
+		
+		//use each gene, use it as a normalizer
+		for (KohliGene kg: genes.values()) {
+			NormalizerGene ng = geneNameNormalizedGene.get(kg.getGeneName());
+			HashMap<String, double[]> geneMinMaxZScores = ng.getGeneNameZScoreMinMax();
+
+			//scale the germline data and load it into the capture regions
+			//@TODO really should cache this!
+			meanScaleGermlineReadCoverageDatasetsOneGene(1000, kg.getGeneName());
+			
+			//scale the test
+			meanScaleTestReadCoverageDatasetsOneGene(1000, kg.getGeneName(), sampleIdToTest);
+File boxPlotDataTest = new File(boxPlotDirectory, "testing_"+sampleIdToTest+"_"+kg.getGeneName()+"_BoxPlotData.txt");
+saveScaledTestReadCoverageDatasetsForBoxPlot(boxPlotDataTest);
+			
+			//for each gene compare
+			int numOutOfRange = 0;
+			
+			//@TODO: skip TMPRSS2-ERG
+			
+			for (KohliGene kgs: genes.values()) {
+				CopyTestResult testResult = kgs.compareTestvsPoN();
+				//is the meanZScore within the germline test zscores?
+				double[] minMax = geneMinMaxZScores.get(kgs.getGeneName());
+				double testMeanZScore = testResult.getMeanZScore();
+				boolean inGermZScoreRange = false;
+				if (testMeanZScore < minMax[0] || testMeanZScore > minMax[1]) {
+					inGermZScoreRange = true;
+					numOutOfRange++;
+				}
+				//IO.pl(sampleIdToTest+"\t"+kg.getGeneName()+"\t"+kgs.getGeneName()+"\t"+testResult.getMeanZScore()+"\t"+inGermZScoreRange);
+			}
+			IO.pl(sampleIdToTest+"\t"+ kg.getGeneName()+ "\t"+ numOutOfRange);
+			
+			//@TODO, convert to show sorted list of normalizer genes
+			/*if (numOutOfRange < minNumOutOfRange) {
+				minNumOutOfRange = numOutOfRange;
+				bestNormalizer = sampleIdToTest+"\t"+ kg.getGeneName();
+			}*/
 		}
-		//use the normalizer gene to calculate a scalar to normalize the test raw counts
-		KohliGene normalizerGene = genes.get(normalizerGeneName);
-		double[] ponGeneCounts = normalizerGene.getScaledPonCounts();
-		//get the testCounts for that gene
-		double[] testGeneCounts = normalizerGene.getTestCounts();
-		//calculate the scalar
-		double scalar = Num.calculateScalar(ponGeneCounts, testGeneCounts);
-		//scale all of the test counts
-		for (CaptureRegion cr: captureRegions) {
-			double rawCount = cr.getRawTestCount();
-			cr.setScaledTestCount(rawCount*scalar);
+		//IO.pl(bestNormalizer);
+			
+		
+	}
+
+	private void generatePonBackground() {
+		IO.pl("Generating all gene normalized PoN...");
+		//for each gene
+		for (KohliGene kg: genes.values()) {
+			String normalizerGeneName = kg.getGeneName(); 
+			NormalizerGene ng = new NormalizerGene(normalizerGeneName);
+			geneNameNormalizedGene.put(normalizerGeneName, ng);
+
+			//scale the PoN, not necessary, just useful for boxplots, not used in zscore calcs
+			meanScaleGermlineReadCoverageDatasetsOneGene(1000, normalizerGeneName);
+			File boxPlotDataGermline = new File(boxPlotDirectory, normalizerGeneName+"_All_Germline_BoxPlotData.txt");
+			saveScaledGermlineReadCoverageDatasetsForBoxPlot(boxPlotDataGermline);
+			
+			//for each germline sample that isn't flagged, use it as a mock test sample
+			ArrayList<String> testSamples = new ArrayList<String>();
+			for (KohliSample ks: samples.values()) {
+				
+				//skip any non germline samples and any that have failed a prior determination to be bad
+				if (ks.isGermlineSample() == false || ks.isExcludeFromPon() == true) continue;
+				
+				//set exclude the current test sample from pon generation
+				ks.setExcludeFromPon(true);
+				//scale the PoN without the mock test sample
+				meanScaleGermlineReadCoverageDatasetsOneGene(1000, normalizerGeneName);
+				//File boxPlotDataGermline = new File(boxPlotDirectory, normalizerGeneName+"_Minus_"+ks.getSampleId()+"_Germline_BoxPlotData.txt");
+				//saveScaledGermlineReadCoverageDatasetsForBoxPlot(boxPlotDataGermline);
+				//reset to include for the next round
+				ks.setExcludeFromPon(false);
+
+				//scale the test
+				String testSampleId = ks.getSampleId(); 
+				testSamples.add(testSampleId);
+				meanScaleTestReadCoverageDatasetsOneGene(1000, normalizerGeneName, testSampleId);
+				//File boxPlotDataTest = new File(boxPlotDirectory, normalizerGeneName+"_"+testSampleId+"_BoxPlotData.txt");
+				//saveScaledTestReadCoverageDatasetsForBoxPlot(boxPlotDataTest);
+				
+				//compare the test to the pon
+				for (KohliGene kgs: genes.values()) {
+					double compScore = kgs.compareTestvsPoN().getMeanZScore();
+					//IO.pl(kgs.getGeneName()+"/t"+compScore);
+					ng.addZScore(kgs.getGeneName(), compScore);
+				}
+			}
+			ng.setGermlineSampleNames(testSamples);
+			//IO.pl(ng.toString());
 		}
+		//IO.pl("Calculate the mean and stdev of these zscores for mock germline sample against the PoN to identify and remove outliers.");
+		if (germlineSamplesToRemoveFromPoN.size()!=0) IO.pl("\tExcluding user flagged "+Misc.stringArrayListToString(germlineSamplesToRemoveFromPoN, ", "));
+	}
+	
+	private void saveScaledTestReadCoverageDatasetsForBoxPlot(File toSave) {
 		//print out all of the scaled counts for boxplots
 		StringBuilder sb = new StringBuilder();
 		//header row
@@ -125,15 +214,15 @@ IO.pl("Here");
 			sb.append(Double.toString(cr.getScaledTestCount()));
 			sb.append("\n");
 		}
-		return sb.toString();
+		IO.writeString(sb.toString(), toSave);
 	}
 
-	private void meanScaleGermlineReadCoverageDatasets(double target) {
+	private void meanScaleGermlineReadCoverageDatasetsAllGenes(double target) {
 
-		//scale the counts
+		//scale the counts using all of the capture regions
 //IO.pl("Scaling germline sample counts....");
 		for (KohliSample ks: samples.values()) {
-			if (ks.getType().equals("germline")) ks.getScaledRegionCountMap(captureRegions, target);
+			if (ks.isGermlineSample()) ks.createScaledRegionCountMap(captureRegions, captureRegions, target);
 		}
 		
 		//for each capture region
@@ -143,16 +232,87 @@ IO.pl("Here");
 			ArrayList<Double> germlineScaledCounts = new ArrayList<Double>();
 			//for each germline pon sample
 			for (KohliSample ks: samples.values()) {
-				if (ks.getType().equals("germline")) {
-					HashMap<String, Double> sampleScaledCaptureRegionMeans = ks.getScaledRegionCountMap(captureRegions, target);
+				if (ks.isGermlineSample()) {
+					HashMap<String, Double> sampleScaledCaptureRegionMeans = ks.getScaledReadCoverageCounts();
 					germlineScaledCounts.add(sampleScaledCaptureRegionMeans.get(crId));
 				}
 			}
 			//convert to double[] and set in cr
 //IO.pl("Setting counts in "+cr.getOriginalInput());
-			cr.setPonScaledCounts(Num.arrayListOfDoubleToArray(germlineScaledCounts));
+			cr.setPonScaledCountsCalculateStats(Num.arrayListOfDoubleToArray(germlineScaledCounts));
 //IO.pl("\t"+cr.getPonScaledMean());
 		}
+	}
+	
+	private void meanScaleGermlineReadCoverageDatasetsOneGene(double target, String gene) {
+
+		//scale the counts using one gene to the target value
+		KohliGene kg = genes.get(gene);
+		ArrayList<CaptureRegion> forScalarRegions = kg.getCaptureRegions();
+		for (KohliSample ks: samples.values()) {
+			if (ks.isGermlineSample() && ks.isExcludeFromPon()==false) ks.createScaledRegionCountMap(forScalarRegions, captureRegions, target);
+		}
+	
+		//load the capture regions with the scaled counts
+		for (CaptureRegion cr: captureRegions) {
+			String crId = cr.getOriginalInput();
+			ArrayList<Double> germlineScaledCounts = new ArrayList<Double>();
+			
+			//for each germline pon sample, exclude those that have been flagged
+			for (KohliSample ks: samples.values()) {
+				if (ks.isGermlineSample()  && ks.isExcludeFromPon()==false) {
+					HashMap<String, Double> sampleScaledCaptureRegionMeans = ks.getScaledReadCoverageCounts();
+					germlineScaledCounts.add(sampleScaledCaptureRegionMeans.get(crId));
+				}
+			}
+			//convert to double[] and set in cr
+			cr.setPonScaledCountsCalculateStats(Num.arrayListOfDoubleToArray(germlineScaledCounts));
+		}
+	}
+	
+	private void meanScaleTestReadCoverageDatasetsOneGene(double target, String gene, String testSampleId) {
+
+		//scale the counts using one gene to the target value
+//IO.pl("Scaling germline sample counts using gene "+gene+" to target "+target);
+		KohliGene kg = genes.get(gene);
+		KohliSample ks = samples.get(testSampleId);
+		ks.createScaledRegionCountMap(kg.getCaptureRegions(), captureRegions, target);
+		
+		//load the capture regions with the scaled counts
+//IO.pl("Pulling counts over each capture region for the test sample....");
+		for (CaptureRegion cr: captureRegions) {
+			String crId = cr.getOriginalInput();
+			HashMap<String, Double> sampleScaledCaptureRegionMeans = ks.getScaledReadCoverageCounts();
+			cr.setScaledTestCount(sampleScaledCaptureRegionMeans.get(crId));
+		}
+	}
+	
+	private void saveScaledGermlineReadCoverageDatasetsForBoxPlot(File toSave) {
+		//header row
+		StringBuilder sb = new StringBuilder("Gene\tScaledCount\n");
+		String gene = "";
+		int counter = 0;
+		for (int i=0; i< captureRegions.size(); i++) {
+			CaptureRegion cr = captureRegions.get(i);
+			String crId = cr.getOriginalInput();
+			if (cr.getGene().equals(gene) == false) {
+				gene = cr.getGene();
+				counter = 0;
+			}
+			counter++;
+			String counterString = Integer.toString(counter);
+			if (counterString.length()==1) counterString = "0"+counterString;
+			String name = gene+"_"+counterString;
+			//for each sample
+			for (KohliSample ks: samples.values()) {
+				if (ks.isGermlineSample() == false || ks.isExcludeFromPon() == true) continue;
+				sb.append(name);
+				sb.append("\t");
+				sb.append(ks.getScaledReadCoverageCounts().get(crId));
+				sb.append("\n");
+			}
+		}
+		IO.writeString(sb.toString(), toSave);
 	}
 	
 	private void meanScaleAndPrintReadCoverageDatasets(double target) {
@@ -182,14 +342,15 @@ IO.pl("Here");
 			//for each sample
 			for (KohliSample ks: samples.values()) {
 				sb.append("\t");
-				sb.append(ks.getScaledRegionCountMap(captureRegions, target).get(region.getOriginalInput()));
+				ks.createScaledRegionCountMap(captureRegions, captureRegions, target);
+				sb.append(ks.getScaledReadCoverageCounts().get(region.getOriginalInput()));
 			}
 			sb.append("\n");
 		}
 		IO.pl(sb);
 	}
 	
-	private void meanScaleReadCoverageDatasetsBoxPlot(double target, String type) {
+	private void meanScaleReadCoverageDatasetsBoxPlot(double target, boolean germline) {
 		//header row
 		StringBuilder sb = new StringBuilder("Gene\tScaledCount\n");
 		String gene = "";
@@ -206,12 +367,14 @@ IO.pl("Here");
 			if (counterString.length()==1) counterString = "0"+counterString;
 			String name = gene+"_"+counterString;
 IO.pl(cr.getOriginalInput()+"\t"+name);
-			//for each sample
+			//for each sample 
 			for (KohliSample ks: samples.values()) {
-				if (ks.getType().equals(type) == false) continue;
+				//if (ks.getType().equals(type) == false) continue;
+				if ((ks.isGermlineSample() == germline) == false) continue;
 				sb.append(name);
 				sb.append("\t");
-				sb.append(ks.getScaledRegionCountMap(captureRegions, target).get(crId));
+				ks.createScaledRegionCountMap(captureRegions, captureRegions, target);
+				sb.append(ks.getScaledReadCoverageCounts().get(crId));
 				sb.append("\n");
 			}
 		}
@@ -225,8 +388,10 @@ IO.pl(sb);
 		sb.append("ProbId");
 		for (String sampleId: samples.keySet()) {
 			KohliSample ks = samples.get(sampleId);
+			String type = "germline";
+			if (ks.isGermlineSample()==false) type = "tumor";
 			sb.append("\t");
-			sb.append(sampleId+"_"+ks.getType());
+			sb.append(sampleId+"_"+type);
 		}
 		sb.append("\n");
 		//data lines
@@ -249,8 +414,10 @@ IO.pl(sb);
 		sb.append("ProbId");
 		for (String sampleId: samples.keySet()) {
 			KohliSample ks = samples.get(sampleId);
+			String type = "germline";
+			if (ks.isGermlineSample()==false) type = "tumor";
 			sb.append("\t");
-			sb.append(sampleId+"_"+ks.getType());
+			sb.append(sampleId+"_"+type);
 		}
 		sb.append("\n");
 		//data lines
@@ -266,8 +433,9 @@ IO.pl(sb);
 		IO.p(sb);
 	}
 	
-	private void loadReadCoverageData(File vcfCountData) {
-		String[] lines = IO.loadFileIntoStringArray(vcfCountData);
+	private void loadReadCoverageData(File countData) {
+		IO.pl("Loading capture region count data...");
+		String[] lines = IO.loadFileIntoStringArray(countData);
 		// parse the header line, create a hashMap of index and KohliSample
 		// Chr_Start_Stop_Info 22712X10 22712X11 22712X12 22712X13 ...
 		if (lines[0].startsWith("Chr_Start_Stop_Info") == false) Misc.printErrAndExit("First line in the read count data file doesn't start with 'Chr_Start_Stop_Info'? -> "+lines[0]);
@@ -345,6 +513,7 @@ IO.pl(sb);
 	}
 
 	private void loadPatients(File anno) {
+		IO.pl("Loading patient and sample meta data...");
 		String[] lines = IO.loadFileIntoStringArray(anno);
 		if (lines[0].equals("#HCIPersonID\tSampleID\tType\tDateDrawn") == false) Misc.printErrAndExit("First line in the anno file isn't '#HCIPersonID SampleID Type	DateDrawn'? -> "+lines[0]);
 		for (int i=1; i< lines.length; i++) {
@@ -354,13 +523,24 @@ IO.pl(sb);
 				kp = new KohliPatient(tokens);
 				patients.put(tokens[0], kp);
 			}
-			else kp.getSamples().add(new KohliSample(tokens[1], tokens[2], tokens[3]));
+			else {
+				boolean isGermline = false;
+				if (tokens[2].toLowerCase().contains("germline")) isGermline = true;
+				kp.getSamples().add(new KohliSample(tokens[1], isGermline, tokens[3]));
+			}
 		}
 		//load the sample treemap
 		for (KohliPatient kp: patients.values()) {
 			for (KohliSample ks: kp.getSamples()) {
 				if (samples.containsKey(ks.getSampleId())) Misc.printErrAndExit("Duplicate sample found! "+ks.getSampleId());
 				samples.put(ks.getSampleId(), ks);
+			}
+		}
+		//any germline samples to exclude from the Pon?
+		if (germlineSamplesToRemoveFromPoN.size()!=0) {
+			for (String sampleId: germlineSamplesToRemoveFromPoN) {
+				KohliSample ks = samples.get(sampleId);
+				ks.setExcludeFromPon(true);
 			}
 		}
 	}
