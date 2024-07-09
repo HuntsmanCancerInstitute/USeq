@@ -94,4 +94,38 @@ public class KohliGene {
 		}
 	}
 
+	public int getNumberTestValuesOutsideCaptureRegions() {
+		int numOutside = 0;
+		for (CaptureRegion cr: captureRegions) {
+			if (cr.isTestOutsidePoN()) numOutside++;
+		}
+		return numOutside;
+	}
+	
+	public double getMeanCaptureRegionZScore() {
+		double meanZScore = 0.0;
+		for (CaptureRegion cr: captureRegions) {
+			meanZScore+= cr.calculateZScoreFromPoN();
+		}
+		return meanZScore/(double)captureRegions.size();
+	}
+	
+	public double getMeanCaptureRegionScaledTestScore() {
+		double total = 0.0;
+		for (CaptureRegion cr: captureRegions) {
+			total+= cr.getScaledTestCount();
+		}
+		return total/(double)captureRegions.size();
+	}
+	public double getMeanCaptureRegionPoNScore() {
+		double total = 0.0;
+		for (CaptureRegion cr: captureRegions) {
+			total+= cr.getPonScaledMean();
+		}
+		return total/(double)captureRegions.size();
+	}
+	public String getChromosome() {
+		return captureRegions.get(0).getChr();
+	}
+
 }

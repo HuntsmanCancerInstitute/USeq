@@ -1,6 +1,6 @@
 package edu.utah.kohli;
 
-import util.gen.IO;
+import java.util.Arrays;
 import util.gen.Misc;
 import util.gen.Num;
 
@@ -18,6 +18,11 @@ public class CaptureRegion {
 	private double ponScaledMean = -1;
 	private double ponStdDev = -1;
 	
+	//Panel of Normals based on initial 1000 scaling
+	private double[] initialPonScaledCounts = null;
+	private double initialPonScaledMean = -1;
+	private double initialPonStdDev = -1;
+	
 	//Test dataset
 	private double scaledTestCount = -1;
 	
@@ -31,8 +36,19 @@ public class CaptureRegion {
 		gene = f[3];
 	}
 	
+	public boolean isTestOutsidePoN() {
+		double[] minMax = Num.findMinMaxDoubleValues(ponScaledCounts);
+		if (scaledTestCount < minMax[0]) return true;
+		if (scaledTestCount > minMax[1]) return true;
+		return false;
+	}
+	
 	public double calculateZScoreFromPoN(double testValue) {
 		return (testValue-ponScaledMean)/ponStdDev;
+	}
+	
+	public double calculateZScoreFromPoN() {
+		return (scaledTestCount-ponScaledMean)/ponStdDev;
 	}
 	
 	public String toString() {	
@@ -46,12 +62,23 @@ public class CaptureRegion {
 	}
 	
 	/**for each of the pons, save the scaled counts and calculate the mean*/
-	public void setPonScaledCountsCalculateStats (double[] ponScaledCounts) {
+	public void setPonScaledCountsCalculateStats (double[] ponScaledCounts, boolean setInitial) {
 		this.ponScaledCounts = ponScaledCounts;
 		ponScaledMean = Num.mean(ponScaledCounts);
 		ponStdDev = Num.standardDeviation(ponScaledCounts, ponScaledMean);
+		if (setInitial) {
+			initialPonScaledCounts = Arrays.copyOf(ponScaledCounts, ponScaledCounts.length);
+			initialPonScaledMean = ponScaledMean;
+			initialPonStdDev = ponStdDev;
+		}
 	}
 	
+	/**Replace the working PoN stats with the initially assigned values.*/
+	public void copyInitialPoNToCurrentPon() {
+		ponScaledCounts = Arrays.copyOf(initialPonScaledCounts, initialPonScaledCounts.length);
+		ponScaledMean = initialPonScaledMean;
+		ponStdDev = initialPonStdDev;
+	}
 
 	public String getOriginalInput() {
 		return originalInput;

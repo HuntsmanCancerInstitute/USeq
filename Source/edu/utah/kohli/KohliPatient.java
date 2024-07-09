@@ -12,7 +12,7 @@ public class KohliPatient {
 		this.hciPatientId = tokens[0];
 		boolean isGermline = false;
 		if (tokens[0].toLowerCase().contains("germline")) isGermline = true;
-		samples.add(new KohliSample(tokens[1], isGermline, tokens[3]));
+		samples.add(new KohliSample(this, tokens[1], isGermline, tokens[3]));
 	}
 	
 	public String toString() {
@@ -32,5 +32,16 @@ public class KohliPatient {
 
 	public ArrayList<KohliSample> getSamples() {
 		return samples;
+	}
+
+	public KohliSample getGermlineSample() {
+		for (KohliSample ks: samples) if (ks.isGermlineSample()) return ks;
+		return null;
+	}
+
+	public ArrayList<KohliSample> getNonGermlineSamples() {
+		ArrayList<KohliSample> ng = new ArrayList<KohliSample>();
+		for (KohliSample ks: samples) if (ks.isGermlineSample()==false) ng.add(ks);
+		return ng;
 	}
 }

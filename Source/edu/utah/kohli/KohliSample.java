@@ -2,12 +2,11 @@ package edu.utah.kohli;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-
-import util.gen.IO;
 import util.gen.Misc;
 
 public class KohliSample {
 	
+	private KohliPatient patient = null;
 	private String sampleId = null;
 	private String type = null;
 	private String dateString = null;
@@ -22,7 +21,8 @@ public class KohliSample {
 	private double meanRegionCounts = -1.0;
 	private double regionCountScalar = -1.0;
 	
-	public KohliSample (String sampleId, boolean isGermline, String dateString) {
+	public KohliSample (KohliPatient patient, String sampleId, boolean isGermline, String dateString) {
+		this.patient = patient;
 		this.sampleId = sampleId;
 		if (isGermline) germlineSample = true;
 		else germlineSample = false;
@@ -94,7 +94,6 @@ public class KohliSample {
 	
 	public void createScaledRegionCountMap(ArrayList<CaptureRegion> regionsForScalarCalc,  ArrayList<CaptureRegion> regionsToScale, double targetMean) {
 		regionCountScalar = targetMean / getMeanRegionCounts(regionsForScalarCalc);
-		//IO.pl("Scaling using just one gene for "+this.sampleId+ " numRegionsInGene "+regionsForScalarCalc.size()+" scalar "+regionCountScalar);
 		scaledReadCoverageCounts = new HashMap<String, Double>();
 		//probe info	
 		for (int i=0; i< regionsToScale.size(); i++) {
@@ -148,6 +147,10 @@ public class KohliSample {
 
 	public boolean isGermlineSample() {
 		return germlineSample;
+	}
+
+	public KohliPatient getPatient() {
+		return patient;
 	}
 	
 }
