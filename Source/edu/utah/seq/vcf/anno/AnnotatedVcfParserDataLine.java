@@ -23,6 +23,9 @@ public class AnnotatedVcfParserDataLine {
 	String filter = null;
 	String info = null;
 	
+	//N's in ref or alt?
+	boolean passesNCheck = true;
+	
 	String priorCallFreq = null;
 	String bkz = null;
 	String bkzAF = null;
@@ -69,6 +72,7 @@ public class AnnotatedVcfParserDataLine {
 			if (filter.length()<2) filter = "MULTIALLELIC";
 			else filter = filter+",MULTIALLELIC";
 		}
+		if (alt.toUpperCase().contains("N") || ref.toUpperCase().contains("N")) passesNCheck = false;
 	}
 
 	public static final String headerSpreadSheet = "FileName\tIGVLink\tCHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tAlleleFreq\t"

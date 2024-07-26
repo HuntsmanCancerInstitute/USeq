@@ -713,7 +713,7 @@ public class AnnotatedVcfParser {
 		//From gnomAD
 		String gnomadAFString = infoKeyValue.get("GnomAD_AF");
 		if (gnomadAFString != null){
-			if (gnomadAFString.equals(".") == false){
+			if (gnomadAFString.equals(".") == false && gnomadAFString.contains(",")==false){
 				foundPop = true;
 				double popAF = Double.parseDouble(gnomadAFString);
 				if (popAF > maximumPopAF) passGnomAD_AF = false;
@@ -1167,7 +1167,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Annotated Vcf Parser  March 2023                       **\n" +
+				"**                           Annotated Vcf Parser  July 2024                        **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+

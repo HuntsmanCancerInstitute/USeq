@@ -137,7 +137,7 @@ public class CBio2Sgr {
 				try{
 					switch (test){
 					case 'd': tsvFiles = IO.extractFiles(args[++i], ".tsv"); break;
-					case 's': skipSampleNames = true; break;
+					case 's': skipSampleNames = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group());
 					}
