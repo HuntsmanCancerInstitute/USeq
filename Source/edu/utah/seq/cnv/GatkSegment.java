@@ -143,7 +143,20 @@ public class GatkSegment implements Comparable<GatkSegment>{
 		return sb.toString();
 	}
 	
+	public String toBedGraph(){
+		StringBuilder sb = new StringBuilder();
+		sb.append(chr); sb.append("\t");
+		sb.append(start); sb.append("\t");
+		sb.append(end); sb.append("\t");
+		//score
+		sb.append(f(lgMeanTNRatios));
+		
+		return sb.toString();
+	}
+	
 	public String f(double num){
+		//watch out for bad doubles
+		if (Double.isInfinite(num) || Double.isNaN(num)) return ".";
 		return Num.formatNumber(num, 4);
 	}
 	

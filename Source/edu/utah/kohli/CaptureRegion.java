@@ -26,6 +26,8 @@ public class CaptureRegion {
 	//Test dataset
 	private double scaledTestCount = -1;
 	
+	private double pValTTest = -1;
+	
 	public CaptureRegion (String rep) {
 		//Chr_Start_Stop_Info
 		originalInput = rep;
@@ -118,6 +120,14 @@ public class CaptureRegion {
 
 	public double[] getPonScaledCounts() {
 		return ponScaledCounts;
+	}
+
+	public double getpValTTest() {
+		return pValTTest;
+	}
+
+	public void setpValTTest(double pValTTest) {
+		this.pValTTest = pValTTest;
 	}
 
 }

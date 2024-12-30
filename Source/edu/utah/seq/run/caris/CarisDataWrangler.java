@@ -42,6 +42,7 @@ public class CarisDataWrangler {
 	private String profile = "default";
 	private boolean deleteAfterDownload = false;
 	private boolean verbose = false;
+	private String[] filePrefixesToIgnore = null;
 	
 	//internal
 	private HashMap<String, CarisPatient> namePatient = new HashMap<String, CarisPatient>();
@@ -208,8 +209,20 @@ public class CarisDataWrangler {
 				if (fileName.startsWith("DNA_TN") || fileName.startsWith("RNA_TN"))  testID = splitName[1];
 				else if (fileName.startsWith("TN")) testID = splitName[0];
 				else {
-					errorMessages.add("Failed to parse the test ID from "+fileName+ " in "+line);
-					pl("\tERROR\t"+line);
+					boolean errorIt = true;
+					//one of the prefixes to ignore?
+					if (filePrefixesToIgnore != null) {
+						for (String pre: filePrefixesToIgnore) {
+							if (fileName.startsWith(pre)) {
+								errorIt = false;
+								break;
+							}
+						}
+					}
+					if (errorIt) {
+						errorMessages.add("Failed to parse the test ID from "+fileName+ " in "+line);
+						pl("\tERROR\t"+line);
+					}
 				}
 
 				//fetch or create the patient
@@ -257,6 +270,7 @@ public class CarisDataWrangler {
 						case 't': minimumHrsOld = Integer.parseInt(args[++i]); break;
 						case 'p': profile =args[++i]; break;
 						case 'd': deleteAfterDownload = true; break;
+						case 'f': filePrefixesToIgnore = Misc.COMMA.split(args[++i]); break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 						}
 					}
@@ -310,7 +324,7 @@ public class CarisDataWrangler {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                             Caris Data Wrangler : Mar 2024                       **\n" +
+				"**                             Caris Data Wrangler : Oct 2024                       **\n" +
 				"**************************************************************************************\n" +
 				"The Caris Data Wrangler downloads complete patient datasets from an AWS bucket, parses\n"+
 				"the xml test file for patient info, fetches/makes coreIds using the SubjectMatchMaker\n"+
@@ -328,9 +342,10 @@ public class CarisDataWrangler {
 				"-t Minimum hours old before downloading, defaults to 12\n"+
 				"-p Credentials profile, defaults to 'default'\n"+
 				"-d Delete S3 objects after successful download\n"+
+				"-f S3 file prefixes to ignore, comma delimited, no spaces\n"+
 				
 
-				"\nExample: java -jar pathToUSeq/Apps/CarisDataWrangler -b s3://hci-caris/ \n"+
+				"\nExample: java -jar pathToUSeq/Apps/CarisDataWrangler -b s3://hci-caris \n"+
 				"     -j ~/Scratch/Caris/CJobs/ -r ~/Scratch/Caris/XmlReports_PHI/ -c \n"+
 				"     ~/Scratch/SMM/Registry_PHI -s ~/Scratch/Caris/SMM_Tmp_PHI\n"+
 

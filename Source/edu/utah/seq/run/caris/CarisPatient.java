@@ -70,6 +70,13 @@ public class CarisPatient {
 		for (String[] tokens : objectInfo) {
 			String fileName = tokens[3];
 			if (fileName.endsWith(".fastq.gz")) {
+				//check the size
+				int fileSize = Integer.parseInt(tokens[2]);
+				if (fileSize == 0) {
+					cdw.getErrorMessages().add("Fastq file size is zero! "+tokens[3]);
+					ready = false;
+					return false;
+				}
 				if (fileName.startsWith("RNA_")) rnaNames.add(fileName);
 				else if (fileName.startsWith("DNA_")) dnaNames.add(fileName);
 				else {
@@ -154,10 +161,12 @@ public class CarisPatient {
 	}
 	public void makeJobDirsMoveXml(String coreId) throws Exception {
 		//parse the date from the xml, TN21-109147_2021-02-24_11_18.xml and TN20-170109_2021-01-20_21.31.xml
+		//they changed the format again! TN23-228385_20231109110415.xml
 		String xmlFileName = carisXml.getXmlFile().getName();
 		String[] tokens = Misc.UNDERSCORE.split(xmlFileName);
 		String date = tokens[1];
-		if (date.startsWith("20")==false || date.contains("-")==false) throw new IOException("\nERROR: failed to parse the date from "+xmlFileName);
+		if (date.endsWith(".xml")) date = date.substring(0,8);
+		if (date.startsWith("20")==false) throw new IOException("\nERROR: failed to parse the date from "+xmlFileName);
 		
 		testDir = new File (cdw.getJobsDirectory(), coreId+"/Caris/"+testID+"_"+date+"/");
 		testDir.mkdirs();

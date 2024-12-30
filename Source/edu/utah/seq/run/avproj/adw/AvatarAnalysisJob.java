@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -23,6 +24,7 @@ public class AvatarAnalysisJob {
 	private boolean matchedPlatform = true;
 	private String submittingGroup = null;
 	private PatientADW patient = null;
+	private File normalDNAFastqDir = null;
 
 	public AvatarAnalysisJob(PatientADW patient, TumorSampleADW tumorSample, ArrayList<NormalSampleADW> normalSamples, boolean matchedPlatform) {
 		this.patient = patient;
@@ -73,7 +75,7 @@ public class AvatarAnalysisJob {
 		return matchedPlatform;
 	}
 
-	public void makeAnalysisJobAster(File fastqDownloadRoot, String nameAJ, File testDir, ArrayList<String> cmds, ClinicalMolLinkage linkage, HashSet<String> dirPathsToDownload) throws IOException {
+	public void makeAnalysisJobAsterOld(File fastqDownloadRoot, String nameAJ, File testDir, ArrayList<String> cmds, ClinicalMolLinkage linkage, HashSet<String> dirPathsToDownload) throws IOException {
 		String downloadRoot = fastqDownloadRoot.getCanonicalPath();
 
 		//Fastq
@@ -87,13 +89,13 @@ public class AvatarAnalysisJob {
 			String tumorFastqDir = tumorDNA.getCanonicalPath()+"/";
 
 			//make link commands, downloads with Aster are a major issue
-			for (String[] s: tumorSample.getTumorWesFastqPathsToFetch()) {
-				String path = Util.stringArrayToString(s, "/");
+			for (String path: tumorSample.getTumorWesFastqPathsToFetch()) {
 				String ln = "ln -s "+ downloadRoot+ path+ " "+ tumorFastqDir;
 				cmds.add(ln);
 			}
 			//update the dirPathsToDownload
-			dirPathsToDownload.add(TumorSampleADW.fetchFastqPathDir(tumorSample.getTumorWesFastqPathsToFetch()));
+			dirPathsToDownload.add(tumorSample.getTumorWesFastqPathsToFetch().toString());
+			dirPathsToDownload.add(tumorSample.getTumorWesFastqPathsToFetch().toString());
 		}
 		//TumorRNA
 		if (tumorSample.getTumorRnaName()!= null) {
@@ -102,14 +104,13 @@ public class AvatarAnalysisJob {
 			String tumorFastqDir = tumorRNA.getCanonicalPath()+"/";
 
 			//make link commands, downloads with Aster are a major issue
-			for (String[] s: tumorSample.getTumorRnaFastqPathsToFetch()) {
-				String path = Util.stringArrayToString(s, "/");
+			for (String path: tumorSample.getTumorRnaFastqPathsToFetch()) {
 				String ln = "ln -s "+ downloadRoot+ path+ " "+ tumorFastqDir;
 				cmds.add(ln);
 			}
 			
 			//update the dirPathsToDownload
-			dirPathsToDownload.add(TumorSampleADW.fetchFastqPathDir(tumorSample.getTumorRnaFastqPathsToFetch()));
+			dirPathsToDownload.add(tumorSample.getTumorRnaFastqPathsToFetch().toString());
 			
 		}
 		//NormalDNAs
@@ -120,14 +121,13 @@ public class AvatarAnalysisJob {
 			for (NormalSampleADW ns: normalSamples) {
 
 				//make link commands, downloads with Aster are a major issue
-				for (String[] s: ns.getNormalWesFastqPathsToFetch()) {
-					String path = Util.stringArrayToString(s, "/");
+				for (String path: ns.getNormalWesFastqPathsToFetch()) {
 					String ln = "ln -s "+ downloadRoot+ path+ " "+ normalFastqDir;
 					cmds.add(ln);
 				}
 				
 				//update the dirPathsToDownload
-				dirPathsToDownload.add(TumorSampleADW.fetchFastqPathDir(ns.getNormalWesFastqPathsToFetch()));
+				dirPathsToDownload.add(ns.getNormalWesFastqPathsToFetch().toString());
 			} 
 		}
 		//ClinicalReport
@@ -136,39 +136,60 @@ public class AvatarAnalysisJob {
 		writeJson(nameAJ, clinicalReport, linkage);
 	}
 
-	public void makeAnalysisJobDnaNexus(String nameAJ, File testDir, ArrayList<String> dxCmds, ClinicalMolLinkage linkage) throws IOException {
+	public void makeAnalysisJobAsterNew(File fastqDownloadRoot, String nameAJ, File testDir, ArrayList<String> cmds, ClinicalMolLinkage linkage, LinkedHashSet<String> filesToDownload) throws IOException {
+		String downloadRoot = fastqDownloadRoot.getCanonicalPath();
 		//Fastq
 		File fastq = new File (testDir, "Fastq");
 		fastq.mkdir();
 		//TumorDNA
 		if (tumorSample.getTumorDnaName() != null) {
+			tumorSample.getTumorDnaFastqFiles();
 			File tumorDNA = new File (fastq, "TumorDNA");
 			tumorDNA.mkdir();
-			String dx = "dx download -f --no-progress HCI_ORIEN_AVATAR_MOLECULAR_DATA:/Whole_Exome/alignment_crams/"+tumorSample.getTumorWesFastqPathsToFetch()+" -o "+tumorDNA.getCanonicalPath()+"/";
-			dxCmds.add(dx);
+			String tumorFastqDir = tumorDNA.getCanonicalPath()+"/";
+			//for each file
+			for (String path: tumorSample.getTumorWesFastqPathsToFetch()) {
+				String fileName = path.substring(path.lastIndexOf('/'));
+				String ln = "ln -s "+ downloadRoot + fileName+ " " +tumorFastqDir;
+				cmds.add(ln);
+				filesToDownload.add(path);
+			}
 		}
 		//TumorRNA
 		if (tumorSample.getTumorRnaName()!= null) {
 			File tumorRNA = new File (fastq, "TumorRNA");
 			tumorRNA.mkdir();
-			String dx = "dx download -f --no-progress HCI_ORIEN_AVATAR_MOLECULAR_DATA:/RNAseq/alignment_crams/"+tumorSample.getTumorRnaFastqPathsToFetch()+" -o "+tumorRNA.getCanonicalPath()+"/";
-			dxCmds.add(dx);
+			String tumorFastqDir = tumorRNA.getCanonicalPath()+"/";
+
+			for (String path: tumorSample.getTumorRnaFastqPathsToFetch()) {
+				String fileName = path.substring(path.lastIndexOf('/'));
+				String ln = "ln -s "+ downloadRoot + fileName+ " " +tumorFastqDir;
+				cmds.add(ln);
+				filesToDownload.add(path);
+			}
+			
 		}
 		//NormalDNAs
 		if (normalSamples.size()!=0) {
-			File normalDNA = new File (fastq, "NormalDNA");
-			normalDNA.mkdir();
+			normalDNAFastqDir = new File (fastq, "NormalDNA");
+			normalDNAFastqDir.mkdir();
+			String normalFastqDir = normalDNAFastqDir.getCanonicalPath()+"/";
 			for (NormalSampleADW ns: normalSamples) {
-				String dx = "dx download -f --no-progress HCI_ORIEN_AVATAR_MOLECULAR_DATA:/Whole_Exome/alignment_crams/"+ns.getNormalWesFastqPathsToFetch()+" -o "+ normalDNA.getCanonicalPath()+"/";
-				dxCmds.add(dx);
-			}
 
+				for (String path: ns.getNormalWesFastqPathsToFetch()) {
+					String fileName = path.substring(path.lastIndexOf('/'));
+					String ln = "ln -s "+ downloadRoot + fileName+ " " +normalFastqDir;
+					cmds.add(ln);
+					filesToDownload.add(path);
+				}
+			} 
 		}
 		//ClinicalReport
 		File clinicalReport = new File (testDir, "ClinicalReport");
 		clinicalReport.mkdir();
 		writeJson(nameAJ, clinicalReport, linkage);
 	}
+
 
 	private void writeJson(String nameAJ, File clinicalReport, ClinicalMolLinkage linkage) throws IOException {
 
@@ -239,6 +260,10 @@ public class AvatarAnalysisJob {
 		}
 
 		IO.writeString(main.toString(3), json);
+	}
+
+	public File getNormalDNAFastqDir() {
+		return normalDNAFastqDir;
 	}
 
 }

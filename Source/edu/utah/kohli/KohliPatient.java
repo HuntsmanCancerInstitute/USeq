@@ -7,6 +7,7 @@ public class KohliPatient {
 	private String hciPatientId = null;
 	private ArrayList<KohliSample> samples = new ArrayList<KohliSample>();
 	
+	
 	public KohliPatient (String[] tokens) {
 		// #HCIPersonID 	SampleID	Type	DateDrawn
 		this.hciPatientId = tokens[0];

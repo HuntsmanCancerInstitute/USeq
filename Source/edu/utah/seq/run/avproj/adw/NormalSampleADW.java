@@ -3,6 +3,8 @@ package edu.utah.seq.run.avproj.adw;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashSet;
+
 import org.json.JSONObject;
 
 public class NormalSampleADW {
@@ -10,7 +12,7 @@ public class NormalSampleADW {
 	private String platformName = null;
 	private String normalDnaSampleName = null;
 	private ArrayList<File> normalDnaFastqFiles = new ArrayList<File>();
-	private ArrayList<String[]>  normalWesFastqPathsToFetch = null;
+	private HashSet<String>  normalWesFastqPathsToFetch = null;
 	private String[] linkageDataLine = null;
 
 	public NormalSampleADW (String normalDnaName, String platformName, String[] linkageDataLine) {
@@ -42,11 +44,11 @@ public class NormalSampleADW {
 		return normalDnaFastqFiles;
 	}
 
-	public ArrayList<String[]>  getNormalWesFastqPathsToFetch() {
+	public HashSet<String>  getNormalWesFastqPathsToFetch() {
 		return normalWesFastqPathsToFetch;
 	}
 
-	public void setNormalWesFastqPathsToFetch(ArrayList<String[]>  normalWesFastqPathsToFetch) {
+	public void setNormalWesFastqPathsToFetch(HashSet<String>  normalWesFastqPathsToFetch) {
 		this.normalWesFastqPathsToFetch = normalWesFastqPathsToFetch;
 	}
 

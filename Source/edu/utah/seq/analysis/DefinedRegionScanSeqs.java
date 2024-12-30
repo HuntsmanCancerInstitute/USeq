@@ -1417,6 +1417,18 @@ public class DefinedRegionScanSeqs {
 				File[] otherDirs = IO.extractOnlyDirectories(controlPointDirs[0]);
 				if (otherDirs != null && otherDirs.length > 0) controlPointDirs = otherDirs;
 			}
+			//check for R and required libraries
+			if (fullPathToR == null || fullPathToR.canExecute()== false) {
+				Misc.printExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
+			}
+			else {
+				String errors = IO.runRCommandLookForError("library(qvalue)", fullPathToR, saveDirectory);
+				if (errors == null || errors.length() !=0){
+					Misc.printExit("\nError: Cannot find the required R library.  Did you install qvalue " +
+							"(http://genomics.princeton.edu/storeylab/qvalue/)?  See the author's websites for installation instructions. Once installed, " +
+							"launch an R terminal and type 'library(qvalue)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
+				}
+			}
 		}
 		//set half peak shift and windowSize
 		halfPeakShift = (int)Math.round( ((double)peakShift)/2 );
@@ -1425,18 +1437,6 @@ public class DefinedRegionScanSeqs {
 		if (saveDirectory == null) Misc.printExit("\nError: enter a directory text to save results.\n");
 		if (saveDirectory.exists() == false) saveDirectory.mkdir();
 
-		//check for R and required libraries
-		if (fullPathToR == null || fullPathToR.canExecute()== false) {
-			Misc.printExit("\nError: Cannot find or execute the R application -> "+fullPathToR+"\n");
-		}
-		else {
-			String errors = IO.runRCommandLookForError("library(qvalue)", fullPathToR, saveDirectory);
-			if (errors == null || errors.length() !=0){
-				Misc.printExit("\nError: Cannot find the required R library.  Did you install qvalue " +
-						"(http://genomics.princeton.edu/storeylab/qvalue/)?  See the author's websites for installation instructions. Once installed, " +
-						"launch an R terminal and type 'library(qvalue)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
-			}
-		}
 
 		//look for bed file
 		if (refSeqFile == null && bedFile == null){
@@ -1465,7 +1465,7 @@ public class DefinedRegionScanSeqs {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Defined Region Scan Seqs: March 2011                   **\n" +
+				"**                           Defined Region Scan Seqs: Oct 2024                     **\n" +
 				"**************************************************************************************\n" +
 				"DRSS takes chromosome specific PointData xxx.bar.zip files and extracts scores under\n" +
 				"each region to calculate several statistics including a binomial p-value, Storey\n" +
@@ -1480,7 +1480,7 @@ public class DefinedRegionScanSeqs {
 				"files for treatment and control RNA-Seq data, see the NovoalignParser, splice\n" +
 				"junctions will be scored for differential expression. This is an additional\n" +
 				"calculation unrelated to the chi-square independance test. Lastly, if control\n" +
-				"data is not provided, simple region sums are calculated.\n\n"+
+				"data is not provided, simple region sums are calculated and R is unnecessary.\n\n"+
 
 				"Options:\n"+
 				"-s Save directory, full path.\n"+

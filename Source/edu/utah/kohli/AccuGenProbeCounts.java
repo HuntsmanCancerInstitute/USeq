@@ -4,11 +4,14 @@ import util.gen.Num;
 
 public class AccuGenProbeCounts {
 	
+	private AccuGenProbe probe;
 	private int refCounts;
 	private int altCounts;
+	private double scaledAlleleFraction;
 	
 	
-	public AccuGenProbeCounts(int refCounts, int altCounts) {
+	public AccuGenProbeCounts(AccuGenProbe probe, int refCounts, int altCounts) {
+		this.probe = probe;
 		this.refCounts = refCounts;
 		this.altCounts = altCounts;
 	}
@@ -23,6 +26,26 @@ public class AccuGenProbeCounts {
 	
 	public String toString() {
 		return refCounts+":"+altCounts+":"+getReadDepth()+":"+Num.formatNumber(getAlleleFraction(), 3);
+	}
+
+	public int getRefCounts() {
+		return refCounts;
+	}
+
+	public int getAltCounts() {
+		return altCounts;
+	}
+
+	public AccuGenProbe getProbe() {
+		return probe;
+	}
+
+	public double getScaledAlleleFraction() {
+		return scaledAlleleFraction;
+	}
+
+	public void setScaledAlleleFraction(double scaledAlleleFraction) {
+		this.scaledAlleleFraction = scaledAlleleFraction;
 	}
 
 }

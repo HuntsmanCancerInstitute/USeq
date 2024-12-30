@@ -51,7 +51,7 @@ public class TNRunner2 {
 	private boolean gatkGroupProcessingFailed = false;
 	private boolean illGroupProcessingComplete = false;
 	private boolean illGroupProcessingFailed = false;
-	private boolean restartFailed = false;
+	private boolean restartFailed = true;
 	private int maxNumJobs = 35;
 	private boolean loop = false;
 	private int numMinToSleep = 60;
@@ -720,7 +720,7 @@ public class TNRunner2 {
 						case 'z': niceJobs = false; break;
 						case 'J': sbatch = false; break;
 						case 'l': loop = true; break;
-						case 'd': restartFailed = true; break;
+						case 'd': restartFailed = false; break;
 						case 'n': partition = args[++i]; break;
 						case 'A': accountOverride = args[++i]; break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
@@ -941,7 +941,7 @@ public class TNRunner2 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TNRunner2 : Aug 2023                             **\n" +
+				"**                                 TNRunner2 : Dec 2024                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner2 is designed to execute several containerized workflows on tumor normal\n"+
 				"datasets via a slurm cluster.  Based on the availability of paired fastq datasets, \n"+
@@ -1019,7 +1019,7 @@ public class TNRunner2 {
 				"      Bam/xxx_final.bam and QC/xxx_Pass.bed.gz dirs and files with indexes.\n"+
 
 				"\nJob Execution Options:\n"+
-				"-d Delete and restart FAILED jobs.\n"+
+				"-d Do not restart FAILED jobs one time.\n"+
 				"-J Just set up jobs, don't launch them via sbatch.\n"+
 				"-x Maximum # jobs to run at any given time, defaults to 35.\n"+
 				"-z Do not nice jobs (--nice=10000), run at maximum primority.\n"+

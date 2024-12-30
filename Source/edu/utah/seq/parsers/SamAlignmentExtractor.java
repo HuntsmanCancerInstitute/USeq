@@ -51,6 +51,7 @@ public class SamAlignmentExtractor {
 	private long numFailingFS = 0;
 	private long numPassingBasicOnTargetAndScores = 0;
 	private long numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate = 0;
+	private long numberPassingBases = 0;
 	private File jsonOutputFile;
 	private Histogram histogram = new Histogram(1, 250, 249);
 	
@@ -96,7 +97,8 @@ public class SamAlignmentExtractor {
 			List<SAMSequenceRecord> chrList = bamReader.getFileHeader().getSequenceDictionary().getSequences();
 
 			//for each
-			//TODO: thread this! would need to write out individual them merge... might be slow.. the bottleneck is the io not the compute so parallel won't gain much
+			//TODO: thread this! would need to write out individual then use samtools to merge... strip header of chrs? 
+			//TODO: Might be slow.. the bottleneck is the io not the compute so parallel won't gain much?
 			System.out.print("\nWalking bam alignments for ");
 			Iterator<SAMSequenceRecord> it = chrList.iterator();
 			while (it.hasNext()){
@@ -130,6 +132,10 @@ public class SamAlignmentExtractor {
 			printStatLine(numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate, numPassingBasicOnTargetAndScores, "Duplicates (not filtered)");
 			printStatLine(numPassingBasicOnTargetAndScores, numRawAlignments, "Passing all filters");
 			
+			IO.pl("\n"+numberPassingBases+ "\tPassing base pairs");
+			
+			
+			
 			if (minimumFamilySize !=0) {
 				System.out.println("\nFamily Size Histogram for alignments passing filters:");
 				histogram.printScaledHistogram();
@@ -156,6 +162,7 @@ public class SamAlignmentExtractor {
 			Gzipper gz = new Gzipper(jsonOutputFile);
 			gz.println("{");
 			gz.printJson("numberUnfilteredAlignments", numberUnfilteredAlignments, true);
+			gz.printJson("numberPassingBases", numberPassingBases, true);
 			gz.printJson("fractionAlignmentsPassQCScoreFilters", fractionAlignmentsPassQCScoreFilters, true);
 			gz.printJson("fractionAlignmentsOnTarget", fractionAlignmentsOnTarget, true);
 			gz.printJson("fractionOnTargetAndPassQCScoreFilters", fractionOnTargetAndPassQCScoreFilters, true);
@@ -345,6 +352,7 @@ public class SamAlignmentExtractor {
 				//pass? or fail? scores
 				if (passScores) {
 					passingBamWriter.addAlignment(sam);
+					numberPassingBases+=sam.getReadLength();
 					if (onTarget) {
 						numPassingBasicOnTargetAndScores++;
 						if (sam.getDuplicateReadFlag()) numPassingBasicOnTargetAndScoresYetMarkedAsADuplicate++;
@@ -473,7 +481,7 @@ public class SamAlignmentExtractor {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Sam Alignment Extractor: March 2021                       **\n" +
+				"**                        Sam Alignment Extractor: Dec 2024                         **\n" +
 				"**************************************************************************************\n" +
 				"Splits an alignment file into those that pass or fail thresholds and intersects\n"+
 				"regions of interest. Calculates a variety of QC statistics.\n"+

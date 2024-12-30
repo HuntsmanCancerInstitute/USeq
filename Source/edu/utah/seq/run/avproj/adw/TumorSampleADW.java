@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 
 import org.json.JSONArray;
 import org.json.JSONObject;
@@ -21,12 +22,12 @@ public class TumorSampleADW {
 	private String platformName = null;
 	private String tumorDnaSampleName = null;
 	private ArrayList<File> tumorDnaFastqFiles = new ArrayList<File>();
-	private ArrayList<String[]>  tumorWesFastqPathsToFetch = null;
+	private HashSet<String>  tumorWesFastqPathsToFetch = null;
 	
 	//Tumor RNA
 	private String tumorRnaSampleName = null;
 	private ArrayList<File> tumorRnaFastqFiles = new ArrayList<File>();
-	private ArrayList<String[]>  tumorRnaFastqPathsToFetch = null;
+	private HashSet<String>  tumorRnaFastqPathsToFetch = null;
 	
 
 	public TumorSampleADW (String tumorDnaName, String tumorRnaName, String platformName, String trimmedSpecimineId, String[] tumorLinkageDataLine) {
@@ -56,20 +57,15 @@ public class TumorSampleADW {
 		jo.put("trimmedSpecimineId", genericSpecimineId);
 		JSONArray ja = new JSONArray();
 		String[] paths = mergePairedFastqPaths(tumorRnaFastqPathsToFetch);
-		ja.put(paths[0]);
-		ja.put(paths[1]);
+		for (String p: paths) ja.put(p);
 		jo.put("tumorRNASeqPaths", ja);
 		jo.put("tumorRNASampleLibraryId", tumorRnaSampleName);
 		addLinkageInfo(tumorRnaSampleName, jo, linkage, tumorLinkageDataLines, false);
 		return jo;
 	}
 	
-	public static String[] mergePairedFastqPaths(ArrayList<String[]> al) throws IOException {
-		if (al.size()!=2 ) throw new IOException("\nDidn't find two fastq file paths.");
-		// removing leading /
-		String merged1 = Misc.stringArrayToString(al.get(0), "/").substring(1);
-		String merged2 = Misc.stringArrayToString(al.get(1), "/").substring(1);
-		return new String[] {merged1, merged2};
+	public static String[] mergePairedFastqPaths(HashSet<String> al) throws IOException {
+		return Misc.hashSetToStringArray(al);
 	}
 	
 	public static String fetchFastqPathDir(ArrayList<String[]> al) {
@@ -122,19 +118,19 @@ public class TumorSampleADW {
 		return tumorRnaFastqFiles;
 	}
 
-	public ArrayList<String[]>  getTumorWesFastqPathsToFetch() {
+	public HashSet<String>  getTumorWesFastqPathsToFetch() {
 		return tumorWesFastqPathsToFetch;
 	}
 
-	public void setTumorWesFastqPathsToFetch(ArrayList<String[]>  tumorWesFastqPathsToFetch) {
+	public void setTumorWesFastqPathsToFetch(HashSet<String>  tumorWesFastqPathsToFetch) {
 		this.tumorWesFastqPathsToFetch = tumorWesFastqPathsToFetch;
 	}
 
-	public ArrayList<String[]>  getTumorRnaFastqPathsToFetch() {
+	public HashSet<String>  getTumorRnaFastqPathsToFetch() {
 		return tumorRnaFastqPathsToFetch;
 	}
 
-	public void setTumorRnaPathsToFetch(ArrayList<String[]>  tumorRnaFastqPathsToFetch) {
+	public void setTumorRnaPathsToFetch(HashSet<String>  tumorRnaFastqPathsToFetch) {
 		this.tumorRnaFastqPathsToFetch = tumorRnaFastqPathsToFetch;
 	}
 

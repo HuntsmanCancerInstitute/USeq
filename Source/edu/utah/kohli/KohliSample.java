@@ -2,18 +2,23 @@ package edu.utah.kohli;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+
 import util.gen.Misc;
 
 public class KohliSample {
 	
 	private KohliPatient patient = null;
 	private String sampleId = null;
-	private String type = null;
+	private String type = "tumor";
 	private String dateString = null;
 	private boolean excludeFromPon = false;
 	private boolean germlineSample;
 	
+	//spike-ins
 	private HashMap<String, AccuGenProbeCounts> accuGenProbeCounts = new HashMap<String, AccuGenProbeCounts>();
+	private HashSet<String> genesToUseInNormalization = null;
+
 	
 	//Read Coverage
 	private HashMap<String, Double> readCoverageCounts = new HashMap<String, Double>();
@@ -21,10 +26,21 @@ public class KohliSample {
 	private double meanRegionCounts = -1.0;
 	private double regionCountScalar = -1.0;
 	
+	//for comparing Copy Alteration results
+	private ArrayList<CnvCallSet> cnvCallSets = new ArrayList<CnvCallSet>();
+	
+	//for comparing somatic variant results
+	private ArrayList<String> intersectingVariants = new ArrayList<String>();
+	
+
+	
 	public KohliSample (KohliPatient patient, String sampleId, boolean isGermline, String dateString) {
 		this.patient = patient;
 		this.sampleId = sampleId;
-		if (isGermline) germlineSample = true;
+		if (isGermline) {
+			germlineSample = true;
+			type = "germline";
+		}
 		else germlineSample = false;
 		this.dateString = dateString;
 	}
@@ -35,7 +51,8 @@ public class KohliSample {
 	
 	public String toStringProbes(ArrayList<AccuGenProbe> probes) {
 		StringBuilder sb = new StringBuilder();
-		sb.append(sampleId+"\t"+type+"\t"+dateString+"\n");
+		if (type!=null) sb.append(sampleId+"\t"+type+"\t"+dateString+"\n");
+		else  sb.append(sampleId+"\t"+dateString+"\n");
 		//probe info
 		for (AccuGenProbe p: probes) {
 			sb.append("\t");
@@ -103,9 +120,18 @@ public class KohliSample {
 		}
 	}
 	
-	
 	public String toString() {
 		return sampleId+"\t"+type+"\t"+dateString;
+	}
+	
+	public String toStringVariants() {
+		if (intersectingVariants.size()==0) return "";
+		StringBuilder sb = new StringBuilder(sampleId+"\t"+dateString);
+		for (String vars: this.intersectingVariants) {
+			sb.append("\n");
+			sb.append(vars);
+		}
+		return sb.toString();
 	}
 
 	public String getSampleId() {
@@ -122,7 +148,7 @@ public class KohliSample {
 		String[] counts = Misc.COMMA.split(callsCounts[1]);
 		int ref = Integer.parseInt(counts[0]);
 		int alt = Integer.parseInt(counts[1]);
-		accuGenProbeCounts.put(p.getOriginalInput(), new AccuGenProbeCounts(ref,alt));
+		accuGenProbeCounts.put(p.getOriginalInput(), new AccuGenProbeCounts(p, ref,alt));
 	}
 	
 	public void addCaptureRegionCount(CaptureRegion p, String count) {
@@ -151,6 +177,22 @@ public class KohliSample {
 
 	public KohliPatient getPatient() {
 		return patient;
+	}
+
+	public ArrayList<CnvCallSet> getCnvCallSets() {
+		return cnvCallSets;
+	}
+
+	public ArrayList<String> getIntersectingVariants() {
+		return intersectingVariants;
+	}
+
+	public HashSet<String> getGenesToUseInNormalization() {
+		return genesToUseInNormalization;
+	}
+
+	public void setGenesToUseInNormalization(HashSet<String> genesToUseInNormalization) {
+		this.genesToUseInNormalization = genesToUseInNormalization;
 	}
 	
 }

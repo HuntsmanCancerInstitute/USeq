@@ -309,6 +309,7 @@ public class Sam2USeq {
 		//set scalar
 		if (scalarCount == Double.MAX_VALUE) scalar = (float)(numberPassingAlignmentsForScaling/ 1000000.0);
 		else scalar = (float)(scalarCount/ 1000000.0);
+		IO.pl("Scalar Count: "+scalarCount+" Scalar: "+scalar+"\n");
 	}
 
 	/**Closes writers.*/
@@ -517,10 +518,11 @@ public class Sam2USeq {
 								}
 							}
 							double total = (double) counts.length;
+							double sum = Num.sumArray(counts); //sum of the bps covered not alignment count
 							String fracPass = Num.formatNumber(numPass/total, 2);
 							Arrays.sort(counts);
 							perRegionsGzipper.println(chromData.chromosome+"\t"+chromData.strand+"\t"+r.getStart()+"\t"+r.getStop()+"\t"+
-									r.getText()+"\t"+fracPass+"\t"+Num.statFloatArrayWithSizeChecks(counts)); 
+									r.getText()+"\t"+fracPass+"\t"+sum+"\t"+Num.statFloatArrayWithSizeChecks(counts)); 
 							
 							//save mean count?
 							if (jsonOutputFile != null){
@@ -895,7 +897,7 @@ public class Sam2USeq {
 			}
 			try {
 				perRegionsGzipper = new Gzipper(perRegionCoverageStats);
-				perRegionsGzipper.println("Chr\tStrand\tStart\tStop\tInfo\tFracBPs>="+minimumCounts+"\tMean\tMedian\tStdDev\tMin\tMax\t10th\t90th");
+				perRegionsGzipper.println("Chr\tStrand\tStart\tStop\tInfo\tFracBPs>="+minimumCounts+"\tTotal\tMean\tMedian\tStdDev\tMin\tMax\t10th\t90th");
 			} catch (Exception e) {
 				e.printStackTrace();
 				Misc.printErrAndExit("Failed instantiating a gzipper for saving the individual read coverage stats.");
@@ -985,6 +987,7 @@ public class Sam2USeq {
 		//set scalar
 		if (scalarCount == Double.MAX_VALUE) scalar = (float)(numberPassingAlignmentsForScaling/ 1000000.0);
 		else scalar = (float)(scalarCount/ 1000000.0);
+		IO.pl("Scalar Count: "+scalarCount+" Scalar: "+scalar+"\n");
 	}
 
 	public void printStats(){
@@ -1083,7 +1086,7 @@ public class Sam2USeq {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                Sam 2 USeq : April 2019                           **\n" +
+				"**                                  Sam 2 USeq : Oct 2024                           **\n" +
 				"**************************************************************************************\n" +
 				"Generates per base read depth stair-step graph files for genome browser visualization.\n" +
 				"By default, values are scaled per million mapped reads with no score thresholding. Can\n" +
@@ -1108,6 +1111,7 @@ public class Sam2USeq {
 				"      thus given fractional count values at a given location. Requires that the IH\n" +
 				"      tag was set.\n"+
 				"-g Set the scalar count to this value, defaults to the number of passing alignments.\n"+
+				"      Use samtools view to pull counts over defined regions.\n"+
 				"-b Path to a region bed file (tab delim: chr start stop ...) to use in calculating\n" +
 				"      read coverage statistics.  Be sure these do not overlap! Run the MergeRegions app\n" +
 				"      if in doubt.\n"+ 

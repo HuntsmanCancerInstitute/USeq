@@ -25,6 +25,7 @@ public class AvatarClinicalInfo {
 	
 	
 	public AvatarClinicalInfo (File json) {
+		try {
 		this.jsonFile = json;
 		String jString = IO.loadFile(json, " ", true);
 		JSONObject mainJsonObject = new JSONObject(jString);
@@ -47,6 +48,10 @@ public class AvatarClinicalInfo {
 			else {
 				root.put(key, mainJsonObject.get(key).toString());
 			}
+		}
+		} catch (Exception e) {
+			IO.pl("ERROR parsing "+json+ "\n"+ e.toString());
+			System.exit(1);
 		}
 		
 	}

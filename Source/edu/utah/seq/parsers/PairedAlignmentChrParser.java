@@ -253,6 +253,8 @@ public class PairedAlignmentChrParser implements Runnable{
 
 		//make arrays to hold sequence and qualities in cigar space
 		int size = numAdders + stop-startLeft;
+		
+		//int middle = ((stop-startLeft)/2) + startLeft;
 
 		SamLayout leftLayout = new SamLayout(size);
 		SamLayout rightLayout = new SamLayout(size);
@@ -281,7 +283,6 @@ public class PairedAlignmentChrParser implements Runnable{
 
 		//merge layouts, modifies original layouts so print first if you want to see em before mods.
 		SamLayout mergedSamLayout = SamLayout.mergeLayouts(leftLayout, rightLayout, minimumDiffQualScore, minimumFractionInFrameMismatch);
-
 //System.out.println("\nMergedLayout");
 //mergedSamLayout.print();
 

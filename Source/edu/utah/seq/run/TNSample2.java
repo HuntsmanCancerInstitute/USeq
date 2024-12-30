@@ -1397,14 +1397,14 @@ public class TNSample2 {
 	private boolean checkJob(HashMap<String, File> nameFile, File jobDir, File[] toSoftLink, File[] runDocs) throws IOException {
 		//force a restart?
 		if (nameFile.containsKey("FAILED")){
-			if (restartFailedJobs ){
+			if (restartFailedJobs && nameFile.containsKey("RESTARTED")==false){
 				//cancel any slurm jobs and delete the directory
 				TNSample2.cancelDeleteJobDir(nameFile, jobDir, info, true);
 				restart(jobDir, toSoftLink, runDocs);
 				return true;
 			}
-			//FAILED but no restart
-			else if (nameFile.containsKey("FAILED")){
+			//FAILED but no restart or already restarted
+			else {
 				info.add("\tFAILED "+jobDir);
 				failed = true;
 				return false;
@@ -1425,9 +1425,18 @@ public class TNSample2 {
 			if (TNSample2.checkQueue(nameFile, jobDir, info, false) == false) failed = true;
 			else running = true;
 		}
-		//hmm no status files, probably something went wrong on the cluster? mark it as FAILED
+		//hmm no status files, probably something went wrong on the cluster?
 		else {
-			info.add("\tMarking as FAILED, no job status files in "+jobDir);
+			info.add("\tNo job status files in "+jobDir);
+			//restart it?
+			if (restartFailedJobs && nameFile.containsKey("RESTARTED")==false){
+				//cancel any slurm jobs and delete the directory
+				TNSample2.cancelDeleteJobDir(nameFile, jobDir, info, true);
+				restart(jobDir, toSoftLink, runDocs);
+				return true;
+			}
+			
+			info.add("\tMarking as FAILED "+jobDir);
 			new File(jobDir, "FAILED").createNewFile();
 			failed = true;
 		}

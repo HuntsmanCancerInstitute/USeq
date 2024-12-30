@@ -3118,6 +3118,24 @@ public class Num {
 		}
 		return Num.arrayListOfFloatToArray(al);
 	}
+	
+	/**Remove zero values from float array.*/
+	public static double[] replaceZeroValuesWithSmallestNonZero(double[] d){
+		ArrayList<Double> al = new ArrayList<Double>(d.length);
+		int numZeros = 0;
+		double smallest = Double.MAX_VALUE;
+		for (int i=0; i<d.length; i++){
+			if (d[i] != 0.0) {
+				al.add(d[i]);
+				if (d[i] < smallest) smallest = d[i];
+			}
+			else numZeros++;
+		}
+		//add in the smallest values
+		for (int i=0; i< numZeros; i++) al.add(smallest);
+		
+		return Num.arrayListOfDoubleToArray(al);
+	}
 
 	/**Gets the average of the integers bracketed and including the start and stop.
 	 * (ie 3,6  returns the average of 3+4+5+6/4= 4.5)*/

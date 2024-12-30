@@ -199,16 +199,18 @@ public class CarisXmlParser {
 			if (cNode instanceof Element) {
 				String name = cNode.getNodeName();
 				//remove any ' in the name since this will be used in the file name
+				//remove any spaces!!! Ugg
 				//lastName
 				if (name.equals("lastName")) {
 					lastNamePhysician = getLastChild("lastName",cNode);
 					lastNamePhysician = Misc.SINGLE_QUOTE.matcher(lastNamePhysician).replaceAll("");
-					
+					lastNamePhysician = Misc.WHITESPACE.matcher(lastNamePhysician).replaceAll("");
 				}
 				//firstName
 				else if (name.equals("firstName")) {
 					firstNamePhysician = getLastChild("firstName",cNode);
 					firstNamePhysician = Misc.SINGLE_QUOTE.matcher(firstNamePhysician).replaceAll("");
+					firstNamePhysician = Misc.WHITESPACE.matcher(firstNamePhysician).replaceAll("");
 				}
 			}
 		}

@@ -1356,7 +1356,7 @@ public class ScanSeqs {
 						"(http://www-huber.embl.de/users/anders/DESeq/)?  See the author's websites for installation instructions. Once installed, " +
 						"launch an R terminal and type 'library(DESeq)' to see if it is present. R error message:\n\t\t"+errors+"\n\n");
 			}*/
-				String errors = IO.runRCommandLookForError("library(qvalue)", fullPathToR, saveDirectory);
+				String errors = IO.runRCommandLookForError("library(qvalue)", fullPathToR, saveDirectory, false);
 				if (errors == null || errors.length() !=0){
 					Misc.printExit("\nError: Cannot find the required R library.  Did you install qvalue " +
 							"(http://genomics.princeton.edu/storeylab/qvalue/)?  See the author's websites for installation instructions. Once installed, " +
@@ -1381,7 +1381,7 @@ public class ScanSeqs {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                  Scan Seqs: Jan 2024                             **\n" +
+				"**                                  Scan Seqs: Sept 2024                            **\n" +
 				"**************************************************************************************\n" +
 				"Takes unshifted stranded chromosome specific PointData and uses a sliding window to\n" +
 				"calculate several smoothed window statistics. These include a binomial p-value, a\n" +

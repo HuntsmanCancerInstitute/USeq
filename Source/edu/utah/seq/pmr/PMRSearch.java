@@ -1054,6 +1054,7 @@ public class PMRSearch {
 					case 'd': clinicalReportDir = new File(args[++i]).getCanonicalFile(); break;
 					case 'x': awsPatientDirUri = args[++i]; break;
 					case 'p': profile =args[++i]; break;
+					case 'v': verbose = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -1094,7 +1095,7 @@ public class PMRSearch {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                       Patient Molecular Repo Search : August 2023                **\n" +
+				"**                       Patient Molecular Repo Search : Sept 2024                  **\n" +
 				"**************************************************************************************\n" +
 				"Interactive searching of the clinical and sample attribute information in the json/xml\n"+
 				"reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.\n"+
@@ -1105,7 +1106,7 @@ public class PMRSearch {
 
 				"\nOptions:\n"+
 				"-d  Directory to save the PHI redacted clinical xml and json reports.\n"+
-				"-u  S3 URI containing the patient molecular repo, defaults to\n"+
+				"-x  S3 URI containing the patient molecular repo, defaults to\n"+
 				"      s3://hcibioinfo-patient-molecular-repo/Patients/ \n"+
 				"-p  AWS credential profile, defaults to 'default'\n"+
 				"-v  Verbose output.\n"+

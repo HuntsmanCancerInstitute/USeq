@@ -194,6 +194,51 @@ public class IO {
 		if (errorFound) return errors.toString();
 		return "";
 	}
+	
+	/**Returns null is something bad happened, otherwise returns the r output lines containing 'error' case insensitive or returns '' if no error found.*/
+	public static String runRCommandLookForError(String rCmdLine, File rApp, File tempDir, boolean deleteTmpFiles){
+		//look for R
+		if (rApp.canExecute() == false) return "Cannot execute R check -> "+rApp;
+		String rndWrd = Passwords.createRandowWord(7);
+		File inFile = new File (tempDir, "RCmdLine_"+rndWrd);
+		File outFile = new File (tempDir, "ROutput_"+rndWrd);
+		String[] command = {
+				rApp.toString(),
+				"CMD",
+				"BATCH",
+				"--no-save",
+				"--no-restore", 
+				inFile.toString(),
+				outFile.toString()
+		};
+		if (IO.writeString(rCmdLine, inFile) == false) return null;
+		String[] messages = IO.executeCommandLineReturnAll(command);
+		if (deleteTmpFiles) inFile.delete();
+		if (messages == null || messages.length !=0){
+			Misc.printArray(messages);
+			if (deleteTmpFiles) outFile.delete();
+			return null;
+		}
+		//load results
+		String[] rLines = IO.loadFile(outFile);
+		if (deleteTmpFiles) outFile.delete();
+		//look for error
+		boolean errorFound = false;
+		StringBuilder errors = new StringBuilder();
+		Pattern errorPat = Pattern.compile("error", Pattern.CASE_INSENSITIVE);
+		for (int i=0; i< rLines.length; i++){
+			if (errorFound) {
+				errors.append(" ");
+				errors.append(rLines[i]);
+			}
+			else if (errorPat.matcher(rLines[i]).lookingAt()){
+				errors.append(rLines[i]);
+				errorFound = true;
+			}
+		}
+		if (errorFound) return errors.toString();
+		return "";
+	}
 
 	/**Takes a file, capitalizes the text, strips off .gz or .zip and any other extension, then makes a directory of the file and returns it.
 	 * returns null if the new directory exists.*/
@@ -727,7 +772,8 @@ public class IO {
 		}
 	}
 	
-	/**Seems to work in most cases provided files aren't in use in the app.*/
+	/**Seems to work in most cases provided files aren't in use in the app.
+	 * Does not delete the source of a soft link, just the link itself.*/
 	public static boolean deleteDirectorySimple(File dir) {
 	    File[] allContents = dir.listFiles();
 	    if (allContents != null) {

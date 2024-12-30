@@ -235,7 +235,7 @@ public class CarisXmlVcfParser {
 		String[] ihcNames = {"p16","PD-L1 (SP263)", "PD-L1 (22c3)", "PD-L1 (SP142)", "PD-L1 FDA(SP142)", "PD-L1 FDA (28-8)", 
 				"MLH1", "PMS2", "MSH2", "MSH6", "ALK", "PTEN", "Mismatch Repair Status", "Her2/Neu", 
 				"TrkA/B/C", "Androgen Receptor", "Folfox Responder Similarity Score", "ROS1", "ER", 
-				"BRAF V600E", "EGFR L858R", "EGFR ex19del", "PR", "CLDN18" };
+				"BRAF V600E", "EGFR L858R", "EGFR ex19del", "PR", "CLDN18", "FOLR1" };
 		ihcTestNames = new HashSet<String>();
 		for (String n: ihcNames) ihcTestNames.add(n);
 
@@ -426,6 +426,7 @@ public class CarisXmlVcfParser {
 	 * @throws IOException */
 	private void parseTests(Node node) throws DOMException, ParseException, IOException {
 		//parse the tests
+		ArrayList<String> unknownTest = new ArrayList<String>();
 		NodeList childNodes = node.getChildNodes();
 		for (int j = 0; j < childNodes.getLength(); j++) {
 			Node cNode = childNodes.item(j);
@@ -434,16 +435,31 @@ public class CarisXmlVcfParser {
 				//testName
 				if (name.equals("testName")) {
 					String testName = cNode.getTextContent().trim();
+					
 					if (testName.equals("Exome Panel - Clinical Genes")) parseGenesTest(childNodes);
 					else if (testName.equals("Exome Panel - Additional Genes")) parseGenesTest(childNodes);
+					else if (testName.equals("Exome Panel - Hybrid - Clinical Genes")) parseGenesTest(childNodes);
+					else if (testName.equals("Exome Panel - Hybrid - Additional Genes")) parseGenesTest(childNodes);
+					
 					else if (testName.equals("Exome CND Panel - Clinical Genes")) parseCNVPanel(childNodes);
 					else if (testName.equals("Exome CNA Panel - Clinical Genes")) parseCNVPanel(childNodes);
 					else if (testName.equals("Exome CNA Panel - Additional Genes")) parseCNVPanel(childNodes);
+					else if (testName.equals("Exome CNA Panel - Hybrid - Clinical Genes")) parseCNVPanel(childNodes);
+					else if (testName.equals("Exome CNA Panel - Hybrid - Additional Genes")) parseCNVPanel(childNodes);
+					else if (testName.equals("Exome CND Panel - Hybrid - Clinical Genes")) parseCNVPanel(childNodes);
+					else if (testName.equals("Her2 CISH")) parseCNVPanel(childNodes);
+					
 					else if (testName.equals("Transcriptome Detection_v1 Panel")) parseTranslocationPanel(childNodes);
 					else if (testName.equals("Transcriptome Detection_v1 Variant Panel")) parseTranslocationPanel(childNodes);
+					else if (testName.equals("Transcriptome Detection_v1 Variant Panel - Hybrid")) parseTranslocationPanel(childNodes);
+					else if (testName.equals("Transcriptome Detection_v1 Panel - Hybrid")) parseTranslocationPanel(childNodes);
+					else if (testName.equals("Transcriptome Detection_v1 Panel - Hybrid")) parseTranslocationPanel(childNodes);
+					else if (testName.equals("Transcriptome Detection_v1 Variant Panel - Hybrid")) parseTranslocationPanel(childNodes);
+					
 					else if (testName.equals("MGMT-Me")) parseMethyl(childNodes);
+					
 					else if (ihcTestNames.contains(testName)) parseIHC(childNodes);
-					else if (testName.equals("Her2 CISH")) parseCNVPanel(childNodes);
+					
 					else if (testName.equals("EBER ISH")){
 						IO.el("\nSkipping the parsing of 'EBER ISH' test for Epstein-Barr virus genome copy number\n");
 					}
@@ -453,15 +469,18 @@ public class CarisXmlVcfParser {
 					else if (testName.equals("RNA Expression")){
 						IO.el("\nSkipping the parsing of 'RNA Expression' test for a small set of genes.");
 					}
-					else if (testName.equals("HPV16") || testName.equals("HPV18")){
-						IO.el("\nSkipping the parsing of 'HPV16' or 'HPV18' test for a viral sequencing.");
+					else if (testName.equals("HPV45") || testName.equals("HPV33") || testName.equals("HPV31") || testName.equals("HPV16") || testName.equals("HPV18") || testName.equals("EBV") || testName.equals("MCPYV")){
+						IO.el("\nSkipping viral sequencing test: "+testName);
 					}
-					else if (testName.equals("eKarotypeGraph")){
-						//silently skip, this is a binary result
+					else if (testName.equals("P7/N10 Chromosome Analysis") || testName.equals("eKarotypeGraph") || testName.equals("H&E - Initial") || testName.equals("1p/19q Co-Deletion")){
+						IO.el("\nSkipping test: "+testName);
 					}
-					else throw new IOException("Found an unknown test! "+testName);
+					else unknownTest.add(testName);
 				}
 			}
+		}
+		if (unknownTest.size()!=0) {
+			throw new IOException("Found an unknown test(s)!\n\t"+Misc.stringArrayListToString(unknownTest, ","));
 		}
 	}
 
@@ -887,12 +906,13 @@ public class CarisXmlVcfParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Caris Xml Vcf Parser: May 2024                        **\n" +
+				"**                            Caris Xml Vcf Parser: Nov 2024                        **\n" +
 				"**************************************************************************************\n" +
 				"This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml\n"+
 				"reported genomic alternations are annotated, bed files of copy number changes and gene\n"+
 				"fusions as well as a summary spreadsheet of the non NGS test results and report\n"+
-				"attributes. Use Vt to normalize the vcf output files. \n"+
+				"attributes. Use Vt to normalize the vcf output files. Check the output against the\n"+
+				"evolving Caris Xml format.\n"+
 
 				"\nOptions:\n"+
 				"-d Path to a directory containing paired xml and vcf files from Caris.\n"+
@@ -909,7 +929,7 @@ public class CarisXmlVcfParser {
 				"-a Include all vcf records in output, defaults to just those with an xml match.\n"+
 				"-k Skip datasets that are missing either an xml or vcf report.\n"+
 
-				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/\n" +
+				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReportsDwld\n" +
 				"     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq25Dec2020_MergedStdChr.ucsc.gz\n\n" +
 
 				"**************************************************************************************\n");

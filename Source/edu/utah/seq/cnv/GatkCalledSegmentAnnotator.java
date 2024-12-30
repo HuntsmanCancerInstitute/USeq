@@ -57,6 +57,7 @@ public class GatkCalledSegmentAnnotator {
 			saveSegResults();
 			saveSpreadsheetResults();
 			saveFilteredBedResults();
+			saveFilteredBedGraphResults();
 			
 
 			
@@ -159,6 +160,22 @@ public class GatkCalledSegmentAnnotator {
 			}
 			else if (Math.abs(gs.getLgMeanTNRatios()) >= minCopyRatioMeanTNRatios && Math.abs(gs.getLogMeanNormalCopyRatios()) <= maxAbsLg2NormalCopyRatio && Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) {
 				out.println(gs.toBed());
+			}
+		}
+		out.close();
+	}
+	
+	private void saveFilteredBedGraphResults() throws IOException {
+		File pass = new File(resultsDirectory, segFile.getName()+".pass.bedgraph");
+		PrintWriter out = new PrintWriter( new FileWriter( pass));
+		out.println("track type=bedGraph visibility=full color=200,100,0 altColor=0,100,200 priority=20");
+		
+		for (GatkSegment gs : gatkSegments) {
+			if (normalPresent == false) {
+				if (Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) out.println(gs.toBedGraph());
+			}
+			else if (Math.abs(gs.getLgMeanTNRatios()) >= minCopyRatioMeanTNRatios && Math.abs(gs.getLogMeanNormalCopyRatios()) <= maxAbsLg2NormalCopyRatio && Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) {
+				out.println(gs.toBedGraph());
 			}
 		}
 		out.close();
@@ -403,7 +420,7 @@ public class GatkCalledSegmentAnnotator {
 		
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                      Gatk Called Segment Annotator: April 2023                   **\n" +
+				"**                       Gatk Called Segment Annotator: Nov 2024                    **\n" +
 				"**************************************************************************************\n" +
 				"Annotates GATKs CallCopyRatioSegments output with denoised copy ratio and heterozygous\n"+
 				"allele frequency data from the tumor and matched normal samples. Enables filtering\n"+
