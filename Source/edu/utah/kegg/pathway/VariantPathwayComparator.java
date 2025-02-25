@@ -1,11 +1,11 @@
-package edu.utah.seq.pathway;
+package edu.utah.kegg.pathway;
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 import util.gen.*;
 
 
-public class VariantPathwayComparatorKeggMedicus {
+public class VariantPathwayComparator {
 
 	//user fields
 	private File groupAGeneHits;
@@ -22,7 +22,7 @@ public class VariantPathwayComparatorKeggMedicus {
 	
 	
 	//constructor
-	public VariantPathwayComparatorKeggMedicus(String[] args){
+	public VariantPathwayComparator(String[] args){
 		//start clock
 		long startTime = System.currentTimeMillis();
 
@@ -223,7 +223,7 @@ public class VariantPathwayComparatorKeggMedicus {
 			printDocs();
 			System.exit(0);
 		}
-		new VariantPathwayComparatorKeggMedicus(args);
+		new VariantPathwayComparator(args);
 	}		
 
 

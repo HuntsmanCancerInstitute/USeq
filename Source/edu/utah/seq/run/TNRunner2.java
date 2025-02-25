@@ -33,6 +33,7 @@ public class TNRunner2 {
 	private File[] msiDocs = null;
 	private File[] lohDocs = null;
 	private File normalAlignmentDir = null;
+	private File oncoKBConfig = null;
 	private File[] nonMatchedNormal = null;
 	private File copyRatioBkgDir = null;
 	private File[] copyRatioBkgHdf5Files = null;
@@ -541,7 +542,7 @@ public class TNRunner2 {
 		//squeue the shell script
 		String alignDirPath = jobDir.getCanonicalPath();
 		String [] cmd = null;
-		if (nice.length() !=0) cmd = new String[]{"sbatch", nice, "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
+		if (nice != null) cmd = new String[]{"sbatch", nice, "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
 		else cmd = new String[]{"sbatch", "-J", alignDirPath.replace(pathToTrim, ""), "-D", alignDirPath, shellScript.getCanonicalPath()};
 		if (sbatch) {
 			String[] output = IO.executeViaProcessBuilder(cmd, false);
@@ -642,7 +643,6 @@ public class TNRunner2 {
 					IO.pl("\nMaximum number jobs launched, skipping remaining samples.");
 					return false;
 				}
-//IO.p("\t"+rootDirs[i].getName());
 				if (verbose == false) IO.p("\t"+rootDirs[i].getName());
 				tNSamples[i] = new TNSample2(rootDirs[i].getCanonicalFile(), this);
 				idSample.put(tNSamples[i].getId(), tNSamples[i]);
@@ -706,6 +706,7 @@ public class TNRunner2 {
 						case 'h': haploWorklfowDir = new File(args[++i]); break;
 						case 'y': copyRatioDocsDir = new File(args[++i]); break;
 						case 'k': copyRatioBkgDir = new File(args[++i]); break;
+						case 'o': oncoKBConfig = new File(args[++i]); break;
 						case 'P': panel2Skip = args[++i]; break;
 						case 'v': clinicalVcfDir = new File(args[++i]); break;
 						case 'B': bpileupFileOrDir = new File(args[++i]); break;
@@ -786,6 +787,7 @@ public class TNRunner2 {
 			if (annoWorkflowDir != null){
 				if (annoWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing variant annotation workflow docs? "+annoWorkflowDir);
 				varAnnoDocs = IO.extractFiles(annoWorkflowDir);
+				if (oncoKBConfig == null || oncoKBConfig.exists()==false) Misc.printErrAndExit("Error: failed to find an OncoKB configuration file, see annotator.README.sh. "+ oncoKBConfig);
 			}
 
 			//sample concordance
@@ -877,6 +879,7 @@ public class TNRunner2 {
 				IO.pl("GATK somatic variant workflow directory\t"+ gatkSomVarCallWorkflowDir);
 				if (normalAlignmentDir != null) IO.pl("Non matched normal alignment directory for somatic calling\t"+normalAlignmentDir);
 				IO.pl("Variant annotation workflow directory\t"+annoWorkflowDir);
+				if (annoWorkflowDir!=null) IO.pl("OncoKB configuration file\t"+ oncoKBConfig);
 				IO.pl("Sample concordance workflow directory\t"+sampleConWorkflowDir);
 				IO.pl("MSI workflow directory\t"+msiWorkflowDir);
 				IO.pl("LoH workflow directory\t"+lohWorkflowDir);
@@ -941,7 +944,7 @@ public class TNRunner2 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TNRunner2 : Dec 2024                             **\n" +
+				"**                                 TNRunner2 : Jan 2025                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner2 is designed to execute several containerized workflows on tumor normal\n"+
 				"datasets via a slurm cluster.  Based on the availability of paired fastq datasets, \n"+
@@ -985,6 +988,7 @@ public class TNRunner2 {
 				"-C Workflow docs for launching GATK somatic variant calling.\n"+
 				"-m Workflow docs for launching MSI status calling.\n"+
 				"-a Workflow docs for launching variant annotation.\n"+
+				"-o If -a provide an OncoKB configuration file, see the annotator.README.sh\n"+
 				"-b Workflow docs for launching sample concordance.\n"+
 				"-y Workflow docs for launching somatic copy analysis.\n"+
 				"-q Workflow docs for launching Illumina germline joint genotyping.\n"+
@@ -1031,7 +1035,7 @@ public class TNRunner2 {
 				"     -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b \n"+
 				"     ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/\n"+
 				"     -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 125 -l \n"+
-				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l \n"+
+				"     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l -o oncoKB.txt\n"+
 
 
 				"\n**************************************************************************************\n");
@@ -1130,5 +1134,9 @@ public class TNRunner2 {
 
 	public String getAccountOverride() {
 		return accountOverride;
+	}
+
+	public File getOncoKBConfig() {
+		return oncoKBConfig;
 	}
 }

@@ -199,6 +199,7 @@ public class TNSample2 {
 		if (nameFile.size() == 0) {
 			IO.writeString(tnRunner.getGermlineAnnotatedVcfParser(), new File(jobDir, "annotatedVcfParser.config.txt"));
 			IO.writeString(tnRunner.getGermlineVcfCallFreq(), new File(jobDir, "vcfCallFrequency.config.txt"));
+			IO.copyViaFileChannel(tnRunner.getOncoKBConfig(), new File(jobDir, "oncoKB.config.txt"));
 			launch(jobDir, germlineVcf, tnRunner.getVarAnnoDocs());
 		}
 
@@ -213,6 +214,7 @@ public class TNSample2 {
 			if (checkJob(nameFile, jobDir, germlineVcf, tnRunner.getVarAnnoDocs())){
 				IO.writeString(tnRunner.getGermlineAnnotatedVcfParser(), new File(jobDir, "annotatedVcfParser.config.txt"));
 				IO.writeString(tnRunner.getGermlineVcfCallFreq(), new File(jobDir, "vcfCallFrequency.config.txt"));
+				IO.copyViaFileChannel(tnRunner.getOncoKBConfig(), new File(jobDir, "oncoKB.config.txt"));
 			}
 		}
 	}
@@ -373,6 +375,7 @@ public class TNSample2 {
 		if (nameFile.size() == 0) {
 			IO.writeString(tnRunner.getSomaticAnnotatedVcfParser(), new File(jobDir, "annotatedVcfParser.config.txt"));
 			IO.writeString(tnRunner.getSomaticVcfCallFreq(), new File(jobDir, "vcfCallFrequency.config.txt"));
+			IO.copyViaFileChannel(tnRunner.getOncoKBConfig(), new File(jobDir, "oncoKB.config.txt"));
 			launch(jobDir, toLink, tnRunner.getVarAnnoDocs());
 		}
 
@@ -383,6 +386,7 @@ public class TNSample2 {
 			for (File f: toLink) new File(jobDir, f.getName()).delete();
 			new File(jobDir, "annotatedVcfParser.config.txt").delete();
 			new File(jobDir, "vcfCallFrequency.config.txt").delete();
+			new File(jobDir, "oncoKB.config.txt").delete();
 			info.add("\tCOMPLETE "+jobDir);
 		}
 

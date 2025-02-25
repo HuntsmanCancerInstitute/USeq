@@ -39,6 +39,8 @@ public class AnnotatedVcfParser {
 	private TreeSet<String> passingAnnImpact = null;
 	private TreeSet<String> passingClinSig = null;
 	private TreeSet<String> excludeClinSig = null;
+	private TreeSet<String> passingOncoKB = null;
+	private TreeSet<String> excludeOncoKB = null;
 	private TreeSet<String> passingGermlineGenes = null;
 	private TreeSet<String> drugResClinSigGenes = null;
 	private String[] passingVCFSS = null;
@@ -60,13 +62,20 @@ public class AnnotatedVcfParser {
 	//trackers
 	private Histogram afs = new Histogram(0, 1.01, 101);
 	private TreeMap<String, Integer> clinsig = new TreeMap<String, Integer>();
+	private TreeMap<String, Integer> oncokb
+	= new TreeMap<String, Integer>();
 	private int[] dps = new int[10000];
 	private TreeMap<String, Integer> impacts = new TreeMap<String, Integer>();
 	private TreeMap<String, Integer> effects = new TreeMap<String, Integer>();
-	private String acmgGenes = "ACTA2,ACTC1,APC,APOB,ATM,ATP7B,BARD1,BMPR1A,BRCA1,BRCA2,BRIP1,CACNA1S,CDH1,CDK4,CDKN2A,CHEK2,COL3A1,DSC2,DSG2,DSP,"
+	/*Old private String acmgGenes = "ACTA2,ACTC1,APC,APOB,ATM,ATP7B,BARD1,BMPR1A,BRCA1,BRCA2,BRIP1,CACNA1S,CDH1,CDK4,CDKN2A,CHEK2,COL3A1,DSC2,DSG2,DSP,"
 			+ "EPCAM,FBN1,GLA,GREM1,KCNH2,KCNQ1,LDLR,LMNA,MEN1,MLH1,MSH2,MSH6,MUTYH,MYBPC3,MYH7,MYH11,MYL2,MYL3,NBN,NF2,OTC,PALB2,PCSK9,"
 			+ "PKP2,PMS2,POLD1,POLE,PRKAG2,PTEN,RAD51C,RAD51D,RB1,RET,RYR1,RYR2,SCN5A,SDHAF2,SDHB,SDHC,SDHD,SMAD3,SMAD4,STK11,TGFBR1,"
-			+ "TGFBR2,TMEM43,TNNI3,TNNT2,TP53,TPM1,TSC1,TSC2,VHL,WT1";
+			+ "TGFBR2,TMEM43,TNNI3,TNNT2,TP53,TPM1,TSC1,TSC2,VHL,WT1";*/
+	//v3.2 https://doi.org/10.1016/j.gim.2023.100866
+	private String acmgGenes = "ACTA2,ACTC1,ACVRL1,APC,APOB,ATP7B,BAG3,BAG3,BMPR1A,BRCA1,BRCA2,BTD,CACNA1S,CALM1,CALM1,CALM2,CALM2,CALM3,CALM3,CASQ2,COL3A1,DES,"+
+			"DES,DSC2,DSG2,DSP,DSP,ENG,FBN1,FLNC,FLNC,FLNC,GAA,GLA,HFE,HNF1A,KCNH2,KCNQ1,LDLR,LMNA,MAX,MEN1,MLH1,MSH2,MSH6,MUTYH,MYBPC3,MYH11,"+
+			"MYH7,MYH7,MYL2,MYL3,NF2,OTC,PALB2,PCSK9,PKP2,PMS2,PRKAG2,PTEN,RB1,RBM20,RET,RET,RET,RPE65,RYR1,RYR2,SCN5A,SCN5A,SCN5A,SDHAF2,SDHB,"+
+			"SDHC,SDHD,SMAD3,SMAD4,SMAD4,STK11,TGFBR1,TGFBR2,TMEM127,TMEM43,TNNC1,TNNI3,TNNT2,TNNT2,TP53,TPM1,TRDN,TRDN,TSC1,TSC2,TTN,TTR,VHL,WT1";
 	private TreeMap<String, Integer> observedGermlineGenes = new TreeMap<String, Integer>();
 	
 	//counters
@@ -83,9 +92,12 @@ public class AnnotatedVcfParser {
 	private int numPassingBKAFs = 0;
 	private int numWithClin = 0;
 	private int numPassingClinSing = 0;
+	private int numPassingExcludeClinSing = 0;
+	private int numWithOncoKB = 0;
+	private int numPassingOncoKB = 0;
+	private int numPassingExcludeOncoKB = 0;
 	private int numWithCF = 0;
 	private int numPassingCF = 0;
-	private int numPassingExcludeClinSing = 0;
 	private int numWithSplice = 0;
 	private int numPassingSplice = 0;
 	private int numPassIDs = 0;
@@ -105,7 +117,7 @@ public class AnnotatedVcfParser {
 			
 		processArgs(args);
 		
-		if (somaticProcessing) modifySettingsForFoundation();
+		if (somaticProcessing) modifySettingsForSomatic();
 		
 		openSpreadSheet();
 		impactedGenes = new Gzipper( new File (saveDirectory, "impactedGenes.txt.gz"));
@@ -191,10 +203,12 @@ public class AnnotatedVcfParser {
 				dataLine = new AnnotatedVcfParserDataLine(trimmedFileName, cells, clinvarDate);
 				
 				boolean passDP=true, passAF=true, passImpact=true, passSplice=true, passID = true, passGermlineGenes = false, passAlt=true, passMulti=true;
+				
 				boolean[] passCF= null;
 				boolean[] passBKAF= null; 
 				boolean[] passPop= null;
-				boolean[] passClinSig= null;
+				boolean[] passClinSig= null; //passClinSig, passClinSigAgainst
+				boolean[] passOncoKB= null;
 				
 				
 				if (passingGermlineGenes != null) passGermlineGenes = checkGermlineGenes();
@@ -206,14 +220,15 @@ public class AnnotatedVcfParser {
 				if (maximumPopAF != 0) 			passPop = checkPopFreq();
 				if (passingAnnImpact != null) 	passImpact = checkImpact();
 				if (passingClinSig != null || excludeClinSig != null) 	passClinSig = checkClinSig();
+				if (passingOncoKB != null || excludeOncoKB != null) 	passOncoKB = checkOncoKB();
 				if (maxFracBKAFs != 0 || minimumBKZ !=0) passBKAF = checkBKAFs();
 				if (passingVCFSS != null) 		passSplice = checkSplice();
 				if (passingIDKeys != null) 		passID = checkIDs(cells[2]);
 				
 				boolean pass;
-				if (somaticProcessing) pass =  passFoundationFiltering(passID, passDP, passAF, passAlt, passImpact,passSplice, passPop, passBKAF,passClinSig, passCF, passMulti); 
-				else if (orAnnos) pass = passWithOrAnnos(passID, passDP, passAF, passAlt, passImpact, passSplice, passPop, passBKAF,passClinSig, passCF, passMulti);
-				else pass = allPass(passID, passDP, passAF, passAlt, passImpact, passSplice, passPop, passBKAF, passClinSig, passCF, passMulti);
+				if (somaticProcessing) pass =  passFoundationFiltering(passID, passDP, passAF, passAlt, passImpact,passSplice, passPop, passBKAF,passClinSig, passOncoKB, passCF, passMulti); 
+				else if (orAnnos) pass = passWithOrAnnos(passID, passDP, passAF, passAlt, passImpact, passSplice, passPop, passBKAF,passClinSig, passOncoKB, passCF, passMulti);
+				else pass = allPass(passID, passDP, passAF, passAlt, passImpact, passSplice, passPop, passBKAF, passClinSig, passOncoKB, passCF, passMulti);
 				
 				if (pass){
 					numPassingVcf++;
@@ -249,7 +264,7 @@ public class AnnotatedVcfParser {
 
 
 	/**Requires all are true. Not if these aren't set off defaults then they default to true. Note if passID then returns true regardless of others.*/
-	private boolean allPass(boolean passID, boolean passDP, boolean passAF, boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF, boolean passMulti) {
+	private boolean allPass(boolean passID, boolean passDP, boolean passAF, boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passOncoKB, boolean[] passCF, boolean passMulti) {
 		if (passingIDKeys != null && passID) return true;
 		if (passDP == false) return false;
 		if (passAF == false) return false;
@@ -272,11 +287,17 @@ public class AnnotatedVcfParser {
 			if (excludeClinSig !=null && passClinSig[1] == true) return false;
 			if (passingClinSig != null && passClinSig[0] == false) return false;
 		}
+		//check oncoKB?
+		if (passingOncoKB != null && passClinSig == null ) return false;
+		if (passOncoKB != null){
+			if (excludeOncoKB !=null && passOncoKB[1] == true) return false;
+			if (passingOncoKB != null && passOncoKB[0] == false) return false;
+		}
 		return true;
 	}
 	
 	/**Requires DP, AF, Pop, CF, BKAF are true if present. Only one of Clin, Splice, or Impact need be true, Note if passID then returns true regardless of others.*/
-	private boolean passWithOrAnnos(boolean passID, boolean passDP, boolean passAF, boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF, boolean passMulti) {
+	private boolean passWithOrAnnos(boolean passID, boolean passDP, boolean passAF, boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passOncoKB, boolean[] passCF, boolean passMulti) {
 		if (passingIDKeys != null && passID) return true;
 		if (passDP == false) return false;
 		if (passAF == false) return false;
@@ -290,11 +311,20 @@ public class AnnotatedVcfParser {
 		if (passPop != null && passPop[0] == true) passPop2 = passPop[1];
 		if (passPop2 == false) return false;
 		
+		//check that one is good, these take priority
 		if (passClinSig != null){
-			//are they excluding vars based on clinSig terms? if one was found fail the record
-			if (excludeClinSig !=null && passClinSig[1] == true) return false;
 			//are they looking for particular clinsig terms
 			if (passingClinSig != null && passClinSig[0] == true) return true;
+			//are they excluding vars based on clinSig terms? if one was found fail the record
+			if (excludeClinSig !=null && passClinSig[1] == true) return false;
+		}
+		
+		//check OncoKB
+		if (passOncoKB != null){
+			//are they looking for particular oncoKB terms
+			if (passingOncoKB != null && passOncoKB[0] == true) return true;
+			//are they excluding vars based on oncoKB terms? if one was found fail the record
+			if (excludeOncoKB !=null && passOncoKB[1] == true) return false;
 		}
 		
 		if (passingVCFSS != null && passSplice == true) return true;
@@ -307,7 +337,7 @@ public class AnnotatedVcfParser {
 		for (String s: Misc.COMMA.split(acmgGenes)) passingGermlineGenes.add(s.trim());
 	}
 
-	private boolean passFoundationFiltering(boolean passID, boolean passDP, boolean passAF,  boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passCF, boolean passMulti){
+	private boolean passFoundationFiltering(boolean passID, boolean passDP, boolean passAF,  boolean passAlt, boolean passImpact, boolean passSplice, boolean[] passPop, boolean[] passBKAF, boolean[] passClinSig, boolean[] passOncoKB, boolean[] passCF, boolean passMulti){
 		//pass it if ID correct
 		if (passID) return true;
 		//fail it if DP, AF, alt fails
@@ -316,13 +346,24 @@ public class AnnotatedVcfParser {
 		if (passPop[0] == true && passPop[1] == false) return false;
 		if (passBKAF[0] == true && passBKAF[1] == false) return false;
 		if (passCF!= null && passCF[0] == true && passCF[1] == false) return false;
+		
 		//check that one is good, these take priority
+		//check clinsig, this over rules oncoKB pass
 		if (passClinSig != null){
 			//are they looking for particular clinsig terms
 			if (passingClinSig != null && passClinSig[0] == true) return true;
 			//are they excluding vars based on clinSig terms? if one was found fail the record
 			if (excludeClinSig !=null && passClinSig[1] == true) return false;
 		}
+		
+		//check OncoKB
+		if (passOncoKB != null){
+			//are they looking for particular oncoKB terms
+			if (passingOncoKB != null && passOncoKB[0] == true) return true;
+			//are they excluding vars based on oncoKB terms? if one was found fail the record
+			if (excludeOncoKB !=null && passOncoKB[1] == true) return false;
+		}
+		
 		if (passingVCFSS != null && passSplice == true) return true;
 		if (passingAnnImpact != null && passImpact == true) return true;
 		return false;
@@ -556,6 +597,57 @@ public class AnnotatedVcfParser {
 			return null;
 		}
 	}
+	
+	/*Returns null if no oncoKB annotation, returns boolean[]{foundRequestedForOncoKB, foundRequestedAgainstOncoKB}
+	 * ONCOGENIC	Oncogenic, Likely_Oncogenic, Likely_Neutral, Inconclusive, Unknown, Resistance 
+	 * HIGHEST_LEVEL	LEVEL_1, LEVEL_2, LEVEL_3A, LEVEL_3B, LEVEL_4, LEVEL_R1, LEVEL_R2 -The highest level of evidence for therapeutic implications. Order: LEVEL_R1 > LEVEL_1 > LEVEL_2 > LEVEL_3A > LEVEL_3B > LEVEL_4 > LEVEL_R2
+	 * MUTATION_EFFECT	Gain-of-function, Likely_Gain-of-function, Loss-of-function, Likely_Loss-of-function, Switch-of-function, Likely_Switch-of-function, Neutral, Likely_Neutral, Inconclusive, Unknown - The biological effect of a mutation/alteration on the protein function that gives rise to changes in the biological properties of cells expressing the mutant/altered protein compared to cells expressing the wildtype protein.
+	 * - In OncoKB, oncogenic is defined as referring to the ability to induce or cause cancer as described in the second edition of The Biology of Cancer by Robert Weinberg (2014).
+	 */
+	private boolean[] checkOncoKB() throws Exception {
+		String oncogenic = infoKeyValue.get("ONCOGENIC");
+		if (oncogenic != null){
+			numWithOncoKB++;
+			//set just MUTATION_EFFECT,ONCOGENIC,HIGHEST_LEVEL might be null
+			dataLine.oncogenic = oncogenic;
+			dataLine.mutationEffect= infoKeyValue.get("MUTATION_EFFECT");
+			dataLine.highestLevel = infoKeyValue.get("HIGHEST_LEVEL");
+			if (oncokb.containsKey(oncogenic)) {
+				int count = oncokb.get(oncogenic);
+				oncokb.put(oncogenic, new Integer( ++count ));
+			}
+			else oncokb.put(oncogenic, new Integer(1));
+			boolean passOncoKB = false;
+			//is there a check for particular ONCOGENIC term?
+			if (passingOncoKB != null){
+				passOncoKB = passingOncoKB.contains(oncogenic);
+				if (passOncoKB) {
+					dataLine.passesOncoKB = true;
+					dataLine.rejectedOncoKB = false;
+					numPassingOncoKB++;
+				}
+			}
+		
+			boolean passOncoKBAgainst = false;
+			//is there a check against particular ONCOGENIC term?
+			if (excludeOncoKB != null){
+				passOncoKBAgainst = excludeOncoKB.contains(oncogenic);
+				if (passOncoKBAgainst) {
+					numPassingExcludeOncoKB++;
+					dataLine.rejectedOncoKB = true;
+					dataLine.passesOncoKB = false;
+
+				}
+			}
+			
+			return new boolean[]{passOncoKB, passOncoKBAgainst};
+		}
+		else {
+			if (verbose) IO.pl("\tOncoKB Check\tfalse\tNo ONCOGENIC");
+			return null;
+		}
+	}
+
 	
 	/**
 	 * ##INFO=<ID=ANN,Number=.,Type=String,Description="Functional annotations: 
@@ -875,7 +967,7 @@ public class AnnotatedVcfParser {
 		return hist;
 	}
 	
-	private void modifySettingsForFoundation() {
+	private void modifySettingsForSomatic() {
 		if (minimumDP == 0) minimumDP = 50;
 		if (minimumAlt == 0) minimumAlt = 3;
 		if (minimumAF == 0) minimumAF = 0.01;
@@ -905,7 +997,17 @@ public class AnnotatedVcfParser {
 			drugResClinSigGenes = new TreeSet<String>();
 			drugResClinSigGenes.add("RYR1");
 		}
-		if (passingIDKeys == null) passingIDKeys = new String[]{"foundation","tempus","caris"};
+		if (passingOncoKB == null){
+			passingOncoKB = new TreeSet<String>();
+			passingOncoKB.add("Oncogenic");
+			passingOncoKB.add("Likely_Oncogenic");
+			passingOncoKB.add("Resistance");
+		}
+		if (excludeOncoKB == null){
+			excludeOncoKB = new TreeSet<String>();
+			excludeOncoKB.add("Likely_Neutral");
+		}
+		if (passingIDKeys == null) passingIDKeys = new String[]{"foundation","tempus","caris","ambry","invitae"};
 		if (passingVCFSS == null) passingVCFSS = new String[]{"D5S", "D3S", "G5S", "G3S"};	
 		if (minimumVCFSSDiff == 0) minimumVCFSSDiff = 4;
 		createGermlineGenes();
@@ -919,7 +1021,7 @@ public class AnnotatedVcfParser {
 			al.add("\tSomatic processing, unset fields are set to Somatic defaults and the following logic is used to pass or fail each record.\n"
 					+ "\t\tIf ID matches pass irregardless of other settings.\n"
 					+ "\t\tFail it if DP or AF are false.\n"
-					+ "\t\tFail it if ClinSig, Splice, and Impact are all false.\n"
+					+ "\t\tFail it if ClinSig, OncoKB, Splice, and Impact are all false.\n"
 					+ "\t\tFail it if Pop, BKAF, CF are present and they are false.\n");
 		}
 		if (minimumDP != 0) al.add("\t"+ minimumDP+"\t: Minimum DP read depth");
@@ -950,12 +1052,15 @@ public class AnnotatedVcfParser {
 		if (excludeClinSig != null) al.add("\t"+Misc.treeSetToString(excludeClinSig, ",")+"\t: CLINSIG exclude keys");
 		if (drugResClinSigGenes != null) al.add("\t"+Misc.treeSetToString(drugResClinSigGenes, ",")+"\t: CLINSIG drug_response restricted genes");
 		if (clinvarDate != null) al.add("\t"+ clinvarDate+"\t: CLINVAR file date for spreadsheet.");
-		
+
+		if (passingOncoKB != null) al.add("\n\t"+Misc.treeSetToString(passingOncoKB, ",")+"\t: OncoKB keep keys");
+		if (excludeOncoKB != null) al.add("\t"+Misc.treeSetToString(excludeOncoKB, ",")+"\t: OncoKB exclude keys");
+
 		if (passingVCFSS != null) {
 			al.add("\n\t"+Misc.stringArrayToString(passingVCFSS, ",")+"\t: Splice junction types to scan");
 			al.add("\t"+ minimumVCFSSDiff+"\t: Minimum difference in MaxEnt scan scores for a splice junction effect");
 		}
-		if (somaticProcessing ==false) al.add("\t"+ orAnnos+"\t: Require that only one need pass: ANN Impact or Clinvar or Splice Effect");
+		if (somaticProcessing ==false) al.add("\t"+ orAnnos+"\t: Require that only one need pass: ANN Impact or Clinvar or OncoKB or Splice Effect");
 		if (passingIDKeys != null) al.add("\n\t"+Misc.stringArrayToString(passingIDKeys, ",")+"\t: VCF ID keys that if present pass it regardless of any filter settings");
 		if (passingGermlineGenes != null) al.add("\n\t"+acmgGenes+"\t: ACMG Genes that cause the maxAF filter to be skipped for intersecting variants");
 		if (somaticProcessing ==false) 
@@ -1004,6 +1109,11 @@ public class AnnotatedVcfParser {
 			IO.pl("\t"+ format(numPassingClinSing, numWithClin)+"Passing Include ClinSig");
 			IO.pl("\t"+ format(numPassingExcludeClinSing, numWithClin)+"Passing Exclude ClinSig");
 		}
+		if (passingOncoKB != null){
+			IO.pl("\t"+ format(numWithOncoKB, numRecords)+"With OncoKB");
+			IO.pl("\t"+ format(numPassingOncoKB, numWithOncoKB)+"Passing Include OncoKB");
+			IO.pl("\t"+ format(numPassingExcludeOncoKB, numWithOncoKB)+"Passing Exclude OncoKB");
+		}
 		if (passingVCFSS != null){
 			IO.pl("\t"+ format(numWithSplice, numRecords)+"With Splice");
 			IO.pl("\t"+ format(numPassingSplice, numWithSplice)+"Passing Splice");
@@ -1016,6 +1126,10 @@ public class AnnotatedVcfParser {
 		if (passingClinSig != null){
 			IO.pl("\nObserved CLINSIG annotations:" );
 			for (String key: clinsig.keySet()) IO.pl("\t"+key+"\t"+clinsig.get(key));
+		}
+		if (passingOncoKB != null){
+			IO.pl("\nObserved OncoKB ONCOGENIC annotations:" );
+			for (String key: oncokb.keySet()) IO.pl("\t"+key+"\t"+oncokb.get(key));
 		}
 		if (passingAnnImpact != null){
 			IO.pl("\nObserved ANN impacts:");
@@ -1076,6 +1190,8 @@ public class AnnotatedVcfParser {
 		String clinString = null;
 		String clinStringExclude = null;
 		String drugResString = null;
+		String oncoKBString = null;
+		String oncoKBStringExclude = null;
 		IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i];
@@ -1102,6 +1218,8 @@ public class AnnotatedVcfParser {
 					case 'c': clinString = args[++i]; break;
 					case 'C': clinvarDate = args[++i]; break;
 					case 'e': clinStringExclude = args[++i]; break;
+					case 'O': oncoKBString = args[++i]; break;
+					case 'E': oncoKBStringExclude = args[++i]; break;
 					case 'j': createGermlineGenes(); break;
 					case 'i': passingIDKeys = Misc.COMMA.split(args[++i]); break;
 					case 'o': orAnnos = true; break;
@@ -1157,6 +1275,16 @@ public class AnnotatedVcfParser {
 			drugResClinSigGenes = new TreeSet<String>();
 			for (String s: Misc.COMMA.split(drugResString)) drugResClinSigGenes.add(s);
 		}
+		
+		if (oncoKBString != null) {
+			passingOncoKB = new TreeSet<String>();
+			for (String s: Misc.COMMA.split(oncoKBString)) passingOncoKB.add(s);
+		}
+		if (oncoKBStringExclude != null) {
+			excludeOncoKB = new TreeSet<String>();
+			for (String s: Misc.COMMA.split(oncoKBStringExclude)) excludeOncoKB.add(s);
+		}
+		
 		if (minimumVCFSSDiff !=0 && passingVCFSS == null) Misc.printErrAndExit("\nError: please provide a comma delimited list of splice junction types (e.g. D5S,D3S,G5S,G3S) to examine.\n");
 		
 		if (transcriptList != null)  transcriptFilter = IO.loadFileIntoHashSet(transcriptList);
@@ -1167,7 +1295,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Annotated Vcf Parser  July 2024                        **\n" +
+				"**                          Annotated Vcf Parser  January 2025                      **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+
@@ -1204,12 +1332,15 @@ public class AnnotatedVcfParser {
                 "       delimited, no spaces. Defaults to all.\n"+
                 "-e Comma delimited list of CLINSIG terms to select against.\n"+
                 "-C CLINVAR file date for spreadsheet output.\n"+
+                "-O Comma delimited list of OncoKB ONCOGENIC terms to select for, \n"+
+                "       e.g. Oncogenic,Likely_Oncogenic,Resistance\n"+
+                "-E Comma delimited list of OncoKB ONCOGENIC terms to select against, \n"+
+                "       e.g. Likely_Neutral,Inconclusive,Unknown\n"+              
                 "-R Remove variants containing a 'MULTIALLELIC' INFO key. Typically from vt decompose.\n"+
-
                 "-i Comma delimited list of VCF ID keys to select for. If the VCF ID contains one or\n"+
                 "       more, the record is passed regardless of other filters. The match is not exact.\n"+
                 "-o Only require, if set or present, SnpEff ANN or CLINSIG or Splice to be true to pass.\n"+
-                "       Defaults to require that all set pass.\n"+
+                "       Defaults to require that all set pass. CLINVAR take priority over OncoKB.\n"+
                 "-T Txt file containing a list of transcripts to keep, one per line, to use in filtering\n"+
                 "       the summary spreadsheet output.\n"+
 				"-r Verbose per record output.\n"+ 
@@ -1221,9 +1352,10 @@ public class AnnotatedVcfParser {
 				"        -d 74 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a\n"+
 				"        HIGH,MODERATE -e Benign,Likely_benign -c Pathogenic,Likely_pathogenic,\n"+
 				"        Conflicting_interpretations_of_pathogenicity -t 0.51 -u RYR1 -T \n"+
-				"        ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3 -R \n\n"+
+				"        ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3 -R -E Likely_Neutral \n"+
+				"        -O Oncogenic,Likely_Oncogenic,Resistance \n"+
 
 
-				"**************************************************************************************\n");
+				"\n**************************************************************************************\n");
 	}
 }

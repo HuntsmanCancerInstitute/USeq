@@ -62,7 +62,7 @@ public class AccuGenomicGeneSelector {
 		runCfDNASamples();  
 		
 		//testScalars = "1.0";
-		//runAllGermlinesAsTest();
+		runAllGermlinesAsTest();
 
 		IO.pl("\nCOMPLETE!");
 

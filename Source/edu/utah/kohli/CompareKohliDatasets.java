@@ -37,18 +37,16 @@ public class CompareKohliDatasets {
 	public static void main(String[] args) throws IOException {
 		File patientSampleInfo = new File ("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/FinalAggregateAnalysis/sampleMatchingPersonGNomIDs_13June2024.txt");
 		File geneInfo = new File ("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNADesign/CBioReviewProstateCancer23July2024/targetGeneSummary.txt");
-		File gatkResultsDir = new File ("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/FinalAggregateAnalysis/GatkCopyRatioPassingBeds");
-		File gatkWGSResultsDir = new File("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/WgsAnalysis/GATKForWGS/PassingBeds2.5kb");
-		File gatkWGS10KBDir = new File ("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/WgsAnalysis/GATKForWGS/PassingBeds10kb");
-		File ichorResultsDir = new File ("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/WgsAnalysis/SegFiles/GeneAnnotatedSegFiles");
+		File gatkPanelResultsDir = new File ("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/FinalAggregateAnalysis/GatkCopyRatioPassingBeds");
+		File gatkWGSResultsDir = new File("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/WgsAnalysis/GATKForWGS/SubSamplingComparision/S0_100_PassBed");
 		File smallPanelResults = new File ("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/FinalAggregateAnalysis/KohliCopyRatio/CopyAlterationCalls/fourNormMethodsFinal.txt");
 		File cBioVcf = new File("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNADesign/CBioReviewProstateCancer23July2024/Mutations_Hg19/cBio23July2024MutationsHg38.vcf.gz");
 		File somVarCallDir = new File ("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/SomVarCalling/Anno");
 		File snaqSeqResults = new File ("/Users/u0028003/HCI/Labs/Kohli_Manish/ProstateCfDNAAnalysis/FinalAggregateAnalysis/AccuGenomicsCopyCalls/snaqSeqStats.txt");
-		new CompareKohliDatasets(patientSampleInfo, geneInfo, gatkResultsDir, gatkWGSResultsDir, gatkWGS10KBDir,ichorResultsDir, smallPanelResults, cBioVcf, somVarCallDir, snaqSeqResults);
+		new CompareKohliDatasets(patientSampleInfo, geneInfo, gatkPanelResultsDir, gatkWGSResultsDir, smallPanelResults, cBioVcf, somVarCallDir, snaqSeqResults);
 	}
 	
-	public CompareKohliDatasets(File patientSampleInfo, File geneInfo, File gatkResultsDir, File gatkWGSResultsDir, File gatkWGS10KBDir, File ichorResultsDir, File smallPanelResults, File cBioVcf, File somVarCallDir, File snaqSeqResults) throws IOException {
+	public CompareKohliDatasets(File patientSampleInfo, File geneInfo, File gatkPanelResultsDir, File gatkWGSResultsDir, File smallPanelResults, File cBioVcf, File somVarCallDir, File snaqSeqResults) throws IOException {
 
 		//load patients and samples
 		loadPatients(patientSampleInfo);
@@ -62,25 +60,14 @@ public class CompareKohliDatasets {
 			loadSnaqSeqCopyCalls(snaqSeqResults);
 			
 			//load dir of cnv results
-			loadGatkCopyRatioCalls(gatkResultsDir, "GatkPanel");
+			loadGatkCopyRatioCalls(gatkPanelResultsDir, "GatkPanel");
 			
 			//load dir of cnv results
-			loadGatkCopyRatioCalls(gatkWGSResultsDir, "GatkWGS2.5");
-			
-			//load dir of cnv results
-			loadGatkCopyRatioCalls(gatkWGS10KBDir, "GatkWGS10");
+			loadGatkCopyRatioCalls(gatkWGSResultsDir, "GatkWGS");
 
 			//load the small panel method results
 			loadSmallPanelCopyRatioCalls(smallPanelResults);
 			
-			//load the wgs ichor results
-			//loadIChorCopyCalls(ichorResultsDir);
-
-			//compare Patients Samples
-			//compareResults();
-			//compareResultsWithIChor();
-			//compareResultsWithGatkWGS();
-			//compareResultsWithGatkWGSMerged();
 			compareResultsWithMergedGatkWgsConfusionMatrix();
 		}
 		
@@ -445,6 +432,7 @@ public class CompareKohliDatasets {
 			//for each cfDNA sample
 			for (KohliSample ks: nonGermline) {
 				IO.p(kp.getHciPatientId()+"\t"+ks.getSampleId());
+				
 				//find the GatkWGS2.5 and GatkWGS10
 				CnvCallSet gatkWGS2 = null;
 				CnvCallSet gatkWGS10 = null;

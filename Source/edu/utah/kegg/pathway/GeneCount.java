@@ -1,4 +1,4 @@
-package edu.utah.seq.pathway;
+package edu.utah.kegg.pathway;
 
 
 public class GeneCount implements Comparable<GeneCount>{

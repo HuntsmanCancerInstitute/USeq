@@ -1,11 +1,11 @@
-package edu.utah.seq.pathway;
+package edu.utah.kegg.pathway;
 import java.io.*;
 import java.util.*;
 import java.util.regex.*;
 import util.gen.*;
 
 
-public class GeneSetPathwayComparatorKeggMedicus {
+public class GeneSetPathwayComparator {
 
 	//user fields
 	private File interrogatedGeneList;
@@ -15,6 +15,7 @@ public class GeneSetPathwayComparatorKeggMedicus {
 	private File tempDirectory;
 	private File fullPathToR;
 	private File resultsSpreadsheet = null;
+	private double minimumFdr = 0.1;
 
 	//internal
 	private HashSet<String> uniqueInterrogatedGenes = null;
@@ -24,7 +25,7 @@ public class GeneSetPathwayComparatorKeggMedicus {
 	
 	
 	//constructor
-	public GeneSetPathwayComparatorKeggMedicus(String[] args) throws IOException{
+	public GeneSetPathwayComparator(String[] args) throws IOException{
 		//start clock
 		long startTime = System.currentTimeMillis();
 
@@ -103,6 +104,38 @@ public class GeneSetPathwayComparatorKeggMedicus {
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
+	}
+	
+	private void walkPathwayMaps() {
+		
+		//for each pathway(hsa05220) in the network(N00002), build a URL
+		//	color the intersected genes pink for upregulated, skyblue for downregulated
+		//  add selector for all of the significant networks (adjPVal <= 0.1)
+		//e.g. https://www.kegg.jp/kegg-bin/show_pathway?map=hsa05220&multi_query=673%20skyblue%0A3265%20pink&network=N00002
+		//  %20 between gene# and bkg color
+		//  %0A between genes
+		// pink:skyblue purple:orange
+		/*Present the data by pathway map!
+			For each map with a significant network
+				Select the networks
+				Aggregate and color the genes
+				
+		Rewrite using common objects from the Extractor?
+		
+		Here*/
+		
+			//find significant networks with a map
+			HashSet<String> sigPathwayIds = new HashSet<String>();
+			HashSet<String> sigNetworkIds = new HashSet<String>();
+			for (Pathway p: pathways) {
+				if (p.adjPval <= minimumFdr) {
+					sigPathwayIds.add(p.name);
+					sigNetworkIds.add(p.networkId);
+				}
+			}
+			
+			//for each sig network
+		
 	}
 
 	private void comparePathways() throws IOException {
@@ -270,6 +303,67 @@ public class GeneSetPathwayComparatorKeggMedicus {
 
 			return sb.toString();
 		}
+		
+		public String toStringNew() {
+			//name pval, adjPval, #UniquePathwayGenes, #FoundUniquePathwayGenes, #DiffExpGenes, #GenesIntersect, GenesIntersect/FoundUniPathGenes, IntersectingGenes, IntersectingGeneLogRtos, PathwayMapLinks...
+			StringBuilder sb = new StringBuilder();
+			
+			sb.append("=HYPERLINK(\"https://www.kegg.jp/entry/");
+			sb.append(networkId);
+			sb.append("\",\"");
+			sb.append(name);
+			sb.append("\")");
+			String networkCell = sb.toString();
+			sb.append("\t");
+			
+			sb.append(pval); sb.append("\t");
+			sb.append(Num.formatNumber(adjPval, 5)); sb.append("\t");
+			sb.append(numInputGenes); sb.append("\t");
+			sb.append(genes.size()); sb.append("\t");
+			sb.append(uniqueSelectGenes.size()); sb.append("\t");
+			sb.append(sharedGenes.size()); sb.append("\t");
+			double frac = (double)sharedGenes.size()/ (double)genes.size();
+			sb.append(Num.formatNumber(frac, 5)); sb.append("\t");
+			
+			//sort the sharedGenes by gene symbol so easier to group
+			SelectGene[] sortedSGs = new SelectGene[sharedGenes.size()];
+			sharedGenes.toArray(sortedSGs);
+			Arrays.sort(sortedSGs);
+			//just gene symbols
+			for (SelectGene sg: sortedSGs) {
+				sb.append(sg.geneSymbol);
+				sb.append(" ");
+			}
+			sb.append("\t"); 
+			
+			//just log2Rtos have to use , to keep excel from converting it to a formula
+			if (sortedSGs.length!=0) {
+				sb.append(sortedSGs[0].log2Rto);
+				for (int i=1; i< sortedSGs.length; i++) {
+					sb.append(",");
+					sb.append(sortedSGs[i].log2Rto);
+				}
+			}
+			
+			if (urlLinkDescriptions.size()!=0) {
+				for (int i=0; i< urlLinkDescriptions.size(); i++) {
+					sb.append("\t");
+					String[] toLinkDesc = urlLinkDescriptions.get(i);
+					sb.append("=HYPERLINK(\"https://www.kegg.jp/pathway/");
+					sb.append(toLinkDesc[0]);
+					sb.append("\",\"");
+					sb.append(toLinkDesc[1]);
+					sb.append("\")");
+				}
+			}
+			else {
+				sb.append("\t");
+				sb.append(networkCell);
+			}
+
+			return sb.toString();
+		}
+
 
 		public int compareTo(Pathway o) {
 			if (this.pval< o.pval) return -1;
@@ -311,7 +405,7 @@ public class GeneSetPathwayComparatorKeggMedicus {
 			printDocs();
 			System.exit(0);
 		}
-		new GeneSetPathwayComparatorKeggMedicus(args);
+		new GeneSetPathwayComparator(args);
 	}		
 
 

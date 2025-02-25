@@ -1335,5 +1335,17 @@ public class Misc {
 		System.arraycopy(a, 0, c, 0, a.length);
 		System.arraycopy(b, 0, c, a.length, b.length);
 		return c;
+	}
+
+	public static String stringSetToString(Set<String> keySet, String delimiter) {
+		if (keySet.size()==0) return "";
+		StringBuilder sb = new StringBuilder();
+		Iterator<String> it = keySet.iterator();
+		sb.append(it.next());
+		while (it.hasNext()) {
+			sb.append(delimiter);
+			sb.append(it.next());
+		}
+		return sb.toString();
 	}	
 }

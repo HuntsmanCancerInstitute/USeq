@@ -89,7 +89,7 @@
 				
 					<a href="#CarisXmlVcfParser">CarisXmlVcfParser</a><br>
 				
-					<a href="#CBiBilling">CBiBilling</a><br>
+					<a href="#CBiBilling2">CBiBilling2</a><br>
 				
 					<a href="#CBio2Sgr">CBio2Sgr</a><br>
 				
@@ -102,6 +102,8 @@
 					<a href="#CompareParsedAlignments">CompareParsedAlignments</a><br>
 				
 					<a href="#ConcatinateFastas">ConcatinateFastas</a><br>
+				
+					<a href="#CopyAnalysisZScoreMinimizer">CopyAnalysisZScoreMinimizer</a><br>
 				
 					<a href="#CorrectVCFEnds">CorrectVCFEnds</a><br>
 				
@@ -231,6 +233,8 @@
 				
 					<a href="#MergePairedAlignments">MergePairedAlignments</a><br>
 				
+					<a href="#MergePairedFastqs">MergePairedFastqs</a><br>
+				
 					<a href="#MergePointData">MergePointData</a><br>
 				
 					<a href="#MergeRegions">MergeRegions</a><br>
@@ -270,6 +274,8 @@
 					<a href="#NovoalignParser">NovoalignParser</a><br>
 				
 					<a href="#NovoalignPairedParser">NovoalignPairedParser</a><br>
+				
+					<a href="#OncoKB2VCF">OncoKB2VCF</a><br>
 				
 					<a href="#OverdispersedRegionScanSeqs">OverdispersedRegionScanSeqs</a><br>
 				
@@ -793,7 +799,7 @@ Example: java -jar pathToUSeq/Apps/TNScopeVCFParser -v ToParse/ -n 0.5 -u 100
 </pre><br><p>
 				
 					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                           Annotated Vcf Parser  March 2023                       **
+**                          Annotated Vcf Parser  January 2025                      **
 **************************************************************************************
 Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
 VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
@@ -830,11 +836,15 @@ Options:
        delimited, no spaces. Defaults to all.
 -e Comma delimited list of CLINSIG terms to select against.
 -C CLINVAR file date for spreadsheet output.
+-O Comma delimited list of OncoKB ONCOGENIC terms to select for, 
+       e.g. Oncogenic,Likely_Oncogenic,Resistance
+-E Comma delimited list of OncoKB ONCOGENIC terms to select against, 
+       e.g. Likely_Neutral,Inconclusive,Unknown
 -R Remove variants containing a 'MULTIALLELIC' INFO key. Typically from vt decompose.
 -i Comma delimited list of VCF ID keys to select for. If the VCF ID contains one or
        more, the record is passed regardless of other filters. The match is not exact.
 -o Only require, if set or present, SnpEff ANN or CLINSIG or Splice to be true to pass.
-       Defaults to require that all set pass.
+       Defaults to require that all set pass. CLINVAR take priority over OncoKB.
 -T Txt file containing a list of transcripts to keep, one per line, to use in filtering
        the summary spreadsheet output.
 -r Verbose per record output.
@@ -844,7 +854,8 @@ Example: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/
         -d 74 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a
         HIGH,MODERATE -e Benign,Likely_benign -c Pathogenic,Likely_pathogenic,
         Conflicting_interpretations_of_pathogenicity -t 0.51 -u RYR1 -T 
-        ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3 -R 
+        ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3 -R -E Likely_Neutral 
+        -O Oncogenic,Likely_Oncogenic,Resistance 
 
 **************************************************************************************
 </pre><br><p>
@@ -878,33 +889,33 @@ Example: java -jar -Xmx2G ~/USeqApps/AvatarAssembler -p /Repository/PersonData/
 </pre><br><p>
 				
 					<a name="AvatarDataWrangler"><pre>**************************************************************************************
-**                           Avatar Data Wrangler : Feb 2024                        **
+**                           Avatar Data Wrangler : Sept 2024                       **
 **************************************************************************************
-Tool for assembling directories for TNRunner based on files provided by M2Gen via
-download from DNAnexus. Handles patient datasets from different exome capture
-platforms with multiple tumor and normal samples.
+Tool for assembling directories for TNRunner based on files provided by Aster and AWS.
+Handles patient datasets from different exome capture platforms with multiple tumor
+and normal samples.
 Each TNRunner Job will be named as AvatarID-NormalExomeID-TumorExomeID-TumorRNASeqID.
 When missing they will be labeled NA. Uses the SubjectMatchMaker to fetch or make
 molecular data patient ids shared with the other clinically processed datasets.
+Four files are written to the -r dir: downloadAsterFiles.sh, awsFilesToDownload.txt,
+moveAsterFiles.sh, makeSoftLinks.sh, and normalsToMerge.txt for additional processing.
 
 Required Parameters:
 -r Path to a folder containing the following resource files.  Each must end with the
      given extensions:
-        xxx_ClinicalMolLinkage_V4.csv - DNAnexus
-        xxx_WES_QC_Metrics.csv - DNAnexus
-        xxx_WesCramList.txt - DNAnexus
-        xxx_RNACramList.txt - DNAnexus
+        xxx_ClinicalMolLinkage_V4.csv - Aster
+        xxx_WES_QC_Metrics.csv - Aster
+        fastqFiles.txt - Aster
         xxx_AWSRepoList.txt - AWS
         (optional) xxx_PatientPHI.csv - RISR's PatientIdCoverter
--p Print an example script to pull these resource files.
+   See ~/TNRunner/Workflows/Auto/Avatar/ for scripts to pull these.
 -j Job dir to build out the patient dir structure.
 -t Directory to place temp files with PHI for Subject ID matching
 -s Directory containing the SubjectMatchMaker 'currentRegistry_' file
--d Path to save a bash script for downloading the sequence read data.
--a Path to where the Aster datasets will be downloaded.
+-a Path to where the primary seq datasets will be downloaded.
 
 Example: java -jar ~/USeqApps/AvatarDataWrangler -r Resources/ -j AJobs -t SMM_PHI
-   -s ~/PHI/SmmRegistry/ -d dxDownloadCmds.sh -a AsterDownloads
+   -s ~/PHI/SmmRegistry/ -d asterDownloadCmds.sh -a AsterDownloads
 
 **************************************************************************************
 </pre><br><p>
@@ -1473,7 +1484,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/CalculatePerCycleErrorRate
 </pre><br><p>
 				
 					<a name="CarisDataWrangler"><pre>**************************************************************************************
-**                             Caris Data Wrangler : Mar 2024                       **
+**                             Caris Data Wrangler : Oct 2024                       **
 **************************************************************************************
 The Caris Data Wrangler downloads complete patient datasets from an AWS bucket, parses
 the xml test file for patient info, fetches/makes coreIds using the SubjectMatchMaker
@@ -1491,8 +1502,9 @@ Options:
 -t Minimum hours old before downloading, defaults to 12
 -p Credentials profile, defaults to 'default'
 -d Delete S3 objects after successful download
+-f S3 file prefixes to ignore, comma delimited, no spaces
 
-Example: java -jar pathToUSeq/Apps/CarisDataWrangler -b s3://hci-caris/ 
+Example: java -jar pathToUSeq/Apps/CarisDataWrangler -b s3://hci-caris 
      -j ~/Scratch/Caris/CJobs/ -r ~/Scratch/Caris/XmlReports_PHI/ -c 
      ~/Scratch/SMM/Registry_PHI -s ~/Scratch/Caris/SMM_Tmp_PHI
 
@@ -1519,12 +1531,13 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/CarisVcfComparator -f TL-18-03CFD6.vcf
 </pre><br><p>
 				
 					<a name="CarisXmlVcfParser"><pre>**************************************************************************************
-**                            Caris Xml Vcf Parser: May 2024                        **
+**                            Caris Xml Vcf Parser: Nov 2024                        **
 **************************************************************************************
 This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml
 reported genomic alternations are annotated, bed files of copy number changes and gene
 fusions as well as a summary spreadsheet of the non NGS test results and report
-attributes. Use Vt to normalize the vcf output files. 
+attributes. Use Vt to normalize the vcf output files. Check the output against the
+evolving Caris Xml format.
 
 Options:
 -d Path to a directory containing paired xml and vcf files from Caris.
@@ -1541,27 +1554,29 @@ Options:
 -a Include all vcf records in output, defaults to just those with an xml match.
 -k Skip datasets that are missing either an xml or vcf report.
 
-Example: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReports/
+Example: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReportsDwld
      -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq25Dec2020_MergedStdChr.ucsc.gz
 
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="CBiBilling"><pre>**************************************************************************************
-**                               CBI Billing:    Jan 2024                           **
+					<a name="CBiBilling2"><pre>**************************************************************************************
+**                              CBI Billing2:   April 2024                          **
 **************************************************************************************
-Generates billing reports for the Cancer Bioinformatics Shared Resource.
+Generates billing reports for the Cancer Bioinformatics Shared Resource. Only groups
+with > $5 of hourly+ compute costs are billed.
 
 Required Parameters:
 -j Path to the exported cvs Jira 'Logged Time' report.
 -m Path to the masterAccountInfo.xlsx spreadsheet updated from the prior month.
 -a Path to the awsAccounts.xlsx spreadsheet.
 -w Path to a dir containing the hourly and cloud 'WAF Tracking Schedule' xlsx files.
--c If available, path to a dir with the cloud AWS Carahsoft xlsx expense reports.
--o Path to write the results.
+-c If available, path to a dir with the cloud AWS TDSynnex xlsx expense reports.
+-e If available, path to a miscellaneous compute usage expense xlsx spreadsheet.
+-o Path to write the Invoices.
 
 Example: java -Xmx256M -jar pathTo/USeq/Apps/CBiBilling -j jiraTime.cvs -m 
-   masterAccountInfo.xlsx -w WAFs/ -c Carahsoft/ -o Invoices
+   masterAccountInfo.xlsx -w WAFs/ -c TDSynnex/ -o Invoices
 **************************************************************************************
 </pre><br><p>
 				
@@ -1696,6 +1711,40 @@ Options:
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/ConcatinateFastas -n 2000 -d
     /zv8/MergedNA_Scaffolds -f /zv8/BadFastas/ -c chrNA_Scaffold 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="CopyAnalysisZScoreMinimizer"><pre>**************************************************************************************
+**                       Copy Analysis ZScore Minimizer: May 2024                   **
+**************************************************************************************
+Beta
+Takes a bed file of regions, counts the number of observations under each for the single tumor and panel of normals.Scales each normal in the PoN to 1000, then calculates a scalar for the tumor that minimizes the median z-score by scanning.Use this scalar in downstream apps to normalize the tumor when calling copy alterations.
+Options:
+-s Save directory, full path.
+-t Treatment replica PointData directories, full path, comma delimited, no spaces,
+       one per biological replica. Use the PointDataManipulator app to merge same
+       replica and technical replica datasets. Each directory should contain stranded
+       chromosome specific xxx_-/+_.bar.zip files. Alternatively, provide one
+       directory that contains multiple biological replical PointData directories.
+-c Control replica PointData directories, ditto. 
+-r Full path to 64bit R loaded with DESeq library, defaults to '/usr/bin/R' file, see
+       http://www-huber.embl.de/users/anders/DESeq/ . Type 'library(DESeq2)' in
+       an R terminal to see if it is installed.
+-p Peak shift, average distance between + and - strand peaks for chIP-Seq data, see
+       PeakShiftFinder or set it to 100bp. For RNA-Seq set it to 0. It will be used
+       to shift the PointData by 1/2 the peak shift.
+-w Window size, defaults to the peak shift. For chIP-Seq data, a good alternative 
+       is the peak shift plus the standard deviation, see the PeakShiftFinder app.
+       For RNA-Seq data, set this to 100-250.
+
+Advanced Options:
+-m Minimum number of reads in a window, defaults to 15
+-d Don't delete temp files
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/MultipleReplicaScanSeqs -t
+      /Data/PolIIRep1/,/Data/PolIIRep2/ -c /Data/Input1/,Data/Input2/ -s
+      /Data/PolIIResults/ -p 150 -w 250 -b 
 
 **************************************************************************************
 </pre><br><p>
@@ -1937,7 +1986,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/DefinedRegionRNAEditing -b hg19UTRs.b
 </pre><br><p>
 				
 					<a name="DefinedRegionScanSeqs"><pre>**************************************************************************************
-**                           Defined Region Scan Seqs: March 2011                   **
+**                           Defined Region Scan Seqs: Oct 2024                     **
 **************************************************************************************
 DRSS takes chromosome specific PointData xxx.bar.zip files and extracts scores under
 each region to calculate several statistics including a binomial p-value, Storey
@@ -1952,7 +2001,7 @@ intronic retention and novel transfrags/ exons.  If one provides splice junction
 files for treatment and control RNA-Seq data, see the NovoalignParser, splice
 junctions will be scored for differential expression. This is an additional
 calculation unrelated to the chi-square independance test. Lastly, if control
-data is not provided, simple region sums are calculated.
+data is not provided, simple region sums are calculated and R is unnecessary.
 
 Options:
 -s Save directory, full path.
@@ -2539,7 +2588,7 @@ Example: java -jar pathToUSeq/Apps/FreebayesVCFParser -v /VCFFiles/ -t 0.05 -n 0
 </pre><br><p>
 				
 					<a name="GatkCalledSegmentAnnotator"><pre>**************************************************************************************
-**                      Gatk Called Segment Annotator: April 2023                   **
+**                       Gatk Called Segment Annotator: Nov 2024                    **
 **************************************************************************************
 Annotates GATKs CallCopyRatioSegments output with denoised copy ratio and heterozygous
 allele frequency data from the tumor and matched normal samples. Enables filtering
@@ -2708,12 +2757,12 @@ VariantPathwayComparatorKeggMedicus app then run the USeq JointPathwayComparator
 calculate combine p-values for each.
 
 Required Parameters:
--i File containing all of the interrogated genes in the study, one per line.
--g File containing the selected genes of interest, ditto.
+-i File containing all of the interrogated genes in the study, one gene per line.
+-g File containing the selected genes of interest with their log2Rto, one per line,
+   tab delimited.
 -p File containing KEGG MEDICUS pathways to compare, each line represents one pathway,
-     tab delimited, the first cell is the unique pathway name (e.g.
-     'REFERENCE_ATR_SIGNALING'), the second the network id (e.g. N01451), and
-     subsequent cells, the associated gene symbols.
+     tab delimited: unique pathway name, network ID, and associated gene symbols (e.g.
+     REFERENCE_ATR_SIGNALING  N01451 ATR ATRIP CHEK1 HUS1 ...)
 -l  File containing KEGG network IDs, pathway links, and their descriptions (e.g.
     N01486 hsa04110+N01486 CellCycle), one network per row, tab delimited.
 -r File to save the txt results, should end with .xls
@@ -2879,7 +2928,7 @@ Example: java -jar pathToUSeq/Apps/JobCleaner -d -n 'Logs,RunScripts' -r CJobs/ 
 </pre><br><p>
 				
 					<a name="JointGenotypeVCFParser"><pre>**************************************************************************************
-**                       Joint Genotype VCF Parser: September 2021                  **
+**                         Joint Genotype VCF Parser: Jan 2025                      **
 **************************************************************************************
 Splits and filters GATK and Strelka joint genotyped multi sample vcf files. Use vt to
 decompose and normalize multi alts. See https://genome.sph.umich.edu/wiki/Vt. Replaces
@@ -2887,7 +2936,7 @@ the AF and DP INFO fields with the sample level values. Warning, some multi alts
 cannot be resolved following Vt decomposing and are assigned a value of 0.
 
 Required Params:
--v Path to vt decomposed GATK joint genotyped multi sample vcf file, gz/zip OK.
+-v Path to vt decomposed joint genotyped multi sample vcf file, gz/zip OK.
      ~/BioApps/vt decompose -s jointGenotyped.vcf.gz -o jointGenotyped.decomp.vcf.gz
 -s Path to a directory to save the split files.
 
@@ -2911,7 +2960,7 @@ Example: java -jar -Xmx2G pathToUSeq/Apps/HaplotypeVCFParser -d 20 -a 0.05 -g 30
 </pre><br><p>
 				
 					<a name="JointPathwayComparator"><pre>**************************************************************************************
-**                        Joint Pathway Comparator : June 2023                      **
+**                        Joint Pathway Comparator : June 2024                      **
 **************************************************************************************
 JPC parses the output of the GeneSet and Variant Pathway Comparators when run on the
 same pathway set, combines the pvalues using Fisher's method, and multiple test
@@ -2920,7 +2969,7 @@ corrects these using the Benjamini-Hochberg FDR method.
 Required Parameters:
 -g File containing the GeneSetPathwayComparator txt results.
 -v File containing the VariantPathwayComparator txt results.
--s File to save the spreadsheet results, should end with .txt
+-s File to save the spreadsheet results, should end with .txt or .xls
 
 Example: java -Xmx10G -jar pathTo/USeq/Apps/JointPathwayComparator -s 
    joint.kegg.txt -g gene.kegg.txt -v var.kegg.txt 
@@ -3275,6 +3324,22 @@ Default Options:
 
 Example: java -Xmx20G -jar pathToUSeq/Apps/MergePairedBamAlignments -f /Bams/ms.bam
      -p -s /Bams/MergedPairs/ms.mergedPairs.sam.gz -d 10000 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="MergePairedFastqs"><pre>**************************************************************************************
+**                             Merge Paired Fastqs: Sept 2024                       **
+**************************************************************************************
+Uses cat to combine multiple sets of paired fastq.gz files.
+
+Option:
+-f Directory containing the fastqs to cat
+-s Merged name separator, defaults to '-'
+-d Delete the starting fastqs after successfully merging. Will delete softlinks but
+      not the sources.
+
+Example: java -jar pathTo/USeq_xxx/Apps/MergePairedFastqs -f .
 
 **************************************************************************************
 </pre><br><p>
@@ -3831,6 +3896,26 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/NovoalignPairedParser -f /Novo/Run7
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="OncoKB2VCF"><pre>**************************************************************************************
+**                             OncoKB 2 VCF : January 2025                          **
+**************************************************************************************
+Converts OncoKB annotations from a maf file into vcf INFO fields and appends them to 
+the original vcf. The vcf ID column must contain unique values. Both files must be
+sorted identically.
+
+Required Params:
+-m MAF file annotated by the OncoKB MafAnnotator.py app (.gz/.zip OK)
+-v Original VCF file that was converted to maf and then annotated.
+-o (Optional) Output VCF file with OncoKB annotations, it should end in xxx.vcf.gz
+-a (Optional) Comma delimited list, no spaces, of OncoKB annotations to transfer.
+      Defaults to MUTATION_EFFECT,ONCOGENIC,HIGHEST_LEVEL
+
+Example: java -Xmx1G -jar pathTo/USeq/Apps/OncoKB2VCF -v avatarP7.vcf.gz
+       -m avatarP7.okb.maf.gz 
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="OverdispersedRegionScanSeqs"><pre>**************************************************************************************
 **                        Overdispersed Region Scan Seqs: May 2012                  **
 **************************************************************************************
@@ -3937,7 +4022,7 @@ Example: java -Xmx12G -jar pathTo/USeq/Apps/ParsePointDataContexts -c '..CG.' -s
 </pre><br><p>
 				
 					<a name="PMRSearch"><pre>**************************************************************************************
-**                       Patient Molecular Repo Search : August 2023                **
+**                       Patient Molecular Repo Search : Sept 2024                  **
 **************************************************************************************
 Interactive searching of the clinical and sample attribute information in the json/xml
 reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.
@@ -3948,7 +4033,7 @@ https://github.com/HuntsmanCancerInstitute/GQuery
 
 Options:
 -d  Directory to save the PHI redacted clinical xml and json reports.
--u  S3 URI containing the patient molecular repo, defaults to
+-x  S3 URI containing the patient molecular repo, defaults to
       s3://hcibioinfo-patient-molecular-repo/Patients/ 
 -p  AWS credential profile, defaults to 'default'
 -v  Verbose output.
@@ -4464,7 +4549,7 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/Sam2Fastq -a /SAM/unaligned.sam.gz -f
 </pre><br><p>
 				
 					<a name="Sam2USeq"><pre>**************************************************************************************
-**                                Sam 2 USeq : April 2019                           **
+**                                  Sam 2 USeq : Oct 2024                           **
 **************************************************************************************
 Generates per base read depth stair-step graph files for genome browser visualization.
 By default, values are scaled per million mapped reads with no score thresholding. Can
@@ -4489,6 +4574,7 @@ Default Options:
       thus given fractional count values at a given location. Requires that the IH
       tag was set.
 -g Set the scalar count to this value, defaults to the number of passing alignments.
+      Use samtools view to pull counts over defined regions.
 -b Path to a region bed file (tab delim: chr start stop ...) to use in calculating
       read coverage statistics.  Be sure these do not overlap! Run the MergeRegions app
       if in doubt.
@@ -4536,7 +4622,7 @@ Example: java -Xmx25G -jar pathToUSeq/Apps/SamAlignmentDepthMatcher -m normal.ba
 </pre><br><p>
 				
 					<a name="SamAlignmentExtractor"><pre>**************************************************************************************
-**                        Sam Alignment Extractor: March 2021                       **
+**                        Sam Alignment Extractor: Dec 2024                         **
 **************************************************************************************
 Splits an alignment file into those that pass or fail thresholds and intersects
 regions of interest. Calculates a variety of QC statistics.
@@ -4805,7 +4891,7 @@ Example: java -Xmx25G -jar pathToUSeq/Apps/SamSubsampler -x 240 -q 20 -a
 </pre><br><p>
 				
 					<a name="ScanSeqs"><pre>**************************************************************************************
-**                                  Scan Seqs: Jan 2024                             **
+**                                  Scan Seqs: Sept 2024                            **
 **************************************************************************************
 Takes unshifted stranded chromosome specific PointData and uses a sliding window to
 calculate several smoothed window statistics. These include a binomial p-value, a
@@ -5331,7 +5417,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 </pre><br><p>
 				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                 TNRunner2 : Aug 2023                             **
+**                                 TNRunner2 : Jan 2025                             **
 **************************************************************************************
 TNRunner2 is designed to execute several containerized workflows on tumor normal
 datasets via a slurm cluster.  Based on the availability of paired fastq datasets, 
@@ -5375,6 +5461,7 @@ Setup Options:
 -C Workflow docs for launching GATK somatic variant calling.
 -m Workflow docs for launching MSI status calling.
 -a Workflow docs for launching variant annotation.
+-o If -a provide an OncoKB configuration file, see the annotator.README.sh
 -b Workflow docs for launching sample concordance.
 -y Workflow docs for launching somatic copy analysis.
 -q Workflow docs for launching Illumina germline joint genotyping.
@@ -5409,7 +5496,7 @@ Setup Options:
       Bam/xxx_final.bam and QC/xxx_Pass.bed.gz dirs and files with indexes.
 
 Job Execution Options:
--d Delete and restart FAILED jobs.
+-d Do not restart FAILED jobs one time.
 -J Just set up jobs, don't launch them via sbatch.
 -x Maximum # jobs to run at any given time, defaults to 35.
 -z Do not nice jobs (--nice=10000), run at maximum primority.
@@ -5421,7 +5508,7 @@ Example: java -jar pathToUSeq/Apps/TNRunner -p PatientDirs -o ~/FoundationPatien
      -e ~/Hg38/DNAAlignQC/ -c ~/Hg38/SomaticCaller/ -a ~/Hg38/Annotator/ -b 
      ~/Hg38/BamConcordance/ -j ~/Hg38/JointGenotyping/ -t ~/Hg38/RNAAlignQC/
      -y ~/Hg38/CopyRatio/ -k /Hg38/CopyRatio/Bkg/ -s '-d 30 -r' -x 125 -l 
-     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l 
+     -v ~/Hg38/Tempus/TempusVcf -m ~/Hg38/Msi/ -f ~/Hg38/StarFusion/ -l -o oncoKB.txt
 
 **************************************************************************************
 </pre><br><p>
@@ -5650,9 +5737,8 @@ Required Parameters:
      is the subject ID, subsequent cells are the gene names.
 -b File containing cohort B gene sets, ditto.
 -p File containing KEGG MEDICUS pathways to compare, each line represents one pathway,
-     tab delimited, the first cell is the unique pathway name (e.g.
-     'REFERENCE_ATR_SIGNALING'), the second the network id (e.g. N01451), and
-     subsequent cells, the associated gene symbols.
+     tab delimited: unique pathway name, network ID, and associated gene symbols (e.g.
+     REFERENCE_ATR_SIGNALING  N01451 ATR ATRIP CHEK1 HUS1 ...)
 -l  File containing KEGG network IDs, pathway links, and their descriptions (e.g.
     N01486 hsa04110+N01486 CellCycle), one network per row, tab delimited.
 -r File to save the txt results, should end with .xls

@@ -1,4 +1,4 @@
-package edu.utah.seq.pathway;
+package edu.utah.kegg.pathway;
 
 import java.util.ArrayList;
 import java.util.Arrays;

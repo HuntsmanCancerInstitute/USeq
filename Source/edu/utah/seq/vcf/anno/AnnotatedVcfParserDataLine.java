@@ -48,6 +48,17 @@ public class AnnotatedVcfParserDataLine {
 	String clinAlleleId = null;
 	String clinvarFileDate = null;
 	
+	//OncoKB
+	boolean passesOncoKB = false;
+	boolean rejectedOncoKB = false;
+	/* ONCOGENIC	Oncogenic, Likely_Oncogenic, Likely_Neutral, Inconclusive, Unknown, Resistance 
+	* HIGHEST_LEVEL	LEVEL_1, LEVEL_2, LEVEL_3A, LEVEL_3B, LEVEL_4, LEVEL_R1, LEVEL_R2 -The highest level of evidence for therapeutic implications. Order: LEVEL_R1 > LEVEL_1 > LEVEL_2 > LEVEL_3A > LEVEL_3B > LEVEL_4 > LEVEL_R2
+	* MUTATION_EFFECT	Gain-of-function, Likely_Gain-of-function, Loss-of-function, Likely_Loss-of-function, Switch-of-function, Likely_Switch-of-function, Neutral, Likely_Neutral, Inconclusive, Unknown - The biological effect of a mutation/alteration on the protein function that gives rise to changes in the biological properties of cells expressing the mutant/altered protein compared to cells expressing the wildtype protein.
+	* */
+	String oncogenic = null;
+	String mutationEffect = null;
+	String highestLevel = null;
+	
 	//Splice
 	boolean passesSplice = false;
 	String spliceGeneName = null;
@@ -77,7 +88,7 @@ public class AnnotatedVcfParserDataLine {
 
 	public static final String headerSpreadSheet = "FileName\tIGVLink\tCHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tAlleleFreq\t"
 			+ "UniOb\tReadDepth\tPriorCallFreq\tBKZ\tBKAF\tPopFreq\tPassClinvar\tClinvarFileDate\tClinLink\tClinHGVS\tClinSig\t"
-			+ "ClinSigConf\tPassSpliceScan\tSpliceGene\tSpliceDiff";
+			+ "ClinSigConf\tPassOKB\tOKB-Oncogenic\tOKB-MutEff\tOKB-HighestLvl\tPassSpliceScan\tSpliceGene\tSpliceDiff";
 	
 	public void println(Gzipper sumarySpreadSheet, HashSet<String> transcriptsToKeep) throws IOException {
 		//calc varUniOb
@@ -130,6 +141,12 @@ public class AnnotatedVcfParserDataLine {
 		al.add(clinSigCLNHGVS);
 		al.add(clinSig);
 		al.add(clinSigConf);
+		
+		//CLINVAR
+		al.add(passesOncoKB+"");
+		al.add(oncogenic);
+		al.add(mutationEffect);
+		al.add(highestLevel);
 		
 		//Splice
 		al.add(passesSplice+"");
@@ -258,9 +275,6 @@ public class AnnotatedVcfParserDataLine {
 			"Gene\tANN impacted gene name\n"+
 			"TranscriptId\tANN impacted transcript\n"+
 			"TranscriptMatch\tWhether the transcript ID matches one in the transcript IDs in the filtering file.\n"+
-			
-			
-
 			"Annotation\tANN annotation\n"+
 			"Impact\tANN impact\n"+
 			"cDot\tANN HGVS.c\n"+

@@ -2159,6 +2159,22 @@ public class IO {
 		a.toArray(strings);
 		return strings;
 	}
+	/**Loads a file's lines into a String[], leaves blank lines, doesn't trim, gz/zip OK*/
+	public static String[] loadFileNoTrim(File file){
+		ArrayList<String> a = new ArrayList<String>();
+		try{
+			BufferedReader in = IO.fetchBufferedReader(file);
+			String line;
+			while ((line = in.readLine())!=null)a.add(line);
+			in.close();
+		}catch(Exception e){
+			System.out.println("Prob loadFileInto String[]");
+			e.printStackTrace();
+		}
+		String[] strings = new String[a.size()];
+		a.toArray(strings);
+		return strings;
+	}
 	
 	/**Loads a file's lines into a String, will save blank lines. gz/zip OK.*/
 	public static String loadFile(File file, String seperator, boolean trimLeadingTrailing){
@@ -2951,7 +2967,7 @@ public class IO {
 
 	public static void closeNoException(BufferedReader in) {
 		try {
-			in.close();
+			if (in != null) in.close();
 		} catch (IOException e) {
 		}
 	}

@@ -36,6 +36,7 @@ public class JointGenotypeVCFParser {
 	private int numRecords;
 	private boolean justFilterNoSplit = false;
 	private String gqSelector = "GQ";
+	private String dataSource = "Illumina-";
 	private String[] filterKeysToExclude = null;
 	
 	public static final Pattern AF = Pattern.compile("AF=[\\d\\.]+;");
@@ -47,13 +48,14 @@ public class JointGenotypeVCFParser {
 
 		processArgs(args);
 		
-		System.out.println("Thresholds:");
-		System.out.println(alleleFreq + "\tMinimum sample allele frequency based on AD");
-		System.out.println((int)readDepth + "\tMinimum sample read depth based on AD");
-		System.out.println((int)genotypeQuality + "\tMinimum sample genotype quality, "+gqSelector);
-		System.out.println((int)minAltCount + "\tMinimum sample alt allele count");
-		System.out.println(qual + "\tMinimum record QUAL value");
-		if (filterKeysToExclude != null) System.out.println(Misc.stringArrayToString(filterKeysToExclude, " ")+ "\tRecord FILTER keys to exclude");
+		IO.pl("Thresholds:");
+		IO.pl(alleleFreq + "\tMinimum sample allele frequency based on AD");
+		IO.pl((int)readDepth + "\tMinimum sample read depth based on AD");
+		IO.pl((int)genotypeQuality + "\tMinimum sample genotype quality, "+gqSelector);
+		IO.pl((int)minAltCount + "\tMinimum sample alt allele count");
+		IO.pl(qual + "\tMinimum record QUAL value");
+		IO.pl(dataSource+"\tData source");
+		if (filterKeysToExclude != null) IO.pl(Misc.stringArrayToString(filterKeysToExclude, " ")+ "\tRecord FILTER keys to exclude");
 
 		if (justFilterNoSplit) filter();
 		else parse();
@@ -112,7 +114,7 @@ public class JointGenotypeVCFParser {
 
 			//for each line in the file
 			while ((line = in.readLine()) != null){
-				if (debug) System.out.println("\n"+line);
+				if (debug) IO.pl("\n"+line);
 				numRecords++;
 				
 				//#CHROM POS ID REF ALT QUAL FILTER INFO FORMAT Sample1, Sample2.....
@@ -198,10 +200,11 @@ public class JointGenotypeVCFParser {
 			}
 			numPass = new int[numSamples];
 			numFail = new int[numSamples];
+			int idCounter = 0;
 
 			//for each line in the file
 			while ((line = in.readLine()) != null){
-				if (debug) System.out.println("\n"+line);
+				if (debug) IO.pl("\n"+line);
 				numRecords++;
 				
 				//#CHROM POS ID REF ALT QUAL FILTER INFO FORMAT Sample1, Sample2.....
@@ -236,6 +239,11 @@ public class JointGenotypeVCFParser {
 					}
 				}
 
+				//edit ID column
+				if (fields[2].length()==0 || fields[2].equals("."))fields[2]=dataSource+idCounter;
+				else fields[2]=fields[2]+";"+dataSource+idCounter;
+				idCounter++;
+				
 				String[] format = Misc.COLON.split(fields[8]);
 				//build partial line
 				StringBuilder sb = new StringBuilder();
@@ -286,16 +294,16 @@ public class JointGenotypeVCFParser {
 	}
 
 	private void printStats() {
-		System.out.println("\nRecord Parsing Statistics:");
-		System.out.println(numRecords+ "\tNumber records");
-		System.out.println(numFailingQual+ "\tNumber failing QUAL");
-		System.out.println(numFailingRefAlt+ "\tNumber failed REF ALTS with *");
-		System.out.println(numFailingFilter+ "\tNumber failing FILTER");
-		if (justFilterNoSplit) System.out.println(numFailingAllSamples+ "\tNumber failing all samples");
+		IO.pl("\nRecord Parsing Statistics:");
+		IO.pl(numRecords+ "\tNumber records");
+		IO.pl(numFailingQual+ "\tNumber failing QUAL");
+		IO.pl(numFailingRefAlt+ "\tNumber failed REF ALTS with *");
+		IO.pl(numFailingFilter+ "\tNumber failing FILTER");
+		if (justFilterNoSplit) IO.pl(numFailingAllSamples+ "\tNumber failing all samples");
 		else {
-			System.out.println("\nSample ParsingStatistics:\nPassing\tFailing\tSampleName");
+			IO.pl("\nSample ParsingStatistics:\nPassing\tFailing\tSampleName");
 			for (int i=0; i< sampleNames.length; i++){
-				System.out.println(numPass[i] + "\t"+ numFail[i] + "\t"+ sampleNames[i] );
+				IO.pl(numPass[i] + "\t"+ numFail[i] + "\t"+ sampleNames[i] );
 			}
 		}
 	}
@@ -334,7 +342,7 @@ public class JointGenotypeVCFParser {
 	/**Returns null if fails, otherwise the DP and AF.
 	 * @param infoAF */
 	private double[] checkSample(String[] ids, String sample) throws Exception {
-		if (debug) System.out.println("\t"+sample);
+		if (debug) IO.pl("\t"+sample);
 		
 		formatValues.clear();
 		String[] values = Misc.COLON.split(sample);
@@ -350,7 +358,7 @@ public class JointGenotypeVCFParser {
 		gt = gt.replace('|', '/');
 		//no values?
 		if (gt.equals("0/1") == false && gt.equals("1/1") == false  && gt.equals("1/0") == false) {
-			if (debug) System.out.println ("\t\tEmpty");
+			if (debug) IO.pl ("\t\tEmpty");
 			return null;
 		}
 		
@@ -358,13 +366,13 @@ public class JointGenotypeVCFParser {
 		if (genotypeQuality != 0){
 			String gqString = formatValues.get(gqSelector);
 			if (gqString == null || gqString.equals(".")) {
-				if (debug) System.out.println ("\t\tNo "+gqSelector);
+				if (debug) IO.pl ("\t\tNo "+gqSelector);
 				return null;
 			}
 			else {
 				double gq = Double.parseDouble(gqString);
 				if (gq < genotypeQuality) {
-					if (debug) System.out.println ("\t\tFailing "+gqSelector);
+					if (debug) IO.pl ("\t\tFailing "+gqSelector);
 					return null;
 				}
 			}
@@ -396,7 +404,7 @@ public class JointGenotypeVCFParser {
 		if (dp >= readDepth && af >= alleleFreq && altCounts >= minAltCount) return new double[]{dp, af};
 		
 		
-		if (debug) System.out.println ("\t\tFailing dp ("+dp+") or af ("+af+") or altCount ("+altCounts+")");
+		if (debug) IO.pl ("\t\tFailing dp ("+dp+") or af ("+af+") or altCount ("+altCounts+")");
 		return null;
 	}
 
@@ -440,18 +448,21 @@ public class JointGenotypeVCFParser {
 			}
 		}
 		
-		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
+		IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 
 		if (vcfFile == null || vcfFile.exists() == false) Misc.printErrAndExit("\nError: please enter a path to a vcf file to split and filter.\n");	
 		if (saveDirectory == null) Misc.printErrAndExit("\nCannot find your save directory?! "+saveDirectory);
 		saveDirectory.mkdirs();
 		
+		//set Illumina or GATK
+		if (gqSelector.equals("GQ")) dataSource = "GATK-";
+		
 	}	
 	
 	public static void printDocs(){
-		System.out.println("\n" +
+		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                       Joint Genotype VCF Parser: September 2021                  **\n" +
+				"**                         Joint Genotype VCF Parser: Jan 2025                      **\n" +
 				"**************************************************************************************\n" +
 				"Splits and filters GATK and Strelka joint genotyped multi sample vcf files. Use vt to\n"+
 				"decompose and normalize multi alts. See https://genome.sph.umich.edu/wiki/Vt. Replaces\n"+
@@ -459,7 +470,7 @@ public class JointGenotypeVCFParser {
 				"cannot be resolved following Vt decomposing and are assigned a value of 0.\n"+
 
 				"\nRequired Params:\n"+
-				"-v Path to vt decomposed GATK joint genotyped multi sample vcf file, gz/zip OK.\n"+
+				"-v Path to vt decomposed joint genotyped multi sample vcf file, gz/zip OK.\n"+
 				"     ~/BioApps/vt decompose -s jointGenotyped.vcf.gz -o jointGenotyped.decomp.vcf.gz\n" +
 				"-s Path to a directory to save the split files.\n"+
 				
