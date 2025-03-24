@@ -1316,6 +1316,15 @@ public class Num {
 		double s = -1.0 * fredScore/10.0;
 		return Math.pow(10, s);
 	}
+	
+	public static double[] antiNeg10log10(float[] fredScores) {
+		double[] anti = new double[fredScores.length];
+		for (int i=0; i< anti.length; i++) {
+			double s = -1.0 * fredScores[i]/10.0;
+			anti[i] = Math.pow(10, s);
+		}
+		return anti;
+	}
 
 	/**Converts an array float[] to unlogged values.*/
 	public static float[] antiLog(float[] loggedValues, int base){

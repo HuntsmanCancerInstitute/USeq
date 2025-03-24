@@ -15,7 +15,7 @@ import util.gen.Misc;
 public class KeggResourceExtractor {
 
 	//fields
-	private int minimumNumberGenes = 5;
+	private int minimumNumberGenes = 4;
 	private boolean requirePathways = true;
 	private File resultsDirectory = null;
 	private String networkListUrl = "https://rest.kegg.jp/list/network";
@@ -208,13 +208,12 @@ nt06023	Galactose degradation
 				"**************************************************************************************\n" +
 				"**                         Kegg Resource Extractor: Jan 2025                        **\n" +
 				"**************************************************************************************\n" +
-				"Pulls the latest list of Kegg Medicus Networks, their associated genes, and pathways.\n"+
-				"Writes out reference files for the USeq GeneSetPathwayComparatorKeggMedicus, \n"+
-				"VariantPathwayComparatorKeggMedicus, and JointPathwayComparator applications.\n"+
+				"Pulls the latest list of KEGG Networks, their associated genes, and pathways.\n"+
+				"Writes out reference files for the USeq KEGG pathway applications.\n"+
 
 				"\nOptions:\n"+
 				"-r Results directory to save the Kegg resource files.\n"+
-				"-m (Optional) Minimum # genes in network, defaults to 5.\n"+
+				"-m (Optional) Minimum # genes in network, defaults to 4.\n"+
 				"-p (Optional) Save networks lacking pathways, defaults to excluding.\n"+
 				
 				"\n"+

@@ -1,42 +1,34 @@
 package edu.utah.kegg.pathway;
+
 import java.io.*;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.*;
-import edu.utah.kegg.api.KeggApiGene;
 import edu.utah.kegg.api.KeggApiNetwork;
-import edu.utah.kegg.api.KeggApiPathway;
-import edu.utah.kegg.api.KeggGeneSymbolIdExtractor;
-import edu.utah.kegg.api.KeggResourceExtractor;
 import util.gen.*;
 
 public class KeggGeneAndVariantPathwayAnalyzer {
 
 	//user fields
+	private File keggNetworkDirectory;
+	private File keggIdsFile;
+	private File resultsDirectory = null;
 	private File interrogatedGeneList;
 	private File selectGeneList;
 	private File fullPathToR;
 	private File groupAGeneHits;
 	private File groupBGeneHits;
-	private boolean addOne = false;
-	private File tempDirectory = null;
-	
-	//internal
-	private double maximumFdr = 0.15;
-	private HashMap<String, ArrayList<String>> gs2ki = null;
-	private HashMap<String, ArrayList<String>> ki2gs = null;
-	private File keggNetworkDirectory;
-	private File keggIdsFile;
-	private File resultsDirectory = null;
 	private int minimumNumberGenes = 4;
 	private HashSet<String> networkTypesToExclude = null;
 	private String typesToExclude = null;
-	private HashMap<String, AnalyzedNetwork> networkIdAnalyzedNetwork = null;
-	private AnalyzedNetwork[] analyzedNetworks = null;
-	private TreeMap<String, Integer> missingGeneSymbols = new TreeMap<String, Integer>();
-	private TreeMap<String, Integer> foundGeneSymbols = new TreeMap<String, Integer>();
-	private HashSet<String> uniqueInterrogatedGenes = null;
-	private HashSet<SelectGene> uniqueSelectGenes = null;
+	private boolean addOne = false;
+	private File tempDirectory = null;
+	private double maximumFdr = 0.15;
 	
+	private KeggGenePathwayAnalyzer genes = null;
+	private KeggVariantPathwayAnalyzer variants = null;
+	private HashMap<String, ArrayList<String>> gs2ki = null;
 	
 	//constructor
 	public KeggGeneAndVariantPathwayAnalyzer(String[] args){
@@ -48,132 +40,61 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 		processArgs(args);
 		checkFiles();
 		
-		IO.pl("\nLoading KEGG HUGO gene symbol <-> id lookup tables...");
-		loadKeggIdLookupHashes();
-		
-		//parse network info
-		IO.pl("\nLoading and filtering KEGG Medicus networks...");
-		loadKeggApiNetworks();
-		
-		IO.pl("\nLoading group A gene hits...");
-		loadGroup(groupAGeneHits, true);
-		
-		IO.pl("\nLoading group B gene hits...");
-		loadGroup(groupBGeneHits, false);
-		
-		/*not sure if this is the right approach?
-		load analyzed networks
-		filter out non possibles
-		calc pvals, combine pvals, adj pvals
-		
-		Volcano network plot
-			Variant, 	y-access is FDR, x-axis is log2Rto
-			Gene,		y-access is FDR, x-axis is ? network activation score
-					
-		For every gene
-		For every network
-			For every gene
-				Effect 	on deletion				on network activity
-						on LoF inactivation
-						on truncation
-						on amplification
-						on promoter methylation
-		*/
-						
-						
-						
-				
-		IO.pl("\nLoading your interrogated gene symbols...");
-		//loadInterrogatedGenes();
+		IO.pl("\nLaunching gene and variant pathway analysis...");
+		runAnalysis();
+		gs2ki = genes.getGs2ki();
 
-		IO.pl("\nLoading your select genes...");
-		//loadSelectedGenes();
-		
-		
-		IO.pl("\nFilter network hits...");
-		filterNetworks();
-		
-		IO.pl("\nComparing pathway hits...");
-		comparePathways();
-		
-		IO.pl("\nSaving individual network results...");
-		saveNetworks();
-		
 		IO.pl("\nSaving combine pathway results...");
-		savePathways();
+		buildAndSaveGenePathways();
 
 		//finish and calc run time
 		double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
-		System.out.println("\nDone! "+Math.round(diffTime)+" seconds\n");
+		IO.pl("\nDone! "+Math.round(diffTime)+" seconds\n");
 		
 		} catch (Exception e) {
 			e.printStackTrace();
-			IO.el("ERROR running the KeggVariantPathwayAnalyzer!");
+			IO.el("ERROR running the KeggGeneAndVariantPathwayAnalyzer!");
+			System.exit(1);
 		}
 	}
 	
-	private void filterNetworks() {
-		HashMap<String, ArrayList<AnalyzedNetwork>> geneNameKeyNetwork = new HashMap<String, ArrayList<AnalyzedNetwork>>();
-
-
-		//first toss any with no hits
-		for (AnalyzedNetwork an: networkIdAnalyzedNetwork.values()) {
-			//any hits?
-			if (an.getGroupAHits().size() > 0 || an.getGroupBHits().size() > 0) {
-				TreeSet<String> found = an.getVarinatGeneNameHits();
-				String key = Misc.treeSetToString(found, ",");
-				ArrayList<AnalyzedNetwork> al = geneNameKeyNetwork.get(key);
-				if (al == null) {
-					al = new ArrayList<AnalyzedNetwork>();
-					geneNameKeyNetwork.put(key, al);
-				}
-				al.add(an);
-			}
-		}
-
-		//second merge networks with the same gene name hits, 
-		//several networks sets are variants of the same genes so don't want to score them separately if the gene hits are the same
-		analyzedNetworks = new AnalyzedNetwork[geneNameKeyNetwork.size()];
-		int index = 0;
-		for (String genes: geneNameKeyNetwork.keySet()) {
-			ArrayList<AnalyzedNetwork> al = geneNameKeyNetwork.get(genes);
-			//IO.pl("\t"+ al.size()+"\tNetworks with "+genes);
-			analyzedNetworks[index] = al.get(0);
-			//add in networks
-			ArrayList<KeggApiNetwork> n = analyzedNetworks[index].getVariantAnalizedNetworks(); 
-			for (AnalyzedNetwork an: al) n.add(an.getKeggApiNetwork());
-			index++;
-		}
-
-		IO.pl("\t"+analyzedNetworks.length+" networks with dataset hits from "+networkIdAnalyzedNetwork.size()+" total.");
+	private void buildAndSaveGenePathways() throws IOException {
+		CombinePathwayRoot cpr = new CombinePathwayRoot(genes.getAnalyzedNetworks(), variants.getAnalyzedNetworks());
+		cpr.makeCombinePathways(maximumFdr);
+		cpr.saveGeneAndVariantPathways(maximumFdr, gs2ki, resultsDirectory, minimumNumberGenes);
 	}
 
-	private void loadKeggApiNetworks() throws IOException {
-		KeggApiNetwork[] networks = KeggResourceExtractor.loadNetworks(keggNetworkDirectory);
-		networkIdAnalyzedNetwork = new HashMap<String, AnalyzedNetwork>(networks.length);
-		for (int i=0; i< networks.length; i++) {
-			//check type?
-			if (networkTypesToExclude != null) {
-				String type = networks[i].getNetworkType().toLowerCase();
-				if (networkTypesToExclude.contains(type)) continue; 
-			}
+	private void runAnalysis() throws IOException {
+		//create the objects
+		boolean verbose = false;
+		genes = new KeggGenePathwayAnalyzer(keggIdsFile, keggNetworkDirectory, fullPathToR, resultsDirectory, tempDirectory, interrogatedGeneList, 
+				selectGeneList, maximumFdr, minimumNumberGenes, typesToExclude, networkTypesToExclude, verbose);
 
-			//check minimum # genes
-			KeggApiGene[]  genes = networks[i].getGenes();
-			if (genes!=null && genes.length >= minimumNumberGenes) {
-				//networkIdAnalyzedNetwork.put(networks[i].getNetworkId(), new AnalyzedNetwork(networks[i], uniqueSelectGenes.size()));
-				networkIdAnalyzedNetwork.put(networks[i].getNetworkId(), new AnalyzedNetwork(networks[i], 0));
-			}
-		}
-		IO.pl("\t"+networkIdAnalyzedNetwork.size()+"\tNetworks loaded that pass minimum # genes ("+minimumNumberGenes+") and excluded types: "+typesToExclude);
+		variants = new KeggVariantPathwayAnalyzer(keggIdsFile, keggNetworkDirectory, resultsDirectory, groupAGeneHits, groupBGeneHits, minimumNumberGenes, 
+				maximumFdr, addOne, typesToExclude, networkTypesToExclude, verbose);
+		
+		//run the analysis in separate threads
+		ExecutorService executor = Executors.newFixedThreadPool(2);
+		executor.execute(variants);
+		executor.execute(genes);
+		executor.shutdown();
+
+		//spins here until the executer is terminated, e.g. all threads complete
+		while (!executor.isTerminated()) {}
+		
+		//write out logs
+		File geneLog = new File (resultsDirectory, "geneAnalysisLog.txt");
+		IO.writeArrayList(genes.getLog(), geneLog);
+		File variantLog = new File (resultsDirectory, "variantAnalysisLog.txt");
+		IO.writeArrayList(variants.getLog(), variantLog);
+		
+		//check both 
+		if (genes.isFailed() || variants.isFailed()) throw new IOException();
 	}
-	
-	private void loadKeggIdLookupHashes() throws IOException {
-		HashMap<String, ArrayList<String>>[] hashes = KeggGeneSymbolIdExtractor.loadGeneLookupHashes(keggIdsFile);
-		gs2ki = hashes[0];
-		ki2gs = hashes[1];
-	}
-	
+
+
+
+	/*	
 	private void savePathways() throws IOException {
 		//the idea here is to find all of the significant networks with a pathway
 		//	then for each pathway decorate it with all of the network genes colored, and highlight the networks
@@ -259,119 +180,109 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 		for (StringValueSort s: results) out.print(s.getCargo().toString());
 		out.close();
 	}
-
+	*/
 
 	private void saveNetworks() {
-		Arrays.sort(analyzedNetworks);
-		try {
-			PrintWriter out = new PrintWriter( new FileWriter(new File(resultsDirectory, "variantNetworksMinGen"+minimumNumberGenes+".xls")));
-			out.println("# Network Name(s)\tNetwork Desc Link\tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tBHits\tBNoHits\tFracBHits\tBGeneHits\tLog2(fracA/fracB)\tAllGeneHits\tPathwayMapLinksWithTopMapDescription...");
-			for (AnalyzedNetwork an: analyzedNetworks) out.print(an.toStringVariant(addOne, gs2ki));
-			out.close();
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
-	}
-
-	private void comparePathways() {
-		FisherExact fe = null;
-		float[] minLog10Pvals = new float[analyzedNetworks.length];
-		for (int i=0; i< analyzedNetworks.length; i++) { 
-			AnalyzedNetwork an = analyzedNetworks[i];
-			int numGroupAHits = an.getGroupAHits().size();
-			
-			int numGroupANoHits = an.getGroupANoHits().size();
-			
-			int numGroupBHits = an.getGroupBHits().size();
-			
-			int numGroupBNoHits = an.getGroupBNoHits().size();
-			
-			if (fe == null) fe = new FisherExact(numGroupAHits+ numGroupANoHits+ numGroupBHits+ numGroupBNoHits);
-			double pVal = fe.getTwoTailedP(numGroupAHits, numGroupANoHits, numGroupBHits, numGroupBNoHits);
-			an.setVariantPVal(pVal);
-			an.setSortValue(pVal);
-			minLog10Pvals[i] = (float)Num.minus10log10(pVal);
+		
+		//make a hash of analyzed networks
+		AnalyzedNetwork[] geneAnNet = genes.getAnalyzedNetworks();
+		AnalyzedNetwork[] variantAnNet = variants.getAnalyzedNetworks();
+		TreeMap<String, AnalyzedNetwork[]> netIdGenVarAnNet = new TreeMap<String, AnalyzedNetwork[]>();
+		
+		for (AnalyzedNetwork an: geneAnNet) {
+			ArrayList<KeggApiNetwork> networks = an.getAnalizedKeggApiNetworks();
+			for (KeggApiNetwork n: networks) {
+				AnalyzedNetwork[] geneVar = netIdGenVarAnNet.get(n.getNetworkId());
+				if (geneVar == null) {
+					geneVar = new AnalyzedNetwork[2];
+					netIdGenVarAnNet.put(n.getNetworkId(), geneVar);
+				}
+				geneVar[0]=an;
+			}
 		}
 		
-		//adjust the pvalues
-		float[] adjPVals = Num.benjaminiHochbergCorrectUnsorted(minLog10Pvals);
-		for (int i=0; i< analyzedNetworks.length; i++) {
-			AnalyzedNetwork an = analyzedNetworks[i];
-			double adjPval = Num.antiNeg10log10(adjPVals[i]);
-			if (adjPval>1.0) adjPval = 1.0;
-			an.setVariantAdjPVal(adjPval);
+		for (AnalyzedNetwork an: variantAnNet) {
+			ArrayList<KeggApiNetwork> networks = an.getAnalizedKeggApiNetworks();
+			for (KeggApiNetwork n: networks) {
+				AnalyzedNetwork[] geneVar = netIdGenVarAnNet.get(n.getNetworkId());
+				if (geneVar == null) {
+					geneVar = new AnalyzedNetwork[2];
+					netIdGenVarAnNet.put(n.getNetworkId(), geneVar);
+				}
+				geneVar[1]=an;
+			}
 		}
-	}
-	
-	//TODO: multithread, slow step
-	private void loadGroup(File groupGeneHits, boolean isGroupA) {
-		BufferedReader in;
-		try {
-			in = IO.fetchBufferedReader(groupGeneHits);
-			String line;
-			String[] cells;
-			while ((line=in.readLine())!=null) {
-				line = line.trim();
-				if (line.startsWith("#") || line.length() ==0) continue;
-				// 10DTM2THWO_IDTv1_A58476_A58475_SL430712	ABCC6	ADGRG1	APC	CREB1	DTD2	EFCAB1	EML6	FBXW7	KRAS	SLAIN1	TP53	TRPM3	ZFP36L2
-				//                  0                         1        2     3    4       5        6      7    ....
-				cells = Misc.TAB.split(line);
 		
-				//for each pathway network, count the number of gene hits
-				for (AnalyzedNetwork p: networkIdAnalyzedNetwork.values()) {
+		//combine the pvalues
+		CombinePValues cp = new CombinePValues();
+		double[] toCombine = new double[2];
+		ArrayList<Float> toCorrect = new ArrayList<Float>();
 
-					boolean hit = false;
-					HashMap<String, KeggApiGene> networkGenes = p.getKeggApiNetwork().getGeneNameKeggApiGene();
-					
-					//for each gene in the sample
-					for (int i=1; i< cells.length; i++) {
-						//is it a known to kegg?
-						if (lookupKeggGeneSymbol(cells[i]) == false) continue;
-						
-						if (networkGenes.containsKey(cells[i])) {
-							if(isGroupA) {
-								p.getGroupAHits().add(cells[0]);
-								Integer geneCount = p.getaGenes().get(cells[i]);
-								if (geneCount == null) p.getaGenes().put(cells[i], new Integer(1));
-								else p.getaGenes().put(cells[i], new Integer(geneCount+1));
-							}
-							else {
-								p.getGroupBHits().add(cells[0]);
-								Integer geneCount = p.getbGenes().get(cells[i]);
-								if (geneCount == null) p.getbGenes().put(cells[i], new Integer(1));
-								else p.getbGenes().put(cells[i], new Integer(geneCount+1));
-							}
-							hit = true;
-							break;
-						}
-					}
-					if (hit == false) {
-						if(isGroupA) p.getGroupANoHits().add(cells[0]);
-						else p.getGroupBNoHits().add(cells[0]);
-					}
+		for (String netId: netIdGenVarAnNet.keySet()) {
+			AnalyzedNetwork[] geneVar = netIdGenVarAnNet.get(netId);
+			if (geneVar[0]!=null && geneVar[1]!=null) {
+				toCombine[0] = geneVar[0].getPValue();
+				toCombine[1] = geneVar[1].getPValue(); 
+				//watch out with 1's can cause non convergence
+				double combinePVal = 1.0;
+				if (toCombine[0]!=1.0 && toCombine[1]!=1.0) combinePVal = cp.calculateCombinePValues(toCombine);
+				geneVar[0].setCombinePValue(combinePVal);
+				geneVar[1].setCombinePValue(combinePVal);
+				toCorrect.add(Num.minus10log10Float(combinePVal));
+			}
+		}
+		
+		//correct the pvals and add back
+		float[] f = Num.benjaminiHochbergCorrectUnsorted(Num.arrayListOfFloatToArray(toCorrect));
+		double[] fdrs = Num.antiNeg10log10(f);
+		
+		int counter = 0;
+		for (String netId: netIdGenVarAnNet.keySet()) {
+			AnalyzedNetwork[] geneVar = netIdGenVarAnNet.get(netId);
+			if (geneVar[0]!=null && geneVar[1]!=null) {
+				geneVar[0].setCombineFdr(fdrs[counter]);
+				geneVar[1].setCombineFdr(fdrs[counter]);
+				counter++;
+			}
+		}
+		
+		//print out a combine analysis for those hitting both
+		try {
+			PrintWriter out = new PrintWriter( new FileWriter(new File(resultsDirectory, "combineNetworksMinGen"+minimumNumberGenes+".xls")));
+			//genes
+			//name descLink pval, adjPval, #UniqueNetworkGenes, #FoundUniqueNetworkGenes, #DiffExpGenes, #GenesIntersect, GenesIntersect/PathGenes, IntersectingGenes
+			//out.println("# Gene Network Name(s)\tNetwork Desc Link\tPval\tAdj Pval\tAll Network Genes\tFound Network Genes\tSelect Genes\tIntersect\tInt/Net\tInt Gene Symbols\tInt Genes LgRtos\tPathway Map Links...");
+			//for (AnalyzedNetwork an: analyzedNetworks) out.print(an.toStringGene(gs2ki));
+			
+			//variants
+			//out.println("# Var Network Name(s)\tNetwork Desc Link\tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tBHits\tBNoHits\tFracBHits\tBGeneHits\tLog2(fracA/fracB)\tAllGeneHits\tPathwayMapLinksWithTopMapDescription...");
+			//for (AnalyzedNetwork an: analyzedNetworks) out.print(an.toStringVariant(addOne, gs2ki));
+			
+			out.println("# Network Name\tNetwork Desc Link\tCombine Pval\tCombine Adj Pval\tGene Pval\tGene Adj Pval\tGene #IntGenes/ #NetGenes\tInt Gene Symbols\tVariant Pval\tVariant AdjPval\tVariant Log2(fracA/fracB)\tVariant AllGeneHits\tPathway Map Links...");
+			
+			
+			for (String netId: netIdGenVarAnNet.keySet()) {
+				AnalyzedNetwork[] geneVar = netIdGenVarAnNet.get(netId);
+				if (geneVar[0]!=null && geneVar[1]!=null) {
+					out.println(netId+"\t"+geneVar[0].getCombinePValue()+"\t"+geneVar[0].getCombineFdr());
+					out.print(geneVar[0].toStringGeneCombo(netId, gs2ki));
+					out.print(geneVar[1].toStringVariantCombo(netId, geneVar[0], addOne, gs2ki));
+					out.println();
 				}
 			}
-			in.close();
+			
+			out.close();
+			IO.pl("Combo print complete");
 		} catch (IOException e) {
 			e.printStackTrace();
-			Misc.printErrAndExit("\nFailed to parse the gene hit file "+groupGeneHits);
 		}
+		
 	}
+	
 
-	private boolean lookupKeggGeneSymbol(String geneSymbol) {
-		if (gs2ki.containsKey(geneSymbol)) {
-			Integer counter = foundGeneSymbols.get(geneSymbol);
-			if (counter == null) foundGeneSymbols.put(geneSymbol, 1);
-			else foundGeneSymbols.put(geneSymbol, counter++);
-			return true;
-		}
-		else {
-			Integer counter = missingGeneSymbols.get(geneSymbol);
-			if (counter == null) missingGeneSymbols.put(geneSymbol, 1);
-			else missingGeneSymbols.put(geneSymbol, counter++);
-			return false;
-		}
-	}
+	
+
+
 
 	public static void main(String[] args) {
 		if (args.length ==0){
@@ -401,6 +312,9 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 					case 't': typesToExclude = args[++i]; break;
 					case 'x': maximumFdr = Double.parseDouble(args[++i]); break;
 					case 'o': addOne = true; break;
+					case 'i': interrogatedGeneList = new File(args[++i]); break;
+					case 'g': selectGeneList = new File(args[++i]); break;
+					case 'e': fullPathToR = new File(args[++i]); break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -412,6 +326,7 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 			}
 		}
 		
+		tempDirectory = new File(System.getProperty("java.io.tmpdir"));
 		if (resultsDirectory != null) resultsDirectory.mkdirs();
 
 		if (typesToExclude != null) {
@@ -423,8 +338,8 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 	
 	private void checkFiles() throws IOException {
 		IO.pl("Checking required files and directories...");
-		File[] toCheck = {keggIdsFile, keggNetworkDirectory, resultsDirectory, groupAGeneHits, groupBGeneHits};
-		String[] names = {"-k keggIdsLookupFile", "-n keggNetworkDir", "-r resultsDir", "-a groupAGeneHitsFile", "-b groupBGeneHitsFile"};
+		File[] toCheck = {keggIdsFile, keggNetworkDirectory, interrogatedGeneList, selectGeneList, fullPathToR, resultsDirectory, groupAGeneHits, groupBGeneHits};
+		String[] names = {"-k keggIdsLookupFile", "-n keggNetworkDir", "-i interrogatedGeneList", "-g selectGeneList", "-e fullPathToR", "-r resultsDir", "-a groupAGeneHitsFile", "-b groupBGeneHitsFile"};
 		boolean notFound = false;
 		for (int i=0; i< toCheck.length; i++) {
 			if (toCheck[i] == null || toCheck[i].exists()== false) {
@@ -438,38 +353,65 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                 Variant Pathway Comparator Kegg Medicus : June 2024              **\n" +
+				"**                 Kegg Gene and Variant Pathway Analyzer : March 2025              **\n" +
 				"**************************************************************************************\n" +
-				"For each KEGG MEDICUS pathway, VKPC creates a 2x2 contingency table and calculates a\n"+
-				"Fisher's exact p-value that is subsequently multiple test corrected using Benjamini-\n"+
-				"Hochberg's method. The contingency table is the number of subjects from cohort A with\n"+
-				"one or more matching gene names, the number from A without any gene matches, and\n"+
-				"likewise for the subjects in cohort B. A variety of statistics, including the\n"+
-				"matching gene frequency, degree and directionality of change, and html links to each\n"+
-				"network and pathway are saved in two spreadsheets. For TNRunner processed somatic\n"+
-				"variant files, use the USeq AnnotatedVcfParser to select high impact, loss of\n"+
-				"function/ CLINVAR patho/likely-pathogenic variants.\n"+
+				"Runs both the KeggGenePathwayAnalyzer and KeggVariantPathwayAnalyzer applications.\n"+
+				"Combines the results at the KEGG Pathway level, coloring each gene for interacive\n"+
+				"exploration in the KEGG Pathway Viewer (https://www.kegg.jp). Calculates\n"+
+				"a combine Pathway p-value (Fisher's method) and FDR (Benjamini-Hochberg) for Pathways\n"+
+				"with multiple significant Networks. Best to use this tool if you are comparing two\n"+
+				"large cohorts with both differential gene expression and somatic mutation datasets.\n"+
 				
-				"\nRequired Parameters:\n"+
+				"\nRelated Applications:\n\n"+
+				"KeggGeneSymbolIdExtractor - Uses the Kegg API to look up and parse Kegg Gene Ids that\n"+
+				"   match each of the provided HUGO Gene Symbols. Use this tool to generate the\n"+
+				"   required '-k KEGG gene Id HUGO gene symbol lookup file'.\n"+
+				"KeggResourceExtractor - Pulls the latest list of KEGG Networks, their associated\n"+
+				"   genes, and pathways. Use this to generate the required '-n KEGG network dir'.\n"+
+				"KeggGenePathwayAnalyzer - Differential gene expression KEGG Network and Pathway\n"+
+				"   analysis.\n"+
+				"KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and\n"+
+				"   Pathway analysis.\n"+
+				"AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.\n"+
+				"DESeq2, edgeR - R packages for selecting differentially expressed gene sets.\n"+
+				
+				"\nKEGG Gene Color Key:\n\n"+
+				"   Negative Diff Exp LgRto - Light Blue - #87CEEB\n"+
+				"   Positive Diff Exp LgRto - Light Red, Pink - #FFB6C1\n"+
+				"   Negative Mutation Freq LgRto - Light Violet - #D6B4FC\n"+
+				"   Positive Mutation Freq LgRto - Light Orange - #FFD580\n"+
+				"   Abs(Mut Freq) < 1.25x - Light Yellow - #FFFFAC\n"+
+		        "   Genes in red text are disease associated\n"+
+				
+				"\nApp Parameters:\n\n"+
+				"-i File containing all of the interrogated genes in your gene expression study, one\n"+
+				"     gene per line. Typically > 15K genes\n"+
+				"-g File containing the selected genes of interest with their log2Rto, one per line,\n"+
+				"     tab delimited, from your study, e.g. differentially expressed, typically <2K\n"+
+				"-e File path to the R executable\n\n"+
+				
 				"-a File containing cohort A gene sets, each line represents a subject's genes of\n"+
 				"     interest (e.g. those with HIGH impact mutations), tab delimited, the first cell\n"+
 				"     is the subject ID, subsequent cells are the gene names.\n"+
 				"-b File containing cohort B gene sets, ditto.\n"+
-				"-k KEGG gene Id HUGO gene symbol lookup file generated by running the USeq\n"+
-				"     KeggGeneSymbolIdExtractor.\n"+
-				"-n KEGG network directory created by running the USeq KeggResourceExtractor.\n"+
-				"-r Directory to save the spreadsheet results.\n"+
-				"-t Network TYPEs to exclude from testing, comma delimited no spaces.\n"+
-				"-m Minimum number of interrogated genes in a network for analysis, defaults to 5\n"+
-				"-x Maximum FDR for including networks into the Kegg Pathway spreadsheet, defaults\n"+
-				"     to 0.15\n"+
-				"-o Add one to zero count A or B fractions when calculating the log2Rto(fracA/fracB)\n"+
+				"-o (Optional) Add one to zero count A or B fractions when calculating the\n"+
+				"     log2Rto(fracA/fracB)\n\n"+
 				
-				"\nExample: java -Xmx10G -jar pathTo/USeq/Apps/VariantPathwayComparatorKegg -a \n"+
-				"   earlyCRC.txt -b lateCRC.txt -k keggIdLookup.txt -n KeggNetworks/ -o\n"+
-				"   -r VariantPathwayAnalyzerResults -t 'Pathogen,Ev factor' -x 0.1 \n"+
+				"-r Directory to save the spreadsheet results\n"+
+				"-k KEGG gene Id HUGO gene symbol lookup file, see above\n"+
+				"-n KEGG network directory, see above\n"+
+				"-t (Optional) Network TYPEs to exclude from testing, comma delimited no spaces.\n"+
+				"-m (Optional) Minimum number of interrogated genes in a network for analysis,\n"+
+				"     defaults to 4\n"+
+				"-x (Optional) Maximum FDR for including networks into the combine Kegg Pathway\n"+
+				"     spreadsheet, defaults to 0.15\n"+
+	
+				"\nExample:\n\n"+
+				"java -Xmx1G -jar pathTo/USeq/Apps/KeggGeneAndVariantPathwayAnalyzer\n"+
+				"   -i allTestedGenes.txt -g diffExpGenes.txt -a earlyCRC.txt -b lateCRC.txt \n"+
+				"   -k keggIdLookup.txt -n KeggNetworks/ -o -r CombinePathwayAnalyzerResults -t\n"+
+				"   'Pathogen,Ev factor'\n"+
 
 		"\n**************************************************************************************\n");
-
 	}
 }

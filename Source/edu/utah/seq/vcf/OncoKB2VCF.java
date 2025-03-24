@@ -29,6 +29,7 @@ public class OncoKB2VCF {
 	private LinkedHashMap<String, String> knownOkbNameDesc = new LinkedHashMap<String, String>();
 	private LinkedHashMap<String, Integer> okbNameIndexes = new LinkedHashMap<String, Integer>();
 	private LinkedHashSet<String> foundOkbNames = new LinkedHashSet<String>();
+	private HashMap<String, String[]> mafIdLine = new HashMap<String, String[]>();
 	private BufferedReader mafIn = null;
 	private int vcfIdIndex = -1;
 	private int annotatedIndex = -1;
@@ -91,37 +92,45 @@ public class OncoKB2VCF {
 		String[] vcfFields = null;
 		String[] mafFields = null;
 		Gzipper out = null;
+		int numMissing = 0;
 
 		try {
 			out = new Gzipper(bodyOkbVcfFile);
+			//for each vcfLine
 			while ((vcfLine = vcfIn.readLine())!= null) {
-				mafLine = mafIn.readLine();
 				
 				//#CHROM-0 POS-1 ID-2 REF-3 ALT-4 QUAL-5 FILTER-6 INFO-7	FORMAT	NORMAL	TUMOR
 				vcfFields = Misc.TAB.split(vcfLine);
-				mafFields = Misc.TAB.split(mafLine);
 				
 				//check IDs
 				String vcfId = vcfFields[2];
-				String mafId = mafFields[vcfIdIndex];
 				//not needed?
 				if (vcfIds.contains(vcfId)) throw new Exception("\nERROR, seeing duplicate VCF ID, these must be unique. "+vcfId);
 				vcfIds.add(vcfId);
-				if (vcfId.equals(mafId) == false) throw new Exception ("\nERROR, files are either not sorted the same or contain different records. "+vcfId+" doesn't equal "+mafId);
 				
-				//was it annotated
-				String annotated = mafFields[annotatedIndex];
-				if (annotated.equals("FALSE")) out.println(vcfLine);
-				else out.println(mergeInfo(vcfFields, mafFields));
+				mafFields = mafIdLine.get(vcfId);
+				
+				if (mafFields == null) {
+					IO.el("\tWARNING, failed to find the Vcf: "+vcfId+" in the maf? Skipping.");
+					numMissing++;
+					if (numMissing > 9) throw new Exception("\nToo many missing vcfIds in maf, aborting!");
+					out.println(vcfLine);
+				}
+				else {
+					//was it annotated
+					String annotated = mafFields[annotatedIndex];
+					if (annotated.equals("FALSE")) out.println(vcfLine);
+					else out.println(mergeInfo(vcfFields, mafFields));
+				}
 			}
 			if (vcfChromLine == null || vcfFileFormat == null) throw new Exception("Failed to parse one or both "+vcfFileFormat+" "+vcfChromLine);
+			
 		} catch (Exception e) {
 			e.printStackTrace();
 			bodyOkbVcfFile.delete();
-			Misc.printErrAndExit("\nProblem parsing vcf header for "+vcfFile);
+			Misc.printErrAndExit("\nJoining records.");
 		} finally {
 			IO.closeNoException(vcfIn);
-			IO.closeNoException(mafIn);
 			out.closeNoException();
 		}
 	}
@@ -157,9 +166,10 @@ public class OncoKB2VCF {
 	private void loadMafHeader () {
 		IO.pl("Loading the maf header...");
 		String line = null;
-
+		
 		try {
 			mafIn = IO.fetchBufferedReader(mafFile);
+			//load the header
 			while ((line = mafIn.readLine())!= null) {
 				if (line.startsWith("Hugo_Symbol")) {
 					String[] f = Misc.TAB.split(line);
@@ -172,6 +182,15 @@ public class OncoKB2VCF {
 				}
 			}
 			if (vcfIdIndex == -1 || annotatedIndex == -1) throw new Exception("Failed to parse the 'vcf_id' or 'ANNOTATED' from "+line);
+			
+			//load the data
+			while ((line = mafIn.readLine())!= null) {
+				String[] mafFields = Misc.TAB.split(line);
+				String mafId = mafFields[vcfIdIndex];
+				mafIdLine.put(mafId, mafFields);
+			}
+			
+			mafIn.close();
 		} catch (Exception e) {
 			IO.closeNoException(mafIn);
 			e.printStackTrace();
@@ -311,7 +330,7 @@ public class OncoKB2VCF {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                             OncoKB 2 VCF : January 2025                          **\n" +
+				"**                              OncoKB 2 VCF : March 2025                           **\n" +
 				"**************************************************************************************\n" +
 				"Converts OncoKB annotations from a maf file into vcf INFO fields and appends them to \n"+
 				"the original vcf. The vcf ID column must contain unique values. Both files must be\n"+

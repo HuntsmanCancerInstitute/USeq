@@ -23,7 +23,7 @@ public class TempusJson2Vcf {
 	private LinkedHashSet<String> keysToExport = null;
 	
 	//internal fields
-	private String[] acceptedSchema = {"1.3", "1.3.1", "1.3.2", "1.4", "1.4.2"};
+	private String[] acceptedSchema = {"1.3", "1.3.1", "1.3.2", "1.4", "1.4.2", "v2.0.0"};
 	private IndexedFastaSequenceFile fasta = null;
 	private String source = null;
 	private HashMap<String, Bed> cnvGeneNameBed = null;
@@ -264,6 +264,20 @@ public class TempusJson2Vcf {
 	    workingResults = null;
 	}
 
+	//need to pull vcfs to get coordinates
+	/*
+	025-02-27 09:27:30    3308508 TL-25-1CGRW7DEBN/DNA/TL-25-1CGRW7DEBN_20250227.germ.freebayes.vcf
+	2025-02-27 09:27:31         79 TL-25-1CGRW7DEBN/DNA/TL-25-1CGRW7DEBN_20250227.germ.freebayes.vcf.md5
+	2025-02-27 09:27:28      96070 TL-25-1CGRW7DEBN/DNA/TL-25-1CGRW7DEBN_20250227.germ.pindel.vcf
+	2025-02-27 09:27:15         76 TL-25-1CGRW7DEBN/DNA/TL-25-1CGRW7DEBN_20250227.germ.pindel.vcf.md5
+	2025-02-27 09:27:16      32556 TL-25-1CGRW7DEBN/DNA/TL-25-1CGRW7DEBN_20250227.soma.freebayes.vcf
+	2025-02-27 09:27:30         79 TL-25-1CGRW7DEBN/DNA/TL-25-1CGRW7DEBN_20250227.soma.freebayes.vcf.md5
+	2025-02-27 09:27:15       5422 TL-25-1CGRW7DEBN/DNA/TL-25-1CGRW7DEBN_20250227.soma.pindel.vcf
+	2025-02-27 09:27:29         76 TL-25-1CGRW7DEBN/DNA/TL-25-1CGRW7DEBN_20250227.soma.pindel.vcf.md5
+	
+	No longer any chrom pos info so need to pull vcfs.
+	*/
+	
 	private void writeVcf() {
 		
 		try {

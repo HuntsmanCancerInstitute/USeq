@@ -147,8 +147,8 @@ public class KeggApiNetwork {
 		}
 		return sb.toString();
 	}
-	public String getNetworkIdName() {
-		return networkId+" : "+networkName;
+	public String getNetworkIdName(String delimiter) {
+		return networkId+ delimiter +networkName;
 	}
 	public String getNetworkId() {
 		return networkId;
