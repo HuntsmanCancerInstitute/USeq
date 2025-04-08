@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.3.6.beta
+			<html><head><title>USeq Command Line Menus 9.3.7.beta
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -181,10 +181,6 @@
 				
 					<a href="#GeneiASEParser">GeneiASEParser</a><br>
 				
-					<a href="#GeneSetPathwayComparator">GeneSetPathwayComparator</a><br>
-				
-					<a href="#GeneSetPathwayComparatorKeggMedicus">GeneSetPathwayComparatorKeggMedicus</a><br>
-				
 					<a href="#Graph2Bed">Graph2Bed</a><br>
 				
 					<a href="#Gr2Bar">Gr2Bar</a><br>
@@ -201,7 +197,15 @@
 				
 					<a href="#JointGenotypeVCFParser">JointGenotypeVCFParser</a><br>
 				
-					<a href="#JointPathwayComparator">JointPathwayComparator</a><br>
+					<a href="#KeggGenePathwayAnalyzer">KeggGenePathwayAnalyzer</a><br>
+				
+					<a href="#KeggGeneAndVariantPathwayAnalyzer">KeggGeneAndVariantPathwayAnalyzer</a><br>
+				
+					<a href="#KeggVariantPathwayAnalyzer">KeggVariantPathwayAnalyzer</a><br>
+				
+					<a href="#KeggGeneSymbolIdExtractor">KeggGeneSymbolIdExtractor</a><br>
+				
+					<a href="#KeggResourceExtractor">KeggResourceExtractor</a><br>
 				
 					<a href="#KnownSpliceJunctionScanner">KnownSpliceJunctionScanner</a><br>
 				
@@ -390,10 +394,6 @@
 					<a href="#USeq2Text">USeq2Text</a><br>
 				
 					<a href="#VariantInfoAggregator">VariantInfoAggregator</a><br>
-				
-					<a href="#VariantPathwayComparator">VariantPathwayComparator</a><br>
-				
-					<a href="#VariantPathwayComparatorKeggMedicus">VariantPathwayComparatorKeggMedicus</a><br>
 				
 					<a href="#VarScanVCFParser">VarScanVCFParser</a><br>
 				
@@ -1571,12 +1571,13 @@ Required Parameters:
 -m Path to the masterAccountInfo.xlsx spreadsheet updated from the prior month.
 -a Path to the awsAccounts.xlsx spreadsheet.
 -w Path to a dir containing the hourly and cloud 'WAF Tracking Schedule' xlsx files.
--c If available, path to a dir with the cloud AWS TDSynnex xlsx expense reports.
+-c If available, path to a two column tab delimited txt file of AWS account numbers
+     and their expenses, e.g. '8525629597	91.06'
 -e If available, path to a miscellaneous compute usage expense xlsx spreadsheet.
 -o Path to write the Invoices.
 
 Example: java -Xmx256M -jar pathTo/USeq/Apps/CBiBilling -j jiraTime.cvs -m 
-   masterAccountInfo.xlsx -w WAFs/ -c TDSynnex/ -o Invoices
+   masterAccountInfo.xlsx -w WAFs/ -c fourPtsAws.txt -o Invoices
 **************************************************************************************
 </pre><br><p>
 				
@@ -2718,64 +2719,6 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/AllelicExpressionDetector -b Bam/RPEN
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="GeneSetPathwayComparator"><pre>**************************************************************************************
-**                       Gene Set Pathway Comparator : June 2023                    **
-**************************************************************************************
-GSPC uses the interrogatedGeneList to filter the selectGeneList and pathwayGenes sets,
-intersects the filtered selectGeneList against each filtered pathwayGene sets and
-calculates a p-value for the degree of intersection using a hypergeometric
-distribution. These are subsequently multiple test corrected using Benjamini-
-Hochberg FDR method.
-
-Required Parameters:
--i File containing all of the interrogated genes in the study, one gene symbol per
-     line.
--g File containing the selected genes of interest, ditto.
--p File containing pathways to compare, each line represents one pathway, tab
-     delimited, the first cell is the pathway ID and description (e.g.
-     'hsa05210  Colorectal cancer'), subsequent cells, the associated genes.
--s File to save the results spreadsheet, should end with .txt
--r File path to the R application.
--t Directory in which to save temporary files.
-
-Example: java -Xmx10G -jar pathTo/USeq/Apps/GeneSetPathwayComparator -i 
-   allGenes.txt -g diffExpGenes.txt -p keggPathways.txt -s earlyVsLate.xls -t Temp
-   -r /usr/bin/R 
-
-**************************************************************************************
-</pre><br><p>
-				
-					<a name="GeneSetPathwayComparatorKeggMedicus"><pre>**************************************************************************************
-**                       Gene Set Pathway Comparator : June 2023                    **
-**************************************************************************************
-GSPC uses the interrogatedGeneList to filter the selectGeneList and pathwayGenes sets,
-intersects the filtered selectGeneList against each filtered pathwayGene sets and
-calculates a p-value for the degree of intersection using a hypergeometric
-distribution. These are subsequently multiple test corrected using Benjamini-
-Hochberg FDR method. Use the same KEGG MEDICUS reference files as used by the USeq
-VariantPathwayComparatorKeggMedicus app then run the USeq JointPathwayComparator to
-calculate combine p-values for each.
-
-Required Parameters:
--i File containing all of the interrogated genes in the study, one gene per line.
--g File containing the selected genes of interest with their log2Rto, one per line,
-   tab delimited.
--p File containing KEGG MEDICUS pathways to compare, each line represents one pathway,
-     tab delimited: unique pathway name, network ID, and associated gene symbols (e.g.
-     REFERENCE_ATR_SIGNALING  N01451 ATR ATRIP CHEK1 HUS1 ...)
--l  File containing KEGG network IDs, pathway links, and their descriptions (e.g.
-    N01486 hsa04110+N01486 CellCycle), one network per row, tab delimited.
--r File to save the txt results, should end with .xls
--e File path to the R executable.
--t Directory in which to save temporary files.
-
-Example: java -Xmx10G -jar pathTo/USeq/Apps/GeneSetPathwayComparator -i allGenes.txt
-   -g diffExpGenes.txt -l keggLinks.txt -p keggPathways.txt -r earlyVsLateRnaSeq.xls
-   -t Temp -e /usr/bin/R 
-
-**************************************************************************************
-</pre><br><p>
-				
 					<a name="Graph2Bed"><pre>**************************************************************************************
 **                                 Graph 2 Bed: Feb 2011                            **
 **************************************************************************************
@@ -2959,20 +2902,220 @@ Example: java -jar -Xmx2G pathToUSeq/Apps/HaplotypeVCFParser -d 20 -a 0.05 -g 30
 **************************************************************************************
 </pre><br><p>
 				
-					<a name="JointPathwayComparator"><pre>**************************************************************************************
-**                        Joint Pathway Comparator : June 2024                      **
+					<a name="KeggGenePathwayAnalyzer"><pre>**************************************************************************************
+**                     Kegg Gene Pathway Analyzer : March 2025                      **
 **************************************************************************************
-JPC parses the output of the GeneSet and Variant Pathway Comparators when run on the
-same pathway set, combines the pvalues using Fisher's method, and multiple test
-corrects these using the Benjamini-Hochberg FDR method.
+KGPA uses your interrogated gene list to 1) filter your select gene list and the KEGG
+Network gene sets then 2) intersects these lists, 3) calculates hypergeometric 
+p-values, 4) controls for multiple testing (Benjamini-Hochberg FDR method), and
+5) outputs two Excel spreadsheets focused on each tested KEGG Network (sub pathways)
+and KEGG Pathway. Use the URL links in the spreadsheets to interactively explort the
+results in the KEGG Pathway Viewer (https://www.kegg.jp).
 
-Required Parameters:
--g File containing the GeneSetPathwayComparator txt results.
--v File containing the VariantPathwayComparator txt results.
--s File to save the spreadsheet results, should end with .txt or .xls
+Related Apps:
 
-Example: java -Xmx10G -jar pathTo/USeq/Apps/JointPathwayComparator -s 
-   joint.kegg.txt -g gene.kegg.txt -v var.kegg.txt 
+KeggGeneSymbolIdExtractor - Uses the Kegg API to look up and parse Kegg Gene Ids that
+   match each of the provided HUGO Gene Symbols. Use this tool to generate the
+   required '-k KEGG gene Id HUGO gene symbol lookup file'.
+KeggResourceExtractor - Pulls the latest list of KEGG Networks, their associated
+   genes, and pathways. Use this to generate the required '-n KEGG network dir'.
+KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and
+   Pathway analysis.
+KeggGeneAndVariantPathway Analyzer - Runs a joint gene expression and gene mutation
+   KEGG Network and Pathway analysis. Recommended if both available.
+DESeq2, edgeR - R packages for selecting differentially expressed gene sets.
+
+KEGG Viewer Gene Color Key:
+
+   Negative Diff Exp LgRto - Light Blue - #87CEEB
+   Positive Diff Exp LgRto - Light Red, Pink - #FFB6C1
+   Genes in red text are disease associated
+
+App Parameters:
+
+-i File containing all of the interrogated genes in your study, one gene per line.
+     Typically > 15K gene HUGO gene symbols.
+-g File containing the selected genes of interest with their log2Rto, one per line,
+     tab delimited, from your study, e.g. differentially expressed, typically <2K
+-e File path to the R executable
+
+-r Directory to save the spreadsheet results
+-k KEGG gene Id HUGO gene symbol lookup file, see above
+-n KEGG network directory, see above
+-t (Optional) Network TYPEs to exclude from testing, comma delimited no spaces.
+-m (Optional) Minimum number of interrogated genes in a network for analysis,
+     defaults to 4
+-x (Optional) Maximum FDR for including networks into the combine Kegg Pathway
+     spreadsheet, defaults to 0.15
+
+Example:
+
+java -Xmx1G -jar pathTo/USeq/Apps/KeggGenePathwayAnalyzer -i 
+   allTestedGenes.txt -g diffExpGenes.txt -k keggIdLookup.txt -n KeggNetworks/ 
+   -r GeneAnalyzerResults -t 'Pathogen,Ev factor' -m 5 -e /usr/bin/R
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="KeggGeneAndVariantPathwayAnalyzer"><pre>**************************************************************************************
+**                 Kegg Gene and Variant Pathway Analyzer : March 2025              **
+**************************************************************************************
+Runs both the KeggGenePathwayAnalyzer and KeggVariantPathwayAnalyzer applications.
+Combines the results at the KEGG Pathway level, coloring each gene for interacive
+exploration in the KEGG Pathway Viewer (https://www.kegg.jp). Calculates
+a combine Pathway p-value (Fisher's method) and FDR (Benjamini-Hochberg) for Pathways
+with multiple significant Networks. Best to use this tool if you are comparing two
+large cohorts with both differential gene expression and somatic mutation datasets.
+
+Related Applications:
+
+KeggGeneSymbolIdExtractor - Uses the Kegg API to look up and parse Kegg Gene Ids that
+   match each of the provided HUGO Gene Symbols. Use this tool to generate the
+   required '-k KEGG gene Id HUGO gene symbol lookup file'.
+KeggResourceExtractor - Pulls the latest list of KEGG Networks, their associated
+   genes, and pathways. Use this to generate the required '-n KEGG network dir'.
+KeggGenePathwayAnalyzer - Differential gene expression KEGG Network and Pathway
+   analysis.
+KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and
+   Pathway analysis.
+AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.
+DESeq2, edgeR - R packages for selecting differentially expressed gene sets.
+
+KEGG Gene Color Key:
+
+   Negative Diff Exp LgRto - Light Blue - #87CEEB
+   Positive Diff Exp LgRto - Light Red, Pink - #FFB6C1
+   Negative Mutation Freq LgRto - Light Violet - #D6B4FC
+   Positive Mutation Freq LgRto - Light Orange - #FFD580
+   Abs(Mut Freq) < 1.25x - Light Yellow - #FFFFAC
+   Genes in red text are disease associated
+
+App Parameters:
+
+-i File containing all of the interrogated genes in your gene expression study, one
+     gene per line. Typically > 15K genes
+-g File containing the selected genes of interest with their log2Rto, one per line,
+     tab delimited, from your study, e.g. differentially expressed, typically <2K
+-e File path to the R executable
+
+-a File containing cohort A gene sets, each line represents a subject's genes of
+     interest (e.g. those with HIGH impact mutations), tab delimited, the first cell
+     is the subject ID, subsequent cells are the gene names.
+-b File containing cohort B gene sets, ditto.
+-o (Optional) Add one to zero count A or B fractions when calculating the
+     log2Rto(fracA/fracB)
+
+-r Directory to save the spreadsheet results
+-k KEGG gene Id HUGO gene symbol lookup file, see above
+-n KEGG network directory, see above
+-t (Optional) Network TYPEs to exclude from testing, comma delimited no spaces.
+-m (Optional) Minimum number of interrogated genes in a network for analysis,
+     defaults to 4
+-x (Optional) Maximum FDR for including networks into the combine Kegg Pathway
+     spreadsheet, defaults to 0.15
+
+Example:
+
+java -Xmx1G -jar pathTo/USeq/Apps/KeggGeneAndVariantPathwayAnalyzer
+   -i allTestedGenes.txt -g diffExpGenes.txt -a earlyCRC.txt -b lateCRC.txt 
+   -k keggIdLookup.txt -n KeggNetworks/ -o -r CombinePathwayAnalyzerResults -t
+   'Pathogen,Ev factor'
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="KeggVariantPathwayAnalyzer"><pre>**************************************************************************************
+**                     Kegg Variant Pathway Analyzer : March 2025                   **
+**************************************************************************************
+For each KEGG network, this app creates a 2x2 contingency table and calculates a
+Fisher's exact p-value that is subsequently multiple test corrected using Benjamini-
+Hochberg's method. The contingency table is the number of subjects from cohort A with
+one or more matching gene names, the number from A without any gene matches, and
+likewise for the subjects in cohort B. A variety of statistics, including the
+matching gene frequency, degree and directionality of change, and html links to each
+network and pathway are saved in two spreadsheets. For TNRunner processed somatic
+variant files, use the USeq AnnotatedVcfParser to select high impact, loss of
+function/ CLINVAR patho/likely-pathogenic variants for each cohort.
+
+Related Applications:
+
+KeggGeneSymbolIdExtractor - Uses the Kegg API to look up and parse Kegg Gene Ids that
+   match each of the provided HUGO Gene Symbols. Use this tool to generate the
+   required '-k KEGG gene Id HUGO gene symbol lookup file'.
+KeggResourceExtractor - Pulls the latest list of KEGG Networks, their associated
+   genes, and pathways. Use this to generate the required '-n KEGG network dir'.
+KeggGenePathwayAnalyzer - Differential gene expression KEGG Network and Pathway
+   analysis.
+KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and
+   Pathway analysis.
+KeggGeneAndVariantPathway Analyzer - Runs a joint gene expression and gene mutation
+   KEGG Network and Pathway analysis. Recommended if both available.
+AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.
+
+KEGG Gene Color Key:
+
+   Negative Mutation Freq LgRto - Light Violet - #D6B4FC
+   Positive Mutation Freq LgRto - Light Orange - #FFD580
+   Abs(Mut Freq) < 1.25x - Light Yellow - #FFFFAC
+   Genes in red text are disease associated
+
+App Parameters:
+
+-a File containing cohort A gene sets, each line represents a subject's genes of
+     interest (e.g. those with HIGH impact mutations), tab delimited, the first cell
+     is the subject ID, subsequent cells are the gene names.
+-b File containing cohort B gene sets, ditto.
+-o (Optional) Add one to zero count A or B fractions when calculating the
+     log2Rto(fracA/fracB)
+
+-r Directory to save the spreadsheet results
+-k KEGG gene Id HUGO gene symbol lookup file, see above
+-n KEGG network directory, see above 
+-t (Optional) Network TYPEs to exclude from testing, comma delimited no spaces.
+-m (Optional) Minimum number of interrogated genes in a network for analysis,
+     defaults to 4
+-x (Optional) Maximum FDR for including networks into the combine Kegg Pathway
+     spreadsheet, defaults to 0.15
+
+Example:
+
+java -Xmx1G -jar pathTo/USeq/Apps/KeggVariantPathwayAnalyzer -a 
+   earlyCRC.txt -b lateCRC.txt -k keggIdLookup.txt -n KeggNetworks/ -o
+   -r VariantPathwayAnalyzerResults -t 'Pathogen,Ev factor'
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="KeggGeneSymbolIdExtractor"><pre>**************************************************************************************
+**                         Kegg Gene Symbol Id Extractor: Jan 2025                  **
+**************************************************************************************
+Uses the Kegg API to look up and then parse the Kegg Gene Id that most closely
+matches each of the provided HUGO Gene Symbols. Delete the xxx/Genes directory or 
+files within to load the most recent gene info. See https://rest.kegg.jp/find/genes/
+
+Options:
+-g File containing HUGO Gene Symbols to look up, one per line.
+-r Results directory to save the Kegg resource files.
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/KeggGeneSymbolIdExtractor -r KeggResources
+         -g interrogatedGeneSymbolNames.txt
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="KeggResourceExtractor"><pre>**************************************************************************************
+**                         Kegg Resource Extractor: Jan 2025                        **
+**************************************************************************************
+Pulls the latest list of KEGG Networks, their associated genes, and pathways.
+Writes out reference files for the USeq KEGG pathway applications.
+
+Options:
+-r Results directory to save the Kegg resource files.
+-m (Optional) Minimum # genes in network, defaults to 4.
+-p (Optional) Save networks lacking pathways, defaults to excluding.
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/KeggResourceExtractor -r KeggResources
+ 
 
 **************************************************************************************
 </pre><br><p>
@@ -3897,7 +4040,7 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/NovoalignPairedParser -f /Novo/Run7
 </pre><br><p>
 				
 					<a name="OncoKB2VCF"><pre>**************************************************************************************
-**                             OncoKB 2 VCF : January 2025                          **
+**                              OncoKB 2 VCF : March 2025                           **
 **************************************************************************************
 Converts OncoKB annotations from a maf file into vcf INFO fields and appends them to 
 the original vcf. The vcf ID column must contain unique values. Both files must be
@@ -5232,7 +5375,7 @@ Example: java -Xmx1500M -jar pathTo/USeq/Apps/SubSamplePointData -n 10000000 -f
 </pre><br><p>
 				
 					<a name="TempusDataWrangler"><pre>**************************************************************************************
-**                          Tempus Data Wrangler : August 2022                      **
+**                          Tempus Data Wrangler : March 2025                       **
 **************************************************************************************
 The Tempus Data Wrangler downloads complete patient datasets from an AWS bucket, parses
 the json test file for patient info, fetches/makes coreIds using the SubjectMatchMaker
@@ -5261,32 +5404,34 @@ Example: java -jar pathToUSeq/Apps/TempusDataWrangler -b s3://tm-huntsman/
 </pre><br><p>
 				
 					<a name="TempusJson2Vcf"><pre>**************************************************************************************
-**                             Tempus Json 2 Vcf: Sept 2022                         **
+**                            Tempus Json 2 Vcf: April 2025                         **
 **************************************************************************************
 Parses json Tempus reports to vcf. Leave in PHI to enable calculating age at
 diagnosis. Summary statistics calculated for all reports. Vcfs will contain a mix of 
 somatic and inherited snvs, indels, and cnvs. Be sure to vt normalize the exported
-vcfs, https://github.com/atks/vt . Works with schemas 1.3, 1.3.1, 1.3.2 
+vcfs, https://github.com/atks/vt . Works with schemas 1.3 thru 2.0, but not 3.3+ 
 
 Options:
 -j Path to Tempus json report or directory containing such, xxx.json(.gz/.zip OK)
+-v Path to a directory containing Tempus vcf files, xxx.vcf(.gz/.zip OK)
 -s Path to a directory for saving the results.
 -b Path to a bed file for converting CNV and fusion gene names to coordinates where the
      bed name column contains just the gene name.
 -f Path to the reference fasta with xxx.fai index. Required for gene conversions.
+-g Path to a gene alias file. Required for genomic coordiante conversions.
 -i Include PHI in spreadsheet output, defaults to excluding it.
 -a Print this list of attributes in spreadsheet, comma delimited, case sensitive, no
      spaces. Defaults to all. Run without to get a list of available attributes.
 
 Example: java -Xmx2G -jar pathToUSeq/Apps/TempusJson2Vcf -j /F1/TempusJsons
      -f /Ref/human_g1k_v37.fasta -s /F1/VCF/ -b /Ref/b37TempusGeneRegions.bed.gz
-     -a accessionId,sex,tumorMutationalBurden,msiStatus,diagnosis
+     -a accessionId,tumorMutationalBurden,msiStatus,diagnosis -g /Ref/geneAli.txt.gz
 
 **************************************************************************************
 </pre><br><p>
 				
 					<a name="TempusVcfComparator"><pre>**************************************************************************************
-**                           Tempus Vcf Comparator: Sept 2020                       **
+**                           Tempus Vcf Comparator: April 2025                      **
 **************************************************************************************
 TVC compares a Tempus vcf generated with the TempusJson2Vcf to a recalled vcf.
 Exact recall vars are so noted and removed. Tempus vcf with no exact but one
@@ -5417,7 +5562,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 </pre><br><p>
 				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                 TNRunner2 : Jan 2025                             **
+**                                TNRunner2 : March 2025                            **
 **************************************************************************************
 TNRunner2 is designed to execute several containerized workflows on tumor normal
 datasets via a slurm cluster.  Based on the availability of paired fastq datasets, 
@@ -5684,70 +5829,6 @@ Options:
 
 Example: java -jar -Xmx2G ~/USeqApps/VariantInfoAggregator -j AJobs/ -s 
     aggregatedVariantInfo.txt
-
-**************************************************************************************
-</pre><br><p>
-				
-					<a name="VariantPathwayComparator"><pre>**************************************************************************************
-**                           Variant Pathway Comparator : Nov 2023                  **
-**************************************************************************************
-For each pathway, VPC creates a 2x2 contingency table and calculates a Fisher's exact
-p-value that is subsequently multiple test corrected using Benjamini-Hochberg's
-method. The contingency table is the number of subjects from cohort A with one or more
-matching gene names, the number from A without any gene matches, and likewise for the
-subjects in cohort B. A variety of statistics, including the matching gene frequency,
-degree and directionality of change, and html links to each pathway are saved.
-
-Required Parameters:
--a File containing cohort A gene sets, each line represents a subject's genes of
-     interest (e.g. those with HIGH impact mutations), tab delimited, the first cell
-     is the subject ID, subsequent cells are the gene names.
--b File containing cohort B gene sets, ditto.
--p File containing pathways to compare, each line represents one pathway, tab
-     delimited, the first cell is the pathway ID and description (e.g.
-     'hsa05210  Colorectal cancer'), subsequent cells, the associated genes.
--r File to save results, should end with .xls
--k (Optional) Tab delimited file containing KEGG gene IDs and gene Names, one row
-      per gene, for highlighting impacted genes in each KEGG pathway hyperlink.
--m Minimum gene hit frequency for inclusion in KEGG hyperlink, defaults to 0.001
--l Add one to zero count A or B fractions when calculating the log2Rto(fracA/fracB)
-
-Example: java -Xmx10G -jar pathTo/USeq/Apps/VariantPathwayComparator -a earlyCRC.txt
-   -l -b lateCRC.txt -p keggPathways.txt -r earlyVsLateVPC.xls -k keggGeneIDName.txt
-
-**************************************************************************************
-</pre><br><p>
-				
-					<a name="VariantPathwayComparatorKeggMedicus"><pre>**************************************************************************************
-**                 Variant Pathway Comparator Kegg Medicus : June 2024              **
-**************************************************************************************
-For each KEGG MEDICUS pathway, VKPC creates a 2x2 contingency table and calculates a
-Fisher's exact p-value that is subsequently multiple test corrected using Benjamini-
-Hochberg's method. The contingency table is the number of subjects from cohort A with
-one or more matching gene names, the number from A without any gene matches, and
-likewise for the subjects in cohort B. A variety of statistics, including the
-matching gene frequency, degree and directionality of change, and html links to each
-pathway are saved. For TNRunner processed somatic variant files, use the USeq 
-AnnotatedVcfParser to select high impact, loss of function/ CLINVAR patho/likely-
-pathogenic variants.
-
-Required Parameters:
--a File containing cohort A gene sets, each line represents a subject's genes of
-     interest (e.g. those with HIGH impact mutations), tab delimited, the first cell
-     is the subject ID, subsequent cells are the gene names.
--b File containing cohort B gene sets, ditto.
--p File containing KEGG MEDICUS pathways to compare, each line represents one pathway,
-     tab delimited: unique pathway name, network ID, and associated gene symbols (e.g.
-     REFERENCE_ATR_SIGNALING  N01451 ATR ATRIP CHEK1 HUS1 ...)
--l  File containing KEGG network IDs, pathway links, and their descriptions (e.g.
-    N01486 hsa04110+N01486 CellCycle), one network per row, tab delimited.
--r File to save the txt results, should end with .xls
--m Minimum gene hit frequency for inclusion in output, defaults to 0.0005
--o Add one to zero count A or B fractions when calculating the log2Rto(fracA/fracB)
-
-Example: java -Xmx10G -jar pathTo/USeq/Apps/VariantPathwayComparatorKegg -a 
-   earlyCRC.txt -l keggLinks.txt -p keggPathways.txt -a eCRC.txt -b lCRC.txt -o
-   -r earlyVsLateVPCKM.xls 
 
 **************************************************************************************
 </pre><br><p>

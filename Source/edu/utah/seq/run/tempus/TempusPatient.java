@@ -5,6 +5,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -17,6 +19,7 @@ public class TempusPatient {
 	private ArrayList<TempusJsonParser> jsonDatasets = new ArrayList<TempusJsonParser>();
 	private ArrayList<String> dnaPaths = new ArrayList<String>();
 	private ArrayList<String> rnaPaths = new ArrayList<String>();
+	private ArrayList<String> vcfPaths = new ArrayList<String>();
 	private File testDir = null;
 	private File clinReportDir = null;
 	private boolean ready = true;
@@ -43,18 +46,20 @@ public class TempusPatient {
 		boolean oneJson = checkJson();
 		boolean oneDna = dnaPaths.size() == 1;
 		boolean oneRna = rnaPaths.size() == 1;
+		boolean someVcfs = vcfPaths.size() > 0;
 		//must have one json, and one dna fastq tar; rna is optional
-		if (oneJson == false || oneDna == false) ready = false;
+		if (oneJson == false || oneDna == false || someVcfs == false) ready = false;
 		else ready = true;
 		
 		//pull Json names
 		ArrayList<String> jsonFileNames = new ArrayList<String>();
 		for (TempusJsonParser tjp: jsonDatasets) jsonFileNames.add(tjp.getJsonFile().getName());
 		
-		IO.pl("\tJson\t"+oneJson+"\t"+ jsonFileNames);
-		IO.pl("\tDNA\t"+oneDna+"\t"+ dnaPaths);
-		IO.pl("\tRNA\t"+oneRna+"\t"+ rnaPaths);
-		IO.pl("\tOK\t"+ready);
+		//IO.pl("\tJson\t"+oneJson+"\t"+ jsonFileNames);
+		//IO.pl("\tDNA\t"+oneDna+"\t"+ dnaPaths);
+		//IO.pl("\tRNA\t"+oneRna+"\t"+ rnaPaths);
+		//IO.pl("\tVcfs\t"+someVcfs+"\t"+ vcfPaths);
+		//IO.pl("\tOK\t"+ready);
 	}
 
 	private boolean checkJson() {
@@ -87,6 +92,15 @@ public class TempusPatient {
 	}
 
 	public void downloadDatasets() throws Exception {
+		
+		//download vcfs
+		for (String vcf: vcfPaths) {
+			String name = vcf.substring(vcf.lastIndexOf("/")+1);
+			File v = new File(clinReportDir, name);
+			cdw.cp(vcf, v, false);
+		}
+		
+		//download and process fastqs
 		File fastqDir = new File (testDir, "Fastq");
 		fastqDir.mkdir();
 		
@@ -104,6 +118,7 @@ public class TempusPatient {
 		//move the fastq.gz files?
 		moveDNAFastq(tarDna.getParentFile(), fastqDir);
 		
+
 		
 		//any RNA?
 		if (rnaPaths.size() == 1) {
@@ -228,6 +243,15 @@ public class TempusPatient {
 
 	public ArrayList<TempusJsonParser> getJsonDatasets() {
 		return jsonDatasets;
+	}
+
+	public void addVcfLine(String[] tokens) {
+		// TODO Auto-generated method stub
+		
+	}
+
+	public ArrayList<String> getVcfPaths() {
+		return vcfPaths;
 	}
 
 }

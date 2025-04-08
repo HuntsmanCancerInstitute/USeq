@@ -41,9 +41,6 @@ public class TempusVcfComparator {
 	private ArrayList<SimpleVcf> vcfToPrint = new ArrayList<SimpleVcf>();
 	private ArrayList<String> headerLines = new ArrayList<String>();
 	
-	
-	
-
 	//constructors
 	public TempusVcfComparator(String[] args){
 		try {
@@ -100,9 +97,20 @@ public class TempusVcfComparator {
 			//fetch merged header
 			String[] header = mergeHeaders(headerLines);
 			
+			//must watch out for duplicate IDs due to normalization with VT splitting compound vars AA -> CG is split to A->C and A-G with the same id
+			HashSet<String> ids = new HashSet<String>();
+			int counter = 1;
 			for (String h: header) out.println(h);
 			for (SimpleVcf v: vcf) {
-				if (v.getFilter().toLowerCase().contains("fail") == false) out.println(v.getVcfLine());
+				if (v.getFilter().toLowerCase().contains("fail") == false) {
+					String id = v.getId();
+					if (ids.contains(id)) {
+						v.setId(id + ";merge_"+counter);
+						counter++;
+					}
+					else ids.add(id);
+					out.println(v.getVcfLine());
+				}
 			}
 			
 			out.close();
@@ -316,7 +324,7 @@ public class TempusVcfComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Tempus Vcf Comparator: Sept 2020                       **\n" +
+				"**                           Tempus Vcf Comparator: April 2025                      **\n" +
 				"**************************************************************************************\n" +
 				"TVC compares a Tempus vcf generated with the TempusJson2Vcf to a recalled vcf.\n"+
 				"Exact recall vars are so noted and removed. Tempus vcf with no exact but one\n"+

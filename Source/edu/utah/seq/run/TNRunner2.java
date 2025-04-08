@@ -944,7 +944,7 @@ public class TNRunner2 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TNRunner2 : Jan 2025                             **\n" +
+				"**                                TNRunner2 : March 2025                            **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner2 is designed to execute several containerized workflows on tumor normal\n"+
 				"datasets via a slurm cluster.  Based on the availability of paired fastq datasets, \n"+

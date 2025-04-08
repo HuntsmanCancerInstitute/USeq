@@ -16,7 +16,7 @@ public class CBiBilling2 {
 	private File wafDirectory; 
 	private File outputDirectory;
 	private File masterAcountInfo;
-	private File cloudReportsDirectory;
+	private File awsAccountExpenses;
 	private File awsAccountsFile;
 	private File expenseFile;
 	private boolean debug = false;
@@ -64,7 +64,7 @@ public class CBiBilling2 {
 		parseWafs();
 		
 		//any AWS cloud compute stuff to parse
-		if (cloudReportsDirectory != null) {
+		if (awsAccountExpenses != null) {
 			parseAwsAccounts();
 			parseAWSCloudAccountInvoices();
 		}
@@ -310,8 +310,37 @@ public class CBiBilling2 {
 		return indexesToReturn;
 	}
 
-
 	private void parseAWSCloudAccountInvoices() throws IOException {
+		IO.pl("\nParsing AWS monthly account expenses...");
+		
+		//pull know account numbers
+		TreeMap<String, String> accountNumberGroupName = awsXlsxAccountParser.getAwsAccountGroupName();
+		
+
+		//for each billing group charged, add to it their AWS expenses
+		ArrayList<String> missingNames = new ArrayList<String>();
+		//tDSynnexXlsxParser = new TDSynnexXlsxParser(awsAccountExpenses, debug);
+		AwsAccountBilling aab = new AwsAccountBilling(awsAccountExpenses);
+		
+		HashMap<String, Float> accountNumberTotalExpense= aab.getAccountTotal();
+		for (String awsAccountNumber: accountNumberTotalExpense.keySet()) {
+			//find the billing group name 
+			String billingGroupName = accountNumberGroupName.get(awsAccountNumber);
+			if (billingGroupName == null) missingNames.add(awsAccountNumber);
+			
+			else {
+				BillingGroup bg = aliasesBillingGroups.get(billingGroupName);
+				bg.getAwsAccountExpenses().add(new AwsAccountExpense(awsAccountNumber, accountNumberTotalExpense.get(awsAccountNumber)));
+			}
+		}
+		if (missingNames.size()!=0) {
+			IO.el("The following group names from the AWS monthly billing expenses are missing from the AWS Account Xlsx info sheet, add them and restart:");
+			for (String gn: missingNames) IO.el("\t"+gn);
+			System.exit(1);
+		}
+	}
+
+	private void parseAWSCloudAccountInvoicesOld() throws IOException {
 		IO.pl("\nParsing TDSynnex AWS account invoices...");
 		
 		TreeMap<String, String> accountNumberGroupName = awsXlsxAccountParser.getAwsAccountGroupName();
@@ -319,7 +348,7 @@ public class CBiBilling2 {
 
 		//for each billing group charged, add to it their AWS expenses
 		ArrayList<String> missingNames = new ArrayList<String>();
-		tDSynnexXlsxParser = new TDSynnexXlsxParser(cloudReportsDirectory, debug);
+		tDSynnexXlsxParser = new TDSynnexXlsxParser(awsAccountExpenses, debug);
 		TreeMap<String, Float> accountNumberTotalExpense= tDSynnexXlsxParser.getAwsAccountNumberTotals();
 		for (String awsAccountNumber: accountNumberTotalExpense.keySet()) {
 			//find the billing group name 
@@ -405,7 +434,7 @@ public class CBiBilling2 {
 					case 'w': wafDirectory = new File (args[i+1]); i++; break;
 					case 'o': outputDirectory = new File (args[i+1]); i++; break;
 					case 'm': masterAcountInfo = new File (args[i+1]); i++; break;
-					case 'c': cloudReportsDirectory = new File (args[i+1]); i++; break;
+					case 'c': awsAccountExpenses = new File (args[i+1]); i++; break;
 					case 'a': awsAccountsFile = new File (args[i+1]); i++; break;
 					case 'e': expenseFile = new File (args[i+1]); i++; break;
 					case 'v': debug = true; break;
@@ -439,12 +468,13 @@ public class CBiBilling2 {
 				"-m Path to the masterAccountInfo.xlsx spreadsheet updated from the prior month.\n"+
 				"-a Path to the awsAccounts.xlsx spreadsheet.\n"+
 				"-w Path to a dir containing the hourly and cloud 'WAF Tracking Schedule' xlsx files.\n" +
-				"-c If available, path to a dir with the cloud AWS TDSynnex xlsx expense reports.\n"+
+				"-c If available, path to a two column tab delimited txt file of AWS account numbers\n"+
+				"     and their expenses, e.g. '8525629597	91.06'\n"+
 				"-e If available, path to a miscellaneous compute usage expense xlsx spreadsheet.\n"+
 				"-o Path to write the Invoices.\n"+
 
 				"\nExample: java -Xmx256M -jar pathTo/USeq/Apps/CBiBilling -j jiraTime.cvs -m \n"+
-				"   masterAccountInfo.xlsx -w WAFs/ -c TDSynnex/ -o Invoices\n" +
+				"   masterAccountInfo.xlsx -w WAFs/ -c fourPtsAws.txt -o Invoices\n" +
 
 
 		"**************************************************************************************\n");		

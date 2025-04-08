@@ -1,4 +1,4 @@
-package edu.utah.seq.vcf.json;
+package edu.utah.seq.vcf.json.tempusv3;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -15,35 +15,31 @@ import util.gen.Json;
 import util.gen.Misc;
 import util.gen.Num;
 
-public class TempusVariant{
+public class TempusV3Variant{
 	
-	//This is a composite of all of the variant fields in the 80 json reports we've received. Many of these fields will remain null
-	private String variantSource = null;
+	//This is a composite of all of the variant fields in the 10 v3.30 json reports we've received. Still missing fusion info.
+	//New
+	private String variantType = null; //snvIndels, cnvs
+	private String variantSource  = null; //potentiallyActionable, biologicallyRelevant, likelyPathogenic, riskAllele, unknownSignificance
+	private String allelicFraction = null;
+	private String cVar = null;
+	private String pVar = null;
 	private String gene = null;
-	private String transcript = null;
-	private String mutationEffect = null;
-	private String cHGVS = null;
-	private String pHGVS = null;
-	private String pFullHGVS = null;
-	private String referenceGenome = null;
-	private String variantType = null;
-	private String variantDescription = null;
-	private String nucleotideAlteration = null;
+	private String fusedGene = null;
+	private String gene3 = null;
+	private String gene5 = null;
+	private String geneDescription = null;
+	private String genomicSourceClass = null; //somatic, genomic variant,
+	private String transcriptId = null;
+	private String variantDescription = null; //Copy number gain, Copy number loss, Frameshift
+
+	//Old
 	private String chromosome = null;
 	private String pos = null;
 	private String ref = null;
 	private String alt = null;
-	private String allelicFraction = null;
-	private String coverage = null;
-	private String copyNumber = null;
-	private String clinicalSignificance = null;
-	private String disease = null;
-	private String structuralVariant = null;
-	private String fusionType = null;
-	private String gene3 = null;
-	private String gene5 = null;
-	private String geneDescription = null;
-	private TempusJson2Vcf tempusJson2Vcf = null;
+	
+	private TempusV3Json2Vcf tempusJson2Vcf = null;
 	private String accessionId = null;
 	
 	//for CNV
@@ -53,65 +49,22 @@ public class TempusVariant{
 		
 	/**Object to represent a Tempus variant, SNV/ INDEL/ CNV/ Fusion
 	 * @throws IOException */
-	public TempusVariant(String variantSource, String geneName, JSONObject object, TempusJson2Vcf tempusJson2Vcf) throws JSONException, IOException {
+	public TempusV3Variant(String variantSource, String variantType, JSONObject object, TempusV3Json2Vcf tempusJson2Vcf) throws JSONException, IOException {
 		this.variantSource = variantSource;
 		this.tempusJson2Vcf = tempusJson2Vcf;
-		//attempt to parse gene, if null pull from constructor
-		gene = Json.forceGetString(object, "gene");
-		if (gene == null) gene = geneName;
-
-		mutationEffect = Json.forceGetString(object, "mutationEffect");
-		transcript = Json.forceGetString(object, "transcript");
-		cHGVS = Json.forceGetString(object, "HGVS.c");
-		if (cHGVS == null) cHGVS = Json.forceGetString(object, "HGVS_c");
-		pHGVS = Json.forceGetString(object, "HGVS.p");
-		pFullHGVS = Json.forceGetString(object, "HGVS.pFull");
-		referenceGenome = Json.forceGetString(object, "referenceGenome");
-
-		variantType = Json.forceGetString(object, "variantType");
-		variantDescription = Json.forceGetString(object, "variantDescription");
-
-		nucleotideAlteration = Json.forceGetString(object, "nucleotideAlteration");
-		chromosome = Json.forceGetString(object, "chromosome");
-		pos = Json.forceGetString(object, "pos");
-		ref = Json.forceGetString(object, "ref");
-		alt = Json.forceGetString(object, "alt");
-
+		this.variantType = variantType;
+		
 		allelicFraction = Json.forceGetString(object, "allelicFraction");
-		coverage = Json.forceGetString(object, "coverage");
-
-		copyNumber = Json.forceGetString(object, "copyNumber");
-
-		clinicalSignificance = Json.forceGetString(object, "clinicalSignificance");
-		disease = Json.forceGetString(object, "disease");
-
-		// structural vars are all over the place so lots of edge cases
-		structuralVariant = Json.forceGetString(object, "structuralVariant");
-		fusionType = Json.forceGetString(object, "fusionType");
+		cVar = Json.forceGetString(object, "cVar");
+		fusedGene  = Json.forceGetString(object, "fusedGene");
+		gene = Json.forceGetString(object, "gene");
 		gene3 = Json.forceGetString(object, "gene3");
 		gene5 = Json.forceGetString(object, "gene5");
-		if (gene3 != null && gene5 != null) variantType = "fusion";
-		
-		if (variantType == null && variantSource.toLowerCase().contains("fusion")) variantType = "fusion";
-		
 		geneDescription = Json.forceGetString(object, "geneDescription");
-		
-		//set coordinates from nucleotideAlteration?
-		if (nucleotideAlteration != null){
-			String[] t = Misc.COLON.split(nucleotideAlteration);
-			if (t.length == 4 ) {
-				chromosome = t[0];
-				pos = t[1];
-				ref = t[2];
-				alt = t[3];
-			}
-		}
-		
-		//watch out for inherited variants
-		if (variantType == null) {
-			if (cHGVS != null && transcript != null && gene != null) variantType = "SNV";
-			else throw new IOException("\nNull Variant Type\n"+this.toString());
-		}
+		genomicSourceClass  = Json.forceGetString(object, "genomicSourceClass");
+		pVar = Json.forceGetString(object, "pVar");
+		transcriptId  = Json.forceGetString(object, "transcriptId");
+		variantDescription = Json.forceGetString(object, "variantDescription");
 		
 		//increment counters
 		incrementCounters(tempusJson2Vcf);
@@ -120,7 +73,7 @@ public class TempusVariant{
 	
 
 	public boolean addGenomicCoordinateInfo(String[] vcfLinesFirst, String[] vcfLinesSecond) throws IOException {
-		if (gene == null || cHGVS == null || transcript == null) {
+		if (gene == null || cVar == null || transcriptId == null) {
 			Misc.printErrAndExit("\nMissing SNV Info for genomic coordinate parsing\n"+toString());
 		}
 		// Watch out for gene aliases, Tempus is switching these in the report from what is in the vcf annotations
@@ -137,7 +90,7 @@ public class TempusVariant{
 		for (int i=0; i< genePats.length; i++) genePats[i] = Pattern.compile(".*"+ geneAliases[i]+ ".*", Pattern.CASE_INSENSITIVE);
 		
 		// Watch out for + in the string
-		String cleanCDot = cHGVS.replace("+", "\\+");
+		String cleanCDot = cVar.replace("+", "\\+");
 		
 		// Major issues with the reported cHGVS
 		//Tempus is changing c.1442_1443delGCinsCT to c.1442_1443delinsCT in the reports from what is in the vcf annotations
@@ -155,42 +108,42 @@ public class TempusVariant{
 		//Why are all of the AF's in the vcfs 0.167 ?  Yet in the json reports they are something else. Again, is Tempus deliberated obscuring these data?
 		
 		Pattern cdotPat = Pattern.compile(".*"+ cleanCDot+ ".*");
-		Pattern tranPat = Pattern.compile(".*"+ transcript+ ".*");
+		Pattern tranPat = Pattern.compile(".*"+ transcriptId+ ".*");
 		
 		ArrayList<String> cDotTransMatches = new ArrayList<String>();
-		if (vcfLinesFirst != null) {
-			for (String line: vcfLinesFirst) {
-				if (cdotPat.matcher(line).matches() && tranPat.matcher(line).matches()) {
-					for (Pattern gene: genePats) {
-						if (gene.matcher(line).matches()) {
-							//#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	...
-							//   0       1   2   3   4
-							String[] f = Misc.TAB.split(line);
-							chromosome = f[0];
-							pos = f[1];
-							ref = f[3];
-							alt = f[4];
-							return true;
-						}
+		
+		for (String line: vcfLinesFirst) {
+			if (cdotPat.matcher(line).matches() && tranPat.matcher(line).matches()) {
+				cDotTransMatches.add(line);
+//IO.pl(line);
+				for (Pattern gene: genePats) {
+//IO.pl("\t"+gene);
+					if (gene.matcher(line).matches()) {
+						//#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	...
+						//   0       1   2   3   4
+						String[] f = Misc.TAB.split(line);
+						chromosome = f[0];
+						pos = f[1];
+						ref = f[3];
+						alt = f[4];
+						return true;
 					}
 				}
 			}
 		}
 
-		if (vcfLinesSecond != null) {
-			for (String line: vcfLinesSecond) {
-				if (cdotPat.matcher(line).matches() && tranPat.matcher(line).matches()) {
-					for (Pattern gene: genePats) {
-						if (gene.matcher(line).matches()) {
-							//#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	...
-							//   0       1   2   3   4
-							String[] f = Misc.TAB.split(line);
-							chromosome = f[0];
-							pos = f[1];
-							ref = f[3];
-							alt = f[4];
-							return true;
-						}
+		for (String line: vcfLinesSecond) {
+			if (cdotPat.matcher(line).matches() && tranPat.matcher(line).matches()) {
+				for (Pattern gene: genePats) {
+					if (gene.matcher(line).matches()) {
+						//#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	...
+						//   0       1   2   3   4
+						String[] f = Misc.TAB.split(line);
+						chromosome = f[0];
+						pos = f[1];
+						ref = f[3];
+						alt = f[4];
+						return true;
 					}
 				}
 			}
@@ -215,21 +168,20 @@ public class TempusVariant{
 	
 	public void setSnvVariantType() {
 		//check variant type, Tempus groups all short vars as SNV
-		if (variantType.equals("SNV") && ref!= null && alt!=null) {
+		if (variantType.equals("snvIndels") && ref!= null && alt!=null) {
 			if (ref.length()< alt.length()) variantType = "INS";
 			else if (ref.length()> alt.length()) variantType = "DEL";
 		}
 	}
 	
-	private void incrementCounters(TempusJson2Vcf t) {
+	private void incrementCounters(TempusV3Json2Vcf t) {
 		//these only get added if not null
-		TempusJson2Vcf.add(gene, t.genes);
-		TempusJson2Vcf.add(referenceGenome, t.referenceGenome);
-		TempusJson2Vcf.add(variantType, t.variantType);
-		TempusJson2Vcf.add(variantDescription, t.variantDescription);
+		TempusV3Json2Vcf.add(gene, t.genes);
+		TempusV3Json2Vcf.add(genomicSourceClass, t.genomicSourceClass);
+		TempusV3Json2Vcf.add(variantType, t.variantType);
+		TempusV3Json2Vcf.add(variantDescription, t.variantDescription);
 		//histograms
 		if (allelicFraction !=null) t.tumorAF.count(Double.parseDouble(allelicFraction));
-		if (coverage !=null) t.tumorDP.count(Double.parseDouble(coverage));
 	}
 	
 	/** Returns CHROM POS ID REF ALT QUAL FILTER INFO (EG FE ST PE DP AF)
@@ -262,10 +214,6 @@ public class TempusVariant{
 			sb.append(";FE=");
 			sb.append(variantDescription.replaceAll(" ", "_"));
 		}
-		if (coverage !=null) {
-			sb.append(";DP=");
-			sb.append(coverage);
-		}
 		if (allelicFraction !=null) {
 			double ap = Double.parseDouble(allelicFraction);
 			double af = ap/100.0;
@@ -275,10 +223,6 @@ public class TempusVariant{
 		//cnv?
 		if (end !=0) {
 			sb.append(";IMPRECISE;SVTYPE=CNV");
-			if (copyNumber != null) {
-				sb.append(";CN=");
-				sb.append(copyNumber);
-			}
 			sb.append(";END=");
 			sb.append(end);
 			sb.append(";SVLEN=");
@@ -347,26 +291,20 @@ public class TempusVariant{
 		if (accessionId!=null) sb.append("accessionId\t"+ accessionId+ "\n");
 		if (variantSource != null) sb.append("variantSource\t"+variantSource+ "\n");
 		if (gene != null) sb.append("gene\t"+gene+ "\n");
-		if (transcript != null) sb.append("transcript\t"+transcript+ "\n"); 
-		if (mutationEffect != null) sb.append("mutationEffect\t"+mutationEffect+ "\n"); 
-		if (cHGVS != null) sb.append("cHGVS\t"+cHGVS+ "\n"); 
-		if (pHGVS != null) sb.append("pHGVS\t"+pHGVS+ "\n"); 
-		if (pFullHGVS != null) sb.append("pFullHGVS\t"+pFullHGVS+ "\n"); 
-		if (referenceGenome != null) sb.append("referenceGenome\t"+referenceGenome+ "\n"); 
+		if (fusedGene != null) sb.append("fusedGene\t"+fusedGene+ "\n");
+		if (transcriptId != null) sb.append("transcriptId\t"+transcriptId+ "\n"); 
+		if (variantDescription != null) sb.append("variantDescription\t"+variantDescription+ "\n"); 
+		if (cVar != null) sb.append("cVar\t"+cVar+ "\n"); 
+		if (pVar != null) sb.append("pVar\t"+pVar+ "\n"); 
 		if (variantType != null) sb.append("variantType\t"+variantType+ "\n"); 
 		if (variantDescription != null) sb.append("variantDescription\t"+variantDescription+ "\n"); 
-		if (nucleotideAlteration != null) sb.append("nucleotideAlteration\t"+nucleotideAlteration+ "\n"); 
+		if (geneDescription != null) sb.append("geneDescription\t"+geneDescription+ "\n"); 
+		if (genomicSourceClass != null) sb.append("genomicSourceClass\t"+genomicSourceClass+ "\n"); 
 		if (chromosome != null) sb.append("chromosome\t"+chromosome+ "\n"); 
 		if (pos != null) sb.append("pos\t"+pos+ "\n"); 
 		if (ref != null) sb.append("ref\t"+ref+ "\n"); 
 		if (alt != null) sb.append("alt\t"+alt+ "\n"); 
 		if (allelicFraction != null) sb.append("allelicFraction\t"+allelicFraction+ "\n"); 
-		if (coverage != null) sb.append("coverage\t"+coverage+ "\n"); 
-		if (copyNumber != null) sb.append("copyNumber\t"+copyNumber+ "\n"); 
-		if (clinicalSignificance != null) sb.append("clinicalSignificance\t"+clinicalSignificance+ "\n"); 
-		if (disease != null) sb.append("disease\t"+disease+ "\n"); 
-		if (structuralVariant != null) sb.append("structuralVariant\t"+structuralVariant+ "\n"); 
-		if (fusionType != null) sb.append("fusionType\t"+fusionType+ "\n"); 
 		if (gene3 != null) sb.append("gene3\t"+gene3+ "\n"); 
 		if (gene5 != null) sb.append("gene5\t"+gene5+ "\n"); 
 		return sb.toString();
@@ -375,7 +313,7 @@ public class TempusVariant{
 	public void addCnvInfo(HashMap<String, Bed> cnvGeneNameBed, IndexedFastaSequenceFile fasta) throws IOException {
 		Bed b = cnvGeneNameBed.get(gene);
 		if (b == null) {
-			//ugg Tempus!
+			//ugg Tempus! better to just add these genes to the bed file
 			if (gene.equals("PD-L1")) b = cnvGeneNameBed.get("CD274");
 			else if (gene.equals("PD-L2")) b = cnvGeneNameBed.get("PDCD1LG2");
 			if (b == null) throw new IOException("Failed to find gene info in CNV lookup hash for "+ toString());
@@ -386,7 +324,7 @@ public class TempusVariant{
 		end = b.getStop();
 		alt = "<CNV>";
 		svLen = b.getLength();
-		if ((variantType!=null && variantType.contains("deletion")) || (variantDescription!=null && variantDescription.toLowerCase().contains("loss"))) {
+		if (variantType!=null && variantType.contains("loss")) {
 			svLen = -1*svLen;
 			variantDescription = "CNV_LOSS";
 		}
@@ -404,40 +342,12 @@ public class TempusVariant{
 		return gene;
 	}
 
-	public String getMutationEffect() {
-		return mutationEffect;
-	}
-
-	public String getTranscript() {
-		return transcript;
-	}
-
-	public String getcHGVS() {
-		return cHGVS;
-	}
-
-	public String getpHGVS() {
-		return pHGVS;
-	}
-
-	public String getpFullHGVS() {
-		return pFullHGVS;
-	}
-
-	public String getReferenceGenome() {
-		return referenceGenome;
-	}
-
 	public String getVariantType() {
 		return variantType;
 	}
 
 	public String getVariantDescription() {
 		return variantDescription;
-	}
-
-	public String getNucleotideAlteration() {
-		return nucleotideAlteration;
 	}
 
 	public String getChromosome() {
@@ -458,30 +368,6 @@ public class TempusVariant{
 
 	public String getAllelicFraction() {
 		return allelicFraction;
-	}
-
-	public String getCoverage() {
-		return coverage;
-	}
-
-	public String getCopyNumber() {
-		return copyNumber;
-	}
-
-	public String getClinicalSignificance() {
-		return clinicalSignificance;
-	}
-
-	public String getDisease() {
-		return disease;
-	}
-
-	public String getStructuralVariant() {
-		return structuralVariant;
-	}
-
-	public String getFusionType() {
-		return fusionType;
 	}
 
 	public String getGene3() {

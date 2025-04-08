@@ -52,6 +52,11 @@ public class TempusDataWrangler {
 	// 2018-11-16 13:47:22 5839004176 TL-18-41018B/RNA/FastQ/TL-18-41018B_-RNA-fastq.tar.gz
 	// 2018-11-16 14:08:20 4770633766 TL-18-C174D3/TL-18-C174D3/DNA/FastQ/TL-18-C174D3_TL-18-C174D3-DNA-fastq.tar.gz
 	private static final Pattern tarPattern = Pattern.compile(".+(TL-\\d\\d-.+)/.NA/.+tar.gz");
+	
+	// 2025-02-27 09:27:16      32556 TL-25-1CGRW7DEBN/DNA/TL-25-1CGRW7DEBN_20250227.soma.freebayes.vcf
+	// 2025-02-27 09:27:28      96070 TL-25-1CGRW7DEBN/DNA/TL-25-1CGRW7DEBN_20250227.germ.pindel.vcf
+	private static final Pattern vcfPattern = Pattern.compile(".+(TL-\\d\\d-.+)/.NA/.+vcf");
+	
 	// 2020-01-16 10:43:23      12520 result_json/result_69d44328-7c5e-4295-a6af-0da8097acc27.json
 	private static final Pattern jsonPattern = Pattern.compile(".+\\sresult_json/.+\\.json");
 	public static final SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
@@ -71,7 +76,7 @@ public class TempusDataWrangler {
 			
 			//pull bucket objects and load patient tar and json lines
 			loadPatientLines();
-			
+
 			//download the json test files and parse the test id as well as phi for the subject match maker
 			downloadJsonFiles();
 			
@@ -198,13 +203,13 @@ public class TempusDataWrangler {
 		
 		pl("\nChecking patient datasets...");
 		for (String testID : namePatient.keySet()) {
-			pl(testID);
 			TempusPatient cp = namePatient.get(testID);
 			cp.parseFileLines(minimumHrsOld);
 			if (cp.isReady()) workingPatients.add(cp);
 			else partialPatientTestIDs.add(testID);
 		}
-		pl(partialPatientTestIDs.size()+" partial test datasets and those with duplicate files: "+Misc.stringArrayListToString(partialPatientTestIDs, " "));
+		pl(workingPatients.size()+" ready for processing.");
+		pl(partialPatientTestIDs.size()+" not supported or missing files. ");
 	}
 
 
@@ -217,10 +222,10 @@ public class TempusDataWrangler {
 		for (String line: out) {
 			line = line.trim();
 			//tar.gz?
-			Matcher mat = tarPattern.matcher(line);
-			if (mat.matches()) {
+			Matcher matTar = tarPattern.matcher(line);
+			if (matTar.matches()) {
 				//pull the testID
-				String testID = mat.group(1);
+				String testID = matTar.group(1);
 
 				//2018-11-16 13:47:32 6877541013 TL-18-29F99A/TL-18-29F99A/DNA/FastQ/TL-18-29F99A_TL-18-29F99A-DNA-fastq.tar.gz
 				//    0          1         2                  3
@@ -245,17 +250,51 @@ public class TempusDataWrangler {
 				}
 			}
 			else {
-				//2020-01-16 10:43:23      12520 result_json/result_69d44328-7c5e-4295-a6af-0da8097acc27.json
-				mat = jsonPattern.matcher(line);
-				if (mat.matches()) {
-					String[] tokens = Misc.WHITESPACE.split(line);
-					if (tokens.length != 4) throw new IOException ("\nERROR: not seeing 4 parts of the .json line: "+line);
-					
-					//check the age
-					if (checkAge(tokens) == false) pl("\tToo new\t"+line);
-					else jsonFilePaths.add(tokens);
+				//vcf?
+				Matcher matvcf = vcfPattern.matcher(line);
+				if (matvcf.matches()) {
+					//soma or germ?
+					if (line.contains(".soma") || line.contains(".germ")) {
+						//pull the testID
+						String testID = matvcf.group(1);
+
+						//2018-11-16 13:47:32 6877541013 TL-25-1CGRW7DEBN/DNA/TL-25-1CGRW7DEBN_20250227.germ.pindel.vcf
+						//    0          1         2                  3
+						String[] tokens = Misc.WHITESPACE.split(line);
+						if (tokens.length != 4) throw new IOException ("\nERROR: not seeing 4 parts of the .vcf line: "+line);
+
+						//skip?
+						if (testID != null && testIds2Skip.contains(testID) == true) pl("\tIn skip file\t"+line);
+						//check the age
+						else if (checkAge(tokens) == false) pl("\tToo new\t"+line);
+						else {
+							//fetch or create the patient
+							if (testID != null) {
+								TempusPatient cp = namePatient.get(testID);
+								if (cp == null) {
+									cp = new TempusPatient(testID, this);
+									namePatient.put(testID, cp);
+								}
+								pl("\tAdding\t"+line);
+								cp.getVcfPaths().add(tokens[3]);
+							}
+						}
+					}
 				}
-				//else pl("\tSkipping\t"+line);
+				//json?
+				else {
+					//2020-01-16 10:43:23      12520 result_json/result_69d44328-7c5e-4295-a6af-0da8097acc27.json
+					matTar = jsonPattern.matcher(line);
+					if (matTar.matches()) {
+						String[] tokens = Misc.WHITESPACE.split(line);
+						if (tokens.length != 4) throw new IOException ("\nERROR: not seeing 4 parts of the .json line: "+line);
+						
+						//check the age
+						if (checkAge(tokens) == false) pl("\tToo new\t"+line);
+						else jsonFilePaths.add(tokens);
+					}
+					//else pl("\tSkipping\t"+line);
+				}
 			}
 		}
 	}
@@ -348,8 +387,8 @@ public class TempusDataWrangler {
 
 			//Only needed in Eclipse
 			//if (1==2) {
-				//envPropToAdd.put("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin");
-				//awsPath="/usr/local/bin/aws";
+			//	envPropToAdd.put("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin");
+			//	awsPath="/usr/local/bin/aws";
 			//}
 			
 	}
@@ -357,7 +396,7 @@ public class TempusDataWrangler {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                          Tempus Data Wrangler : August 2022                      **\n" +
+				"**                          Tempus Data Wrangler : March 2025                       **\n" +
 				"**************************************************************************************\n" +
 				"The Tempus Data Wrangler downloads complete patient datasets from an AWS bucket, parses\n"+
 				"the json test file for patient info, fetches/makes coreIds using the SubjectMatchMaker\n"+

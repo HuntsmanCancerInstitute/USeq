@@ -110,7 +110,7 @@ public class TNSample2 {
 	}
 
 
-	private void parseMergeClinicalVars() throws IOException {
+	private void parseMergeClinicalVarsOldDelme() throws IOException {
 		info.add("Checking clinical variant integration...");
 
 		//look for json file and xml vcfs
@@ -122,6 +122,7 @@ public class TNSample2 {
 		//more than one json file? exclude anything with RS.v
 		if (jsonTestResults.length>1)  jsonTestResults = filterJsonReports(jsonTestResults);
 
+		//Caris test
 		if (jsonTestResults == null || jsonTestResults.length !=1) {
 
 			//look for caris xml and vcf.gz
@@ -136,7 +137,11 @@ public class TNSample2 {
 			jsonTestResults = null;
 			toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), xmls[0], vcfs[0]};
 		}
-		else toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), jsonTestResults[0]};
+		
+		//Tempus
+		else {
+			toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), jsonTestResults[0]};
+		}
 
 		//make dir, ok if it already exists
 		File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_ClinicalVars");
@@ -162,6 +167,71 @@ public class TNSample2 {
 		}
 
 		else checkJob(nameFile, jobDir, toLink, tnRunner.getClinicalVcfDocs());
+	}
+	
+	private void parseMergeClinicalVars() throws IOException {
+		info.add("Checking clinical variant integration...");
+
+		//look for json file and xml vcfs
+		File clinRepDir = new File (rootDir, "ClinicalReport");
+		File[] jsonTestResults = IO.extractFiles(clinRepDir, ".json");
+		File[] xmls = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".xml");
+		File[] vcfs = IO.extractFiles(clinRepDir, ".vcf.gz");
+		File[] toLink = null;
+
+		//make dir, ok if it already exists
+		File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_ClinicalVars");
+		jobDir.mkdirs();
+
+		//Caris test
+		String failMessage = null;
+		if (xmls != null && xmls.length >0 ) {
+			//might be uncompressed?
+			if (vcfs == null || vcfs.length == 0) vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf");
+			if (xmls.length != 1 || vcfs.length != 1) {
+				failMessage = "\tJson/Xml/VcfReport\tFAILED to find one xxx.json or one xxx.vcf.gz and xxx.xml clinical test report file(s)";
+			}
+			toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), xmls[0], vcfs[0]};
+		}
+
+		//Tempus
+		else if (jsonTestResults !=null && jsonTestResults.length>0) {
+			//more than one json file? exclude anything with RS.v
+			if (jsonTestResults.length>1 || vcfs == null || vcfs.length == 0)  {
+				failMessage = "\tMore than one json file or too few vcfs in the Tempus ClinicalReport dir in "+jobDir;
+			}
+			toLink = new File[]{clinRepDir, somaticVariants, new File(somaticVariants+".tbi"), };
+		}
+
+		else {
+			failMessage = "\tJson/Xml/ClinicalReport/Vcf\tFAILED to find parsable clinical test report file(s) in "+jobDir;
+		}
+
+		//did it fail?
+		if (failMessage != null)clearAndFail(jobDir, failMessage);
+
+		else {
+			//any files?
+			HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+			if (nameFile.size() == 0) launch(jobDir, toLink, tnRunner.getClinicalVcfDocs());
+
+			//OK some files are present
+			//COMPLETE
+			else if (nameFile.containsKey("COMPLETE")){
+				//find the final vcf file
+				File[] vcf = IO.extractFiles(new File(jobDir, "Vcfs"), "_final.vcf.gz");
+				if (vcf == null || vcf.length !=1) {
+					clearAndFail(jobDir, "\tThe clinical variant parsing and merging workflow was marked COMPLETE but failed to find the xxx_final.vcf.gz file in the Vcfs/ in "+jobDir);
+					return;
+				}
+				mergedSomaticVariants = vcf[0];
+				//remove the linked files
+				for (File f: toLink) new File(jobDir, f.getName()).delete();
+				info.add("\tCOMPLETE "+jobDir);
+			}
+
+			else checkJob(nameFile, jobDir, toLink, tnRunner.getClinicalVcfDocs());
+		}
 	}
 
 	private File[] filterJsonReports(File[] jsonTestResults) {
@@ -678,8 +748,6 @@ public class TNSample2 {
 
 	private void copyRatioAnalysis() throws IOException {
 		info.add("Checking copy ratio calling...");	
-		
-//need to skip XO.V and others without enough samples to build backgrounds
 
 		//look for tumor normal alignments
 		if (tumorDNAAlignment == null || normalDNAAlignment == null ) return;
@@ -713,6 +781,7 @@ public class TNSample2 {
 			germlineVcf = new File[]{vcf, vcfIndex};
 		}
 		
+		//need to skip XO.V and others without enough samples to build backgrounds
 		//check if they want to skip this one
 		if (tnRunner.getPanels2SkipForCopyRatio()!=null) {
 			PlatformGenderInfo pgi = parsePlatformGenderInfo();
@@ -1254,7 +1323,7 @@ public class TNSample2 {
 						return new File[] {f, new File(f.getCanonicalPath()+".tbi")};
 					}
 				}
-				throw new IOException("ERROR: failed to find a panel matched xxx.bp.txt.gz file in "+bp+" for "+platformGenderInfo.getOriginalName());
+				throw new IOException("ERROR: failed to find a panel matched xxx.bp.txt.gz file in "+bp+" for "+platformGenderInfo.getOriginalName()+" panel -> "+panel);
 			}	
 		}
 	}

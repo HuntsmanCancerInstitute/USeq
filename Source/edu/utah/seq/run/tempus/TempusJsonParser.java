@@ -52,6 +52,15 @@ public class TempusJsonParser {
 		XT.V3 Panel of 648 genes (germline, tumor) + mRNA (tumor)
 		XT.V3 Panel of 648 genes (tumor) + mRNA (tumor)
 		XT.V4 Panel of 648 genes (germline, tumor) + mRNA (tumor)
+		
+		HRD - not supported
+		MMR - not supported
+		PD-L1 - not supported
+		RS.v2 - not supported
+		XE
+		XF - not supported
+		XO
+		XT
 	 */
 	private void checkTestOrder() {
 		if (parsed == false) return;

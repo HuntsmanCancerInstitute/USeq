@@ -44,7 +44,8 @@ public class TempusResults {
         "lowCoverageAmplicons": []
     },
 	 */
-	public TempusResults(JSONObject object, TempusJson2Vcf tempusJson2Vcf) throws JSONException, IOException {
+	public TempusResults(JSONObject object, TempusJson2Vcf tempusJson2Vcf) throws JSONException, IOException {	
+		
 		this.tempusJson2Vcf = tempusJson2Vcf;
 		JSONObject results = object.getJSONObject("results");
 		//messy tempus json output for tumorMutationBurden stuff
@@ -103,8 +104,7 @@ public class TempusResults {
 		}
 		
 		//OK change with 1.3.1, Tempus is providing objects instead of arrays for the inherited germline info
-		//1.3
-//how about with 1.4?
+		//1.3 only
 		if (tempusJson2Vcf.getJsonSchema().equals("1.3")) {
 			//any inheritedRelevantVariants
 			if (results.has("inheritedRelevantVariants")) {
@@ -128,11 +128,10 @@ public class TempusResults {
 				tempusJson2Vcf.setWorkingNumInheritedVariantsOfUnknownSignificance(ja.length());
 			}
 		}
-		//headache, none of the 1/2 dozen reports we have provide any of the following variants in 1.3.1!  So don't know what else they've done in the new schema! Frack!
-		else if (tempusJson2Vcf.getJsonSchema().equals("1.3.1")) {
+		else  {
 			//any inheritedRelevantVariants
 			if (results.has("inheritedRelevantVariants")) {
-				//1.3.1 this is a json object with a note and values
+				//>= 1.3.1 this is a json object with a note and values
 				JSONObject jo = results.getJSONObject("inheritedRelevantVariants");
 				JSONArray ja = jo.getJSONArray("values");
 				for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedRelevantVariant", null, ja.getJSONObject(i), tempusJson2Vcf) );
@@ -141,7 +140,7 @@ public class TempusResults {
 			}
 			//any inheritedIncidentalFindings
 			if (results.has("inheritedIncidentalFindings")) {
-				//1.3.1 this is a json object with a note and values
+				//>= 1.3.1 this is a json object with a note and values
 				JSONObject jo = results.getJSONObject("inheritedIncidentalFindings");
 				JSONArray ja = jo.getJSONArray("values");
 				for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedIncidentalFinding", null, ja.getJSONObject(i), tempusJson2Vcf) );
@@ -150,7 +149,7 @@ public class TempusResults {
 			}
 			//any inheritedVariantsOfUnknownSignificance
 			if (results.has("inheritedVariantsOfUnknownSignificance")) {
-				//1.3.1 this is a json object with a note and values
+				//>= 1.3.1 this is a json object with a note and values
 				JSONObject jo = results.getJSONObject("inheritedVariantsOfUnknownSignificance");
 				JSONArray ja = jo.getJSONArray("values");			
 				for (int i=0; i<ja.length(); i++) variants.add( new TempusVariant("inheritedVariantsOfUnknownSignificance", null, ja.getJSONObject(i), tempusJson2Vcf) );
@@ -158,11 +157,40 @@ public class TempusResults {
 			}
 		}
 		
-		
 		//cnvs processing
 		addCoordinatesToCNVs(tempusJson2Vcf.getCnvGeneNameBed(), tempusJson2Vcf.getFasta());
+		
+		//variant processing
+		addCoordinatesToVariants(tempusJson2Vcf.getWorkingSomVcfLines(), tempusJson2Vcf.getWorkingGermVcfLines(), tempusJson2Vcf.getFailedToFindCooridinates());
 	}
 	
+	private void addCoordinatesToVariants(String[] somVcfLines, String[] germVcfLines, ArrayList<TempusVariant> failedToFindCooridinates) throws IOException {
+		for (TempusVariant tv: variants) {
+			//already loaded?
+			if (tv.getNucleotideAlteration()!= null && tv.getNucleotideAlteration().length()>10) {
+				tv.setSnvVariantType();
+			}
+			//somatic or inherited
+			else if (tv.getVariantSource().contains("somatic") && tv.getVariantType().equals("SNV")) {
+				boolean found = tv.addGenomicCoordinateInfo(somVcfLines, germVcfLines);
+				if (found == false) {
+					failedToFindCooridinates.add(tv);
+					tv.setAccessionId(tempusJson2Vcf.getWorkingOrder().getAccessionId());
+				}
+				else tv.setSnvVariantType();
+			}
+			else if (tv.getVariantSource().contains("inherited") && tv.getVariantType().equals("SNV")) {
+				boolean found = tv.addGenomicCoordinateInfo(germVcfLines, somVcfLines);
+				if (found == false) {
+					failedToFindCooridinates.add(tv);
+					tv.setAccessionId(tempusJson2Vcf.getWorkingOrder().getAccessionId());
+				}
+				else tv.setSnvVariantType();
+			}
+		}
+	}
+
+
 	private void addCoordinatesToCNVs(HashMap<String, Bed> cnvGeneNameBed, IndexedFastaSequenceFile fasta) throws IOException {
 		if (cnvGeneNameBed == null) return;
 		for (TempusVariant tv: variants) {

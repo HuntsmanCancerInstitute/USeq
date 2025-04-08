@@ -271,5 +271,9 @@ public class SimpleVcf  implements Comparable<SimpleVcf>{
 		this.padEnd = padEnd;
 	}
 
+	public void setId(String id) {
+		this.id = id;
+	}
+
 
 }
