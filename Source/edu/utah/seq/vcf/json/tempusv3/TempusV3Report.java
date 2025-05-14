@@ -1,5 +1,6 @@
 package edu.utah.seq.vcf.json.tempusv3;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import org.json.JSONException;
@@ -9,6 +10,7 @@ import util.gen.Misc;
 
 public class TempusV3Report {
 
+	private File jsonFile = null;
 	private String reportId = null;
 	private String signoutDate = null;
 	private String bioInfoPipeline = null;
@@ -31,11 +33,11 @@ public class TempusV3Report {
           "signoutDate": "2025-03-02T19:46:09"
      },
 	 */
-	public TempusV3Report(JSONObject object, TempusV3Json2Vcf tempusJson2Vcf) throws JSONException {
+	public TempusV3Report(File jsonFile, JSONObject object, TempusV3Json2Vcf tempusJson2Vcf) throws JSONException {
+		this.jsonFile = jsonFile;
 		JSONObject report = object.getJSONObject("report");
 		reportId = Json.getStringAttribute(report, "reportId");
 		signoutDate = Json.getStringAttribute(report, "signoutDate");
-		if (signoutDate == null) signoutDate = Json.getStringAttribute(report, "signoutDate");
 		bioInfoPipeline = Json.getStringAttribute(report, "bioInfoPipeline");
 		notes = Json.getStringAttribute(report, "notes");
 		if (notes != null) notes = Misc.WHITESPACE.matcher(notes).replaceAll(" ");
@@ -77,19 +79,24 @@ public class TempusV3Report {
 
 	/**Added to Vcf header*/
 	public void addMetaData(LinkedHashMap<String, String> meta) {
-		meta.put("tempusReportId", reportId);
-		meta.put("tempusReportStatus", reportStatus);
-		meta.put("tempusSignoutDate", signoutDate);
-		meta.put("tempusBioInfPipeline", bioInfoPipeline);
-		if (notes != null) meta.put("tempusReportNotes", notes);
+		Misc.addConcatinatedValue (meta,"tempusReportId", reportId, "; ");
+		Misc.addConcatinatedValue (meta,"tempusReportStatus", reportStatus, "; ");
+		Misc.addConcatinatedValue (meta,"tempusSignoutDate", signoutDate, "; ");
+		Misc.addConcatinatedValue (meta,"tempusBioInfPipeline", bioInfoPipeline, "; ");
+		Misc.addConcatinatedValue (meta, "tempusReportNotes", notes, "; ");
 	}
-	/**Addes to spreadsheet*/
+	/**Added to spreadsheet*/
 	public void addAttributes(LinkedHashMap<String, String> meta) {
+		meta.put("jsonFile", jsonFile.toString());
 		meta.put("reportId", reportId);
 		meta.put("reportStatus", reportStatus);
 		meta.put("signoutDate", signoutDate);
 		meta.put("bioInfPipeline", bioInfoPipeline);
 		if (notes != null) meta.put("notes", notes);
+	}
+
+	public File getJsonFile() {
+		return jsonFile;
 	}
 	
 }

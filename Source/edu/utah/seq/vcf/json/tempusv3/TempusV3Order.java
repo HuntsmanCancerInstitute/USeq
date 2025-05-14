@@ -1,9 +1,11 @@
 package edu.utah.seq.vcf.json.tempusv3;
 
+import java.io.File;
 import java.util.LinkedHashMap;
 import org.json.JSONException;
 import org.json.JSONObject;
 import util.gen.Json;
+import util.gen.Misc;
 
 public class TempusV3Order {
 
@@ -47,18 +49,21 @@ public class TempusV3Order {
 	
 	/**Placed in VCF Header*/
 	public void addMetaData(LinkedHashMap<String, String> meta) {
-		meta.put("tempusPhysician", physician);
-		meta.put("tempusTestCode", testCode);
-		meta.put("tempusTestDescription", testDescription);
-		meta.put("tempusAccessionId", accessionId);
-		meta.put("tempusOrderId", tempusOrderId);
-		meta.put("tempusReportingReferenceGenome", referenceGenome);
+		Misc.addConcatinatedValue (meta, "tempusPhysician", physician, "; ");
+		Misc.addConcatinatedValue (meta, "tempusTestCode", testCode, "; ");
+		Misc.addConcatinatedValue (meta, "tempusTestDescription", testDescription, "; ");
+		Misc.addConcatinatedValue (meta, "tempusAccessionId", accessionId, "; ");
+		Misc.addConcatinatedValue (meta, "tempusOrderId", tempusOrderId, "; ");
+		Misc.addConcatinatedValue (meta, "tempusReportingReferenceGenome", referenceGenome, "; ");
 	}
+	
+
 	
 	/**Put into the spreadsheet output.*/
 	public void addAttributes(LinkedHashMap<String, String> meta) {
 		meta.put("institution", institution);
 		meta.put("physician", physician);
+		meta.put("tempusOrderId", tempusOrderId);
 		meta.put("accessionId", accessionId);
 		meta.put("testCode", testCode);
 		meta.put("testDescription", testDescription);
@@ -79,5 +84,17 @@ public class TempusV3Order {
 
 	public String getTestDescription() {
 		return testDescription;
+	}
+
+	public String getTempusOrderId() {
+		return tempusOrderId;
+	}
+
+	public String getReferenceGenome() {
+		return referenceGenome;
+	}
+
+	public String getInstitution() {
+		return institution;
 	}
 }

@@ -106,12 +106,12 @@ public class TempusV3Variant{
 		}
 		
 		//Why are all of the AF's in the vcfs 0.167 ?  Yet in the json reports they are something else. Again, is Tempus deliberated obscuring these data?
-		
 		Pattern cdotPat = Pattern.compile(".*"+ cleanCDot+ ".*");
 		Pattern tranPat = Pattern.compile(".*"+ transcriptId+ ".*");
 		
 		ArrayList<String> cDotTransMatches = new ArrayList<String>();
-		
+
+	if (vcfLinesFirst != null) {
 		for (String line: vcfLinesFirst) {
 			if (cdotPat.matcher(line).matches() && tranPat.matcher(line).matches()) {
 				cDotTransMatches.add(line);
@@ -131,7 +131,8 @@ public class TempusV3Variant{
 				}
 			}
 		}
-
+	}
+	if (vcfLinesSecond != null) {
 		for (String line: vcfLinesSecond) {
 			if (cdotPat.matcher(line).matches() && tranPat.matcher(line).matches()) {
 				for (Pattern gene: genePats) {
@@ -148,6 +149,7 @@ public class TempusV3Variant{
 				}
 			}
 		}
+	}
 		
 		//I really don't want to do this. Tempus is using some non existent gene aliases. E.g. LOC100129520 vcf -> TEX13C json report
 		//So if only one match based on cDot and Transcript, then assume those coordinates.
@@ -187,7 +189,7 @@ public class TempusV3Variant{
 	/** Returns CHROM POS ID REF ALT QUAL FILTER INFO (EG FE ST PE DP AF)
 	 * @throws IOException */
 	public String toVcf(int id) throws IOException{
-		if (gene5 != null && gene3 !=null && tempusJson2Vcf.getCnvGeneNameBed() != null) return fusionVariantToVcf(id);
+		if (variantType.equals("fusions")) return fusionVariantToVcf(id);
 		if (chromosome==null || pos==null || ref==null || alt==null) return null;
 		StringBuilder sb = new StringBuilder();
 		//CHROM
@@ -246,6 +248,8 @@ public class TempusV3Variant{
 		//if (geneDescription != null) {
 			//sb.append(";DESC="); sb.append(geneDescription.replaceAll(" ", "_"));
 		//}
+		if (fusedGene!=null) sb.append(";FG="+fusedGene);
+		
 		sb.append(";IMPRECISE;SVTYPE=BND");
 		String commonInfo = sb.toString();
 		

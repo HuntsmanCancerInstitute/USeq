@@ -99,6 +99,21 @@ public class Misc {
 		return toTrim.substring(beginningIndex, endingIndex);
 	}
 	
+	/**If the value is null won't add.  If the value exists and is different, it is concatenated with the delimiter*/
+	public static void addConcatinatedValue (LinkedHashMap<String, String> meta, String key, String value, String delimiter) {
+		if (value == null) return;
+		if (meta.containsKey(key) == false) meta.put(key, value);
+		else {
+			String originalValue = meta.get(key);
+			if (originalValue.equals(value)) return;
+			
+			Pattern pat = Pattern.compile(delimiter);
+			String[] split = pat.split(originalValue);
+			for (String s: split) if (s.equals(value)) return;
+			meta.put(key, originalValue+ delimiter +value);
+		}
+	}
+	
 	/**Finds Strings common to all, any zero sized or null members will cause a return of a zero sized AL.*/
 	public static ArrayList<String> commonToAll (ArrayList<String>[] als){
 		//find smallest and copy it

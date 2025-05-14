@@ -68,14 +68,14 @@ public class TempusV3Patient {
 	
 	/**Added to VCF header*/
 	public void addMetaData(LinkedHashMap<String, String> meta) {
-		meta.put("tempusPatientId", tempusId);
-		meta.put("tempusPatientGender", sex);
-		if (ageAtDiagnosis != null) meta.put("tempusAgeAtDiagnosis", ageAtDiagnosis.toString());
+		Misc.addConcatinatedValue (meta,"tempusPatientId", tempusId, "; ");
+		Misc.addConcatinatedValue (meta,"tempusPatientSex", sex, "; ");
+		if (ageAtDiagnosis != null) Misc.addConcatinatedValue (meta,"tempusAgeAtDiagnosis", ageAtDiagnosis.toString(), "; ");
 	}
 	
 	/**Added to spreadsheet output*/
 	public void addAttributes(LinkedHashMap<String, String> meta, boolean includePhi) {		
-		meta.put("tempusId", tempusId);
+		meta.put("tempusPatientId", tempusId);
 		meta.put("sex", sex);
 		if (ageAtDiagnosis != null) meta.put("ageAtDiagnosis", ageAtDiagnosis.toString());
 		if (includePhi) {

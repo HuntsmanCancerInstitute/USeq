@@ -51,6 +51,7 @@ public class AvatarClinicalInfo {
 		}
 		} catch (Exception e) {
 			IO.pl("ERROR parsing "+json+ "\n"+ e.toString());
+			e.printStackTrace();
 			System.exit(1);
 		}
 		
@@ -89,13 +90,28 @@ public class AvatarClinicalInfo {
 		}
 	}
 	
+	public static void main (String[] args) {
+		File f = new File("/Users/u0028003/Downloads/DebugPMRSearch/A046932_NA_FT-SA251372D_FT-SA251372R_TWSv2_HN_F.json");
+		IO.pl(new AvatarClinicalInfo(f).toString());
+	}
 
 
 	private void loadLinkedHashMap(LinkedHashMap<String, String> hm, JSONObject j) {
 		Iterator it = j.keys();
 		while (it.hasNext()) {
 			String key = (String)it.next();
-			hm.put(key, j.getString(key));
+			//watch out for arrays
+			if (key.endsWith("SeqPaths")) {
+				JSONArray ja = j.getJSONArray(key);
+				StringBuilder sb = new StringBuilder(ja.getString(0));
+				for (int i=1; i< ja.length(); i++) {
+					sb.append(",");
+					sb.append(ja.getString(i));
+				}
+				hm.put(key, sb.toString());
+			}
+			
+			else hm.put(key, j.getString(key));
 		}
 	}
 

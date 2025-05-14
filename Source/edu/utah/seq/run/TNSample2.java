@@ -499,7 +499,7 @@ public class TNSample2 {
 				return;
 			}
 			somaticVariants = vcf[0];
-			//remove the linked fastq
+			//remove the links
 			removeSomaticLinks(jobDir);
 			info.add("\tCOMPLETE "+jobDir);
 		}
@@ -541,7 +541,7 @@ public class TNSample2 {
 			}
 			// don't set it at this time, 
 			//somaticVariants = vcf[0];
-			//remove the linked fastq
+			//remove the links
 			removeSomaticLinks(jobDir);
 			info.add("\tCOMPLETE "+jobDir);
 		}
@@ -552,7 +552,7 @@ public class TNSample2 {
 	}
 
 	private PlatformGenderInfo parsePlatformGenderInfo() {
-		if (platformGenderInfo != null) return platformGenderInfo;
+		if (platformGenderInfo != null) return platformGenderInfo;	
 		//attempt to parse platform and gender info
 		File[] toCheck = IO.extractFiles(new File(rootDir, "ClinicalReport"));
 		for (File f: toCheck) {
@@ -648,7 +648,7 @@ public class TNSample2 {
 				clearAndFail(jobDir, "\tThe msi status calling was marked COMPLETE but failed to find the final xxx_Mantis.txt file in "+jobDir);
 				return;
 			}
-			//remove the linked fastq
+			//remove the linked files
 			removeMsiLinks(jobDir);
 			info.add("\tCOMPLETE "+jobDir);
 		}
@@ -785,6 +785,7 @@ public class TNSample2 {
 		//check if they want to skip this one
 		if (tnRunner.getPanels2SkipForCopyRatio()!=null) {
 			PlatformGenderInfo pgi = parsePlatformGenderInfo();
+			
 			if (pgi.isParsed() && tnRunner.getPanels2SkipForCopyRatio().contains(pgi.getPanel())) {
 				info.add("\tSkipping panel "+pgi.getPanel());
 				return;
@@ -1216,9 +1217,10 @@ public class TNSample2 {
 
 			//remove any linked fastq or cram files
 			File f = jobDir.getCanonicalFile();
-			new File(f, "1.fastq.gz").delete();
-			new File(f,"2.fastq.gz").delete();
 			new File(f, "rawSeq.cram").delete();
+			for (File gz: IO.extractFiles(f, ".gz")) {
+				if (gz.getName().startsWith("tmpLink_")) gz.delete();
+			}
 		}
 
 		//files present but not complete, check job
@@ -1233,23 +1235,25 @@ public class TNSample2 {
 
 	private void createDNAAlignLinks(File[] cramFastq, File alignDir) throws IOException {
 		File f = alignDir.getCanonicalFile();
-		Path real1 = cramFastq[0].toPath();
-		//fastq?
-		if (cramFastq.length == 2) {
-			//remove any links
-			new File(f, "1.fastq.gz").delete();
-			new File(f,"2.fastq.gz").delete();
-			//soft link in the new ones
-			Path real2 = cramFastq[1].toPath();
-			Files.createSymbolicLink(new File(alignDir.getCanonicalFile(),"1.fastq.gz").toPath(), real1);
-			Files.createSymbolicLink(new File(alignDir.getCanonicalFile(),"2.fastq.gz").toPath(), real2);
+		
+		//remove prior linked fastqs
+		for (File gz: IO.extractFiles(f, ".gz")) {
+			if (gz.getName().startsWith("tmpLink_")) gz.delete();
+		}
+		//fastq? can be multiple pairs, the workflow will merge these
+		if (cramFastq.length > 1) {
+			for (int i=0; i< cramFastq.length; i++) {
+				//soft link in the new one
+				Path real = cramFastq[i].toPath();
+				Files.createSymbolicLink(new File(alignDir.getCanonicalFile(),"tmpLink_"+cramFastq[i].getName()).toPath(), real);
+			}
 		}
 		//must be cram
 		else {
 			//remove any links
 			new File(f, "rawSeq.cram").delete();
 			//soft link in the new ones
-			Files.createSymbolicLink(new File(alignDir.getCanonicalFile(),"rawSeq.cram").toPath(), real1);
+			Files.createSymbolicLink(new File(alignDir.getCanonicalFile(),"rawSeq.cram").toPath(), cramFastq[0].toPath());
 		}
 	}
 

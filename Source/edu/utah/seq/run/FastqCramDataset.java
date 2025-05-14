@@ -20,12 +20,12 @@ public class FastqCramDataset{
 			File dir = new File(fastqDir, name);
 			if (dir.exists()) {
 				cramFastqDirExists = true;
-				//look for paired fastq
+				//look for 2 or more paired fastq
 				cramFastqs = checkNumberFiles(dir, ".gz", 2);
 				//if not found look for cram
 				if (cramFastqs == null) cramFastqs = checkNumberFiles(dir, ".cram", 1);
 				if (cramFastqs == null) {
-					info.add("\tFAILED: Did not find two fastq files or one cram file within "+dir);
+					info.add("\tFAILED: Did not find two or more fastq files or one cram file within "+dir);
 					incorrectNumberCramFastq = true;
 					tnSample.setFailed(true);
 				}
@@ -37,7 +37,7 @@ public class FastqCramDataset{
 	
 	public File[] checkNumberFiles(File dir, String extension, int requiredNumberFiles) throws IOException {
 		File[] f = IO.extractFiles(dir, extension);
-		if (f.length != requiredNumberFiles) {
+		if (f.length < requiredNumberFiles) {
 			return null;
 		}
 		return f;

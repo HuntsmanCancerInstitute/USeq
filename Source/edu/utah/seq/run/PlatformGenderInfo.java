@@ -12,6 +12,9 @@ public class PlatformGenderInfo {
 	
 	public PlatformGenderInfo(String clinInfoFile) {
 		originalName = clinInfoFile;
+		
+		//TL-25-XWFG82IHZX_XT.V4_2025-02-18_deid_Daniel_Ermann_M.json
+		//       0           1       2        3     4       5  6
 		//TL-18-843E9B_XT.V1_2018-10-26_deid_Neeraj_Agarwal_M.json
 		//     0         1        2       3     4      5    6
 		String[] fields = Misc.UNDERSCORE.split(clinInfoFile);

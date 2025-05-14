@@ -45,19 +45,24 @@ public class AnnotatedVcfParser {
 	private TreeSet<String> drugResClinSigGenes = null;
 	private String[] passingVCFSS = null;
 	private double minimumVCFSSDiff = 0; //difference between ref and alt for splice junction score
+	private double minimumSpliceAIScore = 0;
 	private boolean verbose = false;
 	private boolean somaticProcessing = false;
 	private boolean orAnnos = false;
 	private boolean skipWarningTrans = true;
 	private boolean onlyProteinCoding = true;
 	private boolean justFrameShiftStartStop = false;
-	private String annInfo = "##INFO=<ID=ANN,Number=.,Type=String,Description=\"Functional annotations: 'Allele | Annotation | Annotation_Impact | Gene_Name | Gene_ID | Feature_Type | Feature_ID | Transcript_BioType | Rank | HGVS.c | HGVS.p | cDNA.pos / cDNA.length | CDS.pos / CDS.length | AA.pos / AA.length | Distance | ERRORS / WARNINGS / INFO' \">";
+	private String annInfo = "##INFO=<ID=ANN,Number=.,Type=String,Description=\"Functionalannotations:'Allele|Annotation|Annotation_Impact|Gene_Name|Gene_ID|Feature_Type|Feature_ID|Transcript_BioType|Rank|HGVS.c|HGVS.p|cDNA.pos/cDNA.length|CDS.pos/CDS.length|AA.pos/AA.length|Distance|ERRORS/WARNINGS/INFO'\">";
 	private Gzipper sumarySpreadSheet = null;
 	private static final Pattern COMMA_SLASH = Pattern.compile(",|/");
 	private String appSettings = null;
 	private HashSet<String> transcriptFilter = null;
 	private Gzipper impactedGenes = null;
 	private boolean removeMulitAlt = false;
+	
+	//for adding PHI
+	private File pmrCurrentRegistry = null;
+	private HashMap<String, String> idPhi = null;
 	
 	//trackers
 	private Histogram afs = new Histogram(0, 1.01, 101);
@@ -67,10 +72,7 @@ public class AnnotatedVcfParser {
 	private int[] dps = new int[10000];
 	private TreeMap<String, Integer> impacts = new TreeMap<String, Integer>();
 	private TreeMap<String, Integer> effects = new TreeMap<String, Integer>();
-	/*Old private String acmgGenes = "ACTA2,ACTC1,APC,APOB,ATM,ATP7B,BARD1,BMPR1A,BRCA1,BRCA2,BRIP1,CACNA1S,CDH1,CDK4,CDKN2A,CHEK2,COL3A1,DSC2,DSG2,DSP,"
-			+ "EPCAM,FBN1,GLA,GREM1,KCNH2,KCNQ1,LDLR,LMNA,MEN1,MLH1,MSH2,MSH6,MUTYH,MYBPC3,MYH7,MYH11,MYL2,MYL3,NBN,NF2,OTC,PALB2,PCSK9,"
-			+ "PKP2,PMS2,POLD1,POLE,PRKAG2,PTEN,RAD51C,RAD51D,RB1,RET,RYR1,RYR2,SCN5A,SDHAF2,SDHB,SDHC,SDHD,SMAD3,SMAD4,STK11,TGFBR1,"
-			+ "TGFBR2,TMEM43,TNNI3,TNNT2,TP53,TPM1,TSC1,TSC2,VHL,WT1";*/
+
 	//v3.2 https://doi.org/10.1016/j.gim.2023.100866
 	private String acmgGenes = "ACTA2,ACTC1,ACVRL1,APC,APOB,ATP7B,BAG3,BAG3,BMPR1A,BRCA1,BRCA2,BTD,CACNA1S,CALM1,CALM1,CALM2,CALM2,CALM3,CALM3,CASQ2,COL3A1,DES,"+
 			"DES,DSC2,DSG2,DSP,DSP,ENG,FBN1,FLNC,FLNC,FLNC,GAA,GLA,HFE,HNF1A,KCNH2,KCNQ1,LDLR,LMNA,MAX,MEN1,MLH1,MSH2,MSH6,MUTYH,MYBPC3,MYH11,"+
@@ -98,8 +100,10 @@ public class AnnotatedVcfParser {
 	private int numPassingExcludeOncoKB = 0;
 	private int numWithCF = 0;
 	private int numPassingCF = 0;
-	private int numWithSplice = 0;
-	private int numPassingSplice = 0;
+	private int numWithMaxEntScanSplice = 0;
+	private int numPassingMaxEntScanSplice = 0;
+	private int numWithSpliceAI = 0;
+	private int numPassingSpliceAI = 0;
 	private int numPassIDs = 0;
 	private int numPass = 0;
 	
@@ -151,19 +155,50 @@ public class AnnotatedVcfParser {
 	private void closeSpreadsheet() throws IOException {
 		sumarySpreadSheet.println(appSettings);
 		sumarySpreadSheet.println(AnnotatedVcfParserDataLine.legend);
-		
 		sumarySpreadSheet.close();
-		
 	}
 
 
 	private void openSpreadSheet() throws FileNotFoundException, IOException {
+		//adding PHI?
+		String phi = "";
+		if (pmrCurrentRegistry != null) {
+			idPhi = loadPmrRegistry(pmrCurrentRegistry);
+			phi = ".PHI";
+		}
+		
 		String date = Misc.getDateNoSpaces();
-		File sss = new File(saveDirectory, "annotatedVcfParser."+date+".xls.gz");
+		File sss = new File(saveDirectory, "annotatedVcfParser."+date+phi+".xls.gz");
 		sumarySpreadSheet = new Gzipper(sss);
+		if (idPhi!=null) sumarySpreadSheet.print(AnnotatedVcfParserDataLine.headerPhi);
 		sumarySpreadSheet.print(AnnotatedVcfParserDataLine.headerSpreadSheet);
 		if (transcriptFilter != null) sumarySpreadSheet.println(AnnotatedGene.headerSpreadSheetMatch);
 		else sumarySpreadSheet.println(AnnotatedGene.headerSpreadSheet);
+	}
+	
+	public static HashMap<String,String> loadPmrRegistry(File file) throws IOException{
+		HashMap<String,String> keyValue = new HashMap<String,String>(1000);
+
+			BufferedReader in = IO.fetchBufferedReader(file);
+			String line;
+			String[] f;
+			while ((line = in.readLine())!=null){
+				if (line.startsWith("#")) continue;
+				
+				//#LastName	FirstName	DoBMonth(1-12)	DoBDay(1-31)	DoBYear(1900-2050)	Gender(M|F)	MRN	CoreId	OtherIds(;delimited)
+				//    0        1            2              3               4                    5        6     7       8
+				f = Misc.TAB.split(line);
+				StringBuilder sb = new StringBuilder();
+				sb.append(f[0]); sb.append("\t");
+				sb.append(f[1]); sb.append("\t");
+				sb.append(f[2]); sb.append("/");sb.append(f[3]);sb.append("/");sb.append(f[4]);sb.append("\t");
+				sb.append(f[6]); sb.append("\t");
+				sb.append(f[7]); 
+				keyValue.put(f[7], sb.toString());
+			}
+			in.close();
+		
+		return keyValue;
 	}
 
 
@@ -190,7 +225,10 @@ public class AnnotatedVcfParser {
 					passVcf.println(vcfLine);
 					failVcf.println(vcfLine);
 					//ANN?
-					if (vcfLine.startsWith("##INFO=<ID=ANN,") && vcfLine.equals(annInfo) == false) throw new Exception("Your ##INFO=<ID=ANN line  doesn't match\n"+vcfLine+"\n"+annInfo);
+					if (vcfLine.startsWith("##INFO=<ID=ANN,")) {
+						String noSpaces = Misc.WHITESPACE.matcher(vcfLine).replaceAll("");
+						if (noSpaces.equals(annInfo) == false) throw new Exception("Your ##INFO=<ID=ANN line  doesn't match\n"+noSpaces+"\n"+annInfo);
+					}
 					continue;
 				}
 				numRecords++;
@@ -222,7 +260,14 @@ public class AnnotatedVcfParser {
 				if (passingClinSig != null || excludeClinSig != null) 	passClinSig = checkClinSig();
 				if (passingOncoKB != null || excludeOncoKB != null) 	passOncoKB = checkOncoKB();
 				if (maxFracBKAFs != 0 || minimumBKZ !=0) passBKAF = checkBKAFs();
-				if (passingVCFSS != null) 		passSplice = checkSplice();
+				if (passingVCFSS != null) {
+					//starts true
+					boolean passMax = false;
+					boolean passAI = false;
+					if (minimumVCFSSDiff !=0) passMax = checkMaxEntScanSplice();
+					if (passMax == false && minimumSpliceAIScore !=0) passAI = checkSpliceAI();
+					if (passMax == false && passAI == false) passSplice = false;
+				}
 				if (passingIDKeys != null) 		passID = checkIDs(cells[2]);
 				
 				boolean pass;
@@ -234,7 +279,7 @@ public class AnnotatedVcfParser {
 					numPassingVcf++;
 					passingGeneNames.addAll(dataLine.fetchPassingGeneNames());
 					passVcf.println(vcfLine);
-					dataLine.println(sumarySpreadSheet, transcriptFilter);
+					dataLine.println(sumarySpreadSheet, transcriptFilter, idPhi);
 				}
 				else {
 					failVcf.println(vcfLine);
@@ -411,15 +456,15 @@ public class AnnotatedVcfParser {
 		return false;
 	}
 
-	private boolean checkSplice() throws Exception {
+	private boolean checkMaxEntScanSplice() throws Exception {
 		
 		String vcfSSLine = infoKeyValue.get("VCFSS");
 		//any splice info
 		if (vcfSSLine == null){
-			if (verbose) IO.pl("\tSplice Check\tfalse\tNo VCFSS");
+			if (verbose) IO.pl("\tMaxEntScan Splice Check\tfalse\tNo VCFSS");
 			return false;
 		}
-		numWithSplice++;
+		numWithMaxEntScanSplice++;
 		
 		//split by splice effects, may be more than one
 		//VCFSS=ENSG00000163554:G3S,158584103,AAAATTCATGTTTTTTTTTTTTCTTTCAGGGACATCAAAGGTGTG,AAAATTCATGTTTTTTTTTTTTTCTTTCAGGGACATCAAAGGTGTG,-7.52,3.04,3.04
@@ -448,11 +493,67 @@ public class AnnotatedVcfParser {
 		boolean passSplice = maxDelta >= minimumVCFSSDiff;
 		if (verbose) IO.pl("\tSplice Check\t"+passSplice+"\t"+maxDelta+"\t"+vcfSSLine);	
 		if (passSplice) {
-			numPassingSplice++;
+			numPassingMaxEntScanSplice++;
 			dataLine.passesSplice = true;
 			return true;
 		}
 		else return false;
+	}
+
+	private boolean checkSpliceAI() throws Exception {
+		
+		String spliceInfo = infoKeyValue.get("SpliceAI");
+		//any splice info
+		if (spliceInfo == null){
+			if (verbose) IO.pl("\tSpliceAI Check\tfalse\tNo Annotation");
+			return false;
+		}
+		numWithSpliceAI++;
+		
+		//split on comma, typically just one
+		//SpliceAI=CT|RP11-287D1.3|0.00|0.00|0.00|0.00|-5|-16|36|-16,CT|SLC4A5|0.00|0.00|0.00|0.00|-5|-16|36|-16  so more that one...
+		//       0          1        2    3    4   5
+		//      allele     gene     AG    AL   DG  DL   Acceptor/Donor Gain/Loss
+		String[] se = Misc.COMMA.split(spliceInfo);
+		
+		//VCFSS=ENSG00000163554:G3S,158584103,AAAATTCATGTTTTTTTTTTTTCTTTCAGGGACATCAAAGGTGTG,AAAATTCATGTTTTTTTTTTTTTCTTTCAGGGACATCAAAGGTGTG,-7.52,3.04,3.04
+		//&
+		//ENSG00000163554:G3E,158584103,AAAATTCATGTTTTTTTTTTTTCTTTCAGGGACATCAAAGGTGTG,AAAATTCATGTTTTTTTTTTTTTCTTTCAGGGACATCAAAGGTGTG,-7.52,3.04,3.04
+		
+		
+		//for each one look for the G3E, D3S, and parse the delta
+		boolean pass = false;
+		double score = 0;
+		for (String effect: se){
+			//split on |
+			String[] tokens = Misc.PIPE.split(effect);
+			//for each of the user defined effects: D5S,D3S,G5S,G3S
+			for (String code: passingVCFSS){
+				int indexToCheck = -1;
+				//damaged 5 donor, DL
+				if (code.equals("D5S")) indexToCheck = 5;
+				//damaged 3 acceptor, AL
+				else if (code.equals("D3S")) indexToCheck = 3;
+				//Gain 5 donor, DG
+				else if (code.equals("G5S")) indexToCheck = 4;
+				//Gain 3 acceptor, AG
+				else if (code.equals("G3S")) indexToCheck = 2;
+				else throw new IOException("ERROR: unrecognized splice type to check "+code);
+				
+				score = Double.parseDouble(tokens[indexToCheck]);
+				if (score >= minimumSpliceAIScore) {
+					pass = true;
+					break;
+				}
+			}
+		}
+		
+		if (verbose) IO.pl("\tSpliceAI Check\t"+pass+"\t"+score+"\t"+spliceInfo);	
+		if (pass) {
+			numPassingSpliceAI++;
+			dataLine.passesSplice = true;
+		}
+		return pass;
 	}
 
 	
@@ -1010,6 +1111,7 @@ public class AnnotatedVcfParser {
 		if (passingIDKeys == null) passingIDKeys = new String[]{"foundation","tempus","caris","ambry","invitae"};
 		if (passingVCFSS == null) passingVCFSS = new String[]{"D5S", "D3S", "G5S", "G3S"};	
 		if (minimumVCFSSDiff == 0) minimumVCFSSDiff = 4;
+		if (minimumSpliceAIScore == 0) minimumSpliceAIScore = 0.8;
 		createGermlineGenes();
 	}
 
@@ -1038,6 +1140,8 @@ public class AnnotatedVcfParser {
 		al.add("\t"+ skipWarningTrans+"\t: Ignore transcripts labeled WARNING_TRANSCRIPT_XXX");
 		al.add("\t"+ onlyProteinCoding+"\t: Only consider protein_coding transcripts");
 		if (transcriptFilter != null) al.add("\t"+ transcriptList+"\t: Select annotations that match transcript IDs in this file.");
+		if (pmrCurrentRegistry != null) al.add("\t"+ pmrCurrentRegistry+"\t:  Adding PHI to spreadsheet output.");
+
 		
 		if (passingAnnImpact != null) {
 			al.add("\n\t"+Misc.treeSetToString(passingAnnImpact, ",")+"\t: ANN impact keys");
@@ -1058,12 +1162,13 @@ public class AnnotatedVcfParser {
 
 		if (passingVCFSS != null) {
 			al.add("\n\t"+Misc.stringArrayToString(passingVCFSS, ",")+"\t: Splice junction types to scan");
-			al.add("\t"+ minimumVCFSSDiff+"\t: Minimum difference in MaxEnt scan scores for a splice junction effect");
+			al.add("\t"+ minimumVCFSSDiff+"\t: Minimum difference in MaxEntScan scores for a splice junction effect.");
+			al.add("\t"+ minimumSpliceAIScore+"\t: Minimum SpliceAI score for a splice junction effect.");
 		}
 		if (somaticProcessing ==false) al.add("\t"+ orAnnos+"\t: Require that only one need pass: ANN Impact or Clinvar or OncoKB or Splice Effect");
 		if (passingIDKeys != null) al.add("\n\t"+Misc.stringArrayToString(passingIDKeys, ",")+"\t: VCF ID keys that if present pass it regardless of any filter settings");
 		if (passingGermlineGenes != null) al.add("\n\t"+acmgGenes+"\t: ACMG Genes that cause the maxAF filter to be skipped for intersecting variants");
-		if (somaticProcessing ==false) 
+		
 		al.add("\n\t"+verbose+"\t: Verbose output");
 		al.add("\t"+ saveDirectory+"\t: Save directory");
 		
@@ -1114,10 +1219,15 @@ public class AnnotatedVcfParser {
 			IO.pl("\t"+ format(numPassingOncoKB, numWithOncoKB)+"Passing Include OncoKB");
 			IO.pl("\t"+ format(numPassingExcludeOncoKB, numWithOncoKB)+"Passing Exclude OncoKB");
 		}
-		if (passingVCFSS != null){
-			IO.pl("\t"+ format(numWithSplice, numRecords)+"With Splice");
-			IO.pl("\t"+ format(numPassingSplice, numWithSplice)+"Passing Splice");
+		if (minimumVCFSSDiff != 0){
+			IO.pl("\t"+ format(numWithMaxEntScanSplice, numRecords)+"With MaxEntScan Splice");
+			IO.pl("\t"+ format(numPassingMaxEntScanSplice, numWithMaxEntScanSplice)+"Passing MaxEntScan Splice");
 		}
+		if (minimumSpliceAIScore != 0){
+			IO.pl("\t"+ format(numWithSpliceAI, numRecords)+"With SpliceAI");
+			IO.pl("\t"+ format(numPassingSpliceAI, numWithSpliceAI)+"Passing SpliceAI");
+		}
+
 		if (passingIDKeys != null) IO.pl("\t"+ format(numPassIDs, numRecords)+"Pass IDs");
 		IO.pl("\t"+ format(numPass, numRecords)+"Records passing all filters");
 	}
@@ -1184,7 +1294,7 @@ public class AnnotatedVcfParser {
 	public void processArgs(String[] args){
 		//look for a config file and append
 		args = appendConfigArgs(args,"-y");
-		Pattern pat = Pattern.compile("-[a-zA-T]");
+		Pattern pat = Pattern.compile("-[a-zA-Z]");
 		File forExtraction = null;
 		String impactString = null;
 		String clinString = null;
@@ -1211,9 +1321,11 @@ public class AnnotatedVcfParser {
 					case 'b': maxFracBKAFs = Double.parseDouble(args[++i]); break;
 					case 'g': passingVCFSS = Misc.COMMA.split(args[++i]); break;
 					case 'n': minimumVCFSSDiff = Double.parseDouble(args[++i]); break;
+					case 'N': minimumSpliceAIScore = Double.parseDouble(args[++i]); break;
 					case 'z': minimumBKZ = Double.parseDouble(args[++i]); break;
 					case 't': minFractionPathogenic = Double.parseDouble(args[++i]); break;
 					case 'u': drugResString = args[++i]; break;
+					case 'U': pmrCurrentRegistry = new File(args[++i]); break;
 					case 'a': impactString = args[++i]; break;
 					case 'c': clinString = args[++i]; break;
 					case 'C': clinvarDate = args[++i]; break;
@@ -1285,17 +1397,17 @@ public class AnnotatedVcfParser {
 			for (String s: Misc.COMMA.split(oncoKBStringExclude)) excludeOncoKB.add(s);
 		}
 		
-		if (minimumVCFSSDiff !=0 && passingVCFSS == null) Misc.printErrAndExit("\nError: please provide a comma delimited list of splice junction types (e.g. D5S,D3S,G5S,G3S) to examine.\n");
+		if ((minimumVCFSSDiff !=0 || minimumSpliceAIScore !=0) && passingVCFSS == null) Misc.printErrAndExit("\nError: please provide a comma delimited list of splice junction types (e.g. D5S,D3S,G5S,G3S) to examine.\n");
 		
 		if (transcriptList != null)  transcriptFilter = IO.loadFileIntoHashSet(transcriptList);
-		
+		if (pmrCurrentRegistry != null && pmrCurrentRegistry.canRead()== false) Misc.printErrAndExit("\nError: cannot read or find your PMR current registry file: "+pmrCurrentRegistry);
 	}
 	
 
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                          Annotated Vcf Parser  January 2025                      **\n" +
+				"**                          Annotated Vcf Parser - April 2025                       **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+
@@ -1320,8 +1432,9 @@ public class AnnotatedVcfParser {
 				"-z Minimum BKZ when present.\n"+
                 "-b Maximum fraction of BKAF samples with allele frequency >= VCF AF*0.9, only applies\n"+
                 "       if present.\n"+
-                "-g Splice junction types to scan.\n"+
-                "-n Minimum difference in splice junction scores, only applies if present.\n"+
+                "-g Splice junction types to scan, comma delimited, no spaces: D5S,D3S,G5S,G3S\n"+
+                "-n Minimum difference in MaxEntScan splice junction scores, only applies if present.\n"+
+                "-N Minimum SpliceAI score, 0-1, only applies if present.\n"+
                 "-a Comma delimited list of SnpEff ANN impact categories to select for.\n"+
                 "-l Further restrict ANN impacts to one of these effects: frameshift_variant,\n"+
                 "       stop_gained, stop_lost, or start_lost.\n"+
@@ -1343,13 +1456,15 @@ public class AnnotatedVcfParser {
                 "       Defaults to require that all set pass. CLINVAR take priority over OncoKB.\n"+
                 "-T Txt file containing a list of transcripts to keep, one per line, to use in filtering\n"+
                 "       the summary spreadsheet output.\n"+
+                "-U Path to a Patient Molecular Repo currentRegistry_xxx.txt file for adding patient PHI to\n"+
+                "       the spreadsheet report.\n"+
 				"-r Verbose per record output.\n"+ 
                 "-y Path to a config txt file for setting the above.\n"+
 
                 
 				
 				"\nExample: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/\n"+
-				"        -d 74 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a\n"+
+				"        -d 74 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S -n 4.5 -N 0.5 -a\n"+
 				"        HIGH,MODERATE -e Benign,Likely_benign -c Pathogenic,Likely_pathogenic,\n"+
 				"        Conflicting_interpretations_of_pathogenicity -t 0.51 -u RYR1 -T \n"+
 				"        ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3 -R -E Likely_Neutral \n"+

@@ -2,6 +2,7 @@ package edu.utah.seq.vcf.anno;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 
 import util.gen.Gzipper;
@@ -89,11 +90,20 @@ public class AnnotatedVcfParserDataLine {
 	public static final String headerSpreadSheet = "FileName\tIGVLink\tCHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tAlleleFreq\t"
 			+ "UniOb\tReadDepth\tPriorCallFreq\tBKZ\tBKAF\tPopFreq\tPassClinvar\tClinvarFileDate\tClinLink\tClinHGVS\tClinSig\t"
 			+ "ClinSigConf\tPassOKB\tOKB-Oncogenic\tOKB-MutEff\tOKB-HighestLvl\tPassSpliceScan\tSpliceGene\tSpliceDiff";
+	public static final String headerPhi = "LastName\tFirstName\tDoB\tMRN\tPmrID\t";
 	
-	public void println(Gzipper sumarySpreadSheet, HashSet<String> transcriptsToKeep) throws IOException {
+	public void println(Gzipper sumarySpreadSheet, HashSet<String> transcriptsToKeep, HashMap<String, String> pmrIdPhi) throws IOException {
 		//calc varUniOb
 		if (varUniOb == -1) varUniOb = (int)Math.round(varAlleleFreq*(double)totalUniObDepth);
 		ArrayList<String> al = new ArrayList<String>();
+		//add phi? 
+		if (pmrIdPhi != null) {
+			//assuming PmrId is first in FR5YV2uf_A036832_FT-SA212032_FT-SA211983D_FT-SA211983R
+			String[] f = Misc.UNDERSCORE.split(trimmedFileName);
+			String phi = pmrIdPhi.get(f[0]);
+			if (phi == null) throw new IOException("\nERROR: failed to fetch phi for '"+ f[0]+"' from "+trimmedFileName);
+			al.add(phi);
+		}
 		//FileName
 		al.add(trimmedFileName);
 		//IGVLink

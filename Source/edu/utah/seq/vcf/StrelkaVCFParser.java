@@ -1,5 +1,6 @@
 package edu.utah.seq.vcf;
 
+import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -68,7 +69,7 @@ public class StrelkaVCFParser {
 		System.out.println("\nName\tPassing\tFailing");
 		for (File vcf: vcfFiles){
 			System.out.print(vcf.getName()+"\t");
-			parse(vcf);
+			parseLineByLine(vcf);
 		}
 		
 		System.out.println("\nComplete!");
@@ -117,23 +118,37 @@ public class StrelkaVCFParser {
 		sample.setAlternateCounts(nonRefCount+"");
 	}
 
-	public void parse(File vcf){
+	
+	public void parseLineByLine(File vcf){
 		try {
-			VCFParser parser = new VCFParser (vcf);
+
+			VCFParser parser = new VCFParser (vcf, false, true, true);
 			if (parser.getSampleNames()[1].equals("TUMOR") == false) Misc.printErrAndExit("Error: TUMOR doesn't appear to be the second sample in the VCF file?! "+vcf.getName());
+
+			//make io
+			BufferedReader in = parser.initializeParser();
+			File outFile = new File (saveDirectory, Misc.removeExtension(vcf.getName())+"_Filtered.vcf.gz");
+			Gzipper passOut = new Gzipper(outFile);
 			
-			File txt = null;
-			Gzipper out = null;
+			Gzipper outSpreadsheet = null;
 			if (printSpreadsheet){
-				txt = new File (saveDirectory, Misc.removeExtension(vcf.getName())+".txt.gz");
-				out = new Gzipper(txt);
-				out.println("#PASS\tCHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
+				File txt = new File (saveDirectory, Misc.removeExtension(vcf.getName())+".txt.gz");
+				outSpreadsheet = new Gzipper(txt);
+				outSpreadsheet.println("#PASS\tCHROM\tPOS\tREF\tALT\tT_AF\tT_DP\tN_AF\tN_DP\tFILTER\tINFO");
 			}
 			
-			for (VCFRecord r: parser.getVcfRecords()){	
+			//write out header inserting AF
+			writeHeaderWithExtraInfo(passOut, parser);
+			
+			VCFRecord r = null;
+			int numPass = 0;
+			int numFail = 0;
+			
+			while ((r= parser.fetchNext(in)) != null){
+
 				//look for . in ref or first alt
 				if (r.getReference().equals(".") || r.getAlternate()[0].equals(".")){
-					r.setFilter(VCFRecord.FAIL);
+					numFail++;
 					continue;
 				}
 				
@@ -149,85 +164,134 @@ public class StrelkaVCFParser {
 				}
 				double normRto = normTum[0].getAltRatio();
 				double tumRto = normTum[1].getAltRatio();
-				boolean pass = true;
 				
 				//check depth
 				int normDepth = normTum[0].getReadDepthDP();
 				int tumDepth = normTum[1].getReadDepthDP();
 				
-				if (normDepth < minimumNormalReadDepth || tumDepth < minimumTumorReadDepth) pass = false;
+				if (normDepth < minimumNormalReadDepth || tumDepth < minimumTumorReadDepth) {
+					numFail++;
+					continue;
+				}
 				
 				//check alt counts
 				int altCounts = Integer.parseInt(normTum[1].getAlternateCounts());
-				if (altCounts < minimumAltReadDepth) pass = false;
+				if (altCounts < minimumAltReadDepth) {
+					numFail++;
+					continue;
+				}
 				
 				//check allelic ratio diff
-				if (pass && minimumTNFractionDiff != 0){
+				if (minimumTNFractionDiff != 0){
 					double change = tumRto-normRto;
-					if (change < minimumTNFractionDiff) pass = false;
+					if (change < minimumTNFractionDiff) {
+						numFail++;
+						continue;
+					}
 				}
 
 				//check T/N AF ratio
-				if (pass && minimumTNRatio != 0 && normRto !=0){
+				if (minimumTNRatio != 0 && normRto !=0){
 					double change = tumRto/normRto;
-					if (change < minimumTNRatio) pass = false;
+					if (change < minimumTNRatio) {
+						numFail++;
+						continue;
+					}
 				}
 				
 				//check normal alt fraction?
-				if (pass && maximumNormalAltFraction !=1){
-					if (normRto > maximumNormalAltFraction) pass = false;
+				if (maximumNormalAltFraction !=1){
+					if (normRto > maximumNormalAltFraction) {
+						numFail++;
+						continue;
+					}
 				}
 				//check tumor alt fraction?
-				if (pass && minimumTumorAltFraction !=0){
-					if (tumRto < minimumTumorAltFraction) pass = false;
+				if (minimumTumorAltFraction !=0){
+					if (tumRto < minimumTumorAltFraction) {
+						numFail++;
+						continue;
+					}
 				}
 				//check PASS?
-				if (pass && excludeNonPass && r.getFilter().toLowerCase().contains("pass") == false) pass = false;
+				if (excludeNonPass && r.getFilter().toLowerCase().contains("pass") == false) {
+					numFail++;
+					continue;
+				}
 				
 				//set QSI QSS score in QUAL
 				Matcher mat = qsiOrs.matcher(r.getOriginalRecord());
 				if (mat.matches() == false) Misc.printErrAndExit("QSI or QSS score doesn't appear to be present in the record? "+r.getOriginalRecord());
 				float score = Float.parseFloat(mat.group(1));
 				r.setQuality(score);
-				if (score < minimumScore) pass = false;
+				if (score < minimumScore) {
+					numFail++;
+					continue;
+				}
 				
 				//apply tuned exome scoring based on QSI and QSS?
-				if (pass && stringency !=0) pass = tunedExomeFilt(tumRto, r.isSNP(), score);
+				if (stringency !=0) {
+					if (tunedExomeFilt(tumRto, r.isSNP(), score) == false) {
+						numFail++;
+						continue;
+					}
+				}
 				
-				/*if (false){	
-				Matcher mat = somEVS.matcher(r.getOriginalRecord());
-				if (mat.matches() == false) Misc.printErrAndExit("SomaticEVS doesn't appear to be present in the record? "+r.getOriginalRecord());
-				float score = Float.parseFloat(mat.group(1));
-				r.setQuality(score);
-				if (score < minimumScore) pass = false;
-				//System.out.println("Setting EVS "+ mat.group()+" "+r.getQuality());
-				}*/
+				if (printSpreadsheet) {
+					//build txt output
+					ArrayList<String> al = new ArrayList<String>();
+					al.add("true");
+					al.add(r.getChromosome());
+					al.add((r.getPosition()+1)+"");
+					al.add(r.getReference());
+					al.add(Misc.stringArrayToString(r.getAlternate(), ","));
+					al.add(tumRto+"");
+					al.add(tumDepth+"");
+					al.add(normRto+"");
+					al.add(normDepth+"");
+					al.add(r.getFilter());
+					al.add(r.getInfoObject().getInfoString());
+					String line = Misc.stringArrayListToString(al, "\t");
+					outSpreadsheet.println(line);
+				}
 				
-				//build txt output
-				ArrayList<String> al = new ArrayList<String>();
-				al.add(pass+"");
-				al.add(r.getChromosome());
-				al.add((r.getPosition()+1)+"");
-				al.add(r.getReference());
-				al.add(Misc.stringArrayToString(r.getAlternate(), ","));
-				al.add(tumRto+"");
-				al.add(tumDepth+"");
-				al.add(normRto+"");
-				al.add(normDepth+"");
-				al.add(r.getFilter());
-				al.add(r.getInfoObject().getInfoString());
-				String line = Misc.stringArrayListToString(al, "\t");
-				if (printSpreadsheet) out.println(line);
-				if (pass) r.setFilter(VCFRecord.PASS);
-				else r.setFilter(VCFRecord.FAIL);
+				//save it
+				numPass++;
+				String orig = r.toString();
+				//#CHROM POS ID REF ALT QUAL FILTER INFO FORMAT NORMAL TUMOR......
+				//   0    1   2  3   4   5     6     7      8      9     10
+				String[] fields = VCFParser.TAB.split(orig);
+				//reset score
+				fields[5] = Float.toString(r.getQuality());
+				//reset ID
+				fields[2] = "Strelka_"+numPass;
+				//add GT to format, igv is now requiring this to be first
+				fields[8] = "GT:"+fields[8]+ ":AF";
+				//add af to Norm and Tum
+				fields[9] = "./.:"+ fields[9]+ ":"+ formatAf (r.getSample()[0].getAltRatio());
+				String tumorAf = formatAf (r.getSample()[1].getAltRatio());
+				fields[10] = "./.:"+ fields[10]+ ":"+ tumorAf;
+				//remove existing DP
+				fields[7] = dp.matcher(fields[7]).replaceFirst("");
+				
+				//modify INFO
+				String normalAf = formatAf (r.getSample()[0].getAltRatio());
+				
+				//add DP and AF for tumor to INFO
+				fields[7] = "T_DP=" + r.getSample()[1].getReadDepthDP()+ ";T_AF=" + tumorAf+ ";N_DP=" + r.getSample()[0].getReadDepthDP()+ ";N_AF=" + normalAf + ";"+ fields[7] ;
+				
+				passOut.println(Misc.stringArrayToString(fields, "\t"));
+
+				
 			}
-			if (printSpreadsheet) out.close();
-			
-			File outFile = new File (saveDirectory, Misc.removeExtension(vcf.getName())+"_Filtered.vcf.gz");
-			printRecords(parser, outFile);
+			System.out.println(numPass+"\t"+numFail);
+			passOut.close();
+			if (printSpreadsheet) outSpreadsheet.close();
+			in.close();
 
 		} catch (Exception e) {
 			e.printStackTrace();
+			Misc.printErrAndExit("\nError parsing "+vcf);
 		}
 	}
 
@@ -405,14 +469,14 @@ public class StrelkaVCFParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Strelka VCF Parser: Dec 2018                          **\n" +
+				"**                           Strelka VCF Parser: April 2025                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS\n"+
 				"score. Also filters for read depth, T/N alt allelic ratio and diff, ref/alt with '.',\n"+
 				"and tumor and normal alt allelic ratios. Lastly, it inserts the tumor DP and AF info.\n"+
 				"For somatic exome datasets sequenced at >100X unique observation read depth, try the \n"+
 				"tier filtering to select for lists with approx 1%, 3-5%, and 9-15% FDR. Follow the\n"+
-				"example.\n"+
+				"example. Not accurate with lower read depts.\n"+
 
 				"\nRequired Params:\n"+
 				"-v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).\n" +
