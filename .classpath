@@ -63,7 +63,7 @@
 	<classpathentry kind="lib" path="LibraryJars/jsch-0.1.53.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/minimal-json-0.9.4.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/mongo-java-driver-2.14.2.jar"/>
-	<classpathentry kind="lib" path="LibraryJars/json-20140107.jar"/>
+	<classpathentry kind="lib" path="LibraryJars/json-20140107.jar" sourcepath="/Users/u0028003/.m2/repository/org/json/json/20140107/json-20140107-sources.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/commons-codec-1.10.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/sqljdbc41.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/joda-time-2.10.1.jar"/>
@@ -72,6 +72,7 @@
 	<classpathentry kind="lib" path="LibraryJars/picard_2.22.4.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/GQueryCLI.jar"/>
 	<classpathentry kind="lib" path="LibraryJars/commons-text-1.9.jar"/>
-	<classpathentry kind="lib" path="/Users/u0028003/Code/USeq/LibraryJars/SubjectMatchMaker_0.4.jar"/>
+	<classpathentry kind="lib" path="LibraryJars/SubjectMatchMaker_0.5.jar"/>
+	<classpathentry kind="lib" path="LibraryJars/opencsv-5.8.jar"/>
 	<classpathentry kind="output" path="Classes"/>
 </classpath>

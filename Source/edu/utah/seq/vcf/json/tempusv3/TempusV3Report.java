@@ -1,8 +1,11 @@
 package edu.utah.seq.vcf.json.tempusv3;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.regex.Pattern;
+
 import org.json.JSONException;
 import org.json.JSONObject;
 import util.gen.Json;
@@ -17,6 +20,7 @@ public class TempusV3Report {
 	private String notes = null;
 	private String reportStatus = null;
 	private ArrayList<String> warningMessages = new ArrayList<String>();
+	private static final Pattern patT = Pattern.compile("T");
 	
 	/*
      "report": {
@@ -41,24 +45,27 @@ public class TempusV3Report {
 		bioInfoPipeline = Json.getStringAttribute(report, "bioInfoPipeline");
 		notes = Json.getStringAttribute(report, "notes");
 		if (notes != null) notes = Misc.WHITESPACE.matcher(notes).replaceAll(" ");
-		TempusV3Json2Vcf.add(bioInfoPipeline, tempusJson2Vcf.bioInfoPipeline);
+		if (tempusJson2Vcf!=null) TempusV3Json2Vcf.add(bioInfoPipeline, tempusJson2Vcf.bioInfoPipeline);
 
 		if (report.has("workflow")) {
 			JSONObject workflow = report.getJSONObject("workflow");
 			//report status, watch this one, if qns then expect junk results
 			reportStatus = Json.getStringAttribute(workflow, "reportStatus");
 			if (reportStatus.contains("standard")==false) warningMessages.add("Report Status indicates it is not standard, possible quality control problem. View results with caution.");
-			TempusV3Json2Vcf.add(reportStatus, tempusJson2Vcf.reportStatus);
+			if (tempusJson2Vcf!=null) TempusV3Json2Vcf.add(reportStatus, tempusJson2Vcf.reportStatus);
 		}
 		
+	}
+	
+	public String getSignOutDateNoTime() throws IOException {
+		//"signoutDate": "2025-03-02T19:46:09"
+		String[] split = patT.split(signoutDate);
+		if (split.length !=2 || split[0].startsWith("20")==false) throw new IOException("Failed to split the sign out data "+signoutDate);
+		return split[0];
 	}
 
 	public String getReportId() {
 		return reportId;
-	}
-
-	public String getsignoutDate() {
-		return signoutDate;
 	}
 
 	public String getBioInfPipeline() {
@@ -97,6 +104,18 @@ public class TempusV3Report {
 
 	public File getJsonFile() {
 		return jsonFile;
+	}
+
+	public String getSignoutDate() {
+		return signoutDate;
+	}
+
+	public String getBioInfoPipeline() {
+		return bioInfoPipeline;
+	}
+
+	public String getReportStatus() {
+		return reportStatus;
 	}
 	
 }

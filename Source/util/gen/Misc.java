@@ -6,6 +6,7 @@ import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintWriter;
+import java.text.SimpleDateFormat;
 
 import org.apache.log4j.Logger;
 
@@ -1001,6 +1002,14 @@ public class Misc {
 		GregorianCalendar c = new GregorianCalendar();
 		return c.get(Calendar.DAY_OF_MONTH)+months[c.get(Calendar.MONTH)]+ c.get(Calendar.YEAR);
 	}
+	
+	/**Returns YYYYMMDD*/
+	public static String getDateInNumbersNoSpaces(){
+		Date currentDate = new Date();
+		SimpleDateFormat formatter = new SimpleDateFormat("yyyyMMdd");
+		return formatter.format(currentDate);
+	}
+	
 	
 	/**Returns a formatted time 2:15:00 given 2.25*/
 	public static String getFormattedTimeFromFraction (double fractionalTime){

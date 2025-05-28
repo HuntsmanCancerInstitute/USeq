@@ -107,7 +107,7 @@ public class TempusV3Specimen {
 		caseId = Json.getStringAttribute(id, "caseId");
 		blockId = Json.getStringAttribute(id, "blockId");
 		tumorPercentage = Json.getIntegerAttribute(id, "tumorPercentage");
-		if (tumorPercentage != null) tempusJson2Vcf.tumorPercentages.count(tumorPercentage);
+		if (tumorPercentage != null && tempusJson2Vcf!=null) tempusJson2Vcf.tumorPercentages.count(tumorPercentage);
 		
 		//diagnosis
 		JSONObject d = object.getJSONObject("diagnosis");
@@ -116,10 +116,12 @@ public class TempusV3Specimen {
 		tempusIcd10Code = Json.getStringAttribute(d, "tempusIcd10Code");
 		originPathLabDiagnosis = Json.getStringAttribute(d, "originPathLabDiagnosis");
 		
-		TempusV3Json2Vcf.add(sampleCategory, tempusJson2Vcf.sampleCategories);
-		TempusV3Json2Vcf.add(primarySampleSite, tempusJson2Vcf.sampleSites);
-		TempusV3Json2Vcf.add(normalSampleSite, tempusJson2Vcf.sampleSites);
-		TempusV3Json2Vcf.add(originPathLabDiagnosis, tempusJson2Vcf.diagnosis);
+		if (tempusJson2Vcf!=null) {
+			TempusV3Json2Vcf.add(sampleCategory, tempusJson2Vcf.sampleCategories);
+			TempusV3Json2Vcf.add(primarySampleSite, tempusJson2Vcf.sampleSites);
+			TempusV3Json2Vcf.add(normalSampleSite, tempusJson2Vcf.sampleSites);
+			TempusV3Json2Vcf.add(originPathLabDiagnosis, tempusJson2Vcf.diagnosis);
+		}
 		
 	}
 	

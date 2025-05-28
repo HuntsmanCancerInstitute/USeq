@@ -25,7 +25,7 @@ public class TempusV3Json2Vcf {
 	private LinkedHashSet<String> keysToExport = null;
 	
 	//internal fields
-	private String[] acceptedSchema = {"v3.3.0"}; 
+	private static String acceptedSchema = "v3."; 
 	private IndexedFastaSequenceFile fasta = null;
 	private String source = null;
 	private HashMap<String, Bed> cnvGeneNameBed = null;
@@ -34,7 +34,7 @@ public class TempusV3Json2Vcf {
 	private LinkedHashMap<String,String>[] allReportAttributes = null;
 	private HashMap<String, String[]> geneAliases = null;
 	private ArrayList<TempusV3Variant> failedToFindCooridinates = new ArrayList<TempusV3Variant>();
-	private HashMap<String, TempusV3JsonCollection> patientCollections = null;
+	private HashMap<String, TempusV3JsonCollection> orderCollections = null;
 	
 	//counters across all datasets
 	TreeMap<String, Integer> bioInfoPipeline = new TreeMap<String, Integer>();
@@ -66,6 +66,7 @@ public class TempusV3Json2Vcf {
 	//working data for a particular report
 	private LinkedHashMap<String,String> reportAttributes = null;
 	private File workingJsonFile = null;
+	private JSONObject workingJsonObject = null;
 	private TempusV3Report workingReport = null;
 	private TempusV3Patient workingPatient = null;
 	private TempusV3Order workingOrder = null;
@@ -140,20 +141,20 @@ public class TempusV3Json2Vcf {
 			workingJsonFile = jsonFiles[i];
 			IO.p("\t"+workingJsonFile.getName());
 
-			convert();
-
-			summaries.add(new TempusV3JsonSummary(workingOrder, workingPatient, workingReport, workingSpecimens, workingResults));
-			
-			resetWorkingCounters();
-			allReportAttributes[i] = reportAttributes;
+			if (convert()) {
+				summaries.add(new TempusV3JsonSummary(workingJsonObject, workingOrder, workingPatient, workingReport, workingSpecimens, workingResults));
+				resetWorkingCounters();
+				allReportAttributes[i] = reportAttributes;
+			}
+			else IO.pl();
 		}
 		
-		//group summaries by patient, by tumor sample
+		//group summaries by tempusOrderId, cannot do by tempus patient id, these are not system wide
 		groupSummaries();
 		
 		//save vcfs
 		IO.pl("\nWriting merged json VCFs... ");
-		for (TempusV3JsonCollection c: patientCollections.values()) writeVcfs(c);
+		for (TempusV3JsonCollection c: orderCollections.values()) writeVcfs(c);
 
 		//close the fasta lookup fetcher
 		if (indexedFasta != null) fasta.close();
@@ -161,39 +162,34 @@ public class TempusV3Json2Vcf {
 	}
 	
 	private void groupSummaries() {
-		IO.pl("\nGrouping summaries by patient and tumor specimen...");
-		patientCollections = new HashMap<String, TempusV3JsonCollection>();
+		IO.pl("\nGrouping summaries by 'tempusOrderId' all of which are focused on one tumor sample...");
+		orderCollections = new HashMap<String, TempusV3JsonCollection>();
 		for (TempusV3JsonSummary s: summaries) {
-			String tempusPatientId = s.getTempusPatient().getTempusId();
-			TempusV3JsonCollection c = patientCollections.get(tempusPatientId);
+			String tempusOrderId = s.getTempusOrder().getTempusOrderId();
+			TempusV3JsonCollection c = orderCollections.get(tempusOrderId);
 			if (c==null) {
-				c = new TempusV3JsonCollection(tempusPatientId);
-				patientCollections.put(tempusPatientId, c);
+				c = new TempusV3JsonCollection(tempusOrderId);
+				orderCollections.put(tempusOrderId, c);
 			}
 			c.getJsonSummaries().add(s);
 		}
-		IO.pl("\t"+patientCollections.size()+"\tPatients");
-		
-		//for each patient group summaries by tumor specimine
-		for (TempusV3JsonCollection col: patientCollections.values()) col.groupByTumor();
-		
+		IO.pl("\t"+orderCollections.size()+"\tOrders");
+
 		//print stats
-		for (String patientId: patientCollections.keySet()) {
-			IO.pl("PatientId: "+patientId);
+		for (String tempusOrderId: orderCollections.keySet()) {
+			IO.pl("TempusOrderId: "+tempusOrderId);
 			//get the collection
-			TempusV3JsonCollection collection = patientCollections.get(patientId);
-			//for each tumor sample, HashMap<String, ArrayList<TempusV3JsonSummary>>
-			for (String tumorKey: collection.getTumorSummaries().keySet()) {
-				IO.pl("\t"+ tumorKey);
-				ArrayList<TempusV3JsonSummary> al = collection.getTumorSummaries().get(tumorKey);
-				IO.p("\t\t"+al.size()+"\tReports: ");
-				for (TempusV3JsonSummary sum: al) {
-					TempusV3Order order = sum.getTempusOrder();
-					IO.p(order.getAccessionId()+ "_"+ order.getTempusOrderId());
-					IO.p(" ");
-				}
-				IO.pl();
-			}	
+			TempusV3JsonCollection collection = orderCollections.get(tempusOrderId);
+
+			ArrayList<TempusV3JsonSummary> al = collection.getJsonSummaries();
+			IO.p("\t"+al.size()+"\tReports: ");
+			for (TempusV3JsonSummary sum: al) {
+				TempusV3Order order = sum.getTempusOrder();
+				IO.p(order.getAccessionId()+ "_"+ order.getTempusOrderId());
+				IO.p(" ");
+			}
+			IO.pl();
+
 		}
 	}
 	
@@ -233,7 +229,7 @@ public class TempusV3Json2Vcf {
 		in.close();
 	}
 
-	/**PMR ID, Patient Molecular Repo ID, HCI patient identifier*/
+	/**PMR ID, Patient Molecular Repo ID, HCI patient identifier, will NOT be present in a new json from Tempus*/
 	private void addMDPID() throws IOException {
 		String mdpid = Misc.fetchMDPID(workingJsonFile);
 		if (mdpid != null) reportAttributes.put("MolecularDataPatientId", mdpid);
@@ -243,7 +239,7 @@ public class TempusV3Json2Vcf {
 		IO.pl("\nExporting patient summary spreadsheet... ");
 		//merge all the keys
 		LinkedHashSet<String> allKeys = new LinkedHashSet<String>();
-		for (LinkedHashMap<String,String> s : allReportAttributes) allKeys.addAll(s.keySet());
+		for (LinkedHashMap<String,String> s : allReportAttributes) if (s!=null) allKeys.addAll(s.keySet());
 		IO.pl("\tAvailable attributes: "+allKeys);
 		
 		if (keysToExport == null) keysToExport = allKeys;
@@ -274,6 +270,7 @@ public class TempusV3Json2Vcf {
 		
 		//write a line per sample
 		for (LinkedHashMap<String,String> s : allReportAttributes) {
+			if (s== null) continue;
 			//for each key
 			for (String k: keysToExport) {
 				String v = s.get(k);
@@ -321,37 +318,34 @@ public class TempusV3Json2Vcf {
 	
 	private void writeVcfs(TempusV3JsonCollection collection) throws Exception {
 
-		//for each tumor sample
-		for (String tumorKey: collection.getTumorSummaries().keySet()) {
-			ArrayList<TempusV3JsonSummary> al = collection.getTumorSummaries().get(tumorKey);
-			//collect accessionIDs
-			String[] ids = new String[al.size()];
-			int i=0;
-			for (TempusV3JsonSummary sum: al) ids[i++] = sum.getTempusOrder().getAccessionId();
-			String combIds = Misc.stringArrayToString(ids, "_");
+		ArrayList<TempusV3JsonSummary> al = collection.getJsonSummaries();
+		//collect accessionIDs
+		String[] ids = new String[al.size()];
+		int i=0;
+		for (TempusV3JsonSummary sum: al) ids[i++] = sum.getTempusOrder().getAccessionId();
+		String combIds = Misc.stringArrayToString(ids, "_");
 
-			Gzipper out = new Gzipper(new File (saveDirectory, combIds+".vcf.gz"));
-			//add header
-			out.println(fetchVcfHeader(al));
-			ArrayList<Bed> bedVcfs = new ArrayList<Bed>();
-			int counter = 0;
-			
-			for (TempusV3JsonSummary sum: al) { 
-				for (TempusV3Variant tv: sum.getTempusV3Results().getVariants()) {
-					String vcf = tv.toVcf(counter);
-					if (vcf != null) {
-						counter++;
-						bedVcfs.add(fetchBed(vcf));
-					}
+		Gzipper out = new Gzipper(new File (saveDirectory, combIds+".vcf.gz"));
+		//add header
+		out.println(fetchVcfHeader(al));
+		ArrayList<Bed> bedVcfs = new ArrayList<Bed>();
+		int counter = 0;
+
+		for (TempusV3JsonSummary sum: al) { 
+			for (TempusV3Variant tv: sum.getTempusV3Results().getVariants()) {
+				String vcf = tv.toVcf(counter);
+				if (vcf != null) {
+					counter++;
+					bedVcfs.add(fetchBed(vcf));
 				}
 			}
-			//sort the variants by position and print to file, might be none so an empty vcf
-			Bed[] b = new Bed[bedVcfs.size()];
-			bedVcfs.toArray(b);
-			Arrays.sort(b);
-			for (Bed t: b) out.println(t.getName());
-			out.close();
 		}
+		//sort the variants by position and print to file, might be none so an empty vcf
+		Bed[] b = new Bed[bedVcfs.size()];
+		bedVcfs.toArray(b);
+		Arrays.sort(b);
+		for (Bed t: b) out.println(t.getName());
+		out.close();
 	}
 
 	private String fetchVcfHeader(ArrayList<TempusV3JsonSummary> al){
@@ -412,33 +406,34 @@ public class TempusV3Json2Vcf {
 		sb.append("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO");
 		return sb.toString();
 	}
-	
-	private void convert() {
+	 
+	private boolean convert() {
 		try {
 			
 			String jString = IO.loadFile(workingJsonFile, " ", true);
-	        JSONObject object = new JSONObject(jString);
-	        
+	        workingJsonObject = new JSONObject(jString);
+
 	        //schema
-	        checkSchema(object);
+	        if (checkSchema(workingJsonObject)== false) return false;
+	        
 	        reportAttributes = new LinkedHashMap<String,String>();
 			addMDPID();
 	        reportAttributes.put("jsonFile", workingJsonFile.getCanonicalPath());
 	        
 	        //report
-	        workingReport = new TempusV3Report(workingJsonFile, object, this);
+	        workingReport = new TempusV3Report(workingJsonFile, workingJsonObject, this);
 	        workingReport.addAttributes(reportAttributes);
 	        
 	        //patient
-	        workingPatient = new TempusV3Patient(object, this);
+	        workingPatient = new TempusV3Patient(workingJsonObject, this, true);
 	        workingPatient.addAttributes(reportAttributes, includePHI);
 	        
 	        //order
-	        workingOrder = new TempusV3Order(object, this);
+	        workingOrder = new TempusV3Order(workingJsonObject, this);
 	        workingOrder.addAttributes(reportAttributes);
 
 	        //specimens, should be a maximum of two!
-	        workingSpecimens = TempusV3Specimen.getSpecimens(object, this);
+	        workingSpecimens = TempusV3Specimen.getSpecimens(workingJsonObject, this);
 	        TempusV3Specimen.addAttributes(reportAttributes, workingSpecimens);
 	        
 	        //load any somatic and germline vcf files, might be null
@@ -447,18 +442,39 @@ public class TempusV3Json2Vcf {
 	        if (workingSomVcfLines == null && workingGermVcfLines == null) IO.pl("\tWARNING: no vcf lines for "+workingOrder.getAccessionId());
 	        else IO.pl();
 	        //results
-	        workingResults = new TempusV3GenomicVariants(object, this);
+	        workingResults = new TempusV3GenomicVariants(workingJsonObject, this);
 	        workingResults.addAttributes(reportAttributes);
 
 	        //check variant ref bps
 	        if (indexedFasta != null) checkRefSeqs();
-	        
+	        return true;
 	        
 		} catch (Exception e) {
 			e.printStackTrace();
 			Misc.printErrAndExit("\nError parsing this json file "+workingJsonFile);
+			return false;
 		}
 	}	
+	
+	public static TempusV3JsonSummary parseJsonNoVariants(File v3JsonFile) throws Exception {
+		String jString = IO.loadFile(v3JsonFile, " ", true);
+        JSONObject object = new JSONObject(jString);
+        
+        //schema
+        if (checkSchema(object)== false) return null;
+        
+        //parse components
+        TempusV3Report report = new TempusV3Report(v3JsonFile, object, null);
+        //check status, skip quality failing reports, "biomarker_qns" and "qns"
+        if (report.getReportStatus().contains("qns")) return null;
+        
+        TempusV3Patient patient = new TempusV3Patient(object, null, true);
+        TempusV3Order order = new TempusV3Order(object, null);
+        TempusV3Specimen[] specimens = TempusV3Specimen.getSpecimens(object, null);
+        TempusV3GenomicVariants results = null;
+
+        return new TempusV3JsonSummary(object, order, patient, report, specimens, results);
+	}
 	
 	private String[] loadVcfLines(String accessionId, boolean loadSomaticVcfs) throws IOException {
 		//TL-25-1CGRW7DEBN_20250227.soma.freebayes.vcf
@@ -490,18 +506,13 @@ public class TempusV3Json2Vcf {
 		return lines;
 	}
 
-	private void checkSchema(JSONObject object) {
+	private static boolean checkSchema(JSONObject object) {
+		if (object.has("metadata") == false) return false;
         JSONObject meta = object.getJSONObject("metadata");
-        jsonSchema = Json.getStringAttribute(meta, "schemaVersion");
+        String jsonSchema = Json.getStringAttribute(meta, "schemaVersion");
         if (jsonSchema == null) Misc.printErrAndExit("\nschemaVersion not found! Aborting. ");
-        boolean OK = false;
-        for (String s: acceptedSchema) {
-        	if (jsonSchema.equals(s)) {
-        		OK = true;
-        		break;
-        	}
-        }
-        if (OK == false) Misc.printErrAndExit("\nIncorrect schema! Aborting. Only works with "+ Misc.stringArrayToString(acceptedSchema, ", ")+" found "+jsonSchema);
+        if (jsonSchema.startsWith(acceptedSchema)) return true;
+        return false;
 	}
 
 	private void checkRefSeqs() throws Exception {

@@ -2,15 +2,19 @@ package edu.utah.seq.vcf.json.tempusv3;
 
 import java.io.File;
 
+import org.json.JSONObject;
+
 public class TempusV3JsonSummary {
 
+	private JSONObject mainObject = null;
 	private TempusV3Order tempusV3Order = null;
 	private TempusV3Patient tempusV3Patient = null;
 	private TempusV3Report tempusV3Report = null;
 	private TempusV3Specimen[] tempusV3Specimens = null;
 	private TempusV3GenomicVariants tempusV3Results = null;
 	
-	TempusV3JsonSummary (TempusV3Order tempusV3Order, TempusV3Patient tempusV3Patient, TempusV3Report tempusV3Report, TempusV3Specimen[] tempusSpecimens, TempusV3GenomicVariants tempusV3Results){
+	TempusV3JsonSummary (JSONObject mainObject, TempusV3Order tempusV3Order, TempusV3Patient tempusV3Patient, TempusV3Report tempusV3Report, TempusV3Specimen[] tempusSpecimens, TempusV3GenomicVariants tempusV3Results){
+		this.mainObject = mainObject;
 		this.tempusV3Order = tempusV3Order;
 		this.tempusV3Patient = tempusV3Patient;
 		this.tempusV3Report = tempusV3Report;
@@ -36,5 +40,9 @@ public class TempusV3JsonSummary {
 
 	public TempusV3GenomicVariants getTempusV3Results() {
 		return tempusV3Results;
+	}
+
+	public JSONObject getMainObject() {
+		return mainObject;
 	}
 }

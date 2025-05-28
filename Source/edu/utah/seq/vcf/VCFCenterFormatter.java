@@ -164,7 +164,7 @@ public class VCFCenterFormatter {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Center Formatter : Mar 2020                       **\n" +
+				"**                            VCF Center Formatter : May 2025                       **\n" +
 				"**************************************************************************************\n" +
 				"Looks for key words in each VCF record's ID field, if found appends the matching\n"+
 				"center designation to the info field.\n"+
@@ -174,7 +174,7 @@ public class VCFCenterFormatter {
 				"-s Path to a directory to save the modified vcf files.\n"+
 				"-i Comma delimited list, no spaces, lower case, of IDs to look for, defaults to \n"+
 				"      foundation,tempus,strelka\n"+
-				"-i Comma delimited list, no spaces, of Center names to append to the CIV= info field\n"+
+				"-c Comma delimited list, no spaces, of Center names to append to the CIV= info field\n"+
 				"      defaults to Foundation,Tempus,HCI\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/VCFCenterFormatter -v Calls/ -s CCalls\n\n"+

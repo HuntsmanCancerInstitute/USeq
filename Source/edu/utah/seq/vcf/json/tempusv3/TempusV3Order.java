@@ -17,6 +17,10 @@ public class TempusV3Order {
 	private String referenceGenome = null;
 	private String institution = null;
 	
+	//parsed for file naming
+	private String firstNamePhysician = null;
+	private String lastNamePhysician = null;
+	
 	/*
      "order": {
           "institution": "Huntsman Cancer Institute",
@@ -42,9 +46,22 @@ public class TempusV3Order {
 		testDescription = Json.getStringAttribute(test, "description");
 		referenceGenome = Json.getStringAttribute(test, "referenceGenome");
 		
-		TempusV3Json2Vcf.add(physician, tempusJson2Vcf.physicians);
-		TempusV3Json2Vcf.add(testCode, tempusJson2Vcf.testCodes);
-		TempusV3Json2Vcf.add(testDescription, tempusJson2Vcf.testDescriptions);
+		if (tempusJson2Vcf!=null) {
+			TempusV3Json2Vcf.add(physician, tempusJson2Vcf.physicians);
+			TempusV3Json2Vcf.add(testCode, tempusJson2Vcf.testCodes);
+			TempusV3Json2Vcf.add(testDescription, tempusJson2Vcf.testDescriptions);
+		}
+		
+		String firstLast = physician;
+		firstLast = Misc.SINGLE_QUOTE.matcher(firstLast).replaceAll("");
+		String[] split = Misc.WHITESPACE.split(firstLast);
+		firstNamePhysician = split[0];
+		StringBuilder sb = new StringBuilder (split[1]);
+		for (int i=2; i< split.length; i++) {
+			sb.append("-");
+			sb.append(split[i]);
+		}
+		lastNamePhysician = sb.toString();
 	}
 	
 	/**Placed in VCF Header*/
@@ -96,5 +113,13 @@ public class TempusV3Order {
 
 	public String getInstitution() {
 		return institution;
+	}
+
+	public String getFirstNamePhysician() {
+		return firstNamePhysician;
+	}
+
+	public String getLastNamePhysician() {
+		return lastNamePhysician;
 	}
 }

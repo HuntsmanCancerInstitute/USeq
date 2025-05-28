@@ -40,7 +40,6 @@ public class TempusJsonParser {
 		checkTestOrder();
 		//printInfo();
 	}
-	
 	/*
 	 	XE.V1 Complete exome (germline, tumor) + mRNA (tumor)
 		XO Panel of 1714 genes (germline, tumor) + mRNA (tumor)

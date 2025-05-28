@@ -371,7 +371,11 @@
 				
 					<a href="#TempusDataWrangler">TempusDataWrangler</a><br>
 				
+					<a href="#TempusDataWranglerV3">TempusDataWranglerV3</a><br>
+				
 					<a href="#TempusJson2Vcf">TempusJson2Vcf</a><br>
+				
+					<a href="#TempusV3Json2Vcf">TempusV3Json2Vcf</a><br>
 				
 					<a href="#TempusVcfComparator">TempusVcfComparator</a><br>
 				
@@ -799,7 +803,7 @@ Example: java -jar pathToUSeq/Apps/TNScopeVCFParser -v ToParse/ -n 0.5 -u 100
 </pre><br><p>
 				
 					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                          Annotated Vcf Parser  January 2025                      **
+**                          Annotated Vcf Parser - April 2025                       **
 **************************************************************************************
 Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
 VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
@@ -824,8 +828,9 @@ Options:
 -z Minimum BKZ when present.
 -b Maximum fraction of BKAF samples with allele frequency >= VCF AF*0.9, only applies
        if present.
--g Splice junction types to scan.
--n Minimum difference in splice junction scores, only applies if present.
+-g Splice junction types to scan, comma delimited, no spaces: D5S,D3S,G5S,G3S
+-n Minimum difference in MaxEntScan splice junction scores, only applies if present.
+-N Minimum SpliceAI score, 0-1, only applies if present.
 -a Comma delimited list of SnpEff ANN impact categories to select for.
 -l Further restrict ANN impacts to one of these effects: frameshift_variant,
        stop_gained, stop_lost, or start_lost.
@@ -847,11 +852,13 @@ Options:
        Defaults to require that all set pass. CLINVAR take priority over OncoKB.
 -T Txt file containing a list of transcripts to keep, one per line, to use in filtering
        the summary spreadsheet output.
+-U Path to a Patient Molecular Repo currentRegistry_xxx.txt file for adding patient PHI to
+       the spreadsheet report.
 -r Verbose per record output.
 -y Path to a config txt file for setting the above.
 
 Example: java -jar pathToUSeq/Apps/AnnotatedVcfParser -v VCFFiles/ -s Parsed/
-        -d 74 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S,G5S,G3S -n 4.5 -a
+        -d 74 -m 0.05 -x 0.75 -j -p 0.02 -b 0.1 -z 3 -g D5S,D3S -n 4.5 -N 0.5 -a
         HIGH,MODERATE -e Benign,Likely_benign -c Pathogenic,Likely_pathogenic,
         Conflicting_interpretations_of_pathogenicity -t 0.51 -u RYR1 -T 
         ~/Ref/ACMGTranscripts.txt -C 2021-04-04 -w 3 -R -E Likely_Neutral 
@@ -5403,6 +5410,49 @@ Example: java -jar pathToUSeq/Apps/TempusDataWrangler -b s3://tm-huntsman/
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="TempusDataWranglerV3"><pre>**************************************************************************************
+**                          Tempus Data Wrangler V3 : May 28 2025                   **
+**************************************************************************************
+The Tempus Data Wrangler downloads complete patient datasets from an AWS bucket, parses
+the json test files for patient info, fetches/makes coreIds using the SubjectMatchMaker
+app and assembles TNRunner compatible analysis directories. Deidentified versions of the
+json reports are saved. Do look at the log output at the failing patient datasets and
+resolve the issues (e.g. broken/missing jsons, multiple DNA/RNA tars, etc.). This tool
+works with json schema's 3.x+ and ignores others. For each patient tumor sample, all
+of the associated json reports (RS, cfDNA, xT, PDL, MMR, etc. ) and associated vcf
+files in the ClinicalReport folder for processing with the USeq TempusV3Json2Vcf app.
+Tar.gz files are uncompressed and the fastq.gz files placed in the Fastq/ folders.
+
+Required system apps: AWS CLI (https://aws.amazon.com/cli) and parallel 
+(https://www.gnu.org/software/parallel)
+
+Options:
+-j Directory to build patient job folders
+-r Directory to download Tempus json reports with PHI
+-c Directory containing the SubjectMatchMaker 'currentRegistry_' file
+-t Directory for writing tmp files with PHI for SubjectMatchMaker.
+-o Minimum days old before processing any patient tumor data collection, defaults to 7
+      Tempus releases reports as they become available and does not hold reports before
+      the entire set is ready.  Immediately processing reports will lead to partial
+      datasets. Each order results in multiple reports.
+-b S3 bucket URI where test results files are placed by Tempus, defaults to 
+      's3://tm-huntsman'
+-p AWS credentials profile for accessing your Tempus bucket, defaults to 'tempus'
+-d File containing the list of files in your Tempus bucket, e.g. 
+      'aws --profile tempus s3 ls s3://tm-huntsman --recursive > tm-huntsman.list.txt'
+-m File containing the list of Tempus ClinicalReport 'xxx.manifest.txt' files in your
+      patient molecular repository bucket, e.g. 'aws s3 ls 
+      s3://hcibioinfo-patient-molecular-repo --recursive | grep _manifest.txt | grep
+      ClinicalReport > manifestFiles.txt'
+-v Verbose output.
+
+Example: java -jar pathToUSeq/Apps/TempusDataWranglerV3 -o 5 -j ~/Tempus/TJobs/ 
+      -r ~/Tempus/JsonReports_PHI/ -c ~/SMM/Registry_PHI -t ~/SMM/SMM_Tmp_PHI 
+      -d tm-huntsman.list.txt -m manifests.txt
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="TempusJson2Vcf"><pre>**************************************************************************************
 **                            Tempus Json 2 Vcf: April 2025                         **
 **************************************************************************************
@@ -5426,6 +5476,36 @@ Options:
 Example: java -Xmx2G -jar pathToUSeq/Apps/TempusJson2Vcf -j /F1/TempusJsons
      -f /Ref/human_g1k_v37.fasta -s /F1/VCF/ -b /Ref/b37TempusGeneRegions.bed.gz
      -a accessionId,tumorMutationalBurden,msiStatus,diagnosis -g /Ref/geneAli.txt.gz
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="TempusV3Json2Vcf"><pre>**************************************************************************************
+**                            Tempus V3 Json 2 Vcf: May 2025                        **
+**************************************************************************************
+This app groups json v3+ Tempus reports by patient and tumor. It then merges the 
+variant, IHC, MMR, RNA results and generates a combine vcf with both germline and 
+somatic snvs, indels, cnvs, and gene fusions.  Clinical attributes are included in the
+vcf header as well as written out to a spreadsheet. Vcfs from tumor only submissions
+may contain a mix of somatic and inherited variants. Vt normalize the exported vcfs,
+https://github.com/atks/vt and CrossMap https://github.com/liguowang/CrossMap the
+coordinates to hg38.
+
+Options:
+-j Path to a directory containing json and vcf files downloaded from Tempus for one
+     or more patients, (.json/.vcf)(.gz/.zip OK)
+-s Path to a directory for saving the parsed results.
+-b Path to a bed file for converting CNV and fusion gene names to coordinates where the
+     bed name column contains just the gene name.
+-f Path to the reference hg19 fasta with xxx.fai index for gene conversions.
+-g Path to a gene alias file for genomic coordiante conversions.
+-i Include PHI in spreadsheet output, defaults to excluding it. 
+-a Print this list of attributes in spreadsheet, comma delimited, case sensitive, no
+     spaces. Defaults to all. Run without to get a list of available attributes.
+
+Example: java -Xmx2G -jar pathToUSeq/Apps/TempusV3Json2Vcf -j /F1/TempusJsonsVcfs
+     -f /Ref/human_g1k_v37.fasta -s /F1/ParsedResults/ -b /Ref/b37TempusGeneRegions.bed
+     -a 'accessionId,tumorMutationalBurden,msiStatus,diagnosis' -g /Ref/geneAli.txt.gz
 
 **************************************************************************************
 </pre><br><p>
@@ -6002,7 +6082,7 @@ Example: java -jar pathToUSeq/Apps/VCFCallFrequency -f Vcf/ -s CFVcfs -v
 </pre><br><p>
 				
 					<a name="VCFCenterFormatter"><pre>**************************************************************************************
-**                            VCF Center Formatter : Mar 2020                       **
+**                            VCF Center Formatter : May 2025                       **
 **************************************************************************************
 Looks for key words in each VCF record's ID field, if found appends the matching
 center designation to the info field.
@@ -6012,7 +6092,7 @@ Options:
 -s Path to a directory to save the modified vcf files.
 -i Comma delimited list, no spaces, lower case, of IDs to look for, defaults to 
       foundation,tempus,strelka
--i Comma delimited list, no spaces, of Center names to append to the CIV= info field
+-c Comma delimited list, no spaces, of Center names to append to the CIV= info field
       defaults to Foundation,Tempus,HCI
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFCenterFormatter -v Calls/ -s CCalls
@@ -6730,14 +6810,14 @@ Example: java -Xmx10G -jar pathTo/USeq/Apps/ScoreEnrichedRegions -c
 </pre><br><p>
 				
 					<a name="StrelkaVCFParser"><pre>**************************************************************************************
-**                            Strelka VCF Parser: Dec 2018                          **
+**                           Strelka VCF Parser: April 2025                         **
 **************************************************************************************
 Parses Strelka VCF INDEL and SNV files, replacing the QUAl score with the QSI or QSS
 score. Also filters for read depth, T/N alt allelic ratio and diff, ref/alt with '.',
 and tumor and normal alt allelic ratios. Lastly, it inserts the tumor DP and AF info.
 For somatic exome datasets sequenced at >100X unique observation read depth, try the 
 tier filtering to select for lists with approx 1%, 3-5%, and 9-15% FDR. Follow the
-example.
+example. Not accurate with lower read depts.
 
 Required Params:
 -v Full path file or directory containing xxx.vcf(.gz/.zip OK) file(s).
