@@ -764,6 +764,7 @@ public class IO {
 		if (dir.exists()) deleteDirectoryViaCmdLine(dir);
 	}
 
+	/**Don't run this on linked dirs, it will track to the original and delete it!*/
 	public static void deleteDirectoryViaCmdLine(File dir){
 		try {
 			IO.executeCommandLine(new String[]{"rm","-rf",dir.getCanonicalPath()});

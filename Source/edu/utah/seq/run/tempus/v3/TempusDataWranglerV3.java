@@ -6,7 +6,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
-import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -16,19 +15,13 @@ import java.util.HashSet;
 import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.biojava.bio.seq.impl.NewAssembledSymbolList;
-import org.json.JSONException;
 import edu.utah.hci.bioinfo.smm.Subject;
 import edu.utah.hci.bioinfo.smm.SubjectMatchMaker;
 import edu.utah.seq.pmr.PMRSearch;
-import edu.utah.seq.run.tempus.TempusJsonParser;
-import edu.utah.seq.run.tempus.TempusPatient;
 import edu.utah.seq.vcf.json.tempusv3.TempusV3Json2Vcf;
 import edu.utah.seq.vcf.json.tempusv3.TempusV3JsonCollection;
 import edu.utah.seq.vcf.json.tempusv3.TempusV3JsonSummary;
 import edu.utah.seq.vcf.json.tempusv3.TempusV3Order;
-import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -57,9 +50,9 @@ public class TempusDataWranglerV3 {
 	private File[] allJsonFiles = null;
 	private String vcfKeys = null;
 	private String tarKeys = null;
+	private long lastModifiedTempusBucketList = 0;
 	
 	//internal
-	private String processDate = null;
 	private HashMap<String, String> envPropToAdd = new HashMap <String, String>();
 	private HashSet<String> orderIds2Process = new HashSet<String>();
 	private ArrayList<TempusDataWranglerTumorV3> finalOrdersToProcess  = null; //final set of orders to process
@@ -81,7 +74,7 @@ public class TempusDataWranglerV3 {
 			
 			checkAwsCli();
 			
-			//parse Tempus data bucket for json, vcf, and tar files from >= 2025 
+			//parse Tempus data bucket for json, vcf, and tar files from >= 2025, fixed unchanging
 			parseTempusDataBucketFile();
 			
 			//download all of the json files not present locally 
@@ -137,7 +130,49 @@ public class TempusDataWranglerV3 {
 
 		}
 		IO.pl("\t"+orderCollections.size()+"\tOrders");
+		
+		
+		IO.pl("\nRemoving duplicate summaries with an appended report...");
+		for (String tempusOrderId: orderCollections.keySet()) {
 
+			TempusV3JsonCollection collection = orderCollections.get(tempusOrderId);
+			HashMap<String, ArrayList<TempusV3JsonSummary>> codeSummary = new HashMap<String, ArrayList<TempusV3JsonSummary>>();
+			//split by test code
+			for (TempusV3JsonSummary sum: collection.getJsonSummaries()) {
+				String code = sum.getTempusOrder().getTestCode();
+				ArrayList<TempusV3JsonSummary> al = codeSummary.get(code);
+				if (al==null) {
+					al = new ArrayList<TempusV3JsonSummary>();
+					codeSummary.put(code, al);
+				}
+				al.add(sum);
+			}
+
+			//look to see if any with the same test code have a report status of 'amendment'
+			for (String code: codeSummary.keySet()) {
+				ArrayList<TempusV3JsonSummary> al = codeSummary.get(code);
+				//duplicates
+				if (al.size()>1) {
+					//any amendment?
+					TempusV3JsonSummary toKeep = null;
+					for (TempusV3JsonSummary sum: al) {
+						if (sum.getTempusReport().getReportStatus().contains("amendment")) {
+							toKeep = sum;
+							break;
+						}
+					}
+					//toKeep assigned? nuke others
+					if (toKeep != null) {
+						for (TempusV3JsonSummary sum: al) {
+							if (sum.getTempusReport().getReportStatus().contains("amendment") == false) {
+								if (verbose) IO.pl("\tExcluding "+sum.getTempusOrder().getAccessionId());
+								sum.setDepreciated(true);
+							}
+						}
+					}
+				}
+			}
+		}
 
 		//Check if all of the json reports in an order meet age requirements and check if they have already been processed and uploaded to the PMR
 		IO.pl("\nChecking file age and whether tumor json collection was already processed...");
@@ -150,22 +185,24 @@ public class TempusDataWranglerV3 {
 
 				//look at the reports associated with the tumor,
 				boolean allOk = true;
-				String[] accessionIds = new String[al.size()];
-				for (int i=0; i< accessionIds.length; i++) {
+				ArrayList<String> accessionIds = new ArrayList<String>();
+				for (int i=0; i< al.size(); i++) {
 					TempusV3JsonSummary sum = al.get(i);
+					if (sum.isDepreciated()) continue;
 					TempusV3Order order = sum.getTempusOrder();
 					String jsonFileName = sum.getTempusReport().getJsonFile().getName();
 					String[] dataLine = jsonFileNameDataLine.get(jsonFileName);
 					boolean ok = checkAge(dataLine);
 					if (ok==false) allOk = false;
 					if (verbose) IO.pl("\tReportId: "+order.getAccessionId()+" "+order.getTestCode()+" "+order.getTempusOrderId()+" "+jsonFileName);
-					accessionIds[i] = order.getAccessionId();
+					accessionIds.add(order.getAccessionId());
 				}
 				//are the ages OK? and thus ready for processing?
 				if (allOk) {
 					collection.setPassMinAge(true);
-					Arrays.sort(accessionIds);
-					String colName = Misc.stringArrayToString(accessionIds, "_");
+					String[] aIds = Misc.stringArrayListToStringArray(accessionIds);
+					Arrays.sort(aIds);
+					String colName = Misc.stringArrayToString(aIds, "_");
 					if (verbose) IO.pl("\tAge passes");
 							
 					//has it been processed before and uploaded into the PMR?
@@ -269,30 +306,32 @@ public class TempusDataWranglerV3 {
 
 		ArrayList<String> cmdsToExecute = new ArrayList<String>();
 		ArrayList<File> tarFiles = new ArrayList<File>();
-		String awsCmdProfBucket = "aws --profile "+profile+" s3 cp "+bucketURI;
-				
+		
 		for (TempusDataWranglerTumorV3 o : finalOrdersToProcess) {
 			//make TJob ClinicalReport and Fastq dirs with PMR Id
-			o.makeJobDirectories(jobsDirectory, processDate);
+			o.makeJobDirectories(jobsDirectory);
 			//write deidentified jsons to ClinicalReport
 			o.writeDeIdentifiedJsons();
 			//collect download cmds
-			o.addVcfTarDownloadCmds(cmdsToExecute, awsCmdProfBucket, verbose, tarFiles);
-		}		
+			o.addVcfTarDownloadCmds(cmdsToExecute, bucketURI, profile, verbose, tarFiles);
+		}
 		
 		//anything to download
-		if (cmdsToExecute.size()!=0) executeInParallel(cmdsToExecute);
-		
+		if (cmdsToExecute.size()!=0) {
+			pl("\t"+cmdsToExecute.size()+"\tFiles to sync");
+			executeInParallel(cmdsToExecute);
+		}
+
 		//anything to untar?
 		if (tarFiles.size()!=0) {
-			IO.pl("Untaring fastq datasets...");
+			IO.pl("\nUntaring "+tarFiles.size()+" fastq datasets...");
 			unTarArchives(tarFiles);
-			
-			//check RNA and move DNA to correct folders (normal or tumor)
-			for (TempusDataWranglerTumorV3 o : finalOrdersToProcess) {
-				o.checkRnaFastqDir();
-				o.moveDNAFastq();
-			}
+		}
+		
+		//check RNA and move DNA to correct folders (normal or tumor)
+		for (TempusDataWranglerTumorV3 o : finalOrdersToProcess) {
+			o.checkRnaFastqDir();
+			o.moveDNAFastq();
 		}
 		
 		//write the manifest.txt files
@@ -316,7 +355,6 @@ public class TempusDataWranglerV3 {
 		String[] cmd = {
 				"parallel", "--will-cite", "--jobs", numProcThreads, "--halt", "soon,fail=1", "--arg-file", tmpExec.getCanonicalPath()
 		};
-		if (verbose)IO.pl("Executing: "+Misc.stringArrayToString(cmd, " "));
 		int exitCode = executeReturnExitCode(cmd, verbose, null);
 		if (exitCode !=0) throw new IOException("Parallel execution failed, for "+Misc.stringArrayToString(cmd, " "));
 	}
@@ -362,7 +400,7 @@ public class TempusDataWranglerV3 {
 		in.close();
 	}
 	
-	private void fetchRequiredResourceFiles() {
+	private void fetchRequiredResourceFiles() throws IOException {
 		IO.pl("\nAttempting to fetch vcf and tar files for each tumor order...");
 		finalOrdersToProcess = new ArrayList<TempusDataWranglerTumorV3>();
 		ArrayList<TempusDataWranglerTumorV3> missingFiles = new ArrayList<TempusDataWranglerTumorV3>();
@@ -377,18 +415,35 @@ public class TempusDataWranglerV3 {
 		IO.pl("\t"+missingFiles.size()+"\tOrders skipped due to missing files");
 		
 		if (missingFiles.size()!=0) {
-			IO.pl("\nThe following are missing one or more tar.gz and or vcf files given the test codes. Contact Tempus!\n");
-			for (TempusDataWranglerTumorV3 bad: missingFiles) IO.pl(bad+"\n");
+			File mf = new File (System.getProperty("user.dir")+"/tempusOrdersMissingFiles.txt");
+			IO.pl("\nThe following are missing one or more tar.gz and or vcf files given the test codes. Contact Tempus and send them "+mf+"\n");
+			StringBuilder sb = new StringBuilder();
+			for (TempusDataWranglerTumorV3 bad: missingFiles) {
+				sb.append(bad);
+				sb.append("\n\n");
+			}
+			IO.writeString(sb.toString(), mf);
+			IO.pl(sb.toString());
 		}
 
 	}
 	
-	public boolean checkAge(String[] dataLine) throws ParseException {
+	public boolean checkAge(String[] dataLine) throws Exception {
 		//2018-11-16 13:47:32 6877541013 TL-18-29F99A/TL-18-29F99A/DNA/FastQ/TL-18-29F99A_TL-18-29F99A-DNA-fastq.tar.gz
 		//    0          1         2                  3
 		Date objectDate = sdf.parse(dataLine[0]+" "+dataLine[1]);
-		long diff = System.currentTimeMillis() - objectDate.getTime();
+		long diff = lastModifiedTempusBucketList - objectDate.getTime();
 		long diffDays = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
+		if (diffDays< minimumDaysOld) return false;
+		return true;
+	}
+	
+	public boolean delme() throws Exception {
+		//look for start date file,
+		long lastModifiedTempusBucketList = tempusDataBucketList.getCanonicalFile().lastModified();
+		long diff = System.currentTimeMillis() - lastModifiedTempusBucketList;
+		long diffDays = TimeUnit.DAYS.convert(diff, TimeUnit.MILLISECONDS);
+		Misc.printErrAndExit("Days: "+diffDays);
 		if (diffDays< minimumDaysOld) return false;
 		return true;
 	}
@@ -402,8 +457,8 @@ public class TempusDataWranglerV3 {
 	}		
 
 	/**This method will process each argument and assign new variables
-	 * @throws IOException */
-	public void processArgs(String[] args) throws IOException{
+	 * @throws Exception */
+	public void processArgs(String[] args) throws Exception{
 
 			IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 			Pattern pat = Pattern.compile("-[a-zA-Z]");
@@ -439,6 +494,13 @@ public class TempusDataWranglerV3 {
 				Misc.printErrAndExit("\nError: please provide a file containing the s3 object list of the PMR bucket parsed for /Tempus/ lines.\n");
 			}
 			
+			//check for the hci tempus bucket list file, can use the entire thing best to pull just /Tempus/ containing lines
+			if (tempusDataBucketList == null || tempusDataBucketList.exists() == false) {
+				Misc.printErrAndExit("\nError: please provide a file containing the s3 object list of the hci tempus bucket.\n");
+			}
+			//pull the last modified, this is the date used for measuring age
+			lastModifiedTempusBucketList = tempusDataBucketList.getCanonicalFile().lastModified();
+			
 			//check bucket
 			if (bucketURI.startsWith("s3://")==false) Misc.printErrAndExit("Error: your bucket URS does not start with s3:// ? Aborting. "+bucketURI);
 			if (bucketURI.endsWith("/")==false) bucketURI = bucketURI+"/";
@@ -467,8 +529,6 @@ public class TempusDataWranglerV3 {
 			smmDirectory = new File (tmpDir, System.currentTimeMillis()+"_DeleteMe");
 			smmDirectory.mkdir();
 			
-			processDate = Misc.getDateInNumbersNoSpaces();
-			
 			//set env var for the aws cli 
 			envPropToAdd.put("AWS_SHARED_CREDENTIALS_FILE", credentialsFile.getCanonicalPath());
 
@@ -483,7 +543,7 @@ public class TempusDataWranglerV3 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                          Tempus Data Wrangler V3 : May 28 2025                   **\n" +
+				"**                        Tempus Data Wrangler V3 : June 24, 2025                   **\n" +
 				"**************************************************************************************\n" +
 				"The Tempus Data Wrangler downloads complete patient datasets from an AWS bucket, parses\n"+
 				"the json test files for patient info, fetches/makes coreIds using the SubjectMatchMaker\n"+
@@ -505,7 +565,7 @@ public class TempusDataWranglerV3 {
 				"-o Minimum days old before processing any patient tumor data collection, defaults to 7\n"+
 				"      Tempus releases reports as they become available and does not hold reports before\n"+
 				"      the entire set is ready.  Immediately processing reports will lead to partial\n"+
-				"      datasets. Each order results in multiple reports.\n"+
+				"      datasets. Each order results in multiple reports. \n"+
 				"-b S3 bucket URI where test results files are placed by Tempus, defaults to \n"+
 				"      's3://tm-huntsman'\n"+
 				"-p AWS credentials profile for accessing your Tempus bucket, defaults to 'tempus'\n"+
@@ -622,10 +682,4 @@ public class TempusDataWranglerV3 {
 	public boolean isVerbose() {
 		return verbose;
 	}
-
-	public String getProcessDate() {
-		return processDate;
-	}
-
-
 }

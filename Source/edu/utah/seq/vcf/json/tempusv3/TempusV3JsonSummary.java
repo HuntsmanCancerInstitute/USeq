@@ -12,6 +12,7 @@ public class TempusV3JsonSummary {
 	private TempusV3Report tempusV3Report = null;
 	private TempusV3Specimen[] tempusV3Specimens = null;
 	private TempusV3GenomicVariants tempusV3Results = null;
+	private boolean depreciated = false;
 	
 	TempusV3JsonSummary (JSONObject mainObject, TempusV3Order tempusV3Order, TempusV3Patient tempusV3Patient, TempusV3Report tempusV3Report, TempusV3Specimen[] tempusSpecimens, TempusV3GenomicVariants tempusV3Results){
 		this.mainObject = mainObject;
@@ -44,5 +45,17 @@ public class TempusV3JsonSummary {
 
 	public JSONObject getMainObject() {
 		return mainObject;
+	}
+
+	public boolean isDepreciated() {
+		return depreciated;
+	}
+
+	public void setDepreciated(boolean depreciated) {
+		this.depreciated = depreciated;
+		if (depreciated) {
+			tempusV3Specimens = null; //seen examples where a tumor only report was issued and then an amendment report with the normal
+			tempusV3Results = null;
+		}
 	}
 }

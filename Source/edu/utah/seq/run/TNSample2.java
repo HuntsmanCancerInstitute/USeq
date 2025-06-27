@@ -22,7 +22,7 @@ public class TNSample2 {
 	private static final Pattern slurmJobId = Pattern.compile("slurm-(\\d+).out");
 	private ArrayList<String> info = new ArrayList<String>();
 	private boolean deleteSampleConcordance = false;
-	private PlatformGenderInfo platformGenderInfo = null;
+	private PlatformGenderInfo[] platformGenderInfo = null;
 	// Tempus _RS.v RNASeq reqports
 	private String[] jsonFilesToSkip = new String[] {"_rs.v"};
 
@@ -189,22 +189,18 @@ public class TNSample2 {
 			//might be uncompressed?
 			if (vcfs == null || vcfs.length == 0) vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf");
 			if (xmls.length != 1 || vcfs.length != 1) {
-				failMessage = "\tJson/Xml/VcfReport\tFAILED to find one xxx.json or one xxx.vcf.gz and xxx.xml clinical test report file(s)";
+				failMessage = "\tXml/VcfReport\tFAILED to find one xxx.vcf.gz and or one xxx.xml clinical test report file(s)";
 			}
 			toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), xmls[0], vcfs[0]};
 		}
 
-		//Tempus
-		else if (jsonTestResults !=null && jsonTestResults.length>0) {
-			//more than one json file? exclude anything with RS.v
-			if (jsonTestResults.length>1 || vcfs == null || vcfs.length == 0)  {
-				failMessage = "\tMore than one json file or too few vcfs in the Tempus ClinicalReport dir in "+jobDir;
-			}
+		//Tempus, with v3+ multiple jsons and multiple vcf.gz
+		else if (jsonTestResults !=null && jsonTestResults.length>0 && vcfs !=null && vcfs.length>0) {
 			toLink = new File[]{clinRepDir, somaticVariants, new File(somaticVariants+".tbi"), };
 		}
 
 		else {
-			failMessage = "\tJson/Xml/ClinicalReport/Vcf\tFAILED to find parsable clinical test report file(s) in "+jobDir;
+			failMessage = "\tJson/Xml/ClinicalReport/Vcf\tFAILED to find clinical test report file(s) sufficient for processing in "+clinRepDir;
 		}
 
 		//did it fail?
@@ -229,7 +225,6 @@ public class TNSample2 {
 				for (File f: toLink) new File(jobDir, f.getName()).delete();
 				info.add("\tCOMPLETE "+jobDir);
 			}
-
 			else checkJob(nameFile, jobDir, toLink, tnRunner.getClinicalVcfDocs());
 		}
 	}
@@ -417,10 +412,25 @@ public class TNSample2 {
 
 	private void removeSampleConcordanceLinks(File jobDir) throws IOException{
 		File bPFileDir = new File (jobDir.getCanonicalFile(), "BamPileupFiles");
-		IO.deleteDirectory(bPFileDir);
+		deleteDirectoryNotLinkedFiles(bPFileDir); 
 		File[] toDel = IO.extractFilesStartingWith(jobDir, "gender.");
 		if (toDel != null && toDel.length ==1) toDel[0].delete();
 
+	}
+	
+	/**Attempts to delete a directory and it's contents.
+	 * Returns false if all the file cannot be deleted or the directory is null.
+	 * Files contained within scheduled for deletion upon close will cause the return to be false.*/
+	public static void deleteDirectoryNotLinkedFiles(File dir){
+		if (dir == null || dir.exists() == false) return;
+		if (dir.isDirectory()) {
+			File[] children = dir.listFiles();
+			for (int i=0; i<children.length; i++) {
+				deleteDirectoryNotLinkedFiles(children[i]);
+			}
+			dir.delete();
+		}
+		dir.delete();
 	}
 
 	private void annotateSomaticVcf() throws IOException {
@@ -551,18 +561,23 @@ public class TNSample2 {
 
 	}
 
-	private PlatformGenderInfo parsePlatformGenderInfo() {
+	private PlatformGenderInfo[] parsePlatformGenderInfo() {
 		if (platformGenderInfo != null) return platformGenderInfo;	
 		//attempt to parse platform and gender info
 		File[] toCheck = IO.extractFiles(new File(rootDir, "ClinicalReport"));
+		
+		//So many jsons for tempus in ClinicalReport dir,  XT.V1 - good but also PD-L1-22C3 - bad
+		//How select for the good.  Don't return all.
+		
+		ArrayList<PlatformGenderInfo> al = new ArrayList<PlatformGenderInfo>();
+		
 		for (File f: toCheck) {
 			PlatformGenderInfo pgi = new PlatformGenderInfo(f.getName());
-			if (pgi.isParsed()) {
-				platformGenderInfo = pgi;
-				return platformGenderInfo;
-			}
+			if (pgi.isParsed()) al.add(pgi);
 		}
-		return null;
+		platformGenderInfo = new PlatformGenderInfo[al.size()];
+		al.toArray(platformGenderInfo);
+		return platformGenderInfo;
 	}
 
 
@@ -784,11 +799,12 @@ public class TNSample2 {
 		//need to skip XO.V and others without enough samples to build backgrounds
 		//check if they want to skip this one
 		if (tnRunner.getPanels2SkipForCopyRatio()!=null) {
-			PlatformGenderInfo pgi = parsePlatformGenderInfo();
-			
-			if (pgi.isParsed() && tnRunner.getPanels2SkipForCopyRatio().contains(pgi.getPanel())) {
-				info.add("\tSkipping panel "+pgi.getPanel());
-				return;
+			PlatformGenderInfo[] pgis = parsePlatformGenderInfo();
+			for (PlatformGenderInfo pgi: pgis) {
+				if (pgi.isParsed() && tnRunner.getPanels2SkipForCopyRatio().contains(pgi.getPanel())) {
+					info.add("\tSkipping panel "+pgi.getPanel());
+					return;
+				}
 			}
 		}
 
@@ -897,10 +913,10 @@ public class TNSample2 {
 		//now being used by the AvatarProjectAssembler
 		File crDir = new File(rootDir, "ClinicalReport");
 		if (crDir.exists()) {
-			PlatformGenderInfo pgi = parsePlatformGenderInfo();
-			if (pgi == null || pgi.isParsed() == false) throw new IOException("\nERROR: failed to parse gender info for copy ratio analysis from files in "+crDir);
-			if (pgi.getGender().startsWith("F")) gender = "F";
-			else if (pgi.getGender().startsWith("M")) gender = "M";
+			PlatformGenderInfo[] pgi = parsePlatformGenderInfo();
+			if (pgi == null ) throw new IOException("\nERROR: failed to parse gender info for copy ratio analysis from files in "+crDir);
+			if (pgi[0].getGender().startsWith("F")) gender = "F";
+			else if (pgi[0].getGender().startsWith("M")) gender = "M";
 		}
 		else {
 			//pull gender from the xxxInfo.json.gz 
@@ -944,13 +960,15 @@ public class TNSample2 {
 			//match platform
 			if (platformGenderInfo == null) throw new IOException("\nERROR: missing panel info to differentiate between the hdf5 files in "+crDir);
 			for (File f: genderMatchedHdf5) {
-				if (f.getName().contains(platformGenderInfo.getPanel())) {
-					hdf5 = f;
-					break;
+				for ( PlatformGenderInfo pgi: platformGenderInfo) {
+					if (f.getName().contains(pgi.getPanel())) {
+						hdf5 = f;
+						break;
+					}
+					if (hdf5!= null) break;
 				}
 			}
-			if (hdf5 == null) throw new IOException ("\nERROR: failed to find a copy ratio hdf5 file that matches the panel "+
-					platformGenderInfo.getPanel()+" in "+tnRunner.getCopyRatioHdf5Files()[0].getParent()+" for "+id);
+			if (hdf5 == null) throw new IOException ("\nERROR: failed to find a copy ratio hdf5 file that matches the panel in "+tnRunner.getCopyRatioHdf5Files()[0].getParent()+" for "+id);
 		}
 
 		//find a panel and gender specific interval file?
@@ -978,13 +996,15 @@ public class TNSample2 {
 				//match platform
 				if (platformGenderInfo == null) throw new IOException("\nERROR: missing panel info to differentiate between the interval_list files in "+crDir);
 				for (File f: genderMatchedInterval) {
-					if (f.getName().contains(platformGenderInfo.getPanel())) {
-						il = f;
-						break;
-					}
+					for ( PlatformGenderInfo pgi: platformGenderInfo) {
+						if (f.getName().contains(pgi.getPanel())) {
+							il = f;
+							break;
+						}
+						if (il!= null) break;
+					}	
 				}
-				if (il == null) throw new IOException ("\nERROR: failed to find a copy ratio interval_list file that matches the panel "+
-						platformGenderInfo.getPanel()+" in "+tnRunner.getCopyRatioHdf5Files()[0].getParent()+" for "+id);
+				if (il == null) throw new IOException ("\nERROR: failed to find a copy ratio interval_list file that matches the panel in "+tnRunner.getCopyRatioHdf5Files()[0].getParent()+" for "+id);
 			}
 		}
 		return new File[] {hdf5, il};
@@ -1307,27 +1327,25 @@ public class TNSample2 {
 	private File[] fetchBPileup() throws IOException {
 		File bp = tnRunner.getBpileupFileOrDir();
 		if (bp.isFile()) {
-			//IO.pl("\nBamPileup single file "+bp);
 			return new File[] {bp, new File(bp.getCanonicalPath()+".tbi")};
 		}
 		File[] bps = IO.extractFiles(bp, "bp.txt.gz");
+		
 		if (bps.length == 0) throw new IOException("ERROR: failed to find any xxx.bp.txt.gz files in "+bp);
 		else if (bps.length == 1) {
-			//IO.pl("\nBamPileup directory with single file "+bp);
 			return new File[] {bps[0], new File(bps[0].getCanonicalPath()+".tbi")};
 		}
 		else {
 			//more than one, any platform info?
 			if (platformGenderInfo == null) throw new IOException("ERROR: failed to find platform info for "+ id);
 			else {
-				String panel = platformGenderInfo.getPanel();
-				for (File f: bps) {
-					if (f.getName().contains(panel)) {
-						//IO.pl("\nBamPileup file match "+f+ " for "+ platformGenderInfo.getOriginalName());						
-						return new File[] {f, new File(f.getCanonicalPath()+".tbi")};
+				for (PlatformGenderInfo pgi: platformGenderInfo) {
+					String panel = pgi.getPanel();
+					for (File f: bps) {							
+						if (f.getName().contains(panel)) return new File[] {f, new File(f.getCanonicalPath()+".tbi")};
 					}
 				}
-				throw new IOException("ERROR: failed to find a panel matched xxx.bp.txt.gz file in "+bp+" for "+platformGenderInfo.getOriginalName()+" panel -> "+panel);
+				throw new IOException("ERROR : failed to find a panel matched xxx.bp.txt.gz file in "+bp+" for "+id);
 			}	
 		}
 	}
@@ -1411,8 +1429,7 @@ public class TNSample2 {
 		//delete dir
 		if (deleteJobDir){
 			info.add("\tDeleting "+jobDir);
-			IO.deleteDirectory(jobDir);
-			if (jobDir.exists()) IO.deleteDirectoryViaCmdLine(jobDir);
+			deleteDirectoryNotLinkedFiles(jobDir);
 			jobDir.mkdirs();
 		}
 	}

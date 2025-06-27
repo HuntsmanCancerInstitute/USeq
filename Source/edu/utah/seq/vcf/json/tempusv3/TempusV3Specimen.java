@@ -136,7 +136,7 @@ public class TempusV3Specimen {
 		if (tempusIcdOCodeMorphology != null) Misc.addConcatinatedValue (meta, "tempusIcdOCodeMorphology_"+id, tempusIcdOCodeMorphology, "; ");
 		if (tempusIcdOCodeTopography != null) Misc.addConcatinatedValue (meta, "tempusIcdOCodeTopography_"+id, tempusIcdOCodeTopography, "; ");
 		if (tempusIcd10Code != null) Misc.addConcatinatedValue (meta, "tempusIcd10Code_"+id, tempusIcd10Code, "; ");
-		if (originPathLabDiagnosis != null) Misc.addConcatinatedValue (meta, "originPathLabDiagnosis_"+id, originPathLabDiagnosis, "; ");
+		if (originPathLabDiagnosis != null) Misc.addConcatinatedValue (meta, "tempusOriginPathLabDiagnosis_"+id, originPathLabDiagnosis, "; ");
 	}
 	
 	public static TempusV3Specimen[] getSpecimens(JSONObject object, TempusV3Json2Vcf tempusJson2Vcf) throws JSONException{

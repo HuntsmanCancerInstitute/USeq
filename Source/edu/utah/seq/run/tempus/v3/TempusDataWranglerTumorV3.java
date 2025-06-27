@@ -2,11 +2,17 @@ package edu.utah.seq.run.tempus.v3;
 
 import java.io.File;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.joda.time.LocalDate;
+import org.joda.time.format.DateTimeFormat;
+import org.joda.time.format.DateTimeFormatter;
 
 import edu.utah.seq.pmr.PMRSearch;
 import edu.utah.seq.vcf.json.tempusv3.TempusV3JsonCollection;
@@ -39,13 +45,73 @@ public class TempusDataWranglerTumorV3 {
 	private File clinReportDir = null;
 	// AAK6HT3yad/Tempus/25tnlyzo_20250527/Fastq/  NormalDNA TumorDNA TumorRNA
 	private File fastqDir = null;
-	private static final Pattern dnaSource = Pattern.compile(".+_([TN])_DSQ.+");
+	private static final Pattern dnaSource = Pattern.compile(".+_([TN])_.+");
+	private static DateTimeFormatter dateFormatter = DateTimeFormat.forPattern( "yyyy-MM-dd" );
+	private static DateTimeFormatter dateJustNum = DateTimeFormat.forPattern( "yyyyMMdd" );
+	private String latestDate = null;
 	
+	public TempusDataWranglerTumorV3(TempusDataWranglerV3 tdw, TempusV3JsonCollection collection) throws IOException {
+		this.collection = collection;
+		String vcfs = tdw.getVcfKeys();
+		String tars = tdw.getTarKeys();
+		
+		boolean rnaTestPresent = false;
+		boolean dnaTestPresent = false;
+		ArrayList<String> signoutDates = new ArrayList<String>();
+		
+		//pull json accessionIds, jsonPaths, and signout dates
+		for (TempusV3JsonSummary sum: collection.getJsonSummaries()) {
+			if (sum.isDepreciated()) continue;
+			TempusV3Report report = sum.getTempusReport();
+			jsonFiles.add(report.getJsonFile());
+			signoutDates.add(report.getSignOutDateNoTime());
+			
+			String accessionId = sum.getTempusOrder().getAccessionId();
+			//search for vcf file objects and tar objects
+			Pattern pat = PMRSearch.fetchSearchPattern(accessionId, false, true);
+			TreeSet<String> vcfMatches = PMRSearch.searchKeysString(vcfs, pat);
+			vcfAwsInfo.addAll(vcfMatches);
+			//ditto for tars
+			TreeSet<String> tarMatches = PMRSearch.searchKeysString(tars, pat); 
+			for (String tar: tarMatches) {
+				if (tar.contains("/DNA/")) dnaAwsInfo.add(tar);
+				else if (tar.contains("/RNA/")) rnaAwsInfo.add(tar);
+			}
+			String testCode = sum.getTempusOrder().getTestCode();
+			if (testCode.startsWith("RS")) rnaTestPresent = true;
+			else if (testCode.startsWith("XF") || testCode.startsWith("XT") || testCode.startsWith("XE")) dnaTestPresent = true;
+		}
+		
+		setLatestDate(signoutDates);
+		
+		//check if tars/ vcfs are present given the test codes observed
+		
+		//Rna tar not needed for processing so don't check. Still want to download it though.
+		//if (rnaTestPresent && rnaAwsInfo.size()==0) ready = false;
+
+		if (dnaTestPresent) {
+			if (dnaAwsInfo.size()==0 || vcfAwsInfo.size()==0) ready = false;
+		}
+	}
+	
+	
+	private void setLatestDate(ArrayList<String> signoutDates) {
+		//2025-03-02
+		LocalDate[] dates = new LocalDate[signoutDates.size()];
+		for (int i=0; i< dates.length; i++) {
+			dates[i] = dateFormatter.parseLocalDate(signoutDates.get(i));
+		}
+		Arrays.sort(dates);
+		latestDate = dateJustNum.print(dates[dates.length-1]);
+	}
+
+
+
 	// aws --profile tempus s3 cp s3://bucket/
-	public void addVcfTarDownloadCmds(ArrayList<String> cmdsToExecute, String awsCmdProfBucket, boolean verbose, ArrayList<File> tarFiles) throws IOException {
+	public void addVcfTarDownloadCmds(ArrayList<String> cmdsToExecute, String bucket, String profile, boolean verbose, ArrayList<File> tarFiles) throws IOException {
 		//vcfs
 		for (String vcfInfo: vcfAwsInfo) {
-			addDownloadCmd(vcfInfo, clinReportDir, cmdsToExecute, awsCmdProfBucket, verbose, tarFiles);
+			addAwsSyncCmd(vcfInfo, clinReportDir, cmdsToExecute, bucket, profile, verbose, tarFiles);
 		}
 		
 		//don't download a tar if the fastq already exist
@@ -54,26 +120,32 @@ public class TempusDataWranglerTumorV3 {
 			File tumorDNA = new File(fastqDir, "TumorDNA");
 			tumorDNA.mkdirs(); //might already exist
 			for (String dnaInfo: dnaAwsInfo) {
-				File[] gzFq = IO.extractFiles(tumorDNA, "q.gz"); //any already present?
-				if (gzFq.length != 2) addDownloadCmd(dnaInfo, tumorDNA, cmdsToExecute, awsCmdProfBucket, verbose, tarFiles);
+				File[] gzFq = IO.extractFiles(tumorDNA, "q.gz"); //any already present? could be 2 or 4
+				if (gzFq.length !=2 && gzFq.length !=4) {
+					addAwsSyncCmd(dnaInfo, tumorDNA, cmdsToExecute, bucket, profile, verbose, tarFiles);
+				}
 			}
 		}
+
 		//rna tars
 		if (rnaAwsInfo.size()!=0) {
 			File tumorRNA = new File(fastqDir, "TumorRNA");
 			tumorRNA.mkdirs();
 			for (String rnaInfo: rnaAwsInfo) {
 				File[] gzFq = IO.extractFiles(tumorRNA, "q.gz"); //any already present?
-				if (gzFq.length != 2) addDownloadCmd(rnaInfo, tumorRNA, cmdsToExecute, awsCmdProfBucket, verbose, tarFiles);
+				if (gzFq.length != 2) {
+					addAwsSyncCmd(rnaInfo, tumorRNA, cmdsToExecute, bucket, profile, verbose, tarFiles);
+				}
 			}
 		}
 	}
 	
+	/* Switching to using sync
 	private void addDownloadCmd(String awsInfo, File saveDir, ArrayList<String> cmdsToExecute, String awsCmdProfBucket, boolean verbose, ArrayList<File> tarFiles) throws IOException {
 		String[] sizeAwsPath = Misc.WHITESPACE.split(awsInfo);
 		long size = Long.parseLong(sizeAwsPath[0]);
 		File toSave = new File (saveDir, sizeAwsPath[1].substring(sizeAwsPath[1].lastIndexOf('/')));
-		//does the file exist with the correct size?
+		//does the file exist with the correct size?   Not working!
 		if (toSave.exists() && toSave.length()==size) {
 			if (verbose) IO.pl("File exists and same size, skipping: "+toSave);
 		}
@@ -82,8 +154,23 @@ public class TempusDataWranglerTumorV3 {
 			String cmd = awsCmdProfBucket+sizeAwsPath[1]+" "+toSave.getCanonicalPath();
 			cmdsToExecute.add(cmd);
 			if (verbose) IO.pl("Adding '"+cmd+"'");
-			if (toSave.getName().endsWith("tar.gz")) tarFiles.add(toSave);
 		}
+		if (toSave.getName().endsWith("tar.gz")) tarFiles.add(toSave);
+	}*/
+	
+	private void addAwsSyncCmd(String awsInfo, File saveDir, ArrayList<String> cmdsToExecute, String bucket, String profile, boolean verbose, ArrayList<File> tarFiles) throws IOException {
+		String[] sizeAwsPath = Misc.WHITESPACE.split(awsInfo);
+		String fileName = sizeAwsPath[1].substring(sizeAwsPath[1].lastIndexOf('/')+1);
+		String prefix = sizeAwsPath[1].substring(0, sizeAwsPath[1].lastIndexOf('/')+1);
+		
+		//aws --profile tempus s3 sync --only-show-errors --exclude '*' \
+		//--include 'TL-25-MS175C45R1_20250410.germ.freebayes.vcf' s3://tm-huntsman/TL-25-MS175C45R1/DNA/ \
+		///scratch/general/pe-nfs1/u0028003/Tempus/TJobs/NqJ3xQ9DGw/Tempus/25uzrxwl_20250410/ClinicalReport/
+		String cmd = "aws --profile "+profile + " s3 sync --only-show-errors --exclude '*' --include '"+fileName +"' "+
+				bucket+ prefix +" "+ saveDir.getCanonicalPath()+"/";
+		cmdsToExecute.add(cmd);
+		if (verbose) IO.pl("Adding '"+cmd+"'");
+		if (fileName.endsWith("tar.gz")) tarFiles.add(new File(saveDir, fileName));
 	}
 
 	public void writeDeIdentifiedJsons() throws Exception {
@@ -91,6 +178,7 @@ public class TempusDataWranglerTumorV3 {
 		//accessionId_testCode_date_deid_firstNamePhy_lastNamePhy_gender.json
 		//ClinicalReport/TL-24-Z84GNRRF_XT.V4_2024-01-23_deid_Neeraj_Agarwal_M.json		
 		for (TempusV3JsonSummary sum: collection.getJsonSummaries()) {
+			if (sum.isDepreciated()) continue;
 			TempusV3Order order = sum.getTempusOrder();
 			String name = order.getAccessionId()+"_"+
 					order.getTestCode()+"_"+
@@ -125,43 +213,6 @@ public class TempusDataWranglerTumorV3 {
 		IO.writeString(Misc.stringArrayListToString(files, "\n"), new File(clinReportDir, name));
 	}
 
-	public TempusDataWranglerTumorV3(TempusDataWranglerV3 tdw, TempusV3JsonCollection collection) {
-		this.collection = collection;
-		String vcfs = tdw.getVcfKeys();
-		String tars = tdw.getTarKeys();
-		
-		boolean rnaTestPresent = false;
-		boolean dnaTestPresent = false;
-		
-		//pull json accessionIds and jsonPaths
-		for (TempusV3JsonSummary sum: collection.getJsonSummaries()) {
-			jsonFiles.add(sum.getTempusReport().getJsonFile());
-			String accessionId = sum.getTempusOrder().getAccessionId();
-			//search for vcf file objects and tar objects
-			Pattern pat = PMRSearch.fetchSearchPattern(accessionId, false, true);
-			TreeSet<String> vcfMatches = PMRSearch.searchKeysString(vcfs, pat);
-			vcfAwsInfo.addAll(vcfMatches);
-			//ditto for tars
-			TreeSet<String> tarMatches = PMRSearch.searchKeysString(tars, pat); 
-			for (String tar: tarMatches) {
-				if (tar.contains("/DNA/")) dnaAwsInfo.add(tar);
-				else if (tar.contains("/RNA/")) rnaAwsInfo.add(tar);
-			}
-			String testCode = sum.getTempusOrder().getTestCode();
-			if (testCode.startsWith("RS")) rnaTestPresent = true;
-			else if (testCode.startsWith("XF") || testCode.startsWith("XT") || testCode.startsWith("XE")) dnaTestPresent = true;
-			//else IO.pl("Unrecog: "+testCode);
-		}
-		
-		//check if tars/ vcfs are present given the test codes observed
-		
-		//Rna tar not needed for processing so don't check. Still want to download it though.
-		//if (rnaTestPresent && rnaAwsInfo.size()==0) ready = false;
-
-		if (dnaTestPresent) {
-			if (dnaAwsInfo.size()==0 || vcfAwsInfo.size()==0) ready = false;
-		}
-	}
 	
 	/**Looks for 2 q.gz files.*/
 	public void checkRnaFastqDir() throws IOException {
@@ -169,14 +220,16 @@ public class TempusDataWranglerTumorV3 {
 		File rnaDir = new File(fastqDir, "TumorRNA");
 		File[] gz = IO.extractFiles(rnaDir, "q.gz");
 		if (gz.length != 2) throw new IOException("Failed to find two TumorRNA fastq files in "+rnaDir);
+		File[] tar = IO.extractFiles(rnaDir, "tar.gz");
+		for (File t: tar) t.delete();
 	}
 
 	
 	public void moveDNAFastq() throws IOException {
 		if (dnaAwsInfo.size()==0) return;
-		File[] gz = IO.extractFiles(fastqDir, "q.gz");	
+			
 		File tumorFastq = new File(fastqDir, "TumorDNA");
-		tumorFastq.mkdir();
+		File[] gz = IO.extractFiles(tumorFastq, "q.gz");
 		
 		File normalFastq = null;
 		
@@ -208,19 +261,26 @@ public class TempusDataWranglerTumorV3 {
 			//check the numbers, must always be 2 tumorDNA fastqs, sometimes 2 normalDNA fastqs
 			if (numT!=2) throw new IOException("Failed to find two TumorDNA fastq files in "+tumorFastq);
 			if (numN!=0 && numN!=2) throw new IOException("Failed to find two NormalDNA fastq files in "+normalFastq);
+			
+			//OK all done so delete the tars
+			File[] tar = IO.extractFiles(tumorFastq, ".tar.gz");
+			for (File t: tar) t.delete();
 		}
 	}
 	
-	public void makeJobDirectories(File jobsDirectory, String procDate) throws IOException {
+	public void makeJobDirectories(File jobsDirectory) throws IOException {
 		String pmrId = collection.getJsonSummaries().get(0).getTempusPatient().getPmrId();
-		testDir = new File(jobsDirectory, pmrId+"/Tempus/"+collection.getTempusOrderId()+"_"+procDate);
+		testDir = new File(jobsDirectory, pmrId+"/Tempus/"+collection.getTempusOrderId()+"_"+latestDate);
 		testDir.mkdirs();
 		clinReportDir = new File(testDir,"ClinicalReport");
 		clinReportDir.mkdir();
 		if (clinReportDir.exists() == false) throw new IOException("\nError: failed to make "+clinReportDir);
-		fastqDir = new File(testDir,"Fastq");
-		fastqDir.mkdir();
-		if (fastqDir.exists() == false) throw new IOException("\nError: failed to make "+fastqDir);
+		//anything to process? if so create Fastq dir
+		if (dnaAwsInfo.size()!=0 || rnaAwsInfo.size()!=0) {
+			fastqDir = new File(testDir,"Fastq");
+			fastqDir.mkdir();
+			if (fastqDir.exists() == false) throw new IOException("\nError: failed to make "+fastqDir);
+		}
 	}
 	
 	public String toString() {
@@ -284,208 +344,5 @@ public class TempusDataWranglerTumorV3 {
 
 	
 	
-	/*
-
-	public void parseFileLines(int minHours) throws Exception {
-		if (loadTarObjecArrayLists() == false) return;
-		checkDatasets();
-	}
-	
-	private void checkDatasets() throws IOException {
-		boolean oneJson = checkJson();
-		boolean oneDna = dnaPaths.size() == 1;
-		boolean oneRna = rnaPaths.size() == 1;
-		boolean someVcfs = vcfPaths.size() > 0;
-		//must have one json, and one dna fastq tar; rna is optional
-		if (oneJson == false || oneDna == false || someVcfs == false) ready = false;
-		else ready = true;
-		
-		//pull Json names
-		ArrayList<String> jsonFileNames = new ArrayList<String>();
-		for (TempusJsonParser tjp: jsonDatasets) jsonFileNames.add(tjp.getJsonFile().getName());
-		
-		//IO.pl("\tJson\t"+oneJson+"\t"+ jsonFileNames);
-		//IO.pl("\tDNA\t"+oneDna+"\t"+ dnaPaths);
-		//IO.pl("\tRNA\t"+oneRna+"\t"+ rnaPaths);
-		//IO.pl("\tVcfs\t"+someVcfs+"\t"+ vcfPaths);
-		//IO.pl("\tOK\t"+ready);
-	}
-
-	private boolean checkJson() {
-		//need to have only one DNA test
-		int numDNA = 0;
-		for (TempusJsonParser tjp: jsonDatasets) if (tjp.isDNATest()) numDNA++;
-		if (numDNA == 1) return true;
-		return false;
-	}
-
-	private boolean loadTarObjecArrayLists() {
-		
-		for (String[] tokens : objectInfo) {
-			//2018-11-16 13:47:32 6877541013 TL-18-29F99A/TL-18-29F99A/DNA/FastQ/TL-18-29F99A_TL-18-29F99A-DNA-fastq.tar.gz
-			//    0          1         2                  3
-			String objectName = tokens[3];
-			if (objectName.contains("/DNA/")) dnaPaths.add(objectName);
-			else if (objectName.contains("/RNA/"))  rnaPaths.add(objectName);
-			else {
-				cdw.getErrorMessages().add("Couldn't source the fastq type from "+tokens[3]);
-				IO.pl("ERROR");
-				return false;
-			}
-		}
-		return true;
-	}
-
-	public boolean isReady() {
-		return ready;
-	}
-
-	public void downloadDatasets() throws Exception {
-		
-		//download vcfs
-		for (String vcf: vcfPaths) {
-			String name = vcf.substring(vcf.lastIndexOf("/")+1);
-			File v = new File(clinReportDir, name);
-			cdw.cp(vcf, v, false);
-		}
-		
-		//download and process fastqs
-		File fastqDir = new File (testDir, "Fastq");
-		fastqDir.mkdir();
-		
-		//must be one DNA, might contain tumor and normal	
-		File tarDna = new File (fastqDir, "/TarDNA/"+fetchName(dnaPaths.get(0)));
-		File unpacked = new File(tarDna.getCanonicalPath()+".unpacked");
-		
-		if (unpacked.exists() == false) {
-			//download it
-			cdw.cp(dnaPaths.get(0), tarDna, true);
-			//untar, delete, replace with empty placeholder
-			unPackIt(tarDna);
-		}
-		
-		//move the fastq.gz files?
-		moveDNAFastq(tarDna.getParentFile(), fastqDir);
-		
-
-		
-		//any RNA?
-		if (rnaPaths.size() == 1) {
-			File tarRna =  new File (fastqDir, "/TarRNA/"+fetchName(rnaPaths.get(0)));
-			unpacked = new File(tarRna.getCanonicalPath()+".unpacked");
-			
-			if (unpacked.exists() == false) {
-				//download it
-				cdw.cp(rnaPaths.get(0), tarRna, true);
-				//untar, delete, replace with empty placeholder
-				unPackIt(tarRna);
-			}
-
-			//any fastq.gz files?
-			moveRNAFastq(tarRna.getParentFile(), fastqDir);
-		}
-	}
-	
-	private void moveRNAFastq(File rnaDir, File fastqDir) throws IOException {
-		File[] gz = IO.extractFiles(rnaDir, "q.gz");
-		if (gz.length !=0) {
-			if (gz.length == 2) {
-				File tumorFastq = new File(fastqDir, "TumorRNA");
-				tumorFastq.mkdir();
-				for (File f: gz) {
-					File moved = new File(tumorFastq, f.getName());
-					f.renameTo(moved);
-				}
-			}
-			else throw new IOException("Failed to find two RNA fastq files in "+rnaDir);
-		}
-	}
-
-	
-	private void moveDNAFastq(File dnaDir, File fastqDir) throws IOException {
-		File[] gz = IO.extractFiles(dnaDir, "q.gz");		
-		if (gz.length !=0) {
-			File tumorFastq = null;
-			File normalFastq = null;
-			int numT = 0;
-			int numN = 0;
-			for (File f: gz) {
-				Matcher mat = dnaSource.matcher(f.getName());
-				if (mat.matches()) {
-					String source = mat.group(1);
-					if (source.equals("T")) {
-						if (tumorFastq == null) {
-							tumorFastq = new File(fastqDir, "TumorDNA");
-							tumorFastq.mkdir();
-						}
-						File moved = new File(tumorFastq, f.getName());
-						f.renameTo(moved);
-						numT++;
-					}
-					else if (source.equals("N")) {
-						if (normalFastq == null) {
-							normalFastq = new File(fastqDir, "NormalDNA");
-							normalFastq.mkdir();
-						}
-						File moved = new File(normalFastq, f.getName());
-						f.renameTo(moved);
-						numN++;
-					}
-					else throw new IOException("Failed to extract the correct DNA source (T or N) from "+f);
-				}
-				else throw new IOException("Failed to extract the DNA source (T or N) from "+f);
-			}
-			//check the numbers
-			if (numT!=0 && numT!=2) throw new IOException("Failed to find two TumorDNA fastq files in "+fastqDir);
-			if (numN!=0 && numN!=2) throw new IOException("Failed to find two NormalDNA fastq files in "+fastqDir);
-		}
-		
-	}
-
-	private void unPackIt(File tarGzFile) throws IOException {
-		
-		//untar it
-		String tarPath = tarGzFile.getCanonicalPath();
-		String[] cmd = {
-				"tar", "-xf", tarPath, 
-				"-C", tarGzFile.getCanonicalFile().getParent()+"/"
-		};		
-		int exitCode = IO.executeViaProcessBuilderReturnExit(cmd);		
-		if (exitCode !=0) throw new IOException("ERROR: failed to untar "+tarGzFile);
-
-		//delete it
-		if (tarGzFile.delete() == false) throw new IOException("ERROR: failed to delete "+tarGzFile);
-		
-		//create placeholder
-		File unpacked = new File(tarPath+".unpacked");
-		unpacked.createNewFile();
-	}
-
-	public String fetchName (String tarPath) {
-		String[] t = Misc.FORWARD_SLASH.split(tarPath);
-		return (t[t.length-1]);
-	}
-
-	public void makeJobDirsMoveJson(String coreId) throws Exception {
-		
-		testDir = new File (cdw.getJobsDirectory(), coreId+"/Tempus/"+testID);
-		testDir.mkdirs();
-		clinReportDir = new File (testDir, "/ClinicalReport/");
-		clinReportDir.mkdirs();
-		clinReportDir = clinReportDir.getCanonicalFile();
-		if (clinReportDir.exists() == false) throw new IOException("\nError: failed to make "+clinReportDir);
-		// for some reason the files won't move!  Wonder if it's a latency issue with creating the dir, nope seems to be an issue with rw disk mounts
-		//copy then set to delete, the report(s) into the ClinicalReport folder	
-		for (TempusJsonParser tjp : jsonDatasets) {
-			File deId = tjp.getDeidentifiedJsonFile();
-			File inClinRep = new File(clinReportDir, deId.getName());
-			if (IO.copyViaFileChannel(deId, inClinRep) == false) throw new IOException("\nError: failed to move "+deId+" to "+inClinRep);
-			else deId.deleteOnExit();
-		}
-		
-	}
-
-
-	 */
 
 }

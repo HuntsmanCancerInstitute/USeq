@@ -186,8 +186,8 @@ public class TempusV3GenomicVariants {
 		//diff exp genes
 		if (diffExpressedGenes!=null) Misc.addConcatinatedValue (meta, "tempusDiffExpGenes", Misc.stringArrayToString(diffExpressedGenes, ";"), "; ");
 		//ihc
-		Misc.addConcatinatedValue (meta, "PDL-1", ihc.getPdl1Result(), "; ");
-		Misc.addConcatinatedValue (meta, "MMR", ihc.getMmrResult(), "; ");	
+		Misc.addConcatinatedValue (meta, "tempusPDL-1", ihc.getPdl1Result(), "; ");
+		Misc.addConcatinatedValue (meta, "tempusMMR", ihc.getMmrResult(), "; ");	
 		//ctDNA?
 		Misc.addConcatinatedValue (meta, "tempusCtDnaFraction", ctDnaFraction, "; ");
 		

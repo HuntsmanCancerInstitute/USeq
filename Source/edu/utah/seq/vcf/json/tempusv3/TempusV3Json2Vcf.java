@@ -174,6 +174,49 @@ public class TempusV3Json2Vcf {
 			c.getJsonSummaries().add(s);
 		}
 		IO.pl("\t"+orderCollections.size()+"\tOrders");
+		
+		IO.pl("\nDepreciate duplicate summaries with an appended report...");
+		for (String tempusOrderId: orderCollections.keySet()) {
+			IO.pl("TempusOrderId: "+tempusOrderId);
+
+			TempusV3JsonCollection collection = orderCollections.get(tempusOrderId);
+			HashMap<String, ArrayList<TempusV3JsonSummary>> codeSummary = new HashMap<String, ArrayList<TempusV3JsonSummary>>();
+			//split by test code
+			for (TempusV3JsonSummary sum: collection.getJsonSummaries()) {
+				String code = sum.getTempusOrder().getTestCode();
+				ArrayList<TempusV3JsonSummary> al = codeSummary.get(code);
+				if (al==null) {
+					al = new ArrayList<TempusV3JsonSummary>();
+					codeSummary.put(code, al);
+				}
+				al.add(sum);
+			}
+
+			//look to see if any with the same test code have a report status of 'amendment'
+			for (String code: codeSummary.keySet()) {
+				ArrayList<TempusV3JsonSummary> al = codeSummary.get(code);
+				//duplicates
+				if (al.size()>1) {
+					//any amendment?
+					TempusV3JsonSummary toKeep = null;
+					for (TempusV3JsonSummary sum: al) {
+						if (sum.getTempusReport().getReportStatus().contains("amendment")) {
+							toKeep = sum;
+							break;
+						}
+					}
+					//toKeep assigned? nuke others
+					if (toKeep != null) {
+						for (TempusV3JsonSummary sum: al) {
+							if (sum.getTempusReport().getReportStatus().contains("amendment") == false) {
+								IO.pl("\tExcluding "+sum.getTempusOrder().getAccessionId());
+								sum.setDepreciated(true);
+							}
+						}
+					}
+				}
+			}
+		}
 
 		//print stats
 		for (String tempusOrderId: orderCollections.keySet()) {
@@ -332,6 +375,8 @@ public class TempusV3Json2Vcf {
 		int counter = 0;
 
 		for (TempusV3JsonSummary sum: al) { 
+			//skip depreciated tests due to the existance of an amendment
+			if (sum.isDepreciated()) continue;
 			for (TempusV3Variant tv: sum.getTempusV3Results().getVariants()) {
 				String vcf = tv.toVcf(counter);
 				if (vcf != null) {
@@ -354,6 +399,8 @@ public class TempusV3Json2Vcf {
 		LinkedHashMap<String,String> meta = new LinkedHashMap<String, String>();
 
 		for (TempusV3JsonSummary sum: al) {
+			//depreciated?
+			if (sum.isDepreciated()) continue;
 			//json file path
 			jsonFilePaths.add(sum.getTempusReport().getJsonFile().getName());
 			//meta data
@@ -373,9 +420,15 @@ public class TempusV3Json2Vcf {
 
 		//build header
 		sb.append("##fileformat=VCFv4.2\n");
-		sb.append("##source=\""+source+"\"\n");
-		sb.append("##file-path=\""+Misc.stringArrayListToString(jsonFilePaths, "; ")+"\"\n");
-		sb.append("##parse-date=\""+Misc.getDateNoSpaces()+"\"\n");
+		sb.append("##tempusParseCmd=\""+source+"\"\n");
+		sb.append("##tempusJsonFiles=\""+Misc.stringArrayListToString(jsonFilePaths, "; ")+"\"\n");
+		StringBuilder vcfNames = new StringBuilder (vcfFiles[0].getName());
+		for (int i=1; i< vcfFiles.length; i++) {
+			vcfNames.append("; ");
+			vcfNames.append(vcfFiles[i].getName());
+		}
+		sb.append("##tempusVcfFiles=\""+vcfNames+"\"\n");
+		sb.append("##tempusParseDate=\""+Misc.getDateNoSpaces()+"\"\n");
 	
 		for (String key: meta.keySet()){
 			String value = meta.get(key);
