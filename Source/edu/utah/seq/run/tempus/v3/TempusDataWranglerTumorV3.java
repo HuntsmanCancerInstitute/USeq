@@ -204,7 +204,7 @@ public class TempusDataWranglerTumorV3 {
 		ArrayList<String> files = new ArrayList<String>();
 		for (File f: IO.extractFiles(clinReportDir, ".json")) files.add(f.getCanonicalPath());
 		for (File f: IO.extractFiles(clinReportDir, ".vcf")) files.add(f.getCanonicalPath());  //these will eventually be gzipped
-		for (File f: IO.fetchAllFilesRecursively(fastqDir, "q.gz")) files.add(f.getCanonicalPath());
+		if (fastqDir != null) for (File f: IO.fetchAllFilesRecursively(fastqDir, "q.gz")) files.add(f.getCanonicalPath());
 		
 		//25tnlyzo_20250527_TL-25-6KOAZ9D9H1_TL-25-Q4TTL72L1T_TL-25-T3L8TUDC61_TL-25-UYR2M4OVJR_TL-25-VA94DV6NPJ.manifest.txt
 		String[] aids = Misc.stringArrayListToStringArray(accessionIds);

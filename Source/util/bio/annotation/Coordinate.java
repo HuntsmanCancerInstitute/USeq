@@ -63,6 +63,18 @@ public class Coordinate implements Comparable<Coordinate>, Serializable{
 		return true;
 	}
 	
+	public static boolean writeToFile(Bed[] c, File file){
+		try{
+			PrintWriter out = new PrintWriter( new FileWriter(file));
+			for (int i=0; i< c.length; i++) out.println(c[i]);
+			out.close();		
+		} catch (Exception e){
+			e.printStackTrace();
+			return false;
+		}
+		return true;
+	}
+	
 	/**Assumes coordinates are inclusive.*/
 	public boolean intersects (Coordinate other){
 		if (other.chromosome.equals(this.chromosome) == false) return false;

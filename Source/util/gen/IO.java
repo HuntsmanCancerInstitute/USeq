@@ -1202,13 +1202,13 @@ public class IO {
 		String[] cmd = {"chmod", "777", fullPath};
 		String[] res = IO.executeCommandLineReturnAll(cmd);
 		if (res == null || res.length !=0 ) {
-			//shellFile.delete();
+			shellFile.delete();
 			return null;
 		}
 		//execute
 		cmd = new String[]{fullPath};
 		res = IO.executeCommandLineReturnAll(cmd);
-		//shellFile.delete();
+		shellFile.delete();		
 		return res; 
 	}
 
@@ -2990,7 +2990,6 @@ public class IO {
 
 	/**Return's path or null, traps error, prints stacktrace.*/
 	public static String getCanonicalPath(File saveDir) {
-		// TODO Auto-generated method stub
 		try {
 			return saveDir.getCanonicalPath();
 		} catch (IOException e) {
@@ -2998,5 +2997,19 @@ public class IO {
 			return null;
 		}
 	}
+
+	public static void executeViaParallel(ArrayList<String> cmdsToExecute, int numberThreads) throws Exception {
+			//write out the cmds
+			File tmpExec = new File(System.getProperty("java.io.tmpdir")+"/useqCmdsForParallel.txt");
+			IO.writeArrayList(cmdsToExecute, tmpExec);
+			String[] cmd = {
+					"parallel", "--will-cite", "--jobs", numberThreads+"", "--halt", "soon,fail=1", "--arg-file", tmpExec.getCanonicalPath()
+			};
+			int exitCode = IO.executeViaProcessBuilderReturnExit(cmd);
+			if (exitCode !=0) throw new IOException("Parallel execution failed, for "+Misc.stringArrayToString(cmd, " "));
+	}
+		
+	
+
 
 }

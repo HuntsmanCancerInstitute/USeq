@@ -663,7 +663,7 @@ public class TempusV3Json2Vcf {
 	public void processArgs(String[] args) throws IOException{
 		Pattern pat = Pattern.compile("-[a-z]");
 		String useqVersion = IO.fetchUSeqVersion();
-		source = useqVersion+" Args: USeq/TempusJson2Vcf "+ Misc.stringArrayToString(args, " ");
+		source = useqVersion+" Args: USeq/TempusV3Json2Vcf "+ Misc.stringArrayToString(args, " ");
 		System.out.println("\n"+ source +"\n");
 		File forExtraction = null;
 		String attributes = null;

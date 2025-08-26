@@ -35,11 +35,13 @@ public class PMRSearch {
 	private String profile = "default";
 	private HashMap<String, String> envPropToAdd = new HashMap <String, String>();
 	private boolean verbose = false;
+	private int numberThreads = 10;
 	private File awsRepoList = null;
 	private HashMap<String, Patient> idPatient = new HashMap<String, Patient>();
 	private HashMap<String, Dataset> idDataset = new HashMap<String, Dataset>();
 	private TreeMap<String, HashSet<String>> sourceDatasets = null; //Avatar,Tempus,Caris,etc : TestIds
 	private TreeMap<String, TreeSet<String>> sourceCombinations = null; //Patients with combinations of tests
+	private ArrayList<String> cmdsForParallel = new ArrayList<String>();
 
 	//names
 	private String clinicalReportDirName = "ClinicalReport/";
@@ -70,18 +72,17 @@ public class PMRSearch {
 			downloadAwsFileList();
 
 			loadPatientFiles();
+			
+			fetchReports();
 
 			//Avatar
-			fetchAvatarClinicalJsons();
 			loadAvatarClinicalJsons();
 			summarizeAvatarClinicalInfo();
 
 			//Tempus
-			fetchTempusClinicalJsons();
 			loadTempusClinicalJsons();
 
 			//Caris
-			fetchCarisClinicalXmls();
 			loadCarisClinicalXmls();  
 			summarizeCarisClinicalInfo();
 
@@ -97,6 +98,18 @@ public class PMRSearch {
 		}
 	}
 	
+	private void fetchReports() throws Exception {
+		IO.pl("Looking for new reports to download...");
+		fetchAvatarClinicalJsons();
+		fetchTempusClinicalJsons();
+		fetchCarisClinicalXmls();
+		//anything to download?
+		if (cmdsForParallel.size()>0) {
+			IO.pl("\tDownloading "+ cmdsForParallel.size() +" new reports...");
+			IO.executeViaParallel(cmdsForParallel, numberThreads);
+		}
+	}
+
 	private void runInteractiveSearch() throws IOException {
 		Scanner s = new Scanner(System.in);
 		while (true) {  
@@ -596,36 +609,29 @@ public class PMRSearch {
 		printHashMapTreeMap(tumorRna);	
 	}
 
-	public static void printHashMapTreeMap(TreeMap<String, TreeMap<String, Integer>> patient) {
+	public void printHashMapTreeMap(TreeMap<String, TreeMap<String, Integer>> patient) {
 		for (String key: patient.keySet()) {
-			IO.pl("\t"+key+" : "+patient.get(key));
-			/*
-			TreeMap<String, Integer> values = patient.get(key);
-			Iterator<String> subKeysIterator = values.keySet().iterator();
-			for (int i=0; i< 100; i++) {
-				if (subKeysIterator.hasNext()) {
-					String subKey = subKeysIterator.next();
-					Integer count = values.get(subKey);
-					IO.pl("\t\t"+subKey+"\t"+count);
+			TreeMap<String, Integer> vals = patient.get(key);
+			if (verbose) IO.pl("\t\""+key+"\" : "+vals);
+			else {
+				StringBuilder sb = new StringBuilder();
+				Iterator<String> keys = vals.keySet().iterator();
+				for (int i=0; i< 10; i++) {
+					if (keys.hasNext()) {
+						String k = keys.next();
+						Integer count = vals.get(k);
+						sb.append("\"");
+						sb.append(k);
+						sb.append("\"=");
+						sb.append(count);
+						sb.append(", ");
+						if (sb.length()> 120) break;
+					}
+					else break;
 				}
-				else break;
+				if (keys.hasNext()) sb.append("...");
+				IO.pl("\t\""+key+"\" : "+sb);
 			}
-			if (subKeysIterator.hasNext()) IO.pl("\t\t...");
-			 */
-		}
-	}
-
-	private void printHashMapTreeSet(HashMap<String, TreeSet<String>> hashTree) {
-		for (String key: hashTree.keySet()) {
-			IO.p("\t"+key+" : ");
-			TreeSet<String> values = hashTree.get(key);
-			Iterator<String> it =values.iterator();
-			IO.p(it.next());
-			for (int i=0; i< 100; i++) {
-				if (it.hasNext()) IO.p(", "+it.next());
-			}
-			if (values.size()>=100) IO.pl(" ...");
-			else IO.pl();
 		}
 	}
 
@@ -705,36 +711,49 @@ public class PMRSearch {
 	}
 
 	private void loadTempusClinicalJsons() throws Exception {
-		IO.pl("Loading Tempus Clinical Json files...");
+IO.el("Fix multiple tempus reports issue ");		
 		ArrayList<File> toParse = new ArrayList<File>();
 		ArrayList<Dataset> toSet = new ArrayList<Dataset>();
+		
+		//for each patient
 		for (Patient p: idPatient.values()) {
+			//look if it has a tempus dataset
 			for (Dataset d: p.getIdDataSets().values()) {
+				
+				//is it Tempus?
 				if (d.getSource().equals(tempusSourceName)) {
+					
+					//any clinical json reports?
 					if (d.getClinicalInfoFiles() == null) IO.el("WARNING! "+p.getCoreId()+" "+d.getDatasetId()+" Tempus dataset is missing a json!");
-					else if (d.getClinicalInfoFiles().size() !=1) IO.el("WARNING! "+p.getCoreId()+" "+d.getDatasetId()+" Tempus dataset has more than one standard test json!");
+//else if (d.getClinicalInfoFiles().size() !=1) IO.el("WARNING! "+p.getCoreId()+" "+d.getDatasetId()+" Tempus dataset has more than one standard test json!");
+
+					//yes some reports
 					else {
-						toParse.add(d.getClinicalInfoFiles().get(0));
+						//not sure this is going to work
+						for (File f: d.getClinicalInfoFiles()) {
+							toParse.add(f);
+						}
+						//toParse.add(d.getClinicalInfoFiles().get(0));
 						toSet.add(d);
 					}
 				}
 			}
 		}
+		//parse all of the patient tempus reports
 		File[] files = new File[toParse.size()];
 		toParse.toArray(files);
 
 		//parse the json report files, this also prints out an aggregate summary
+//this should error out since it won't handle v3.3		
 		TempusJson2Vcf tj = new TempusJson2Vcf(files);
 
-		//set the summaries in each of the datasets
+		//set the summaries in each of the patients tempus datasets
 		ArrayList<TempusJsonSummary> summaries = tj.getSummaries();
 		if (toSet.size() != summaries.size()) throw new Exception("\nMismatch in Dataset number and TempusJsonSummary number");
 		for (int i=0; i< toSet.size(); i++) toSet.get(i).setTempusJsonReportInfo(summaries.get(i));
 	}
 
 	private void fetchTempusClinicalJsons() throws Exception {
-		IO.pl("\nDownloading Tempus Clinical Json files...");
-		int numTempusJsons = 0;
 		for (Patient p: idPatient.values()) {
 			for (Dataset d: p.getIdDataSets().values()) {
 				//IO.pl(d.getSource()+" -> "+d.getDatasetId());
@@ -743,24 +762,18 @@ public class PMRSearch {
 						//IO.pl(partPath);
 						// there are often 2 jsons for each Tempus (one DNA, one RNA)
 						if (partPath.contains(clinicalReportDirName) && partPath.endsWith("json") && partPath.contains("_RS.")==false) {
-							numTempusJsons++;
 							String relativePath = p.getCoreId()+"/"+d.getSource()+"/"+d.getDatasetId()+"/"+partPath;
 							File j = new File (clinicalReportDir, relativePath);
-							if (j.exists() == false) {
-								if (download(awsPatientDirUri+relativePath, j) == false) throw new IOException("Failed to download "+j);
-							}
+							if (j.exists() == false) download(awsPatientDirUri+relativePath, j);
 							d.setClinicalInfoFile(j);
 						}
 					}
 				}
 			}
 		}
-		IO.pl("\t"+numTempusJsons);
 	}
 
 	private void fetchCarisClinicalXmls() throws Exception {
-		IO.pl("\nDownloading Caris clinical xml files...");
-		int numCarisJsons = 0;
 		for (Patient p: idPatient.values()) {
 			for (Dataset d: p.getIdDataSets().values()) {
 				//IO.pl(d.getSource()+" -> "+d.getDatasetId());
@@ -769,19 +782,15 @@ public class PMRSearch {
 						//IO.pl(partPath);
 						// there are often 2 jsons for each Tempus (one DNA, one RNA)
 						if (partPath.contains(clinicalReportDirName) && partPath.endsWith("xml") && partPath.contains("_RS.")==false) {
-							numCarisJsons++;
 							String relativePath = p.getCoreId()+"/"+d.getSource()+"/"+d.getDatasetId()+"/"+partPath;
 							File j = new File (clinicalReportDir, relativePath);
-							if (j.exists() == false) {
-								if (download(awsPatientDirUri+relativePath, j) == false) throw new IOException("Failed to download "+j);
-							}
+							if (j.exists() == false) download(awsPatientDirUri+relativePath, j);
 							d.setClinicalInfoFile(j);
 						}
 					}
 				}
 			}
 		}
-		IO.pl("\t"+numCarisJsons);
 	}
 
 	private void loadCarisClinicalXmls() throws Exception {
@@ -828,15 +837,12 @@ public class PMRSearch {
 		printHashMapTreeMap(summary);		
 	}
 
-
 	private AvatarClinicalInfo loadAvatarJson(File file) {
 		return new AvatarClinicalInfo(file);
 
 	}
 
 	private void fetchAvatarClinicalJsons() throws Exception {
-		IO.pl("\nDownloading Avatar Clinical Json files...");
-		int numAvatarJsons = 0;
 		for (Patient p: idPatient.values()) {
 			for (Dataset d: p.getIdDataSets().values()) {
 				//IO.pl(d.getSource()+" -> "+d.getDatasetId());
@@ -844,28 +850,24 @@ public class PMRSearch {
 					for (String partPath: d.getPartialPaths()) {
 						//IO.pl(partPath);
 						if (partPath.contains(clinicalReportDirName) && partPath.endsWith("json")) {
-							numAvatarJsons++;
 							String relativePath = p.getCoreId()+"/"+d.getSource()+"/"+d.getDatasetId()+"/"+partPath;
 							File j = new File (clinicalReportDir, relativePath);
-							if (j.exists() == false) {
-								if (download(awsPatientDirUri+relativePath, j) == false) throw new IOException("Failed to download "+j);
-							}
+							if (j.exists() == false) download(awsPatientDirUri+relativePath, j);
+
 							d.setClinicalInfoFile(j);
 						}
 					}
 				}
 			}
 		}
-		IO.pl("\t"+numAvatarJsons);
 	}
 
-	private boolean download(String s3Uri, File j) throws Exception {
+	
+	
+	private void download(String s3Uri, File j) throws Exception {
 		if (verbose) IO.pl("\tDownloading "+s3Uri+ " -> "+j);
-		String[] cmd = {awsPath, "s3", "cp", s3Uri, j.getCanonicalPath(), "--profile", profile};
-		int exitCode = executeReturnExitCode(cmd);
-		if (exitCode != 0 || j.exists()==false) return false;
-		return true;
-
+		String cmd = awsPath + " s3 cp "+s3Uri+ " "+ j.getCanonicalPath()+ " --profile "+profile;
+		cmdsForParallel.add(cmd);
 	}
 
 	private void loadPatientFiles() throws IOException {
@@ -902,18 +904,12 @@ public class PMRSearch {
 		loadSourceDatasetIds();
 		loadSourceCombinations();
 		IO.pl("\nSummary Statistics:");
-		IO.pl("\t"+idPatient.size()+"\tPatients");
-		IO.pl();
-		for (String source: sourceDatasets.keySet()) {
-			IO.pl("\t"+sourceDatasets.get(source).size()+"\t"+source+"\t"+sourceDatasets.get(source));
-		}
-		IO.pl();
-		for (String sourceCombo: sourceCombinations.keySet()) {
-			IO.pl("\t"+sourceCombinations.get(sourceCombo).size()+"\t"+sourceCombo+"\t"+sourceCombinations.get(sourceCombo));
-		}
-
-
-
+		IO.pl("\t"+idPatient.size()+"\tPatients\n");
+		if (verbose) for (String source: sourceDatasets.keySet()) IO.pl("\t"+sourceDatasets.get(source).size()+"\t"+source+"\t"+sourceDatasets.get(source));
+		else for (String source: sourceDatasets.keySet()) IO.pl("\t"+sourceDatasets.get(source).size()+"\t"+source);
+		IO.pl("\n\tCombinations:");
+		if (verbose) for (String sourceCombo: sourceCombinations.keySet()) IO.pl("\t"+sourceCombinations.get(sourceCombo).size()+"\t"+sourceCombo+"\t"+sourceCombinations.get(sourceCombo));
+		else for (String sourceCombo: sourceCombinations.keySet()) IO.pl("\t"+sourceCombinations.get(sourceCombo).size()+"\t"+sourceCombo);
 	}
 
 	private void loadSourceDatasetIds() {
@@ -965,11 +961,11 @@ public class PMRSearch {
 		return p;
 	}
 
-	/*Looks for the repo file list file, downloads it if not found for today and saves it.*/
+	/*Looks for the repo file list file, downloads it if not found and saves it.*/
 	private void downloadAwsFileList() throws IOException {
-		String date = Misc.getDateNoSpaces();
-		awsRepoList = new File (clinicalReportDir, "awsRepoList"+date+".txt");
+		awsRepoList = new File (System.getProperty("user.dir")+ "/awsRepoList.txt");
 		if (awsRepoList.exists() == false) fetchFilesInRepo();
+		else IO.pl("WARNING! Using existing AWS file list " +awsRepoList+"! Delete and restart to pull latest.");
 	}
 
 	/**Uses ProcessBuilder to execute a cmd
@@ -984,7 +980,6 @@ public class PMRSearch {
 		Process proc = pb.start();
 		return proc.waitFor();
 	}
-
 
 	/**Uses ProcessBuilder to execute a cmd, combines standard error and standard out into one and returns their output.
 	 * @throws IOException */
@@ -1009,7 +1004,6 @@ public class PMRSearch {
 		al.toArray(res);
 		return res;
 	}
-
 
 	private void fetchFilesInRepo() throws IOException{
 		IO.pl("Fetching file list from AWS for '"+awsPatientDirUri+ "'...");
@@ -1095,7 +1089,7 @@ public class PMRSearch {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                       Patient Molecular Repo Search : Sept 2024                  **\n" +
+				"**                       Patient Molecular Repo Search : July 2025                  **\n" +
 				"**************************************************************************************\n" +
 				"Interactive searching of the clinical and sample attribute information in the json/xml\n"+
 				"reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.\n"+

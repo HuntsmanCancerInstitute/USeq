@@ -430,7 +430,7 @@ public class TNSample2 {
 			}
 			dir.delete();
 		}
-		dir.delete();
+		else dir.delete();
 	}
 
 	private void annotateSomaticVcf() throws IOException {

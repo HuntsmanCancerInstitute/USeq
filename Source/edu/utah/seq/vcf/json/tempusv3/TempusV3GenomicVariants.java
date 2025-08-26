@@ -120,7 +120,7 @@ public class TempusV3GenomicVariants {
 		int numVars = varTypes.length();
 		for (int i=0; i< numVars; i++) {
 			JSONObject jo = varTypes.getJSONObject(i);
-			String variantType = jo.getString("variantType"); //snvIndels, cnvs, and fusions
+			String variantType = jo.getString("variantType"); //snvIndels, cnvs, isoforms, and fusions
 			JSONArray vd = jo.getJSONArray("variantDetails");
 			int numVarDet = vd.length();
 			varsLoaded += numVarDet;

@@ -473,11 +473,13 @@ public class TempusJson2Vcf {
 		//TL-25-1CGRW7DEBN_20250227.soma.freebayes.vcf
 		//TL-25-1CGRW7DEBN_20250227.germ.pindel.vcf
 		ArrayList<File> vcfsToLoad = new ArrayList<File>();
-		for (File v: vcfFiles) {
-			String fileName = v.getName();
-			if (fileName.contains(accessionId)) {
-				if (loadSomaticVcfs == true && fileName.contains(".soma")) vcfsToLoad.add(v);
-				else if (loadSomaticVcfs == false && fileName.contains(".germ")) vcfsToLoad.add(v);
+		if (vcfFiles != null && vcfFiles.length !=0) {
+			for (File v: vcfFiles) {
+				String fileName = v.getName();
+				if (fileName.contains(accessionId)) {
+					if (loadSomaticVcfs == true && fileName.contains(".soma")) vcfsToLoad.add(v);
+					else if (loadSomaticVcfs == false && fileName.contains(".germ")) vcfsToLoad.add(v);
+				}
 			}
 		}
 		if (vcfsToLoad.size()==0) return null;

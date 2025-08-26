@@ -19,7 +19,7 @@ public class TempusV3Variant{
 	
 	//This is a composite of all of the variant fields in the 10 v3.30 json reports we've received. Still missing fusion info.
 	//New
-	private String variantType = null; //snvIndels, cnvs
+	private String variantType = null; //snvIndels, cnvs, isoforms
 	private String variantSource  = null; //potentiallyActionable, biologicallyRelevant, likelyPathogenic, riskAllele, unknownSignificance
 	private String allelicFraction = null;
 	private String cVar = null;
@@ -52,7 +52,7 @@ public class TempusV3Variant{
 	public TempusV3Variant(String variantSource, String variantType, JSONObject object, TempusV3Json2Vcf tempusJson2Vcf) throws JSONException, IOException {
 		this.variantSource = variantSource;
 		this.tempusJson2Vcf = tempusJson2Vcf;
-		this.variantType = variantType;
+		this.variantType = variantType;		
 		
 		allelicFraction = Json.forceGetString(object, "allelicFraction");
 		cVar = Json.forceGetString(object, "cVar");
@@ -189,6 +189,7 @@ public class TempusV3Variant{
 	/** Returns CHROM POS ID REF ALT QUAL FILTER INFO (EG FE ST PE DP AF)
 	 * @throws IOException */
 	public String toVcf(int id) throws IOException{
+		
 		if (variantType.equals("fusions")) return fusionVariantToVcf(id);
 		if (chromosome==null || pos==null || ref==null || alt==null) return null;
 		StringBuilder sb = new StringBuilder();
@@ -237,7 +238,12 @@ public class TempusV3Variant{
 		//fetch bed coordinates
 		Bed bed5 = tempusJson2Vcf.getCnvGeneNameBed().get(gene5);
 		Bed bed3 = tempusJson2Vcf.getCnvGeneNameBed().get(gene3);
-		if (bed5 == null || bed3 == null) throw new IOException("Failed to find fusion gene info in the lookup hash for "+ gene5 +" and/or "+gene3);
+		if (bed5 == null && bed3 == null) {
+			throw new IOException("Failed to find fusion gene info in the lookup hash for "+ gene5 +" and "+gene3);
+		}
+		// some genes have internal alterations, like EGFRvIII, and Tempus doesn't report the gene3
+		if (bed5 == null) bed5 = bed3;
+		else if (bed3 == null) bed3 = bed5;
 		
 		//create common info 
 		StringBuilder sb = new StringBuilder();
@@ -258,7 +264,6 @@ public class TempusV3Variant{
 		
 		String vcf5 = fetchFusionVcf(bed5, commonInfo, id5, id3);
 		String vcf3 = fetchFusionVcf(bed3, commonInfo, id3, id5);
-		
 		return vcf5+"\n"+vcf3;
 	}
 

@@ -30,7 +30,6 @@ public class CarisXmlVcfParser {
 	private DocumentBuilderFactory factory;
 	private DocumentBuilder builder; 
 	private String genomeVersion = "##reference=hg38";
-	private HashSet<String> ihcTestNames = null;
 	private LinkedHashMap<String,String> workingReportAttributes = null;
 	private LinkedHashMap<String,String>[] allReportAttributes = null;
 	private String[] statLines = null;
@@ -130,9 +129,6 @@ public class CarisXmlVcfParser {
 
 	public void parseDatasets() throws Exception{
 
-		//build hash for ihc expression tests
-		buildIHCHash();
-
 		//Get the DOM Builder Factory and builder
 		factory = DocumentBuilderFactory.newInstance();
 		builder = factory.newDocumentBuilder();
@@ -229,16 +225,6 @@ public class CarisXmlVcfParser {
 		//# Failed to match genomic alterations
 		al.add(workingNumberFailedGenomicMatches+"");
 		return Misc.stringArrayListToString(al, "\t");
-	}
-
-	private void buildIHCHash() {
-		String[] ihcNames = {"p16","PD-L1 (SP263)", "PD-L1 (22c3)", "PD-L1 (SP142)", "PD-L1 FDA(SP142)", "PD-L1 FDA (28-8)", 
-				"MLH1", "PMS2", "MSH2", "MSH6", "ALK", "PTEN", "Mismatch Repair Status", "Her2/Neu", 
-				"TrkA/B/C", "Androgen Receptor", "Folfox Responder Similarity Score", "ROS1", "ER", 
-				"BRAF V600E", "EGFR L858R", "EGFR ex19del", "PR", "CLDN18", "FOLR1" };
-		ihcTestNames = new HashSet<String>();
-		for (String n: ihcNames) ihcTestNames.add(n);
-
 	}
 
 	private void loadVcf() throws IOException {
@@ -456,9 +442,7 @@ public class CarisXmlVcfParser {
 					else if (testName.equals("Transcriptome Detection_v1 Panel - Hybrid")) parseTranslocationPanel(childNodes);
 					else if (testName.equals("Transcriptome Detection_v1 Variant Panel - Hybrid")) parseTranslocationPanel(childNodes);
 					
-					else if (testName.equals("MGMT-Me")) parseMethyl(childNodes);
-					
-					else if (ihcTestNames.contains(testName)) parseIHC(childNodes);
+					else if (testName.equals("MGMT-Me")) parseMethyl(childNodes); 
 					
 					else if (testName.equals("EBER ISH")){
 						IO.el("\nSkipping the parsing of 'EBER ISH' test for Epstein-Barr virus genome copy number\n");
@@ -475,16 +459,14 @@ public class CarisXmlVcfParser {
 					else if (testName.equals("P7/N10 Chromosome Analysis") || testName.equals("eKarotypeGraph") || testName.equals("H&E - Initial") || testName.equals("1p/19q Co-Deletion")){
 						IO.el("\nSkipping test: "+testName);
 					}
-					else unknownTest.add(testName);
+					//just try parsing it as an IHC test, new ones come out every batch, will throw error if it isn't
+					else parseIHC(childNodes, testName);
 				}
 			}
 		}
-		if (unknownTest.size()!=0) {
-			throw new IOException("Found an unknown test(s)!\n\t"+Misc.stringArrayListToString(unknownTest, ","));
-		}
 	}
 
-	private void parseIHC(NodeList childNodes) throws IOException {
+	private void parseIHC(NodeList childNodes, String testName) throws IOException {
 		for (int j = 0; j < childNodes.getLength(); j++) {
 			Node cNode = childNodes.item(j);
 			if (cNode instanceof Element) {
@@ -496,8 +478,8 @@ public class CarisXmlVcfParser {
 						Node n = subNodes.item(i);
 						if (n instanceof Element) {
 							String subName = n.getNodeName();
-							if (subName.equals("expressionAlteration")) workingExpressionAlterations.add( new ExpressionAlteration(this.workingReportAttributes, n.getChildNodes()));
-							else throw new IOException("Found something other than 'expressionAlteration' "+subName);
+							if (subName.equals("expressionAlteration")) workingExpressionAlterations.add( new ExpressionAlteration(workingReportAttributes, n.getChildNodes()));
+							else throw new IOException("Found something other than 'expressionAlteration' "+subName+". This might not be an IHC test "+testName);
 						}
 					}
 				}
@@ -906,7 +888,7 @@ public class CarisXmlVcfParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Caris Xml Vcf Parser: Nov 2024                        **\n" +
+				"**                            Caris Xml Vcf Parser: July 2025                       **\n" +
 				"**************************************************************************************\n" +
 				"This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml\n"+
 				"reported genomic alternations are annotated, bed files of copy number changes and gene\n"+
@@ -929,7 +911,7 @@ public class CarisXmlVcfParser {
 				"-a Include all vcf records in output, defaults to just those with an xml match.\n"+
 				"-k Skip datasets that are missing either an xml or vcf report.\n"+
 
-				"\nExample: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReportsDwld\n" +
+				"\nExample: java -Xmx1G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReportsDwld\n" +
 				"     -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq25Dec2020_MergedStdChr.ucsc.gz\n\n" +
 
 				"**************************************************************************************\n");

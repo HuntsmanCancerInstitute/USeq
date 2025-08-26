@@ -573,7 +573,7 @@ public class TempusDataWranglerV3 {
 				"      'aws --profile tempus s3 ls s3://tm-huntsman --recursive > tm-huntsman.list.txt'\n"+
 				"-m File containing the list of Tempus ClinicalReport 'xxx.manifest.txt' files in your\n"+
 				"      patient molecular repository bucket, e.g. 'aws s3 ls \n"+
-				"      s3://hcibioinfo-patient-molecular-repo --recursive | grep _manifest.txt | grep\n"+
+				"      s3://hcibioinfo-patient-molecular-repo --recursive | grep manifest.txt | grep\n"+
 				"      ClinicalReport > manifestFiles.txt'\n"+
 				"-v Verbose output.\n"+
 				

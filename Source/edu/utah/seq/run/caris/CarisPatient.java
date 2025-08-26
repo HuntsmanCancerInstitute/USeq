@@ -71,7 +71,7 @@ public class CarisPatient {
 			String fileName = tokens[3];
 			if (fileName.endsWith(".fastq.gz")) {
 				//check the size
-				int fileSize = Integer.parseInt(tokens[2]);
+				long fileSize = Long.parseLong(tokens[2]);
 				if (fileSize == 0) {
 					cdw.getErrorMessages().add("Fastq file size is zero! "+tokens[3]);
 					ready = false;
@@ -142,7 +142,7 @@ public class CarisPatient {
 			cdw.cp(rnaNames.get(1), new File (fastqDir, "/TumorRNA/"+rnaNames.get(1)), true);
 		}
 	}
-	
+		
 	public void fetchXmlAndLoad() throws Exception {
 		//cp from S3 the xml to the PHI directory
 		File xml = new File (cdw.getPhiDirectory(), xmlNames.get(0));
