@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.3.7.beta
+			<html><head><title>USeq Command Line Menus 9.3.8.beta
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -28,6 +28,8 @@
 					<a href="#AllelicExpressionRNASeqWriter">AllelicExpressionRNASeqWriter</a><br>
 				
 					<a href="#AllelicMethylationDetector">AllelicMethylationDetector</a><br>
+				
+					<a href="#AmbryDataWrangler">AmbryDataWrangler</a><br>
 				
 					<a href="#AnnotateBedWithGenes">AnnotateBedWithGenes</a><br>
 				
@@ -140,6 +142,8 @@
 					<a href="#ExportTrimmedGenes">ExportTrimmedGenes</a><br>
 				
 					<a href="#FastqBarcodeTagger">FastqBarcodeTagger</a><br>
+				
+					<a href="#FastqUmiTagger">FastqUmiTagger</a><br>
 				
 					<a href="#FastqInterlacer">FastqInterlacer</a><br>
 				
@@ -288,6 +292,8 @@
 					<a href="#ParsePointDataContexts">ParsePointDataContexts</a><br>
 				
 					<a href="#PMRSearch">PMRSearch</a><br>
+				
+					<a href="#PMRSearchGQueryJoiner">PMRSearchGQueryJoiner</a><br>
 				
 					<a href="#PmrVcfBedMerger">PmrVcfBedMerger</a><br>
 				
@@ -734,6 +740,40 @@ Options:
 Example: java -Xmx4G -jar pathTo/USeq/Apps/AllelicMethylationDetector -s AMD
 -f Fastas/ -t Bams/ -c PointData/Con -n PointData/NonCon 
 
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="AmbryDataWrangler"><pre>**************************************************************************************
+**                        Ambry Data Wrangler : October 2025                        **
+**************************************************************************************
+App for parsing xlsx bulk results spreadsheets to vcf, bed, and json results. Uses
+Jannovar to convert Ambry cDots to vcf coordinates. Uses Liftover to convert the hg19
+Ambry chrom pos ref alt to hg38. Patient results with cDots that cannot be converted
+and don't contain Ambry vcf info are skipped. Patient reports with no results are
+saved. Use the patientInfoForSMM_PHI.txt file to map patient PHI to PMR IDs. Use the  
+patientFileNames.txt to link the PMR IDs to the files written to the -r Dir.
+
+Options:
+-x Directory containing xlsx files from Ambry
+-r Directory to write out the results.
+-j Path to your jannovar-cli jar file, see https://github.com/charite/jannovar
+-t Path to your jannovar serialized transcript file.
+-f Path to your matching fasta reference file with fai index and dict files in the
+      parent directory.
+-p Path to the picard.jar executable.
+-c Path to the hg19ToHg38.over.chain.gz liftover chain file.
+-g Path to the gene region bed file for all interrogated Ambry genes.
+-a Path to a file containing the 'Ambry' files in the PMR, e.g. grep Ambry 
+      hcibioinfo-patient-molecular-repo.index.txt > ambryPmr.txt
+-s (Optional) Path to a directory containing the currentRegistry_xxx file for the PMR
+      and SubjectMatchMaker. This will move the parsed dirs into a YJobs/PmrID/...
+      structure
+
+Example: java -jar -Xmx2G ~/USeqApps/AmbryDataWrangler -x AmbryExpoFiles -r Results
+   -j ~/Apps/jannovar-cli-0.36.jar -f ~/Refs/hs38DH.fa -a ~/Refs/ambryPmr.txt -t 
+   ~/Refs/refseq_curated_109_hg38.ser -p ~/Apps/picard.jar -c 
+   ~/Refs/hg19ToHg38.over.chain.gz -g ~/Refs/hg38AmbryGeneRegionsAug2025.bed 
+   -s ~/PmrRegisry/
 **************************************************************************************
 </pre><br><p>
 				
@@ -1538,7 +1578,7 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/CarisVcfComparator -f TL-18-03CFD6.vcf
 </pre><br><p>
 				
 					<a name="CarisXmlVcfParser"><pre>**************************************************************************************
-**                            Caris Xml Vcf Parser: Nov 2024                        **
+**                            Caris Xml Vcf Parser: July 2025                       **
 **************************************************************************************
 This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml
 reported genomic alternations are annotated, bed files of copy number changes and gene
@@ -1561,7 +1601,7 @@ Options:
 -a Include all vcf records in output, defaults to just those with an xml match.
 -k Skip datasets that are missing either an xml or vcf report.
 
-Example: java -Xmx2G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReportsDwld
+Example: java -Xmx1G -jar pathToUSeq/Apps/CarisXmlVcfParser -d CarisReportsDwld
      -s ParsedCarisReports/ -u ~/GRCh38/hg38RefSeq25Dec2020_MergedStdChr.ucsc.gz
 
 **************************************************************************************
@@ -2287,6 +2327,30 @@ Options:
 
 Example: java -Xmx1G -jar pathToUSeq/Apps/FastqBarcodeTagger -f lob_1.fastq.gz
      -s lob_2.fastq.gz -b lob_barcode.fastq.gz -i | bwa mem -p /ref/hg19.fa 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="FastqUmiTagger"><pre>**************************************************************************************
+**                            Fastq Umi Tagger: July 2025                           **
+**************************************************************************************
+Slightly faster version of the FastqBarcodTagger. Only outputs interlaced fastq.
+Takes 2 or 3 fastq files (paired end reads and possibly a third containing unique 
+molecular indexes), appends the UMI and its quality scores to the fastq header and 
+writes out interlaced fastq records to standard out. For in line UMI datasets, provide
+a length to extract the UMI from the beginning of each fastq. 
+
+Options:
+-f First fastq file, .gz/.zip OK.
+-s Second fastq file, .gz/.zip OK.
+-b UMI fastq file, .gz/.zip OK.    Skip for in line UMI extraction.
+-l For in line, length of UMI to parse from the beginning of each fastq read.
+-t For in line, length to trim the fastq reads, defaults to -l
+-c Number of cpu to use in parsing. Defaults to 1. More isn't necessarily better!
+-n Maximum number of Ns in UMI to save.
+
+Example: java -Xmx1G -jar pathToUSeq/Apps/FastqUmiTagger -f lob_1.fastq.gz
+     -s lob_2.fastq.gz -l 3 -t 5 -c 1 -n 0 | bwa mem -p /ref/hg19.fa -c 5 
 
 **************************************************************************************
 </pre><br><p>
@@ -4172,7 +4236,7 @@ Example: java -Xmx12G -jar pathTo/USeq/Apps/ParsePointDataContexts -c '..CG.' -s
 </pre><br><p>
 				
 					<a name="PMRSearch"><pre>**************************************************************************************
-**                       Patient Molecular Repo Search : Sept 2024                  **
+**                       Patient Molecular Repo Search : Oct 2025                   **
 **************************************************************************************
 Interactive searching of the clinical and sample attribute information in the json/xml
 reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.
@@ -4183,12 +4247,53 @@ https://github.com/HuntsmanCancerInstitute/GQuery
 
 Options:
 -d  Directory to save the PHI redacted clinical xml and json reports.
--x  S3 URI containing the patient molecular repo, defaults to
+-a  S3 URI containing the patient molecular repo, defaults to
       s3://hcibioinfo-patient-molecular-repo/Patients/ 
 -p  AWS credential profile, defaults to 'default'
+-i  File containing ICD 10 diagnosis codes and their descriptors. Tab delimited. For 
+       converting Tempus diagnosis codes to searchable text.
+-m  File containing ICD 0 morphology codes. Ditto.
+-t  File containing ICD 0 topology codes. Ditto.
+-s  Run non interactive search using this input then exit. Surround with "  ".
+       Separate multiple searches with ;
+-x  Maximum days old to parse, defaults to all.
 -v  Verbose output.
 
-Example: java -jar pathToUSeq/Apps/PMRSearch -d ~/PMRFiles/
+Search Options, enter at the interactive prompt or using the -s 'xxxx' option above:
+-d  Data table to search, choose from: Diagnosis, PhysicianDiseaseGroups, SpecimenSites,
+       SpecimenIds, Sex, PmrIds
+-s  Search terms, comma delimited, no spaces. Surround phrases with single quotes.
+-c  Terms are case sensitive.
+-e  Terms are exact, no partial matching.
+-m  All terms must match.
+-a  Add matches to the prior result set.
+-x  New search, clear any prior results.
+-p  Print the contents of the named data table, see -d
+-f  Print the available file AWS URIs for the matched datasets.
+-i  Print the clinical and test details for the matched datasets.
+-n  Print the matched dataset names.
+
+Example: java -jar pathToUSeq/Apps/PMRSearch -d ~/PMRFiles/ -x 365 -i 
+   ~/ICD/ICD-10_Diagnosis.txt -m ~/ICD/ICD_Morphology.txt -t ~/ICD/ICD_Topology.txt
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="PMRSearchGQueryJoiner"><pre>**************************************************************************************
+**                         PMRSearch GQuery Joiner : Nov 2025                       **
+**************************************************************************************
+Merges results from the PMRSearch and GQuery tools into a summary spreadsheet.
+
+Required Options:
+-p  Directory containing PMRSearch results files with output from the -i option.
+-g  GQuery json results file.
+-o  Output directory for writing the results.
+-r  (Optional) Directory containing the currentRegistry_xxx_PHI.txt file for pulling
+       patient info.
+-x  (Optional) File containing PMR IDs to skip, e.g. prior runs of this tool.
+
+Example: java -jar pathToUSeq/Apps/PMRSearchGQueryJoiner -p PmrSearchResults -o 
+   JointResults -g gqueryKrasResults.json -r ~/PHI/Registry/ -x priorPmrs.txt
+
 **************************************************************************************
 </pre><br><p>
 				
@@ -5411,7 +5516,7 @@ Example: java -jar pathToUSeq/Apps/TempusDataWrangler -b s3://tm-huntsman/
 </pre><br><p>
 				
 					<a name="TempusDataWranglerV3"><pre>**************************************************************************************
-**                          Tempus Data Wrangler V3 : May 28 2025                   **
+**                        Tempus Data Wrangler V3 : June 24, 2025                   **
 **************************************************************************************
 The Tempus Data Wrangler downloads complete patient datasets from an AWS bucket, parses
 the json test files for patient info, fetches/makes coreIds using the SubjectMatchMaker
@@ -5434,7 +5539,7 @@ Options:
 -o Minimum days old before processing any patient tumor data collection, defaults to 7
       Tempus releases reports as they become available and does not hold reports before
       the entire set is ready.  Immediately processing reports will lead to partial
-      datasets. Each order results in multiple reports.
+      datasets. Each order results in multiple reports. 
 -b S3 bucket URI where test results files are placed by Tempus, defaults to 
       's3://tm-huntsman'
 -p AWS credentials profile for accessing your Tempus bucket, defaults to 'tempus'
@@ -5442,7 +5547,7 @@ Options:
       'aws --profile tempus s3 ls s3://tm-huntsman --recursive > tm-huntsman.list.txt'
 -m File containing the list of Tempus ClinicalReport 'xxx.manifest.txt' files in your
       patient molecular repository bucket, e.g. 'aws s3 ls 
-      s3://hcibioinfo-patient-molecular-repo --recursive | grep _manifest.txt | grep
+      s3://hcibioinfo-patient-molecular-repo --recursive | grep manifest.txt | grep
       ClinicalReport > manifestFiles.txt'
 -v Verbose output.
 
@@ -6101,7 +6206,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFCenterFormatter -v Calls/ -s CCall
 </pre><br><p>
 				
 					<a name="VCFCollapser"><pre>**************************************************************************************
-**                              VCF Collapser : June 2022                           **
+**                              VCF Collapser : Aug 2025                            **
 **************************************************************************************
 Merges records with the same CHROM POS ID REF ALT and outputs an unsorted stripped
 down vcf file. 

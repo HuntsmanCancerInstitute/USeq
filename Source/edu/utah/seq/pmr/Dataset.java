@@ -1,6 +1,7 @@
 package edu.utah.seq.pmr;
 
 import java.io.File;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 
@@ -9,6 +10,9 @@ import edu.utah.seq.vcf.json.TempusOrder;
 import edu.utah.seq.vcf.json.TempusPatient;
 import edu.utah.seq.vcf.json.TempusReport;
 import edu.utah.seq.vcf.json.TempusSpecimen;
+import edu.utah.seq.vcf.json.tempusv3.TempusV3JsonSummary;
+import edu.utah.seq.vcf.json.tempusv3.TempusV3Specimen;
+import util.gen.IO;
 
 public class Dataset {
 	
@@ -17,7 +21,8 @@ public class Dataset {
 	private ArrayList<String> partialPaths = new ArrayList<String>();
 	private ArrayList<File> clinicalInfoFiles = null;
 	private AvatarClinicalInfo avatarClinicalInfo = null;  //only for Avatar datasets
-	private TempusJsonSummary tempusJsonReportInfo = null; //only for Tempus datasets
+	private TempusJsonSummary tempusJsonReportInfoPreV3 = null; //only for Tempus datasets before v3
+	private TempusV3JsonSummary tempusJsonReportInfoV3 = null; //for Tempus datasets v3+
 	private LinkedHashMap<String, String> carisClinicalInfo = null; //only for Caris datasets
 
 	public Dataset(String source, String datasetId) {
@@ -25,9 +30,12 @@ public class Dataset {
 		this.datasetId = datasetId;
 	}
 	
-	public String toString(String patientMolecularRepoId) {
+	
+	
+	public String toString(String patientMolecularRepoId) throws IOException {
 		StringBuilder sb = new StringBuilder();
 		sb.append(patientMolecularRepoId+"\n");
+		sb.append("  File(s) : "+IO.fileArrayListToString(clinicalInfoFiles, ", ")+"\n");  
 		//Avatar?
 		if (avatarClinicalInfo != null) sb.append(avatarClinicalInfo.toString());
 		//Caris
@@ -40,14 +48,13 @@ public class Dataset {
 				sb.append("\n");
 			}
 		}
-		//Tempus
-		else {
+		//Tempus pre v3
+		else if (tempusJsonReportInfoPreV3 != null) {
 			LinkedHashMap<String, String> meta = new LinkedHashMap<String, String>();
-			tempusJsonReportInfo.getTempusPatient().addAttributes(meta, false);
-			tempusJsonReportInfo.getTempusOrder().addAttributes(meta);
-			tempusJsonReportInfo.getTempusReport().addAttributes(meta);
-			TempusSpecimen.addAttributes(meta, tempusJsonReportInfo.getTempusSpecimens());
-			tempusJsonReportInfo.getTempusReport().addAttributes(meta);
+			tempusJsonReportInfoPreV3.getTempusPatient().addAttributes(meta, false);
+			tempusJsonReportInfoPreV3.getTempusOrder().addAttributes(meta);
+			tempusJsonReportInfoPreV3.getTempusReport().addAttributes(meta);
+			TempusSpecimen.addAttributes(meta, tempusJsonReportInfoPreV3.getTempusSpecimens());
 			for (String key: meta.keySet()) {
 				sb.append("  ");
 				sb.append(key); 
@@ -56,6 +63,22 @@ public class Dataset {
 				sb.append("\n");
 			}
 		}
+		//Tempus v3
+		else if (tempusJsonReportInfoV3 != null) {
+			LinkedHashMap<String, String> meta = new LinkedHashMap<String, String>();
+			tempusJsonReportInfoV3.getTempusPatient().addAttributes(meta, false);
+			tempusJsonReportInfoV3.getTempusOrder().addAttributes(meta);
+			tempusJsonReportInfoV3.getTempusReport().addAttributes(meta);
+			TempusV3Specimen.addAttributes(meta, tempusJsonReportInfoV3.getTempusSpecimens());
+			for (String key: meta.keySet()) {
+				sb.append("  ");
+				sb.append(key); 
+				sb.append(" : "); 
+				sb.append(meta.get(key)); 
+				sb.append("\n");
+			}
+		}
+		
 		return sb.toString();
 	}
 	
@@ -93,12 +116,20 @@ public class Dataset {
 		this.avatarClinicalInfo = avatarClinicalInfo;
 	}
 
-	public TempusJsonSummary getTempusJsonReportInfo() {
-		return tempusJsonReportInfo;
+	public TempusJsonSummary getTempusJsonReportInfoPreV3() {
+		return tempusJsonReportInfoPreV3;
 	}
 
-	public void setTempusJsonReportInfo(TempusJsonSummary tempusJsonReportInfo) {
-		this.tempusJsonReportInfo = tempusJsonReportInfo;
+	public void setTempusJsonReportInfoPreV3(TempusJsonSummary tempusJsonReportInfo) {
+		this.tempusJsonReportInfoPreV3 = tempusJsonReportInfo;
+	}
+	
+	public TempusV3JsonSummary getTempusJsonReportInfoV3() {
+		return tempusJsonReportInfoV3;
+	}
+
+	public void setTempusJsonReportInfoV3(TempusV3JsonSummary tempusJsonReportInfo) {
+		this.tempusJsonReportInfoV3 = tempusJsonReportInfo;
 	}
 
 	public void setCarisXmlReportInfo(LinkedHashMap<String, String> linkedHashMap) {

@@ -7,6 +7,8 @@ import org.joda.time.Period;
 import org.joda.time.PeriodType;
 import org.json.JSONException;
 import org.json.JSONObject;
+
+import util.gen.IO;
 import util.gen.Json;
 import util.gen.Misc;
 
@@ -102,7 +104,8 @@ public class TempusV3Patient {
 		if (dobYear != -1) sb.append(new Integer(dobYear).toString());
 		sb.append("\t");
 		
-		if (gender != null) sb.append(gender);
+		if (gender != null && gender.equals("NA")==false) sb.append(gender);
+		else sb.append(".");
 		sb.append("\t");
 		
 		if (emrId != null) sb.append(emrId);
@@ -116,7 +119,8 @@ public class TempusV3Patient {
 		else if (sex.toUpperCase().equals("FEMALE")) gender = "F";
 		else {
 			gender = "NA";
-			throw new Exception("ERROR: parsing gender, must be male or female, case insensitive.");
+			//throw new Exception("ERROR: parsing gender, must be 'male' or 'female', case insensitive.");
+			IO.el("WARNING: parsing gender, must be 'male' or 'female', case insensitive. "+sex);
 		}
 	}
 

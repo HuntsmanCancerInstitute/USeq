@@ -2,6 +2,8 @@ package edu.utah.seq.vcf.json.tempusv3;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
+
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -21,11 +23,16 @@ public class TempusV3Specimen {
 	
 	private String primarySampleSite = null; //new
 	private String normalSampleSite = null; //new
-	//diagnosis
+	
+	//diagnosis and specimine site codes and txt, these only populate if the map is created
 	private String tempusIcdOCodeMorphology = null;
 	private String tempusIcdOCodeTopography = null;
 	private String tempusIcd10Code = null;
 	private String originPathLabDiagnosis = null;
+	
+	private LinkedHashSet<String> tempusIcdOTxtMorphology = new LinkedHashSet<String>();
+	private LinkedHashSet<String> tempusIcdOTxtTopography = new LinkedHashSet<String>();
+	private LinkedHashSet<String> tempusIcd10Txt = new LinkedHashSet<String>();
 	
 
 
@@ -146,7 +153,7 @@ public class TempusV3Specimen {
 		return specimens;
 	}
 
-	/**Added to the spreadsheet output.*/
+	/**Added to the spreadsheet output and used in the PMRSearch*/
 	public static void addAttributes(LinkedHashMap<String, String> reportAttributes, TempusV3Specimen[] specimens) {
 		ArrayList<String> al = new ArrayList<String>();
 		Integer tp = null;
@@ -157,6 +164,11 @@ public class TempusV3Specimen {
 		String tempusIcdOCodeMorphology = null;
 		String tempusIcdOCodeTopography = null;
 		String tempusIcd10Code = null;
+		
+		String tempusIcdOTxtMorphology = null;
+		String tempusIcdOTxtTopography = null;
+		String tempusIcd10Txt = null;
+		
 		String originPathLabDiagnosis = null;
 		//for each specimen
 		for (int i=0; i< specimens.length; i++ ) {
@@ -181,6 +193,11 @@ public class TempusV3Specimen {
 				tempusIcdOCodeTopography = specimens[i].getTempusIcdOCodeTopography();
 				tempusIcd10Code = specimens[i].getTempusIcd10Code();
 				originPathLabDiagnosis = specimens[i].getOriginPathLabDiagnosis();
+				//ICD txt
+				tempusIcdOTxtMorphology = fetchIcdTxt(specimens[i].getTempusIcdOTxtMorphology());
+				tempusIcdOTxtTopography = fetchIcdTxt(specimens[i].getTempusIcdOTxtTopography());
+				tempusIcd10Txt = fetchIcdTxt(specimens[i].getTempusIcd10Txt());
+				
 			}
 			al.add(tn+" : "+site);
 		}
@@ -198,11 +215,24 @@ public class TempusV3Specimen {
 			reportAttributes.put("blockId", blockId);
 		}
 		if (tempusIcdOCodeMorphology != null) reportAttributes.put("icdOCodeMorphology", tempusIcdOCodeMorphology);
+		if (tempusIcdOTxtMorphology != null) reportAttributes.put("icdOTxtMorphology", tempusIcdOTxtMorphology);
+		
 		if (tempusIcdOCodeTopography != null) reportAttributes.put("icdOCodeTopography", tempusIcdOCodeTopography);
+		if (tempusIcdOTxtTopography != null) reportAttributes.put("icdOTxtTopography", tempusIcdOTxtTopography);
+		
 		if (tempusIcd10Code != null) reportAttributes.put("icd10Code", tempusIcd10Code);
-		if (originPathLabDiagnosis != null) reportAttributes.put("originPathLabDiagnosis", originPathLabDiagnosis);
+		if (tempusIcd10Txt != null) reportAttributes.put("icd10Txt", tempusIcd10Txt);
+
+		if (originPathLabDiagnosis != null) reportAttributes.put("diagnosis", originPathLabDiagnosis);
 	}
 	
+	private static String fetchIcdTxt(LinkedHashSet<String> lhs) {
+		if (lhs == null || lhs.size() ==0)return null;
+		String merge = Misc.linkedSetToString(lhs, "; ");
+		return merge;
+		
+	}
+
 	public String getKey() {
 		StringBuilder sb = new StringBuilder(sampleCategory);
 		sb.append("_");
@@ -269,6 +299,18 @@ public class TempusV3Specimen {
 
 	public String getNormalSampleSite() {
 		return normalSampleSite;
+	}
+
+	public LinkedHashSet<String> getTempusIcdOTxtMorphology() {
+		return tempusIcdOTxtMorphology;
+	}
+
+	public LinkedHashSet<String> getTempusIcdOTxtTopography() {
+		return tempusIcdOTxtTopography;
+	}
+
+	public LinkedHashSet<String> getTempusIcd10Txt() {
+		return tempusIcd10Txt;
 	}
 
 

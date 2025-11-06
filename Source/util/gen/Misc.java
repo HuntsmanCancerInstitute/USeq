@@ -571,6 +571,28 @@ public class Misc {
 		return null;
 	}
 	
+	/**Splits on white space, except for 'xxx zzz' single quoted items which are kept as one.*/
+	public static ArrayList<String> splitArgsOnWhitespaceButNotSingleQuotes(String commandLine) {
+		ArrayList<String> args = new ArrayList<>();
+        StringBuilder currentArg = new StringBuilder();
+        boolean inQuote = false;
+
+        for (int i = 0; i < commandLine.length(); i++) {
+            char c = commandLine.charAt(i);
+            if (c == '\'') {
+            	if (inQuote == false) inQuote = true;
+            	else inQuote = false;
+            } else if (Character.isWhitespace(c) && inQuote == false) {
+                if (currentArg.length() > 0) {
+                    args.add(currentArg.toString());
+                    currentArg.setLength(0); // Clear for the next argument
+                }
+            } else currentArg.append(c);
+        }
+        if (currentArg.length() > 0) args.add(currentArg.toString());
+        return args;
+    }
+	
 	/**Prints message to screen, then exits.*/
 	public static void printErrAndExit (String message){
 		System.err.println (message);

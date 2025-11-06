@@ -449,13 +449,15 @@ public class TempusJson2Vcf {
 	        workingSpecimens = TempusSpecimen.getSpecimens(object, this);
 	        TempusSpecimen.addAttributes(reportAttributes, workingSpecimens);
 	        
-	        //load any somatic and germline vcf files, might be null
-	        workingSomVcfLines = loadVcfLines (workingOrder.getAccessionId(), true);
-	        workingGermVcfLines = loadVcfLines (workingOrder.getAccessionId(), false);
-	        if (workingSomVcfLines == null && workingGermVcfLines == null) throw new IOException("\nERROR: no vcf lines for "+workingOrder.getAccessionId());
 
 	        //results
 	        if (justParsingClinInfo == false) {
+	        	
+		        //load any somatic and germline vcf files, might be null
+		        workingSomVcfLines = loadVcfLines (workingOrder.getAccessionId(), true);
+		        workingGermVcfLines = loadVcfLines (workingOrder.getAccessionId(), false);
+		        if (workingSomVcfLines == null && workingGermVcfLines == null) throw new IOException("\nERROR: no vcf lines for "+workingOrder.getAccessionId());
+
 	        	workingResults = new TempusResults(object, this);
 	        	workingResults.addAttributes(reportAttributes);
 

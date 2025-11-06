@@ -1,6 +1,7 @@
 package edu.utah.seq.pmr;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -30,8 +31,8 @@ public class UserSearch {
 	
 	public static void printInteractiveMenu() {
 		StringBuilder sb = new StringBuilder("\nInteractive Search Options:\n");
-		sb.append("   -d Data table to search, choose from: Diagnosis, PhysicianDiseaseGroups, SpecimenSites, SpecimenIds, Sex, DatasetIds\n");
-		sb.append("   -s Search terms, comma delimited, no spaces\n");
+		sb.append("   -d Data table to search, choose from: Diagnosis, PhysicianDiseaseGroups, SpecimenSites, SpecimenIds, Sex, PmrIds\n");
+		sb.append("   -s Search terms, comma delimited, no spaces. Surround phrases with single quotes.\n");
 		sb.append("   -c Terms are case sensitive.\n");
 		sb.append("   -e Terms are exact, no partial matching.\n");
 		sb.append("   -m All terms must match.\n");
@@ -50,11 +51,13 @@ public class UserSearch {
 	 * @throws IOException 
 	*/
 	public void processArgs(String input) throws IOException {
-		//remove any ' or " from the input
-		input = Util.QUOTE_SINGLE.matcher(input).replaceAll("");
-		input = Util.QUOTE_DOUBLE.matcher(input).replaceAll("");
-		//IO.pl("\tINPUT: "+input);
-		String[] args = Util.WHITESPACE.split(input);
+
+		//replace any " with ' from the input
+		input = Util.QUOTE_DOUBLE.matcher(input).replaceAll("'");
+				
+		ArrayList<String> split = Misc.splitArgsOnWhitespaceButNotSingleQuotes(input);
+		String[] args = new String[split.size()];
+		split.toArray(args);
 		
 		Pattern pat = Pattern.compile("-[a-z]");
 		for (int i = 0; i<args.length; i++){

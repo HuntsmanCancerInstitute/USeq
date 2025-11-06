@@ -49,12 +49,15 @@ public class VCFCollapser {
 			out.println("##fileformat=VCFv4.2");
 			out.print(header.toString());
 			out.println("#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO");
+			int id = 0;
 			for (String key: records) {
 				String[] t = Misc.UNDERSCORE.split(key);
 				StringBuilder sb = new StringBuilder(t[0]);
 				sb.append("\t");
 				sb.append(t[1]);
-				sb.append("\t.\t");
+				sb.append("\t");
+				sb.append(id+"\t");
+				id++;
 				sb.append(t[2]);
 				sb.append("\t");
 				sb.append(t[3]);
@@ -153,7 +156,7 @@ public class VCFCollapser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              VCF Collapser : June 2022                           **\n" +
+				"**                              VCF Collapser : Aug 2025                            **\n" +
 				"**************************************************************************************\n" +
 				"Merges records with the same CHROM POS ID REF ALT and outputs an unsorted stripped\n"+
 				"down vcf file. \n"+

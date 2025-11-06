@@ -14,6 +14,7 @@ import edu.utah.seq.data.sam.SamAlignment;
 import edu.utah.seq.data.sam.SamAlignmentFlags;
 import util.gen.Gzipper;
 import util.gen.Histogram;
+import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
@@ -299,14 +300,12 @@ public class BarcodeChromMerger implements Runnable {
 			else {
 				//call consensus on these firstOfPairs
 				String[] fastq = consensusEngine.callConsensus(c2Col);
-//if (fastq[0].contains("GGCGGGAGTCGGTGTA")) Misc.printArray(fastq);
-				//attempt to collect mates of these first of pairs 
+
+				//attempt to collect mates of these first of pairs, sometimes the mate has been removed due to low quality alignment
 				SAMRecord[] mates = collectMates(c2Col);
-				if (mates == null) writeOutSingleEndFastq(fastq);
-				else {
-					if (mates.length != c2Col.length) Misc.printErrAndExit("Error: mate numbers don't match for first of pair? "+c2Col.length+" vs "+mates.length);
-					writeOutPairedEndFastq(fastq, consensusEngine.callConsensus(mates));
-				}
+				if (mates == null || (mates.length != c2Col.length)) writeOutSingleEndFastq(fastq);
+				else writeOutPairedEndFastq(fastq, consensusEngine.callConsensus(mates));
+										
 				//increment family size in histogram
 				famSizeHist.count(c2Col.length);
 			}
@@ -375,8 +374,9 @@ public class BarcodeChromMerger implements Runnable {
 		secondReverse.clear();
 		
 		//split into 4 catagories
+		//watch out for unpaired reads too
 		for (SAMRecord sam : workingRecords){
-			if (sam.getFirstOfPairFlag()){
+			if (sam.getReadPairedFlag()==false || sam.getFirstOfPairFlag()){
 				if (sam.getReadNegativeStrandFlag()) firstReverse.add(sam);
 				else firstForward.add(sam);
 			}
@@ -387,10 +387,10 @@ public class BarcodeChromMerger implements Runnable {
 		}
 	}
 
-	/**This writes out the firstOfPair and it's mate, if it is a second of pair, it will do likewise provided the mate is missing or is unmapped.*/
+	/**This writes out the firstOfPair and it's mate, if it is a second of pair, it will do likewise provided the mate is missing or is unmapped. If unpaired it writes it out.*/
 	private void processSolo( SAMRecord sam) throws Exception {
-		//is it firstOfPair
-		if (sam.getFirstOfPairFlag()) {
+		//is it unpaired or firstOfPair
+		if (sam.getReadPairedFlag()==false || sam.getFirstOfPairFlag()) {
 			writeOutSingle(sam);
 			//increment family size histogram
 			famSizeHist.count(1);

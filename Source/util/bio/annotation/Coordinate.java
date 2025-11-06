@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 import trans.anno.BindingRegion;
+import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -66,6 +67,18 @@ public class Coordinate implements Comparable<Coordinate>, Serializable{
 	public static boolean writeToFile(Bed[] c, File file){
 		try{
 			PrintWriter out = new PrintWriter( new FileWriter(file));
+			for (int i=0; i< c.length; i++) out.println(c[i]);
+			out.close();		
+		} catch (Exception e){
+			e.printStackTrace();
+			return false;
+		}
+		return true;
+	}
+	
+	public static boolean writeToGzippedFile(Bed[] c, File file){
+		try{
+			Gzipper out = new Gzipper(file);
 			for (int i=0; i< c.length; i++) out.println(c[i]);
 			out.close();		
 		} catch (Exception e){

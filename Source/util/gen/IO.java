@@ -346,6 +346,17 @@ public class IO {
 		return sb.toString();
 	}
 	
+	/** Returns a String using the delimiter for the file.toString() */
+	public static String fileArrayListToString(ArrayList<File> files, String delimiter) throws IOException {
+		StringBuilder sb = new StringBuilder(files.get(0).toString());
+		int num = files.size();
+		for (int i=1; i< num; i++) {
+			sb.append(delimiter);
+			sb.append(files.get(i));
+		}
+		return sb.toString();
+	}
+	
 	/**Converts a String of "grp1=/my/Dir1,grp2=/my/Dir2, etc that contains 
 	 * directories into a LinkedHashMap.
 	 * Returns null and prints an error message if an error was thrown, ie no directory, not a directory
@@ -2799,6 +2810,22 @@ public class IO {
 	public static boolean writeArrayList(ArrayList al, File file){
 		try{
 			PrintWriter out  = new PrintWriter(new FileWriter(file));
+			int num = al.size();
+			for (int i=0; i<num; i++){
+				out.println(al.get(i));
+			}
+			out.close();
+		}catch (Exception e){
+			e.printStackTrace();
+			return false;
+		}
+		return true;	
+	}
+	
+	/**Writes each element of an Arraylist on a seperate line to a file.*/
+	public static boolean writeArrayListGzipped(ArrayList al, File file){
+		try{
+			Gzipper out  = new Gzipper(file);
 			int num = al.size();
 			for (int i=0; i<num; i++){
 				out.println(al.get(i));

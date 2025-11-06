@@ -177,6 +177,7 @@ public class TNSample2 {
 		File[] jsonTestResults = IO.extractFiles(clinRepDir, ".json");
 		File[] xmls = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".xml");
 		File[] vcfs = IO.extractFiles(clinRepDir, ".vcf.gz");
+		if (vcfs == null || vcfs.length == 0) vcfs = IO.extractFiles(clinRepDir, ".vcf");
 		File[] toLink = null;
 
 		//make dir, ok if it already exists
@@ -186,8 +187,6 @@ public class TNSample2 {
 		//Caris test
 		String failMessage = null;
 		if (xmls != null && xmls.length >0 ) {
-			//might be uncompressed?
-			if (vcfs == null || vcfs.length == 0) vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf");
 			if (xmls.length != 1 || vcfs.length != 1) {
 				failMessage = "\tXml/VcfReport\tFAILED to find one xxx.vcf.gz and or one xxx.xml clinical test report file(s)";
 			}
@@ -200,11 +199,11 @@ public class TNSample2 {
 		}
 
 		else {
-			failMessage = "\tJson/Xml/ClinicalReport/Vcf\tFAILED to find clinical test report file(s) sufficient for processing in "+clinRepDir;
+			failMessage = "\tJson/Xml/ClinicalReport/Vcf\tFAILED to find clinical test file(s) sufficient for processing in "+clinRepDir;
 		}
 
 		//did it fail?
-		if (failMessage != null)clearAndFail(jobDir, failMessage);
+		if (failMessage != null) clearAndFail(jobDir, failMessage);
 
 		else {
 			//any files?
@@ -565,7 +564,7 @@ public class TNSample2 {
 		if (platformGenderInfo != null) return platformGenderInfo;	
 		//attempt to parse platform and gender info
 		File[] toCheck = IO.extractFiles(new File(rootDir, "ClinicalReport"));
-		
+
 		//So many jsons for tempus in ClinicalReport dir,  XT.V1 - good but also PD-L1-22C3 - bad
 		//How select for the good.  Don't return all.
 		
@@ -807,6 +806,15 @@ public class TNSample2 {
 				}
 			}
 		}
+		
+		//NA for gender? Seeing many cases from Tempus
+		File[] toCheck = IO.extractFiles(new File(rootDir, "ClinicalReport"));
+		for (File f : toCheck) {
+			if (f.getName().endsWith("_NA.json")) {
+				info.add("\tSkipping, gender is NA");
+				return;
+			}
+		}
 
 		//make dir, ok if it already exists
 		File jobDir = new File (rootDir, "CopyAnalysis/"+id+"_GATKCopyRatio");
@@ -912,6 +920,7 @@ public class TNSample2 {
 		//is there a ClinicalReport dir? If so then try to get info from the file name
 		//now being used by the AvatarProjectAssembler
 		File crDir = new File(rootDir, "ClinicalReport");
+
 		if (crDir.exists()) {
 			PlatformGenderInfo[] pgi = parsePlatformGenderInfo();
 			if (pgi == null ) throw new IOException("\nERROR: failed to parse gender info for copy ratio analysis from files in "+crDir);
@@ -1326,26 +1335,27 @@ public class TNSample2 {
 
 	private File[] fetchBPileup() throws IOException {
 		File bp = tnRunner.getBpileupFileOrDir();
-		if (bp.isFile()) {
-			return new File[] {bp, new File(bp.getCanonicalPath()+".tbi")};
-		}
+		if (bp.isFile()) return new File[] {bp, new File(bp.getCanonicalPath()+".tbi")};
+	
 		File[] bps = IO.extractFiles(bp, "bp.txt.gz");
 		
 		if (bps.length == 0) throw new IOException("ERROR: failed to find any xxx.bp.txt.gz files in "+bp);
-		else if (bps.length == 1) {
-			return new File[] {bps[0], new File(bps[0].getCanonicalPath()+".tbi")};
-		}
+		else if (bps.length == 1) return new File[] {bps[0], new File(bps[0].getCanonicalPath()+".tbi")};
 		else {
 			//more than one, any platform info?
 			if (platformGenderInfo == null) throw new IOException("ERROR: failed to find platform info for "+ id);
 			else {
+//IO.pl("HereNix inside "+bps.length);	
+				String panel = null;
 				for (PlatformGenderInfo pgi: platformGenderInfo) {
-					String panel = pgi.getPanel();
-					for (File f: bps) {							
+					panel = pgi.getPanel();
+//IO.pl("Panel "+panel);					
+					for (File f: bps) {	
+//IO.pl("File "+f);
 						if (f.getName().contains(panel)) return new File[] {f, new File(f.getCanonicalPath()+".tbi")};
 					}
 				}
-				throw new IOException("ERROR : failed to find a panel matched xxx.bp.txt.gz file in "+bp+" for "+id);
+				throw new IOException("ERROR : failed to find a panel matched xxx.bp.txt.gz file in "+bp+" for "+id+" panel "+panel);
 			}	
 		}
 	}

@@ -70,6 +70,65 @@ public class Num {
 		double diff = diffY * ratio;
 		return diff + y1;
 	}
+	
+    /**Linear interpolation between null values in the array. Null ends are just filled with the first non null value*/
+    public static void interpolate(Double[] doubleVals) {
+    	//find first Double
+        Double firstDouble = null;
+        for (int i=0; i< doubleVals.length; i++) {
+        	if (doubleVals[i] != null) {
+        		firstDouble = doubleVals[i];
+        		break;
+        	}
+        }
+        
+        //fix beginning
+        for (int i=0; i< doubleVals.length; i++) {
+        	if (doubleVals[i] == null) doubleVals[i] = firstDouble;
+        	else break;
+        }
+        
+        //find last Double
+        Double lastDouble = null;
+        for (int i= doubleVals.length-1; i>=0; i--) {
+        	if (doubleVals[i] != null) {
+        		lastDouble = doubleVals[i];
+        		break;
+        	}
+        }
+        
+        //fix end
+        for (int i= doubleVals.length-1; i>=0; i--) {
+        	if (doubleVals[i] == null) {
+        		doubleVals[i] = lastDouble; 
+        	}
+        	else break;
+        }
+        
+        //replace internal nulls with interpolated value
+        for (int i=0; i< doubleVals.length; i++) {
+        	//null?
+        	if (doubleVals[i] == null) {
+        		//find next non null
+        		Double next = null;
+        		double numNulls = 1;
+        		for (int j=i+1; j< doubleVals.length; j++) {
+        			if (doubleVals[j] != null) {
+        				next = doubleVals[j];
+        				break;
+        			}
+        			else numNulls++;
+        		}
+        		double adder = (next - firstDouble)/ (numNulls + 1);
+        		int stop = i +(int)numNulls;
+        		for (int x = i; x<stop; x++) {
+        			doubleVals[x] = firstDouble + adder;
+        			firstDouble = doubleVals[x];
+        		}
+        	}
+        	else firstDouble = doubleVals[i];
+        }
+    }
 
 	/**Using interbase coordinates so length = stop - start.*/
 	public static int calculateMiddleIntergenicCoordinates(int start, int end){

@@ -35,6 +35,8 @@ public class TempusV3Json2Vcf {
 	private HashMap<String, String[]> geneAliases = null;
 	private ArrayList<TempusV3Variant> failedToFindCooridinates = new ArrayList<TempusV3Variant>();
 	private HashMap<String, TempusV3JsonCollection> orderCollections = null;
+	private boolean justParsingClinInfo = false;
+	private boolean verbose = true;
 	
 	//counters across all datasets
 	TreeMap<String, Integer> bioInfoPipeline = new TreeMap<String, Integer>();
@@ -120,6 +122,15 @@ public class TempusV3Json2Vcf {
 		}
 	}
 	
+	//from the LoadPMR app
+	public TempusV3Json2Vcf(File[] jsonFiles) throws Exception{
+		this.jsonFiles = jsonFiles;
+		justParsingClinInfo = true;
+		verbose = false;
+		doWork();
+		printStatsMinimal();
+	}
+	
 	public void doWork() throws Exception{
 
 		//Create fasta fetcher
@@ -131,7 +142,7 @@ public class TempusV3Json2Vcf {
 		//create container for each report attributes
 		allReportAttributes = new LinkedHashMap[jsonFiles.length];
 
-		IO.pl("Parsing jsons...");
+		if (verbose) IO.pl("Parsing jsons...");
 		
 
 		//parse all the single json files
@@ -139,25 +150,27 @@ public class TempusV3Json2Vcf {
 
 			//process file
 			workingJsonFile = jsonFiles[i];
-			IO.p("\t"+workingJsonFile.getName());
+			if (verbose) IO.p("\t"+workingJsonFile.getName());
 
 			if (convert()) {
 				summaries.add(new TempusV3JsonSummary(workingJsonObject, workingOrder, workingPatient, workingReport, workingSpecimens, workingResults));
 				resetWorkingCounters();
 				allReportAttributes[i] = reportAttributes;
 			}
-			else IO.pl();
+			else if (verbose) IO.pl();
 		}
 		
-		//group summaries by tempusOrderId, cannot do by tempus patient id, these are not system wide
-		groupSummaries();
-		
-		//save vcfs
-		IO.pl("\nWriting merged json VCFs... ");
-		for (TempusV3JsonCollection c: orderCollections.values()) writeVcfs(c);
+		if (justParsingClinInfo == false) {
+			//group summaries by tempusOrderId, cannot do by tempus patient id, these are not system wide
+			groupSummaries();
 
-		//close the fasta lookup fetcher
-		if (indexedFasta != null) fasta.close();
+			//save vcfs
+			if (verbose) IO.pl("\nWriting merged json VCFs... ");
+			for (TempusV3JsonCollection c: orderCollections.values()) writeVcfs(c);
+
+			//close the fasta lookup fetcher
+			if (indexedFasta != null) fasta.close();
+		}
 
 	}
 	
@@ -173,11 +186,11 @@ public class TempusV3Json2Vcf {
 			}
 			c.getJsonSummaries().add(s);
 		}
-		IO.pl("\t"+orderCollections.size()+"\tOrders");
+		if (verbose) IO.pl("\t"+orderCollections.size()+"\tOrders");
 		
-		IO.pl("\nDepreciate duplicate summaries with an appended report...");
+		if (verbose) IO.pl("\nDepreciate duplicate summaries with an appended report...");
 		for (String tempusOrderId: orderCollections.keySet()) {
-			IO.pl("TempusOrderId: "+tempusOrderId);
+			if (verbose) IO.pl("TempusOrderId: "+tempusOrderId);
 
 			TempusV3JsonCollection collection = orderCollections.get(tempusOrderId);
 			HashMap<String, ArrayList<TempusV3JsonSummary>> codeSummary = new HashMap<String, ArrayList<TempusV3JsonSummary>>();
@@ -220,18 +233,20 @@ public class TempusV3Json2Vcf {
 
 		//print stats
 		for (String tempusOrderId: orderCollections.keySet()) {
-			IO.pl("TempusOrderId: "+tempusOrderId);
+			if (verbose) IO.pl("TempusOrderId: "+tempusOrderId);
 			//get the collection
 			TempusV3JsonCollection collection = orderCollections.get(tempusOrderId);
 
 			ArrayList<TempusV3JsonSummary> al = collection.getJsonSummaries();
-			IO.p("\t"+al.size()+"\tReports: ");
+			if (verbose) IO.p("\t"+al.size()+"\tReports: ");
 			for (TempusV3JsonSummary sum: al) {
 				TempusV3Order order = sum.getTempusOrder();
-				IO.p(order.getAccessionId()+ "_"+ order.getTempusOrderId());
-				IO.p(" ");
+				if (verbose) {
+					IO.p(order.getAccessionId()+ "_"+ order.getTempusOrderId());
+					IO.p(" ");
+				} 
 			}
-			IO.pl();
+			if (verbose) IO.pl();
 
 		}
 	}
@@ -467,7 +482,9 @@ public class TempusV3Json2Vcf {
 	        workingJsonObject = new JSONObject(jString);
 
 	        //schema
-	        if (checkSchema(workingJsonObject)== false) return false;
+	        if (checkSchema(workingJsonObject)== false) {
+	        	return false;
+	        }
 	        
 	        reportAttributes = new LinkedHashMap<String,String>();
 			addMDPID();
@@ -489,17 +506,19 @@ public class TempusV3Json2Vcf {
 	        workingSpecimens = TempusV3Specimen.getSpecimens(workingJsonObject, this);
 	        TempusV3Specimen.addAttributes(reportAttributes, workingSpecimens);
 	        
-	        //load any somatic and germline vcf files, might be null
-	        workingSomVcfLines = loadVcfLines (workingOrder.getAccessionId(), true);
-	        workingGermVcfLines = loadVcfLines (workingOrder.getAccessionId(), false);
-	        if (workingSomVcfLines == null && workingGermVcfLines == null) IO.pl("\tWARNING: no vcf lines for "+workingOrder.getAccessionId());
-	        else IO.pl();
-	        //results
-	        workingResults = new TempusV3GenomicVariants(workingJsonObject, this);
-	        workingResults.addAttributes(reportAttributes);
+	        if (justParsingClinInfo == false) {
+	        	//load any somatic and germline vcf files, might be null
+	        	workingSomVcfLines = loadVcfLines (workingOrder.getAccessionId(), true);
+	        	workingGermVcfLines = loadVcfLines (workingOrder.getAccessionId(), false);
+	        	if (workingSomVcfLines == null && workingGermVcfLines == null) IO.pl("\tWARNING: no vcf lines for "+workingOrder.getAccessionId());
+	        	else IO.pl();
+	        	//results
+	        	workingResults = new TempusV3GenomicVariants(workingJsonObject, this);
+	        	workingResults.addAttributes(reportAttributes);
 
-	        //check variant ref bps
-	        if (indexedFasta != null) checkRefSeqs();
+	        	//check variant ref bps
+	        	if (indexedFasta != null) checkRefSeqs();
+	        }
 	        return true;
 	        
 		} catch (Exception e) {
@@ -580,18 +599,15 @@ public class TempusV3Json2Vcf {
 	}
 
 	public void printStats(){
-
-		
-			IO.pl("\nSummary Stats:\n");
-			IO.pl(jsonFiles.length+ "\tNum Json files parsed");
-			IO.pl(numPotentiallyActionable+  			"\tNum Potentially Actionable");
-			IO.pl(numBiologicallyRelevant+   			"\tNum Biologically Relevant");
-			IO.pl(numPathogenic+   			"\tNum Pathogenic");
-			IO.pl(numLikelyPathogenic+   			"\tNum Likely Pathogenic");
-			IO.pl(numRiskAllele+  	"\tNum Risk Allele");
-			IO.pl(numUnknownSignificance+  	"\tNum Unknown Significance");
-			IO.pl(failedToFindCooridinates.size()+						 "\tNum Variants skipped for failing to match genomic coordinates.");
-		
+		IO.pl("\nSummary Stats:\n");
+		IO.pl(jsonFiles.length+ "\tNum Json files parsed");
+		IO.pl(numPotentiallyActionable+  			"\tNum Potentially Actionable");
+		IO.pl(numBiologicallyRelevant+   			"\tNum Biologically Relevant");
+		IO.pl(numPathogenic+   			"\tNum Pathogenic");
+		IO.pl(numLikelyPathogenic+   			"\tNum Likely Pathogenic");
+		IO.pl(numRiskAllele+  	"\tNum Risk Allele");
+		IO.pl(numUnknownSignificance+  	"\tNum Unknown Significance");
+		IO.pl(failedToFindCooridinates.size()+						 "\tNum Variants skipped for failing to match genomic coordinates.");
 
 		IO.pl("\nBioInf Pipelines");
 		Misc.printTreeMap(bioInfoPipeline, "\t", "\t");
@@ -611,20 +627,20 @@ public class TempusV3Json2Vcf {
 		Misc.printTreeMap(sampleSites, "\t", "\t");
 		IO.pl("\nPercent Tumor in Sample");
 		tumorPercentages.printScaledHistogram();
-		
-			IO.pl("\nGene Mutations:");
-			Misc.printTreeMap(genes, "\t", "\t");
-			IO.pl("\nGenomic Source Class:");
-			Misc.printTreeMap(genomicSourceClass, "\t", "\t");
-			IO.pl("\nVariant Type:");
-			Misc.printTreeMap(variantType, "\t", "\t");
-			IO.pl("\nVariant Description:");
-			Misc.printTreeMap(variantDescription, "\t", "\t");
-			IO.pl("\nTumor Variant Allele Percentages:");
-			tumorAF.printScaledHistogram();
-			//IO.pl("\nAge at Diagnosis");		Not used?
-			//ageAtDiagnosis.printScaledHistogram();
-		
+
+		IO.pl("\nGene Mutations:");
+		Misc.printTreeMap(genes, "\t", "\t");
+		IO.pl("\nGenomic Source Class:");
+		Misc.printTreeMap(genomicSourceClass, "\t", "\t");
+		IO.pl("\nVariant Type:");
+		Misc.printTreeMap(variantType, "\t", "\t");
+		IO.pl("\nVariant Description:");
+		Misc.printTreeMap(variantDescription, "\t", "\t");
+		IO.pl("\nTumor Variant Allele Percentages:");
+		tumorAF.printScaledHistogram();
+		//IO.pl("\nAge at Diagnosis");		Not used?
+		//ageAtDiagnosis.printScaledHistogram();
+
 		if (failedToFindCooridinates.size()!=0) {
 			IO.pl("\n"+failedToFindCooridinates.size()+"\tTempus variants could not be matched with genomic coordinates:");
 			for (TempusV3Variant tv: failedToFindCooridinates) IO.pl(tv.toString());

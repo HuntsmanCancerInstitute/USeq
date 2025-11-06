@@ -52,6 +52,10 @@ public class CarisXmlVcfParser {
 	private ArrayList<ExpressionAlteration> workingExpressionAlterations = new ArrayList<ExpressionAlteration>();
 	private ArrayList<MethylationAlteration> workingMethylationAlterations = new ArrayList<MethylationAlteration>();
 
+	//for fetching info related to the ICD codes
+	private HashMap<String, String> icd10CodeDesc = null;
+	private HashMap<String, String> icdOCodeMorphology = null;
+	private HashMap<String, String> icdOCodeTopology = null;
 
 
 	//constructors
@@ -80,7 +84,10 @@ public class CarisXmlVcfParser {
 	}
 	
 	//for working with the patient molecular repository
-	public CarisXmlVcfParser(File[] xmlFiles) throws Exception {
+	public CarisXmlVcfParser(File[] xmlFiles, HashMap<String, String> icd10CodeDesc, HashMap<String, String> icdOCodeMorphology, HashMap<String, String> icdOCodeTopology) throws Exception {
+		this.icd10CodeDesc = icd10CodeDesc;
+		this.icdOCodeMorphology = icdOCodeMorphology;
+		this.icdOCodeTopology = icdOCodeTopology;
 		
 		//Get the DOM Builder Factory and builder
 		factory = DocumentBuilderFactory.newInstance();
@@ -692,8 +699,31 @@ public class CarisXmlVcfParser {
 				}
 				//gender
 				if (name.equals("gender")) addLastChild("gender",cNode);
-				//icd_code
-				else if (name.equals("icd_code")) addLastChild("icd_code",cNode);
+				//icd_codes one or more from ICD_Topology, ICD-10_Diagnosis, ICD_Topology, e.g. C16.9,C79.81 or just one, not all match
+				else if (name.equals("icd_code")) {
+					addLastChild("icd_code",cNode);
+					String codes = workingReportAttributes.get("icd_code");
+					if (codes!=null && codes.length()>0 && icd10CodeDesc!=null) {
+						ArrayList<String> codeDesc = new ArrayList<String>();
+						for (String c : Misc.COMMA.split(codes)) {
+							StringBuilder sb = new StringBuilder(c);
+							if (icd10CodeDesc.containsKey(c)) {
+								sb.append(", ");
+								sb.append(icd10CodeDesc.get(c));
+							}
+							if (icdOCodeMorphology.containsKey(c)) {
+								sb.append(", ");
+								sb.append(icdOCodeMorphology.get(c));
+							}
+							if (icdOCodeTopology.containsKey(c)) {
+								sb.append(", ");
+								sb.append(icdOCodeTopology.get(c));
+							}
+							codeDesc.add(sb.toString());
+						}
+						workingReportAttributes.put("icd_code", Misc.stringArrayListToString(codeDesc, "; "));
+					}
+				}
 				//diagnosis
 				else if (name.equals("diagnosis")) addLastChild("diagnosis",cNode);
 				//pathologicDiagnosis

@@ -6,6 +6,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.PrintWriter;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -17,10 +20,18 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.apache.logging.log4j.Level;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.core.config.Configurator;
+
 import edu.utah.hci.misc.Util;
 import edu.utah.seq.vcf.json.TempusJson2Vcf;
 import edu.utah.seq.vcf.json.TempusJsonSummary;
 import edu.utah.seq.vcf.json.TempusSpecimen;
+import edu.utah.seq.vcf.json.tempusv3.TempusV3Json2Vcf;
+import edu.utah.seq.vcf.json.tempusv3.TempusV3JsonSummary;
+import edu.utah.seq.vcf.json.tempusv3.TempusV3Specimen;
 import edu.utah.seq.vcf.xml.caris.CarisXmlVcfParser;
 import util.gen.IO;
 import util.gen.Misc;
@@ -28,8 +39,9 @@ import util.gen.Misc;
 /**Loads the HCI Patient Molecular Repository*/
 public class PMRSearch {
 	
-	//user defined fields
+	//fields
 	private File clinicalReportDir = null;
+	private long maximumDaysOld = 0;
 	private String awsPatientDirUri = "s3://hcibioinfo-patient-molecular-repo/Patients/"; //must end with /
 	private String awsPath = "aws";
 	private String profile = "default";
@@ -42,7 +54,11 @@ public class PMRSearch {
 	private TreeMap<String, HashSet<String>> sourceDatasets = null; //Avatar,Tempus,Caris,etc : TestIds
 	private TreeMap<String, TreeSet<String>> sourceCombinations = null; //Patients with combinations of tests
 	private ArrayList<String> cmdsForParallel = new ArrayList<String>();
-
+	private HashMap<String, String> icd10CodeDesc = null;
+	private HashMap<String, String> icdOCodeMorphology = null;
+	private HashMap<String, String> icdOCodeTopology = null;
+	private String inputNonInteractive = null;
+	
 	//names
 	private String clinicalReportDirName = "ClinicalReport/";
 	private String avatarSourceName = "Avatar";
@@ -58,13 +74,18 @@ public class PMRSearch {
 	private String specimenSiteSearchString = null;
 	private TreeMap<String, TreeSet<String>> specimenId_DatasetName = null;
 	private String specimenIdSearchString = null;
-	private TreeMap<String, TreeSet<String>> datasetId_DatasetName = null;
+	private TreeMap<String, TreeSet<String>> pmrId_DatasetName = null;
 	private String datasetIdSearchString = null;
 	private TreeMap<String, TreeSet<String>> sex_DatasetName = null;
 	private String sexSearchString = null;
 	private TreeSet<String> datasetKeysFound = null;
+	
+	//misc
+    private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+    private LocalDate todaysDate = LocalDate.now();
 
 	public PMRSearch (String[] args) {
+
 		long startTime = System.currentTimeMillis();
 		try {
 			processArgs(args);
@@ -85,8 +106,17 @@ public class PMRSearch {
 			//Caris
 			loadCarisClinicalXmls();  
 			summarizeCarisClinicalInfo();
-
-			runInteractiveSearch();
+			
+			//interactive?
+			if (inputNonInteractive != null) {
+				IO.pl("NonInt "+inputNonInteractive);
+				String[] toRun = Misc.SEMI_COLON.split(inputNonInteractive);
+				for (String i: toRun) {
+					IO.pl("\tRunning "+i);
+					runSearch(i);
+				}
+			}
+			else runInteractiveSearch();
 
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
@@ -128,47 +158,49 @@ public class PMRSearch {
 				s.close();
 				return;
 			}
-			else {
-				UserSearch us = new UserSearch(input);
-				
-				//clear prior?
-				if (us.isClearPriorResults()) {
-					IO.pl("Prior selected datasets cleared.");
-					datasetKeysFound = null;
-				}
-				
-				//print a data table?
-				if (us.getPrintDataTable() != null) {
-					printDataTable(us.getPrintDataTable());
-				}
-				//search
-				else if (us.isGoodToSearch()) {
-					if (datasetKeysFound != null) IO.pl("Selecting from prior search of "+datasetKeysFound.size()+" datasets...");
-					TreeSet<String> foundSearchKeys = searchForDatasets(us);
-					if (datasetKeysFound == null) datasetKeysFound = foundSearchKeys;
-					else if (us.isAddMatches()) datasetKeysFound.addAll(foundSearchKeys);
-					else datasetKeysFound.retainAll(foundSearchKeys);
-					IO.pl("\n"+datasetKeysFound.size()+" datasets selected");
-				}
-				
-				
-				//print dataset files?
-				if (us.isPrintMatchedDatasetURIs()) printURIs();
-				
-				//print dataset info?
-				if (us.isPrintDatasetInfo()) printDatasetInfo();
-				
-				//print dataset info?
-				if (us.isPrintDatasetNames()) printDatasetNames();
-			}
+			else runSearch(input);
 		}
 	}
 	
-	private void printDatasetInfo() {
+	private void runSearch (String input) throws IOException {
+		UserSearch us = new UserSearch(input);
+		
+		//clear prior?
+		if (us.isClearPriorResults()) {
+			IO.pl("Prior selected datasets cleared.");
+			datasetKeysFound = null;
+		}
+		
+		//print a data table?
+		if (us.getPrintDataTable() != null) {
+			printDataTable(us.getPrintDataTable());
+		}
+		//search
+		else if (us.isGoodToSearch()) {
+			if (datasetKeysFound != null) IO.pl("Selecting from prior search of "+datasetKeysFound.size()+" datasets...");
+			TreeSet<String> foundSearchKeys = searchForDatasets(us);
+			if (datasetKeysFound == null) datasetKeysFound = foundSearchKeys;
+			else if (us.isAddMatches()) datasetKeysFound.addAll(foundSearchKeys);
+			else datasetKeysFound.retainAll(foundSearchKeys);
+			IO.pl("\n"+datasetKeysFound.size()+" datasets selected");
+		}
+		
+		//print dataset files?
+		if (us.isPrintMatchedDatasetURIs()) printURIs();
+		
+		//print dataset info?
+		if (us.isPrintDatasetInfo()) printDatasetInfo();
+		
+		//print dataset info?
+		if (us.isPrintDatasetNames()) printDatasetNames();
+
+	}
+	
+	private void printDatasetInfo() throws IOException {
 		IO.pl("\nDataset Info, also download and examine the ClinicalReport/xxx.json/.xml files:");
 		for (String datasetId: datasetKeysFound) {
 			Dataset d = idDataset.get(datasetId);
-			IO.p("\n"+ d.toString(datasetId));
+			IO.p(d.toString(datasetId));
 		}
 	}
 	
@@ -177,11 +209,10 @@ public class PMRSearch {
 		for (String datasetId: datasetKeysFound) IO.pl(datasetId);
 	}
 	
-	
 	private void printURIs() {
 		IO.pl("\nFile URIs for each matched dataset:");
 		for (String datasetId: datasetKeysFound) {
-			IO.pl("\n"+datasetId);
+			IO.pl(datasetId);
 			Dataset d = idDataset.get(datasetId);
 			for (String p: d.getPartialPaths()) IO.pl("\t"+awsPatientDirUri+datasetId+"/"+p);
 		}
@@ -206,9 +237,9 @@ public class PMRSearch {
 			if (specimenId_DatasetName == null) makeSpecimenIdMap();
 			catKeys_DatasetName = specimenId_DatasetName;
 		}
-		else if (whatCategory.equals("DatasetIds")) {
-			if (datasetId_DatasetName == null) makeDatasetIdsMap();
-			catKeys_DatasetName = datasetId_DatasetName;
+		else if (whatCategory.equals("PmrIds")) {
+			if (pmrId_DatasetName == null) makePmrIdsMap();
+			catKeys_DatasetName = pmrId_DatasetName;
 		}
 		else if (whatCategory.equals("Sex")) {
 			if (sex_DatasetName == null) makeSexMap();
@@ -216,14 +247,14 @@ public class PMRSearch {
 		}
 		else {
 			System.out.flush();
-			IO.el("\nDid not recognized '"+whatCategory+"' to print? Choose from Diagnosis, PhysicianDiseaseGroups, SpecimenSites, SpecimenIds, Sex, or DatasetIds");
+			IO.el("\nDid not recognized '"+whatCategory+"' to print? Choose from Diagnosis, PhysicianDiseaseGroups, SpecimenSites, SpecimenIds, Sex, or PmrIds");
 			System.err.flush();
 		}
 		printTreeMapTreeSet(catKeys_DatasetName);
 	}
 
 	/**Searches for datasets that match particular strings
-	 * Categories: Diagnosis, PhysicianDiseaseGroups, SpecimenSites, SpecimenIds, Sex, DatasetIds
+	 * Categories: Diagnosis, PhysicianDiseaseGroups, SpecimenSites, SpecimenIds, Sex, PmrIds
 	 * One or more search terms
 	 * CaseInsensitive
 	 * RequireAll to match
@@ -253,9 +284,9 @@ public class PMRSearch {
 			catKeys_DatasetName = specimenId_DatasetName;
 			keySearchString = specimenIdSearchString;
 		}
-		else if (whatCategory.equals("DatasetIds")) {
-			if (datasetId_DatasetName == null) makeDatasetIdsMap();
-			catKeys_DatasetName = datasetId_DatasetName;
+		else if (whatCategory.equals("PmrIds")) {
+			if (pmrId_DatasetName == null) makePmrIdsMap();
+			catKeys_DatasetName = pmrId_DatasetName;
 			keySearchString = datasetIdSearchString;
 		}
 		else if (whatCategory.equals("Sex")) {
@@ -265,7 +296,7 @@ public class PMRSearch {
 		}
 		else {
 			System.out.flush();
-			IO.el("\nDid not recognized '"+whatCategory+"'? Choose from Diagnosis, PhysicianDiseaseGroups, SpecimenSites, SpecimenIds, Sex, or DatasetIds");
+			IO.el("\nDid not recognized '"+whatCategory+"'? Choose from Diagnosis, PhysicianDiseaseGroups, SpecimenSites, SpecimenIds, Sex, or PmrIds");
 			System.err.flush();
 			return null;
 		}
@@ -282,18 +313,18 @@ public class PMRSearch {
 		}
 
 		//IO.pl("Hits to '"+whatCategory+"' with: '"+Misc.stringArrayToString(us.getSearchTerms(), "','")+"'");
-		TreeSet<String> finalDatasetIds = new TreeSet<String>();
+		TreeSet<String> finalPmrIds = new TreeSet<String>();
 		for (String key: datasets) {
 			if (us.isVerbose()) IO.pl("\t"+key+" : "+catKeys_DatasetName.get(key));
 			else IO.pl("\t"+key+" : "+catKeys_DatasetName.get(key).size());
-			finalDatasetIds.addAll(catKeys_DatasetName.get(key));
+			finalPmrIds.addAll(catKeys_DatasetName.get(key));
 		}
 		//more than one search term?
 		if (us.getSearchTerms().length > 1) {
-			if (us.isVerbose()) IO.pl("Total matches for '"+whatCategory+"' "+finalDatasetIds.size()+" "+finalDatasetIds);
-			else IO.pl("Total matches to '"+whatCategory+"' "+finalDatasetIds.size());
+			if (us.isVerbose()) IO.pl("Total matches for '"+whatCategory+"' "+finalPmrIds.size()+" "+finalPmrIds);
+			else IO.pl("Total matches to '"+whatCategory+"' "+finalPmrIds.size());
 		}
-		return finalDatasetIds;
+		return finalPmrIds;
 	}
 
 
@@ -309,6 +340,8 @@ public class PMRSearch {
 		diagnosis_DatasetName = new TreeMap<String, TreeSet<String>>();
 		String[] avaToSearch = {"Disease Type", "Histology/Behavior"};
 		String[] carisToSearch = {"diagnosis", "pathologicDiagnosis"};
+		
+		TreeSet<String> icdTxt = new TreeSet<String>();
 
 		for (Patient p: idPatient.values()) {
 			for (Dataset d: p.getIdDataSets().values()) {
@@ -334,18 +367,50 @@ public class PMRSearch {
 						addDataset(cci.get(keyToPull), id, diagnosis_DatasetName);
 					}
 				}
-				//Tempus?
-				else if (d.getTempusJsonReportInfo()!=null) {
-					TempusJsonSummary tjs = d.getTempusJsonReportInfo();
+				//Tempus Pre V3?
+				else if (d.getTempusJsonReportInfoPreV3()!=null) {
+					TempusJsonSummary tjs = d.getTempusJsonReportInfoPreV3();
 					addDataset(tjs.getTempusPatient().getDiagnosis(), id, diagnosis_DatasetName);
+				}
+				//Tempus V3?
+				else if (d.getTempusJsonReportInfoV3()!=null) {
+					icdTxt.clear();
+					TempusV3JsonSummary tjs = d.getTempusJsonReportInfoV3();
+					for (TempusV3Specimen s : tjs.getTempusSpecimens()) {
+						//path diagnosis
+						if (s.getOriginPathLabDiagnosis() != null) icdTxt.add(s.getOriginPathLabDiagnosis());
+						//icd 10 diagnosis
+						if (s.getTempusIcd10Code() != null && icd10CodeDesc !=null) {
+							for (String code: Misc.COMMA.split(s.getTempusIcd10Code())) {
+								String decoded = icd10CodeDesc.get(code);
+								if (decoded !=null) {
+									icdTxt.add(decoded);
+									s.getTempusIcd10Txt().add(decoded);
+								}
+								else IO.el("\tFailed to find ICD 10 Code '"+code+"' Add it!");
+							}
+						}	
+						//icd 0 morphology
+						if (s.getTempusIcdOCodeMorphology() != null && icdOCodeMorphology !=null) {
+							for (String code: Misc.COMMA.split(s.getTempusIcdOCodeMorphology())) {
+								String decoded = icdOCodeMorphology.get(code);
+								if (decoded !=null) {
+									icdTxt.add(decoded);
+									s.getTempusIcdOTxtMorphology().add(decoded);
+								}
+								else IO.el("\tFailed to find ICD Morphology Code '"+code+"' Add it!");
+							}
+						}	
+					}
+					//add concatinate
+					if (icdTxt.size() != 0) addDataset(Misc.treeSetToString(icdTxt, "; "), id, diagnosis_DatasetName);
 				}
 			}
 		}
-		
 		diagnosisSearchString = fetchKeysSearchString (diagnosis_DatasetName.keySet());
 	}
 
-	/*DatasetIds 
+	/*PmrIds 
 		All=coreId, e.g. HDD4xq3sTP 
 		A=ORIENAvatarKey, e.g. A038806
 		A=hciPatientId, e.g. 1102924
@@ -353,40 +418,40 @@ public class PMRSearch {
 		C=labReportID,	e.g. TN20-149935
 		T=tempusReportID, e.g. TL-22-HU55Z66A
 	 */
-	private void makeDatasetIdsMap() {
-		IO.pl("\nMaking Dataset ID summary map...");
-		datasetId_DatasetName = new TreeMap<String, TreeSet<String>>();
+	private void makePmrIdsMap() {
+		IO.pl("\nMaking Pmr ID summary map...");
+		pmrId_DatasetName = new TreeMap<String, TreeSet<String>>();
 
 		for (Patient p: idPatient.values()) {
 			for (Dataset d: p.getIdDataSets().values()) {
 				String id = p.getCoreId()+"/"+d.getSource()+"/"+d.getDatasetId();
 
-				addDataset(p.getCoreId(), id, datasetId_DatasetName);
-				addDataset(d.getDatasetId(), id, datasetId_DatasetName); //for Avatar, Tempus, Caris from the file path
+				addDataset(p.getCoreId(), id, pmrId_DatasetName);
+				addDataset(d.getDatasetId(), id, pmrId_DatasetName); //for Avatar, Tempus, Caris from the file path
 
 				//Avatar?
 				if (d.getAvatarClinicalInfo()!=null) {
 					AvatarClinicalInfo aci = d.getAvatarClinicalInfo();
-					addDataset(aci.getPatient().get("hciPatientId"), id, datasetId_DatasetName);
+					addDataset(aci.getPatient().get("hciPatientId"), id, pmrId_DatasetName);
 					
 					//Only need to set this for one of the following, they are all the same
 					//Any Tumor DNA?
 					if (aci.getTumorDna() != null) {
-						addDataset(aci.getTumorDna().get("ORIENAvatarKey"), id, datasetId_DatasetName);
+						addDataset(aci.getTumorDna().get("ORIENAvatarKey"), id, pmrId_DatasetName);
 					}
 					//Any Tumor RNA?
 					else if (aci.getTumorRna()!= null) {
-						addDataset(aci.getTumorRna().get("ORIENAvatarKey"), id, datasetId_DatasetName);
+						addDataset(aci.getTumorRna().get("ORIENAvatarKey"), id, pmrId_DatasetName);
 					}
 					//any Normal DNA samples
 					else if (aci.getNormalDna()!= null) {
-						for (HashMap<String, String> n: aci.getNormalDna()) addDataset(n.get("ORIENAvatarKey"), id, datasetId_DatasetName);
+						for (HashMap<String, String> n: aci.getNormalDna()) addDataset(n.get("ORIENAvatarKey"), id, pmrId_DatasetName);
 					}
 					
 				}
 			}
 		}
-		datasetIdSearchString = fetchKeysSearchString (datasetId_DatasetName.keySet());
+		datasetIdSearchString = fetchKeysSearchString (pmrId_DatasetName.keySet());
 	}
 	
 	/*Sex 
@@ -415,16 +480,15 @@ public class PMRSearch {
 						else addDataset("NA", id, sex_DatasetName);
 					}
 				}
-				//Tempus?
-				else if (d.getTempusJsonReportInfo()!=null) {
-					TempusJsonSummary tjs = d.getTempusJsonReportInfo();
+				//Tempus pre V3?
+				else if (d.getTempusJsonReportInfoV3()!=null) {
+					TempusV3JsonSummary tjs = d.getTempusJsonReportInfoV3();
 					String sex = tjs.getTempusPatient().getSex();
 					if (sex != null) {
 						if (sex.startsWith("F")) addDataset("F", id, sex_DatasetName);
 						else if (sex.startsWith("M")) addDataset("M", id, sex_DatasetName);
 						else addDataset("NA", id, sex_DatasetName);
 					}
-					
 				}
 			}
 		}
@@ -461,9 +525,14 @@ public class PMRSearch {
 					LinkedHashMap<String, String> cci = d.getCarisClinicalInfo();
 					addDataset(cci.get("physicianName"), id, disGrpPhy_DatasetName);
 				}
-				//Tempus?
-				else if (d.getTempusJsonReportInfo()!=null) {
-					TempusJsonSummary tjs = d.getTempusJsonReportInfo();
+				//Tempus pre v3
+				else if (d.getTempusJsonReportInfoPreV3()!=null) {
+					TempusJsonSummary tjs = d.getTempusJsonReportInfoPreV3();
+					addDataset(tjs.getTempusOrder().getPhysician(), id, disGrpPhy_DatasetName);
+				}
+				//Tempus v3
+				else if (d.getTempusJsonReportInfoV3()!=null) {
+					TempusV3JsonSummary tjs = d.getTempusJsonReportInfoV3();
 					addDataset(tjs.getTempusOrder().getPhysician(), id, disGrpPhy_DatasetName);
 				}
 			}
@@ -482,7 +551,8 @@ public class PMRSearch {
 		IO.pl("\nMaking Specimen Site summary map...");
 		specimenSite_DatasetName = new TreeMap<String, TreeSet<String>>();
 		String[] avaToSearch = {"SpecimenSiteOfCollection", "SpecimenSiteOfOrigin", "SpecimenSiteOfOriginRollUp"};
-
+		TreeSet<String> icdTxt = new TreeSet<String>();
+		
 		for (Patient p: idPatient.values()) {
 			for (Dataset d: p.getIdDataSets().values()) {
 				String id = p.getCoreId()+"/"+d.getSource()+"/"+d.getDatasetId();
@@ -505,12 +575,35 @@ public class PMRSearch {
 					LinkedHashMap<String, String> cci = d.getCarisClinicalInfo();
 					addDataset(cci.get("specimenSite"), id, specimenSite_DatasetName);
 				}
-				//Tempus?
-				else if (d.getTempusJsonReportInfo()!=null) {
-					TempusJsonSummary tjs = d.getTempusJsonReportInfo();
+				//Tempus pre v3
+				else if (d.getTempusJsonReportInfoPreV3()!=null) {
+					TempusJsonSummary tjs = d.getTempusJsonReportInfoPreV3();
 					for (TempusSpecimen ts: tjs.getTempusSpecimens()){
 						addDataset(ts.getSampleSite(), id, specimenSite_DatasetName);
 					}
+				}
+				//Tempus V3?
+				else if (d.getTempusJsonReportInfoV3()!=null) {
+					icdTxt.clear();
+					TempusV3JsonSummary tjs = d.getTempusJsonReportInfoV3();
+					for (TempusV3Specimen s : tjs.getTempusSpecimens()) {
+						//primary sample site
+						if (s.getPrimarySampleSite() != null) icdTxt.add(s.getPrimarySampleSite());
+						
+						//icd 0 topology
+						if (s.getTempusIcdOCodeTopography() != null && icdOCodeTopology !=null) {
+							for (String code: Misc.COMMA.split(s.getTempusIcdOCodeTopography())) {
+								String decoded = icdOCodeTopology.get(code);
+								if (decoded !=null) {
+									icdTxt.add(decoded);
+									s.getTempusIcdOTxtTopography().add(decoded);
+								}
+								else IO.el("\tFailed to find ICD Topology Code '"+code+"' Add it!");
+							}
+						}	
+					}
+					//add concatinate
+					if (icdTxt.size() != 0) addDataset(Misc.treeSetToString(icdTxt, "; "), id, specimenSite_DatasetName);
 				}
 			}
 		}
@@ -554,10 +647,15 @@ public class PMRSearch {
 					LinkedHashMap<String, String> cci = d.getCarisClinicalInfo();
 					addDataset(cci.get("specimenID"), id, specimenId_DatasetName);
 				}
-				//Tempus?
-				else if (d.getTempusJsonReportInfo()!=null) {
-					TempusJsonSummary tjs = d.getTempusJsonReportInfo();
+				//Tempus pre v3
+				else if (d.getTempusJsonReportInfoPreV3()!=null) {
+					TempusJsonSummary tjs = d.getTempusJsonReportInfoPreV3();
 					for (TempusSpecimen ts: tjs.getTempusSpecimens())addDataset(ts.getCaseId(), id, specimenId_DatasetName);
+				}
+				//Tempus v3
+				else if (d.getTempusJsonReportInfoV3()!=null) {
+					TempusV3JsonSummary tjs = d.getTempusJsonReportInfoV3();
+					for (TempusV3Specimen ts: tjs.getTempusSpecimens())addDataset(ts.getCaseId(), id, specimenId_DatasetName);
 				}
 			}
 		}
@@ -699,7 +797,9 @@ public class PMRSearch {
 		for (Patient p: idPatient.values()) {
 			for (Dataset d: p.getIdDataSets().values()) {
 				if (d.getSource().equals(avatarSourceName)) {
-					if (d.getClinicalInfoFiles() == null) IO.el("WARNING! "+p.getCoreId()+" "+d.getDatasetId()+" Avatar dataset is missing a json!");
+					if (d.getClinicalInfoFiles() == null) {
+						//IO.el("WARNING! "+p.getCoreId()+" "+d.getDatasetId()+" Avatar dataset is missing a json!");
+					}
 					else if (d.getClinicalInfoFiles().size() !=1) IO.el("WARNING! "+p.getCoreId()+" "+d.getDatasetId()+" Avatar dataset has more than one json!");
 					else {
 						AvatarClinicalInfo aci = loadAvatarJson(d.getClinicalInfoFiles().get(0));
@@ -710,10 +810,11 @@ public class PMRSearch {
 		}
 	}
 
-	private void loadTempusClinicalJsons() throws Exception {
-IO.el("Fix multiple tempus reports issue ");		
-		ArrayList<File> toParse = new ArrayList<File>();
-		ArrayList<Dataset> toSet = new ArrayList<Dataset>();
+	private void loadTempusClinicalJsons() throws Exception {		
+		ArrayList<File> toParseOri = new ArrayList<File>();
+		ArrayList<File> toParseV3 = new ArrayList<File>();
+		ArrayList<Dataset> toSetOri = new ArrayList<Dataset>();
+		ArrayList<Dataset> toSetV3 = new ArrayList<Dataset>();
 		
 		//for each patient
 		for (Patient p: idPatient.values()) {
@@ -725,32 +826,70 @@ IO.el("Fix multiple tempus reports issue ");
 					
 					//any clinical json reports?
 					if (d.getClinicalInfoFiles() == null) IO.el("WARNING! "+p.getCoreId()+" "+d.getDatasetId()+" Tempus dataset is missing a json!");
-//else if (d.getClinicalInfoFiles().size() !=1) IO.el("WARNING! "+p.getCoreId()+" "+d.getDatasetId()+" Tempus dataset has more than one standard test json!");
 
 					//yes some reports
 					else {
 						//not sure this is going to work
 						for (File f: d.getClinicalInfoFiles()) {
-							toParse.add(f);
+							String version = fetchTempusSchemaVersion(f);
+							if (version == null) throw new IOException("ERROR: failed to parse the schema version from "+f);
+							if (version.startsWith("3")) {
+								toParseV3.add(f);
+								toSetV3.add(d);
+							}
+							else {
+								toParseOri.add(f);
+								toSetOri.add(d);
+							}
 						}
-						//toParse.add(d.getClinicalInfoFiles().get(0));
-						toSet.add(d);
 					}
 				}
 			}
 		}
 		//parse all of the patient tempus reports
-		File[] files = new File[toParse.size()];
-		toParse.toArray(files);
+		File[] filesOri = new File[toParseOri.size()];
+		toParseOri.toArray(filesOri);
+		
+		File[] filesV3 = new File[toParseV3.size()];
+		toParseV3.toArray(filesV3);
 
 		//parse the json report files, this also prints out an aggregate summary
-//this should error out since it won't handle v3.3		
-		TempusJson2Vcf tj = new TempusJson2Vcf(files);
+		IO.pl("Parsing Tempus pre V3...");
+		TempusJson2Vcf tj = new TempusJson2Vcf(filesOri);
 
 		//set the summaries in each of the patients tempus datasets
-		ArrayList<TempusJsonSummary> summaries = tj.getSummaries();
-		if (toSet.size() != summaries.size()) throw new Exception("\nMismatch in Dataset number and TempusJsonSummary number");
-		for (int i=0; i< toSet.size(); i++) toSet.get(i).setTempusJsonReportInfo(summaries.get(i));
+		ArrayList<TempusJsonSummary> summariesOri = tj.getSummaries();
+		if (toSetOri.size() != summariesOri.size()) throw new Exception("\nMismatch in Dataset number and TempusJsonSummaryOri number");
+		for (int i=0; i< toSetOri.size(); i++) toSetOri.get(i).setTempusJsonReportInfoPreV3(summariesOri.get(i));
+		
+		IO.pl("Parsing Tempus V3...");
+		TempusV3Json2Vcf tj3 = new TempusV3Json2Vcf(filesV3);
+		//set the summaries in each of the patients tempus datasets
+		ArrayList<TempusV3JsonSummary> summariesV3 = tj3.getSummaries();
+		if (toSetV3.size() != summariesV3.size()) throw new Exception("\nMismatch in Dataset number and TempusJsonSummaryV3 number");
+		for (int i=0; i< toSetV3.size(); i++) {
+			toSetV3.get(i).setTempusJsonReportInfoV3(summariesV3.get(i));
+		}
+	}
+	
+	public static final Pattern schemaCleaner = Pattern.compile("[\\sv,\"]");
+	public static String fetchTempusSchemaVersion(File json) throws IOException {
+		//"schemaVersion": "v3.3.0",
+		//"schemaVersion": "v2.0.0",
+		//"schemaVersion": "1.4.2",
+        BufferedReader in = IO.fetchBufferedReader(json);
+        String line = null;
+        String version = null;	
+        while ((line = in.readLine())!=null) {
+        	if (line.contains("schemaVersion")) {
+        		String[] split = Misc.COLON.split(line);
+        		if (split.length !=2) throw new IOException("ERROR: failed to find two fields split by : with schema, "+line+" from "+json);
+        		version = schemaCleaner.matcher(split[1]).replaceAll("");
+        		break;
+        	}
+        }
+        in.close();
+        return version;
 	}
 
 	private void fetchTempusClinicalJsons() throws Exception {
@@ -815,7 +954,8 @@ IO.el("Fix multiple tempus reports issue ");
 		toParse.toArray(files);
 
 		//parse the json report files, this also prints out an aggregate summary
-		CarisXmlVcfParser tj = new CarisXmlVcfParser(files);
+		CarisXmlVcfParser tj = new CarisXmlVcfParser(files, icd10CodeDesc, icdOCodeMorphology, icdOCodeTopology);
+		
 		LinkedHashMap<String, String>[] attributes = tj.getAllReportAttributes();
 
 		//set the clinical info in each of the datasets
@@ -877,11 +1017,18 @@ IO.el("Fix multiple tempus reports issue ");
 		String[] fields = null;
 		String[] keys = null;
 		while ((line = in.readLine())!=null) {
-			//2023-03-01   09:04:43   2938    Patients/AA2mF6Vy/Avatar/A032049_SL419345_SL419548_SL420681/ClinicalReport/A032049_SL419345_SL419548_SL420681_IDTv1_SAR_F.json
+			//2022-05-31   09:04:43   2938    Patients/AA2mF6Vy/Avatar/A032049_SL419345_SL419548_SL420681/ClinicalReport/A032049_SL419345_SL419548_SL420681_IDTv1_SAR_F.json
 			//  date         time     size       key
 			//    0            1        2         3
 			fields = Misc.TAB.split(line);
 			if (fields.length != 4) throw new IOException("Failed to find 4 fields in "+line);
+			
+			//date filter?
+			if (maximumDaysOld != 0) {
+				LocalDate inputDate = LocalDate.parse(fields[0], formatter);
+		        long daysOld = ChronoUnit.DAYS.between(inputDate, todaysDate);
+		        if (daysOld > maximumDaysOld) continue;
+			}
 			
 
 			//Patients   AA2mF6Vy   Avatar   A032049_SL419345_SL419548_SL420681     ClinicalReport/A032049_SL419345_SL419548_SL420681_IDTv1_SAR_F.json
@@ -963,9 +1110,9 @@ IO.el("Fix multiple tempus reports issue ");
 
 	/*Looks for the repo file list file, downloads it if not found and saves it.*/
 	private void downloadAwsFileList() throws IOException {
-		awsRepoList = new File (System.getProperty("user.dir")+ "/awsRepoList.txt");
+		awsRepoList = new File (clinicalReportDir, "awsRepoList.txt");
 		if (awsRepoList.exists() == false) fetchFilesInRepo();
-		else IO.pl("WARNING! Using existing AWS file list " +awsRepoList+"! Delete and restart to pull latest.");
+		else IO.pl("\nWARNING! Using existing AWS file list " +awsRepoList+"! Delete it and restart to pull the latest.\n");
 	}
 
 	/**Uses ProcessBuilder to execute a cmd
@@ -1006,7 +1153,7 @@ IO.el("Fix multiple tempus reports issue ");
 	}
 
 	private void fetchFilesInRepo() throws IOException{
-		IO.pl("Fetching file list from AWS for '"+awsPatientDirUri+ "'...");
+		IO.pl("\nFetching file list from AWS for '"+awsPatientDirUri+ "'...");
 		String[] cmd = {awsPath, "s3", "ls", "--recursive", awsPatientDirUri, "--profile", profile};
 		String[] res = executeViaProcessBuilder(cmd, false, null);
 		PrintWriter out = new PrintWriter(new FileWriter(awsRepoList));
@@ -1038,6 +1185,9 @@ IO.el("Fix multiple tempus reports issue ");
 
 		IO.pl("\n"+IO.fetchUSeqVersion()+" Arguments: "+ Misc.stringArrayToString(args, " ") +"\n");
 		Pattern pat = Pattern.compile("-[a-z]");
+		File icd10File = null;
+		File icdMorphologyFile = null;
+		File icdTopologyFile = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -1046,8 +1196,13 @@ IO.el("Fix multiple tempus reports issue ");
 				try{
 					switch (test){
 					case 'd': clinicalReportDir = new File(args[++i]).getCanonicalFile(); break;
-					case 'x': awsPatientDirUri = args[++i]; break;
+					case 'a': awsPatientDirUri = args[++i]; break;
 					case 'p': profile =args[++i]; break;
+					case 'i': icd10File = new File(args[++i]); break;
+					case 'm': icdMorphologyFile = new File(args[++i]); break;
+					case 't': icdTopologyFile = new File(args[++i]); break;
+					case 's': inputNonInteractive = args[++i]; break;
+					case 'x': maximumDaysOld = Long.parseLong(args[++i]); break;
 					case 'v': verbose = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -1057,6 +1212,23 @@ IO.el("Fix multiple tempus reports issue ");
 					Misc.printErrAndExit("\nSorry, something doesn't look right with this parameter: -"+test+"\n");
 				}
 			}
+		}
+		
+		//icd files?
+		if (icd10File != null) {
+			IO.pl("Loading ICD 10 codes for Diagnosis...");
+			icd10CodeDesc = IO.loadFileIntoHash(icd10File, 0, 1);
+			if (icd10CodeDesc == null) throw new IOException("ERROR: failed to pars ICD Diagnosis file "+icd10File);
+		}
+		if (icdMorphologyFile != null) {
+			IO.pl("Loading ICD morphology codes for Diagnosis...");
+			icdOCodeMorphology = IO.loadFileIntoHash(icdMorphologyFile, 0, 1);
+			if (icdOCodeMorphology == null) throw new IOException("ERROR: failed to pars ICD morphology file "+icdMorphologyFile);
+		}
+		if (icdTopologyFile != null) {
+			IO.pl("Loading ICD topology codes for SpecimenSites...");
+			icdOCodeTopology = IO.loadFileIntoHash(icdTopologyFile, 0, 1);
+			if (icdOCodeTopology == null) throw new IOException("ERROR: failed to pars ICD topology file "+icdTopologyFile);
 		}
 
 		//root patient dirs?
@@ -1076,8 +1248,7 @@ IO.el("Fix multiple tempus reports issue ");
 		envPropToAdd.put("AWS_SHARED_CREDENTIALS_FILE", credentialsFile.getCanonicalPath());
 
 		//Only needed in Eclipse
-		/*
-		if (true) {
+		/*if (true) {
 			envPropToAdd.put("PATH", "/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/opt/X11/bin");
 			awsPath="/usr/local/bin/aws";
 		}*/
@@ -1089,7 +1260,7 @@ IO.el("Fix multiple tempus reports issue ");
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                       Patient Molecular Repo Search : July 2025                  **\n" +
+				"**                       Patient Molecular Repo Search : Oct 2025                   **\n" +
 				"**************************************************************************************\n" +
 				"Interactive searching of the clinical and sample attribute information in the json/xml\n"+
 				"reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.\n"+
@@ -1100,13 +1271,34 @@ IO.el("Fix multiple tempus reports issue ");
 
 				"\nOptions:\n"+
 				"-d  Directory to save the PHI redacted clinical xml and json reports.\n"+
-				"-x  S3 URI containing the patient molecular repo, defaults to\n"+
+				"-a  S3 URI containing the patient molecular repo, defaults to\n"+
 				"      s3://hcibioinfo-patient-molecular-repo/Patients/ \n"+
 				"-p  AWS credential profile, defaults to 'default'\n"+
+				"-i  File containing ICD 10 diagnosis codes and their descriptors. Tab delimited. For \n"+
+				"       converting Tempus diagnosis codes to searchable text.\n"+
+				"-m  File containing ICD 0 morphology codes. Ditto.\n"+
+				"-t  File containing ICD 0 topology codes. Ditto.\n"+
+				"-s  Run non interactive search using this input then exit. Surround with \"  \".\n"+
+				"       Separate multiple searches with ;\n"+
+				"-x  Maximum days old to parse, defaults to all.\n"+
 				"-v  Verbose output.\n"+
 				
-	
-				"\nExample: java -jar pathToUSeq/Apps/PMRSearch -d ~/PMRFiles/\n"+
+				"\nSearch Options, enter at the interactive prompt or using the -s 'xxxx' option above:\n"+
+				"-d  Data table to search, choose from: Diagnosis, PhysicianDiseaseGroups, SpecimenSites,\n"+
+				"       SpecimenIds, Sex, PmrIds\n"+
+				"-s  Search terms, comma delimited, no spaces. Surround phrases with single quotes.\n"+
+				"-c  Terms are case sensitive.\n"+
+				"-e  Terms are exact, no partial matching.\n"+
+				"-m  All terms must match.\n"+
+				"-a  Add matches to the prior result set.\n"+
+				"-x  New search, clear any prior results.\n"+
+				"-p  Print the contents of the named data table, see -d\n"+
+				"-f  Print the available file AWS URIs for the matched datasets.\n"+
+				"-i  Print the clinical and test details for the matched datasets.\n"+
+				"-n  Print the matched dataset names.\n"+
+
+				"\nExample: java -jar pathToUSeq/Apps/PMRSearch -d ~/PMRFiles/ -x 365 -i \n"+
+				"   ~/ICD/ICD-10_Diagnosis.txt -m ~/ICD/ICD_Morphology.txt -t ~/ICD/ICD_Topology.txt\n"+
 
 				"**************************************************************************************\n");
 	}

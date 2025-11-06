@@ -58,11 +58,11 @@ public class AmbryResult {
 		String[] trimmedFN = Misc.FORWARD_PARENTHESIS.split(patientFirstName);
 		sb.append(trimmedFN[0].trim()); sb.append("\t");
 		
-		Date date = AmbryBulkParser.dateFormatter.parse(dateOfBirth);
+		Date date = AmbryDataWrangler.dateFormatter.parse(dateOfBirth);
 		Calendar calendar = Calendar.getInstance();
 		calendar.setTime(date);
 		
-		sb.append(calendar.get((1+Calendar.MONTH))); sb.append("\t");
+		sb.append(1+calendar.get((Calendar.MONTH))); sb.append("\t");
 		sb.append(calendar.get(Calendar.DAY_OF_MONTH)); sb.append("\t");
 		sb.append(calendar.get(Calendar.YEAR)); sb.append("\t");
 		
