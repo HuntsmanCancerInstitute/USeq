@@ -94,12 +94,13 @@ public class CopyAnalysisBedMerger {
 			for (String type: mergedCalls.keySet()) {
 				IO.pl("\t"+type+"\t"+mergedCalls.get(type).geneStrandCalls);
 			}
+			IO.pl();
 		}
 		
 	}
 
 	public static void main(String[] args) {
-		new CopyAnalysisBedMerger("/Users/u0028003/HCI/Labs/Maughan_Benjamin/ProstateCancerProject2025/26250R/WGS/ByPatient/PassingBeds");
+		new CopyAnalysisBedMerger("/Users/u0028003/HCI/Labs/Maughan_Benjamin/ProstateCancerProject2025/26250R/WGS/ByPatient/PassingBeds/ReallyFixed");
 
 	}
 	

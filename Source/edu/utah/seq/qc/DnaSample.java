@@ -91,7 +91,27 @@ public class DnaSample {
 				return;
 			}
 		}
-		
+		in.close();
+		//not parsed so try trimmomatic
+		parseTrimmomaticSummaryLog(alignLog);
+	}
+	
+	//looking for info from trimmomatic
+	private void parseTrimmomaticSummaryLog(File log) throws Exception {
+		if (log == null) return;
+		String line;
+		BufferedReader in = IO.fetchBufferedReader(log);
+		while ((line = in.readLine())!=null) {
+			if (line.contains("Input Read Pairs:")) {
+				String[] tokens = Misc.COLON.split(line);
+				String num = tokens[1].trim();
+				numberFastqRead1And2 = Long.parseLong(num) * 2;
+				in.close();
+				alignParsed = true;
+				return;
+			}
+		}
+		in.close();
 	}
 	
 	/**At what index does the fraction hit or fall below 0.25?*/

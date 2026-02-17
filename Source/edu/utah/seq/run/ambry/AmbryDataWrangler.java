@@ -449,7 +449,10 @@ public class AmbryDataWrangler {
 						if (hg38Coor !=null && ag.getCDotHg38Vcf() !=null) {
 							String cDot = Misc.stringArrayToString(ag.getCDotHg38Vcf(),"_");
 							String liftover = Misc.stringArrayToString(hg38Coor, "_");
-							if (cDot.equals(liftover)== false) throw new IOException("Error: CDot Hg38 "+cDot+" does not agree with remapped Hg38 "+liftover);
+							if (cDot.equals(liftover)== false) {
+								IO.pl("WARNING: CDot Hg38 "+cDot+" does not agree with remapped Hg38 "+
+										liftover+" for hg19 vcf "+vcfHg19Key+" assigning remapped to variant. Left align issue?");
+							}
 						}
 					}
 				}
@@ -708,7 +711,7 @@ public class AmbryDataWrangler {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                        Ambry Data Wrangler : October 2025                        **\n" +
+				"**                        Ambry Data Wrangler : January 2026                        **\n" +
 				"**************************************************************************************\n" +
 				"App for parsing xlsx bulk results spreadsheets to vcf, bed, and json results. Uses\n"+
 				"Jannovar to convert Ambry cDots to vcf coordinates. Uses Liftover to convert the hg19\n"+

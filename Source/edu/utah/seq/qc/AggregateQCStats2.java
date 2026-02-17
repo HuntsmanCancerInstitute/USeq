@@ -18,9 +18,8 @@ public class AggregateQCStats2 {
 	private File saveDirectory;
 	private File jobDirectory;
 	private String prependString = "";
-	private boolean removeNAColumns = true;
 
-	private String alignLogMatch = ".+Align.log";
+	private String trimLogMatch = ".+Trimmomatic.summary.log"; //".+Align.log";
 	private String dupLogMatch = ".+Markdup.log";
 	private String readCovJsonMatch = ".+UniObRC.json.gz";
 	private String scJsonMatch = ".+SampleConcordance.json.gz";
@@ -28,7 +27,7 @@ public class AggregateQCStats2 {
 	private String normalDNAMatch = ".+NormalDNA.+";
 	private String tumorDNAMatch = ".+TumorDNA.+";
 	
-	private Pattern alignLogPattern;
+	private Pattern trimLogPattern;
 	private Pattern dupLogPattern;
 	private Pattern readCovJsonPattern;
 	private Pattern scJsonPattern;
@@ -139,7 +138,7 @@ public class AggregateQCStats2 {
 	}
 	
 	private void makePatterns() {
-		alignLogPattern = Pattern.compile(alignLogMatch);
+		trimLogPattern = Pattern.compile(trimLogMatch);
 		dupLogPattern = Pattern.compile(dupLogMatch);
 		readCovJsonPattern = Pattern.compile(readCovJsonMatch);
 		scJsonPattern = Pattern.compile(scJsonMatch);
@@ -170,7 +169,7 @@ public class AggregateQCStats2 {
 				for (File f: IO.fetchAllFilesRecursively(job)) {
 					String name = f.getName();
 					//align log
-					if (alignLogPattern.matcher(name).matches()) {
+					if (trimLogPattern.matcher(name).matches()) {
 						int nto = fetchSource(f);
 						if (nto == 0) normAlignLog = f;
 						else tumAlignLog = f;
@@ -251,7 +250,7 @@ public class AggregateQCStats2 {
 					switch (test){
 					case 'j': jobDirectory = new File(args[++i]); break;
 					case 's': saveDirectory = new File(args[++i]); break;
-					case 'a': alignLogMatch = args[++i]; break;
+					case 'a': trimLogMatch = args[++i]; break;
 					case 'd': dupLogMatch = args[++i]; break;
 					case 'r': readCovJsonMatch = args[++i]; break;
 					case 'c': scJsonMatch = args[++i]; break;
@@ -275,7 +274,7 @@ public class AggregateQCStats2 {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Aggregate QC Stats2: March 2024                        **\n" +
+				"**                           Aggregate QC Stats2: March 2025                        **\n" +
 				"**************************************************************************************\n" +
 				"Parses and aggregates alignment quality statistics from log and json files produced by\n"+
 				"the TNRunner2 DnaAlignQC and SampleConcordance workflows.\n"+
@@ -285,7 +284,8 @@ public class AggregateQCStats2 {
 				"-s Directory for saving the AggQC results.\n"+
 
 				"\nOptions:\n"+
-				"-a Alignment log file match, defaults to '.+_Align.log'\n"+
+				"-a CutAdapt or Trimmomatic log info file match, defaults to \n"+
+				"     '.+_Trimmomatic.summary.log' sometimes in '.+_Align.log'\n"+
 				"-d Mark duplicates log file match, defaults to '.+_Markdup.log'\n"+
 				"-r Read coverage json file match, defaults to '.+_UniObRC.json.gz'\n"+
 				"-c Sample concordance json file match, defaults to '.+_SampleConcordance.json.gz'\n"+

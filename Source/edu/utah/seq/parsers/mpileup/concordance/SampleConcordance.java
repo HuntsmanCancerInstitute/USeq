@@ -173,7 +173,7 @@ public class SampleConcordance {
 
 	private void aggregateStats(ConcordanceChunkBamPileup[] runners) throws Exception {
         //collect stats
-    	afHist = runners[0].getAfHist();
+    	afHist = runners[0].getAfHist(); 	
     	chrXAfHist = runners[0].getChrXAfHist();
     	similarities = runners[0].getSimilarities();
     	    	
@@ -183,6 +183,7 @@ public class SampleConcordance {
     		//histograms
     		Histogram[] a = runners[i].getAfHist();
     		Histogram[] b = runners[i].getChrXAfHist();
+    		if (a == null || b == null) continue;
     		for (int x=0; x< afHist.length; x++) {
     			if (a[x] != null) afHist[x].addCounts(a[x]);
     			if (b[x] != null) chrXAfHist[x].addCounts(b[x]);

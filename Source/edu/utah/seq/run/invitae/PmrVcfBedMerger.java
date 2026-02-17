@@ -106,6 +106,8 @@ public class PmrVcfBedMerger {
 			String h = IO.fetchHeader(f);
 			String[] lines = Misc.RETURN.split(h);
 			for (String l: lines) {
+				l = l.trim();
+				if (l.length()==0) continue;
 				if (header.contains(l) == false) header.add(l);
 			}
 		}
@@ -161,12 +163,17 @@ public class PmrVcfBedMerger {
 		//print header and records
 		Gzipper out = new Gzipper(mergedVcf);
 		for (String l : mergedHeader) {
+			l = l.trim();
+			if (l.length()==0) continue;
 			//add header line for merged files
 			if (l.startsWith("#CHROM")) out.println("##MergedVcfFiles="+Misc.stringArrayListToString(fileNames, ","));
 			out.println(l);
 		}
 		for (int i=0; i< mergedVcfs.length; i++) {
-			String[] fields = Misc.TAB.split(mergedVcfs[i].getOriginalRecord());
+			String l = mergedVcfs[i].getOriginalRecord();
+			l = l.trim();
+			if (l.length()==0) continue;
+			String[] fields = Misc.TAB.split(l);
 			//replace IDs so these are unique to the file
 			fields[2] = "Invitae_"+i;
 			out.println(Misc.stringArrayToString(fields, "\t"));
@@ -220,7 +227,7 @@ public class PmrVcfBedMerger {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                             Pmr Vcf Bed Merger: Oct 2023                         **\n" +
+				"**                             Pmr Vcf Bed Merger: Nov 2025                         **\n" +
 				"**************************************************************************************\n" +
 				"Parses directories of Vcf and Bed files named such that the first underscore separated\n"+
 				"field represents a subject's ID.  These will be used to group the vcf and bed files\n"+

@@ -458,7 +458,7 @@ public class PMRSearchGQueryJoiner {
 	private void loadPMRSearchResults() throws IOException {
 		IO.pl("Loading PMRSearch results...");
 		String line = null;
-		File[] resultsFiles = IO.extractFiles(pmrSearchResultDir);
+		File[] resultsFiles = IO.extractFiles(pmrSearchResultDir, ".txt");
 		for (File f: resultsFiles) {
 			if (f.getName().startsWith(".")) continue;
 			BufferedReader in = IO.fetchBufferedReader(f);
@@ -536,7 +536,8 @@ public class PMRSearchGQueryJoiner {
 				"Merges results from the PMRSearch and GQuery tools into a summary spreadsheet.\n"+
 
 				"\nRequired Options:\n"+
-				"-p  Directory containing PMRSearch results files with output from the -i option.\n"+
+				"-p  File or directory containing PMRSearch results xxx.txt with output from the \n"+
+				"    -i option.\n"+
 				"-g  GQuery json results file.\n"+
 				"-o  Output directory for writing the results.\n"+
 				"-r  (Optional) Directory containing the currentRegistry_xxx_PHI.txt file for pulling\n"+

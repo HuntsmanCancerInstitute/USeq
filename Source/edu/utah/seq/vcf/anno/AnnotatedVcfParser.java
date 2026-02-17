@@ -153,7 +153,7 @@ public class AnnotatedVcfParser {
 	
 	
 	private void closeSpreadsheet() throws IOException {
-		sumarySpreadSheet.println(appSettings);
+		sumarySpreadSheet.println("\n"+appSettings);
 		sumarySpreadSheet.println(AnnotatedVcfParserDataLine.legend);
 		sumarySpreadSheet.close();
 	}
@@ -483,8 +483,8 @@ public class AnnotatedVcfParser {
 					double delta = Double.parseDouble(items[6]);
 					if (delta > maxDelta) {
 						maxDelta = delta;
-						dataLine.spliceGeneName = se[0];
-						dataLine.spliceScoreDiff = maxDelta;
+						dataLine.spliceGeneNames.add(tokens[0]);
+						dataLine.spliceScoreDiff = new Double(maxDelta).toString();
 					}
 				}
 			}
@@ -512,18 +512,14 @@ public class AnnotatedVcfParser {
 		
 		//split on comma, typically just one
 		//SpliceAI=CT|RP11-287D1.3|0.00|0.00|0.00|0.00|-5|-16|36|-16,CT|SLC4A5|0.00|0.00|0.00|0.00|-5|-16|36|-16  so more that one...
-		//       0          1        2    3    4   5
+		//         0          1      2    3    4   5
 		//      allele     gene     AG    AL   DG  DL   Acceptor/Donor Gain/Loss
 		String[] se = Misc.COMMA.split(spliceInfo);
 		
-		//VCFSS=ENSG00000163554:G3S,158584103,AAAATTCATGTTTTTTTTTTTTCTTTCAGGGACATCAAAGGTGTG,AAAATTCATGTTTTTTTTTTTTTCTTTCAGGGACATCAAAGGTGTG,-7.52,3.04,3.04
-		//&
-		//ENSG00000163554:G3E,158584103,AAAATTCATGTTTTTTTTTTTTCTTTCAGGGACATCAAAGGTGTG,AAAATTCATGTTTTTTTTTTTTTCTTTCAGGGACATCAAAGGTGTG,-7.52,3.04,3.04
-		
-		
-		//for each one look for the G3E, D3S, and parse the delta
+		//for each one look for the G3E, D3S, and parse the probability
 		boolean pass = false;
-		double score = 0;
+		double maxScore = 0;
+		String gene = null;
 		for (String effect: se){
 			//split on |
 			String[] tokens = Misc.PIPE.split(effect);
@@ -540,22 +536,25 @@ public class AnnotatedVcfParser {
 				else if (code.equals("G3S")) indexToCheck = 2;
 				else throw new IOException("ERROR: unrecognized splice type to check "+code);
 				
-				score = Double.parseDouble(tokens[indexToCheck]);
-				if (score >= minimumSpliceAIScore) {
-					pass = true;
-					break;
+				double score = Double.parseDouble(tokens[indexToCheck]);
+				if (score > maxScore) {
+					maxScore = score;
+					gene = tokens[1];
 				}
+				if (score >= minimumSpliceAIScore) pass = true;
 			}
 		}
 		
-		if (verbose) IO.pl("\tSpliceAI Check\t"+pass+"\t"+score+"\t"+spliceInfo);	
+		if (verbose) IO.pl("\tSpliceAI Check\t"+pass+"\t"+maxScore+"\t"+spliceInfo);	
 		if (pass) {
 			numPassingSpliceAI++;
 			dataLine.passesSplice = true;
+			dataLine.spliceGeneNames.add(gene);
+			if (dataLine.spliceScoreDiff == null) dataLine.spliceScoreDiff = maxScore+"";
+			else dataLine.spliceScoreDiff = maxScore+","+ dataLine.spliceScoreDiff;
 		}
 		return pass;
 	}
-
 	
 	private boolean[] checkBKAFs() throws Exception {
 		boolean foundBK = false;
@@ -1407,7 +1406,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                          Annotated Vcf Parser - April 2025                       **\n" +
+				"**                         Annotated Vcf Parser - December 2025                     **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+

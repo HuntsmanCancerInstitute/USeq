@@ -25,32 +25,32 @@ public class Num {
 		if ( (x & 1) == 0 ) return true;
 		return false;
 	}
-	
+
 	/**Formats bytes to B, KB, MG, GB, TB, PB, EB. copied from icza at 
 	 * http://stackoverflow.com/questions/3758606/how-to-convert-byte-size-into-human-readable-format-in-java */
 	public static String formatBytesToHumanReadableSize(long v) {
-	    if (v < 1024) return v + " B";
-	    int z = (63 - Long.numberOfLeadingZeros(v)) / 10;
-	    return String.format("%.1f %sB", (double)v / (1L << (z*10)), " KMGTPE".charAt(z));
+		if (v < 1024) return v + " B";
+		int z = (63 - Long.numberOfLeadingZeros(v)) / 10;
+		return String.format("%.1f %sB", (double)v / (1L << (z*10)), " KMGTPE".charAt(z));
 	}
-	
+
 	/**100 GB (107,374,182,400 bytes) of data in Amazon S3 Standard*/
 	public static double gigaBytes(double bytes) {
 		return bytes / 1073741824.0;
 	}
-	
+
 	/**100 TB (109,951,162,777,600 bytes) of data in Amazon S3 Standard*/
 	public static double teraBytes(double bytes) {
 		return bytes / 1099511627776.0;
 	}
-	
+
 	public static final NumberFormat dollarFormatter = NumberFormat.getCurrencyInstance();
 	public static String formatBytesToAwsCost (long bytes, double costPerTB) {
 		double tb = teraBytes(bytes);
 		double cost = tb/costPerTB;
 		return dollarFormatter.format(cost);
 	}
-	
+
 	/**Does a linear regression type interpolation, assumes 2's are > 1's.*/
 	public static float interpolateY(float x1, float y1, float x2, float y2, float testX){
 		float diffX = x2-x1;
@@ -70,65 +70,110 @@ public class Num {
 		double diff = diffY * ratio;
 		return diff + y1;
 	}
-	
-    /**Linear interpolation between null values in the array. Null ends are just filled with the first non null value*/
-    public static void interpolate(Double[] doubleVals) {
-    	//find first Double
-        Double firstDouble = null;
-        for (int i=0; i< doubleVals.length; i++) {
-        	if (doubleVals[i] != null) {
-        		firstDouble = doubleVals[i];
-        		break;
-        	}
-        }
-        
-        //fix beginning
-        for (int i=0; i< doubleVals.length; i++) {
-        	if (doubleVals[i] == null) doubleVals[i] = firstDouble;
-        	else break;
-        }
-        
-        //find last Double
-        Double lastDouble = null;
-        for (int i= doubleVals.length-1; i>=0; i--) {
-        	if (doubleVals[i] != null) {
-        		lastDouble = doubleVals[i];
-        		break;
-        	}
-        }
-        
-        //fix end
-        for (int i= doubleVals.length-1; i>=0; i--) {
-        	if (doubleVals[i] == null) {
-        		doubleVals[i] = lastDouble; 
-        	}
-        	else break;
-        }
-        
-        //replace internal nulls with interpolated value
-        for (int i=0; i< doubleVals.length; i++) {
-        	//null?
-        	if (doubleVals[i] == null) {
-        		//find next non null
-        		Double next = null;
-        		double numNulls = 1;
-        		for (int j=i+1; j< doubleVals.length; j++) {
-        			if (doubleVals[j] != null) {
-        				next = doubleVals[j];
-        				break;
-        			}
-        			else numNulls++;
-        		}
-        		double adder = (next - firstDouble)/ (numNulls + 1);
-        		int stop = i +(int)numNulls;
-        		for (int x = i; x<stop; x++) {
-        			doubleVals[x] = firstDouble + adder;
-        			firstDouble = doubleVals[x];
-        		}
-        	}
-        	else firstDouble = doubleVals[i];
-        }
-    }
+
+	/**Linear interpolation between null values in the array. Null ends are just filled with the first non null value*/
+	public static void interpolate(Double[] doubleVals) {
+		//find first Double
+		Double firstDouble = null;
+		for (int i=0; i< doubleVals.length; i++) {
+			if (doubleVals[i] != null) {
+				firstDouble = doubleVals[i];
+				break;
+			}
+		}
+
+		//fix beginning
+		for (int i=0; i< doubleVals.length; i++) {
+			if (doubleVals[i] == null) doubleVals[i] = firstDouble;
+			else break;
+		}
+
+		//find last Double
+		Double lastDouble = null;
+		for (int i= doubleVals.length-1; i>=0; i--) {
+			if (doubleVals[i] != null) {
+				lastDouble = doubleVals[i];
+				break;
+			}
+		}
+
+		//fix end
+		for (int i= doubleVals.length-1; i>=0; i--) {
+			if (doubleVals[i] == null) {
+				doubleVals[i] = lastDouble; 
+			}
+			else break;
+		}
+
+		//replace internal nulls with interpolated value
+		for (int i=0; i< doubleVals.length; i++) {
+			//null?
+			if (doubleVals[i] == null) {
+				//find next non null
+				Double next = null;
+				double numNulls = 1;
+				for (int j=i+1; j< doubleVals.length; j++) {
+					if (doubleVals[j] != null) {
+						next = doubleVals[j];
+						break;
+					}
+					else numNulls++;
+				}
+				double adder = (next - firstDouble)/ (numNulls + 1);
+				int stop = i +(int)numNulls;
+				for (int x = i; x<stop; x++) {
+					doubleVals[x] = firstDouble + adder;
+					firstDouble = doubleVals[x];
+				}
+			}
+			else firstDouble = doubleVals[i];
+		}
+	}
+
+	/**Interpolate values in Y, when none of X is not null. Won't modify any null values
+	 * in Y at the beginning or end, just the middle.
+	 * @throws Exception */
+	public static void interpolateY (Double[] x, Double[] y) throws Exception {
+		//check lengths are the same
+		if (x.length!=y.length) throw new Exception("ERROR: array lengths differ.");
+		//find first good index
+		int goodIndex = -1;
+		for (int i=0; i< y.length; i++) {
+			if (y[i] != null) {
+				goodIndex = i;
+				break;
+			}
+		}
+		//start with first index and start to walk
+		for (int i=goodIndex+1; i< x.length; i++) {
+			//not null, just advance
+			if (y[i] != null) goodIndex = i;
+			else {
+				//find next good index
+				int nextGoodIndex;
+				for (int j=i+1; j< x.length; j++) {
+					//not null
+					if (y[j] != null) {
+						nextGoodIndex = j;
+						//pull good values
+						double x1 = x[goodIndex];
+						double x2 = x[nextGoodIndex];
+						double y1 = y[goodIndex];
+						double y2 = y[nextGoodIndex];
+						for (int z=goodIndex+1; z<nextGoodIndex; z++) {
+							double xTest = x[z];
+							double yTest = Num.interpolateY(x1, y1, x2, y2, xTest);
+							y[z] = yTest;
+						}
+						//reset
+						i = nextGoodIndex;
+						goodIndex = nextGoodIndex;
+						break;
+					}
+				}
+			}
+		}
+	}
 
 	/**Using interbase coordinates so length = stop - start.*/
 	public static int calculateMiddleIntergenicCoordinates(int start, int end){
@@ -137,7 +182,7 @@ public class Num {
 		double halfLength = length/2.0;
 		return (int)Math.round(halfLength) + start;
 	}
-	
+
 	/**Sums the abs(diff)/a*100 at each index.*/
 	public static double sumPercentDifference(double[] a, double[] b){
 		double pDiff = 0;
@@ -465,7 +510,7 @@ public class Num {
 		}
 		return ints;
 	}
-	
+
 	/**Rounds floats to ints*/
 	public static int[] floatArraysToInt (float[] flt){
 		int[] ints = new int[flt.length];
@@ -594,7 +639,7 @@ public class Num {
 			IO.executeCommandLine(command);
 			//load results
 			double[] values = Num.loadDoublesNoNegs(results, 3234.0);
-			
+
 			//check
 			if (values == null || values.length != data.length) throw new Exception ("Number of results from R does not match the number of trials.");
 			//clean up
@@ -843,7 +888,7 @@ public class Num {
 
 		}
 	}
-	
+
 	/**Inverts the int[].*/
 	public static void invertArray(int[] x){
 		int lenthMinusOne = x.length -1;
@@ -1099,7 +1144,7 @@ public class Num {
 			else sortedPValDecending[i] = prior;
 		}
 	}
-	
+
 	/**Returns B&H corrected -10Log10(FDRs) in order provided.  Assumes -10log10(pvals).*/
 	public static float[] benjaminiHochbergCorrectUnsorted(float[] unsortedPValues){
 		//load Point[] with all of the pvalues
@@ -1355,7 +1400,7 @@ public class Num {
 	public static double antiLog(double loggedValue, double base){
 		return Math.pow(base, loggedValue);
 	}
-	
+
 	/**Calculate m and b given two points for interpolation.
 	 * @return double[]{m,b}*/
 	public static double[] calculateSlopeAndYIntercept(double x1, double y1, double x2, double y2){
@@ -1363,7 +1408,7 @@ public class Num {
 		double b = y2 - (m * x2);
 		return new double[]{m,b};
 	}
-	
+
 	/**Calculate interpolated Y given the slope m and y intercept
 	 * @return Y*/
 	public static double calculateYGivenX(double[] mb, double x){
@@ -1375,7 +1420,7 @@ public class Num {
 		double s = -1.0 * fredScore/10.0;
 		return Math.pow(10, s);
 	}
-	
+
 	public static double[] antiNeg10log10(float[] fredScores) {
 		double[] anti = new double[fredScores.length];
 		for (int i=0; i< anti.length; i++) {
@@ -1445,7 +1490,7 @@ public class Num {
 		}
 		return maxIndex;
 	}
-	
+
 	/**Returns the first index containing the maximum value. */
 	public static int findMaxLongIndex(long[] ints) {
 		int len = ints.length;
@@ -1909,7 +1954,7 @@ public class Num {
 			array[n - 1] = tmp;
 		}
 	}
-	
+
 	public static void randomize (byte[] array, Random rng){      
 		// n is the number of items left to shuffle
 		for (int n = array.length; n > 1; n--) {
@@ -2941,7 +2986,7 @@ public class Num {
 		}
 		return values;
 	}
-	
+
 	/**Loads a column of double from a file into an array.
 	 * Returns null if nothing found.
 	 * Skips blank lines. Will substitute defaultValue if value = "Inf"
@@ -3104,7 +3149,7 @@ public class Num {
 		float stndDev = (float)Num.standardDeviation(sortedFloat,mean);
 		return mean+"\t"+median+"\t"+stndDev+"\t"+minMax[0]+"\t"+minMax[1]+"\t"+perc10th+"\t"+perc90th;
 	}
-	
+
 	/**Returns a tab delimited string of Mean Median StdDev Min Max 10th 90th for the Float[]
 	 * if the sortedFloat size is too small then the vals will be assigned a -0*/
 	public static String statFloatArrayWithSizeChecks(float[] sortedFloat){
@@ -3186,7 +3231,7 @@ public class Num {
 		}
 		return Num.arrayListOfFloatToArray(al);
 	}
-	
+
 	/**Remove zero values from float array.*/
 	public static double[] replaceZeroValuesWithSmallestNonZero(double[] d){
 		ArrayList<Double> al = new ArrayList<Double>(d.length);
@@ -3201,7 +3246,7 @@ public class Num {
 		}
 		//add in the smallest values
 		for (int i=0; i< numZeros; i++) al.add(smallest);
-		
+
 		return Num.arrayListOfDoubleToArray(al);
 	}
 
@@ -3364,7 +3409,7 @@ public class Num {
 		for (int i=0; i< lenTreat; i++) tTot+=f[i];
 		return (double)tTot/(double)lenTreat;
 	}
-	
+
 	/**Calculates the harmonic mean of a double[] */
 	public static double harmonicMean(double[] data) {  
 		double sum = 0.0;
@@ -3494,7 +3539,7 @@ public class Num {
 			return index;
 		}
 	}
-	
+
 	/**Returns the index of the closest values[index] to the key. Rounds up
 	 * if the value is equi distant between two indexes.  Will not return an
 	 * index <0 or > length-1 .
@@ -3568,7 +3613,7 @@ public class Num {
 			return index;
 		}
 	}
-	
+
 	public static int countNumLessThan(float threshold, float[] sortedValues){
 		int index = Arrays.binarySearch(sortedValues,threshold);
 		//no exact match
@@ -3598,8 +3643,8 @@ public class Num {
 		//IO.pl("countNumLessThan\t"+index);
 		return index;
 	}
-	
-	
+
+
 	/**Returns the index of the smalles values[index] to the key. Returns -1 if none found
 	 * If identical values are present, returns the smallest index containing the key.
 	 * Don't forget to SORT!.*/
@@ -3974,7 +4019,7 @@ public class Num {
 		}
 		return means;
 	}
-	
+
 	public static double[] removeNaNAndInfinite(double[] d){
 		ArrayList<Double> al = new ArrayList<Double>(d.length);
 		for (int i=0; i< d.length; i++) if (Double.isNaN(d[i]) == false && Double.isInfinite(d[i]) == false) al.add(new Double(d[i]));
@@ -4044,7 +4089,7 @@ public class Num {
 		}
 		return medians;
 	}
-	
+
 	/** Slides a window along an array, one index at a time, calculating the median contents. */
 	public static double[] windowMedianScores(int[] scores, int windowSize) {
 		int num = 1+ scores.length - windowSize;
@@ -4748,7 +4793,7 @@ public class Num {
 		f.setMaximumFractionDigits(numberOfDecimalPlaces);
 		return f.format(num);
 	}
-	
+
 	/**Converts a double ddd.dddddddd to a user determined number of decimal places right of the .  */
 	public static String formatNumberMinOne(double num, int numberOfDecimalPlaces){
 		NumberFormat f = NumberFormat.getNumberInstance();
@@ -4756,7 +4801,7 @@ public class Num {
 		f.setMinimumFractionDigits(1);
 		return f.format(num);
 	}
-	
+
 	/**Converts a double ddd.dddddddd to a user determined number of decimal places right of the .  */
 	public static String formatNumberNoComma(double num, int numberOfDecimalPlaces){
 		NumberFormat f = NumberFormat.getNumberInstance();
@@ -4764,7 +4809,7 @@ public class Num {
 		f.setGroupingUsed(false);
 		return f.format(num);
 	}
-	
+
 	/**Converts a double ddd.dddddddd to a user determined number of decimal places right of the .  */
 	public static String formatNumberJustMax(double num, int numberOfDecimalPlaces){
 		NumberFormat f = NumberFormat.getNumberInstance();
@@ -4792,7 +4837,7 @@ public class Num {
 		for (int i=0; i< ints.length; i++) floats[i] = ints[i];
 		return floats;
 	}
-	
+
 	/**Converts a int[] to double[]*/
 	public static double[] intArrayToDouble(int[] ints){
 		double[] d = new double[ints.length];
@@ -4863,7 +4908,7 @@ public class Num {
 		}
 		return sb.toString();
 	}
-	
+
 	/**Converts an array of Integer to a String seperated by the delimiter.  */
 	public static String integerArrayToString(Integer[] d, String delimiter){
 		StringBuffer sb = new StringBuffer();
@@ -4875,7 +4920,7 @@ public class Num {
 		}
 		return sb.toString();
 	}
-	
+
 	/**Converts an array of short to a String seperated by the delimiter.  */
 	public static String shortArrayToString(short[] d, String delimiter){
 		StringBuffer sb = new StringBuffer();
@@ -4901,7 +4946,7 @@ public class Num {
 			return null;
 		}
 	}
-	
+
 	/**Given a String of ints delimited by something, will parse or return null.*/
 	public static int[] stringToInts(String s, Pattern pat){
 		String[] tokens = pat.split(s);
@@ -5037,7 +5082,7 @@ public class Num {
 		double ave = (double)total/(double)len;
 		return (int)Math.round(ave);
 	}
-	
+
 	/**Averages an ArrayList of Integer objects.*/
 	public static double meanIntegersReturnDouble(ArrayList<Integer> al){
 		int len = al.size();
@@ -5050,7 +5095,7 @@ public class Num {
 		double ave = total/(double)len;
 		return ave;
 	}
-	
+
 	/**Averages an ArrayList of Integer objects.*/
 	public static double meanDouble(ArrayList<Double> al){
 		int len = al.size();
@@ -5200,7 +5245,7 @@ public class Num {
 		for (Double n : d) a.add(n);
 		return a;
 	}
-	
+
 	public static ArrayList<Integer> convertDoubleToArrayListInt(double[] d){
 		ArrayList<Integer> a = new ArrayList<Integer>(d.length);
 		for (double n : d) a.add((int)(Math.round(n)));
@@ -5240,7 +5285,7 @@ public class Num {
 				bAL.remove(bSize);
 			}
 		}
-		
+
 		tA = Num.arrayListOfDoubleToArray(aAL);
 		tB = Num.arrayListOfDoubleToArray(bAL);
 
@@ -5277,7 +5322,7 @@ public class Num {
 				total+= (double)toScan[i];
 				numCounted++;
 			}
-			
+
 		}
 		return total/numCounted;
 	}
@@ -5286,7 +5331,7 @@ public class Num {
 		String[] i = comma.split(s);
 		return Num.parseInts(i);
 	}
-	
+
 	public static double[] parseDoubles(String s, Pattern pat) {
 		String[] i = pat.split(s);
 		return Num.parseDoubles(i);
@@ -5315,7 +5360,7 @@ public class Num {
 		}
 		return ss;
 	}
-	
+
 	/**Splits the region defined by the start and stop (not included) into chunks of the chunkSize or larger*/
 	public static int[][] chunkRegionExact(int minSize, int start, int stop) {
 		//how many?
@@ -5326,7 +5371,7 @@ public class Num {
 			toReturn[0] = new int[]{start,stop};
 			return toReturn;
 		}
-		
+
 		int bpPerCut = (int)(size/(double)numCuts);
 		if (bpPerCut < minSize) bpPerCut = minSize;
 
@@ -5354,7 +5399,7 @@ public class Num {
 		for (int i=0; i< a.length; i++) scaled[i] = a[i]*multiplier;
 		return scaled;
 	}
-	
+
 	/**Calculates the scalar needed to scale the test to the ref based on means.
 	 * @return meanRef/meanTest*/
 	public static double calculateScalar(double[] ref, double[] test) {
@@ -5364,7 +5409,7 @@ public class Num {
 	}
 
 
-	
-	
+
+
 
 }

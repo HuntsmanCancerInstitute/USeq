@@ -141,9 +141,9 @@ public class AvatarPMRPruner {
 			StringBuilder sb = new StringBuilder();
 			sb.append(pmrId); sb.append("/");
 			sb.append("Avatar/");
-			sb.append(orienId); sb.append("/");
-			sb.append(ne); sb.append("/");
-			sb.append(te); sb.append("/");
+			sb.append(orienId); sb.append("_");
+			sb.append(ne); sb.append("_");
+			sb.append(te); sb.append("_");
 			sb.append(tt);
 			return sb.toString();
 		}
@@ -190,25 +190,7 @@ public class AvatarPMRPruner {
 
 	public static void printDocs(){
 		IO.pl("\n" +
-				"**************************************************************************************\n" +
-				"**                       Patient Molecular Repo Search : August 2023                **\n" +
-				"**************************************************************************************\n" +
-				"Interactive searching of the clinical and sample attribute information in the json/xml\n"+
-				"reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.\n"+
-				"Press return after loading to see the search menu. Assumes the AWS CLI:\n"+
-				"https://docs.aws.amazon.com/cli/ is installed in your path and you have read access\n"+
-				"to the PMR. For searching for particular mutations, fusions, or cnvs, use GQuery:\n"+
-				"https://github.com/HuntsmanCancerInstitute/GQuery\n"+
-
-				"\nOptions:\n"+
-				"-d  Directory to save the PHI redacted clinical xml and json reports.\n"+
-				"-u  S3 URI containing the patient molecular repo, defaults to\n"+
-				"      s3://hcibioinfo-patient-molecular-repo/Patients/ \n"+
-				"-p  AWS credential profile, defaults to 'default'\n"+
-				"-v  Verbose output.\n"+
-				
-	
-				"\nExample: java -jar pathToUSeq/Apps/PMRSearch -d ~/PMRFiles/\n"+
+				"xxx\n"+
 
 				"**************************************************************************************\n");
 	}

@@ -168,7 +168,10 @@ public class VCFSpliceScanner {
 		 
 		//add initial vcf
 		if (simpleVcf == null) {
-			simpleVcf = new SimpleVcf(in.readLine(), 0);
+			//watch out for zero record vcfs!
+			String line = in.readLine();
+			if (line == null) return false;
+			simpleVcf = new SimpleVcf(line, 0);
 		}
 		
 		//add new chrom
@@ -596,7 +599,7 @@ public class VCFSpliceScanner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Splice Scanner : Sept 2020                        **\n" +
+				"**                            VCF Splice Scanner : Dec 2025                         **\n" +
 				"**************************************************************************************\n" +
 				"Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and\n"+
 				"Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice\n"+

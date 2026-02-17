@@ -31,6 +31,7 @@ public class BedTabix{
 
 		} catch (IOException e) {
 			e.printStackTrace();
+			Misc.printErrAndExit("ERROR: failed to tabix bed files.");
 		}
 	}
 	//GNomEx constructor
@@ -189,7 +190,7 @@ public class BedTabix{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                BedTabix: Dec 2019                                **\n" +
+				"**                                BedTabix: Nov 2025                                **\n" +
 				"**************************************************************************************\n" +
 				"Converts bed files to a SAMTools compressed bed tabix format. Recursive.\n" +
 

@@ -62,8 +62,8 @@ public class AnnotatedVcfParserDataLine {
 	
 	//Splice
 	boolean passesSplice = false;
-	String spliceGeneName = null;
-	double spliceScoreDiff = -1;
+	HashSet<String> spliceGeneNames = new HashSet<String>();
+	String spliceScoreDiff = null;
 	
 	
 	//constructor
@@ -160,8 +160,8 @@ public class AnnotatedVcfParserDataLine {
 		
 		//Splice
 		al.add(passesSplice+"");
-		al.add(spliceGeneName);
-		if (spliceScoreDiff != -1.0)al.add(spliceScoreDiff+"");
+		al.add(Misc.hashSetToString(spliceGeneNames, ","));
+		if (spliceScoreDiff != null)al.add(spliceScoreDiff);
 		else al.add("null");
 		
 		String main = Misc.stringArrayListToString(al, "\t");
@@ -208,10 +208,8 @@ public class AnnotatedVcfParserDataLine {
 	public HashSet<String> fetchPassingGeneNames(){
 		HashSet<String> passNames = new HashSet<String>();
 		for (AnnotatedGene ag: annoGenes) if (ag.passImpact) passNames.add(ag.geneName);
-		if (passesSplice && spliceGeneName !=null) {
-			String realName = spliceGeneName.substring(0,spliceGeneName.indexOf(":"));
-			passNames.add(realName);
-		}
+		if (passesSplice && spliceGeneNames.size() !=0) passNames.addAll(spliceGeneNames);
+		
 		//still nothing? then this passed clinvar but not Anno thus pull first high, then if nothing, then moderate
 		if (passNames.size() == 0) {
 			HashSet<String> high = new HashSet<String>();
@@ -278,9 +276,9 @@ public class AnnotatedVcfParserDataLine {
 			"ClinHGVS\tCLINVARs HGVS notation for this variant\n"+
 			"ClinSig\tCLINVAR's significance annotation\n"+
 			"ClinSigConf\tCLINVAR's conflicting interpretation tabulation\n"+
-			"PassSpliceScan\tBoolean indicating whether this record passes the VCFSpliceScanner criteria\n"+
-			"SpliceGene\tSpliceScanner impacted gene(s)\n"+
-			"SpliceDiff\tDifference in MaxEntScan scores between the reference and variant splice sequences, larger the more significant.\n"+
+			"PassSpliceScan\tBoolean indicating whether this record passes the VCFSpliceScanner or SpliceAI criteria\n"+
+			"SpliceGene\tSplice impacted gene(s)\n"+
+			"SpliceDiff\tDifference in MaxEntScan scores between the reference and variant splice sequences, and/ or the maximum SpliceAI probablility, larger the more significant.\n"+
 			"PassAnn\tBoolean indicating whether this record passes the ANN criteria\n"+
 			"Gene\tANN impacted gene name\n"+
 			"TranscriptId\tANN impacted transcript\n"+

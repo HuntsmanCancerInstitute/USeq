@@ -275,7 +275,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 		}
 		//Calculate pvalues using hg dist, fast way to do a fisher's exact on a 2x2 table
 		IntersectListsHypergeometric ih = new IntersectListsHypergeometric(tempDirectory, fullPathToR);
-		double[] pvals = ih.calculatePValues(nabt);
+		double[] pvals = ih.calculateOverRepresentationPValues(nabt);
 		//for (int i=0; i< pathways.length; i++) pathways[i].pval = pvals[i];
 		for (int i=0; i< analyzedNetworks.length; i++) {
 			analyzedNetworks[i].setPValue(pvals[i]);

@@ -28,6 +28,7 @@ public class TNRunner2 {
 	private File[] haplotypeCallDocs = null;
 	private File[] gatkJointGenotypingDocs = null;
 	private File[] illuminaJointGenotypingDocs = null;
+	private File[] splicAIDocs = null;
 	private File[] copyRatioDocs = null;
 	private File[] clinicalVcfDocs = null;
 	private File[] msiDocs = null;
@@ -487,17 +488,26 @@ public class TNRunner2 {
 				genoVcfIndexes[i].renameTo(new File(resDir, genoVcfIndexes[i].getName()));
 
 				//launch germline annotator?
-				if (getVarAnnoDocs()!= null) toLaunch.annotateGermlineVcf("GATK");
+				if (getVarAnnoDocs()!= null) toLaunch.annotateGermlineVcfSpliceStandard("GATK");
 			}
 			gatkGroupProcessingComplete = true;
 		}
 
 		//force a restart?
 		else if (restartFailed && nameFile.containsKey("FAILED")){
-			//cancel any slurm jobs and delete the directory
-			TNSample.cancelDeleteJobDir(nameFile, jobDir, info, true);
-			//launch it
-			launchGatkJointGenotyping(toGeno, jobDir);
+			//any prior restart?
+			if (nameFile.containsKey("RESTARTED")) {
+				if (verbose) IO.pl("\tFAILED "+jobDir);
+				gatkGroupProcessingFailed = true;
+			}
+			else {
+				//cancel any slurm jobs and delete the directory
+				TNSample.cancelDeleteJobDir(nameFile, jobDir, info, true);
+				//launch it
+				File restart = new File(jobDir, "RESTARTED");
+				restart.createNewFile();
+				launchGatkJointGenotyping(toGeno, jobDir);
+			}
 		}
 		//QUEUED
 		else if (nameFile.containsKey("QUEUED")){
@@ -684,6 +694,7 @@ public class TNRunner2 {
 			File clinicalVcfDir = null;
 			File msiWorkflowDir = null;
 			File lohWorkflowDir = null;
+			File spliceAIWorkflowDir = null;
 			String panel2Skip = null;
 			for (int i = 0; i<args.length; i++){
 				Matcher mat = pat.matcher(args[i]);
@@ -704,6 +715,7 @@ public class TNRunner2 {
 						case 'j': gatkJointGenoWorklfowDir = new File(args[++i]); break;
 						case 'q': illuminaJointGenoWorklfowDir = new File(args[++i]); break;
 						case 'h': haploWorklfowDir = new File(args[++i]); break;
+						case 'I': spliceAIWorkflowDir = new File(args[++i]); break;
 						case 'y': copyRatioDocsDir = new File(args[++i]); break;
 						case 'k': copyRatioBkgDir = new File(args[++i]); break;
 						case 'o': oncoKBConfig = new File(args[++i]); break;
@@ -782,6 +794,12 @@ public class TNRunner2 {
 				if(gatkSomVarCallWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing GATK somatic variant calling workflow docs? "+gatkSomVarCallWorkflowDir);
 				gatkSomaticVarCallDocs = IO.extractFiles(gatkSomVarCallWorkflowDir);
 			}
+			
+			//variant SplicAI annotator
+			if (spliceAIWorkflowDir != null){
+				if(spliceAIWorkflowDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing SpliceAI variant annotation workflow docs? "+spliceAIWorkflowDir);
+				this.splicAIDocs = IO.extractFiles(spliceAIWorkflowDir);
+			}
 
 			//variant annotation
 			if (annoWorkflowDir != null){
@@ -859,7 +877,7 @@ public class TNRunner2 {
 
 
 			//AnnotatedVcfParser options for germline and somatic filtering
-			if (germlineAnnotatedVcfParser == null) germlineAnnotatedVcfParser = "-d "+minReadCoverageNormal+" -m 0.075 -q 0.1 -p 0.01 -g D5S,D3S -n 4.4 -a HIGH -l -c "
+			if (germlineAnnotatedVcfParser == null) germlineAnnotatedVcfParser = "-d "+minReadCoverageNormal+" -m 0.075 -q 0.1 -p 0.01 -g D5S,D3S -n 4.4 -N 0.5 -a HIGH -l -c "
 					+ "Pathogenic,Likely_pathogenic,Conflicting_interpretations_of_pathogenicity,Drug_response -t 0.51 -e Benign,Likely_benign -o -b 0.1 -z 3 -u RYR1";
 			if (somaticAnnotatedVcfParser == null) somaticAnnotatedVcfParser = "-d "+minReadCoverageTumor+" -f -m 0.025 -j ";
 
@@ -879,6 +897,7 @@ public class TNRunner2 {
 				IO.pl("GATK somatic variant workflow directory\t"+ gatkSomVarCallWorkflowDir);
 				if (normalAlignmentDir != null) IO.pl("Non matched normal alignment directory for somatic calling\t"+normalAlignmentDir);
 				IO.pl("Variant annotation workflow directory\t"+annoWorkflowDir);
+				IO.pl("Variant SpliceAI annotation workflow directory\t"+spliceAIWorkflowDir);
 				if (annoWorkflowDir!=null) IO.pl("OncoKB configuration file\t"+ oncoKBConfig);
 				IO.pl("Sample concordance workflow directory\t"+sampleConWorkflowDir);
 				IO.pl("MSI workflow directory\t"+msiWorkflowDir);
@@ -944,7 +963,7 @@ public class TNRunner2 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                TNRunner2 : March 2025                            **\n" +
+				"**                                 TNRunner2 : Dec 2025                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner2 is designed to execute several containerized workflows on tumor normal\n"+
 				"datasets via a slurm cluster.  Based on the availability of paired fastq datasets, \n"+
@@ -989,6 +1008,7 @@ public class TNRunner2 {
 				"-m Workflow docs for launching MSI status calling.\n"+
 				"-a Workflow docs for launching variant annotation.\n"+
 				"-o If -a provide an OncoKB configuration file, see the annotator.README.sh\n"+
+				"-I Workflow docs for launching SpliceAI variant annotations.\n"+
 				"-b Workflow docs for launching sample concordance.\n"+
 				"-y Workflow docs for launching somatic copy analysis.\n"+
 				"-q Workflow docs for launching Illumina germline joint genotyping.\n"+
@@ -1055,6 +1075,9 @@ public class TNRunner2 {
 	}
 	public File[] getVarAnnoDocs() {
 		return varAnnoDocs;
+	}
+	public File[] getVarAnnoSpliceAIDocs() {
+		return splicAIDocs;
 	}
 	public File[] getSampleConcordanceDocs() {
 		return sampleConcordanceDocs;

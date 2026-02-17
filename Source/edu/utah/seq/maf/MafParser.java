@@ -1,4 +1,4 @@
-package edu.utah.seq.vcf;
+package edu.utah.seq.maf;
 
 import java.io.*;
 import java.util.ArrayList;

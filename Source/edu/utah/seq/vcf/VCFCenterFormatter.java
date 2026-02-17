@@ -22,8 +22,8 @@ public class VCFCenterFormatter {
 	private File saveDir;
 	private String info = "##INFO=<ID=CIV,Number=.,Type=String,Description=“Center identifying variant”>";
 	private String cmd;
-	private String[] centers  = new String[] {"Foundation", "Tempus", "HCI"};
-	private String[] toLookForLowerCase  = new String[] {"foundation", "tempus", "strelka"};
+	private String[] centers  = new String[] {"Foundation", "Tempus", "HCI", "Caris", "Ambry", "Invitae"};
+	private String[] toLookForLowerCase  = new String[] {"foundation", "tempus", "strelka", "caris", "ambry", "invitae"};
 	
 	//constructor
 	public VCFCenterFormatter(String[] args){
@@ -149,7 +149,11 @@ public class VCFCenterFormatter {
 		else saveDir.mkdirs();
 		if (saveDir.exists()==false || saveDir.canWrite()==false) Misc.printExit("\nError: failed to find or create a writeable save directory? Aborting.\n");
 		
+		//check centers and replacements
 		printSettings();
+		
+		//check arrays
+		if (centers.length != toLookForLowerCase.length) Misc.printErrAndExit("\nError: the -c and -i array lengths differ.\n");
 		
 	}	
 	
@@ -164,18 +168,18 @@ public class VCFCenterFormatter {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Center Formatter : May 2025                       **\n" +
+				"**                            VCF Center Formatter : Dec 2025                       **\n" +
 				"**************************************************************************************\n" +
 				"Looks for key words in each VCF record's ID field, if found appends the matching\n"+
-				"center designation to the info field.\n"+
+				"center designation to the info field. The -i and -c arrays must be equal.\n"+
 
 				"\nOptions:\n"+
 				"-v Path to a vcf file xxx.vcf(.gz/.zip OK) or directory containing such.\n" +
 				"-s Path to a directory to save the modified vcf files.\n"+
 				"-i Comma delimited list, no spaces, lower case, of IDs to look for, defaults to \n"+
-				"      foundation,tempus,strelka\n"+
+				"      foundation,tempus,strelka,caris,ambry,invitae\n"+
 				"-c Comma delimited list, no spaces, of Center names to append to the CIV= info field\n"+
-				"      defaults to Foundation,Tempus,HCI\n"+
+				"      defaults to Foundation,Tempus,HCI,Caris,Ambry,Invitae\n"+
 
 				"\nExample: java -Xmx4G -jar pathTo/USeq/Apps/VCFCenterFormatter -v Calls/ -s CCalls\n\n"+
 

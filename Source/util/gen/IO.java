@@ -2794,8 +2794,7 @@ public class IO {
 
 	public static boolean saveObject(File file, Object ob) {
 		try {
-			ObjectOutputStream out =
-				new ObjectOutputStream(new FileOutputStream(file));
+			ObjectOutputStream out = new ObjectOutputStream(new FileOutputStream(file));
 			out.writeObject(ob);
 			out.close();
 			return true;

@@ -31,6 +31,7 @@ public class VCFTabix{
 
 		} catch (IOException e) {
 			e.printStackTrace();
+			Misc.printErrAndExit("ERROR: failed to tabix vcf files.");
 		}
 	}
 	//GNomEx constructor
@@ -188,7 +189,7 @@ public class VCFTabix{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                                 VCFTabix: Sept 2021                              **\n" +
+				"**                                 VCFTabix: Nov 2025                               **\n" +
 				"**************************************************************************************\n" +
 				"Converts vcf files to a SAMTools compressed vcf tabix format. Recursive.\n" +
 

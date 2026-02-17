@@ -274,7 +274,7 @@ public class AmbryXlsxParser {
 		dateOfBirthIndex = headerIndexName.get( dateOfBirth );
 		genderIndex = headerIndexName.get( gender );
 		specimenCollectionDateIndex = headerIndexName.get( specimenCollectionDate );
-		familialVariantPreviouslyIdentifiedIndex = headerIndexName.get( familialVariantPreviouslyIdentified );
+		if (headerIndexName.containsKey(familialVariantPreviouslyIdentified)) familialVariantPreviouslyIdentifiedIndex = headerIndexName.get( familialVariantPreviouslyIdentified );
 		orderTypeIndex = headerIndexName.get( orderType );
 		accessionNumberIndex = headerIndexName.get( accessionNumber );
 		orderNumberIndex = headerIndexName.get( orderNumber );
@@ -350,7 +350,7 @@ public class AmbryXlsxParser {
 	}
 
 	public static void main(String[] args) throws Exception {
-		new AmbryXlsxParser(new File ("/Users/u0028003/HCI/ClinicalGenomics/Ambry/WithVCFInfo/AmbryImportFiles/HCI_OrdersResults01.01.25-03.31.25.xlsx"), true);
+		new AmbryXlsxParser(new File ("/Users/u0028003/HCI/ClinicalGenomics/Ambry/20Jan2026/ToParse/HuntsmanCancerInstituteDataTransfer_OrdersResults04.01.25-06.30.25.xlsx"), true);
 	}
 
 	public HashSet<String> getTranscriptCDots() {

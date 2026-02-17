@@ -77,7 +77,7 @@ public class TNSample2 {
 			if (tnRunner.getClinicalVcfDocs()!= null && somaticVariants != null) parseMergeClinicalVars();
 
 			//annotate somatic vcf?
-			if (somaticVariants != null && tnRunner.getVarAnnoDocs() != null) annotateSomaticVcf();
+			if (somaticVariants != null && (tnRunner.getVarAnnoDocs()!=null || tnRunner.getVarAnnoSpliceAIDocs()!=null)) annotateSomaticVcf();
 
 			//sample concordance?
 			if (tnRunner.getSampleConcordanceDocs() != null) sampleConcordance();
@@ -87,8 +87,8 @@ public class TNSample2 {
 
 			//Annotate normal germline vcf
 			if (tnRunner.getVarAnnoDocs() != null) {
-				annotateGermlineVcf("GATK");
-				annotateGermlineVcf("Illumina");
+				annotateGermlineVcfSpliceStandard("GATK");
+				annotateGermlineVcfSpliceStandard("Illumina");
 			}
 
 			//copy ratio/ number
@@ -107,66 +107,6 @@ public class TNSample2 {
 			IO.pl("Failures found? "+failed);
 			IO.pl("Running jobs? "+running);
 		}
-	}
-
-
-	private void parseMergeClinicalVarsOldDelme() throws IOException {
-		info.add("Checking clinical variant integration...");
-
-		//look for json file and xml vcfs
-		File[] jsonTestResults = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".json");
-		File[] xmls = null;
-		File[] vcfs = null;
-		File[] toLink = null;
-		
-		//more than one json file? exclude anything with RS.v
-		if (jsonTestResults.length>1)  jsonTestResults = filterJsonReports(jsonTestResults);
-
-		//Caris test
-		if (jsonTestResults == null || jsonTestResults.length !=1) {
-
-			//look for caris xml and vcf.gz
-			xmls = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".xml");
-			vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf.gz");
-			if (vcfs == null || vcfs.length == 0) vcfs = IO.extractFiles(new File(rootDir, "ClinicalReport"), ".vcf");
-			if (xmls.length != 1 || vcfs.length != 1) {
-				info.add("\tJson/Xml/VcfReport\tFAILED to find one xxx.json or one xxx.vcf.gz and xxx.xml clinical test report file(s)");
-				failed = true;
-				return;
-			}
-			jsonTestResults = null;
-			toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), xmls[0], vcfs[0]};
-		}
-		
-		//Tempus
-		else {
-			toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi"), jsonTestResults[0]};
-		}
-
-		//make dir, ok if it already exists
-		File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_ClinicalVars");
-		jobDir.mkdirs();
-
-		//any files?
-		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
-		if (nameFile.size() == 0) launch(jobDir, toLink, tnRunner.getClinicalVcfDocs());
-
-		//OK some files are present
-		//COMPLETE
-		else if (nameFile.containsKey("COMPLETE")){
-			//find the final vcf file
-			File[] vcf = IO.extractFiles(new File(jobDir, "Vcfs"), "_final.vcf.gz");
-			if (vcf == null || vcf.length !=1) {
-				clearAndFail(jobDir, "\tThe clinical variant parsing and merging workflow was marked COMPLETE but failed to find the xxx_final.vcf.gz file in the Vcfs/ in "+jobDir);
-				return;
-			}
-			mergedSomaticVariants = vcf[0];
-			//remove the linked files
-			for (File f: toLink) new File(jobDir, f.getName()).delete();
-			info.add("\tCOMPLETE "+jobDir);
-		}
-
-		else checkJob(nameFile, jobDir, toLink, tnRunner.getClinicalVcfDocs());
 	}
 	
 	private void parseMergeClinicalVars() throws IOException {
@@ -242,9 +182,8 @@ public class TNSample2 {
 		toKeep.toArray(jsonTestResults);
 		return jsonTestResults;
 	}
-
-
-	public void annotateGermlineVcf(String name) throws IOException {
+	
+	public void annotateGermlineVcfSpliceStandard(String name) throws IOException {
 		info.add("Checking "+name+" germline variant annotation...");
 
 		//look for genotyped vcf
@@ -253,6 +192,49 @@ public class TNSample2 {
 		File[] res = IO.extractFiles(dir, ".vcf.gz");
 		if (res == null || res.length !=1) return;
 		else germlineVcf = new File[] {res[0], new File(dir, res[0].getName()+".tbi")};	
+		
+		
+		//check for SpliceAI?
+		if (tnRunner.getVarAnnoSpliceAIDocs() != null) {
+			//OK they want spliceAI annotation
+			File[] spliceAiVcfs = annotateGermlineWithSpliceAI(name, germlineVcf);
+
+			//proceed to standard Anno?
+			if (spliceAiVcfs == null) info.add("\tWaiting on SpliceAI annotation...");
+			else annotateGermlineVcfFinal(name, spliceAiVcfs);
+		}
+
+		else annotateGermlineVcfFinal(name, germlineVcf);
+	}
+	
+	private File[] annotateGermlineWithSpliceAI(String name, File[] toLink) throws IOException {
+		info.add("\tChecking SpliceAI germline variant annotation...");	
+		
+		//make dir, ok if it already exists
+		File jobDir = new File (rootDir.getCanonicalFile(), "GermlineVariantCalling/"+id+"_"+name+"_Splice");
+		jobDir.mkdirs();
+
+		//any files?
+		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+		if (nameFile.size() == 0) {
+			//no files so launch it
+			launch(jobDir, toLink, tnRunner.getVarAnnoSpliceAIDocs());
+		}
+		else if (nameFile.containsKey("COMPLETE")){
+			//it's done, remove the linked vcfs
+			for (File f: toLink) new File(jobDir, f.getName()).delete();
+			info.add("\tCOMPLETE "+jobDir);
+			return IO.extractFiles(new File(jobDir,"Vcfs"));
+		}
+		else {
+			//it's not done so check the job
+			checkJob(nameFile, jobDir, toLink, tnRunner.getVarAnnoSpliceAIDocs());
+		}
+		return null;
+	}
+	
+	private void annotateGermlineVcfFinal(String name, File[] germlineVcf) throws IOException {
+		info.add("\tChecking standard somatic variant annotation...");	
 
 		//make dir, ok if it already exists
 		File jobDir = new File (rootDir.getCanonicalFile(), "GermlineVariantCalling/"+id+"_"+name+"_Anno");
@@ -282,6 +264,8 @@ public class TNSample2 {
 			}
 		}
 	}
+
+
 
 	private void sampleConcordance() throws IOException {
 		info.add("Checking sample concordance...");
@@ -392,19 +376,21 @@ public class TNSample2 {
 		//link in gender file
 		//is it from Avatar?
 		File[] info = IO.extractFiles(rootDir, "Info.json.gz");
-		if (info == null || info.length !=1) {
+		if (info == null || info.length ==0) {
 			//try to fetch from Tempus/ Caris/ Foundation
 			File d = new File(rootDir, "ClinicalReport");
+			
 			if (d.exists() == false) info= null;
 			info = IO.extractFiles(d, ".json");
 			
-			//more than one json file? all of them have sex/ gender
-			if (info.length>1)  info = new File[] {info[0]};
-			if (info == null || info.length !=1) info = IO.extractFiles(d, ".xml");
-			if (info == null || info.length !=1) info= null;
+			if (info != null && info.length > 0) {
+				//more than one json file? all of them have sex/ gender
+				if (info.length>1)  info = new File[] {info[0]};
+			}
+			else info = IO.extractFiles(d, ".xml");
 		}
 
-		if (info == null) throw new IOException( "ERROR: failed to find a json file containing gender information for SampleConcordance for id "+id);
+		if (info == null || info.length ==0) throw new IOException( "ERROR: failed to find a json or xml file containing gender information for SampleConcordance for id "+id+" in "+bPFileDir);
 
 		Files.createSymbolicLink(new File(jobDir, "gender."+info[0].getName()).toPath(), info[0].toPath());
 	}
@@ -434,12 +420,69 @@ public class TNSample2 {
 
 	private void annotateSomaticVcf() throws IOException {
 		info.add("Checking somatic variant annotation...");	
-
+		
 		//waiting on clinical vars?
 		if (tnRunner.getClinicalVcfDocs() != null && mergedSomaticVariants == null) {
 			running = true;
 			return;
 		}
+
+		//check for SpliceAI?
+		if (tnRunner.getVarAnnoSpliceAIDocs() != null) {
+			//OK they want spliceAI annotation
+			boolean complete = annotateSomaticWithSpliceAI();
+			
+			//proceed to standard Anno?
+			if (complete == false) info.add("\tWaiting on SpliceAI annotation...");
+			else annotateSomaticVcfFinal();
+		}
+		
+		else annotateSomaticVcfFinal();
+
+	}
+
+	private boolean annotateSomaticWithSpliceAI() throws IOException {
+		info.add("\tChecking SpliceAI somatic variant annotation...");	
+
+		//make dir, ok if it already exists
+		File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_SpliceAI");
+		jobDir.mkdirs();
+
+		File[] toLink = null;
+		if (mergedSomaticVariants != null) toLink = new File[]{mergedSomaticVariants, new File(mergedSomaticVariants+".tbi")};
+		else toLink = new File[]{somaticVariants, new File(somaticVariants+".tbi")};
+
+		//any files?
+		HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+		if (nameFile.size() == 0) {
+			//no files so launch it
+			launch(jobDir, toLink, tnRunner.getVarAnnoSpliceAIDocs());
+		}
+		else if (nameFile.containsKey("COMPLETE")){
+			//it's done, remove the linked vcfs
+			for (File f: toLink) new File(jobDir, f.getName()).delete();
+			info.add("\tCOMPLETE "+jobDir);
+			//reset the mergedSomaticVariants so the standard annotator can run on it
+			File[] vcfs = IO.extractFiles(new File(jobDir, "Vcfs"), ".vcf.gz");
+			if (vcfs.length!=1) {
+				info.add("\tFAILED to find one vcf in /Vcfs dir despite COMPLETE "+jobDir);
+				failed = true;
+				return false;
+			}
+			mergedSomaticVariants = vcfs[0];
+			return true;
+		}
+
+		else {
+			//it's not done so check the job
+			checkJob(nameFile, jobDir, toLink, tnRunner.getVarAnnoSpliceAIDocs());
+		}
+		return false;
+	}
+
+
+	private void annotateSomaticVcfFinal() throws IOException {
+		info.add("\tChecking standard somatic variant annotation...");	
 
 		//make dir, ok if it already exists
 		File jobDir = new File (rootDir, "SomaticVariantCalls/"+id+"_Anno");
@@ -473,8 +516,9 @@ public class TNSample2 {
 			if (checkJob(nameFile, jobDir, toLink, tnRunner.getVarAnnoDocs())){
 				IO.writeString(tnRunner.getSomaticAnnotatedVcfParser(), new File(jobDir, "annotatedVcfParser.config.txt"));
 			}
-		}
+		}	
 	}
+
 
 	private void illSomDNACall() throws IOException {
 		if (tumorDNAAlignment == null) return;
@@ -572,7 +616,9 @@ public class TNSample2 {
 		
 		for (File f: toCheck) {
 			PlatformGenderInfo pgi = new PlatformGenderInfo(f.getName());
-			if (pgi.isParsed()) al.add(pgi);
+			if (pgi.isParsed()) {
+				al.add(pgi);
+			}
 		}
 		platformGenderInfo = new PlatformGenderInfo[al.size()];
 		al.toArray(platformGenderInfo);
@@ -1334,6 +1380,7 @@ public class TNSample2 {
 	}
 
 	private File[] fetchBPileup() throws IOException {
+//IO.pl("FetchingBPileupFile: "+getId());		
 		File bp = tnRunner.getBpileupFileOrDir();
 		if (bp.isFile()) return new File[] {bp, new File(bp.getCanonicalPath()+".tbi")};
 	
@@ -1355,7 +1402,7 @@ public class TNSample2 {
 						if (f.getName().contains(panel)) return new File[] {f, new File(f.getCanonicalPath()+".tbi")};
 					}
 				}
-				throw new IOException("ERROR : failed to find a panel matched xxx.bp.txt.gz file in "+bp+" for "+id+" panel "+panel);
+				throw new IOException("ERROR : failed to find a panel matched xxx.bp.txt.gz file in '"+bp+"' for '"+id+"' panel '"+panel+"'");
 			}	
 		}
 	}

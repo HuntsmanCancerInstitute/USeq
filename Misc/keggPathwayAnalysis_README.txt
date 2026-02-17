@@ -1,5 +1,5 @@
 # Quickstart tutorial for running a combine differential gene expression and differential gene variant KEGG pathway analysis
-# 27 June 2025, david.nix@hci.utah.edu, https://github.com/HuntsmanCancerInstitute/USeq
+# 17 Feb 2025, david.nix@hci.utah.edu, https://github.com/HuntsmanCancerInstitute/USeq
 
 # Download the latest KeggResourcesXXX.zip file and uncompress, see https://github.com/HuntsmanCancerInstitute/USeq/blob/master/Misc/KeggResourcesFeb2025.zip
 # If needed, install Java version 11 or higher
@@ -21,6 +21,11 @@ java -version &> /dev/null || echo STOP! Missing Java
 $rApp --version &> /dev/null || echo STOP! Missing R
 mkdir -p $results
 cd $keggResourcesDir
+
+# README: There are 3 ways to run these analysis depending on what data you have.
+1) If you JUST have differential gene expression data, run the KeggGenePathwayAnalyzer and then MergeKeggNetworkResults if you have multiple gene pathway analysis
+2) If you JUST have differential variant analysis, run the KeggVariantPathwayAnalyzer
+3) If you have both, run the KeggGeneAndVariantPathwayAnalyzer
 
 # List the help menu and options
 java -jar -Xmx1G $useqApps/KeggGeneAndVariantPathwayAnalyzer
@@ -92,8 +97,7 @@ java -Xmx1G -jar pathTo/USeq/Apps/KeggGeneAndVariantPathwayAnalyzer
 
 **************************************************************************************"
 
-# Run the joint analyzer
-## If you have just gene expression or just variant analysis use the USeq KeggGenePathwayAnalyzer and KeggVariantPathwayAnalyzer apps respectively.
+# To run the joint analysis
 
 java -jar -Xmx1G $useqApps/KeggGeneAndVariantPathwayAnalyzer \
   -a $testData/varSeq_EO.txt \
@@ -130,6 +134,5 @@ geneNetworksMinGen4.xls - detailed differential gene expression Network results
 genePathwaysMinGen4MaxFdr0.15.xls - detailed differential gene expression Pathway results
 variantNetworksMinGen4.xls - ditto but for differential variant mutation frequencies
 variantPathwaysMinGen4MaxFdr0.15.xls - ditto but for differential variant mutation frequencies
-
 
 # To build the KeggResource files, run the USeq KeggGeneSymbolIdExtractor and KeggResourceExtractor apps.  KEGG is continuously updating their databases so refresh these resources every 6 months.

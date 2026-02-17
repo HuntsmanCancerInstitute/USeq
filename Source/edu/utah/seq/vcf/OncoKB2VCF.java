@@ -12,7 +12,7 @@ public class OncoKB2VCF {
 
 	//user fields
 	private File vcfFile = null;
-	private File mafFile = null;
+	private File[] mafFiles = null;
 	private File okbVcfFile = null;
 	private String[] mafFieldsToAdd = null;
 
@@ -45,7 +45,7 @@ public class OncoKB2VCF {
 
 		//load the vcf and maf headers
 		loadVcfHeader();
-		loadMafHeader();
+		loadMafFiles();
 		
 		joinRecords();
 		writeOutVcfHeader();
@@ -88,7 +88,6 @@ public class OncoKB2VCF {
 	private void joinRecords () {
 		IO.pl("Adding OncoKB annotations to vcf records...");
 		String vcfLine = null;
-		String mafLine = null;
 		String[] vcfFields = null;
 		String[] mafFields = null;
 		Gzipper out = null;
@@ -163,38 +162,43 @@ public class OncoKB2VCF {
 		return toDrop.matcher(toClean).replaceAll("_");
 	}
 
-	private void loadMafHeader () {
-		IO.pl("Loading the maf header...");
+	private void loadMafFiles () {
+		IO.pl("Loading the maf files...");
 		String line = null;
-		
+
 		try {
-			mafIn = IO.fetchBufferedReader(mafFile);
-			//load the header
-			while ((line = mafIn.readLine())!= null) {
-				if (line.startsWith("Hugo_Symbol")) {
-					String[] f = Misc.TAB.split(line);
-					for (int i=0; i< f.length; i++) {
-						if (f[i].equals("vcf_id")) vcfIdIndex = i;
-						else if (f[i].equals("ANNOTATED")) annotatedIndex = i;
-						else if (knownOkbNameDesc.get(f[i]) !=null) okbNameIndexes.put(f[i], i);
+			for (File mafFile: mafFiles) {
+				mafIn = IO.fetchBufferedReader(mafFile);
+				vcfIdIndex = -1;
+				annotatedIndex = -1;
+				okbNameIndexes.clear();
+				
+				//load and check the header
+				while ((line = mafIn.readLine())!= null) {
+					if (line.startsWith("Hugo_Symbol")) {
+						String[] f = Misc.TAB.split(line);
+						for (int i=0; i< f.length; i++) {
+							if (f[i].equals("vcf_id")) vcfIdIndex = i;
+							else if (f[i].equals("ANNOTATED")) annotatedIndex = i;
+							else if (knownOkbNameDesc.get(f[i]) !=null) okbNameIndexes.put(f[i], i);
+						}
+						break;
 					}
-					break;
 				}
+				if (vcfIdIndex == -1 || annotatedIndex == -1) throw new Exception("Failed to parse the 'vcf_id' or 'ANNOTATED' from "+line);
+
+				//load the data
+				while ((line = mafIn.readLine())!= null) {
+					String[] mafFields = Misc.TAB.split(line);
+					String mafId = mafFields[vcfIdIndex];
+					mafIdLine.put(mafId, mafFields);
+				}
+				mafIn.close();
 			}
-			if (vcfIdIndex == -1 || annotatedIndex == -1) throw new Exception("Failed to parse the 'vcf_id' or 'ANNOTATED' from "+line);
-			
-			//load the data
-			while ((line = mafIn.readLine())!= null) {
-				String[] mafFields = Misc.TAB.split(line);
-				String mafId = mafFields[vcfIdIndex];
-				mafIdLine.put(mafId, mafFields);
-			}
-			
-			mafIn.close();
 		} catch (Exception e) {
 			IO.closeNoException(mafIn);
 			e.printStackTrace();
-			Misc.printErrAndExit("\nProblem parsing maf header for "+mafFile);
+			Misc.printErrAndExit("\nProblem parsing maf files");
 		} 
 	}
 
@@ -278,7 +282,7 @@ public class OncoKB2VCF {
 	public void processArgs(String[] args){
 		Pattern pat = Pattern.compile("-[a-z]");
 		System.out.println("\n"+IO.fetchUSeqVersion()+" Arguments: "+Misc.stringArrayToString(args, " ")+"\n");
-
+		File mafDir = null;
 		for (int i = 0; i<args.length; i++){
 			String lcArg = args[i].toLowerCase();
 			Matcher mat = pat.matcher(lcArg);
@@ -286,7 +290,7 @@ public class OncoKB2VCF {
 				char test = args[i].charAt(1);
 				try{
 					switch (test){
-					case 'm': mafFile = new File(args[++i]); break;
+					case 'm': mafDir = new File(args[++i]); break;
 					case 'v': vcfFile = new File(args[++i]); break;
 					case 'o': okbVcfFile = new File(args[++i]); break;
 					case 'a': mafFieldsToAdd = Misc.COMMA.split(args[++i]); break;
@@ -316,7 +320,8 @@ public class OncoKB2VCF {
 		}
 		if (failed) Misc.printErrAndExit("Correct MAF column names for annotation.");
 		
-		if (mafFile == null || mafFile.exists()==false) Misc.printErrAndExit("\nERROR: failed to find your maf file! "+mafFile);
+		if (mafDir == null ) Misc.printErrAndExit("\nERROR: failed to find your xxx.maf file or directory containing such! "+mafDir);
+		mafFiles = IO.extractFiles(mafDir, ".maf");
 		if (vcfFile == null || vcfFile.exists()==false) Misc.printErrAndExit("\nERROR: failed to find your vcf file! "+vcfFile);
 		String name = Misc.removeExtension(vcfFile.getName());
 		if (okbVcfFile == null) okbVcfFile = new File (vcfFile.getParentFile(), name+".okb.vcf.gz");
@@ -330,21 +335,21 @@ public class OncoKB2VCF {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                              OncoKB 2 VCF : March 2025                           **\n" +
+				"**                              OncoKB 2 VCF : Nov 2025                             **\n" +
 				"**************************************************************************************\n" +
 				"Converts OncoKB annotations from a maf file into vcf INFO fields and appends them to \n"+
 				"the original vcf. The vcf ID column must contain unique values. Both files must be\n"+
 				"sorted identically.\n"+
 
 				"\nRequired Params:\n"+
-				"-m MAF file annotated by the OncoKB MafAnnotator.py app (.gz/.zip OK)\n"+
+				"-m MAF file annotated by the OncoKB MafAnnotator.py app or dir containing xxx.maf\n"+
 				"-v Original VCF file that was converted to maf and then annotated.\n"+
 				"-o (Optional) Output VCF file with OncoKB annotations, it should end in xxx.vcf.gz\n"+
 				"-a (Optional) Comma delimited list, no spaces, of OncoKB annotations to transfer.\n"+
 				"      Defaults to MUTATION_EFFECT,ONCOGENIC,HIGHEST_LEVEL\n"+
 
 				"\nExample: java -Xmx1G -jar pathTo/USeq/Apps/OncoKB2VCF -v avatarP7.vcf.gz\n" +
-				"       -m avatarP7.okb.maf.gz \n"+
+				"       -m AnnotatedMafs/ \n"+
 
 				"\n**************************************************************************************\n");
 
