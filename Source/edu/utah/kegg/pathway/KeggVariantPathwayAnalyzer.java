@@ -454,7 +454,7 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                     Kegg Variant Pathway Analyzer : March 2025                   **\n" +
+				"**                      Kegg Variant Pathway Analyzer : Feb 2026                    **\n" +
 				"**************************************************************************************\n" +
 				"For each KEGG network, this app creates a 2x2 contingency table and calculates a\n"+
 				"Fisher's exact p-value that is subsequently multiple test corrected using Benjamini-\n"+
@@ -478,6 +478,7 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 				"   Pathway analysis.\n"+
 				"KeggGeneAndVariantPathway Analyzer - Runs a joint gene expression and gene mutation\n"+
 				"   KEGG Network and Pathway analysis. Recommended if both available.\n"+
+				"MergeKeggNetworkResults - Merges network xls results from multiple pathway analysis.\n"+
 				"AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.\n"+
 				
 				"\nKEGG Gene Color Key:\n\n"+
@@ -505,7 +506,7 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 
 				"\nExample:\n\n"+
 				"java -Xmx1G -jar pathTo/USeq/Apps/KeggVariantPathwayAnalyzer -a \n"+
-				"   earlyCRC.txt -b lateCRC.txt -k keggIdLookup.txt -n KeggNetworks/ -o\n"+
+				"   earlyCRC.txt -b lateCRC.txt -k geneSymbol2KeggGeneInfo.txt.gz -n Networks/ -o\n"+
 				"   -r VariantPathwayAnalyzerResults -t 'Pathogen,Ev factor'\n"+
 
 		"\n**************************************************************************************\n");

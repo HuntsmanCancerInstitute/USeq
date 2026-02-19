@@ -353,7 +353,7 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                 Kegg Gene and Variant Pathway Analyzer : March 2025              **\n" +
+				"**                 Kegg Gene and Variant Pathway Analyzer : Feb 2026                **\n" +
 				"**************************************************************************************\n" +
 				"Runs both the KeggGenePathwayAnalyzer and KeggVariantPathwayAnalyzer applications.\n"+
 				"Combines the results at the KEGG Pathway level, coloring each gene for interacive\n"+
@@ -372,6 +372,7 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 				"   analysis.\n"+
 				"KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and\n"+
 				"   Pathway analysis.\n"+
+				"MergeKeggNetworkResults - Merges network xls results from multiple pathway analysis.\n"+
 				"AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.\n"+
 				"DESeq2, edgeR - R packages for selecting differentially expressed gene sets.\n"+
 				
@@ -409,7 +410,7 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 				"\nExample:\n\n"+
 				"java -Xmx1G -jar pathTo/USeq/Apps/KeggGeneAndVariantPathwayAnalyzer\n"+
 				"   -i allTestedGenes.txt -g diffExpGenes.txt -a earlyCRC.txt -b lateCRC.txt \n"+
-				"   -k keggIdLookup.txt -n KeggNetworks/ -o -r CombinePathwayAnalyzerResults -t\n"+
+				"   -k geneSymbol2KeggGeneInfo.txt.gz -n Networks/ -o -r CombineResults -t\n"+
 				"   'Pathogen,Ev factor'\n"+
 
 		"\n**************************************************************************************\n");

@@ -63,7 +63,7 @@ public class KeggGeneSymbolIdExtractor {
 	 * Won't load any null info.  
 	 * @throws IOException */
 	public static HashMap<String, ArrayList<String>>[] loadGeneLookupHashes( File geneSym2KegGenInfo) throws IOException{
-		BufferedReader in = new BufferedReader( new FileReader( geneSym2KegGenInfo));
+		BufferedReader in = IO.fetchBufferedReader(geneSym2KegGenInfo);
 		String[] f;
 		String l;
 		HashMap<String, ArrayList<String>> gs2ki = new HashMap<String,ArrayList<String>>();

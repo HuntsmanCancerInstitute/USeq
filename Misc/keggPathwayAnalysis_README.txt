@@ -1,17 +1,17 @@
 # Quickstart tutorial for running a combine differential gene expression and differential gene variant KEGG pathway analysis
-# 17 Feb 2025, david.nix@hci.utah.edu, https://github.com/HuntsmanCancerInstitute/USeq
+# 18 Feb 2026, david.nix@hci.utah.edu, https://github.com/HuntsmanCancerInstitute/USeq
 
-# Download the latest KeggResourcesXXX.zip file and uncompress, see https://github.com/HuntsmanCancerInstitute/USeq/blob/master/Misc/KeggResourcesFeb2025.zip
+# Download the latest KeggResourcesXXX.zip file and uncompress, see https://github.com/HuntsmanCancerInstitute/USeq/blob/master/Misc/KeggResourcesXXXX.zip
 # If needed, install Java version 11 or higher
 # If needed, install base R
 # Download and uncompress the latest USeq release, see https://github.com/HuntsmanCancerInstitute/USeq/releases
 
 # Set the paths to match your installation
-keggResourcesDir=/Users/u0028003/Downloads/KEGGTest/KeggResourcesFeb2025
+keggResourcesDir=/Users/u0028003/Code/USeq/Misc/KeggResourceExtractor18Feb2026
 testData=$keggResourcesDir/TestDatasets
-keggGenes=$keggResourcesDir/GeneSymbolLookup/geneSymbol2KeggGeneInfo1Feb2025.txt
+keggGenes=$keggResourcesDir/GeneSymbolLookup/geneSymbol2KeggGeneInfo18Feb2026.txt.gz
 keggNetworks=$keggResourcesDir/Networks
-useqApps=/Users/u0028003/Code/USeq/Releases/USeq_9.3.7.beta/Apps
+useqApps=/Users/u0028003/Code/USeq/Releases/USeq_9.3.8.beta/Apps
 rApp=/usr/local/bin/R
 results=$keggResourcesDir/TestResults
 
@@ -23,16 +23,17 @@ mkdir -p $results
 cd $keggResourcesDir
 
 # README: There are 3 ways to run these analysis depending on what data you have.
-1) If you JUST have differential gene expression data, run the KeggGenePathwayAnalyzer and then MergeKeggNetworkResults if you have multiple gene pathway analysis
+1) If you JUST have differential gene expression data, run the KeggGenePathwayAnalyzer
 2) If you JUST have differential variant analysis, run the KeggVariantPathwayAnalyzer
 3) If you have both, run the KeggGeneAndVariantPathwayAnalyzer
+
+# If you have multiple pathway analysis, use the MergeKeggNetworkResults app to merge the network files into a composite analysis.
 
 # List the help menu and options
 java -jar -Xmx1G $useqApps/KeggGeneAndVariantPathwayAnalyzer
 
-## CmdLine output:
 **************************************************************************************
-**                 Kegg Gene and Variant Pathway Analyzer : March 2025              **
+**                 Kegg Gene and Variant Pathway Analyzer : Feb 2026                **
 **************************************************************************************
 Runs both the KeggGenePathwayAnalyzer and KeggVariantPathwayAnalyzer applications.
 Combines the results at the KEGG Pathway level, coloring each gene for interacive
@@ -52,6 +53,7 @@ KeggGenePathwayAnalyzer - Differential gene expression KEGG Network and Pathway
    analysis.
 KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and
    Pathway analysis.
+MergeKeggNetworkResults - Merges network xls results from multiple pathway analysis.
 AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.
 DESeq2, edgeR - R packages for selecting differentially expressed gene sets.
 
@@ -92,12 +94,12 @@ Example:
 
 java -Xmx1G -jar pathTo/USeq/Apps/KeggGeneAndVariantPathwayAnalyzer
    -i allTestedGenes.txt -g diffExpGenes.txt -a earlyCRC.txt -b lateCRC.txt 
-   -k keggIdLookup.txt -n KeggNetworks/ -o -r CombinePathwayAnalyzerResults -t
+   -k geneSymbol2KeggGeneInfo.txt.gz -n Networks/ -o -r CombineResults -t
    'Pathogen,Ev factor'
 
-**************************************************************************************"
+**************************************************************************************
 
-# To run the joint analysis
+# To run the joint analysis with the test datasets
 
 java -jar -Xmx1G $useqApps/KeggGeneAndVariantPathwayAnalyzer \
   -a $testData/varSeq_EO.txt \
@@ -136,3 +138,4 @@ variantNetworksMinGen4.xls - ditto but for differential variant mutation frequen
 variantPathwaysMinGen4MaxFdr0.15.xls - ditto but for differential variant mutation frequencies
 
 # To build the KeggResource files, run the USeq KeggGeneSymbolIdExtractor and KeggResourceExtractor apps.  KEGG is continuously updating their databases so refresh these resources every 6 months.
+## HUGO protein gene symbols, current: https://www.genenames.org/download/statistics-and-files/

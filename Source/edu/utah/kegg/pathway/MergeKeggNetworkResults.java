@@ -35,6 +35,7 @@ public class MergeKeggNetworkResults {
 	private CellStyle linkStyle = null;
 	private ArrayList<String> header = null;
 	private Pattern quoteCommaQuote = Pattern.compile("\",\"");
+	private Pattern spaceColon = Pattern.compile(" : ");
 	
 	//constructor for cmd line
 	public MergeKeggNetworkResults(String[] args) {
@@ -199,7 +200,9 @@ public class MergeKeggNetworkResults {
 						info.setCellValue(n.intersectingGenes);
 						numSig++;
 					}
+					else info.setCellValue(".");
 				}
+				else info.setCellValue(".");
 			}
 			
 			//set numSig
@@ -271,26 +274,35 @@ public class MergeKeggNetworkResults {
 							}
 							info.setCellValue(sb.toString());
 						}
-						
-						
-						
-						
 						numSig++;
 					}
+					else info.setCellValue(".");
 				}
+				else info.setCellValue(".");
 			}
-			
 			//set numSig
 			numSigCell.setCellValue(numSig);
 		}
 	}
 
 	private String[] parseLinkNameUrl(String hyperLink) throws Exception {
+//What about the other type		
 		// =HYPERLINK("https://www.kegg.jp/entry/N00009","N00009: TRK fusion kinase to RAS-ERK signaling pathway")
-		String[] split = quoteCommaQuote.split(hyperLink);
-		if (split.length != 2) throw new Exception("ERROR: failed to split url in 2 on comma quotes "+hyperLink);
-		split[0] = split[0].substring(12);
-		split[1] = split[1].substring(0, split[1].length()-2);
+		//Apoptosis : https://www.kegg.jp/kegg-bin/show_pathway?map=hsa04210&multi_query=317%20%23FFFFAC%0A572%20%23FFFFAC%0A578%20%23FFFFAC%0A581%20%23FFFFAC%0A27113%20%23D6B4FC%0A596%20%23FFD580%0A10018%20%23FFFFAC%0A836%20%23FFFFAC%0A840%20%23FFFFAC%0A54205%20%23FFFFAC&network=N00098
+		String[] split = null;
+		if (hyperLink.startsWith("=")) {
+			split = quoteCommaQuote.split(hyperLink);
+			if (split.length != 2) throw new Exception("ERROR: failed to split url in 2 on comma quotes "+hyperLink);
+			split[0] = split[0].substring(12);
+			split[1] = split[1].substring(0, split[1].length()-2);
+		}
+		else {
+			split = spaceColon.split(hyperLink);
+			String name = split[0];
+			String url = split[1];
+			split[0] = url;
+			split[1] = name;
+		}
 		split[1] = split[1].replace("pathway", "");
 		return split;
 	}
@@ -347,7 +359,7 @@ public class MergeKeggNetworkResults {
 		}
 	}
 	
-	private void printMergedNetworksPathways() {
+	private void printMergedNetworksPathways() throws IOException {
 		//for each networkDesc
 		IO.pl("NumSigDatasets\tNetworkDescHyperLink\t"+Misc.stringArrayListToString(fileNames, "\t"));
 		for (String nd: netInfo.keySet()) {
@@ -403,24 +415,47 @@ public class MergeKeggNetworkResults {
 			String fileName = Misc.removeExtension(networkFilesToMerge[i].getName());
 			fileNames.add(fileName);
 			IO.pl("\t"+networkFilesToMerge[i].getName());
-			
+			Boolean isGene = null;
 			String[] lines = IO.loadFile(networkFilesToMerge[i]);
 			for (String line : lines) {
 				//header?
-				if (line.contains("Network Desc Link") || line.trim().length() == 0) continue;
+				if (line.contains("Network Desc Link")) {
+					//what file type is this?
+					if (line.contains("ANoHits")) isGene = false;
+					else if (line.contains("Int Gene Symbols")) isGene = true;
+					continue;
+				}
+				if (line.trim().length() == 0) continue;
 				
 				String[] f = Misc.TAB.split(line);
+				// Gene
 				// NetworkName NetworkDescLink Pval AdjPval AllNetworkGenes FoundNetworkGenes SelectGenes Intersect Int/Net IntGeneSymbols IntGenesLgRtos PathwayMapLinks...
 				//      0              1         2     3           4                5              6           7       8           9         10              11 12 13 ...          
-				if (f.length < 9) continue;
+				if (f.length < 10) continue;
 
+				// Variant
+				// #NetworkName(s) NetworkDescLink Pval AdjPval AHits ANoHits FracAHits AGeneHits BHits BNoHits FracBHits BGeneHits Log2(fracA/fracB) AllGeneHits PathwayMapLinksWithTopMapDescription...													
+				//       0                1          2     3      4      5        6         7       8      9       10         11            12             13               14 15 16 ...
+				
 				HashMap<String, KeggNetworkToMerge> al = netInfo.get(f[1]);
 				if (al == null) {
 					al = new HashMap<String, KeggNetworkToMerge>();
 					netInfo.put(f[1], al);
 				}
-				KeggNetworkToMerge m = new KeggNetworkToMerge(fileName, Double.parseDouble(f[3]), f[9]);
-				for (int x=11; x< f.length; x++) m.pathwayLinks.add(f[x]);
+				String genesInvolved = null;
+				int pathwayIndex = -1;
+				if (isGene) {
+					genesInvolved = f[9];
+					pathwayIndex = 11;
+				}
+				else {
+					genesInvolved = f[13];
+					pathwayIndex = 14;
+				}
+				
+				KeggNetworkToMerge m = new KeggNetworkToMerge(fileName, Double.parseDouble(f[3]), genesInvolved);
+				
+				for (int x=pathwayIndex; x< f.length; x++) m.pathwayLinks.add(f[x]);
 				al.put(fileName, m);
 			}
 		}
@@ -440,14 +475,24 @@ public class MergeKeggNetworkResults {
 		}
 
 		
-		public Object getPathwayNames() {
+		public String getPathwayNames() throws IOException {
 			StringBuilder sb = new StringBuilder();
 			//=HYPERLINK("https://www.kegg.jp/kegg-bin/show_pathway?map=hsa04062&multi_query=4773%20%2387CEEB%0A7852%20%23FFB6C1&network=N00401","Chemokine signaling pathway")
+			//Apoptosis : https://www.kegg.jp/kegg-bin/show_pathway?map=hsa04210&multi_query=317%20%23FFFFAC%0A572%20%23FFFFAC%0A578%20%23FFFFAC%0A581%20%23FFFFAC%0A27113%20%23D6B4FC%0A596%20%23FFD580%0A10018%20%23FFFFAC%0A836%20%23FFFFAC%0A840%20%23FFFFAC%0A54205%20%23FFFFAC&network=N00098
 			boolean addComma = false;
+			String p = null;
 			for (String hyperLink : pathwayLinks) {
 				if (addComma) sb.append(", ");
-				String[] split = quoteCommaQuote.split(hyperLink);
-				String p = split[1].substring(0, split[1].length()-2);
+				if (hyperLink.startsWith("=")) {
+					String[] split = quoteCommaQuote.split(hyperLink);
+					if (split.length!=2) throw new IOException("ERROR: failed to split the hyperlink in two: "+hyperLink);
+					p = split[1].substring(0, split[1].length()-2);
+				}
+				else {
+					String[] split = spaceColon.split(hyperLink);
+					if (split.length!=2) throw new IOException("ERROR: failed to split the hyperlink in two: "+hyperLink);
+					p = split[0];
+				}
 				p = p.replace("pathway", "");
 				sb.append(p.trim());
 				addComma = true;
@@ -500,15 +545,16 @@ public class MergeKeggNetworkResults {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                     Merge Kegg Network Results : Feb 2026                      **\n" +
+				"**                       Merge Kegg Network Results : Feb 2026                      **\n" +
 				"**************************************************************************************\n" +
-				"MKNR merges GENE network spreadsheet xxx.xls (not xlsx) files from the USeq Kegg\n"+
-				"analysis applications into a three tab xlsx spreadsheet. Useful for comparing between\n"+
-				"multiple gene set analysis.\n"+
+				"MKNR merges gene and variant network spreadsheet xxx.xls (not xlsx) files from the\n"+
+				"USeq Kegg analysis applications into a three tab xlsx spreadsheet. Useful for \n"+
+				"comparing between multiple pathway analysis.\n"+
 				
 				"\nApp Parameters:\n\n"+
 				
-				"-n Directory containing gene network xxx.xls files to merge. Doesn't work with xlsx.\n"+
+				"-n Directory containing gene and or variant network xxx.xls files from the USeq Kegg\n"+
+				"      analysis tools to merge.\n"+
 				"-s Path to an xxx.xlsx file for saving the merged results.\n"+
 				"-m Maximum adjusted p-value to consider significant, defaults to 0.1\n"+
 				

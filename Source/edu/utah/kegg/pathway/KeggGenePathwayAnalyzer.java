@@ -355,7 +355,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                     Kegg Gene Pathway Analyzer : March 2025                      **\n" +
+				"**                       Kegg Gene Pathway Analyzer : Feb 2026                      **\n" +
 				"**************************************************************************************\n" +
 				"KGPA uses your interrogated gene list to 1) filter your select gene list and the KEGG\n"+
 				"Network gene sets then 2) intersects these lists, 3) calculates hypergeometric \n"+
@@ -375,6 +375,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 				"   Pathway analysis.\n"+
 				"KeggGeneAndVariantPathway Analyzer - Runs a joint gene expression and gene mutation\n"+
 				"   KEGG Network and Pathway analysis. Recommended if both available.\n"+
+				"MergeKeggNetworkResults - Merges network xls results from multiple pathway analysis.\n"+
 				"DESeq2, edgeR - R packages for selecting differentially expressed gene sets.\n"+
 				
 				"\nKEGG Viewer Gene Color Key:\n\n"+
@@ -402,7 +403,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 
 				"\nExample:\n\n"+ 
 				"java -Xmx1G -jar pathTo/USeq/Apps/KeggGenePathwayAnalyzer -i \n"+
-				"   allTestedGenes.txt -g diffExpGenes.txt -k keggIdLookup.txt -n KeggNetworks/ \n"+
+				"   allTestedGenes.txt -g diffExpGenes.txt -k geneSymbol2KeggGeneInfo.txt.gz -n Networks/\n"+
 				"   -r GeneAnalyzerResults -t 'Pathogen,Ev factor' -m 5 -e /usr/bin/R\n"+
 
 				"\n**************************************************************************************\n");
