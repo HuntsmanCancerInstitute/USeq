@@ -22,10 +22,10 @@ $rApp --version &> /dev/null || echo STOP! Missing R
 mkdir -p $results
 cd $keggResourcesDir
 
-# README: There are 3 ways to run these analysis depending on what data you have.
+# README: There are 4 ways to run these analysis depending on what data you have.
 1) If you JUST have differential gene expression data, run the KeggGenePathwayAnalyzer
 2) If you JUST have differential variant analysis, run the KeggVariantPathwayAnalyzer
-3) If you have both, run the KeggGeneAndVariantPathwayAnalyzer
+3) If you have both, run the KeggGeneAndVariantPathwayAnalyzer or KeggTwoGeneSetPathwayAnalyzer.
 
 # If you have multiple pathway analysis, use the MergeKeggNetworkResults and MergeKeggPathwayResults 
    apps to merge the network and pathway xls files, respectively, into composite analysis.
