@@ -5,10 +5,14 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Random;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import edu.utah.hci.misc.Util;
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -34,7 +38,6 @@ public class KeggResourceExtractor {
 		processArgs(args);
 		
 		try {
-			
 			fetchNetworkIds();
 			fetchNetworkInfo();
 			filterNetworks();
@@ -133,6 +136,58 @@ public class KeggResourceExtractor {
 		KeggApiNetwork[] networks = new KeggApiNetwork[networkFiles.length];
 		for (int i=0; i< networks.length; i++) networks[i]= new KeggApiNetwork(networkFiles[i], networkFiles[i].getName().replaceAll(".txt", ""));
 		return networks;
+	}
+	
+	public static KeggApiNetwork[] buildCompositePathways (KeggApiNetwork[] networks) {
+		
+		HashMap<String, ArrayList<KeggApiNetwork>> pathwayIdNetworks = new HashMap<String, ArrayList<KeggApiNetwork>>();
+		HashMap<String, KeggApiPathway> pathwayIdPathway = new HashMap<String, KeggApiPathway>();
+		
+		//for each network
+		for (int i=0; i< networks.length; i++) {
+			//for each pathway
+			KeggApiPathway[] pathways = networks[i].getPathways();
+			if (pathways !=null) {
+				for (int j=0; j < pathways.length; j++) {
+					ArrayList<KeggApiNetwork> al = pathwayIdNetworks.get(pathways[j].getId());
+					if (al == null) {
+						al = new ArrayList<KeggApiNetwork>();
+						pathwayIdNetworks.put(pathways[j].getId(), al);
+					}
+					al.add(networks[i]);
+					pathwayIdPathway.put(pathways[j].getId(), pathways[j]);
+				}
+			}
+		}
+		
+		//for each pathway, make a composite 'network'
+		KeggApiNetwork[] compNets = new KeggApiNetwork[pathwayIdNetworks.size()];
+		
+		int counter = 0;
+		for (String pathwayId: pathwayIdNetworks.keySet()) {
+			ArrayList<KeggApiNetwork> nets = pathwayIdNetworks.get(pathwayId);
+			
+			String id = pathwayId;
+			String name = nets.get(0).getPathways()[0].getName();
+			HashSet<String> types = new HashSet<String>();
+			KeggApiPathway[] pathways = new KeggApiPathway[] {pathwayIdPathway.get(pathwayId)};
+			HashMap<String, KeggApiGene> geneNameKeggApiGene = new HashMap<String, KeggApiGene>();
+			
+			//for each network, add in genes and types
+			for (KeggApiNetwork n: nets) {
+				if (n.getGeneNameKeggApiGene()!=null) geneNameKeggApiGene.putAll(n.getGeneNameKeggApiGene());
+				if (n.getNetworkType()!= null) types.add(n.getNetworkType());
+			}
+			
+			KeggApiGene[] genes = new KeggApiGene[geneNameKeggApiGene.size()];
+			int i = 0;
+			for (KeggApiGene g: geneNameKeggApiGene.values()) genes[i++] = g;
+			
+			KeggApiNetwork n = new KeggApiNetwork(id, name, Misc.hashSetToString(types, ","), pathways, geneNameKeggApiGene, genes);
+			compNets[counter++] = n;
+//IO.pl(n+"\n");
+		}
+		return compNets;
 	}
 
 

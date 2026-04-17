@@ -1,8 +1,10 @@
 package util.gen;
 
+import java.util.Arrays;
 import java.util.HashMap;
 
 import org.apache.commons.math3.distribution.ChiSquaredDistribution;
+import org.apache.commons.math3.exception.ConvergenceException;
 
 /**Combines p-values using Fisher's method. https://en.wikipedia.org/wiki/Fisher%27s_method*/
 public class CombinePValues {
@@ -11,19 +13,27 @@ public class CombinePValues {
 	HashMap<Integer, ChiSquaredDistribution> dfChiDist = new HashMap<Integer, ChiSquaredDistribution>();
 
 	public double calculateCombinePValues(double[] pvalues) {
+		double cPVal = 1;
 		
-		double sumNatLgs = 0;
-		for (double p: pvalues) sumNatLgs+= Math.log(p);
-		double chiSquare = sumNatLgs * -2;
-		Integer df = pvalues.length * 2;
-		
-		ChiSquaredDistribution dist = dfChiDist.get(df);
-		if (dist == null) {
-			dist = new ChiSquaredDistribution(df);
-			dfChiDist.put(df, dist);
+		//might throw : org.apache.commons.math3.exception.ConvergenceException: illegal state: Continued fraction diverged to NaN for value ∞
+		try {
+			double sumNatLgs = 0;
+			for (double p: pvalues) sumNatLgs+= Math.log(p);
+			double chiSquare = sumNatLgs * -2;
+			Integer df = pvalues.length * 2;
+			
+			ChiSquaredDistribution dist = dfChiDist.get(df);
+			if (dist == null) {
+				dist = new ChiSquaredDistribution(df);
+				dfChiDist.put(df, dist);
+			}
+			cPVal = 1.0 - dist.cumulativeProbability(chiSquare);
+			
+		} catch (ConvergenceException e) {
+			//assign smallest pval, might be zero
+			for (Double d: pvalues) if (d<cPVal) cPVal=d;
 		}
-		
-		return 1.0 - dist.cumulativeProbability(chiSquare);
+		return cPVal;
 	}
 	
 	public static void main(String[] args) {

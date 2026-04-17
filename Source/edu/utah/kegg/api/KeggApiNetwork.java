@@ -138,6 +138,18 @@ public class KeggApiNetwork {
 		}
 	}
 
+	
+	//for supporting a composite network, aka pathway analysis
+	public KeggApiNetwork(String id, String name, String type, KeggApiPathway[] pathways,
+			HashMap<String, KeggApiGene> geneNameKeggApiGene, KeggApiGene[] genes) {
+		this.networkId = id;
+		this.networkName = name;
+		this.networkType = type;
+		this.pathways = pathways;
+		this.geneNameKeggApiGene = geneNameKeggApiGene;
+		this.genes = genes;
+	}
+
 	public static String mergeStringArray(String[] s, int startingWithIndex) {
 		if (s.length == 1) return "";
 		StringBuilder sb = new StringBuilder(s[startingWithIndex]);

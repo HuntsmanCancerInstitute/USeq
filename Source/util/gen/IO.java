@@ -2124,7 +2124,8 @@ public class IO {
 		for (int i=0; i< names.length; i++){
 			names[i] = files[i].getName();
 		}
-		names = Misc.trimCommon(names);
+		//names = Misc.trimCommon(names);
+		names = Misc.trimCommonEnd(names);
 		return names;
 	}
 
@@ -2344,6 +2345,30 @@ public class IO {
 			IO.closeNoException(in);
 		}
 		return names;
+	}
+	
+	/**Loads a single column from a TSV file skipping empty lines and # comments.*/
+	public static ArrayList<String> loadTsvFileColumn(File file, int columnIndex){
+		ArrayList<String> toReturn = new ArrayList<String>();
+		BufferedReader in = null;
+		try{
+			in = IO.fetchBufferedReader(file);
+			String line;
+			String[] fields;
+			while ((line = in.readLine())!=null){
+				line = line.trim();
+				if (line.length()==0 || line.startsWith("#")) continue;
+				fields = Misc.TAB.split(line);
+				toReturn.add(fields[columnIndex]);
+			}
+			in.close();
+		}catch(Exception e){
+			e.printStackTrace();
+			toReturn = null;
+		} finally {
+			IO.closeNoException(in);
+		}
+		return toReturn;
 	}
 
 	/**Loads a file's lines into a hash set, keys only.*/

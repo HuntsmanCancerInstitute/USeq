@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.3.8.beta
+			<html><head><title>USeq Command Line Menus 9.3.9.beta
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -105,6 +105,8 @@
 				
 					<a href="#ConcatinateFastas">ConcatinateFastas</a><br>
 				
+					<a href="#CopyAnalysisBedMerger">CopyAnalysisBedMerger</a><br>
+				
 					<a href="#CopyAnalysisZScoreMinimizer">CopyAnalysisZScoreMinimizer</a><br>
 				
 					<a href="#CorrectVCFEnds">CorrectVCFEnds</a><br>
@@ -189,6 +191,8 @@
 				
 					<a href="#Gr2Bar">Gr2Bar</a><br>
 				
+					<a href="#HierarchicalClustering">HierarchicalClustering</a><br>
+				
 					<a href="#IntersectLists">IntersectLists</a><br>
 				
 					<a href="#IntersectKeyWithRegions">IntersectKeyWithRegions</a><br>
@@ -204,6 +208,8 @@
 					<a href="#KeggGenePathwayAnalyzer">KeggGenePathwayAnalyzer</a><br>
 				
 					<a href="#KeggGeneAndVariantPathwayAnalyzer">KeggGeneAndVariantPathwayAnalyzer</a><br>
+				
+					<a href="#KeggTwoGeneSetPathwayAnalyzer">KeggTwoGeneSetPathwayAnalyzer</a><br>
 				
 					<a href="#KeggVariantPathwayAnalyzer">KeggVariantPathwayAnalyzer</a><br>
 				
@@ -236,6 +242,10 @@
 					<a href="#MaxEntScanScore5">MaxEntScanScore5</a><br>
 				
 					<a href="#MergeAdjacentRegions">MergeAdjacentRegions</a><br>
+				
+					<a href="#MergeKeggNetworkResults">MergeKeggNetworkResults</a><br>
+				
+					<a href="#MergeKeggPathwayResults">MergeKeggPathwayResults</a><br>
 				
 					<a href="#MergeOverlappingGenes">MergeOverlappingGenes</a><br>
 				
@@ -403,6 +413,10 @@
 				
 					<a href="#USeq2Text">USeq2Text</a><br>
 				
+					<a href="#UltimaGenomicsVCFParser">UltimaGenomicsVCFParser</a><br>
+				
+					<a href="#UVVariantFilter">UVVariantFilter</a><br>
+				
 					<a href="#VariantInfoAggregator">VariantInfoAggregator</a><br>
 				
 					<a href="#VarScanVCFParser">VarScanVCFParser</a><br>
@@ -541,7 +555,7 @@ Example: java -Xmx1G -jar pathToUSeq/Apps/AggregateQCStats -j . -r QCStats/ -p T
 </pre><br><p>
 				
 					<a name="AggregateQCStats2"><pre>**************************************************************************************
-**                           Aggregate QC Stats2: March 2024                        **
+**                           Aggregate QC Stats2: March 2025                        **
 **************************************************************************************
 Parses and aggregates alignment quality statistics from log and json files produced by
 the TNRunner2 DnaAlignQC and SampleConcordance workflows.
@@ -551,7 +565,8 @@ Required Options:
 -s Directory for saving the AggQC results.
 
 Options:
--a Alignment log file match, defaults to '.+_Align.log'
+-a CutAdapt or Trimmomatic log info file match, defaults to 
+     '.+_Trimmomatic.summary.log' sometimes in '.+_Align.log'
 -d Mark duplicates log file match, defaults to '.+_Markdup.log'
 -r Read coverage json file match, defaults to '.+_UniObRC.json.gz'
 -c Sample concordance json file match, defaults to '.+_SampleConcordance.json.gz'
@@ -744,7 +759,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/AllelicMethylationDetector -s AMD
 </pre><br><p>
 				
 					<a name="AmbryDataWrangler"><pre>**************************************************************************************
-**                        Ambry Data Wrangler : October 2025                        **
+**                        Ambry Data Wrangler : January 2026                        **
 **************************************************************************************
 App for parsing xlsx bulk results spreadsheets to vcf, bed, and json results. Uses
 Jannovar to convert Ambry cDots to vcf coordinates. Uses Liftover to convert the hg19
@@ -843,7 +858,7 @@ Example: java -jar pathToUSeq/Apps/TNScopeVCFParser -v ToParse/ -n 0.5 -u 100
 </pre><br><p>
 				
 					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                          Annotated Vcf Parser - April 2025                       **
+**                         Annotated Vcf Parser - December 2025                     **
 **************************************************************************************
 Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
 VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
@@ -1274,7 +1289,7 @@ Example: java -Xmx4G pathTo/Apps/Bed2Bar -f /affy/res/zeste.bed.gz -v
 </pre><br><p>
 				
 					<a name="BedTabix"><pre>**************************************************************************************
-**                                BedTabix: Dec 2019                                **
+**                                BedTabix: Nov 2025                                **
 **************************************************************************************
 Converts bed files to a SAMTools compressed bed tabix format. Recursive.
 
@@ -1578,7 +1593,7 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/CarisVcfComparator -f TL-18-03CFD6.vcf
 </pre><br><p>
 				
 					<a name="CarisXmlVcfParser"><pre>**************************************************************************************
-**                            Caris Xml Vcf Parser: July 2025                       **
+**                            Caris Xml Vcf Parser: Feb 2026                        **
 **************************************************************************************
 This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml
 reported genomic alternations are annotated, bed files of copy number changes and gene
@@ -1761,6 +1776,29 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/ConcatinateFastas -n 2000 -d
     /zv8/MergedNA_Scaffolds -f /zv8/BadFastas/ -c chrNA_Scaffold 
 
 **************************************************************************************
+</pre><br><p>
+				
+					<a name="CopyAnalysisBedMerger"><pre>**************************************************************************************
+**                           CopyAnalysisBedMerger: March 2026                      **
+**************************************************************************************
+Merges bed files from the GATK-USeq workflow called with different window sizes. See
+https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38RunnerWorkflows2
+/CopyAnalysis Window calling stats with the largest abs(Lg2Tum) value are selected to
+represent the alteration. Only genes and aliases in OncoKB are analyzed. See -g
+
+Options:
+-b Directory containing the xxx.called.seg.pass.bed.gz files. The file name will be
+     split on '_' then '.' to define the patient ID, and if present, the condition
+     e.g.  126006-01-001.Cisplatin_25KB_Hg38.called.seg.pass.bed
+               patientID.condition_xxx datasets with the same ID.condition are merged
+-g OncoKB gene list file. See https://www.oncokb.org/cancer-genes and the 'Cancer Gene
+     List' download link. Only 'Hugo Symbol' and 'Gene Aliases' columns are parsed.
+-r Path to an xls spreadsheet file for saving the results.
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/CopyAnalysisBedMerger -b PassingBeds/ 
+     -g cancerGeneList.tsv -r mergedResults.xls 
+
+************************************************************************************
 </pre><br><p>
 				
 					<a name="CopyAnalysisZScoreMinimizer"><pre>**************************************************************************************
@@ -2822,6 +2860,27 @@ Example: java -Xmx1500M -jar pathTo/T2/Apps/Gr2Bar -f /affy/GrFiles/ -v hg17
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="HierarchicalClustering"><pre>**************************************************************************************
+**                        Hierarchical Clustering: March 2026                       **
+**************************************************************************************
+HC hierarchically clusters serialized float[] arrays using a Pearson correlation
+coefficient (r) as a metric.  For each round, all pairwise r values between the arrays
+are calculated, the pair of arrays with the highest r value is removed from the pool,
+their intensities are averaged, and the averaged array is added back to the pool.
+Rounds of clustering continue until only one cluster remains. R values are typically
+squared and multiplied by 100 to give a similarity percentage. For ChIP chip
+experiments, clusters with an r < 0.75 (50% similar) are processed separately.
+
+-d Full path directory text containing serialized float[] arrays, 'xxx.celp' files.
+-c Convert the files in -d, they are text files containing one column of floats.
+-p Do not display the cluster plot.
+-a AntiLog base 2 the values.
+
+Example: java -Xmx1500M -jar pathTo/USeq/HierarchicalClustering -d FloatFiles -c
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="IntersectLists"><pre>**************************************************************************************
 **                            Intersect Lists: Dec 2008                             **
 **************************************************************************************
@@ -2974,7 +3033,7 @@ Example: java -jar -Xmx2G pathToUSeq/Apps/HaplotypeVCFParser -d 20 -a 0.05 -g 30
 </pre><br><p>
 				
 					<a name="KeggGenePathwayAnalyzer"><pre>**************************************************************************************
-**                     Kegg Gene Pathway Analyzer : March 2025                      **
+**                       Kegg Gene Pathway Analyzer : Feb 2026                      **
 **************************************************************************************
 KGPA uses your interrogated gene list to 1) filter your select gene list and the KEGG
 Network gene sets then 2) intersects these lists, 3) calculates hypergeometric 
@@ -2994,6 +3053,8 @@ KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and
    Pathway analysis.
 KeggGeneAndVariantPathway Analyzer - Runs a joint gene expression and gene mutation
    KEGG Network and Pathway analysis. Recommended if both available.
+MergeKeggNetworkResults and MergeKeggPathwayResults - Merges network or pathway xls
+   results from multiple USeq KEGG analysis.
 DESeq2, edgeR - R packages for selecting differentially expressed gene sets.
 
 KEGG Viewer Gene Color Key:
@@ -3018,18 +3079,19 @@ App Parameters:
      defaults to 4
 -x (Optional) Maximum FDR for including networks into the combine Kegg Pathway
      spreadsheet, defaults to 0.15
+-p Replace networks with composite pathways, thus no network analysis.
 
 Example:
 
 java -Xmx1G -jar pathTo/USeq/Apps/KeggGenePathwayAnalyzer -i 
-   allTestedGenes.txt -g diffExpGenes.txt -k keggIdLookup.txt -n KeggNetworks/ 
+   allTestedGenes.txt -g diffExpGenes.txt -k geneSymbol2KeggGeneInfo.txt.gz -n Networks/
    -r GeneAnalyzerResults -t 'Pathogen,Ev factor' -m 5 -e /usr/bin/R
 
 **************************************************************************************
 </pre><br><p>
 				
 					<a name="KeggGeneAndVariantPathwayAnalyzer"><pre>**************************************************************************************
-**                 Kegg Gene and Variant Pathway Analyzer : March 2025              **
+**                 Kegg Gene and Variant Pathway Analyzer : Feb 2026                **
 **************************************************************************************
 Runs both the KeggGenePathwayAnalyzer and KeggVariantPathwayAnalyzer applications.
 Combines the results at the KEGG Pathway level, coloring each gene for interacive
@@ -3049,6 +3111,8 @@ KeggGenePathwayAnalyzer - Differential gene expression KEGG Network and Pathway
    analysis.
 KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and
    Pathway analysis.
+MergeKeggNetworkResults and MergeKeggPathwayResults - Merges network or pathway xls
+   results from multiple USeq KEGG analysis.
 AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.
 DESeq2, edgeR - R packages for selecting differentially expressed gene sets.
 
@@ -3084,19 +3148,88 @@ App Parameters:
      defaults to 4
 -x (Optional) Maximum FDR for including networks into the combine Kegg Pathway
      spreadsheet, defaults to 0.15
+-p Replace networks with composite pathways, thus no network analysis.
 
 Example:
 
 java -Xmx1G -jar pathTo/USeq/Apps/KeggGeneAndVariantPathwayAnalyzer
    -i allTestedGenes.txt -g diffExpGenes.txt -a earlyCRC.txt -b lateCRC.txt 
-   -k keggIdLookup.txt -n KeggNetworks/ -o -r CombinePathwayAnalyzerResults -t
+   -k geneSymbol2KeggGeneInfo.txt.gz -n Networks/ -o -r CombineResults -t
    'Pathogen,Ev factor'
 
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="KeggTwoGeneSetPathwayAnalyzer"><pre>**************************************************************************************
+**                  Kegg Two Gene Set Pathway Analyzer : Mar 2026                   **
+**************************************************************************************
+Runs two KeggGenePathwayAnalyzer analysis and combines the results at the KEGG Pathway
+level coloring each gene appropriately for interacive exploration in the KEGG Viewer
+(https://www.kegg.jp). Calculates a combine Pathway p-value (Fisher's method) and FDR
+(Benjamini-Hochberg) for Pathways with multiple significant Networks. Best to use this
+tool if you wish to compare variant data (copy or snv/indel) with differential gene
+expression for a single condition.
+
+Related Applications:
+
+KeggGeneSymbolIdExtractor - Uses the Kegg API to look up and parse Kegg Gene Ids that
+   match each of the provided HUGO Gene Symbols. Use this tool to generate the
+   required '-k KEGG gene Id HUGO gene symbol lookup file'.
+KeggResourceExtractor - Pulls the latest list of KEGG Networks, their associated
+   genes, and pathways. Use this to generate the required '-n KEGG network dir'.
+KeggGenePathwayAnalyzer - Differential gene expression KEGG Network and Pathway
+   analysis.
+KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and
+   Pathway analysis.
+MergeKeggNetworkResults and MergeKeggPathwayResults - Merges network or pathway xls
+   results from multiple USeq KEGG analysis.
+AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.
+DESeq2, edgeR - R packages for selecting differentially expressed gene sets.
+
+KEGG Gene Color Key:
+
+   Negative Genes Set A - Light Blue - #87CEEB
+   Positive Genes Set A - Light Red, Pink - #FFB6C1
+   Negative Genes Set B - Light Violet - #D6B4FC
+   Positive Genes Set B - Light Orange - #FFD580
+   Kegg colors genes in red text that are disease pathway associated
+
+Required Parameters:
+
+-i File containing all of the interrogated genes in your gene expression study, one
+     gene per line. Typically > 15K genes
+-a File containing the selected genes of interest A with their 'log2Rto', one per
+     line, tab delimited, from your study, e.g. differentially expressed, copy
+     mutated (loss or gain of function), etc. typically <2K.
+     altered, 'Log2Rtos' should be + or -, not 0. Only the sign is used here, not
+     the value.
+-b File containing the selected genes of interest B, ditto.
+-e File path to the R executable
+-r Directory to save the spreadsheet results
+-k KEGG gene Id HUGO gene symbol lookup file, see above
+-n KEGG network directory, see above
+
+Optional Parameters:
+
+-t Network TYPEs to exclude from testing, comma delimited no spaces.
+-m Minimum number of interrogated genes in a network for analysis,
+     defaults to 4
+-x Maximum FDR for including networks into the combine Kegg Pathway
+     spreadsheet, defaults to 0.15
+-p Replace networks with composite pathways.
+
+Example:
+
+java -Xmx1G -jar pathTo/USeq/Apps/KeggTwoGeneSetPathwayAnalyzer
+   -i allTestedGenes.txt -a diffExpGenes.txt -b copyAlteredGenes.txt 
+   -k geneSymbol2KeggGeneInfo.txt.gz -n Networks/ -o -r CombineResults -t
+   'Pathogen,Ev factor' -e /usr/local/bin/R
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="KeggVariantPathwayAnalyzer"><pre>**************************************************************************************
-**                     Kegg Variant Pathway Analyzer : March 2025                   **
+**                      Kegg Variant Pathway Analyzer : Feb 2026                    **
 **************************************************************************************
 For each KEGG network, this app creates a 2x2 contingency table and calculates a
 Fisher's exact p-value that is subsequently multiple test corrected using Benjamini-
@@ -3121,6 +3254,8 @@ KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and
    Pathway analysis.
 KeggGeneAndVariantPathway Analyzer - Runs a joint gene expression and gene mutation
    KEGG Network and Pathway analysis. Recommended if both available.
+MergeKeggNetworkResults and MergeKeggPathwayResults - Merges network or pathway xls
+   results from multiple USeq KEGG analysis.
 AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.
 
 KEGG Gene Color Key:
@@ -3147,11 +3282,12 @@ App Parameters:
      defaults to 4
 -x (Optional) Maximum FDR for including networks into the combine Kegg Pathway
      spreadsheet, defaults to 0.15
+-p Replace networks with composite pathways, thus no network analysis.
 
 Example:
 
 java -Xmx1G -jar pathTo/USeq/Apps/KeggVariantPathwayAnalyzer -a 
-   earlyCRC.txt -b lateCRC.txt -k keggIdLookup.txt -n KeggNetworks/ -o
+   earlyCRC.txt -b lateCRC.txt -k geneSymbol2KeggGeneInfo.txt.gz -n Networks/ -o
    -r VariantPathwayAnalyzerResults -t 'Pathogen,Ev factor'
 
 **************************************************************************************
@@ -3484,6 +3620,54 @@ Options:
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/MergeAdjacentRegions -b myRegions.bed.zip 
      -m 1000 -r mergedRegions.bed.gz 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="MergeKeggNetworkResults"><pre>**************************************************************************************
+**                       Merge Kegg Network Results : Feb 2026                      **
+**************************************************************************************
+MKNR merges gene and variant 'network' spreadsheet xxx.xls (not xlsx) files from the
+USeq Kegg analysis applications into a three tab xlsx spreadsheet. Useful for 
+comparing between multiple pathway analysis.
+
+App Parameters:
+
+-n Directory containing gene and or variant network xxx.xls files from the USeq Kegg
+      analysis tools to merge.
+-s Path to an xxx.xlsx file for saving the merged results.
+-m Maximum adjusted p-value to consider significant, defaults to 0.1
+
+Example:
+
+java -Xmx1G -jar pathTo/USeq/Apps/MergeKeggNetworkResults -m 0.15 -s mergedNets.xlsx
+   -n USeqKeggNetworkFiles/
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="MergeKeggPathwayResults"><pre>**************************************************************************************
+**                       Merge Kegg Pathway Results : Feb 2026                      **
+**************************************************************************************
+MKPR merges USeq KEGG 'pathway' spreadsheet xxx.xls (not xlsx) files from the
+USeq Kegg analysis applications into a four tab xlsx spreadsheet. Useful for 
+comparing between multiple pathway analysis.
+
+NOTE: If have multiple KeggGeneAndVariantPathwayAnalyzer datasets, ONLY run this
+tool on the combineGeneVariantPathwaysMinGenXXXMaxFdrXXX.xls files. Don't put in the
+intermediate genePathwayXXX.xls or variantPathwayXXX.xls files.
+
+App Parameters:
+
+-p Directory containing the combine or gene and/or variant pathway xxx.xls files from
+      the USeq Kegg analysis tools to merge. See the NOTE above.
+-s Path to an xxx.xlsx file for saving the merged results.
+-m Maximum pathway FDR / adjusted p-value to consider significant, defaults to 0.1
+
+Example:
+
+java -Xmx1G -jar pathTo/USeq/Apps/MergeKeggPathwayResults -m 0.15 -s mergedPaths.xlsx
+   -p USeqKeggPathwayFiles/
 
 **************************************************************************************
 </pre><br><p>
@@ -4111,21 +4295,21 @@ Example: java -Xmx1500M -jar pathToUSeq/Apps/NovoalignPairedParser -f /Novo/Run7
 </pre><br><p>
 				
 					<a name="OncoKB2VCF"><pre>**************************************************************************************
-**                              OncoKB 2 VCF : March 2025                           **
+**                              OncoKB 2 VCF : Nov 2025                             **
 **************************************************************************************
 Converts OncoKB annotations from a maf file into vcf INFO fields and appends them to 
 the original vcf. The vcf ID column must contain unique values. Both files must be
 sorted identically.
 
 Required Params:
--m MAF file annotated by the OncoKB MafAnnotator.py app (.gz/.zip OK)
+-m MAF file annotated by the OncoKB MafAnnotator.py app or dir containing xxx.maf
 -v Original VCF file that was converted to maf and then annotated.
 -o (Optional) Output VCF file with OncoKB annotations, it should end in xxx.vcf.gz
 -a (Optional) Comma delimited list, no spaces, of OncoKB annotations to transfer.
       Defaults to MUTATION_EFFECT,ONCOGENIC,HIGHEST_LEVEL
 
 Example: java -Xmx1G -jar pathTo/USeq/Apps/OncoKB2VCF -v avatarP7.vcf.gz
-       -m avatarP7.okb.maf.gz 
+       -m AnnotatedMafs/ 
 
 **************************************************************************************
 </pre><br><p>
@@ -4284,7 +4468,8 @@ Example: java -jar pathToUSeq/Apps/PMRSearch -d ~/PMRFiles/ -x 365 -i
 Merges results from the PMRSearch and GQuery tools into a summary spreadsheet.
 
 Required Options:
--p  Directory containing PMRSearch results files with output from the -i option.
+-p  File or directory containing PMRSearch results xxx.txt with output from the 
+    -i option.
 -g  GQuery json results file.
 -o  Output directory for writing the results.
 -r  (Optional) Directory containing the currentRegistry_xxx_PHI.txt file for pulling
@@ -4298,7 +4483,7 @@ Example: java -jar pathToUSeq/Apps/PMRSearchGQueryJoiner -p PmrSearchResults -o
 </pre><br><p>
 				
 					<a name="PmrVcfBedMerger"><pre>**************************************************************************************
-**                             Pmr Vcf Bed Merger: Oct 2023                         **
+**                             Pmr Vcf Bed Merger: March 2026                       **
 **************************************************************************************
 Parses directories of Vcf and Bed files named such that the first underscore separated
 field represents a subject's ID.  These will be used to group the vcf and bed files
@@ -5747,7 +5932,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 </pre><br><p>
 				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                TNRunner2 : March 2025                            **
+**                                 TNRunner2 : Dec 2025                             **
 **************************************************************************************
 TNRunner2 is designed to execute several containerized workflows on tumor normal
 datasets via a slurm cluster.  Based on the availability of paired fastq datasets, 
@@ -5792,6 +5977,7 @@ Setup Options:
 -m Workflow docs for launching MSI status calling.
 -a Workflow docs for launching variant annotation.
 -o If -a provide an OncoKB configuration file, see the annotator.README.sh
+-I Workflow docs for launching SpliceAI variant annotations.
 -b Workflow docs for launching sample concordance.
 -y Workflow docs for launching somatic copy analysis.
 -q Workflow docs for launching Illumina germline joint genotyping.
@@ -6002,6 +6188,47 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/USeq2Text -f
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="UltimaGenomicsVCFParser"><pre>**************************************************************************************
+**                           Ultima Genomics VCF Parser: Jan 2026                   **
+**************************************************************************************
+Parses Ultima Genomics somatic VCF files, filtering for read depth and allele
+frequency. Inserts T_AF, T_DP, N_AF, N_DP into the INFO field for integrated parsing
+with the AnnotatedVcfParser. Upper cases REF and ALT.
+
+Required Options:
+  -v Path to a file or directory containing xxx.vcf(.gz/.zip OK) file(s)
+  -s Path to a directory to save the filtered vcfs
+  -t Minimum tumor allele frequency, defaults to 0.05
+  -u Minimum tumor read depth, defaults to 10
+  -u Minimum tumor alt read depth, defaults to 3
+  -n Maximum normal allele frequency, defaults to 0.1
+  -o Minimum normal alignment depth, defaults to 10
+  -p Remove non PASS filter field records
+  -c Remove non chrXXX chromosome records
+
+Example: java -jar pathToUSeq/Apps/UltimaGenomicsVCFParser -v RawVcfs/ -s FiltVcfs
+     -p -t 0.1 -n 0.5 -u 50 -o 20 -u 3 -c 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="UVVariantFilter"><pre>**************************************************************************************
+**                               UVVariantFilter: Nov 2025                          **
+**************************************************************************************
+Splits a vcf file into variants with a UV mutation signature and those without. 
+C->T variants in the context of TCX,XCC,CCX,XCT and G->A in AGX,XGG,GGX,XGA contexts.
+
+Options:
+-v Path to your vcf to filter, xxx.vcf(.gz/.zip OK)
+-s Path to a directory for saving the parsed results.
+-f Path to the reference fasta with xxx.fai index.
+
+Example: java -Xmx2G -jar pathToUSeq/Apps/UVVariantFilter -v melanoma.vcf
+     -f /Ref/human_g1k_v37.fasta -s ParsedVars
+
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="VariantInfoAggregator"><pre>**************************************************************************************
 **                            VariantInfoAggregator : July 2022                     **
 **************************************************************************************
@@ -6187,18 +6414,18 @@ Example: java -jar pathToUSeq/Apps/VCFCallFrequency -f Vcf/ -s CFVcfs -v
 </pre><br><p>
 				
 					<a name="VCFCenterFormatter"><pre>**************************************************************************************
-**                            VCF Center Formatter : May 2025                       **
+**                            VCF Center Formatter : Dec 2025                       **
 **************************************************************************************
 Looks for key words in each VCF record's ID field, if found appends the matching
-center designation to the info field.
+center designation to the info field. The -i and -c arrays must be equal.
 
 Options:
 -v Path to a vcf file xxx.vcf(.gz/.zip OK) or directory containing such.
 -s Path to a directory to save the modified vcf files.
 -i Comma delimited list, no spaces, lower case, of IDs to look for, defaults to 
-      foundation,tempus,strelka
+      foundation,tempus,strelka,caris,ambry,invitae
 -c Comma delimited list, no spaces, of Center names to append to the CIV= info field
-      defaults to Foundation,Tempus,HCI
+      defaults to Foundation,Tempus,HCI,Caris,Ambry,Invitae
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/VCFCenterFormatter -v Calls/ -s CCalls
 
@@ -6693,7 +6920,7 @@ Example: java -Xmx9G -jar pathTo/USeq/Apps/VCFSelector -b GBMTargets.bed.gz -p 1
 </pre><br><p>
 				
 					<a name="VCFSpliceScanner"><pre>**************************************************************************************
-**                            VCF Splice Scanner : Sept 2020                        **
+**                            VCF Splice Scanner : Dec 2025                         **
 **************************************************************************************
 Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and
 Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice
@@ -6733,7 +6960,7 @@ Example: java -Xmx20G -jar ~/USeq/Apps/VCFSpliceAnnotator -f ~/Hg19/Fa/ -v ~/exm
 </pre><br><p>
 				
 					<a name="VCFTabix"><pre>**************************************************************************************
-**                                 VCFTabix: Sept 2021                              **
+**                                 VCFTabix: Nov 2025                               **
 **************************************************************************************
 Converts vcf files to a SAMTools compressed vcf tabix format. Recursive.
 

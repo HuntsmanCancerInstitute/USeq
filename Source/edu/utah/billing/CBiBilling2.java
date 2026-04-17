@@ -249,8 +249,9 @@ public class CBiBilling2 {
 			Integer[] indexesToPull = fetchHscWafIndexes(hourlyWafParser.getHeaderKeyIndex());
 			
 			for (BillingGroup bg: bgsToBillNonCancerWithHSCCostSharing) {
+
 				double hscCost = bg.getTotalHoursToBill()*hscCostSharing;
-				String first = bg.getGroupName()+"\t"+Num.formatNumber(bg.getTotalHoursBilled(), 3)+"\t$"+Num.formatNumber(hscCost, 2)+"\t";
+				String first = bg.getGroupName()+"\t"+Num.formatNumber(bg.getTotalHoursToBill(), 3)+"\t$"+Num.formatNumber(hscCost, 2)+"\t";
 				String second = bg.getGroupName()+"\t\t\t";
 				ArrayList<String[]> wafs = bg.getHourlyWafs();
 				if (wafs.size()==0) IO.pl(first+"0\tNo Hourly WAF");

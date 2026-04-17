@@ -34,7 +34,7 @@ public class MergeKeggNetworkResults {
 	private XSSFCellStyle lightRedStyle = null;
 	private CellStyle linkStyle = null;
 	private ArrayList<String> header = null;
-	private Pattern quoteCommaQuote = Pattern.compile("\",\"");
+	public static final Pattern quoteCommaQuote = Pattern.compile("\",\"");
 	private Pattern spaceColon = Pattern.compile(" : ");
 	
 	//constructor for cmd line
@@ -307,106 +307,6 @@ public class MergeKeggNetworkResults {
 		return split;
 	}
 
-	private void printMergedNetworksAdjPVals() {
-		//for each networkDesc
-		IO.pl("NumSigDatasets\tNetworkDescHyperLink\t"+Misc.stringArrayListToString(fileNames, "\t"));
-		for (String nd: netInfo.keySet()) {
-			int numSig = 0;
-			StringBuilder sb = new StringBuilder();
-			sb.append(nd); 
-			
-			//for each fileName
-			HashMap<String, KeggNetworkToMerge> nameData = netInfo.get(nd);
-			for (String fileName: fileNames) {
-				sb.append("\t");
-				//any network info
-				KeggNetworkToMerge n = nameData.get(fileName);
-				if (n!=null) {
-					sb.append(n.adjPVal);
-					if (n.adjPVal<= maxAdjPVal) numSig++;
-				}
-				else sb.append("NA");
-			}
-			IO.pl(numSig+"\t"+sb);
-		}
-	}
-	
-	private void printMergedNetworksGenes() {
-		//for each networkDesc
-		IO.pl("NumSigDatasets\tNetworkDescHyperLink\t"+Misc.stringArrayListToString(fileNames, "\t"));
-		for (String nd: netInfo.keySet()) {
-			int numSig = 0;
-			StringBuilder sb = new StringBuilder();
-			sb.append(nd); 
-			
-			//for each fileName
-			HashMap<String, KeggNetworkToMerge> nameData = netInfo.get(nd);
-			for (String fileName: fileNames) {
-				sb.append("\t");
-				//any network info
-				KeggNetworkToMerge n = nameData.get(fileName);
-				if (n!=null) {
-					//only print if sig
-					if (n.adjPVal<= maxAdjPVal) {
-						sb.append(n.intersectingGenes);
-						numSig++;
-					}
-					else sb.append(".");
-				}
-				else sb.append(".");
-			}
-			IO.pl(numSig+"\t"+sb);
-		}
-	}
-	
-	private void printMergedNetworksPathways() throws IOException {
-		//for each networkDesc
-		IO.pl("NumSigDatasets\tNetworkDescHyperLink\t"+Misc.stringArrayListToString(fileNames, "\t"));
-		for (String nd: netInfo.keySet()) {
-			int numSig = 0;
-			StringBuilder sb = new StringBuilder();
-			sb.append(nd); 
-			
-			//for each fileName
-			HashMap<String, KeggNetworkToMerge> nameData = netInfo.get(nd);
-			for (String fileName: fileNames) {
-				sb.append("\t");
-				//any network info
-				KeggNetworkToMerge n = nameData.get(fileName);
-				if (n!=null) {
-					//only print if sig
-					if (n.adjPVal<= maxAdjPVal) {
-						sb.append(n.getPathwayNames());
-						numSig++;
-					}
-					else sb.append(".");
-				}
-				else sb.append(".");
-			}
-			IO.pl(numSig+"\t"+sb);
-		}
-	}
-
-	private void printMergedNetworksAll() {
-		//for each networkDesc
-		for (String nd: netInfo.keySet()) {
-			IO.pl("-------------------------------------");
-			IO.pl(nd);
-			
-			//for each fileName
-			HashMap<String, KeggNetworkToMerge> nameData = netInfo.get(nd);
-			for (String fileName: fileNames) {
-				IO.pl(fileName);
-				//any network info
-				KeggNetworkToMerge n = nameData.get(fileName);
-				if (n!=null) {
-					IO.pl("\tPVal\t"+n.adjPVal);
-					IO.pl("\tGenes\t"+n.intersectingGenes);
-					IO.pl("\tPath\t"+n.pathwayLinks);
-				}
-			}
-		}
-	}
 
 
 	public void parseNetworkFiles() {
@@ -538,6 +438,9 @@ public class MergeKeggNetworkResults {
 		if (spreadsheetFile == null) {
 			Misc.printErrAndExit("\nERROR: failed to find your xxx.xlsx output file.\n");
 		}
+		if (spreadsheetFile.getName().endsWith(".xlsx") == false) {
+			Misc.printErrAndExit("\nERROR: your output spreadsheed file doesn't end in  '.xlsx'\n");
+		}
 		
 	}	
 
@@ -547,7 +450,7 @@ public class MergeKeggNetworkResults {
 				"**************************************************************************************\n" +
 				"**                       Merge Kegg Network Results : Feb 2026                      **\n" +
 				"**************************************************************************************\n" +
-				"MKNR merges gene and variant network spreadsheet xxx.xls (not xlsx) files from the\n"+
+				"MKNR merges gene and variant 'network' spreadsheet xxx.xls (not xlsx) files from the\n"+
 				"USeq Kegg analysis applications into a three tab xlsx spreadsheet. Useful for \n"+
 				"comparing between multiple pathway analysis.\n"+
 				

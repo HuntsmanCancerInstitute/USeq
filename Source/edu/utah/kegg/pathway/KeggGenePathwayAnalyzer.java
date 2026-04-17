@@ -22,6 +22,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 	private int minimumNumberGenes = 4;
 	private HashSet<String> networkTypesToExclude = null;
 	private String typesToExclude = null;
+	private boolean replaceNetworksWithPathways = false;
 
 	//internal
 	private File tempDirectory = null;
@@ -35,6 +36,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 	private boolean verbose = true;
 	private ArrayList<String> log = new ArrayList<String>();
 	private long startTime = -1;
+	private String geneSetName = "";
 	
 	//constructor for cmd line
 	public KeggGenePathwayAnalyzer(String[] args) {
@@ -59,7 +61,8 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 
 	//constructor for the joint analysis
 	public KeggGenePathwayAnalyzer(File keggIdsFile, File keggNetworkDirectory, File fullPathToR, File resultsDirectory, File tempDirectory, File interrogatedGeneList, 
-			File selectGeneList, double maximumFdr , int minimumNumberGenes, String typesToExclude, HashSet<String> networkTypesToExclude, boolean verbose) {
+			File selectGeneList, double maximumFdr , int minimumNumberGenes, String typesToExclude, HashSet<String> networkTypesToExclude, boolean verbose, 
+			boolean replaceNetworksWithPathways, String geneSetName) {
 			this.interrogatedGeneList = interrogatedGeneList;
 			this.keggIdsFile = keggIdsFile;
 			this.keggNetworkDirectory = keggNetworkDirectory;
@@ -72,6 +75,8 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 			this.networkTypesToExclude = networkTypesToExclude;
 			this.selectGeneList = selectGeneList;
 			this.verbose = verbose;
+			this.replaceNetworksWithPathways = replaceNetworksWithPathways;
+			this.geneSetName = geneSetName;
 	}
 
 	public void run() {
@@ -105,7 +110,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/1000;
 			verbose = true;
-			lg("\nDone - Gene Pathway Analysis! "+Math.round(diffTime)+" seconds");
+			lg("\nDone - Gene Set "+geneSetName+" Pathway Analysis! "+Math.round(diffTime)+" seconds");
 
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -121,7 +126,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 	}
 
 	private void buildAndSaveGenePathways() throws IOException {
-		CombinePathwayRoot cpr = new CombinePathwayRoot(analyzedNetworks, null);
+		CombinePathwayRoot cpr = new CombinePathwayRoot(analyzedNetworks, null, geneSetName);
 		cpr.makeCombinePathways(maximumFdr);
 		cpr.saveGenePathways(maximumFdr, gs2ki, resultsDirectory, minimumNumberGenes);
 	}
@@ -133,6 +138,12 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 
 	private void loadFilterKeggApiNetworks() throws IOException {
 		allNetworks = KeggResourceExtractor.loadNetworks(keggNetworkDirectory);
+	
+		if (replaceNetworksWithPathways) {
+			IO.pl("\nReplacing networks with composite pathways...");		
+			allNetworks = KeggResourceExtractor.buildCompositePathways(allNetworks);
+		}
+		
 		networkIdAnalyzedNetwork = new HashMap<String, AnalyzedNetwork>(allNetworks.length);
 		for (int i=0; i< allNetworks.length; i++) {
 			//check type?
@@ -144,7 +155,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 			//check minimum # genes
 			KeggApiGene[]  genes = allNetworks[i].getGenes();
 			if (genes!=null && genes.length >= minimumNumberGenes) {
-				networkIdAnalyzedNetwork.put(allNetworks[i].getNetworkId(), new AnalyzedNetwork(allNetworks[i], uniqueSelectGenes.size()));
+				networkIdAnalyzedNetwork.put(allNetworks[i].getNetworkId(), new AnalyzedNetwork(allNetworks[i], uniqueSelectGenes.size(), geneSetName));
 			}
 		}
 		lg("\t"+networkIdAnalyzedNetwork.size()+"\tNetworks loaded that pass minimum # genes ("+minimumNumberGenes+") and excluded types: "+typesToExclude+"\n");
@@ -225,7 +236,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 	}
 
 	private void saveGeneNetworks() throws IOException {
-		PrintWriter out = new PrintWriter( new FileWriter(new File(resultsDirectory, "geneNetworksMinGen"+minimumNumberGenes+".xls")));
+		PrintWriter out = new PrintWriter( new FileWriter(new File(resultsDirectory, "gene"+geneSetName+"NetworksMinGen"+minimumNumberGenes+".xls")));
 		//name descLink pval, adjPval, #UniqueNetworkGenes, #FoundUniqueNetworkGenes, #DiffExpGenes, #GenesIntersect, GenesIntersect/PathGenes, IntersectingGenes
 		out.println("# Network Name(s)\tNetwork Desc Link\tPval\tAdj Pval\tAll Network Genes\tFound Network Genes\tSelect Genes\tIntersect\tInt/Net\tInt Gene Symbols\tInt Genes LgRtos\tPathway Map Links...");
 		for (AnalyzedNetwork an: analyzedNetworks) out.print(an.toStringGene(gs2ki));
@@ -319,6 +330,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 					case 'x': maximumFdr = Double.parseDouble(args[++i]); break;
 					case 'm': minimumNumberGenes = Integer.parseInt(args[++i]); break;
 					case 't': typesToExclude = args[++i]; break;
+					case 'p': replaceNetworksWithPathways = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -375,7 +387,8 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 				"   Pathway analysis.\n"+
 				"KeggGeneAndVariantPathway Analyzer - Runs a joint gene expression and gene mutation\n"+
 				"   KEGG Network and Pathway analysis. Recommended if both available.\n"+
-				"MergeKeggNetworkResults - Merges network xls results from multiple pathway analysis.\n"+
+				"MergeKeggNetworkResults and MergeKeggPathwayResults - Merges network or pathway xls\n"+
+				"   results from multiple USeq KEGG analysis.\n"+
 				"DESeq2, edgeR - R packages for selecting differentially expressed gene sets.\n"+
 				
 				"\nKEGG Viewer Gene Color Key:\n\n"+
@@ -400,6 +413,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 				"     defaults to 4\n"+
 				"-x (Optional) Maximum FDR for including networks into the combine Kegg Pathway\n"+
 				"     spreadsheet, defaults to 0.15\n"+
+				"-p Replace networks with composite pathways, thus no network analysis.\n"+
 
 				"\nExample:\n\n"+ 
 				"java -Xmx1G -jar pathTo/USeq/Apps/KeggGenePathwayAnalyzer -i \n"+

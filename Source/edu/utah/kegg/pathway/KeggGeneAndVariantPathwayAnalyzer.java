@@ -25,6 +25,7 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 	private boolean addOne = false;
 	private File tempDirectory = null;
 	private double maximumFdr = 0.15;
+	private boolean replaceNetworksWithPathways = false;
 	
 	private KeggGenePathwayAnalyzer genes = null;
 	private KeggVariantPathwayAnalyzer variants = null;
@@ -59,7 +60,7 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 	}
 	
 	private void buildAndSaveGenePathways() throws IOException {
-		CombinePathwayRoot cpr = new CombinePathwayRoot(genes.getAnalyzedNetworks(), variants.getAnalyzedNetworks());
+		CombinePathwayRoot cpr = new CombinePathwayRoot(genes.getAnalyzedNetworks(), variants.getAnalyzedNetworks(), "");
 		cpr.makeCombinePathways(maximumFdr);
 		cpr.saveGeneAndVariantPathways(maximumFdr, gs2ki, resultsDirectory, minimumNumberGenes);
 	}
@@ -68,10 +69,10 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 		//create the objects
 		boolean verbose = false;
 		genes = new KeggGenePathwayAnalyzer(keggIdsFile, keggNetworkDirectory, fullPathToR, resultsDirectory, tempDirectory, interrogatedGeneList, 
-				selectGeneList, maximumFdr, minimumNumberGenes, typesToExclude, networkTypesToExclude, verbose);
+				selectGeneList, maximumFdr, minimumNumberGenes, typesToExclude, networkTypesToExclude, verbose, replaceNetworksWithPathways, "");
 
 		variants = new KeggVariantPathwayAnalyzer(keggIdsFile, keggNetworkDirectory, resultsDirectory, groupAGeneHits, groupBGeneHits, minimumNumberGenes, 
-				maximumFdr, addOne, typesToExclude, networkTypesToExclude, verbose);
+				maximumFdr, addOne, typesToExclude, networkTypesToExclude, verbose, replaceNetworksWithPathways);
 		
 		//run the analysis in separate threads
 		ExecutorService executor = Executors.newFixedThreadPool(2);
@@ -94,93 +95,6 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 
 
 
-	/*	
-	private void savePathways() throws IOException {
-		//the idea here is to find all of the significant networks with a pathway
-		//	then for each pathway decorate it with all of the network genes colored, and highlight the networks
-		//	really only useful when multiple diff networks hit the same pathway
-		//		output pathway view xls file
-
-		//find significant networks 
-		//pathway id and the ANs it came from
-		TreeMap<String, ArrayList<AnalyzedNetwork>> sigPath = new TreeMap<String, ArrayList<AnalyzedNetwork>>();
-		HashMap<String, KeggApiPathway> pathwayIdKeggApiPathway = new HashMap<String, KeggApiPathway>();
-		for (AnalyzedNetwork an: analyzedNetworks) {
-			if (an.getVariantAdjPVal()<= maximumFdr) {
-				//for each network in the an
-				for (KeggApiNetwork kan: an.getVariantAnalizedNetworks()){
-					//any pathways?
-					if (kan.getPathways() != null) {
-						for (KeggApiPathway kap: kan.getPathways()) {
-							pathwayIdKeggApiPathway.put(kap.getId(), kap);
-							ArrayList<AnalyzedNetwork> al = sigPath.get(kap.getId());
-							if (al == null) {
-								al = new ArrayList<AnalyzedNetwork>();
-								sigPath.put(kap.getId(), al);
-							}
-							al.add(an);
-						}
-					}
-				}
-			}
-		}
-
-		//for each pathway, create a results obj to sort by pvalue
-		StringValueSort[] results = new StringValueSort[sigPath.size()];
-		int counter = 0;
-		for (String pathwayId: sigPath.keySet()) { 
-			StringBuilder xls = new StringBuilder();
-			xls.append("PATHWAY:\t");
-			xls.append(pathwayId); 
-			xls.append("\t"); 
-			xls.append(pathwayIdKeggApiPathway.get(pathwayId).getName()); 
-			xls.append("\t");  
-			xls.append("=HYPERLINK(\"https://www.kegg.jp/entry/");
-			xls.append(pathwayId);		
-			xls.append("\",\"https://www.kegg.jp/entry/");
-			xls.append(pathwayId);	
-			xls.append("\")\n");
-
-			//fetch all of the genes and networks
-			TreeMap<String, SelectGene> allGenes = new TreeMap<String,SelectGene>();
-			HashSet<String> networkIds = new HashSet<String>();
-			xls.append("Networks:\n");
-			double minPVal = Double.MAX_VALUE;
-			for (AnalyzedNetwork an : sigPath.get(pathwayId)) {
-				if (an.getVariantPVal()< minPVal) minPVal = an.getVariantPVal();
-				for (SelectGene sg: an.fetchVariantGenes()) allGenes.put(sg.getGeneSymbol(), sg);
-				for (KeggApiNetwork net: an.getVariantAnalizedNetworks()) networkIds.add(net.getNetworkId());
-
-				xls.append("\t"); xls.append(an.getVariantAnalizedNetworkIdNames()); xls.append("\n");
-				xls.append("\t\tAdjPval: "); xls.append(Num.formatNumber(an.getVariantAdjPVal(),3)); xls.append("\n");
-				xls.append("\t\tLog2Rto: "); xls.append(Num.formatNumber(an.getVariantLog2Rto(),3)); xls.append("\n");
-				xls.append("\t\tGenes: "); xls.append(Misc.stringSetToString(an.getVarinatGeneNameHits(), ", ")); xls.append("\n");
-			}
-			SelectGene[] sg = new SelectGene[allGenes.size()];
-			int i = 0;
-			for (SelectGene g: allGenes.values()) sg[i++] = g;
-			xls.append("AllGenes:\t"); xls.append(Misc.stringSetToString(allGenes.keySet(), ", ")); xls.append("\n");
-
-			//networks
-			String[] networkIdsStringArray = Misc.hashSetToStringArray(networkIds);
-			String url = AnalyzedNetwork.fetchKeggPathwayMapLink(pathwayId, networkIdsStringArray, sg, gs2ki,AnalyzedNetwork.variantNegColor,AnalyzedNetwork.variantPosColor,AnalyzedNetwork.variantZeroColor);
-			xls.append("KeggLink:\t"); xls.append(url); xls.append("\n");
-			if (url.length()<250) {
-				xls.append("ExcelLink:\t=HYPERLINK(\"");
-				xls.append(url);		
-				xls.append("\",\""+url);	
-				xls.append("\")\n\n");
-			}
-			else xls.append("ExcelLink:\tToo big\n\n");
-			results[counter++] = new StringValueSort(xls, minPVal);
-		}
-		Arrays.sort(results);
-		PrintWriter out = new PrintWriter( new FileWriter(new File(resultsDirectory, "variantPathwaysMinGen"+minimumNumberGenes+"MaxFdr"+maximumFdr+".xls")));
-		out.println("#Composite view of significant networks in KEGG pathways\n");
-		for (StringValueSort s: results) out.print(s.getCargo().toString());
-		out.close();
-	}
-	*/
 
 	private void saveNetworks() {
 		
@@ -315,6 +229,7 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 					case 'i': interrogatedGeneList = new File(args[++i]); break;
 					case 'g': selectGeneList = new File(args[++i]); break;
 					case 'e': fullPathToR = new File(args[++i]); break;
+					case 'p': replaceNetworksWithPathways = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -372,7 +287,8 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 				"   analysis.\n"+
 				"KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and\n"+
 				"   Pathway analysis.\n"+
-				"MergeKeggNetworkResults - Merges network xls results from multiple pathway analysis.\n"+
+				"MergeKeggNetworkResults and MergeKeggPathwayResults - Merges network or pathway xls\n"+
+				"   results from multiple USeq KEGG analysis.\n"+
 				"AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.\n"+
 				"DESeq2, edgeR - R packages for selecting differentially expressed gene sets.\n"+
 				
@@ -406,6 +322,7 @@ public class KeggGeneAndVariantPathwayAnalyzer {
 				"     defaults to 4\n"+
 				"-x (Optional) Maximum FDR for including networks into the combine Kegg Pathway\n"+
 				"     spreadsheet, defaults to 0.15\n"+
+				"-p Replace networks with composite pathways, thus no network analysis.\n"+
 	
 				"\nExample:\n\n"+
 				"java -Xmx1G -jar pathTo/USeq/Apps/KeggGeneAndVariantPathwayAnalyzer\n"+

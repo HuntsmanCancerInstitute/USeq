@@ -1,19 +1,7 @@
 package edu.utah.kegg.pathway;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.io.PrintWriter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.TreeMap;
-
-import edu.utah.kegg.api.KeggApiNetwork;
 import edu.utah.kegg.api.KeggApiPathway;
-import util.gen.Misc;
-import util.gen.Num;
 
 public class CombinePathway {
 	

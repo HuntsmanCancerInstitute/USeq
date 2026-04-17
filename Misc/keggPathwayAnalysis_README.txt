@@ -27,7 +27,8 @@ cd $keggResourcesDir
 2) If you JUST have differential variant analysis, run the KeggVariantPathwayAnalyzer
 3) If you have both, run the KeggGeneAndVariantPathwayAnalyzer
 
-# If you have multiple pathway analysis, use the MergeKeggNetworkResults app to merge the network files into a composite analysis.
+# If you have multiple pathway analysis, use the MergeKeggNetworkResults and MergeKeggPathwayResults 
+   apps to merge the network and pathway xls files, respectively, into composite analysis.
 
 # List the help menu and options
 java -jar -Xmx1G $useqApps/KeggGeneAndVariantPathwayAnalyzer
@@ -53,7 +54,8 @@ KeggGenePathwayAnalyzer - Differential gene expression KEGG Network and Pathway
    analysis.
 KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and
    Pathway analysis.
-MergeKeggNetworkResults - Merges network xls results from multiple pathway analysis.
+MergeKeggNetworkResults and MergeKeggPathwayResults - Merges network or pathway xls
+   results from multiple USeq KEGG analysis.
 AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.
 DESeq2, edgeR - R packages for selecting differentially expressed gene sets.
 

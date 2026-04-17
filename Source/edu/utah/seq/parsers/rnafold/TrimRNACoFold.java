@@ -9,7 +9,7 @@ import util.gen.Misc;
 public class TrimRNACoFold {
 
 	//fields
-	private String seq = "CUGAGAUGUCGUGUGUGU&ACACUACAUAUUUAUUGUUUAUUUAUACCUGAUAAUGCUGCUUUAAUCACACACGAGGUAUCGCUUCUACUA";
+	private String seq =  "CUGAGAUGUCGUGUGUGU&ACACUACAUAUUUAUUGUUUAUUUAUACCUGAUAAUGCUGCUUUAAUCACACACGAGGUAUCGCUUCUACUA";
 	private String fold = ".(((.((.(((((((((.&............(((((((...........)))))))..........))))))))).)).))).........";
 	private int gapDotCount = 3;
 	private Pattern and = Pattern.compile("&");

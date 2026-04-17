@@ -3,17 +3,15 @@ package edu.utah.kegg.pathway;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.TreeSet;
 
 import edu.utah.kegg.api.KeggApiNetwork;
 import edu.utah.kegg.api.KeggApiPathway;
-import util.gen.IO;
 import util.gen.Misc;
 import util.gen.Num;
 
 public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
-	
+
 	//Either Gene or Variant Info
 	private KeggApiNetwork keggApiNetwork = null;
 	private ArrayList<KeggApiNetwork> analizedKeggApiNetworks = new ArrayList<KeggApiNetwork>();
@@ -22,7 +20,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 	public double sortValue = -1;
 	private double combinePValue = -1;
 	private double combineFdr = -1;
-	
+
 	//Gene Specific Info
 	private int totalNumDiffExpGenes = 0;
 	// users interrogated genes that intersect this network's genes
@@ -30,8 +28,8 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 	// users select genes that intersect this network's genes
 	private ArrayList<SelectGene> geneSharedGenes = new ArrayList<SelectGene>();
 	private boolean geneAnalyzed = true;
+	private String geneSetName = "";
 
-	
 	//Variant Specific Info
 	private ArrayList<String> groupAHits = new ArrayList<String>();
 	private ArrayList<String> groupANoHits = new ArrayList<String>();
@@ -43,7 +41,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 	private double minKeggFreq = 0;
 	private HashMap<String, Double> geneFractionsGroupA = null;
 	private HashMap<String, Double> geneFractionsGroupB = null;
-	
+
 	//Kegg info, hex color coding, replace # with %23	
 	public static String geneNegColor = "%2387CEEB";	// light blue
 	public static String genePosColor = "%23FFB6C1";	// light red, pink
@@ -53,21 +51,21 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 	public static String variantZeroColor = "%23FFFFAC";	// light yellow, sometimes set when the pos/neg rto is very small
 
 	public static final String showPathwayUrl = "https://www.kegg.jp/kegg-bin/show_pathway?map=";
-	
-	
-	public AnalyzedNetwork (KeggApiNetwork keggApiNetwork, int totalNumDiffExpGenes) {
+
+	public AnalyzedNetwork (KeggApiNetwork keggApiNetwork, int totalNumDiffExpGenes, String geneSetName) {
 		this.keggApiNetwork = keggApiNetwork;
 		this.totalNumDiffExpGenes = totalNumDiffExpGenes;
+		this.geneSetName = geneSetName;
 	}
-	
+
 	public String toStringVariant(boolean addOne, HashMap<String, ArrayList<String>> geneSymbolKeggId) {
 		//name descLink \tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tBHits\tBNoHits\tFracBHits\tBGeneHits\tLog2(fracA/fracB)\tAllGeneHits\tPathwayMapLinks.."
-		
+
 		String[] networkIds = fetchNetworkIds();
 		String mergedNetIds = Misc.stringArrayToString(networkIds, ",");
-		
+
 		StringBuilder sb = new StringBuilder();
-		
+
 		//for each network
 		for (KeggApiNetwork n: analizedKeggApiNetworks) {
 
@@ -84,148 +82,152 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 			sb.append("\")");
 			sb.append("\t");
 
-		sb.append(Num.formatNumber(pValue, 5)); sb.append("\t");
+			sb.append(Num.formatNumber(pValue, 5)); sb.append("\t");
 
-		sb.append(Num.formatNumber(fdr, 5)); sb.append("\t");
+			sb.append(Num.formatNumber(fdr, 5)); sb.append("\t");
 
-		sb.append(groupAHits.size()); sb.append("\t");
+			sb.append(groupAHits.size()); sb.append("\t");
 
-		sb.append(groupANoHits.size()); sb.append("\t");
+			sb.append(groupANoHits.size()); sb.append("\t");
 
-		double aFrac = (double)groupAHits.size()/ (double)(groupAHits.size()+groupANoHits.size());
+			double aFrac = (double)groupAHits.size()/ (double)(groupAHits.size()+groupANoHits.size());
 
-		sb.append(Num.formatNumber(aFrac, 5)); sb.append("\t");
-		sb.append(convertToSortedFrequencies(aGenes, true)); sb.append("\t");
+			sb.append(Num.formatNumber(aFrac, 5)); sb.append("\t");
+			sb.append(convertToSortedFrequencies(aGenes, true)); sb.append("\t");
 
-		sb.append(groupBHits.size()); sb.append("\t");
-		sb.append(groupBNoHits.size()); sb.append("\t");
-		double bFrac = (double)groupBHits.size()/ (double)(groupBHits.size()+groupBNoHits.size());
-		sb.append(Num.formatNumber(bFrac, 5)); sb.append("\t");
-		sb.append(convertToSortedFrequencies(bGenes, false)); sb.append("\t");
+			sb.append(groupBHits.size()); sb.append("\t");
+			sb.append(groupBNoHits.size()); sb.append("\t");
+			double bFrac = (double)groupBHits.size()/ (double)(groupBHits.size()+groupBNoHits.size());
+			sb.append(Num.formatNumber(bFrac, 5)); sb.append("\t");
+			sb.append(convertToSortedFrequencies(bGenes, false)); sb.append("\t");
 
-		//correct for zero log2Rto?
-		if (addOne) {
-			if (aFrac == 0) {
-				double a = 1;
-				aFrac = a/ (a+(double)groupANoHits.size());
-			}
-			if (bFrac == 0) {
-				double b = 1;
-				bFrac = b/ (b+(double)groupBNoHits.size());
-			}
-		}
-		variantLog2Rto = aFrac/bFrac;
-		sb.append(Num.formatNumber(Num.log2(variantLog2Rto), 5));
-		sb.append("\t");
-
-		TreeSet<String> allGenes = new TreeSet<String>();
-		allGenes.addAll(aGenes.keySet());
-		allGenes.addAll(bGenes.keySet());
-		for (String geneName: allGenes) {
-			sb.append(geneName);
-			sb.append(" ");
-		}
-
-		
-		
-		//PathwayMapLinks...
-		if (n.getPathways()!= null) {
-			KeggApiPathway[] pathways = n.getPathways(); 
-			SelectGene[] selectGenes = fetchVariantGenes();
-
-			for (int i=0; i< pathways.length; i++) {
-				sb.append("\t");
-				String link = fetchKeggPathwayMapLink(pathways[i].getId(), networkIds, selectGenes, geneSymbolKeggId,variantNegColor ,variantPosColor ,variantZeroColor);
-				if (link.length()<250) {
-					sb.append("=HYPERLINK(\"");
-					sb.append(link);
-					sb.append("\",\"");
-					sb.append(pathways[i].getName());
-					sb.append("\")");
+			//correct for zero log2Rto?
+			if (addOne) {
+				if (aFrac == 0) {
+					double a = 1;
+					aFrac = a/ (a+(double)groupANoHits.size());
 				}
-				else {
-					sb.append(pathways[i].getName());
-					sb.append(" : ");
-					sb.append(link);
+				if (bFrac == 0) {
+					double b = 1;
+					bFrac = b/ (b+(double)groupBNoHits.size());
 				}
 			}
-		}
-		else sb.append("\t");
-		sb.append("\n");
+			variantLog2Rto = aFrac/bFrac;
+			sb.append(Num.formatNumber(Num.log2(variantLog2Rto), 5));
+			sb.append("\t");
+
+			TreeSet<String> allGenes = new TreeSet<String>();
+			allGenes.addAll(aGenes.keySet());
+			allGenes.addAll(bGenes.keySet());
+			for (String geneName: allGenes) {
+				sb.append(geneName);
+				sb.append(" ");
+			}
+
+			//PathwayMapLinks...
+			if (n.getPathways()!= null) {
+				KeggApiPathway[] pathways = n.getPathways(); 
+				SelectGene[] selectGenes = fetchVariantGenes();
+
+				for (int i=0; i< pathways.length; i++) {
+					sb.append("\t");
+					String link = fetchKeggPathwayMapLink(pathways[i].getId(), networkIds, selectGenes, geneSymbolKeggId,variantNegColor ,variantPosColor ,variantZeroColor);
+					if (link.length()<250) {
+						sb.append("=HYPERLINK(\"");
+						sb.append(link);
+						sb.append("\",\"");
+						sb.append(pathways[i].getName());
+						sb.append("\")");
+					}
+					else {
+						sb.append(pathways[i].getName());
+						sb.append(" : ");
+						sb.append(link);
+					}
+				}
+			}
+			else sb.append("\t");
+			sb.append("\n");
 		}
 		return sb.toString();
 	}
 
 	public String toStringVariantCombo(String selectNetId, AnalyzedNetwork geneAnalyzedNetowrk, boolean addOne, HashMap<String, ArrayList<String>> geneSymbolKeggId) {
 		//Pval AdjPval Log2(fracA/fracB) AllGeneHits PathwayMapLinks.."
-		
+
 		StringBuilder sb = new StringBuilder();
-		
+
 		//find select network
 		for (KeggApiNetwork n: analizedKeggApiNetworks) {
 			if (selectNetId.equals(n.getNetworkId())== false) continue;
 
-		sb.append(Num.formatNumber(pValue, 5)); sb.append("\t");
-		sb.append(Num.formatNumber(fdr, 5)); sb.append("\t");
+			sb.append(Num.formatNumber(pValue, 5)); sb.append("\t");
+			sb.append(Num.formatNumber(fdr, 5)); sb.append("\t");
 
-		double aFrac = (double)groupAHits.size()/ (double)(groupAHits.size()+groupANoHits.size());
-		double bFrac = (double)groupBHits.size()/ (double)(groupBHits.size()+groupBNoHits.size());
-		
-		//correct for zero log2Rto?
-		if (addOne) {
-			if (aFrac == 0) {
-				double a = 1;
-				aFrac = a/ (a+(double)groupANoHits.size());
-			}
-			if (bFrac == 0) {
-				double b = 1;
-				bFrac = b/ (b+(double)groupBNoHits.size());
-			}
-		}
-		variantLog2Rto = aFrac/bFrac;
-		sb.append(Num.formatNumber(Num.log2(variantLog2Rto), 5));
-		sb.append("\t");
+			double aFrac = (double)groupAHits.size()/ (double)(groupAHits.size()+groupANoHits.size());
+			double bFrac = (double)groupBHits.size()/ (double)(groupBHits.size()+groupBNoHits.size());
 
-		TreeSet<String> allGenes = new TreeSet<String>();
-		allGenes.addAll(aGenes.keySet());
-		allGenes.addAll(bGenes.keySet());
-		for (String geneName: allGenes) {
-			sb.append(geneName);
-			sb.append(" ");
-		}
-
-		//PathwayMapLinks...
-		if (n.getPathways()!= null) {
-			KeggApiPathway[] pathways = n.getPathways(); 
-			
-			SelectGene[] varSelectGenes = fetchVariantGenes();
-			
-			ArrayList<SelectGene> gsgAl = geneAnalyzedNetowrk.getGeneSharedGenes();
-			SelectGene[] geneSelectGenes = new SelectGene[gsgAl.size()];
-			gsgAl.toArray(geneSelectGenes);
-
-			for (int i=0; i< pathways.length; i++) {
-				sb.append("\t");
-				
-				String link = fetchCombineKeggPathwayMapLink(pathways[i].getId(), new String[] {selectNetId}, geneSelectGenes, varSelectGenes, geneSymbolKeggId);
-				if (link.length()<250) {
-					sb.append("=HYPERLINK(\"");
-					sb.append(link);
-					sb.append("\",\"");
-					sb.append(pathways[i].getName());
-					sb.append("\")");
+			//correct for zero log2Rto?
+			if (addOne) {
+				if (aFrac == 0) {
+					double a = 1;
+					aFrac = a/ (a+(double)groupANoHits.size());
 				}
-				else {
-					sb.append(pathways[i].getName());
-					sb.append(" : ");
-					sb.append(link);
+				if (bFrac == 0) {
+					double b = 1;
+					bFrac = b/ (b+(double)groupBNoHits.size());
 				}
 			}
-		}
-		else sb.append("\t");
-		sb.append("\n");
+			variantLog2Rto = aFrac/bFrac;
+			sb.append(Num.formatNumber(Num.log2(variantLog2Rto), 5));
+			sb.append("\t");
+
+			TreeSet<String> allGenes = new TreeSet<String>();
+			allGenes.addAll(aGenes.keySet());
+			allGenes.addAll(bGenes.keySet());
+			for (String geneName: allGenes) {
+				sb.append(geneName);
+				sb.append(" ");
+			}
+
+			//PathwayMapLinks...
+			if (n.getPathways()!= null) {
+				KeggApiPathway[] pathways = n.getPathways(); 
+
+				SelectGene[] varSelectGenes = fetchVariantGenes();
+
+				ArrayList<SelectGene> gsgAl = geneAnalyzedNetowrk.getGeneSharedGenes();
+				SelectGene[] geneSelectGenes = new SelectGene[gsgAl.size()];
+				gsgAl.toArray(geneSelectGenes);
+
+				for (int i=0; i< pathways.length; i++) {
+					sb.append("\t");
+
+					String link = fetchCombineKeggPathwayMapLink(pathways[i].getId(), new String[] {selectNetId}, geneSelectGenes, varSelectGenes, geneSymbolKeggId);
+					if (link.length()<250) {
+						sb.append("=HYPERLINK(\"");
+						sb.append(link);
+						sb.append("\",\"");
+						sb.append(pathways[i].getName());
+						sb.append("\")");
+					}
+					else {
+						sb.append(pathways[i].getName());
+						sb.append(" : ");
+						sb.append(link);
+					}
+				}
+			}
+			else sb.append("\t");
+			sb.append("\n");
 		}
 		return sb.toString();
+	}
+	
+	public String getDataSetName() {
+		if (geneSetName.length()>0) return geneSetName;
+		if (totalNumDiffExpGenes > 0) return ("GeneSet");
+		return "VariantSet";
 	}
 
 	public SelectGene[] fetchVariantGenes() {
@@ -238,7 +240,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 			Double bFrac = geneFractionsGroupB.get(geneSymbol);
 			if (aFrac == null) aFrac = 0d;
 			if (bFrac == null) bFrac = 0d;
-			
+
 			//are either zero? thus no observations
 			if (aFrac==0 || bFrac ==0) selectGenes[i++] = new SelectGene(geneSymbol,"0");
 			else {
@@ -286,12 +288,12 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 	public String toStringGene(HashMap<String, ArrayList<String>> geneSymbolKeggId) {
 		//name descLink pval, adjPval, #UniquePathwayGenes, #FoundUniquePathwayGenes, #DiffExpGenes, #GenesIntersect, GenesIntersect/FoundUniPathGenes, 
 		//IntersectingGenes, IntersectingGeneLogRtos, PathwayMapLinks...
-		
+
 		String[] networkIds = fetchNetworkIds();
 		String mergedNetIds = Misc.stringArrayToString(networkIds, ",");
-		
+
 		StringBuilder sb = new StringBuilder();
-		
+
 		//for each network
 		for (KeggApiNetwork n: analizedKeggApiNetworks) {
 
@@ -377,13 +379,13 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 		}
 		return sb.toString();
 	}
-	
+
 	public String toStringGeneCombo(String selectNetworkId, HashMap<String, ArrayList<String>> geneSymbolKeggId) {
 		//name, descLink, combinePval, combineFDR, pval, adjPval, GenesIntersect/FoundUniPathGenes, IntersectingGenes
-		
+		String[] networkIds = fetchNetworkIds();
 		StringBuilder sb = new StringBuilder(selectNetworkId);
 		sb.append("\t");
-		
+
 		//find network
 		for (KeggApiNetwork n: analizedKeggApiNetworks) {
 			if (selectNetworkId.equals(n.getNetworkId()) == false) continue;
@@ -396,7 +398,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 			sb.append(n.getNetworkName());	
 			sb.append("\")");
 			sb.append("\t");
-			
+
 			//combine pval, adjPval
 			sb.append(Num.formatNumber(combinePValue, 5)); sb.append("\t");
 			sb.append(Num.formatNumber(combineFdr, 5)); sb.append("\t");
@@ -420,12 +422,54 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 				sb.append(" ");
 			}
 			sb.append("\t"); 
+			
+			
+			
+			/*
+			//new
+			if (includePathwayLinks) {
+				//PathwayMapLinks...
+				if (n.getPathways()!= null) {
+					KeggApiPathway[] pathways = n.getPathways(); 
+
+					SelectGene[] varSelectGenes = fetchVariantGenes();
+
+					ArrayList<SelectGene> gsgAl = geneAnalyzedNetowrk.getGeneSharedGenes();
+					SelectGene[] geneSelectGenes = new SelectGene[gsgAl.size()];
+					gsgAl.toArray(geneSelectGenes);
+
+					for (int i=0; i< pathways.length; i++) {
+						sb.append("\t");
+
+						String link = fetchCombineKeggPathwayMapLink(pathways[i].getId(), new String[] {selectNetId}, geneSelectGenes, varSelectGenes, geneSymbolKeggId);
+						if (link.length()<250) {
+							sb.append("=HYPERLINK(\"");
+							sb.append(link);
+							sb.append("\",\"");
+							sb.append(pathways[i].getName());
+							sb.append("\")");
+						}
+						else {
+							sb.append(pathways[i].getName());
+							sb.append(" : ");
+							sb.append(link);
+						}
+					}
+				}
+				else sb.append("\t");
+			}
+			*/
+			
+			
+			
+			
+			
+			
 			break;
 		}
-			
+
 		return sb.toString();
 	}
-
 
 	public TreeSet<String> getVarinatGeneNameHits() {
 		TreeSet<String> allSymbols = new TreeSet<String>();
@@ -433,13 +477,13 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 		allSymbols.addAll(bGenes.keySet());
 		return allSymbols;
 	}
-	
+
 	public String[] fetchNetworkIds() {
 		String[] ids = new String[analizedKeggApiNetworks.size()];
 		for (int i=0; i< ids.length; i++) ids[i] = analizedKeggApiNetworks.get(i).getNetworkId();
 		return ids;
 	}
-	
+
 	public static String fetchKeggPathwayMapLink(String pathwayId, String[] networkIds, SelectGene[] genes, 
 			HashMap<String, ArrayList<String>> geneSymbolKeggId, String negColor, String posColor, String zeroColor) {
 		//for each pathway(hsa05220) in the network(N00002), build a URL
@@ -451,7 +495,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 		//  %23 in place of #
 		//see https://www.kegg.jp/kegg/webapp/color_url.html and use hex colors
 		/*
-		
+
 		# Diff exp
 		Decrease Neg light blue  - Increase Pos
 		blue 						red
@@ -461,14 +505,14 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 		Decrease Neg 	Increase Pos 	No change
 		light violet	light orange	lightyellow
 		#D6B4FC 		#FFD580 		#FFFFAC
-		
-		*/
-		
+
+		 */
+
 		StringBuilder sb = new StringBuilder("https://www.kegg.jp/kegg-bin/show_pathway?map=");
 		sb.append(pathwayId); 
 		sb.append("&multi_query=");
 		//for each gene
-		
+
 		int lastIndex = genes.length-1;
 		for (int i=0; i< genes.length; i++) {
 			//just take first id, very rarely there is more than one
@@ -480,7 +524,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 			else sb.append(posColor);
 			if (i < lastIndex) sb.append("%0A");
 		}
-		
+
 		//for each network, it's OK to include networks that are not in the pathway
 		sb.append("&network=");
 		sb.append(networkIds[0]);
@@ -493,11 +537,11 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 
 	public static String fetchCombineKeggPathwayMapLink(String pathwayId, String[] networkIds, SelectGene[] geneSelectGenes, 
 			SelectGene[] variantSelectGenes, HashMap<String, ArrayList<String>> geneSymbolKeggId) {
-		
+
 		StringBuilder sb = new StringBuilder("https://www.kegg.jp/kegg-bin/show_pathway?map=");
 		sb.append(pathwayId); 
 		sb.append("&multi_query=");
-		
+
 		//find those specific to genes, variants, and in common
 		HashMap<String,SelectGene> genesHash = new HashMap<String,SelectGene>();
 		HashMap<String,SelectGene> variantsHash = new HashMap<String,SelectGene>();
@@ -506,7 +550,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 		TreeSet<String> allGeneSymbols = new TreeSet<String>();
 		allGeneSymbols.addAll(genesHash.keySet());
 		allGeneSymbols.addAll(variantsHash.keySet());
-		
+
 		//for each gene
 		int lastIndex = allGeneSymbols.size()-1;
 		int j = 0;
@@ -514,7 +558,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 			String geneId = geneSymbolKeggId.get(gs).get(0);
 			sb.append(geneId);
 			sb.append("%20");
-			
+
 			//gene result present?
 			SelectGene gene = genesHash.get(gs);
 			String geneColor = null;
@@ -523,7 +567,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 				else if (gene.getLog2Rto().equals("0")) geneColor = geneZeroColor; //should never happen
 				else geneColor = genePosColor;
 			}
-			
+
 			//variant result present?
 			SelectGene var = variantsHash.get(gs);
 			String varColor = null;
@@ -532,7 +576,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 				else if (var.getLog2Rto().equals("0")) varColor = variantZeroColor;
 				else varColor = variantPosColor;
 			}
-			
+
 			//both present
 			if (geneColor!=null && varColor!=null) {
 				sb.append(geneColor);
@@ -541,7 +585,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 			}
 			else if (geneColor!=null) sb.append(geneColor);
 			else sb.append(varColor);
-			
+
 			//if not the last
 			if (j < lastIndex) sb.append("%0A");
 			j++;
@@ -556,7 +600,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 		}
 		return sb.toString();
 	}
-	
+
 	public KeggApiNetwork getKeggApiNetwork() {
 		return keggApiNetwork;
 	}
@@ -591,7 +635,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 		}
 		return sb.toString();
 	}
-	
+
 	public String getAnalizedNetworkIdNames() {
 		StringBuilder sb = new StringBuilder(analizedKeggApiNetworks.get(0).getNetworkIdName(" : "));
 		for (int i=1; i< analizedKeggApiNetworks.size(); i++) {
@@ -599,9 +643,9 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 			sb.append(analizedKeggApiNetworks.get(i).getNetworkIdName(" : "));
 		}
 		return sb.toString();
-		
+
 	}
-	
+
 	public String getAnalizedNetworkIds() {
 		StringBuilder sb = new StringBuilder(analizedKeggApiNetworks.get(0).getNetworkId());
 		for (int i=1; i< analizedKeggApiNetworks.size(); i++) {
@@ -609,9 +653,9 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 			sb.append(analizedKeggApiNetworks.get(i).getNetworkId());
 		}
 		return sb.toString();
-		
+
 	}
-	
+
 	public boolean isGeneAnalyzedNetwork() {
 		return totalNumDiffExpGenes > 0;
 	}
@@ -662,7 +706,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 	}
 	public void setCombinePValue(double combinePValue) {
 		this.combinePValue = combinePValue;
-		
+
 	}
 	public void setCombineFdr(double combineFdr) {
 		this.combineFdr = combineFdr;
@@ -672,5 +716,9 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 	}
 	public double getCombineFdr() {
 		return combineFdr;
+	}
+
+	public String getGeneSetName() {
+		return geneSetName;
 	}
 }

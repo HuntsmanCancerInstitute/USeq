@@ -144,7 +144,7 @@ public class PmrVcfBedMerger {
 			fileNames.add(vcfFiles[i].getName());
 		}
 
-		String[] mergedHeader = VCFParser.mergeHeaders(vcfParsers, false, false);
+		String[] mergedHeader = VCFParser.mergeHeaders(vcfParsers, false, true);
 		if (mergedHeader == null) Misc.printErrAndExit("\nError: hmm something is wrong when merging headers, are the #CHROM lines different?\n");
 
 		//merge the records taking first occurance
@@ -227,7 +227,7 @@ public class PmrVcfBedMerger {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                             Pmr Vcf Bed Merger: Nov 2025                         **\n" +
+				"**                             Pmr Vcf Bed Merger: March 2026                       **\n" +
 				"**************************************************************************************\n" +
 				"Parses directories of Vcf and Bed files named such that the first underscore separated\n"+
 				"field represents a subject's ID.  These will be used to group the vcf and bed files\n"+

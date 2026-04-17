@@ -463,7 +463,7 @@ public class CarisXmlVcfParser {
 					else if (testName.equals("HPV45") || testName.equals("HPV33") || testName.equals("HPV31") || testName.equals("HPV16") || testName.equals("HPV18") || testName.equals("EBV") || testName.equals("MCPYV")){
 						IO.el("\nSkipping viral sequencing test: "+testName);
 					}
-					else if (testName.equals("P7/N10 Chromosome Analysis") || testName.equals("eKarotypeGraph") || testName.equals("H&E - Initial") || testName.equals("1p/19q Co-Deletion")){
+					else if (testName.equals("P7/N10 Chromosome Analysis") || testName.equals("eKarotypeGraph") || testName.equals("H&E - Initial") || testName.equals("eGPSImagePath") || testName.equals("1p/19q Co-Deletion")){
 						IO.el("\nSkipping test: "+testName);
 					}
 					//just try parsing it as an IHC test, new ones come out every batch, will throw error if it isn't
@@ -918,7 +918,7 @@ public class CarisXmlVcfParser {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Caris Xml Vcf Parser: July 2025                       **\n" +
+				"**                            Caris Xml Vcf Parser: Feb 2026                        **\n" +
 				"**************************************************************************************\n" +
 				"This tool parses Caris paired xml and vcf report files to generate: new vcfs where xml\n"+
 				"reported genomic alternations are annotated, bed files of copy number changes and gene\n"+

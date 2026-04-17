@@ -1,31 +1,14 @@
 package edu.utah.seq.run.tempus.v3;
 
-import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.PrintWriter;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.json.JSONArray;
 import org.json.JSONObject;
-
-import edu.utah.hci.bioinfo.smm.Subject;
-import edu.utah.hci.bioinfo.smm.SubjectMatchMaker;
-import edu.utah.seq.pmr.PMRSearch;
 import edu.utah.seq.vcf.json.tempusv3.TempusV3Json2Vcf;
-import edu.utah.seq.vcf.json.tempusv3.TempusV3JsonCollection;
 import edu.utah.seq.vcf.json.tempusv3.TempusV3JsonSummary;
-import edu.utah.seq.vcf.json.tempusv3.TempusV3Order;
 import edu.utah.seq.vcf.json.tempusv3.TempusV3Specimen;
 import util.gen.IO;
 import util.gen.Misc;
@@ -48,7 +31,7 @@ public class TempusPathoPrinter {
 
 			processArgs(args);
 			
-			parseJsonFiles();
+			parseJsonFilesSimple();
 			
 			saveKeyFile();
 
@@ -140,6 +123,67 @@ public class TempusPathoPrinter {
 			IO.writeString(jo.toString(3), new File(resultsDir, rand+".json"));
 		}
 	}
+	
+	private void parseJsonFilesSimple() throws Exception {
+		
+		IO.pl("\nParsing json files...");
+		for (File json: jsonFiles) {
+			IO.pl("\t"+json.getName());
+			TempusV3JsonSummary sum = TempusV3Json2Vcf.parseJsonNoVariants(json);
+			JSONObject jo = new JSONObject();
+			//add test id
+			String rand = Misc.getRandomString(10);
+			keys.add(sum.getTempusOrder().getAccessionId()+"\t"+rand);
+			jo.put("test_order_id", rand);
+			for (TempusV3Specimen s : sum.getTempusSpecimens()) {
+				//is this a tumor sample
+				String sc = s.getSampleCategory().toLowerCase();
+				if (sc.contains("tumor")==false && sc.contains("heme")==false ) continue;
+				//primary sample site
+				jo.put("sample_site", s.getPrimarySampleSite());
+				//path diagnosis
+				String diag = s.getOriginPathLabDiagnosis();
+				if (diag.trim().length()==0) {
+					IO.el("\t"+json.getName()+" missing diag, skipping");
+					continue;
+				}
+				//any w/o?
+				diag = diag.replace(" c/w ", " consistent with ");
+				// any w/
+				diag = diag.replace(" w/ ", " with ");
+				// and w/o
+				diag = diag.replace(" w/o ", " with out ");
+				jo.put("original_path_lab_diagnosis", diag);
+				//these codes are not part of the pathology report, assigned by Tempus
+				//just collect descriptions
+				ArrayList<String> descAL = new ArrayList<String>();
+				//icd 10 diagnosis codes
+				if (s.getTempusIcd10Code() != null) {
+					for (String code: Misc.COMMA.split(s.getTempusIcd10Code())) {
+						String decoded = icd10CodeDesc.get(code);
+						if (decoded !=null) descAL.add(decoded);
+					}
+				}	
+				//ICD-O morphology - describes the cell type (or histology) of the tumor, together with the behavior (malignant or benign)
+				if (s.getTempusIcdOCodeMorphology() != null) {
+					for (String code: Misc.COMMA.split(s.getTempusIcdOCodeMorphology())) {
+						String decoded = icdOCodeMorphology.get(code);
+						if (decoded !=null) descAL.add(decoded);
+					}
+				}	
+
+				//ICD-O topology - describes the anatomical site of origin (or organ system) of the tumor
+				if (s.getTempusIcdOCodeTopography() != null) {
+					for (String code: Misc.COMMA.split(s.getTempusIcdOCodeTopography())) {
+						String decoded = icdOCodeTopology.get(code);
+						if (decoded !=null) descAL.add(decoded);
+					}
+				}	
+				if (descAL.size()!=0) jo.put("icd_code_descriptions", Misc.stringArrayListToString(descAL, "; "));
+			}
+			IO.writeString(jo.toString(3), new File(resultsDir, rand+".json"));
+		}
+	}
 
 	public static void main(String[] args) {
 		if (args.length ==0){
@@ -202,9 +246,10 @@ public class TempusPathoPrinter {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Tempus Patho Printer : Jan 2025                        **\n" +
+				"**                           Tempus Patho Printer : April 2026                      **\n" +
 				"**************************************************************************************\n" +
-				"\n"+
+				"TPP parses v3.3 Tempus reports and the ICD references therein and saves a shorteded\n"+
+				"deidentified json file for OncoTree LLM tumor classification.\n"+
 				
 				"\nOptions:\n"+
 				"-j Directory containing Tempus v3.3+ json reports.\n" +

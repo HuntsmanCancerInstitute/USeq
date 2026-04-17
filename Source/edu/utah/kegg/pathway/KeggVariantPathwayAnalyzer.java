@@ -15,6 +15,7 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 	private File groupAGeneHits;
 	private File groupBGeneHits;
 	private boolean addOne = false;
+	private boolean replaceNetworksWithPathways = false;
 	
 	//new stuff
 	private double maximumFdr = 0.15;
@@ -57,7 +58,8 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 	//Constructor for joint analysis
 	public KeggVariantPathwayAnalyzer(File keggIdsFile, File keggNetworkDirectory, File resultsDirectory,
 			File groupAGeneHits, File groupBGeneHits, int minimumNumberGenes, 
-			double maximumFdr, boolean addOne, String typesToExclude, HashSet<String> networkTypesToExclude, boolean verbose){
+			double maximumFdr, boolean addOne, String typesToExclude, HashSet<String> networkTypesToExclude, 
+			boolean verbose, boolean replaceNetworksWithPathways){
 
 			this.groupAGeneHits = groupAGeneHits;
 			this.keggIdsFile = keggIdsFile;
@@ -70,6 +72,7 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 			this.addOne = addOne;
 			this.maximumFdr = maximumFdr;
 			this.verbose = verbose;
+			this.replaceNetworksWithPathways = replaceNetworksWithPathways;
 	}
 	
 	//runs the meat of the analysis
@@ -154,6 +157,12 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 
 	private void loadKeggApiNetworks() throws IOException {
 		KeggApiNetwork[] networks = KeggResourceExtractor.loadNetworks(keggNetworkDirectory);
+		
+		if (replaceNetworksWithPathways) {
+			IO.pl("\nReplacing networks with composite pathways...");		
+			networks = KeggResourceExtractor.buildCompositePathways(networks);
+		}
+		
 		networkIdAnalyzedNetwork = new HashMap<String, AnalyzedNetwork>(networks.length);
 		for (int i=0; i< networks.length; i++) {
 			//check type?
@@ -166,7 +175,7 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 			KeggApiGene[]  genes = networks[i].getGenes();
 			if (genes!=null && genes.length >= minimumNumberGenes) {
 				//networkIdAnalyzedNetwork.put(networks[i].getNetworkId(), new AnalyzedNetwork(networks[i], uniqueSelectGenes.size()));
-				networkIdAnalyzedNetwork.put(networks[i].getNetworkId(), new AnalyzedNetwork(networks[i], 0));
+				networkIdAnalyzedNetwork.put(networks[i].getNetworkId(), new AnalyzedNetwork(networks[i], 0, ""));
 			}
 		}
 		lg("\t"+networkIdAnalyzedNetwork.size()+"\tNetworks loaded that pass minimum # genes ("+minimumNumberGenes+") and excluded types: "+typesToExclude);
@@ -179,7 +188,7 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 	}
 	
 	private void buildAndSaveGenePathways() throws IOException {
-		CombinePathwayRoot cpr = new CombinePathwayRoot(null, analyzedNetworks);
+		CombinePathwayRoot cpr = new CombinePathwayRoot(null, analyzedNetworks, "");
 		cpr.makeCombinePathways(maximumFdr);
 		cpr.saveVariantPathways(maximumFdr, gs2ki, resultsDirectory, minimumNumberGenes);
 	}
@@ -417,6 +426,7 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 					case 't': typesToExclude = args[++i]; break;
 					case 'x': maximumFdr = Double.parseDouble(args[++i]); break;
 					case 'o': addOne = true; break;
+					case 'p': replaceNetworksWithPathways = true; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -478,7 +488,8 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 				"   Pathway analysis.\n"+
 				"KeggGeneAndVariantPathway Analyzer - Runs a joint gene expression and gene mutation\n"+
 				"   KEGG Network and Pathway analysis. Recommended if both available.\n"+
-				"MergeKeggNetworkResults - Merges network xls results from multiple pathway analysis.\n"+
+				"MergeKeggNetworkResults and MergeKeggPathwayResults - Merges network or pathway xls\n"+
+				"   results from multiple USeq KEGG analysis.\n"+
 				"AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.\n"+
 				
 				"\nKEGG Gene Color Key:\n\n"+
@@ -503,6 +514,7 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 				"     defaults to 4\n"+
 				"-x (Optional) Maximum FDR for including networks into the combine Kegg Pathway\n"+
 				"     spreadsheet, defaults to 0.15\n"+
+				"-p Replace networks with composite pathways, thus no network analysis.\n"+
 
 				"\nExample:\n\n"+
 				"java -Xmx1G -jar pathTo/USeq/Apps/KeggVariantPathwayAnalyzer -a \n"+

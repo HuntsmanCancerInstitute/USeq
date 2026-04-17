@@ -62,7 +62,7 @@ public class HierarchicalClustering {
 			//cluster files
 			clusterNormalizedFloatArrayFiles();
 			//break out clusters
-			results.append("Ordering...\n");
+			results.append("\nOrdering...\n");
 			breakOutClusters();
 			//display cluster on screen?
 			if (savePNG && pngResultFile == null) pngResultFile = new File(celpFiles[0].getParentFile(),title+"ClusterPlot.png");
@@ -101,6 +101,7 @@ public class HierarchicalClustering {
 		Arrays.sort(virtualCelFiles);
 		//get trimmed file names
 		String[] trimmedNames = IO.getTruncatedNames(virtualCelFiles);
+
 		//make temp directory and copy files into it, also create ArrayList to hold Clusters
 		File tempDir = null;
 		results.append("\nMaking temp files...\n");
@@ -305,6 +306,7 @@ public class HierarchicalClustering {
 					case 'd': dir = new File(args[i+1]); i++; break;
 					case 'c': convert = true; break;
 					case 'a': antiLog = true; break;
+					case 'p': displayClusterPlot = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printExit("\nProblem, unknown option! " + mat.group()+"\n");
 					}
@@ -337,7 +339,7 @@ public class HierarchicalClustering {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                        Hierarchical Clustering: June 2012                        **\n" +
+				"**                        Hierarchical Clustering: March 2026                       **\n" +
 				"**************************************************************************************\n" +
 				"HC hierarchically clusters serialized float[] arrays using a Pearson correlation\n" +
 				"coefficient (r) as a metric.  For each round, all pairwise r values between the arrays\n" +
@@ -348,10 +350,11 @@ public class HierarchicalClustering {
 				"experiments, clusters with an r < 0.75 (50% similar) are processed separately.\n\n"+ 
 
 				"-d Full path directory text containing serialized float[] arrays, 'xxx.celp' files.\n" +
-				"-c These are text files containing one column of floats, convert to 'xxx.celp'\n" +
+				"-c Convert the files in -d, they are text files containing one column of floats.\n" +
+				"-p Do not display the cluster plot.\n"+
 				"-a AntiLog base 2 the values.\n\n"+
 
-				"Example: java -Xmx1500M -jar pathTo/T2/HierarchicalClustering -d /affy/CelpFiles\n\n" +
+				"Example: java -Xmx1500M -jar pathTo/USeq/HierarchicalClustering -d FloatFiles -c\n\n" +
 
 		"**************************************************************************************\n");		
 	}
