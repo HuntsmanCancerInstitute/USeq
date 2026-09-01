@@ -141,3 +141,71 @@ variantPathwaysMinGen4MaxFdr0.15.xls - ditto but for differential variant mutati
 
 # To build the KeggResource files, run the USeq KeggGeneSymbolIdExtractor and KeggResourceExtractor apps.  KEGG is continuously updating their databases so refresh these resources every 6 months.
 ## HUGO protein gene symbols, current: https://www.genenames.org/download/statistics-and-files/
+
+
+########## List of all of the USeq-KEGG pathway associated tools ##########
+
+# Analysis Apps
+KeggGenePathwayAnalyzer - Differential gene expression KEGG Network and Pathway analysis.
+	KGPA uses your interrogated gene list to 1) filter your select gene list and the KEGG
+Network gene sets then 2) intersects these lists, 3) calculates hypergeometric 
+p-values, 4) controls for multiple testing (Benjamini-Hochberg FDR method), and
+5) outputs two Excel spreadsheets focused on each tested KEGG Network (sub pathways)
+and KEGG Pathway. Use the URL links in the spreadsheets to interactively explort the
+results in the KEGG Pathway Viewer (https://www.kegg.jp).
+
+KeggVariantPathwayAnalyzer - Differential gene mutation cohort KEGG Network and Pathway analysis.
+	For each KEGG network, this app creates a 2x2 contingency table and calculates a
+Fisher's exact p-value that is subsequently multiple test corrected using Benjamini-
+Hochberg's method. The contingency table is the number of subjects from cohort A with
+one or more matching gene names, the number from A without any gene matches, and
+likewise for the subjects in cohort B. A variety of statistics, including the
+matching gene frequency, degree and directionality of change, and html links to each
+network and pathway are saved in two spreadsheets. For TNRunner processed somatic
+variant files, use the USeq AnnotatedVcfParser to select high impact, loss of
+function/ CLINVAR patho/likely-pathogenic variants for each cohort.
+
+KeggGeneAndVariantPathwayAnalyzer
+	Runs both the KeggGenePathwayAnalyzer and KeggVariantPathwayAnalyzer applications.
+Combines the results at the KEGG Pathway level, coloring each gene for interacive
+exploration in the KEGG Pathway Viewer (https://www.kegg.jp). Calculates
+a combine Pathway p-value (Fisher's method) and FDR (Benjamini-Hochberg) for Pathways
+with multiple significant Networks. Best to use this tool if you are comparing two
+large cohorts with both differential gene expression and somatic mutation datasets.
+
+KeggTwoGeneSetPathwayAnalyzer -  
+	Runs two KeggGenePathwayAnalyzer analysis and combines the results at the KEGG Pathway
+level coloring each gene appropriately for interacive exploration in the KEGG Viewer
+(https://www.kegg.jp). Calculates a combine Pathway p-value (Fisher's method) and FDR
+(Benjamini-Hochberg) for Pathways with multiple significant Networks. Best to use this
+tool if you wish to compare variant data (copy or snv/indel) with differential gene
+expression for a single condition.
+
+# Tools to merge results from multiple analysis
+MergeKeggNetworkResults and MergeKeggPathwayResults - Merges network or pathway xls results from multiple USeq KEGG analysis.
+	MKNR merges gene and variant 'network' spreadsheet xxx.xls (not xlsx) files from the
+USeq Kegg analysis applications into a three tab xlsx spreadsheet. Useful for 
+comparing between multiple pathway analysis.
+	MKPR merges USeq KEGG 'pathway' spreadsheet xxx.xls (not xlsx) files from the
+USeq Kegg analysis applications into a four tab xlsx spreadsheet. Useful for 
+comparing between multiple pathway analysis.
+
+# Tools for creating the backend resources 
+KeggGeneSymbolIdExtractor - Uses the Kegg API to look up and parse Kegg Gene Ids that match each of the provided HUGO Gene Symbols. Use this tool to generate the required '-k KEGG gene Id HUGO gene symbol lookup file'.
+	Uses the Kegg API to look up and then parse the Kegg Gene Id that most closely
+matches each of the provided HUGO Gene Symbols. Delete the xxx/Genes directory or 
+files within to load the most recent gene info. See https://rest.kegg.jp/find/genes/
+
+KeggResourceExtractor - Pulls the latest list of KEGG Networks, their associated genes, and pathways. Use this to generate the required '-n KEGG network dir'.
+
+# Tools for creating input files for the analysis
+AnnotatedVcfParser - App to select high impact, gain/loss of function gene mutations.
+	Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
+VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
+records. Use the -r option to inspect the effect of the various filters on each
+record. Use the VCFRegionFilter app to restrict variants to particular regions.
+A summary spreadsheet is exported with select information and excel hyperlinks for
+rapid inspection. Must have AF (or T_AF) and DP in the INFO field for Alt filtering.
+
+DESeq2, edgeR - R packages for selecting differentially expressed gene sets.
+

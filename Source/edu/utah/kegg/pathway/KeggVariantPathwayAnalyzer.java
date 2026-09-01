@@ -250,7 +250,7 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 				for (KeggApiNetwork net: an.getAnalizedKeggApiNetworks()) networkIds.add(net.getNetworkId());
 
 				xls.append("\t"); xls.append(an.getAnalizedNetworkIdNames()); xls.append("\n");
-				xls.append("\t\tAdjPval: "); xls.append(Num.formatNumber(an.getFdr(),3)); xls.append("\n");
+				xls.append("\t\tAdjPVal: "); xls.append(Num.formatNumber(an.getFdr(),3)); xls.append("\n");
 				xls.append("\t\tLog2Rto: "); xls.append(Num.formatNumber(an.getVariantLog2Rto(),3)); xls.append("\n");
 				xls.append("\t\tGenes: "); xls.append(Misc.stringSetToString(an.getVarinatGeneNameHits(), ", ")); xls.append("\n");
 			}
@@ -263,13 +263,15 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 			String[] networkIdsStringArray = Misc.hashSetToStringArray(networkIds);
 			String url = AnalyzedNetwork.fetchKeggPathwayMapLink(pathwayId, networkIdsStringArray, sg, gs2ki,AnalyzedNetwork.variantNegColor,AnalyzedNetwork.variantPosColor,AnalyzedNetwork.variantZeroColor);
 			xls.append("KeggLink:\t"); xls.append(url); xls.append("\n");
-			if (url.length()<250) {
+			
+			/*if (url.length()<250) {
 				xls.append("ExcelLink:\t=HYPERLINK(\"");
 				xls.append(url);		
 				xls.append("\",\""+url);	
 				xls.append("\")\n\n");
 			}
 			else xls.append("ExcelLink:\tToo big\n\n");
+			*/
 			results[counter++] = new StringValueSort(xls, minPVal);
 		}
 		Arrays.sort(results);
@@ -284,7 +286,7 @@ public class KeggVariantPathwayAnalyzer implements Runnable {
 		Arrays.sort(analyzedNetworks);
 		try {
 			PrintWriter out = new PrintWriter( new FileWriter(new File(resultsDirectory, "variantNetworksMinGen"+minimumNumberGenes+".xls")));
-			out.println("# Network Name(s)\tNetwork Desc Link\tPval\tAdjPval\tAHits\tANoHits\tFracAHits\tAGeneHits\tBHits\tBNoHits\tFracBHits\tBGeneHits\tLog2(fracA/fracB)\tAllGeneHits\tPathwayMapLinksWithTopMapDescription...");
+			out.println("# Network Name(s)\tNetwork Desc Link\tPVal\tAdjPval\tA Hits\tA No Hits\tFrac A Hits\tA Gene Hits\tB Hits\tB No Hits\tFrac B Hits\tB Gene Hits\tLog2(fracA/fracB)\tAll Gene Hits\tPathway Map Links With Top Map Description...");
 			for (AnalyzedNetwork an: analyzedNetworks) out.print(an.toStringVariant(addOne, gs2ki));
 			out.println("\n"+CombinePathwayRoot.fetchColorKey(false, true));
 			out.close();

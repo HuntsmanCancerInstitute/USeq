@@ -747,11 +747,22 @@ public class TempusV3Json2Vcf {
 		}
 
 	}	
+	
+	/**Returns the object or null if the key isn't found or the object is null.*/
+	public static JSONObject getJsonObjectOrNull(String key, JSONObject jo) {
+		JSONObject toReturn = null;
+		if (jo.has(key)) {
+			try {
+				toReturn = jo.getJSONObject(key);
+			} catch (JSONException je) {}
+		}
+		return toReturn;
+	}
 
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            Tempus V3 Json 2 Vcf: May 2025                        **\n" +
+				"**                            Tempus V3 Json 2 Vcf: May 2026                        **\n" +
 				"**************************************************************************************\n" +
 				"This app groups json v3+ Tempus reports by patient and tumor. It then merges the \n"+
 				"variant, IHC, MMR, RNA results and generates a combine vcf with both germline and \n"+

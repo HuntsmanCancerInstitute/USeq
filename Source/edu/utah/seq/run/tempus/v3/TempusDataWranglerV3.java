@@ -302,7 +302,7 @@ public class TempusDataWranglerV3 {
 	}
 	
 	private void downloadDatasetsV3() throws Exception {
-		pl("\nDownloading files and building TNRunner run folders...");
+		pl("\nDownloading files and building TNRunner run folders for "+finalOrdersToProcess.size());
 
 		ArrayList<String> cmdsToExecute = new ArrayList<String>();
 		ArrayList<File> tarFiles = new ArrayList<File>();
@@ -315,6 +315,7 @@ public class TempusDataWranglerV3 {
 			//collect download cmds
 			o.addVcfTarDownloadCmds(cmdsToExecute, bucketURI, profile, verbose, tarFiles);
 		}
+		IO.pl("\tFiles to sync "+cmdsToExecute.size()+"  to untar "+tarFiles.size());
 		
 		//anything to download
 		if (cmdsToExecute.size()!=0) {
@@ -329,11 +330,12 @@ public class TempusDataWranglerV3 {
 		}
 		
 		//check RNA and move DNA to correct folders (normal or tumor)
+		IO.pl("\nChecking Fastq Dirs...");
 		for (TempusDataWranglerTumorV3 o : finalOrdersToProcess) {
 			o.checkRnaFastqDir();
 			o.moveDNAFastq();
 		}
-		
+
 		//write the manifest.txt files
 		for (TempusDataWranglerTumorV3 o : finalOrdersToProcess)  o.writeManifest();
 	}
@@ -543,7 +545,7 @@ public class TempusDataWranglerV3 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                        Tempus Data Wrangler V3 : June 24, 2025                   **\n" +
+				"**                         Tempus Data Wrangler V3 : July 2026                      **\n" +
 				"**************************************************************************************\n" +
 				"The Tempus Data Wrangler downloads complete patient datasets from an AWS bucket, parses\n"+
 				"the json test files for patient info, fetches/makes coreIds using the SubjectMatchMaker\n"+

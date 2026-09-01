@@ -41,6 +41,7 @@ public class VCFSpliceScanner {
 	private File transcriptSeqFile;
 	private File annotatedVcfFile = null;
 	private File tempDirectory;
+	private int numberThreads = 0;
 
 	private double minNewAltScore = 3;
 	private double minNewScoreDelta = 1;
@@ -52,7 +53,6 @@ public class VCFSpliceScanner {
 	private boolean scoreNovelExonJunctions = true;
 	private boolean scoreNovelSpliceJunctionsInSplice = true;
 	private short vcfExportCategory = 2;
-	private int numberThreads = 0;
 	private int chunkSize = 50;
 	
 	//internal fields
@@ -417,6 +417,7 @@ public class VCFSpliceScanner {
 					case 'b': minNewScoreDelta = Double.parseDouble(args[++i]); break;
 					case 'c': maxDamagedAltScore = Double.parseDouble(args[++i]); break;
 					case 'd': minDamagedScoreDelta = Double.parseDouble(args[++i]); break;
+					case 't': numberThreads = Integer.parseInt(args[++i]); break;
 					case 's': removeInfoDropNonAffected = true; break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -451,18 +452,19 @@ public class VCFSpliceScanner {
 		tempDirectory.mkdir();
 		
 		//threads to use
-		double totalGbAvailable = (double)(Runtime.getRuntime().maxMemory()/1000000000.0);
-		int numPossCores = (int)Math.round(totalGbAvailable/10.0);
-		if (numPossCores < 1) numPossCores = 1;
-		int numPossThreads = Runtime.getRuntime().availableProcessors();
-		
-		if (numPossCores <= numPossThreads) numberThreads = numPossCores;
-		else numberThreads = numPossThreads;
-		
-		
-		System.out.println("Core usage:\n\tTotal GB available to Java:\t"+ Num.formatNumber(totalGbAvailable, 1));
-		System.out.println("\tTotal available cores:\t"+numPossThreads);
-		System.out.println("\tNumber cores to use @ 10GB/core:\t"+numberThreads+"\n");
+		if (numberThreads == 0) {
+			double totalGbAvailable = (double)(Runtime.getRuntime().maxMemory()/1000000000.0);
+			int numPossCores = (int)Math.round(totalGbAvailable/20.0);
+			if (numPossCores < 1) numPossCores = 1;
+			int numPossThreads = Runtime.getRuntime().availableProcessors();
+
+			if (numPossCores <= numPossThreads) numberThreads = numPossCores;
+			else numberThreads = numPossThreads;
+
+			System.out.println("Core usage:\n\tTotal GB available to Java:\t"+ Num.formatNumber(totalGbAvailable, 1));
+			System.out.println("\tTotal available cores:\t"+numPossThreads);
+			System.out.println("\tNumber cores to use @ 20GB/core:\t"+numberThreads+"\n");
+		}
 		
 		
 		//flip booleans?
@@ -599,7 +601,7 @@ public class VCFSpliceScanner {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                            VCF Splice Scanner : Dec 2025                         **\n" +
+				"**                            VCF Splice Scanner : April 2026                       **\n" +
 				"**************************************************************************************\n" +
 				"Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and\n"+
 				"Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice\n"+
@@ -632,6 +634,7 @@ public class VCFSpliceScanner {
 				"-c Maximum damaged splice junction score, defaults to 3.\n"+
 				"-d Minimum damaged score difference, refseq - new, defaults to 1.\n"+
 				"-s Format vcf with minimal output for downstream annotators, e.g. snpEff.\n"+
+				"-t Number of threads to use, defaults to all available.\n"+
 
 				"\n"+
 				

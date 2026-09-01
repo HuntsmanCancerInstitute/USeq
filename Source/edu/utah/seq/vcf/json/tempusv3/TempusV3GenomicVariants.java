@@ -9,6 +9,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 import htsjdk.samtools.reference.IndexedFastaSequenceFile;
 import util.bio.annotation.Bed;
+import util.gen.IO;
 import util.gen.Json;
 import util.gen.Misc;
 
@@ -36,10 +37,12 @@ public class TempusV3GenomicVariants {
 
 		JSONObject genomicVariants = object.getJSONObject("genomicVariants");
 		
-		//tumorMutationBurden
-		JSONObject tmb = genomicVariants.getJSONObject("tumorMutationalBurden");
-		tumorMutationalBurden = Json.forceGetString(tmb, "tmb");
-		tumorMutationBurdenPercentile = Json.forceGetString(tmb, "tmbPercentile");
+		//tumorMutationBurden, this needs particular checking because the whole object can be null, the others have keys
+		JSONObject tmb = TempusV3Json2Vcf.getJsonObjectOrNull("tumorMutationalBurden", genomicVariants);
+		if (tmb != null) {
+			tumorMutationalBurden = Json.forceGetString(tmb, "tmb");
+			tumorMutationBurdenPercentile = Json.forceGetString(tmb, "tmbPercentile");
+		}
 		
 		//bloodTumorMutationalBurden
 		JSONObject bloodTbm = genomicVariants.getJSONObject("bloodTumorMutationalBurden");

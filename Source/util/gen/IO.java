@@ -1354,9 +1354,9 @@ public class IO {
 	
 	/**Creates symbolicLinks in the destinationDir*/
 	public static void createSymbolicLinks(File[] filesToLink, File destinationDir) throws IOException {
-		//remove any linked files
+		//remove any linked files, don't do this! 
 		File f = destinationDir.getCanonicalFile();
-		for (File fn: filesToLink) new File(f, fn.getName()).delete();
+		//for (File fn: filesToLink) new File(f, fn.getName()).delete();
 
 		//soft link in the new ones
 		for (File fn: filesToLink) {
@@ -3059,6 +3059,22 @@ public class IO {
 			int exitCode = IO.executeViaProcessBuilderReturnExit(cmd);
 			if (exitCode !=0) throw new IOException("Parallel execution failed, for "+Misc.stringArrayToString(cmd, " "));
 	}
+	
+	public static void executeViaParallel(ArrayList<String> cmdsToExecute, int numberThreads, File tmpFile, int numberAttempts) throws Exception {
+		//write out the cmds
+		IO.writeArrayList(cmdsToExecute, tmpFile);
+		String[] cmd = {
+				"parallel", "--will-cite", "--jobs", numberThreads+"", "--halt", "soon,fail=1", "--arg-file", tmpFile.getCanonicalPath()
+		};
+		//attempt to execute this multiple times before exiting
+		int exitCode = -1;
+		for (int i=0; i< numberAttempts; i++) {
+			exitCode = IO.executeViaProcessBuilderReturnExit(cmd);
+			if (exitCode == 0) break;
+			else IO.el("\tWARNING, failed execution, trying again: "+Misc.stringArrayToString(cmd, " "));
+		} 
+		if (exitCode !=0) throw new IOException("Parallel execution failed, for \n\t"+Misc.stringArrayToString(cmd, " "));
+}
 		
 	
 

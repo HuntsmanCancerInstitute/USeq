@@ -97,6 +97,7 @@ public class GatkCalledSegmentAnnotator {
 		int numPass = 0;
 		int numFail = 0;
 		for (GatkSegment gs : gatkSegments) {
+			
 			if (normalPresent == false) {
 				if (Math.abs(gs.getLogMeanTumorCopyRatios()) >= minAbsLg2TumorCopyRatio) {
 					out.println(gs.toSeg(passName));

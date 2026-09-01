@@ -11,6 +11,8 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import util.apps.MergeRegions;
 import util.bio.annotation.Bed;
 import util.gen.IO;
 import util.gen.Misc;
@@ -86,6 +88,7 @@ public class CopyAnalysisBedMerger {
 		genes = new String[oncoKBGenesAL.size()];
 		oncoKBGenesAL.toArray(genes);
 		in.close();
+		if (genes.length == 0) throw new IOException ("\nFAILED to parse and genes from your gene file? "+geneFileToParse);
 	}
 
 	private void parseBedFiles() {
@@ -130,22 +133,42 @@ public class CopyAnalysisBedMerger {
 
 	private void printJustPanelCopyAlteredGenes() {
 		//Print results
-		IO.pl("Patient\tCondition\t#CopyCalls\t#AlteredGenes\tAlteredGeneNames: - deletion, + amplification\n");
+		IO.pl("Patient\tCondition\t#CopyCalls\t#BPsCopyAlt\t#AlteredGenes\tAlteredGeneNames: - deletion, + amplification\n");
 		//for each Patient
 		for (String patientId: patients.keySet()) {
 			IO.pl(patientId);
 			//for each call set
 			TreeMap<String, MergedCallSet> mergedCalls = patients.get(patientId).mergedCalls;
 			for (String type: mergedCalls.keySet()) {
-				int totalNumCalls = mergedCalls.get(type).geneStrandCalls.size();
-				int numGenes = mergedCalls.get(type).getGenePanelCalls().size();
-				IO.pl("\t"+type+"\t"+totalNumCalls+"\t"+ numGenes+"\t"+ mergedCalls.get(type).getPanelGeneCalls());
+				MergedCallSet mcs = mergedCalls.get(type);
+				int totalNumCalls = mcs.geneStrandCalls.size();
+				int numGenes = mcs.getGenePanelCalls().size();
+				IO.pl("\t"+type+"\t"+totalNumCalls+"\t"+mcs.totalBps+"\t"+ numGenes+"\t"+ mcs.getPanelGeneCalls());
+			}
+		}
+	}
+	
+	private void printJustPanelCopyAlteredGenes(PrintWriter out) throws IOException {
+		//Print results
+		out.println("\nPatient\tCondition\t#CopyCalls\t#BPsCopyAlt\t#AlteredGenes\tAlteredGeneNames: - deletion, + amplification\n");
+		//for each Patient
+		for (String patientId: patients.keySet()) {
+			out.println(patientId);
+			//for each call set
+			TreeMap<String, MergedCallSet> mergedCalls = patients.get(patientId).mergedCalls;
+			for (String type: mergedCalls.keySet()) {
+				MergedCallSet mcs = mergedCalls.get(type);
+				int totalNumCalls = mcs.geneStrandCalls.size();
+				int numGenes = mcs.getGenePanelCalls().size();
+				mcs.calculateMergedAlteredBps();
+				out.println("\t"+type+"\t"+totalNumCalls+"\t"+mcs.totalBps+"\t"+ numGenes+"\t"+ mcs.getPanelGeneCalls());
 			}
 		}
 	}
 
 	private void printGenesSpreadsheet() throws IOException {
 		PrintWriter out = new PrintWriter (new FileWriter(saveFile));
+		
 		//create header
 		String[] stats = new String[] {"Lg2Tum","Lg2Norm","NumOb"};
 		out.print("OncoKB Gene Link\tDataset Hits");
@@ -209,6 +232,8 @@ public class CopyAnalysisBedMerger {
 			out.println(Misc.stringArrayListToString(amp, "\t"));
 			out.println(Misc.stringArrayListToString(del, "\t"));
 		}
+
+		printJustPanelCopyAlteredGenes(out);
 		out.close();
 	}
 
@@ -282,21 +307,41 @@ public class CopyAnalysisBedMerger {
 		String type = null;
 		TreeMap<String, CopyStats> geneStrandCalls = new TreeMap<String, CopyStats>();
 		ArrayList<String> panelGenePanelCalls = null;
+		long totalBps = 0;
+		ArrayList<File> bedToMerge = new ArrayList<File>();
 
 		private MergedCallSet(String type) {
 			this.type = type;
 		}
+		
+		private long calculateMergedAlteredBps() throws IOException {
+			File bedToCount = null;
+			if (bedToMerge.size()==0) return 0;
+			
+			if (bedToMerge.size()==1) bedToCount = bedToMerge.get(0);
+			else {
+				File[] toMerge = new File[bedToMerge.size()];
+				bedToMerge.toArray(toMerge);
+				bedToCount = File.createTempFile("copyAnalysisDelme", ".tmp");
+				bedToCount.deleteOnExit();
+				new MergeRegions(toMerge, bedToCount, true, false);
+			}
+			Bed[] bedRegions = Bed.parseFile(bedToCount, 0, 0);
+			for (Bed b: bedRegions) totalBps+= b.getLength();
+			return totalBps;
+		}
 
 		private void addCalls(File bedFile) {
 			Bed[] bedRegions = Bed.parseFile(bedFile, 0, 0);
+			if (bedRegions.length> 0) bedToMerge.add(bedFile);
 			for (Bed b: bedRegions) {
 				//numOb=64;lg2Tum=0.2725;lg2Norm=-0.0285;genes=TTTY17C,TTTY17B,TTTY17A
 				String[] split = b.getName().split("genes=");
 				String genes = split[1];
 				CopyStats cs = new CopyStats(split[0]);
 				for (String g: Misc.COMMA.split(genes)) {
-					//exclude any antisense stuff or empty call sets '.'
-					if (g.contains("-AS") == false && g.contains(".") == false) {
+					//exclude any antisense stuff 
+					if (g.contains("-AS") == false ) {
 						//try to get oncoKB gene symbol
 						String oncoKBGeneSym = aliasesToOncoKBGene.get(g);
 						if (oncoKBGeneSym == null) oncoKBGeneSym = g;
@@ -311,7 +356,6 @@ public class CopyAnalysisBedMerger {
 							//only put new cs if it has a bigger abs(lg2Tum)
 							if (oldCSTum < newCSTum) geneStrandCalls.put(key, cs);
 						}
-
 					}
 				}
 			}
@@ -390,7 +434,7 @@ public class CopyAnalysisBedMerger {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           CopyAnalysisBedMerger: March 2026                      **\n" +
+				"**                           CopyAnalysisBedMerger: April 2026                      **\n" +
 				"**************************************************************************************\n" +
 				"Merges bed files from the GATK-USeq workflow called with different window sizes. See\n"+
 				"https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38RunnerWorkflows2\n"+
@@ -404,6 +448,7 @@ public class CopyAnalysisBedMerger {
 				"               patientID.condition_xxx datasets with the same ID.condition are merged\n"+
 				"-g OncoKB gene list file. See https://www.oncokb.org/cancer-genes and the 'Cancer Gene\n"+
 				"     List' download link. Only 'Hugo Symbol' and 'Gene Aliases' columns are parsed.\n"+
+				"     A single column file of gene names also works.\n"+
 				"-r Path to an xls spreadsheet file for saving the results.\n"+
 				"\n"+
 

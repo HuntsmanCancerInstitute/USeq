@@ -5,8 +5,6 @@ import java.util.*;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.regex.*;
-
-import edu.utah.hci.bioinfo.smm.Util;
 import util.gen.*;
 
 public class KeggTwoGeneSetPathwayAnalyzer {
@@ -25,6 +23,7 @@ public class KeggTwoGeneSetPathwayAnalyzer {
 	private File tempDirectory = null;
 	private double maximumFdr = 0.15;
 	private boolean replaceNetworksWithPathways = false;
+	private boolean printPValFdrStats = true;
 	
 	private KeggGenePathwayAnalyzer genesA = null;
 	private KeggGenePathwayAnalyzer genesB = null;
@@ -53,7 +52,7 @@ public class KeggTwoGeneSetPathwayAnalyzer {
 		
 		} catch (Exception e) {
 			e.printStackTrace();
-			IO.el("ERROR running the KeggGeneAndVariantPathwayAnalyzer!");
+			IO.el("ERROR running the KeggTwoGeneSetPathwayAnalyzer!");
 			System.exit(1);
 		}
 	}
@@ -61,7 +60,7 @@ public class KeggTwoGeneSetPathwayAnalyzer {
 	private void buildAndSaveGenePathways() throws IOException {
 		CombinePathwayRoot cpr = new CombinePathwayRoot(genesA.getAnalyzedNetworks(), genesB.getAnalyzedNetworks(),"AB");	
 		cpr.makeCombinePathways(maximumFdr);
-		cpr.saveTwoGeneSetPathways(maximumFdr, gs2ki, resultsDirectory, minimumNumberGenes);
+		cpr.saveTwoGeneSetPathways(maximumFdr, gs2ki, resultsDirectory, minimumNumberGenes, printPValFdrStats);
 	}
 
 	private void runAnalysis() throws IOException {
@@ -90,7 +89,7 @@ public class KeggTwoGeneSetPathwayAnalyzer {
 		IO.writeArrayList(genesB.getLog(), geneBLog);
 		
 		//check both 
-		if (genesA.isFailed() || genesB.isFailed()) throw new IOException();
+		if (genesA.isFailed() || genesB.isFailed()) throw new IOException("ERROR while running the gene sets.");
 	}
 
 	public static void main(String[] args) {
@@ -123,6 +122,7 @@ public class KeggTwoGeneSetPathwayAnalyzer {
 					case 'b': selectGeneListTwo = new File(args[++i]); break;
 					case 'e': fullPathToR = new File(args[++i]); break;
 					case 'p': replaceNetworksWithPathways = true; break;
+					case 's': printPValFdrStats = false; break;
 					case 'h': printDocs(); System.exit(0);
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
@@ -213,6 +213,7 @@ public class KeggTwoGeneSetPathwayAnalyzer {
 				"-x Maximum FDR for including networks into the combine Kegg Pathway\n"+
 				"     spreadsheet, defaults to 0.15\n"+
 				"-p Replace networks with composite pathways.\n"+
+				"-s Don't print pvalue or fdr statistics.\n"+
 	
 				"\nExample:\n\n"+
 				"java -Xmx1G -jar pathTo/USeq/Apps/KeggTwoGeneSetPathwayAnalyzer\n"+

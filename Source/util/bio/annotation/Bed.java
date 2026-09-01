@@ -123,7 +123,7 @@ public class Bed extends Coordinate implements Serializable{
 			ArrayList<Bed> al = new ArrayList<Bed>();
 			while ((line = in.readLine()) !=null) {
 				line = line.trim();
-				if (line.length() ==0 || line.startsWith("#")) continue;
+				if (line.length() ==0 || line.startsWith("#") || line.startsWith("Sample")) continue;
 				tokens = line.split("\\s+");
 				if (tokens.length < 3) continue;				
 				al.add(new Bed(tokens[chrStartStopIndexes[0]], Integer.parseInt(tokens[chrStartStopIndexes[1]])-subStart, Integer.parseInt(tokens[chrStartStopIndexes[2]])- subEnd, line, 0, '.'));

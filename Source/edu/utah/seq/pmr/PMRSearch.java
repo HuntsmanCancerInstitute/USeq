@@ -42,12 +42,12 @@ public class PMRSearch {
 	//fields
 	private File clinicalReportDir = null;
 	private long maximumDaysOld = 0;
-	private String awsPatientDirUri = "s3://hcibioinfo-patient-molecular-repo/Patients/"; //must end with /
+	private String awsPatientDirUri = "s3://hcibioinfo-patient-molecular-repo/Patients/"; //MUST end with /
 	private String awsPath = "aws";
 	private String profile = "default";
 	private HashMap<String, String> envPropToAdd = new HashMap <String, String>();
 	private boolean verbose = false;
-	private int numberThreads = 10;
+	private int numberThreads = 6;
 	private File awsRepoList = null;
 	private HashMap<String, Patient> idPatient = new HashMap<String, Patient>();
 	private HashMap<String, Dataset> idDataset = new HashMap<String, Dataset>();
@@ -136,7 +136,8 @@ public class PMRSearch {
 		//anything to download?
 		if (cmdsForParallel.size()>0) {
 			IO.pl("\tDownloading "+ cmdsForParallel.size() +" new reports...");
-			IO.executeViaParallel(cmdsForParallel, numberThreads);
+			File tmpExec = new File(System.getProperty("user.dir")+"/useqCmdsForParallelDelme.txt");
+			IO.executeViaParallel(cmdsForParallel, numberThreads, tmpExec, 3);
 		}
 	}
 
@@ -893,14 +894,16 @@ public class PMRSearch {
 	}
 
 	private void fetchTempusClinicalJsons() throws Exception {
-		for (Patient p: idPatient.values()) {
+		for (Patient p: idPatient.values()) {		
 			for (Dataset d: p.getIdDataSets().values()) {
 				//IO.pl(d.getSource()+" -> "+d.getDatasetId());
 				if (d.getSource().equals(tempusSourceName)) {
 					for (String partPath: d.getPartialPaths()) {
-						//IO.pl(partPath);
-						// there are often 2 jsons for each Tempus (one DNA, one RNA)
-						if (partPath.contains(clinicalReportDirName) && partPath.endsWith("json") && partPath.contains("_RS.")==false) {
+						// there are multiple jsons for each Tempus (DNA, RNA, and IHC), only want the DNA XT XE XF others?
+						// e.g. partPath : ClinicalReport/TL-26-5QN4DKHW95_XT-ONCO.V1_2026-06-04_deid_Vaia_Florou_M.json
+						if (partPath.startsWith(clinicalReportDirName) && partPath.endsWith("json") 
+								&& partPath.contains("_RS.")==false && partPath.contains("_PD-L1")==false 
+								&& partPath.contains("_MMR")==false ) {
 							String relativePath = p.getCoreId()+"/"+d.getSource()+"/"+d.getDatasetId()+"/"+partPath;
 							File j = new File (clinicalReportDir, relativePath);
 							if (j.exists() == false) download(awsPatientDirUri+relativePath, j);
@@ -918,8 +921,6 @@ public class PMRSearch {
 				//IO.pl(d.getSource()+" -> "+d.getDatasetId());
 				if (d.getSource().equals(carisSourceName)) {
 					for (String partPath: d.getPartialPaths()) {
-						//IO.pl(partPath);
-						// there are often 2 jsons for each Tempus (one DNA, one RNA)
 						if (partPath.contains(clinicalReportDirName) && partPath.endsWith("xml") && partPath.contains("_RS.")==false) {
 							String relativePath = p.getCoreId()+"/"+d.getSource()+"/"+d.getDatasetId()+"/"+partPath;
 							File j = new File (clinicalReportDir, relativePath);
@@ -1006,8 +1007,13 @@ public class PMRSearch {
 	
 	private void download(String s3Uri, File j) throws Exception {
 		if (verbose) IO.pl("\tDownloading "+s3Uri+ " -> "+j);
-		String cmd = awsPath + " s3 cp "+s3Uri+ " "+ j.getCanonicalPath()+ " --profile "+profile;
-		cmdsForParallel.add(cmd);
+		//String cmd = awsPath + " s3 cp "+s3Uri+ " "+ j.getCanonicalPath()+ " --profile "+profile;
+		
+		int lastSlash = s3Uri.lastIndexOf("/");
+		String parentDirS3 = s3Uri.substring(0, lastSlash+1);
+		String cmd2 = awsPath + " s3 sync "+parentDirS3+ " " + j.getParentFile().getCanonicalPath()+ 
+				"/ --exclude \"*\" --include \""+j.getName()+"\" --profile "+profile;
+		cmdsForParallel.add(cmd2);
 	}
 
 	private void loadPatientFiles() throws IOException {
@@ -1260,7 +1266,7 @@ public class PMRSearch {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                       Patient Molecular Repo Search : Oct 2025                   **\n" +
+				"**                       Patient Molecular Repo Search : Aug 2026                   **\n" +
 				"**************************************************************************************\n" +
 				"Interactive searching of the clinical and sample attribute information in the json/xml\n"+
 				"reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.\n"+

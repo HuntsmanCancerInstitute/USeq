@@ -140,29 +140,34 @@ public class TempusDataWranglerTumorV3 {
 		}
 	}
 	
-	/* Switching to using sync
-	private void addDownloadCmd(String awsInfo, File saveDir, ArrayList<String> cmdsToExecute, String awsCmdProfBucket, boolean verbose, ArrayList<File> tarFiles) throws IOException {
-		String[] sizeAwsPath = Misc.WHITESPACE.split(awsInfo);
-		long size = Long.parseLong(sizeAwsPath[0]);
-		File toSave = new File (saveDir, sizeAwsPath[1].substring(sizeAwsPath[1].lastIndexOf('/')));
-		//does the file exist with the correct size?   Not working!
-		if (toSave.exists() && toSave.length()==size) {
-			if (verbose) IO.pl("File exists and same size, skipping: "+toSave);
-		}
-		else {
-			// aws --profile tempus s3 cp s3://bucket/path/to/file.gz /full/path/to/save/file.gz
-			String cmd = awsCmdProfBucket+sizeAwsPath[1]+" "+toSave.getCanonicalPath();
-			cmdsToExecute.add(cmd);
-			if (verbose) IO.pl("Adding '"+cmd+"'");
-		}
-		if (toSave.getName().endsWith("tar.gz")) tarFiles.add(toSave);
-	}*/
 	
 	private void addAwsSyncCmd(String awsInfo, File saveDir, ArrayList<String> cmdsToExecute, String bucket, String profile, boolean verbose, ArrayList<File> tarFiles) throws IOException {
 		String[] sizeAwsPath = Misc.WHITESPACE.split(awsInfo);
 		String fileName = sizeAwsPath[1].substring(sizeAwsPath[1].lastIndexOf('/')+1);
 		String prefix = sizeAwsPath[1].substring(0, sizeAwsPath[1].lastIndexOf('/')+1);
+
+		boolean alreadyExists = false;
+		File f = new File(saveDir.getCanonicalPath(), fileName);
+
+		//is it a vcf file? these get downloaded and then gzipped
+		if (fileName.endsWith("vcf") || fileName.endsWith("vcf.gz")) {
+			File fGz = new File(saveDir.getCanonicalPath(), fileName+".gz");
+			if (f.exists() || fGz.exists()) alreadyExists = true;
+		}
+		//ok it's not a vcf so it should be unmodified and be the same size
+		else {
+			if (f.exists()) {
+				if (f.length() == Long.parseLong(sizeAwsPath[0])) alreadyExists = true;
+			}
+			IO.pl("\nNon VCF file sync request "+fileName+" exist? "+alreadyExists+" local size: "+f.length()+" aws size: "+sizeAwsPath[0]);
+			IO.pl("Stopping");
+			System.exit(1);
+		}
 		
+		//does it exist?
+		if (alreadyExists) return;
+
+
 		//aws --profile tempus s3 sync --only-show-errors --exclude '*' \
 		//--include 'TL-25-MS175C45R1_20250410.germ.freebayes.vcf' s3://tm-huntsman/TL-25-MS175C45R1/DNA/ \
 		///scratch/general/pe-nfs1/u0028003/Tempus/TJobs/NqJ3xQ9DGw/Tempus/25uzrxwl_20250410/ClinicalReport/
@@ -220,20 +225,22 @@ public class TempusDataWranglerTumorV3 {
 		File rnaDir = new File(fastqDir, "TumorRNA");
 		File[] gz = IO.extractFiles(rnaDir, "q.gz");
 		if (gz.length != 2) throw new IOException("Failed to find two TumorRNA fastq files in "+rnaDir);
-		File[] tar = IO.extractFiles(rnaDir, "tar.gz");
-		for (File t: tar) t.delete();
 	}
 
 	
 	public void moveDNAFastq() throws IOException {
 		if (dnaAwsInfo.size()==0) return;
-			
+
 		File tumorFastq = new File(fastqDir, "TumorDNA");
 		File[] gz = IO.extractFiles(tumorFastq, "q.gz");
+		
+		//just two? nothing to do, probably already moved
+		if (gz.length ==2) return;
 		
 		File normalFastq = null;
 		
 		if (gz.length !=0) {
+			
 			int numT = 0;
 			int numN = 0;
 			for (File f: gz) {
@@ -261,10 +268,6 @@ public class TempusDataWranglerTumorV3 {
 			//check the numbers, must always be 2 tumorDNA fastqs, sometimes 2 normalDNA fastqs
 			if (numT!=2) throw new IOException("Failed to find two TumorDNA fastq files in "+tumorFastq);
 			if (numN!=0 && numN!=2) throw new IOException("Failed to find two NormalDNA fastq files in "+normalFastq);
-			
-			//OK all done so delete the tars
-			File[] tar = IO.extractFiles(tumorFastq, ".tar.gz");
-			for (File t: tar) t.delete();
 		}
 	}
 	

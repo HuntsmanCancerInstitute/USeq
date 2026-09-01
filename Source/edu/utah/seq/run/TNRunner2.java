@@ -30,6 +30,7 @@ public class TNRunner2 {
 	private File[] illuminaJointGenotypingDocs = null;
 	private File[] splicAIDocs = null;
 	private File[] copyRatioDocs = null;
+	private File[] oncoTreeDocs = null;
 	private File[] clinicalVcfDocs = null;
 	private File[] msiDocs = null;
 	private File[] lohDocs = null;
@@ -691,6 +692,7 @@ public class TNRunner2 {
 			File RNAWorkflowDir = null;
 			File rnaFuseDir = null;
 			File copyRatioDocsDir = null;
+			File oncoTreeDocsDir = null;
 			File clinicalVcfDir = null;
 			File msiWorkflowDir = null;
 			File lohWorkflowDir = null;
@@ -719,6 +721,7 @@ public class TNRunner2 {
 						case 'y': copyRatioDocsDir = new File(args[++i]); break;
 						case 'k': copyRatioBkgDir = new File(args[++i]); break;
 						case 'o': oncoKBConfig = new File(args[++i]); break;
+						case 'O': oncoTreeDocsDir = new File(args[++i]); break;
 						case 'P': panel2Skip = args[++i]; break;
 						case 'v': clinicalVcfDir = new File(args[++i]); break;
 						case 'B': bpileupFileOrDir = new File(args[++i]); break;
@@ -849,6 +852,11 @@ public class TNRunner2 {
 				if (clinicalVcfDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing workflow docs for merging and comparing clinical test reports and vcfs? "+clinicalVcfDocs);
 				clinicalVcfDocs = IO.extractFiles(clinicalVcfDir);
 			}
+			
+			if (oncoTreeDocsDir != null) {
+				if (oncoTreeDocsDir.exists() == false) Misc.printErrAndExit("Error: failed to find a directory containing workflow docs for OncoTree Tempus test tumor classification? "+oncoTreeDocsDir);
+				oncoTreeDocs = IO.extractFiles(oncoTreeDocsDir);
+			}
 
 			//copy ratio analysis?
 			if (copyRatioDocsDir !=null){
@@ -898,6 +906,7 @@ public class TNRunner2 {
 				if (normalAlignmentDir != null) IO.pl("Non matched normal alignment directory for somatic calling\t"+normalAlignmentDir);
 				IO.pl("Variant annotation workflow directory\t"+annoWorkflowDir);
 				IO.pl("Variant SpliceAI annotation workflow directory\t"+spliceAIWorkflowDir);
+				IO.pl("OncoTree classification workflow directory\t"+oncoTreeDocsDir);
 				if (annoWorkflowDir!=null) IO.pl("OncoKB configuration file\t"+ oncoKBConfig);
 				IO.pl("Sample concordance workflow directory\t"+sampleConWorkflowDir);
 				IO.pl("MSI workflow directory\t"+msiWorkflowDir);
@@ -963,7 +972,7 @@ public class TNRunner2 {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                                 TNRunner2 : Dec 2025                             **\n" +
+				"**                                 TNRunner2 : May 2026                             **\n" +
 				"**************************************************************************************\n" +
 				"TNRunner2 is designed to execute several containerized workflows on tumor normal\n"+
 				"datasets via a slurm cluster.  Based on the availability of paired fastq datasets, \n"+
@@ -1008,6 +1017,7 @@ public class TNRunner2 {
 				"-m Workflow docs for launching MSI status calling.\n"+
 				"-a Workflow docs for launching variant annotation.\n"+
 				"-o If -a provide an OncoKB configuration file, see the annotator.README.sh\n"+
+				"-O Workflow docs for OncoTree Tempus tumor classification\n"+
 				"-I Workflow docs for launching SpliceAI variant annotations.\n"+
 				"-b Workflow docs for launching sample concordance.\n"+
 				"-y Workflow docs for launching somatic copy analysis.\n"+
@@ -1161,5 +1171,9 @@ public class TNRunner2 {
 
 	public File getOncoKBConfig() {
 		return oncoKBConfig;
+	}
+
+	public File[] getOncoTreeDocs() {
+		return oncoTreeDocs;
 	}
 }

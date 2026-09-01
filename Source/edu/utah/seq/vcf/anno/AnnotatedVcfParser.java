@@ -534,14 +534,21 @@ public class AnnotatedVcfParser {
 				else if (code.equals("G5S")) indexToCheck = 4;
 				//Gain 3 acceptor, AG
 				else if (code.equals("G3S")) indexToCheck = 2;
-				else throw new IOException("ERROR: unrecognized splice type to check "+code);
-				
-				double score = Double.parseDouble(tokens[indexToCheck]);
-				if (score > maxScore) {
-					maxScore = score;
-					gene = tokens[1];
+				else {
+					IO.el("ERROR: unrecognized splice type to check "+code+", skipping");
+					return false;
 				}
-				if (score >= minimumSpliceAIScore) pass = true;
+				
+				//watch out for splice scores that are .
+				if (tokens[indexToCheck].equals(".") == false) {
+					double score = Double.parseDouble(tokens[indexToCheck]);
+					if (score > maxScore) {
+						maxScore = score;
+						gene = tokens[1];
+					}
+					if (score >= minimumSpliceAIScore) pass = true;
+				}
+				else pass = false;
 			}
 		}
 		
@@ -1406,7 +1413,7 @@ public class AnnotatedVcfParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                         Annotated Vcf Parser - December 2025                     **\n" +
+				"**                          Annotated Vcf Parser - July 2026                        **\n" +
 				"**************************************************************************************\n" +
 				"Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the \n"+
 				"VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing\n"+

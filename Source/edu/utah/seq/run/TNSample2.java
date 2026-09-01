@@ -10,6 +10,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import org.json.JSONObject;
+
 import util.gen.IO;
 import util.gen.Misc;
 
@@ -75,7 +78,10 @@ public class TNSample2 {
 
 			//merge somatic vars with clinical test results?
 			if (tnRunner.getClinicalVcfDocs()!= null && somaticVariants != null) parseMergeClinicalVars();
-
+			
+			//oncoTree classification?
+			if (tnRunner.getOncoTreeDocs() != null) classifyTumors();
+			
 			//annotate somatic vcf?
 			if (somaticVariants != null && (tnRunner.getVarAnnoDocs()!=null || tnRunner.getVarAnnoSpliceAIDocs()!=null)) annotateSomaticVcf();
 
@@ -161,11 +167,82 @@ public class TNSample2 {
 				}
 				mergedSomaticVariants = vcf[0];
 				//remove the linked files
-				for (File f: toLink) new File(jobDir, f.getName()).delete();
+				for (File f: toLink) {
+					Path p = f.toPath();
+					if (Files.isSymbolicLink(p)) Files.deleteIfExists(p);
+				}
+
 				info.add("\tCOMPLETE "+jobDir);
 			}
 			else checkJob(nameFile, jobDir, toLink, tnRunner.getClinicalVcfDocs());
 		}
+	}
+
+	private void classifyTumors() throws IOException {
+		info.add("Classifying tumors...");
+		String failMessage = null;
+
+		//look for json file and xml vcfs
+		File clinRepDir = new File (rootDir, "ClinicalReport");
+		File toClassify = null;
+		File[] jsonTestResults = IO.extractFiles(clinRepDir, ".json");
+		if (jsonTestResults.length == 0) failMessage = "\tFAILED to find any Tempus json test file(s) in "+clinRepDir;
+		else toClassify = findTempusJsonToClassify(jsonTestResults);
+		if (toClassify == null) failMessage = "\tFAILED to find a Tempus json test containing 'originPathLabDiagnosis' and appropriate 'sampleCategory' heme or tumor in "+clinRepDir;
+		else {
+			//make dir, ok if it already exists
+			File jobDir = new File (rootDir, "Classification/"+id+"_OncoTree");
+			jobDir.mkdirs();
+
+			//did it fail?
+			if (failMessage != null) clearAndFail(jobDir, failMessage);
+
+			//Tempus, with v3+ multiple jsons
+			File[] toLink = new File[]{toClassify};
+
+			//any files?
+			HashMap<String, File> nameFile = IO.fetchNamesAndFiles(jobDir);
+			if (nameFile.size() == 0) launch(jobDir, toLink, tnRunner.getOncoTreeDocs());
+
+			//OK some files are present
+			//COMPLETE
+			else if (nameFile.containsKey("COMPLETE")){
+				//find the final json file
+				File[] json = IO.extractFiles(new File(jobDir, "Results/TumorClassifications/"), ".json");
+				if (json == null || json.length !=1) {
+					clearAndFail(jobDir, "\tThe OncoTree workflow was marked COMPLETE but failed to find the Results/TumorClassifications/xxx.json in "+jobDir);
+					return;
+				}
+				//remove the linked files
+				for (File f: toLink) {
+					Path p = f.toPath();
+					if (Files.isSymbolicLink(p)) Files.deleteIfExists(p);
+				}
+				info.add("\tCOMPLETE "+jobDir);
+			}
+			else checkJob(nameFile, jobDir, toLink, tnRunner.getOncoTreeDocs());
+		}
+	}
+
+	
+	private File findTempusJsonToClassify(File[] jsonTestResults) {
+		for (File j: jsonTestResults) {
+			String s = IO.loadFile(j, " ", true);
+			if (s.contains("originPathLabDiagnosis")) {
+				//split into a pretty json split by \n
+				JSONObject jo = new JSONObject(s);
+				String so = jo.toString(3);
+				String[] lines = so.split("\n");
+				//find the sampleCategory line
+				for (String l: lines) {
+					if (l.contains("sampleCategory")) {
+						l = l.toLowerCase();
+						if (l.contains("tumor") || l.contains("heme")) return j;
+					}
+				}
+			}
+		}
+		return null;
 	}
 
 	private File[] filterJsonReports(File[] jsonTestResults) {

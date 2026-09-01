@@ -34,6 +34,7 @@ public class PMRSearchGQueryJoiner {
 	private File patientRegistryDirectory = null;
 	private File outputDirectory = null;
 	private File priorReportedPmrIds = null;
+	private File pDotAnnotationsFile = null;
 	
 	//Internal fields
     private String pmrResultsStartLine = "Dataset Info, also download";
@@ -45,6 +46,7 @@ public class PMRSearchGQueryJoiner {
 	private HashMap<String, TreeSet<String>> sourceVcfs = new HashMap<String, TreeSet<String>>();
 	private HashSet<String> pmrIdsInCommon = new HashSet<String>();
 	private HashMap<String,String[]> pmrIdsPhi = null;
+	private HashMap<String, String> pDotAnnotations = new HashMap<String, String>();
 
 	public PMRSearchGQueryJoiner (String[] args) {
 		long startTime = System.currentTimeMillis();
@@ -69,6 +71,7 @@ public class PMRSearchGQueryJoiner {
 			intersectResults();
 			
 			loadPhi();
+			loadPDotAnnotations();
 			
 			printResultsToXlsxFile();
 
@@ -83,6 +86,15 @@ public class PMRSearchGQueryJoiner {
 		}
 	}
 	
+
+	private void loadPDotAnnotations() throws IOException {
+		if (pDotAnnotationsFile != null) {
+			IO.pl("\nLoading pDot annotations...");
+			pDotAnnotations = IO.loadFileIntoHash(pDotAnnotationsFile, 0, 1);
+			if (pDotAnnotations == null || pDotAnnotations.size()==0) throw new IOException("FAILED to load pDot annotations from "+ pDotAnnotationsFile);
+		}
+	}
+
 
 	private void loadPhi() throws IOException {
 		if (pmrIdsInCommon.size()==0 || patientRegistryDirectory ==null) return;
@@ -266,6 +278,32 @@ public class PMRSearchGQueryJoiner {
 						//out.println("\t"+vcf);
 						Row rowSV = sheet.createRow(counter++);
 						for (int a = 0; a< splitVcf.length; a++) rowSV.createCell(a+1).setCellValue(splitVcf[a]);
+						//parse c dot and p dot
+						String[][] cAndPDots = fetchDots(splitVcf);
+						//any cDots present?
+						if (cAndPDots[0].length!=0) {
+							Row rowCDots = sheet.createRow(counter++);
+							for (int a = 0; a< cAndPDots[0].length; a++) {
+								rowCDots.createCell(a+2).setCellValue(cAndPDots[0][a]);
+							}
+						}
+						//any pDots present?
+						if (cAndPDots[1].length!=0) {
+							if (pDotAnnotationsFile != null) {
+								for (int x = 0; x< cAndPDots[1].length; x++) {
+									//create a row for each pDot
+									Row rowPDots = sheet.createRow(counter++);
+									rowPDots.createCell(2).setCellValue(cAndPDots[1][x]);
+									String anno = pDotAnnotations.get(cAndPDots[1][x]);
+									if (anno != null)rowPDots.createCell(3).setCellValue(anno);
+								}
+							}
+							//print all in one row
+							else {
+								Row rowPDots = sheet.createRow(counter++);
+								for (int a = 0; a< cAndPDots[1].length; a++) rowPDots.createCell(a+2).setCellValue(cAndPDots[1][a]);
+							}
+						}
 					}
 				}
 			}
@@ -284,6 +322,22 @@ public class PMRSearchGQueryJoiner {
         workbook.write(fileOut);
         fileOut.close();
         
+	}
+
+
+	private String[][] fetchDots(String[] splitVcf) {
+		TreeSet<String> cDots = new TreeSet<String>();
+		TreeSet<String> pDots = new TreeSet<String>();
+		for (String s: Misc.PIPE.split(splitVcf[7])) {
+			if (s.startsWith("c.")) cDots.add(s.trim());
+			else if (s.startsWith("p.")) pDots.add(s.trim());
+		}
+		String[][] al = new String[2][];
+		al[0] = new String[cDots.size()];
+		al[1] = new String[pDots.size()];
+		cDots.toArray(al[0]);
+		pDots.toArray(al[1]);
+		return al;
 	}
 
 
@@ -509,6 +563,7 @@ public class PMRSearchGQueryJoiner {
 					case 'r': patientRegistryDirectory = new File(args[++i]); break;
 					case 'x': priorReportedPmrIds = new File(args[++i]); break;
 					case 'o': outputDirectory = new File(args[++i]); break;
+					case 'a': pDotAnnotationsFile = new File(args[++i]); break;
 					default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 					}
 				}
@@ -531,7 +586,7 @@ public class PMRSearchGQueryJoiner {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                         PMRSearch GQuery Joiner : Nov 2025                       **\n" +
+				"**                         PMRSearch GQuery Joiner : Sept 2026                      **\n" +
 				"**************************************************************************************\n" +
 				"Merges results from the PMRSearch and GQuery tools into a summary spreadsheet.\n"+
 
@@ -543,6 +598,7 @@ public class PMRSearchGQueryJoiner {
 				"-r  (Optional) Directory containing the currentRegistry_xxx_PHI.txt file for pulling\n"+
 				"       patient info.\n"+
 				"-x  (Optional) File containing PMR IDs to skip, e.g. prior runs of this tool.\n"+
+				"-a  (Optional) File containing pDot annotations, one per line, two columns: pDot Anno\n"+
 				
 				"\nExample: java -jar pathToUSeq/Apps/PMRSearchGQueryJoiner -p PmrSearchResults -o \n"+
 				"   JointResults -g gqueryKrasResults.json -r ~/PHI/Registry/ -x priorPmrs.txt\n"+

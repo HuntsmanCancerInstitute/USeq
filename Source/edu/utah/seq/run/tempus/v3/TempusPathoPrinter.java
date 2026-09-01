@@ -19,6 +19,7 @@ public class TempusPathoPrinter {
 	//user defined fields
 	private File[] jsonFiles = null;
 	private File resultsDir = null;
+	private boolean renameTestOrderId = false;
 	
 	private HashMap<String, String> icd10CodeDesc = null;
 	private HashMap<String, String> icdOCodeMorphology = null;
@@ -33,7 +34,7 @@ public class TempusPathoPrinter {
 			
 			parseJsonFilesSimple();
 			
-			saveKeyFile();
+			if (renameTestOrderId) saveKeyFile();
 
 			//finish and calc run time
 			double diffTime = ((double)(System.currentTimeMillis() -startTime))/60000;
@@ -80,7 +81,7 @@ public class TempusPathoPrinter {
 				diag = diag.replace(" w/ ", " with ");
 				// and w/o
 				diag = diag.replace(" w/o ", " with out ");
-				jo.put("original_path_lab_diagnosis", diag);
+				jo.put("path_lab_info", diag);
 				//these codes are not part of the pathology report, assigned by Tempus?
 				//icd 10 diagnosis codes
 				if (s.getTempusIcd10Code() != null) {
@@ -132,9 +133,15 @@ public class TempusPathoPrinter {
 			TempusV3JsonSummary sum = TempusV3Json2Vcf.parseJsonNoVariants(json);
 			JSONObject jo = new JSONObject();
 			//add test id
-			String rand = Misc.getRandomString(10);
-			keys.add(sum.getTempusOrder().getAccessionId()+"\t"+rand);
-			jo.put("test_order_id", rand);
+			String testId = sum.getTempusOrder().getAccessionId();
+			if (renameTestOrderId) {
+				String rand = Misc.getRandomString(10);
+				keys.add(testId+"\t"+rand);
+				testId = rand;
+			}
+			jo.put("test_order_id", testId);
+			boolean sampleFound = false;
+			
 			for (TempusV3Specimen s : sum.getTempusSpecimens()) {
 				//is this a tumor sample
 				String sc = s.getSampleCategory().toLowerCase();
@@ -153,7 +160,7 @@ public class TempusPathoPrinter {
 				diag = diag.replace(" w/ ", " with ");
 				// and w/o
 				diag = diag.replace(" w/o ", " with out ");
-				jo.put("original_path_lab_diagnosis", diag);
+				jo.put("path_lab_info", diag);
 				//these codes are not part of the pathology report, assigned by Tempus
 				//just collect descriptions
 				ArrayList<String> descAL = new ArrayList<String>();
@@ -180,8 +187,10 @@ public class TempusPathoPrinter {
 					}
 				}	
 				if (descAL.size()!=0) jo.put("icd_code_descriptions", Misc.stringArrayListToString(descAL, "; "));
+				sampleFound = true;
 			}
-			IO.writeString(jo.toString(3), new File(resultsDir, rand+".json"));
+			if (sampleFound) IO.writeString(jo.toString(3), new File(resultsDir, testId+".json"));
+			else IO.pl("\t\tFailed to find a 'tumor' or 'heme' sample to extract for classification.");
 		}
 	}
 
@@ -214,6 +223,7 @@ public class TempusPathoPrinter {
 						case 'i': icd10File = new File(args[++i]); break;
 						case 'm': icdMorphologyFile = new File(args[++i]); break;
 						case 't': icdTopologyFile = new File(args[++i]); break;
+						case 'r': renameTestOrderId = true; break;
 						default: Misc.printErrAndExit("\nProblem, unknown option! " + mat.group());
 						}
 					}
@@ -246,7 +256,7 @@ public class TempusPathoPrinter {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Tempus Patho Printer : April 2026                      **\n" +
+				"**                           Tempus Patho Printer : July 2026                       **\n" +
 				"**************************************************************************************\n" +
 				"TPP parses v3.3 Tempus reports and the ICD references therein and saves a shorteded\n"+
 				"deidentified json file for OncoTree LLM tumor classification.\n"+
@@ -257,8 +267,10 @@ public class TempusPathoPrinter {
 				"-i File containing ICD-10 diagnosis codes and their descriptors. Tab delimited.\n"+
 				"-m File containing ICD-O morphology codes. Ditto.\n"+
 				"-t File containing ICD-O topology codes. Ditto.\n"+
+				"-r Replace test IDs with random strings and generate a key file.\n"+
 				
-				"\nExample: java -jar pathToUSeq/Apps/TempusPathoPrinter \n"+
+				"\nExample: java -jar pathToUSeq/Apps/TempusPathoPrinter -j Reports -s Parsed -r -i\n"+
+				"    ~/ICD/ICD-10_Diagnosis.txt -m ~/ICD/ICD_Morphology.txt -t ~/ICD/ICD_Topology.txt"+
 
 				"\n**************************************************************************************\n");
 	}

@@ -37,6 +37,7 @@ public class TempusVcfComparator {
 	private int numberPassingRecallWithNoMatch = 0;
 	private int numberInherited = 0;
 	private int numberSomatic = 0;
+	private int numberBrokenVcfs = 0;
 	
 	private ArrayList<SimpleVcf> vcfToPrint = new ArrayList<SimpleVcf>();
 	private ArrayList<String> headerLines = new ArrayList<String>();
@@ -79,6 +80,7 @@ public class TempusVcfComparator {
 		System.out.println( numberOtherTempus +"\t# Other Tempus variants");
 		System.out.println( numberInherited +"\t# Germline Tempus variants, skippped? "+excludeInherited);
 		System.out.println( numberSomatic +"\t# Somatic Tempus variants, skippped? "+excludeSomatic);
+		System.out.println( numberBrokenVcfs +"\t# Malformed variants skippped ");
 		System.out.println( numberExactMatches +"\t# Short with an exact match");
 		System.out.println( numberTempusWithOnlyOverlap +"\t# Short with overlap recal variants");
 		System.out.println( numberModifiedTempusCalls +"\t# Short recommended for modification");
@@ -267,7 +269,12 @@ public class TempusVcfComparator {
 					if (excludeSomatic) continue;
 				}
 				if (appendChr && v.startsWith("chr") == false) v = "chr"+v;
-				al.add(new SimpleVcf(v, bpPaddingForOverlap));
+				SimpleVcf sVcf = new SimpleVcf(v, bpPaddingForOverlap);
+				if (sVcf.getAlt().length()==0) {
+					IO.el("ERROR, missing alt, skipping\t"+v);
+					numberBrokenVcfs++;
+				}
+				else al.add(sVcf);
 			}
 			else {
 				if (excludeContig){
@@ -324,7 +331,7 @@ public class TempusVcfComparator {
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                           Tempus Vcf Comparator: April 2025                      **\n" +
+				"**                           Tempus Vcf Comparator: July 2026                       **\n" +
 				"**************************************************************************************\n" +
 				"TVC compares a Tempus vcf generated with the TempusJson2Vcf to a recalled vcf.\n"+
 				"Exact recall vars are so noted and removed. Tempus vcf with no exact but one\n"+

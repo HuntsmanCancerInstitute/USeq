@@ -278,7 +278,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 			namesToView.append(gc[i].name);
 			namesToView.append("=");
 			namesToView.append(Num.formatNumber(gc[i].fraction, 3));
-			if (i!=last)namesToView.append(",");
+			if (i!=last)namesToView.append(" ");
 			//any for linking?
 			if (gc[i].fraction >= minKeggFreq) namesToLink.add(gc[i].name);
 		}
@@ -347,7 +347,7 @@ public class AnalyzedNetwork implements Comparable<AnalyzedNetwork>{
 			if (sortedSGs.length!=0) {
 				sb.append(sortedSGs[0].getLog2Rto());
 				for (int i=1; i< sortedSGs.length; i++) {
-					sb.append(",");
+					sb.append(" ");
 					sb.append(sortedSGs[i].getLog2Rto());
 				}
 			}

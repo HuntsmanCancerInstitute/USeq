@@ -936,6 +936,12 @@ public class Num {
 		}
 		return f;
 	}
+	
+	/**Calculates fraction change between two numbers, + indicates increase, - indicates decrease
+	 * ASSUMES a and b are positive numbers,   (b-a)/Math.max(a, b)   */
+	public static double calculateNormalizedFractionChange(double a, double b) {
+		return (b-a)/Math.max(a, b);
+	}
 
 	/**Calculates N! modified from http://www.unix.org.ua/orelly/java-ent/jnut/ch01_03.htm
 	 * Good for n < 21.*/
@@ -4281,6 +4287,13 @@ public class Num {
 		int num = dbl.size();
 		double[] d = new double[num];
 		for (int i=0; i<num; i++)d[i]= dbl.get(i).doubleValue();
+		return d;
+	}
+	/**ArrayList of Double to float[]*/
+	public static float[] arrayListOfDoubleToFloatArray(ArrayList<Double> dbl){
+		int num = dbl.size();
+		float[] d = new float[num];
+		for (int i=0; i<num; i++)d[i]= dbl.get(i).floatValue();
 		return d;
 	}
 	/**ArrayList of Float to float[]*/

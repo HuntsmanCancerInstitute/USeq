@@ -37,19 +37,19 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 	private ArrayList<String> log = new ArrayList<String>();
 	private long startTime = -1;
 	private String geneSetName = "";
-	
+
 	//constructor for cmd line
 	public KeggGenePathwayAnalyzer(String[] args) {
 		try {
 
 			processArgs(args);
-			
+
 			checkFiles();
 
 			run();
-			
+
 			if (failed) throw new Exception();
-			
+
 		} catch (Exception e) {
 			e.printStackTrace();
 			IO.el("ERROR running the KeggGenePathwayAnalyzer!");
@@ -57,31 +57,31 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 			System.exit(1);
 		}
 	}
-	
+
 
 	//constructor for the joint analysis
 	public KeggGenePathwayAnalyzer(File keggIdsFile, File keggNetworkDirectory, File fullPathToR, File resultsDirectory, File tempDirectory, File interrogatedGeneList, 
 			File selectGeneList, double maximumFdr , int minimumNumberGenes, String typesToExclude, HashSet<String> networkTypesToExclude, boolean verbose, 
 			boolean replaceNetworksWithPathways, String geneSetName) {
-			this.interrogatedGeneList = interrogatedGeneList;
-			this.keggIdsFile = keggIdsFile;
-			this.keggNetworkDirectory = keggNetworkDirectory;
-			this.tempDirectory = tempDirectory;
-			this.fullPathToR = fullPathToR;
-			this.resultsDirectory = resultsDirectory;
-			this.maximumFdr = maximumFdr;
-			this.minimumNumberGenes = minimumNumberGenes;
-			this.typesToExclude = typesToExclude;
-			this.networkTypesToExclude = networkTypesToExclude;
-			this.selectGeneList = selectGeneList;
-			this.verbose = verbose;
-			this.replaceNetworksWithPathways = replaceNetworksWithPathways;
-			this.geneSetName = geneSetName;
+		this.interrogatedGeneList = interrogatedGeneList;
+		this.keggIdsFile = keggIdsFile;
+		this.keggNetworkDirectory = keggNetworkDirectory;
+		this.tempDirectory = tempDirectory;
+		this.fullPathToR = fullPathToR;
+		this.resultsDirectory = resultsDirectory;
+		this.maximumFdr = maximumFdr;
+		this.minimumNumberGenes = minimumNumberGenes;
+		this.typesToExclude = typesToExclude;
+		this.networkTypesToExclude = networkTypesToExclude;
+		this.selectGeneList = selectGeneList;
+		this.verbose = verbose;
+		this.replaceNetworksWithPathways = replaceNetworksWithPathways;
+		this.geneSetName = geneSetName;
 	}
 
 	public void run() {
 		startTime = System.currentTimeMillis();
-		
+
 		try {
 			lg("\nLoading KEGG gene symbol <-> id lookup tables...");
 			loadKeggIdLookupHashes();
@@ -119,7 +119,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 		}
 
 	}
-	
+
 	private void lg(String message) {
 		if (verbose) System.out.println(message);
 		log.add(message);
@@ -130,7 +130,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 		cpr.makeCombinePathways(maximumFdr);
 		cpr.saveGenePathways(maximumFdr, gs2ki, resultsDirectory, minimumNumberGenes);
 	}
-	
+
 	private void loadKeggIdLookupHashes() throws IOException {
 		HashMap<String, ArrayList<String>>[] hashes = KeggGeneSymbolIdExtractor.loadGeneLookupHashes(keggIdsFile);
 		gs2ki = hashes[0];
@@ -138,12 +138,12 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 
 	private void loadFilterKeggApiNetworks() throws IOException {
 		allNetworks = KeggResourceExtractor.loadNetworks(keggNetworkDirectory);
-	
+
 		if (replaceNetworksWithPathways) {
 			IO.pl("\nReplacing networks with composite pathways...");		
 			allNetworks = KeggResourceExtractor.buildCompositePathways(allNetworks);
 		}
-		
+
 		networkIdAnalyzedNetwork = new HashMap<String, AnalyzedNetwork>(allNetworks.length);
 		for (int i=0; i< allNetworks.length; i++) {
 			//check type?
@@ -159,7 +159,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 			}
 		}
 		lg("\t"+networkIdAnalyzedNetwork.size()+"\tNetworks loaded that pass minimum # genes ("+minimumNumberGenes+") and excluded types: "+typesToExclude+"\n");
-		
+
 		//for each network gene, look for them in the user's interrogated genes
 		for (AnalyzedNetwork an: networkIdAnalyzedNetwork.values()) {
 			TreeSet<String> found = an.getGeneNetworkGeneNamesInInterrogatedGenes();
@@ -205,7 +205,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 			index++;
 		}
 		lg("\t"+analyzedNetworks.length+"\tMerged networks.");
-		
+
 	}
 
 	private void loadSelectedGenes() throws IOException {
@@ -237,8 +237,10 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 
 	private void saveGeneNetworks() throws IOException {
 		PrintWriter out = new PrintWriter( new FileWriter(new File(resultsDirectory, "gene"+geneSetName+"NetworksMinGen"+minimumNumberGenes+".xls")));
+		//File f = new File(resultsDirectory, resultsDirectory.getName()+"_gene"+geneSetName+"NetworksMinGen"+minimumNumberGenes+".xls");
+		//PrintWriter out = new PrintWriter( new FileWriter(f) );
 		//name descLink pval, adjPval, #UniqueNetworkGenes, #FoundUniqueNetworkGenes, #DiffExpGenes, #GenesIntersect, GenesIntersect/PathGenes, IntersectingGenes
-		out.println("# Network Name(s)\tNetwork Desc Link\tPval\tAdj Pval\tAll Network Genes\tFound Network Genes\tSelect Genes\tIntersect\tInt/Net\tInt Gene Symbols\tInt Genes LgRtos\tPathway Map Links...");
+		out.println("# Network Name(s)\tNetwork Desc Link\tPVal\tAdj PVal\tAll Network Genes\tFound Network Genes\tSelect Genes\tIntersect\tInt/Net\tInt Gene Symbols\tInt Genes LgRtos\tPathway Map Links...");
 		for (AnalyzedNetwork an: analyzedNetworks) out.print(an.toStringGene(gs2ki));
 		out.println("\n"+CombinePathwayRoot.fetchColorKey(true, false));
 		out.close();
@@ -266,7 +268,7 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 		lg("\t"+finalAn.length+"\tNetworks found with genes that intersect your select list.");
 		analyzedNetworks = finalAn;	
 	}
-		
+
 	private void compareGeneNetworks() throws IOException {
 		int[][] nabt = new int[analyzedNetworks.length][];
 		//for each AnalyzedNetwork calculate a hyperG pval for the intersection
@@ -284,22 +286,26 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 			nabt[i] = new int[]{n,a,b,t};
 			//if (i<30) lg(analyzedNetworks[i].getKeggApiNetwork().getNetworkName()+"\t"+Num.intArrayToString(nabt[i], "-"));
 		}
-		//Calculate pvalues using hg dist, fast way to do a fisher's exact on a 2x2 table
-		IntersectListsHypergeometric ih = new IntersectListsHypergeometric(tempDirectory, fullPathToR);
-		double[] pvals = ih.calculateOverRepresentationPValues(nabt);
-		//for (int i=0; i< pathways.length; i++) pathways[i].pval = pvals[i];
-		for (int i=0; i< analyzedNetworks.length; i++) {
-			analyzedNetworks[i].setPValue(pvals[i]);
-			analyzedNetworks[i].setSortValue(pvals[i]);
+
+		if (nabt.length > 0) {
+			//Calculate pvalues using hg dist, fast way to do a fisher's exact on a 2x2 table
+			IntersectListsHypergeometric ih = new IntersectListsHypergeometric(tempDirectory, fullPathToR);
+			
+			double[] pvals = ih.calculateOverRepresentationPValues(nabt);
+			//for (int i=0; i< pathways.length; i++) pathways[i].pval = pvals[i];
+			for (int i=0; i< analyzedNetworks.length; i++) {
+				analyzedNetworks[i].setPValue(pvals[i]);
+				analyzedNetworks[i].setSortValue(pvals[i]);
+			}
+			//convert the pvals to fdrs
+			Arrays.sort(analyzedNetworks); //smallest to largest
+			double[] pvalsLargeToSmall = new double[analyzedNetworks.length];
+			int counter = 0;
+			for (int i=analyzedNetworks.length-1; i>=0; i--) pvalsLargeToSmall[counter++] = analyzedNetworks[i].getPValue();
+			Num.benjaminiHochbergCorrect(pvalsLargeToSmall);
+			counter=0;
+			for (int i=analyzedNetworks.length-1; i>=0; i--) analyzedNetworks[i].setFdr(pvalsLargeToSmall[counter++]); 
 		}
-		//convert the pvals to fdrs
-		Arrays.sort(analyzedNetworks); //smallest to largest
-		double[] pvalsLargeToSmall = new double[analyzedNetworks.length];
-		int counter = 0;
-		for (int i=analyzedNetworks.length-1; i>=0; i--) pvalsLargeToSmall[counter++] = analyzedNetworks[i].getPValue();
-		Num.benjaminiHochbergCorrect(pvalsLargeToSmall);
-		counter=0;
-		for (int i=analyzedNetworks.length-1; i>=0; i--) analyzedNetworks[i].setFdr(pvalsLargeToSmall[counter++]); 
 	}
 
 	public static void main(String[] args) throws IOException {
@@ -367,17 +373,17 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 	public static void printDocs(){
 		System.out.println("\n" +
 				"**************************************************************************************\n" +
-				"**                       Kegg Gene Pathway Analyzer : Feb 2026                      **\n" +
+				"**                      Kegg Gene Pathway Analyzer : July 2026                      **\n" +
 				"**************************************************************************************\n" +
 				"KGPA uses your interrogated gene list to 1) filter your select gene list and the KEGG\n"+
 				"Network gene sets then 2) intersects these lists, 3) calculates hypergeometric \n"+
 				"p-values, 4) controls for multiple testing (Benjamini-Hochberg FDR method), and\n"+
 				"5) outputs two Excel spreadsheets focused on each tested KEGG Network (sub pathways)\n"+
-				"and KEGG Pathway. Use the URL links in the spreadsheets to interactively explort the\n"+
+				"and KEGG Pathway. Use the URL links in the spreadsheets to interactively explore the\n"+
 				"results in the KEGG Pathway Viewer (https://www.kegg.jp).\n"+
-				
+
 				"\nRelated Apps:\n\n"+
-				
+
 				"KeggGeneSymbolIdExtractor - Uses the Kegg API to look up and parse Kegg Gene Ids that\n"+
 				"   match each of the provided HUGO Gene Symbols. Use this tool to generate the\n"+
 				"   required '-k KEGG gene Id HUGO gene symbol lookup file'.\n"+
@@ -390,21 +396,21 @@ public class KeggGenePathwayAnalyzer implements Runnable{
 				"MergeKeggNetworkResults and MergeKeggPathwayResults - Merges network or pathway xls\n"+
 				"   results from multiple USeq KEGG analysis.\n"+
 				"DESeq2, edgeR - R packages for selecting differentially expressed gene sets.\n"+
-				
+
 				"\nKEGG Viewer Gene Color Key:\n\n"+
-				
+
 				"   Negative Diff Exp LgRto - Light Blue - #87CEEB\n"+
 				"   Positive Diff Exp LgRto - Light Red, Pink - #FFB6C1\n"+
-		        "   Genes in red text are disease associated\n"+
+				"   Genes in red text are disease associated\n"+
 
 				"\nApp Parameters:\n\n"+
-				
+
 				"-i File containing all of the interrogated genes in your study, one gene per line.\n"+
 				"     Typically > 15K gene HUGO gene symbols.\n"+
 				"-g File containing the selected genes of interest with their log2Rto, one per line,\n"+
 				"     tab delimited, from your study, e.g. differentially expressed, typically <2K\n"+
 				"-e File path to the R executable\n\n"+
-				
+
 				"-r Directory to save the spreadsheet results\n"+
 				"-k KEGG gene Id HUGO gene symbol lookup file, see above\n"+
 				"-n KEGG network directory, see above\n"+

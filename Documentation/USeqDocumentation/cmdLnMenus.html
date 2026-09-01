@@ -1,5 +1,5 @@
 
-			<html><head><title>USeq Command Line Menus 9.3.9.beta
+			<html><head><title>USeq Command Line Menus 9.3.9
 			</title><style type=text/css>#rt{text-align:right; color: #000000; font-weight: bold}
 			#grBk {background-color: #CC9966;}TD {font-family: Verdana, Arial, Helvetica, sans-serif;
 			font-size:12;}H1 {color: #996633; font:arial; font-size:16;}H2 {color: #996633;
@@ -107,7 +107,11 @@
 				
 					<a href="#CopyAnalysisBedMerger">CopyAnalysisBedMerger</a><br>
 				
+					<a href="#CopyAnalysisCalledAnnoSegFilter">CopyAnalysisCalledAnnoSegFilter</a><br>
+				
 					<a href="#CopyAnalysisZScoreMinimizer">CopyAnalysisZScoreMinimizer</a><br>
+				
+					<a href="#CopyNumberRiskScoreCalculator">CopyNumberRiskScoreCalculator</a><br>
 				
 					<a href="#CorrectVCFEnds">CorrectVCFEnds</a><br>
 				
@@ -390,6 +394,8 @@
 					<a href="#TempusDataWranglerV3">TempusDataWranglerV3</a><br>
 				
 					<a href="#TempusJson2Vcf">TempusJson2Vcf</a><br>
+				
+					<a href="#TempusPathoPrinter">TempusPathoPrinter</a><br>
 				
 					<a href="#TempusV3Json2Vcf">TempusV3Json2Vcf</a><br>
 				
@@ -858,7 +864,7 @@ Example: java -jar pathToUSeq/Apps/TNScopeVCFParser -v ToParse/ -n 0.5 -u 100
 </pre><br><p>
 				
 					<a name="AnnotatedVcfParser"><pre>**************************************************************************************
-**                         Annotated Vcf Parser - December 2025                     **
+**                          Annotated Vcf Parser - July 2026                        **
 **************************************************************************************
 Splits VCF files that have been annotated with SnpEff, ExAC, and clinvar, plus the 
 VCFBkz, VCFCallFrequency, and VCFSpliceScanner USeq apps into passing and failing
@@ -1779,7 +1785,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/ConcatinateFastas -n 2000 -d
 </pre><br><p>
 				
 					<a name="CopyAnalysisBedMerger"><pre>**************************************************************************************
-**                           CopyAnalysisBedMerger: March 2026                      **
+**                           CopyAnalysisBedMerger: April 2026                      **
 **************************************************************************************
 Merges bed files from the GATK-USeq workflow called with different window sizes. See
 https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38RunnerWorkflows2
@@ -1793,10 +1799,35 @@ Options:
                patientID.condition_xxx datasets with the same ID.condition are merged
 -g OncoKB gene list file. See https://www.oncokb.org/cancer-genes and the 'Cancer Gene
      List' download link. Only 'Hugo Symbol' and 'Gene Aliases' columns are parsed.
+     A single column file of gene names also works.
 -r Path to an xls spreadsheet file for saving the results.
 
 Example: java -Xmx4G -jar pathTo/USeq/Apps/CopyAnalysisBedMerger -b PassingBeds/ 
      -g cancerGeneList.tsv -r mergedResults.xls 
+
+************************************************************************************
+</pre><br><p>
+				
+					<a name="CopyAnalysisCalledAnnoSegFilter"><pre>**************************************************************************************
+**                    CopyAnalysisCalledAnnoSegFilter: June 2026                    **
+**************************************************************************************
+Filters the xxx.called.anno.seg files from the TNRunner CopyAnalysis workflow. Only
+thresholds set below will be used in filtering. For bed output, run the USeq
+AnnotateBedWithGenes to annotate the input seg files first if you want to include
+intersecting genes info.
+
+Options:
+-s Directory containing the xxx.called.anno.seg files.
+-r Directory to save the filtered files.
+-m Minimum abs TN Log2Rto, only checked if a paired normal was used in the analysis.
+-n Maximum abs N Log2Rto, ditto.
+-t Minimum abs T Log2Rto.
+-c Check that GATK issued a + or - call.
+-g Minimum abs GATK geometric mean T Log Rto.
+-b Output bed formal.
+
+Example: java -Xmx4G -jar pathTo/USeq/Apps/CopyAnalysisCalledAnnoSegFilter -s Segs/ 
+     -r PassingSegs/ -c -g 0.1 -n 0.5 -m 0.1 -t 0.1 
 
 ************************************************************************************
 </pre><br><p>
@@ -1831,6 +1862,25 @@ Advanced Options:
 Example: java -Xmx4G -jar pathTo/USeq/Apps/MultipleReplicaScanSeqs -t
       /Data/PolIIRep1/,/Data/PolIIRep2/ -c /Data/Input1/,Data/Input2/ -s
       /Data/PolIIResults/ -p 150 -w 250 -b 
+
+**************************************************************************************
+</pre><br><p>
+				
+					<a name="CopyNumberRiskScoreCalculator"><pre>**************************************************************************************
+**                      Copy Number Risk Score Calculator: April 2026               **
+**************************************************************************************
+Merges bed files from the GATK-USeq workflow called with different window sizes. See
+https://github.com/HuntsmanCancerInstitute/Workflows/tree/master/Hg38RunnerWorkflows2
+/CopyAnalysis and calculates the prostate cancer 11 gene risk score using the
+hazard ratios from Huang et.al. 2022 MDPI Cancers.
+
+Options:
+-b Directory containing the xxx.called.seg.pass.bed.gz files. The file name will be
+     split on '_' to define the dataset name (e.g.
+     126006-01-001_25KB_Hg38.called.seg.pass.bed .gz/.zip OK). Datasets with the same
+     name are merged.
+
+Example: java -jar pathTo/USeq/Apps/CopyNumberRiskScoreCalculator -b PassingBeds/  
 
 **************************************************************************************
 </pre><br><p>
@@ -3033,13 +3083,13 @@ Example: java -jar -Xmx2G pathToUSeq/Apps/HaplotypeVCFParser -d 20 -a 0.05 -g 30
 </pre><br><p>
 				
 					<a name="KeggGenePathwayAnalyzer"><pre>**************************************************************************************
-**                       Kegg Gene Pathway Analyzer : Feb 2026                      **
+**                      Kegg Gene Pathway Analyzer : July 2026                      **
 **************************************************************************************
 KGPA uses your interrogated gene list to 1) filter your select gene list and the KEGG
 Network gene sets then 2) intersects these lists, 3) calculates hypergeometric 
 p-values, 4) controls for multiple testing (Benjamini-Hochberg FDR method), and
 5) outputs two Excel spreadsheets focused on each tested KEGG Network (sub pathways)
-and KEGG Pathway. Use the URL links in the spreadsheets to interactively explort the
+and KEGG Pathway. Use the URL links in the spreadsheets to interactively explore the
 results in the KEGG Pathway Viewer (https://www.kegg.jp).
 
 Related Apps:
@@ -3217,6 +3267,7 @@ Optional Parameters:
 -x Maximum FDR for including networks into the combine Kegg Pathway
      spreadsheet, defaults to 0.15
 -p Replace networks with composite pathways.
+-s Don't print pvalue or fdr statistics.
 
 Example:
 
@@ -4420,7 +4471,7 @@ Example: java -Xmx12G -jar pathTo/USeq/Apps/ParsePointDataContexts -c '..CG.' -s
 </pre><br><p>
 				
 					<a name="PMRSearch"><pre>**************************************************************************************
-**                       Patient Molecular Repo Search : Oct 2025                   **
+**                       Patient Molecular Repo Search : Aug 2026                   **
 **************************************************************************************
 Interactive searching of the clinical and sample attribute information in the json/xml
 reports in the HCI PMR /ClinicalReport/ folders to identify datasets for analysis.
@@ -4463,7 +4514,7 @@ Example: java -jar pathToUSeq/Apps/PMRSearch -d ~/PMRFiles/ -x 365 -i
 </pre><br><p>
 				
 					<a name="PMRSearchGQueryJoiner"><pre>**************************************************************************************
-**                         PMRSearch GQuery Joiner : Nov 2025                       **
+**                         PMRSearch GQuery Joiner : Sept 2026                      **
 **************************************************************************************
 Merges results from the PMRSearch and GQuery tools into a summary spreadsheet.
 
@@ -4475,6 +4526,7 @@ Required Options:
 -r  (Optional) Directory containing the currentRegistry_xxx_PHI.txt file for pulling
        patient info.
 -x  (Optional) File containing PMR IDs to skip, e.g. prior runs of this tool.
+-a  (Optional) File containing pDot annotations, one per line, two columns: pDot Anno
 
 Example: java -jar pathToUSeq/Apps/PMRSearchGQueryJoiner -p PmrSearchResults -o 
    JointResults -g gqueryKrasResults.json -r ~/PHI/Registry/ -x priorPmrs.txt
@@ -5701,7 +5753,7 @@ Example: java -jar pathToUSeq/Apps/TempusDataWrangler -b s3://tm-huntsman/
 </pre><br><p>
 				
 					<a name="TempusDataWranglerV3"><pre>**************************************************************************************
-**                        Tempus Data Wrangler V3 : June 24, 2025                   **
+**                         Tempus Data Wrangler V3 : July 2026                      **
 **************************************************************************************
 The Tempus Data Wrangler downloads complete patient datasets from an AWS bucket, parses
 the json test files for patient info, fetches/makes coreIds using the SubjectMatchMaker
@@ -5770,8 +5822,27 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/TempusJson2Vcf -j /F1/TempusJsons
 **************************************************************************************
 </pre><br><p>
 				
+					<a name="TempusPathoPrinter"><pre>**************************************************************************************
+**                           Tempus Patho Printer : July 2026                       **
+**************************************************************************************
+TPP parses v3.3 Tempus reports and the ICD references therein and saves a shorteded
+deidentified json file for OncoTree LLM tumor classification.
+
+Options:
+-j Directory containing Tempus v3.3+ json reports.
+-s Directory to save the results.
+-i File containing ICD-10 diagnosis codes and their descriptors. Tab delimited.
+-m File containing ICD-O morphology codes. Ditto.
+-t File containing ICD-O topology codes. Ditto.
+-r Replace test IDs with random strings and generate a key file.
+
+Example: java -jar pathToUSeq/Apps/TempusPathoPrinter -j Reports -s Parsed -r -i
+    ~/ICD/ICD-10_Diagnosis.txt -m ~/ICD/ICD_Morphology.txt -t ~/ICD/ICD_Topology.txt
+**************************************************************************************
+</pre><br><p>
+				
 					<a name="TempusV3Json2Vcf"><pre>**************************************************************************************
-**                            Tempus V3 Json 2 Vcf: May 2025                        **
+**                            Tempus V3 Json 2 Vcf: May 2026                        **
 **************************************************************************************
 This app groups json v3+ Tempus reports by patient and tumor. It then merges the 
 variant, IHC, MMR, RNA results and generates a combine vcf with both germline and 
@@ -5801,7 +5872,7 @@ Example: java -Xmx2G -jar pathToUSeq/Apps/TempusV3Json2Vcf -j /F1/TempusJsonsVcf
 </pre><br><p>
 				
 					<a name="TempusVcfComparator"><pre>**************************************************************************************
-**                           Tempus Vcf Comparator: April 2025                      **
+**                           Tempus Vcf Comparator: July 2026                       **
 **************************************************************************************
 TVC compares a Tempus vcf generated with the TempusJson2Vcf to a recalled vcf.
 Exact recall vars are so noted and removed. Tempus vcf with no exact but one
@@ -5932,7 +6003,7 @@ Example: java -Xmx4G -jar pathTo/USeq/Apps/Telescriptor -u hg19EnsTrans.ucsc -t 
 </pre><br><p>
 				
 					<a name="TNRunner2"><pre>**************************************************************************************
-**                                 TNRunner2 : Dec 2025                             **
+**                                 TNRunner2 : May 2026                             **
 **************************************************************************************
 TNRunner2 is designed to execute several containerized workflows on tumor normal
 datasets via a slurm cluster.  Based on the availability of paired fastq datasets, 
@@ -5977,6 +6048,7 @@ Setup Options:
 -m Workflow docs for launching MSI status calling.
 -a Workflow docs for launching variant annotation.
 -o If -a provide an OncoKB configuration file, see the annotator.README.sh
+-O Workflow docs for OncoTree Tempus tumor classification
 -I Workflow docs for launching SpliceAI variant annotations.
 -b Workflow docs for launching sample concordance.
 -y Workflow docs for launching somatic copy analysis.
@@ -6920,7 +6992,7 @@ Example: java -Xmx9G -jar pathTo/USeq/Apps/VCFSelector -b GBMTargets.bed.gz -p 1
 </pre><br><p>
 				
 					<a name="VCFSpliceScanner"><pre>**************************************************************************************
-**                            VCF Splice Scanner : Dec 2025                         **
+**                            VCF Splice Scanner : April 2026                       **
 **************************************************************************************
 Scores variants for changes in splicing using the MaxEntScan algorithms. See Yeo and
 Burge 2004, http://www.ncbi.nlm.nih.gov/pubmed/15285897 for details. Known splice
@@ -6952,6 +7024,7 @@ Optional options:
 -c Maximum damaged splice junction score, defaults to 3.
 -d Minimum damaged score difference, refseq - new, defaults to 1.
 -s Format vcf with minimal output for downstream annotators, e.g. snpEff.
+-t Number of threads to use, defaults to all available.
 
 Example: java -Xmx20G -jar ~/USeq/Apps/VCFSpliceAnnotator -f ~/Hg19/Fa/ -v ~/exm2.vcf
        -m ~/USeq/Documentation/splicemodels -i -u ~/Hg19/hg19EnsTrans.ucsc.zip -r

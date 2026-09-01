@@ -28,19 +28,19 @@ public class CombinePathwayRoot {
 	private AnalyzedNetwork[] variantAnalyzedNetworks = null;
 	private HashMap<String, CombinePathway> pathwayIdCombinePathway = null;
 	private String geneSetName = "";
-	
+
 	/**Constructor, either may be null, both might be gene networks.*/
 	public CombinePathwayRoot(AnalyzedNetwork[] geneAnalyzedNetworks, AnalyzedNetwork[] variantAnalyzedNetworks, String geneSetName) {
 		this.geneAnalyzedNetworks = geneAnalyzedNetworks;
 		this.variantAnalyzedNetworks = variantAnalyzedNetworks;
 		this.geneSetName = geneSetName;
 	};
-	
-	
+
+
 	//methods
 	public void makeCombinePathways(double maximumFdr) {
 		pathwayIdCombinePathway = new HashMap<String, CombinePathway>();
-		
+
 		//merge all the AnalyzedNetworks
 		ArrayList<AnalyzedNetwork> all = new ArrayList<AnalyzedNetwork>();
 		if (geneAnalyzedNetworks!=null) for (AnalyzedNetwork an: geneAnalyzedNetworks) all.add(an);		
@@ -48,13 +48,13 @@ public class CombinePathwayRoot {
 
 		//for each Analyzed Network
 		for (AnalyzedNetwork an: all) {
-			
+
 			// does it pass the FDR?
 			if (an.getFdr()<= maximumFdr) {
-				
+
 				//for each kegg api network in the an
 				for (KeggApiNetwork kan: an.getAnalizedKeggApiNetworks()){
-					
+
 					//any associated pathways?
 					if (kan.getPathways() != null) {
 						//for each kegg pathway, add the Analyzed Network
@@ -65,13 +65,13 @@ public class CombinePathwayRoot {
 								pathwayIdCombinePathway.put(kap.getId(), cp);
 							}
 							//must watch for duplicates since networks can be found in multiple pathways
-//Modifying to handle multiple data sets hitting the same network							
+							//Modifying to handle multiple data sets hitting the same network							
 							//String networkIds = an.getAnalizedNetworkIds();
-String dataSetNameNetId = an.getDataSetName()+"-"+an.getAnalizedNetworkIds();
-							
+							String dataSetNameNetId = an.getDataSetName()+"-"+an.getAnalizedNetworkIds();
+
 							//down to just a single Analyzed Network, must be either a gene hit or a variant hit
 							//cp.getNetworkIdsAnalyzedNetworks().put(networkIds, an);
-cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
+							cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 						}
 					}
 				}
@@ -79,9 +79,9 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 		}
 		calculateCombinePValues();
 	}
-	
+
 	public void calculateCombinePValues() {
-		
+
 		//calc combine pvalues for pathways with more than one analysis
 		ArrayList<Float> combinePValues = new ArrayList<Float>();
 		CombinePValues combPVal = new CombinePValues();
@@ -92,12 +92,12 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 				int i = 0;
 				for (AnalyzedNetwork an: cp.getNetworkIdsAnalyzedNetworks().values()) toCombine[i++] = an.getPValue();
 				double cPVal = combPVal.calculateCombinePValues(toCombine);
-	
+
 				cp.setCombinePValue(cPVal);
 				combinePValues.add(Num.minus10log10Float(cPVal));
 			}
 		}
-		
+
 		//adjust pvalues
 		float[] f = Num.benjaminiHochbergCorrectUnsorted(Num.arrayListOfFloatToArray(combinePValues));
 		double[] fdrs = Num.antiNeg10log10(f);
@@ -107,19 +107,19 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 		}
 
 	}
-	
+
 	public void saveGenePathways(double maximumFdr, HashMap<String, ArrayList<String>> gs2ki, File resultsDirectory, int minimumNumberGenes) throws IOException {
 		//the idea here is to find all of the significant networks with the same pathway
 		//	then for each pathway decorate it with all of the network genes colored, and highlight the networks
 		//	really only useful when multiple diff networks hit the same pathway
 		//		output pathway view xls file or json for web apps
-		
+
 		//for each pathway, create a results obj to sort by pvalue
 		StringValueSort[] results = new StringValueSort[pathwayIdCombinePathway.size()];
 		int counter = 0;
 		for (String pathwayId: pathwayIdCombinePathway.keySet()) {
 			CombinePathway cp = pathwayIdCombinePathway.get(pathwayId);
-			
+
 			StringBuilder xls = new StringBuilder();
 			xls.append("PATHWAY\t");
 			xls.append(pathwayId); 
@@ -149,27 +149,29 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 					networkIds.add(net.getNetworkId());
 					xls.append("\t"); xls.append(net.getNetworkIdName("\t")); xls.append("\n");
 				}
-				xls.append("\t\tAdjPval\t"); xls.append(Num.formatNumber(an.getFdr(),3)); xls.append("\n");
+				xls.append("\t\tAdjPVal\t"); xls.append(Num.formatNumber(an.getFdr(),3)); xls.append("\n");
 				xls.append("\t\tGenes\t"); xls.append(an.getSharedGeneSymbols()); xls.append("\n");
 			}
-			
+
 			SelectGene[] sg = new SelectGene[allGenes.size()];
 			int i = 0;
 			for (SelectGene g: allGenes.values()) sg[i++] = g;
-			xls.append("AllGenes\t"); xls.append(Misc.stringSetToString(allGenes.keySet(), ", ")); xls.append("\n");
-			
+			xls.append("AllGenes\t"); xls.append(Misc.stringSetToString(allGenes.keySet(), " ")); xls.append("\n");
+
 			//networks
 			String[] networkIdsStringArray = Misc.hashSetToStringArray(networkIds);
 			//"skyblue" for negColor, "pink" for posColor and zeroColor
 			String url = AnalyzedNetwork.fetchKeggPathwayMapLink(pathwayId, networkIdsStringArray, sg, gs2ki,AnalyzedNetwork.geneNegColor,AnalyzedNetwork.genePosColor,AnalyzedNetwork.genePosColor);
 			xls.append("KeggLink\t"); xls.append(url); xls.append("\n");
+			/*
 			if (url.length()<250) {
 				xls.append("ExcelLink\t=HYPERLINK(\"");
 				xls.append(url);		
 				xls.append("\",\""+url);	
 				xls.append("\")\n");
 			}
-			else xls.append("ExcelLink\tToo big\n");
+			else xls.append("ExcelLink\tToo big\n");*/
+			
 			double pathwayPValue = minPVal;
 			double pathwayFdr = fdr;
 			if (cp.getCombinePValue()!=-1) {
@@ -177,22 +179,25 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 				pathwayFdr = cp.getCombineFdr();
 			}
 			xls.append("PathwayPValue\t"); xls.append(pathwayPValue);
-			xls.append("\nPathwayFDR\t"); xls.append(pathwayFdr);
+			xls.append("\nPathwayAdjPVal\t"); xls.append(pathwayFdr);
 			xls.append("\n\n");
-			
+
 			results[counter++] = new StringValueSort(xls, minPVal);
 		}
-		
+
 		Arrays.sort(results);
 		PrintWriter out = new PrintWriter( new FileWriter(new File(resultsDirectory, "gene"+geneSetName+"PathwaysMinGen"+minimumNumberGenes+"MaxFdr"+maximumFdr+".xls")));
+		//File f = new File (resultsDirectory, resultsDirectory.getName()+"_gene"+geneSetName+"PathwaysMinGen"+minimumNumberGenes+"MaxFdr"+maximumFdr+".xls");
+		//PrintWriter out = new PrintWriter( new FileWriter( f ));
+
 		//name descLink pval, adjPval, #UniqueNetworkGenes, #FoundUniqueNetworkGenes, #DiffExpGenes, #GenesIntersect, GenesIntersect/PathGenes, IntersectingGenes
 		out.println("#Composite view of significant networks in KEGG pathways from the gene set analysis\n");
 		out.println(fetchColorKey(true, false)+"\n");
 		for (StringValueSort s: results) out.print(s.getCargo().toString());
 		out.close();
-		
+
 	}
-	
+
 	public static String fetchColorKey(boolean includeGenes, boolean includeVariants) {
 		StringBuilder sb = new StringBuilder("Kegg Link Gene Color Key:\n");
 		if (includeGenes) {
@@ -213,10 +218,10 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 		//for each pathway, create a results obj to sort by pvalue
 		StringValueSort[] results = new StringValueSort[pathwayIdCombinePathway.size()];
 		int counter = 0;
-		
+
 		for (String pathwayId: pathwayIdCombinePathway.keySet()) {
 			CombinePathway cp = pathwayIdCombinePathway.get(pathwayId);
-			
+
 			StringBuilder xls = new StringBuilder();
 			xls.append("PATHWAY\t");
 			xls.append(pathwayId); 
@@ -235,7 +240,7 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 			xls.append("Networks\n");
 			double minPVal = Double.MAX_VALUE;
 			double fdr = Double.MAX_VALUE;
-			
+
 			// for each AN
 			for (AnalyzedNetwork an : cp.getNetworkIdsAnalyzedNetworks().values()) {
 				// check if this is a variant AN 
@@ -250,29 +255,30 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 					networkIds.add(net.getNetworkId());
 					xls.append("\t"); xls.append(net.getNetworkIdName("\t")); xls.append("\n");
 				}
-				xls.append("\t\tAdjPval\t"); xls.append(Num.formatNumber(an.getFdr(),3)); xls.append("\n");
+				xls.append("\t\tAdjPVal\t"); xls.append(Num.formatNumber(an.getFdr(),3)); xls.append("\n");
 				xls.append("\t\tLog2Rto\t"); xls.append(Num.formatNumber(an.getVariantLog2Rto(),3)); xls.append("\n");
-				xls.append("\t\tGenes\t"); xls.append(Misc.stringSetToString(an.getVarinatGeneNameHits(), ", ")); xls.append("\n");
+				xls.append("\t\tGenes\t"); xls.append(Misc.stringSetToString(an.getVarinatGeneNameHits(), " ")); xls.append("\n");
 			}
-			
+
 			// pathway info
 			SelectGene[] sg = new SelectGene[allGenes.size()];
 			int i = 0;
 			for (SelectGene g: allGenes.values()) sg[i++] = g;
-			xls.append("AllGenes\t"); xls.append(Misc.stringSetToString(allGenes.keySet(), ", ")); xls.append("\n");
+			xls.append("AllGenes\t"); xls.append(Misc.stringSetToString(allGenes.keySet(), " ")); xls.append("\n");
 
 			//pathway link
 			String[] networkIdsStringArray = Misc.hashSetToStringArray(networkIds);
 			String url = AnalyzedNetwork.fetchKeggPathwayMapLink(pathwayId, networkIdsStringArray, sg, gs2ki, AnalyzedNetwork.variantNegColor, AnalyzedNetwork.variantPosColor,AnalyzedNetwork.variantZeroColor);
 			xls.append("KeggLink\t"); xls.append(url); xls.append("\n");
-			if (url.length()<250) {
+			
+			/*if (url.length()<250) {
 				xls.append("ExcelLink\t=HYPERLINK(\"");
 				xls.append(url);		
 				xls.append("\",\""+url);	
 				xls.append("\")\n");
 			}
-			else xls.append("ExcelLink\tToo big\n");
-			
+			else xls.append("ExcelLink\tToo big\n");*/
+
 			double pathwayPValue = minPVal;
 			double pathwayFdr = fdr;
 			if (cp.getCombinePValue()!=-1) {
@@ -280,12 +286,12 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 				pathwayFdr = cp.getCombineFdr();
 			}
 			xls.append("PathwayPValue\t"); xls.append(pathwayPValue);
-			xls.append("\nPathwayFDR\t"); xls.append(pathwayFdr);
+			xls.append("\nPathwayAdjPVal\t"); xls.append(pathwayFdr);
 			xls.append("\n\n");
-			
+
 			results[counter++] = new StringValueSort(xls, minPVal);
 		}
-		
+
 		Arrays.sort(results);
 		PrintWriter out = new PrintWriter( new FileWriter(new File(resultsDirectory, "variantPathwaysMinGen"+minimumNumberGenes+"MaxFdr"+maximumFdr+".xls")));
 		out.println("#Composite view of significant networks in KEGG pathways from the variant set analysis\n");
@@ -298,10 +304,10 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 		//for each pathway, create a results obj to sort by pvalue
 		StringValueSort[] results = new StringValueSort[pathwayIdCombinePathway.size()];
 		int counter = 0;
-		
+
 		for (String pathwayId: pathwayIdCombinePathway.keySet()) {
 			CombinePathway cp = pathwayIdCombinePathway.get(pathwayId);
-			
+
 			StringBuilder xls = new StringBuilder();
 			xls.append("PATHWAY\t");
 			xls.append(pathwayId); 
@@ -313,7 +319,7 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 			xls.append("\",\"https://www.kegg.jp/entry/");
 			xls.append(pathwayId);	
 			xls.append("\")\n"); 
-			
+
 			//fetch all of the genes and networks
 			TreeMap<String, SelectGene> allGenesGenes = new TreeMap<String,SelectGene>();
 			TreeMap<String, SelectGene> allGenesVariants = new TreeMap<String,SelectGene>();
@@ -321,18 +327,18 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 			xls.append("Networks\n");
 			double minPVal = Double.MAX_VALUE;
 			double fdr = Double.MAX_VALUE;
-			
+
 			// for each AN
 			for (AnalyzedNetwork an : cp.getNetworkIdsAnalyzedNetworks().values()) {
-				
+
 				String type = "Diff Exp";
 				if (an.isGeneAnalyzedNetwork()==false) type = "Diff Mut";
-				
+
 				if (an.getPValue()< minPVal) {
 					minPVal = an.getPValue();
 					fdr = an.getFdr();
 				}
-				
+
 				for (KeggApiNetwork net: an.getAnalizedKeggApiNetworks()) {
 					networkIds.add(net.getNetworkId());
 					xls.append("\t"); 
@@ -340,24 +346,24 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 					xls.append("\t");
 					xls.append(net.getNetworkIdName("\t")); xls.append("\n");
 				}
-				
+
 				// check if this is a variant AN 
 				if (an.isGeneAnalyzedNetwork() == true) {
 					//gene
 					for (SelectGene sg: an.getGeneSharedGenes()) allGenesGenes.put(sg.getGeneSymbol(), sg);
-					xls.append("\t\tAdjPval\t"); xls.append(Num.formatNumber(an.getFdr(),3)); xls.append("\n");
+					xls.append("\t\tAdjPVal\t"); xls.append(Num.formatNumber(an.getFdr(),3)); xls.append("\n");
 					xls.append("\t\tGenes\t"); xls.append(an.getSharedGeneSymbols()); xls.append("\n");
-					
+
 				}
 				else {
 					//variant
 					for (SelectGene sg: an.fetchVariantGenes()) allGenesVariants.put(sg.getGeneSymbol(), sg);
-					xls.append("\t\tAdjPval\t"); xls.append(Num.formatNumber(an.getFdr(),3)); xls.append("\n");
+					xls.append("\t\tAdjPVal\t"); xls.append(Num.formatNumber(an.getFdr(),3)); xls.append("\n");
 					xls.append("\t\tLog2Rto\t"); xls.append(Num.formatNumber(an.getVariantLog2Rto(),3)); xls.append("\n");
-					xls.append("\t\tGenes\t"); xls.append(Misc.stringSetToString(an.getVarinatGeneNameHits(), ", ")); xls.append("\n");
+					xls.append("\t\tGenes\t"); xls.append(Misc.stringSetToString(an.getVarinatGeneNameHits(), " ")); xls.append("\n");
 				}
 			}
-			
+
 			// pathway info
 			TreeSet<String> allGenes = new TreeSet<String>();
 			SelectGene[] sgG = new SelectGene[allGenesGenes.size()];
@@ -368,12 +374,13 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 			i = 0;
 			for (SelectGene g: allGenesVariants.values()) sgV[i++] = g;
 			allGenes.addAll(allGenesVariants.keySet());
-			xls.append("AllGenes\t"); xls.append(Misc.stringSetToString(allGenes, ", ")); xls.append("\n");
+			xls.append("AllGenes\t"); xls.append(Misc.stringSetToString(allGenes, " ")); xls.append("\n");
 
 			//pathway link
 			String[] networkIdsStringArray = Misc.hashSetToStringArray(networkIds);
 			String url = AnalyzedNetwork.fetchCombineKeggPathwayMapLink(pathwayId, networkIdsStringArray, sgG, sgV, gs2ki);
 			xls.append("KeggLink\t"); xls.append(url); xls.append("\n");
+			/*
 			if (url.length()<250) {
 				xls.append("ExcelLink:\t=HYPERLINK(\"");
 				xls.append(url);		
@@ -381,7 +388,8 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 				xls.append("\")\n");
 			}
 			else xls.append("ExcelLink\tToo big\n");
-			
+			*/
+
 			double pathwayPValue = minPVal;
 			double pathwayFdr = fdr;
 			if (cp.getCombinePValue()!=-1) {
@@ -389,12 +397,12 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 				pathwayFdr = cp.getCombineFdr();
 			}
 			xls.append("PathwayPValue\t"); xls.append(pathwayPValue);
-			xls.append("\nPathwayFDR\t"); xls.append(pathwayFdr);
+			xls.append("\nPathwayAdjPVal\t"); xls.append(pathwayFdr);
 			xls.append("\n\n");
-			
+
 			results[counter++] = new StringValueSort(xls, minPVal);
 		}
-		
+
 		Arrays.sort(results);
 		PrintWriter out = new PrintWriter( new FileWriter(new File(resultsDirectory, "combineGeneVariantPathwaysMinGen"+minimumNumberGenes+"MaxFdr"+maximumFdr+".xls")));
 		out.println("#Composite view of significant networks in KEGG pathways from the variant and gene set analysis\n");
@@ -402,15 +410,15 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 		for (StringValueSort s: results) out.print(s.getCargo().toString());
 		out.close();
 	}
-	
-	public void saveTwoGeneSetPathways(double maximumFdr, HashMap<String, ArrayList<String>> gs2ki, File resultsDirectory, int minimumNumberGenes) throws IOException {
+
+	public void saveTwoGeneSetPathways(double maximumFdr, HashMap<String, ArrayList<String>> gs2ki, File resultsDirectory, int minimumNumberGenes, boolean printPValues) throws IOException {
 		//for each pathway, create a results obj to sort by pvalue
 		StringValueSort[] results = new StringValueSort[pathwayIdCombinePathway.size()];
 		int counter = 0;
-		
+
 		for (String pathwayId: pathwayIdCombinePathway.keySet()) {
 			CombinePathway cp = pathwayIdCombinePathway.get(pathwayId);
-			
+
 			StringBuilder xls = new StringBuilder();
 			xls.append("PATHWAY\t");
 			xls.append(pathwayId); 
@@ -422,7 +430,7 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 			xls.append("\",\"https://www.kegg.jp/entry/");
 			xls.append(pathwayId);	
 			xls.append("\")\n"); 
-			
+
 			//fetch all of the genes and networks
 			TreeMap<String, SelectGene> allGenesGenes = new TreeMap<String,SelectGene>();
 			TreeMap<String, SelectGene> allGenesVariants = new TreeMap<String,SelectGene>();
@@ -433,14 +441,14 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 
 			// for each AN
 			for (AnalyzedNetwork an : cp.getNetworkIdsAnalyzedNetworks().values()) {
-				
+
 				String type = "Gene Set "+an.getGeneSetName();
-				
+
 				if (an.getPValue()< minPVal) {
 					minPVal = an.getPValue();
 					fdr = an.getFdr();
 				}
-				
+
 				for (KeggApiNetwork net: an.getAnalizedKeggApiNetworks()) {
 					networkIds.add(net.getNetworkId());
 					xls.append("\t"); 
@@ -448,15 +456,19 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 					xls.append("\t");
 					xls.append(net.getNetworkIdName("\t")); xls.append("\n");
 				}
-	
+
 				if (an.getGeneSetName().equals("A")){
 					for (SelectGene sg: an.getGeneSharedGenes()) allGenesGenes.put(sg.getGeneSymbol(), sg);
 				}
 				else for (SelectGene sg: an.getGeneSharedGenes()) allGenesVariants.put(sg.getGeneSymbol(), sg);
-				xls.append("\t\tAdjPval\t"); xls.append(Num.formatNumber(an.getFdr(),3)); xls.append("\n");
+				if (printPValues) {
+					xls.append("\t\tAdjPVal\t"); 
+					xls.append(Num.formatNumber(an.getFdr(),3)); 
+					xls.append("\n");
+				}
 				xls.append("\t\tGenes\t"); xls.append(an.getSharedGeneSymbols()); xls.append("\n");
 			}
-			
+
 			// pathway info
 			TreeSet<String> allGenes = new TreeSet<String>();
 			SelectGene[] sgG = new SelectGene[allGenesGenes.size()];
@@ -467,12 +479,14 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 			i = 0;
 			for (SelectGene g: allGenesVariants.values()) sgV[i++] = g;
 			allGenes.addAll(allGenesVariants.keySet());
-			xls.append("AllGenes\t"); xls.append(Misc.stringSetToString(allGenes, ", ")); xls.append("\n");
+			xls.append("AllGenes\t"); xls.append(Misc.stringSetToString(allGenes, " ")); xls.append("\n");
 
 			//pathway link
 			String[] networkIdsStringArray = Misc.hashSetToStringArray(networkIds);
 			String url = AnalyzedNetwork.fetchCombineKeggPathwayMapLink(pathwayId, networkIdsStringArray, sgG, sgV, gs2ki);
 			xls.append("KeggLink\t"); xls.append(url); xls.append("\n");
+			
+			/*
 			if (url.length()<250) {
 				xls.append("ExcelLink:\t=HYPERLINK(\"");
 				xls.append(url);		
@@ -480,20 +494,24 @@ cp.getNetworkIdsAnalyzedNetworks().put(dataSetNameNetId, an);
 				xls.append("\")\n");
 			}
 			else xls.append("ExcelLink\tToo big\n");
-			
-			double pathwayPValue = minPVal;
-			double pathwayFdr = fdr;
-			if (cp.getCombinePValue()!=-1) {
-				pathwayPValue = cp.getCombinePValue();
-				pathwayFdr = cp.getCombineFdr();
+			*/
+
+			if (printPValues) {
+				double pathwayPValue = minPVal;
+				double pathwayFdr = fdr;
+				if (cp.getCombinePValue()!=-1) {
+					pathwayPValue = cp.getCombinePValue();
+					pathwayFdr = cp.getCombineFdr();
+				}
+				xls.append("PathwayPValue\t"); xls.append(pathwayPValue);
+				xls.append("\nPathwayAdjPVal\t"); xls.append(pathwayFdr);
+				xls.append("\n\n");
 			}
-			xls.append("PathwayPValue\t"); xls.append(pathwayPValue);
-			xls.append("\nPathwayFDR\t"); xls.append(pathwayFdr);
-			xls.append("\n\n");
-			
+			else xls.append("\n");
+
 			results[counter++] = new StringValueSort(xls, minPVal);
 		}
-		
+
 		Arrays.sort(results);
 		PrintWriter out = new PrintWriter( new FileWriter(new File(resultsDirectory, "combineTwoGeneSetPathwaysMinGen"+minimumNumberGenes+"MaxFdr"+maximumFdr+".xls")));
 		out.println("#Composite view of significant networks in KEGG pathways from the variant and gene set analysis\n");
