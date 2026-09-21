@@ -5,6 +5,8 @@ import java.io.File;
 import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+
+import edu.utah.hci.misc.Util;
 import util.gen.Gzipper;
 import util.gen.IO;
 import util.gen.Misc;
@@ -27,7 +29,10 @@ public class UltimaGenomicsVCFParser {
 	private static String dpInfo = "##INFO=<ID=T_DP,Number=1,Type=Integer,Description=\"Read depth for tumor\">";
 	private static String nafInfo = "##INFO=<ID=N_AF,Number=1,Type=Float,Description=\"Allele Frequency for normal\">";
 	private static String ndpInfo = "##INFO=<ID=N_DP,Number=1,Type=Integer,Description=\"Read depth for normal\">";
-	private static String format = "GT:AD:BG_AD:BG_DP:BG_SB:BG_VAF:DP:GQ:SB:VAF:PL";
+	private static String formatOri = "GT:AD:BG_AD:BG_DP:BG_SB:BG_VAF:DP:GQ:SB:VAF:PL";
+	private static String formatSecond = "GT:DP:VAF:BG_VAF:AD:BG_AD:GQ:BG_DP:BG_SB:SB:PL";
+	private static String formatThird = "GT:VAF:SB:BG_DP:GQ:BG_VAF:DP:BG_SB:BG_AD:AD:PL";
+	
 
 	public UltimaGenomicsVCFParser (String[] args) {
 
@@ -139,24 +144,32 @@ public class UltimaGenomicsVCFParser {
 		} 
 	}
 
-
+	private int[] parseTheDamFormat(String format) {
+		int adIndex = -1;
+		int bgAdIndex = -1;
+		String[] split = Util.COLON.split(format);
+		for (int i=0; i< split.length; i++) {
+			if (split[i].equals("AD")) adIndex = i;
+			else if (split[i].equals("BG_AD")) bgAdIndex = i;
+		}
+		// it's ok if these are -1;
+		return new int[] {adIndex,bgAdIndex};  
+	}
 
 	private double[] parseCounts(String formatLine, String values ) throws IOException {
 		
-		// check format
-		if (formatLine.equals(format) == false) throw new IOException("ERROR: the format "+formatLine +" doesn't match "+format);
+		//AD and then BG_AD, ridiculous this changes with each vcf record in the same file!!!!
+		int[] ads = parseTheDamFormat(formatLine);		
 
-		// GT:AD:BG_AD:BG_DP:BG_SB:BG_VAF:DP:GQ:SB:VAF:PL
-		//  0  1   2     3     4     5     6  7  8  9  10
 		String[] t = Misc.COLON.split(values);
 		
-		String[] tumorRefAlt = Misc.COMMA.split(t[1]);
+		String[] tumorRefAlt = Misc.COMMA.split(t[ads[0]]);
 		double tR = Double.parseDouble(tumorRefAlt[0]);
 		double tA = 0;
 		//first is ref, alts follow
 		for (int i=1; i< tumorRefAlt.length; i++) tA+= Double.parseDouble(tumorRefAlt[i]);
 		
-		String[] normalRefAlt = Misc.COMMA.split(t[2]);
+		String[] normalRefAlt = Misc.COMMA.split(t[ads[1]]);
 		double nR = Double.parseDouble(normalRefAlt[0]);
 		double nA = 0;
 		for (int i=1; i< normalRefAlt.length; i++) nA+= Double.parseDouble(normalRefAlt[i]);
@@ -228,7 +241,7 @@ public class UltimaGenomicsVCFParser {
 	public static void printDocs(){
 		IO.pl("\n" +
 				"**************************************************************************************\n" +
-				"**                           Ultima Genomics VCF Parser: Jan 2026                   **\n" +
+				"**                           Ultima Genomics VCF Parser: Sept 2026                  **\n" +
 				"**************************************************************************************\n" +
 				"Parses Ultima Genomics somatic VCF files, filtering for read depth and allele\n"+
 				"frequency. Inserts T_AF, T_DP, N_AF, N_DP into the INFO field for integrated parsing\n"+

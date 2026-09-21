@@ -62,7 +62,7 @@ public class TempusPathoPrinter {
 			//add test id
 			String rand = Misc.getRandomString(10);
 			keys.add(sum.getTempusOrder().getAccessionId()+"\t"+rand);
-			jo.put("test_order_id", rand);
+			jo.put("sample_id", rand);
 			for (TempusV3Specimen s : sum.getTempusSpecimens()) {
 				//is this a tumor sample
 				String sc = s.getSampleCategory().toLowerCase();
@@ -139,7 +139,7 @@ public class TempusPathoPrinter {
 				keys.add(testId+"\t"+rand);
 				testId = rand;
 			}
-			jo.put("test_order_id", testId);
+			jo.put("sample_id", testId);
 			boolean sampleFound = false;
 			
 			for (TempusV3Specimen s : sum.getTempusSpecimens()) {

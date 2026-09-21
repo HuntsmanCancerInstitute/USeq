@@ -88,7 +88,7 @@ public class PersonIDConverter {
 		}
 		else sb.append("\t\t\t");
 		
-		sb.append(l[genderIndex]);
+		if (l[genderIndex].equals("M") || l[genderIndex].equals("F"))sb.append(l[genderIndex]);
 		sb.append("\t");
 		
 		sb.append(l[mrnIndex]);
@@ -139,7 +139,10 @@ public class PersonIDConverter {
 						if (line.length() == 0) continue;
 						//split on ,
 						String[] f =  Misc.COMMA.split(line);
-						if (personIdDataLine.containsKey(f[avaIdIndex])) throw new IOException("Found a duplicate avatarId -> "+f[avaIdIndex]);
+						if (personIdDataLine.containsKey(f[avaIdIndex])) {
+							//throw new IOException("Found a duplicate avatarId -> "+f[avaIdIndex]);
+							IO.el("Found a duplicate avatarId and row, skipping -> "+line);
+						}
 						else personIdDataLine.put(f[avaIdIndex], f);
 					}
 				}
@@ -153,11 +156,11 @@ public class PersonIDConverter {
 	}
 
 	public static void main (String[] args) throws IOException {
-		File test = new File ("/Users/u0028003/HCI/AvatarORIEN/AutoAvatar/ResourceFiles/19Sept2022_PatientPHI.csv");
+		File test = new File ("/Users/u0028003/Downloads/TCC/personId.csv");
 		PersonIDConverter cml = new PersonIDConverter(test);
 		IO.pl(cml.getHeaderKeyIndex());
 		IO.pl(cml.getPersonIDDataLine());
-		cml.writeOutSubjectMatchMakerFile(new File("/Users/u0028003/HCI/AvatarORIEN/AutoAvatar/ResourceFiles/smm_PatientPHI.txt"));
+		cml.writeOutSubjectMatchMakerFile(new File("/Users/u0028003/Downloads/TCC/personIdSMM.txt"));
 	}
 
 	public boolean isParsed() {
