@@ -129,11 +129,14 @@ public class UltimaGenomicsVCFParser {
 				
 				//add id
 				tokens[2] = "UG_"+ numPass;
-				out.println(Misc.stringArrayToString(tokens, "\t"));
 				
 				//upper case ref and alt
 				tokens[3] = tokens[3].toUpperCase();
 				tokens[4] = tokens[4].toUpperCase();
+				
+				out.println(Misc.stringArrayToString(tokens, "\t"));
+				
+
 			}
 			in.close();
 			out.close();
@@ -245,7 +248,7 @@ public class UltimaGenomicsVCFParser {
 				"**************************************************************************************\n" +
 				"Parses Ultima Genomics somatic VCF files, filtering for read depth and allele\n"+
 				"frequency. Inserts T_AF, T_DP, N_AF, N_DP into the INFO field for integrated parsing\n"+
-				"with the AnnotatedVcfParser. Upper cases REF and ALT.\n"+
+				"with the AnnotatedVcfParser. Upper cases REF and ALT .\n"+
 
 				"\nRequired Options:\n"+
 				"  -v Path to a file or directory containing xxx.vcf(.gz/.zip OK) file(s)\n" +
